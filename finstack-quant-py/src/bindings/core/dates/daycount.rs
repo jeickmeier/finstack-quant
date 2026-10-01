@@ -219,6 +219,8 @@ impl PyDayCount {
     ///     Accrual end (exclusive); must not precede ``start``.
     /// ctx : DayCountContext | None
     ///     Full context object (calendar, frequency, coupon period, …).
+    ///     ``ACT_365L`` requires ``frequency`` and the enclosing contractual
+    ///     ``coupon_period``; partial accrual retains that coupon's denominator.
     ///     Mutually exclusive with the keywords below.
     /// frequency : Tenor | str | None
     ///     Coupon frequency for ``ACT_ACT_ISMA``/``ACT_365L`` (e.g. ``"6M"``).
@@ -235,7 +237,9 @@ impl PyDayCount {
     /// ValueError
     ///     If ``start > end``, both ``ctx`` and keywords are given, or the
     ///     convention needs context that was not supplied (ISMA without a
-    ///     frequency, Bus/252 without a calendar).
+    ///     frequency, ACT/365L without frequency/enclosing coupon dates,
+    ///     Bus/252 without a calendar), ACT/365L dates lie outside the coupon,
+    ///     or ICMA reference endpoints do not share an unadjusted nominal month grid.
     /// KeyError
     ///     If ``calendar`` names an unknown calendar.
     #[pyo3(
@@ -363,7 +367,9 @@ fn state_repr(name: &str, state: &DayCountContextState) -> String {
 ///
 /// - ``BUS_252`` requires a holiday calendar (``calendar_id``).
 /// - ``ACT_ACT_ISMA`` requires the coupon ``frequency`` and, for irregular
-///   or mid-coupon accruals, the reference ``coupon_period``.
+///   or mid-coupon accruals, the unadjusted regular reference ``coupon_period``.
+/// - ``ACT_365L`` requires ``frequency`` and the full enclosing contractual
+///   ``coupon_period``, including for partial accrual.
 /// - ``THIRTY_E_360_ISDA`` uses ``end_is_termination_date`` for its
 ///   end-of-February rule.
 ///
@@ -378,8 +384,10 @@ fn state_repr(name: &str, state: &DayCountContextState) -> String {
 /// bus_basis : int | None
 ///     Business-day divisor for ``BUS_252``; ``None`` selects 252.
 /// coupon_period : tuple[datetime.date | str, datetime.date | str] | None
-///     Reference coupon period ``(start, end)`` for ACT/ACT (ICMA);
-///     ``start`` must precede ``end``.
+///     Unadjusted regular reference coupon period for ACT/ACT (ICMA), or the enclosing
+///     contractual coupon for ACT/365L, as ``(start, end)``;
+///     ``start`` must precede ``end``. ICMA endpoints must share one nominal
+///     month grid; business-day-adjusted payment dates are not reference dates.
 /// end_is_termination_date : bool
 ///     Whether the accrual end is the instrument termination date.
 ///
@@ -462,7 +470,7 @@ impl PyDayCountContext {
         self.inner.bus_basis
     }
 
-    /// Optional reference coupon period as ``(start, end)`` dates.
+    /// Optional unadjusted ICMA reference or ACT/365L enclosing coupon as ``(start, end)`` dates.
     #[getter]
     fn coupon_period<'py>(
         &self,

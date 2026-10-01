@@ -197,16 +197,16 @@ pub struct PnlAttribution {
     ///
     /// In the standard total-return convention (the default carry path uses
     /// the internal total-return carry helper), this is
-    /// `(val_t1 − val_t0) + coupon_income_between(T0, T1)`. Cashflows received
+    /// `(val_t1 − val_t0) + economic_cash_between(T0, T1)`. Cashflows received
     /// during the period are added back so that
     /// `total_pnl == carry + factor_sum + residual` holds: the `carry` field
-    /// includes the coupon income, and reconciliation against the user's
-    /// observed val_t1 − val_t0 must subtract the coupon_income out of
+    /// includes income and principal receipts, and reconciliation against the user's
+    /// observed val_t1 − val_t0 must subtract the economic cash out of
     /// `total_pnl` to recover the pure mark-to-market move.
     ///
     /// **For a raw mark-to-market view that excludes intra-period cashflows,
     /// read [`Self::mark_to_market_pnl`].** That field, when present, is the
-    /// untouched `val_t1 − val_t0` and never absorbs coupon income.
+    /// untouched `val_t1 − val_t0` and never absorbs cash receipts.
     pub total_pnl: Money,
 
     /// Pure mark-to-market change: `val_t1 − val_t0` with **no** intra-period
@@ -214,7 +214,7 @@ pub struct PnlAttribution {
     ///
     /// Separates the raw user-input price change from
     /// the total-return view stamped on `total_pnl`. When the attribution path
-    /// added coupon_income to `total_pnl` (the standard total-return convention
+    /// added period economic cash to `total_pnl` (the standard total-return convention
     /// in parallel / waterfall / taylor attribution), this field still reports
     /// the raw `val_t1 − val_t0` so a downstream consumer that computed their
     /// own total from the underlying valuations can reconcile cleanly.
@@ -365,7 +365,9 @@ pub struct AttributionMeta {
     /// Instrument identifier.
     pub instrument_id: String,
 
-    /// Number of repricings performed.
+    /// Number of top-level valuation calls, including attempted carry-helper
+    /// metric, flat-yield and funding valuations. Internal risk-metric bump
+    /// valuations are not counted separately.
     pub num_repricings: usize,
 
     /// Absolute tolerance for residual validation.
@@ -392,6 +394,151 @@ pub struct AttributionMeta {
 
     /// Diagnostic notes and warnings.
     pub notes: Vec<String>,
+}
+
+// Share the signed-factor walk between immutable currency validation and
+// mutable scaling/FX conversion. Headline amounts and absolute diagnostics
+// have different transformation rules and are handled by their callers.
+macro_rules! visit_factor_money {
+    ($attribution:ident, $visit:ident, $values:ident $(, $mutability:tt)?) => {{
+        for (name, money) in [
+            ("carry", & $($mutability)? $attribution.carry),
+            ("rates_curves", & $($mutability)? $attribution.rates_curves_pnl),
+            ("credit_curves", & $($mutability)? $attribution.credit_curves_pnl),
+            ("inflation_curves", & $($mutability)? $attribution.inflation_curves_pnl),
+            ("correlations", & $($mutability)? $attribution.correlations_pnl),
+            ("fx", & $($mutability)? $attribution.fx_pnl),
+            ("vol", & $($mutability)? $attribution.vol_pnl),
+            ("cross_factor", & $($mutability)? $attribution.cross_factor_pnl),
+            ("model_params", & $($mutability)? $attribution.model_params_pnl),
+            ("market_scalars", & $($mutability)? $attribution.market_scalars_pnl),
+        ] {
+            $visit(name, money)?;
+        }
+        if let Some(detail) = & $($mutability)? $attribution.carry_detail {
+            $visit("carry_detail.total", & $($mutability)? detail.total)?;
+            for (name, line) in [
+                ("carry_detail.coupon_income", & $($mutability)? detail.coupon_income),
+                ("carry_detail.roll_down", & $($mutability)? detail.roll_down),
+            ] {
+                if let Some(line) = line {
+                    $visit(name, & $($mutability)? line.total)?;
+                    for money in [
+                        & $($mutability)? line.rates_part,
+                        & $($mutability)? line.credit_part,
+                    ].into_iter().flatten() {
+                        $visit(name, money)?;
+                    }
+                }
+            }
+            for (name, money) in [
+                ("carry_detail.pull_to_par", & $($mutability)? detail.pull_to_par),
+                ("carry_detail.funding_cost", & $($mutability)? detail.funding_cost),
+            ] {
+                if let Some(money) = money {
+                    $visit(name, money)?;
+                }
+            }
+        }
+        if let Some(detail) = & $($mutability)? $attribution.rates_detail {
+            for money in detail.by_curve.$values().chain(detail.by_tenor.$values()) {
+                $visit("rates_detail", money)?;
+            }
+            $visit("rates_detail.discount_total", & $($mutability)? detail.discount_total)?;
+            $visit("rates_detail.forward_total", & $($mutability)? detail.forward_total)?;
+        }
+        if let Some(detail) = & $($mutability)? $attribution.credit_detail {
+            for money in detail.by_curve.$values().chain(detail.by_tenor.$values()) {
+                $visit("credit_detail", money)?;
+            }
+        }
+        if let Some(detail) = & $($mutability)? $attribution.inflation_detail {
+            for money in detail.by_curve.$values() {
+                $visit("inflation_detail", money)?;
+            }
+            if let Some(by_tenor) = & $($mutability)? detail.by_tenor {
+                for money in by_tenor.$values() {
+                    $visit("inflation_detail.by_tenor", money)?;
+                }
+            }
+        }
+        if let Some(detail) = & $($mutability)? $attribution.correlations_detail {
+            for money in detail.by_curve.$values() {
+                $visit("correlations_detail", money)?;
+            }
+        }
+        if let Some(detail) = & $($mutability)? $attribution.fx_detail {
+            for money in detail.by_pair.$values() {
+                $visit("fx_detail", money)?;
+            }
+        }
+        if let Some(detail) = & $($mutability)? $attribution.vol_detail {
+            for money in detail.by_surface.$values() {
+                $visit("vol_detail", money)?;
+            }
+        }
+        if let Some(detail) = & $($mutability)? $attribution.cross_factor_detail {
+            $visit("cross_factor_detail.total", & $($mutability)? detail.total)?;
+            for money in detail.by_pair.$values() {
+                $visit("cross_factor_detail.by_pair", money)?;
+            }
+        }
+        if let Some(detail) = & $($mutability)? $attribution.model_params_detail {
+            for money in [
+                & $($mutability)? detail.prepayment,
+                & $($mutability)? detail.default_rate,
+                & $($mutability)? detail.recovery_rate,
+                & $($mutability)? detail.conversion_ratio,
+            ].into_iter().flatten() {
+                $visit("model_params_detail", money)?;
+            }
+            for money in detail.other.$values() {
+                $visit("model_params_detail.other", money)?;
+            }
+        }
+        if let Some(detail) = & $($mutability)? $attribution.scalars_detail {
+            for money in detail.dividends.$values()
+                .chain(detail.inflation.$values())
+                .chain(detail.equity_prices.$values())
+                .chain(detail.commodity_prices.$values()) {
+                $visit("scalars_detail", money)?;
+            }
+        }
+        if let Some(detail) = & $($mutability)? $attribution.credit_factor_detail {
+            $visit("credit_factor_detail.generic_pnl", & $($mutability)? detail.generic_pnl)?;
+            $visit("credit_factor_detail.adder_pnl_total", & $($mutability)? detail.adder_pnl_total)?;
+            $visit("credit_factor_detail.curve_shape_pnl", & $($mutability)? detail.curve_shape_pnl)?;
+            for level in & $($mutability)? detail.levels {
+                $visit("credit_factor_detail.levels", & $($mutability)? level.total)?;
+                for money in level.by_bucket.$values() {
+                    $visit("credit_factor_detail.levels.by_bucket", money)?;
+                }
+            }
+            if let Some(by_issuer) = & $($mutability)? detail.adder_pnl_by_issuer {
+                for money in by_issuer.$values() {
+                    $visit("credit_factor_detail.adder_pnl_by_issuer", money)?;
+                }
+            }
+        }
+        if let Some(detail) = & $($mutability)? $attribution.credit_carry_decomposition {
+            $visit("credit_carry_decomposition.rates_carry_total", & $($mutability)? detail.rates_carry_total)?;
+            $visit("credit_carry_decomposition.credit_carry_total", & $($mutability)? detail.credit_carry_total)?;
+            $visit("credit_carry_decomposition.generic", & $($mutability)? detail.credit_by_level.generic)?;
+            $visit("credit_carry_decomposition.adder_total", & $($mutability)? detail.credit_by_level.adder_total)?;
+            for level in & $($mutability)? detail.credit_by_level.levels {
+                $visit("credit_carry_decomposition.levels", & $($mutability)? level.total)?;
+                for money in level.by_bucket.$values() {
+                    $visit("credit_carry_decomposition.levels.by_bucket", money)?;
+                }
+            }
+            if let Some(by_issuer) = & $($mutability)? detail.credit_by_level.adder_by_issuer {
+                for money in by_issuer.$values() {
+                    $visit("credit_carry_decomposition.adder_by_issuer", money)?;
+                }
+            }
+        }
+        Ok::<(), Error>(())
+    }};
 }
 
 impl PnlAttribution {
@@ -518,206 +665,92 @@ impl PnlAttribution {
         &mut self,
         mut f: impl FnMut(&mut Money) -> Result<()>,
     ) -> Result<()> {
-        fn values<'m>(
-            values: impl Iterator<Item = &'m mut Money>,
-            f: &mut impl FnMut(&mut Money) -> Result<()>,
-        ) -> Result<()> {
-            for v in values {
-                f(v)?;
-            }
-            Ok(())
-        }
-        fn opt(
-            opt: &mut Option<Money>,
-            f: &mut impl FnMut(&mut Money) -> Result<()>,
-        ) -> Result<()> {
-            opt.as_mut().map_or(Ok(()), f)
-        }
-        fn source_line(
-            line: &mut Option<SourceLine>,
-            f: &mut impl FnMut(&mut Money) -> Result<()>,
-        ) -> Result<()> {
-            if let Some(line) = line {
-                f(&mut line.total)?;
-                opt(&mut line.rates_part, f)?;
-                opt(&mut line.credit_part, f)?;
-            }
-            Ok(())
-        }
-        for m in [
-            &mut self.carry,
-            &mut self.rates_curves_pnl,
-            &mut self.credit_curves_pnl,
-            &mut self.inflation_curves_pnl,
-            &mut self.correlations_pnl,
-            &mut self.fx_pnl,
-            &mut self.vol_pnl,
-            &mut self.cross_factor_pnl,
-            &mut self.model_params_pnl,
-            &mut self.market_scalars_pnl,
-        ] {
-            f(m)?;
-        }
-
-        if let Some(d) = &mut self.carry_detail {
-            f(&mut d.total)?;
-            source_line(&mut d.coupon_income, &mut f)?;
-            opt(&mut d.pull_to_par, &mut f)?;
-            source_line(&mut d.roll_down, &mut f)?;
-            opt(&mut d.funding_cost, &mut f)?;
-        }
-        if let Some(d) = &mut self.rates_detail {
-            values(d.by_curve.values_mut(), &mut f)?;
-            values(d.by_tenor.values_mut(), &mut f)?;
-            f(&mut d.discount_total)?;
-            f(&mut d.forward_total)?;
-        }
-        if let Some(d) = &mut self.credit_detail {
-            values(d.by_curve.values_mut(), &mut f)?;
-            values(d.by_tenor.values_mut(), &mut f)?;
-        }
-        if let Some(d) = &mut self.inflation_detail {
-            values(d.by_curve.values_mut(), &mut f)?;
-            if let Some(bt) = &mut d.by_tenor {
-                values(bt.values_mut(), &mut f)?;
-            }
-        }
-        if let Some(d) = &mut self.correlations_detail {
-            values(d.by_curve.values_mut(), &mut f)?;
-        }
-        if let Some(d) = &mut self.fx_detail {
-            values(d.by_pair.values_mut(), &mut f)?;
-        }
-        if let Some(d) = &mut self.vol_detail {
-            values(d.by_surface.values_mut(), &mut f)?;
-        }
-        if let Some(d) = &mut self.cross_factor_detail {
-            f(&mut d.total)?;
-            values(d.by_pair.values_mut(), &mut f)?;
-        }
-        if let Some(d) = &mut self.model_params_detail {
-            opt(&mut d.prepayment, &mut f)?;
-            opt(&mut d.default_rate, &mut f)?;
-            opt(&mut d.recovery_rate, &mut f)?;
-            opt(&mut d.conversion_ratio, &mut f)?;
-            values(d.other.values_mut(), &mut f)?;
-        }
-        if let Some(d) = &mut self.scalars_detail {
-            values(d.dividends.values_mut(), &mut f)?;
-            values(d.inflation.values_mut(), &mut f)?;
-            values(d.equity_prices.values_mut(), &mut f)?;
-            values(d.commodity_prices.values_mut(), &mut f)?;
-        }
-        if let Some(d) = &mut self.credit_factor_detail {
-            f(&mut d.generic_pnl)?;
-            f(&mut d.adder_pnl_total)?;
-            // `curve_shape_pnl` is a signed P&L component and load-bearing for
-            // the `generic + Σlevels + adder + curve_shape ≡ credit_curves_pnl`
-            // reconciliation invariant — it MUST move with the rest.
-            f(&mut d.curve_shape_pnl)?;
-            for level in &mut d.levels {
-                f(&mut level.total)?;
-                values(level.by_bucket.values_mut(), &mut f)?;
-            }
-            if let Some(by_issuer) = &mut d.adder_pnl_by_issuer {
-                values(by_issuer.values_mut(), &mut f)?;
-            }
-        }
-        if let Some(d) = &mut self.credit_carry_decomposition {
-            f(&mut d.rates_carry_total)?;
-            f(&mut d.credit_carry_total)?;
-            f(&mut d.credit_by_level.generic)?;
-            f(&mut d.credit_by_level.adder_total)?;
-            for level in &mut d.credit_by_level.levels {
-                f(&mut level.total)?;
-                values(level.by_bucket.values_mut(), &mut f)?;
-            }
-            if let Some(by_issuer) = &mut d.credit_by_level.adder_by_issuer {
-                values(by_issuer.values_mut(), &mut f)?;
-            }
-        }
-        Ok(())
+        let mut visit = |_: &str, money: &mut Money| f(money);
+        visit_factor_money!(self, visit, values_mut, mut)
     }
 
-    /// Scale all attribution values by a factor.
+    /// Scale every monetary amount by a dimensionless position multiplier.
     ///
-    /// Useful for scaling per-unit attribution to position quantity.
-    ///
-    /// A non-finite `factor` flags the attribution invalid and leaves the
-    /// values untouched instead of panicking inside `Money`'s arithmetic
-    /// (this crate forbids panics on public APIs).
+    /// Negative values reverse signed P&L exposure. Absolute diagnostics use
+    /// the multiplier's magnitude so they remain non-negative. Scaling is
+    /// atomic: an invalid multiplier or unrepresentable product leaves every
+    /// amount and metadata field unchanged.
     ///
     /// # Arguments
     ///
-    /// * `factor` - Dimensionless position multiplier applied in place to attribution amounts; negative values reverse exposure, and non-finite values flag the result invalid without scaling.
-    pub fn scale(&mut self, factor: f64) {
-        if !factor.is_finite() {
-            self.meta.notes.push(format!(
-                "PnlAttribution::scale called with non-finite factor ({factor}); \
-                 values left unscaled and attribution flagged invalid"
-            ));
-            self.result_invalid = true;
-            return;
-        }
-        self.total_pnl *= factor;
-        if let Some(m) = self.mark_to_market_pnl.as_mut() {
-            *m *= factor;
-        }
-        self.fx_translation_pnl *= factor;
-        self.residual *= factor;
-        // `*=` on Money is infallible, so the visitor cannot fail here.
-        let _ = self.for_each_money_mut(|m| {
-            *m *= factor;
-            Ok(())
-        });
-        // `adder_magnitude` is a diagnostic absolute value (= |adder_pnl_total|);
-        // scale by |factor| so it stays non-negative for short positions.
-        if let Some(m) = self
-            .credit_factor_detail
-            .as_mut()
-            .and_then(|d| d.adder_magnitude.as_mut())
-        {
-            *m *= factor.abs();
-        }
-    }
-
-    /// Validate that all factor currencies match total_pnl currency.
-    ///
-    /// # Returns
-    ///
-    /// Ok(()) if all currencies match, Err otherwise.
+    /// * `factor` - Finite dimensionless position multiplier, including zero
+    ///   or a negative value for a short position. Every scaled amount must
+    ///   remain within `Money`'s Decimal representation range.
     ///
     /// # Errors
     ///
-    /// Returns [`finstack_quant_core::Error::Validation`] if any factor P&L or
-    /// optional detail amount uses a currency different from `total_pnl`.
+    /// Returns [`finstack_quant_core::Error::Validation`] for a non-finite
+    /// `factor`, or the checked monetary multiplication error if the scalar
+    /// or any product cannot be represented. The original result is unchanged.
+    pub fn scale(&mut self, factor: f64) -> Result<()> {
+        if !factor.is_finite() {
+            return Err(Error::Validation(
+                "attribution scale factor must be finite".to_string(),
+            ));
+        }
+        let mut scaled = self.clone();
+        scaled.total_pnl = scaled.total_pnl.checked_mul_f64(factor)?;
+        if let Some(money) = &mut scaled.mark_to_market_pnl {
+            *money = money.checked_mul_f64(factor)?;
+        }
+        scaled.fx_translation_pnl = scaled.fx_translation_pnl.checked_mul_f64(factor)?;
+        scaled.residual = scaled.residual.checked_mul_f64(factor)?;
+        scaled.for_each_money_mut(|money| {
+            *money = money.checked_mul_f64(factor)?;
+            Ok(())
+        })?;
+        if let Some(money) = scaled
+            .credit_factor_detail
+            .as_mut()
+            .and_then(|detail| detail.adder_magnitude.as_mut())
+        {
+            *money = money.checked_mul_f64(factor.abs())?;
+        }
+        *self = scaled;
+        Ok(())
+    }
+
+    /// Validate that every monetary amount uses `total_pnl`'s currency.
+    ///
+    /// Includes headline P&L, residual, all nested factor and carry details,
+    /// and absolute diagnostic amounts, so amount-only exports can use one
+    /// report-currency label safely.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] if any monetary
+    /// amount uses a currency different from `total_pnl`.
     pub fn validate_currencies(&self) -> Result<()> {
         let expected = self.total_pnl.currency();
-
-        let factors = [
-            ("carry", self.carry.currency()),
-            ("rates_curves", self.rates_curves_pnl.currency()),
-            ("credit_curves", self.credit_curves_pnl.currency()),
-            ("inflation_curves", self.inflation_curves_pnl.currency()),
-            ("correlations", self.correlations_pnl.currency()),
-            ("fx", self.fx_pnl.currency()),
-            ("vol", self.vol_pnl.currency()),
-            ("cross_factor", self.cross_factor_pnl.currency()),
-            ("model_params", self.model_params_pnl.currency()),
-            ("market_scalars", self.market_scalars_pnl.currency()),
-            ("fx_translation", self.fx_translation_pnl.currency()),
-        ];
-
-        for (name, ccy) in &factors {
-            if *ccy != expected {
+        let visit = |name: &str, money: &Money| {
+            if money.currency() != expected {
                 return Err(Error::Validation(format!(
-                    "Currency mismatch in '{}' factor: expected {}, got {}",
-                    name, expected, ccy
+                    "Currency mismatch in '{}' amount: expected {}, got {}",
+                    name,
+                    expected,
+                    money.currency()
                 )));
             }
+            Ok(())
+        };
+        visit("residual", &self.residual)?;
+        visit("fx_translation", &self.fx_translation_pnl)?;
+        if let Some(money) = &self.mark_to_market_pnl {
+            visit("mark_to_market_pnl", money)?;
         }
-
-        Ok(())
+        if let Some(money) = self
+            .credit_factor_detail
+            .as_ref()
+            .and_then(|detail| detail.adder_magnitude.as_ref())
+        {
+            visit("credit_factor_detail.adder_magnitude", money)?;
+        }
+        visit_factor_money!(self, visit, values)
     }
 
     /// Compute residual as total_pnl minus sum of all attributed factors.
@@ -1069,8 +1102,9 @@ impl AttributionMethod {
 
     /// Returns the risk metrics required for this attribution method.
     ///
-    /// For `MetricsBased`, returns first-order sensitivities (Theta, DV01, CS01,
-    /// Vega, Delta, FX01, Inflation01, Dividend01) plus second-order terms
+    /// For `MetricsBased`, returns first-order sensitivities (Theta, aggregate
+    /// and bucketed DV01/CS01, Vega, Delta, FX01, Inflation01, Dividend01) plus
+    /// second-order terms
     /// (Gamma, Convexity, IrConvexity, Volga, Vanna, CsGamma, InflationConvexity)
     /// needed by the metrics-based attribution algorithm.
     ///
@@ -1084,6 +1118,8 @@ impl AttributionMethod {
                 MetricId::Theta,
                 MetricId::Dv01,
                 MetricId::Cs01,
+                // Bucketed rates retain tenor moves under curve twists.
+                MetricId::BucketedDv01,
                 // Per-tenor par-spread CS01 — drives key-rate credit attribution
                 // when available (CDS-family instruments); otherwise the
                 // aggregate `Cs01` path is used.
@@ -1158,6 +1194,173 @@ mod tests {
     use std::collections::BTreeMap;
     use time::macros::date;
 
+    fn attribution_with_all_details() -> serde_json::Value {
+        let mut value = serde_json::to_value(PnlAttribution::new(
+            Money::from((1_i64, Currency::USD)),
+            "ALL-DETAILS",
+            date!(2025 - 01 - 15),
+            date!(2025 - 02 - 15),
+            AttributionMethod::Parallel,
+        ))
+        .expect("attribution wire payload");
+        let money = serde_json::json!({"amount": "1", "currency": "USD"});
+        let source = serde_json::json!({
+            "total": money, "rates_part": money, "credit_part": money,
+        });
+        let level = serde_json::json!({
+            "level_name": "rating", "total": money, "by_bucket": {"IG": money},
+        });
+        let details = serde_json::json!({
+            "carry_detail": {"total": money, "coupon_income": source,
+                "pull_to_par": money, "roll_down": source, "funding_cost": money},
+            "rates_detail": {"by_curve": {"USD-OIS": money},
+                "by_tenor": {"USD-OIS|1Y": money}, "discount_total": money, "forward_total": money},
+            "credit_detail": {"by_curve": {"ACME-HZD": money}, "by_tenor": {"ACME-HZD|1Y": money}},
+            "inflation_detail": {"by_curve": {"US-CPI": money}, "by_tenor": {"US-CPI|1Y": money}},
+            "correlations_detail": {"by_curve": {"CDX-BC": money}},
+            "fx_detail": {"by_pair": {"EUR/USD": money}},
+            "vol_detail": {"by_surface": {"SPX-VOL": money}},
+            "cross_factor_detail": {"total": money, "by_pair": {"Rates×Credit": money}},
+            "model_params_detail": {"prepayment": money, "default_rate": money,
+                "recovery_rate": money, "conversion_ratio": money, "other": {"parameter": money}},
+            "scalars_detail": {"dividends": {"SPX": money}, "inflation": {"US-CPI": money},
+                "equity_prices": {"SPX": money}, "commodity_prices": {"OIL": money}},
+            "credit_factor_detail": {"model_id": "test/0", "generic_pnl": money,
+                "levels": [level], "adder_pnl_total": money, "curve_shape_pnl": money,
+                "adder_pnl_by_issuer": {"ACME": money}, "adder_magnitude": money},
+            "credit_carry_decomposition": {"model_id": "test/0", "rates_carry_total": money,
+                "credit_carry_total": money, "credit_by_level": {"generic": money,
+                    "levels": [level], "adder_total": money, "adder_by_issuer": {"ACME": money}}},
+        });
+        value
+            .as_object_mut()
+            .expect("attribution object")
+            .extend(details.as_object().expect("detail object").clone());
+        value
+    }
+
+    // Traverse the public wire shape independently of the implementation's
+    // monetary visitor, so an omitted nested Money field fails these checks.
+    fn money_paths(value: &serde_json::Value, prefix: &str, paths: &mut Vec<String>) {
+        match value {
+            serde_json::Value::Object(object) => {
+                if object.contains_key("amount") && object.contains_key("currency") {
+                    paths.push(prefix.to_owned());
+                } else {
+                    for (key, child) in object {
+                        let key = key.replace('~', "~0").replace('/', "~1");
+                        money_paths(child, &format!("{prefix}/{key}"), paths);
+                    }
+                }
+            }
+            serde_json::Value::Array(array) => {
+                for (index, child) in array.iter().enumerate() {
+                    money_paths(child, &format!("{prefix}/{index}"), paths);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    #[test]
+    fn test_currency_validation_checks_every_money_leaf() {
+        let payload = attribution_with_all_details();
+        let attribution: PnlAttribution = serde_json::from_value(payload.clone()).unwrap();
+        attribution
+            .validate_currencies()
+            .expect("all amounts use USD");
+        let mut paths = Vec::new();
+        money_paths(&payload, "", &mut paths);
+        for path in paths {
+            let mut mismatched = payload.clone();
+            *mismatched.pointer_mut(&format!("{path}/currency")).unwrap() =
+                serde_json::json!("EUR");
+            let attribution: PnlAttribution = serde_json::from_value(mismatched).unwrap();
+            assert!(attribution.validate_currencies().is_err(), "missed {path}");
+            assert!(
+                crate::pnl_attribution_wide_row(&attribution).is_err(),
+                "wide row accepted {path}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_scale_rejects_invalid_scalars_without_mutation() {
+        for factor in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 1e100] {
+            let payload = attribution_with_all_details();
+            let mut attribution: PnlAttribution = serde_json::from_value(payload.clone()).unwrap();
+            assert!(attribution.scale(factor).is_err());
+            assert_eq!(serde_json::to_value(attribution).unwrap(), payload);
+        }
+    }
+
+    #[test]
+    fn test_scale_updates_every_money_leaf_and_preserves_currencies() {
+        let payload = attribution_with_all_details();
+        let mut paths = Vec::new();
+        money_paths(&payload, "", &mut paths);
+        for factor in [-2.0, 0.0, 0.5] {
+            let mut attribution: PnlAttribution = serde_json::from_value(payload.clone()).unwrap();
+            attribution.scale(factor).expect("representable scale");
+            let scaled = serde_json::to_value(attribution).unwrap();
+            for path in &paths {
+                let amount = |value: &serde_json::Value| {
+                    value
+                        .pointer(&format!("{path}/amount"))
+                        .unwrap()
+                        .as_str()
+                        .unwrap()
+                        .parse::<f64>()
+                        .unwrap()
+                };
+                let multiplier = if path == "/credit_factor_detail/adder_magnitude" {
+                    factor.abs()
+                } else {
+                    factor
+                };
+                assert_eq!(
+                    amount(&scaled),
+                    amount(&payload) * multiplier,
+                    "missed {path}"
+                );
+                assert_eq!(
+                    scaled.pointer(&format!("{path}/currency")),
+                    payload.pointer(&format!("{path}/currency"))
+                );
+            }
+            assert_eq!(scaled["meta"], payload["meta"]);
+        }
+    }
+
+    #[test]
+    fn test_scale_is_atomic_when_any_money_leaf_overflows() {
+        let payload = attribution_with_all_details();
+        let mut paths = Vec::new();
+        money_paths(&payload, "", &mut paths);
+        for path in paths {
+            let mut overflowing = payload.clone();
+            *overflowing.pointer_mut(&format!("{path}/amount")).unwrap() =
+                serde_json::json!(rust_decimal::Decimal::MAX.to_string());
+            let mut attribution: PnlAttribution = serde_json::from_value(overflowing).unwrap();
+            let original = serde_json::to_value(&attribution).unwrap();
+            assert!(attribution.scale(2.0).is_err(), "missed {path}");
+            assert_eq!(
+                serde_json::to_value(attribution).unwrap(),
+                original,
+                "mutated {path}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_metrics_based_defaults_include_bucketed_rates() {
+        use finstack_quant_valuations::metrics::MetricId;
+        let metrics = crate::default_attribution_metrics();
+        assert!(metrics.contains(&MetricId::BucketedDv01));
+        assert!(metrics.contains(&MetricId::BucketedCs01));
+        assert_eq!(metrics, AttributionMethod::MetricsBased.required_metrics());
+    }
+
     #[test]
     fn test_carry_detail_scale_and_explain_include_decomposition_fields() {
         let mut attribution = PnlAttribution::new(
@@ -1176,7 +1379,7 @@ mod tests {
             funding_cost: Some(Money::from((2_i64, Currency::USD))),
         });
 
-        attribution.scale(0.5);
+        attribution.scale(0.5).expect("finite representable scale");
 
         let detail = attribution.carry_detail.clone().expect("carry detail");
         assert_eq!(detail.total.amount(), 5.0);
@@ -1278,9 +1481,11 @@ mod tests {
         let theta = Money::from((30_i64, Currency::USD));
         let carry_inputs = crate::helpers::TotalReturnCarryInputs {
             cash_paid: coupon,
+            income_cash_paid: coupon,
             delta_accrued: None,
             flat_window_diff: None,
             funding_cost: None,
+            num_repricings: 0,
             warnings: Vec::new(),
         };
         apply_total_return_carry(&mut attr, theta, carry_inputs).expect("carry add");
@@ -1364,7 +1569,7 @@ mod tests {
         };
         assert!(reconciles(&attr), "fixture must reconcile before scaling");
 
-        attr.scale(0.5);
+        attr.scale(0.5).expect("finite representable scale");
         let d = attr.credit_factor_detail.as_ref().expect("detail");
         assert_eq!(
             d.curve_shape_pnl.amount(),
@@ -1382,7 +1587,7 @@ mod tests {
         );
 
         // A negative scale (short position) must keep adder_magnitude non-negative.
-        attr.scale(-1.0);
+        attr.scale(-1.0).expect("finite representable scale");
         assert_eq!(
             attr.credit_factor_detail
                 .as_ref()

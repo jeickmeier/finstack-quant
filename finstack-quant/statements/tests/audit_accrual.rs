@@ -22,13 +22,13 @@
 //! - ISDA 2006 Definitions for day count conventions
 //! - Bond market conventions per SIFMA guidelines
 
-use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{build_periods, Date};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::Bond;
+use finstack_quant_valuations::instruments::Instrument;
 use indexmap::IndexMap;
 use std::sync::Arc;
 use time::Month;
@@ -91,8 +91,7 @@ fn test_accrued_interest_semi_annual_bond() -> Result<(), Box<dyn std::error::Er
         CurveId::new("USD-OIS"),
     )?;
 
-    let mut instruments: IndexMap<String, Arc<dyn CashflowProvider + Send + Sync>> =
-        IndexMap::new();
+    let mut instruments: IndexMap<String, Arc<dyn Instrument>> = IndexMap::new();
     instruments.insert("BOND-AUDIT".to_string(), Arc::new(bond));
 
     // 4. Run Aggregation

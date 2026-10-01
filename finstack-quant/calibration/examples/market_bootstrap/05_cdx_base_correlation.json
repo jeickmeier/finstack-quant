@@ -67,7 +67,7 @@
         "kind": "base_correlation",
         "index_id": "CDX-NA-IG-46",
         "series": 46,
-        "maturity_years": 5.1,
+        "maturity_years": 5.0,
         "base_date": "2026-05-08",
         "discount_curve_id": "USD-OIS",
         "currency": "USD",

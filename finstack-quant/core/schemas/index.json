@@ -2,11 +2,19 @@
   "artifacts": [
     {
       "$id": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
-      "bytes": 127239,
+      "bytes": 135205,
       "kind": "input",
       "path": "schemas/market_data/1/market_context_state.schema.json",
       "summary": "Curves, surfaces, prices, series and FX for one valuation date; the market input to every pricing, scenario and attribution call.",
       "title": "Market Context State"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/market_data/1/vol_cube_expiry_slice.schema.json",
+      "bytes": 2489,
+      "kind": "output",
+      "path": "schemas/market_data/1/vol_cube_expiry_slice.schema.json",
+      "summary": "Tenor-by-strike volatility quotes at a fixed option expiry, preserving quote convention and displacement.",
+      "title": "Volatility Cube Expiry Slice"
     }
   ],
   "schema_index_version": 1

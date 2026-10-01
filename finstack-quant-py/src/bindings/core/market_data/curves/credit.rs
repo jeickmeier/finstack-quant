@@ -57,8 +57,8 @@ impl PyBaseCorrelationCurve {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``knots`` is empty, a correlation is outside ``[0, 1]``, or
-    ///     detachment points are not strictly increasing.
+    ///     If fewer than two knots are supplied, values are non-finite, correlations
+    ///     are outside ``[0, 1]``, or detachments are duplicated or outside ``[0, 100]``.
     ///
     /// Example
     /// -------
@@ -111,7 +111,7 @@ impl PyBaseCorrelationCurve {
     /// Curve identifier string.
     #[getter]
     fn id(&self) -> &str {
-        self.inner.id.as_str()
+        self.inner.id().as_str()
     }
 
     /// Detachment points in percent of index notional, ascending.
@@ -141,7 +141,7 @@ impl PyBaseCorrelationCurve {
     fn __repr__(&self) -> String {
         format!(
             "BaseCorrelationCurve(id='{}', knots={})",
-            self.inner.id.as_str(),
+            self.inner.id().as_str(),
             self.inner.detachment_points().len()
         )
     }
@@ -266,7 +266,7 @@ impl PyCreditIndexData {
             self.inner.num_constituents,
             self.inner.recovery_rate,
             self.inner.index_credit_curve.id().as_str(),
-            self.inner.base_correlation_curve.id.as_str()
+            self.inner.base_correlation_curve.id().as_str()
         )
     }
 }

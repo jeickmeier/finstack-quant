@@ -13,7 +13,7 @@
 
 use super::pricing::{
     metric_value_with_context, parse_market_json, parse_pricing_instrument_json,
-    price_result_with_context, standard_option_greeks_with_context,
+    price_result_with_context, standard_option_greeks_with_context, valuation_result_value,
 };
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_valuations::pricer::{
@@ -73,7 +73,7 @@ fn price_payload(
         metrics,
         market_history.as_deref(),
     )?;
-    to_js_value(&result)
+    valuation_result_value(&result)
 }
 
 fn metric_value(
@@ -221,12 +221,14 @@ macro_rules! fx_class {
             /// @param metrics - Optional canonical metric IDs such as `"delta"`,
             /// `"vega"`, `"hvar"`, or `"expected_shortfall"`. Omit, `null`, or
             /// `undefined` for a valuation-only result.
-            /// @param metric_pricing_overrides - Optional JSON metric-pricing overrides
-            /// merged into the envelope before validation. Omit, `null`, or
-            /// `undefined` to use the envelope as-is.
+            /// @param metric_pricing_overrides - Optional JSON object patch applied before validation.
+            /// Only supplied fields replace stored overrides; `{}` preserves them. Supplied
+            /// `bump_config` fields merge into the stored object. Explicit `null` clears
+            /// nullable fields to their Rust fallback. Omit the argument or pass JavaScript
+            /// `null`/`undefined` to retain the envelope configuration.
             /// @param market_history - Optional serialized market-history JSON
             /// required by historical risk metrics such as historical VaR.
-            /// @returns Structured `ValuationResult` for the selected model.
+            /// @returns Structured `ValuationResult` for the selected model, preserving Monte Carlo seeds as lossless JavaScript `BigInt` values.
             ///
             /// # Errors
             ///
@@ -259,7 +261,7 @@ macro_rules! fx_class {
 }
 
 macro_rules! fx_option_class {
-    ($rust_name:ident, $js_name:literal, $type_tag:literal) => {
+    ($rust_name:ident, $js_name:literal, $type_tag:literal, $theta_units:literal, $greeks_units:literal) => {
         fx_class!($rust_name, $js_name, $type_tag);
 
         #[wasm_bindgen(js_class = $js_name)]
@@ -308,7 +310,7 @@ macro_rules! fx_option_class {
             /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
             /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
             /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-            /// @returns Vega: change in value per 1.0 absolute move in implied volatility.
+            /// @returns Vega in native currency per volatility point (0.01 absolute implied volatility).
             ///
             /// # Errors
             ///
@@ -325,16 +327,18 @@ macro_rules! fx_option_class {
             }
 
             /// Theta of the option.
+            ///
+            /// Uses the canonical metric registry and the instrument's theta convention.
             /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
             /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
             /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-            /// @returns Theta: change in value per year of calendar time.
+            #[doc = $theta_units]
             ///
             /// # Errors
             ///
             /// Throws a JavaScript exception if the instrument or market JSON,
             /// `asOf`, or `model` is invalid; required market data is missing;
-            /// pricing fails; or theta is not produced by the selected model.
+            /// pricing fails; or the selected model does not produce the requested theta metric.
             pub fn theta(
                 &self,
                 market_json: &str,
@@ -348,7 +352,7 @@ macro_rules! fx_option_class {
             /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
             /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
             /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-            /// @returns Domestic rho: change in value per 1.0 absolute move in the domestic rate.
+            /// @returns Domestic rho in native currency per basis point (0.0001 absolute domestic rate).
             ///
             /// # Errors
             ///
@@ -368,7 +372,7 @@ macro_rules! fx_option_class {
             /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
             /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
             /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-            /// @returns Foreign rho: change in value per 1.0 absolute move in the foreign rate.
+            /// @returns Foreign rho in native currency per basis point (0.0001 absolute foreign rate).
             ///
             /// # Errors
             ///
@@ -389,7 +393,7 @@ macro_rules! fx_option_class {
             /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
             /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
             /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-            /// @returns Vanna: cross sensitivity of delta to implied volatility.
+            /// @returns Change in spot delta per volatility point (0.01 absolute implied volatility).
             ///
             /// # Errors
             ///
@@ -409,7 +413,7 @@ macro_rules! fx_option_class {
             /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
             /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
             /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-            /// @returns Volga: change in vega per 1.0 absolute move in implied volatility.
+            /// @returns Volga in native currency per volatility point squared (0.01 absolute implied volatility on each volatility axis).
             ///
             /// # Errors
             ///
@@ -429,7 +433,7 @@ macro_rules! fx_option_class {
             /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
             /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
             /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-            /// @returns Map of greek name to value, such as `delta`, `gamma`, and `vega`.
+            #[doc = $greeks_units]
             ///
             /// # Errors
             ///
@@ -450,13 +454,18 @@ macro_rules! fx_option_class {
 }
 
 macro_rules! fx_option_subset_class {
-    ($rust_name:ident, $js_name:literal, $type_tag:literal, [$(($method:ident, $metric:literal)),+ $(,)?]) => {
+    ($rust_name:ident, $js_name:literal, $type_tag:literal, $greeks_units:literal, [$(($method:ident, $metric:literal, $units:literal)),+ $(,)?]) => {
         fx_class!($rust_name, $js_name, $type_tag);
 
         #[wasm_bindgen(js_class = $js_name)]
         impl $rust_name {
             $(
-                /// Compute this supported option sensitivity.
+                /// Compute this supported option sensitivity in canonical Rust units.
+                /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+                /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+                /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+                #[doc = $units]
+                /// @throws Error - Throws for invalid instrument, market, date, or model inputs; missing required market data; failed pricing; or a sensitivity unsupported by the selected model.
                 pub fn $method(
                     &self,
                     market_json: &str,
@@ -471,6 +480,7 @@ macro_rules! fx_option_subset_class {
             /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
             /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
             /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+            #[doc = $greeks_units]
             ///
             /// # Errors
             ///
@@ -494,42 +504,69 @@ fx_class!(JsFxSpot, "FxSpot", "fx_spot");
 fx_class!(JsFxForward, "FxForward", "fx_forward");
 fx_class!(JsFxSwap, "FxSwap", "fx_swap");
 fx_class!(JsNdf, "Ndf", "ndf");
-fx_option_class!(JsFxOption, "FxOption", "fx_option");
+fx_option_class!(
+    JsFxOption,
+    "FxOption",
+    "fx_option",
+    "@returns Analytical theta in native currency per day, using the instrument's configured theta day-count basis.",
+    "@returns Map of supported Greek names to values: delta/gamma per unit spot, vega/vanna per volatility point, volga per volatility point squared, analytical theta per configured day, and domestic/foreign rho per basis point."
+);
 fx_option_subset_class!(
     JsFxDigitalOption,
     "FxDigitalOption",
     "fx_digital_option",
+    "@returns Map of supported Greek names to values: delta/gamma per unit spot, vega per volatility point, analytical theta per configured day, and rho per basis point.",
     [
-        (delta, "delta"),
-        (gamma, "gamma"),
-        (vega, "vega"),
-        (theta, "theta"),
-        (rho, "rho"),
+        (delta, "delta", "@returns Spot delta: change in native-currency value per unit spot."),
+        (gamma, "gamma", "@returns Spot gamma: change in delta per unit spot."),
+        (vega, "vega", "@returns Vega in native currency per volatility point (0.01 absolute implied volatility)."),
+        (theta, "theta", "@returns Theta in native currency per day, using the instrument's configured theta day-count basis."),
+        (rho, "rho", "@returns Domestic rho in native currency per basis point (0.0001 absolute domestic rate)."),
     ]
 );
 fx_option_subset_class!(
     JsFxTouchOption,
     "FxTouchOption",
     "fx_touch_option",
+    "@returns Map of supported Greek names to values: delta/gamma per unit spot, vega per volatility point, rho per basis point, and theta as native-currency carry P&L over theta_period (default one calendar day), capped at final payment or expiry and not normalized per day.",
     [
-        (delta, "delta"),
-        (gamma, "gamma"),
-        (vega, "vega"),
-        (rho, "rho"),
+        (
+            delta,
+            "delta",
+            "@returns Spot delta: change in native-currency value per unit spot."
+        ),
+        (gamma, "gamma", "@returns Spot gamma: change in delta per unit spot."),
+        (
+            vega,
+            "vega",
+            "@returns Vega in native currency per volatility point (0.01 absolute implied volatility)."
+        ),
+        (
+            rho,
+            "rho",
+            "@returns Domestic rho in native currency per basis point (0.0001 absolute domestic rate)."
+        ),
     ]
 );
 fx_option_subset_class!(
     JsFxBarrierOption,
     "FxBarrierOption",
     "fx_barrier_option",
+    "@returns Map of supported Greek names to values: delta/gamma per unit spot, vega/vanna per volatility point, volga per volatility point squared, rho per basis point, and theta as native-currency carry P&L over theta_period (default one calendar day), capped at final payment or expiry and not normalized per day.",
     [
-        (delta, "delta"),
-        (gamma, "gamma"),
-        (vega, "vega"),
-        (rho, "rho"),
-        (vanna, "vanna"),
-        (volga, "volga"),
+        (delta, "delta", "@returns Spot delta: change in native-currency value per unit spot."),
+        (gamma, "gamma", "@returns Spot gamma: change in delta per unit spot."),
+        (vega, "vega", "@returns Vega in native currency per volatility point (0.01 absolute implied volatility)."),
+        (rho, "rho", "@returns Domestic rho in native currency per basis point (0.0001 absolute domestic rate)."),
+        (vanna, "vanna", "@returns Change in spot delta per volatility point (0.01 absolute implied volatility)."),
+        (volga, "volga", "@returns Volga in native currency per volatility point squared (0.01 absolute implied volatility on each volatility axis)."),
     ]
 );
 fx_class!(JsFxVarianceSwap, "FxVarianceSwap", "fx_variance_swap");
-fx_option_class!(JsQuantoOption, "QuantoOption", "quanto_option");
+fx_option_class!(
+    JsQuantoOption,
+    "QuantoOption",
+    "quanto_option",
+    "@returns Native-currency carry P&L over metric_pricing_overrides.theta_period (default one calendar day), capped at final payment or expiry. Includes rolled PV change and period cashflows; it is not divided by horizon days. The separate analytical theta provider is unsupported.",
+    "@returns Map of supported Greek names to values: delta/gamma per unit spot, vega/vanna per volatility point, volga per volatility point squared, domestic/foreign rho per basis point, and theta as native-currency carry P&L over theta_period (default one calendar day), capped at final payment or expiry and not normalized per day."
+);

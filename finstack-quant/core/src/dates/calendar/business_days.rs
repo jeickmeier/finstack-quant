@@ -66,7 +66,7 @@ pub(crate) fn seek_business_day<C: HolidayCalendar + ?Sized>(
 ) -> Option<Date> {
     let mut searched = 0;
     while !cal.is_business_day(date) {
-        date += Duration::days(step_days as i64);
+        date = date.checked_add(Duration::days(i64::from(step_days)))?;
         searched += 1;
         if searched > max_days {
             return None;

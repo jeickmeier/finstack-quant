@@ -1,11 +1,14 @@
 //! Rolling risk metrics: Sharpe, Sortino, and volatility over a sliding window.
 //!
 //! Crate-internal except for [`DatedSeries`] (re-exported at the crate root).
-//! All rolling functions share O(n) incremental kernels with window rebuilds
-//! and return a [`DatedSeries`] aligned to window-end dates.
+//! All rolling functions use incremental kernels with periodic full-window
+//! rebuilds and return a [`DatedSeries`] aligned to window-end dates. With
+//! rebuild interval `k`, scheduled rebuilds cost `O(n + n * window / k)`;
+//! numerical recovery can trigger additional rebuilds.
 
 use crate::dates::Date;
 use finstack_quant_core::math::neumaier_sum;
+use finstack_quant_core::math::summation::NeumaierAccumulator;
 
 use super::return_based::{invalid_annualization_factor, sharpe};
 
@@ -36,9 +39,13 @@ fn recompute_mean_m2(window: &[f64]) -> (f64, f64) {
 }
 
 #[inline]
-fn recompute_sum_sum_ds(window: &[f64], mar: f64) -> (f64, f64) {
+fn recompute_sum_sum_ds(window: &[f64], mar: f64) -> (NeumaierAccumulator, f64) {
+    let mut sum = NeumaierAccumulator::new();
+    for &value in window {
+        sum.add(value);
+    }
     (
-        neumaier_sum(window.iter().copied()),
+        sum,
         neumaier_sum(window.iter().filter(|&&r| r < mar).map(|&r| {
             let d = mar - r;
             d * d
@@ -214,7 +221,9 @@ pub(crate) fn rolling_sortino(
     rolling_sortino_kernel(returns, n, window, mar, |sum, sum_ds| {
         let m = sum / w - mar;
         let dd = (sum_ds / w).sqrt();
-        out.values.push(if dd == 0.0 {
+        out.values.push(if !m.is_finite() || !dd.is_finite() {
+            f64::NAN
+        } else if dd == 0.0 {
             if m > 0.0 {
                 f64::INFINITY
             } else if m < 0.0 {
@@ -294,12 +303,15 @@ where
 {
     let (mut sum, mut sum_ds) = recompute_sum_sum_ds(&returns[..window], mar);
     let mut downside_scale = sum_ds;
-    emit(sum, sum_ds);
+    emit(sum.total(), sum_ds);
     let mut steps_since_recompute = 0_usize;
     for i in window..n {
         let add = returns[i];
         let rem = returns[i - window];
-        sum += add - rem;
+        // Keep insertion and removal separate so a departing positive outlier
+        // cannot erase the small returns retained in the compensation term.
+        sum.add(add);
+        sum.add(-rem);
         if add < mar {
             let d = mar - add;
             sum_ds += d * d;
@@ -310,7 +322,7 @@ where
             sum_ds -= d * d;
         }
         steps_since_recompute += 1;
-        if !sum.is_finite()
+        if !sum.total().is_finite()
             || !sum_ds.is_finite()
             || sum_ds < 0.0
             || (downside_scale > 0.0 && sum_ds <= f64::EPSILON.sqrt() * downside_scale)
@@ -321,7 +333,7 @@ where
             downside_scale = sum_ds;
             steps_since_recompute = 0;
         }
-        emit(sum, sum_ds);
+        emit(sum.total(), sum_ds);
     }
 }
 
@@ -423,6 +435,47 @@ mod tests {
                 "window {window_start}: got {got}, expected {expected}",
             );
         }
+    }
+
+    #[test]
+    fn rolling_sortino_preserves_small_returns_after_positive_outlier_leaves() {
+        for tail in [1.0e-12, 1.0e-18] {
+            for returns in [
+                vec![0.1, tail, -tail, tail, -tail, tail],
+                vec![0.1, tail, tail, -tail, tail, -tail],
+            ] {
+                let dates: Vec<Date> = (0..returns.len())
+                    .map(|i| jan1(2025) + Duration::days(i as i64))
+                    .collect();
+                let rolling = rolling_sortino(&returns, &dates, 3, 252.0, 0.0);
+                for (start, window) in returns.windows(3).enumerate() {
+                    let expected = sortino(window, true, 252.0, 0.0);
+                    let actual = rolling.values[start];
+                    if expected.is_infinite() {
+                        assert_eq!(actual, expected);
+                    } else {
+                        assert!(
+                            (actual - expected).abs() <= 1.0e-12 * expected.abs().max(1.0),
+                            "tail={tail}, window={window:?}: got {actual}, expected {expected}"
+                        );
+                    }
+                    assert_eq!(rolling.dates[start], dates[start + 2]);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn rolling_sortino_preserves_non_finite_statistics_before_zero_risk_sentinels() {
+        let returns = [1.0e308, 1.0e308, 0.0, 0.0];
+        let dates: Vec<Date> = (0..returns.len())
+            .map(|i| jan1(2025) + Duration::days(i as i64))
+            .collect();
+        let rolling = rolling_sortino(&returns, &dates, 2, 252.0, 0.0);
+        assert!(rolling.values[0].is_nan());
+        assert!(sortino(&returns[..2], true, 252.0, 0.0).is_nan());
+        assert_eq!(rolling.values[1], f64::INFINITY);
+        assert_eq!(rolling.values[2], 0.0);
     }
 
     #[test]

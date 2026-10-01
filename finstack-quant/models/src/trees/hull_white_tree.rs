@@ -118,8 +118,12 @@ impl HullWhiteTreeConfig {
 
     /// Validate configuration parameters.
     pub fn validate(&self) -> Result<()> {
-        validation::require_with(self.kappa > 0.0, || "kappa must be positive".into())?;
-        validation::require_with(self.sigma > 0.0, || "sigma must be positive".into())?;
+        validation::require_with(self.kappa.is_finite() && self.kappa > 0.0, || {
+            "kappa must be finite and positive".into()
+        })?;
+        validation::require_with(self.sigma.is_finite() && self.sigma > 0.0, || {
+            "sigma must be finite and positive".into()
+        })?;
         validation::require_with(self.steps >= 2, || "steps must be at least 2".into())?;
         Ok(())
     }
@@ -201,7 +205,9 @@ impl HullWhiteTree {
     ///
     /// Returns [`finstack_quant_core::Error::Validation`] if the
     /// configuration is invalid or `time_to_maturity` is not a finite,
-    /// strictly positive number of years.
+    /// strictly positive number of years, a discount target is non-finite or
+    /// non-positive, or the calibrated grid misses a target by more than
+    /// 0.1 basis point of relative discount-factor error.
     pub fn calibrate(
         config: HullWhiteTreeConfig,
         discount_curve: &dyn Discounting,
@@ -236,7 +242,9 @@ impl HullWhiteTree {
     /// Returns [`finstack_quant_core::Error::Validation`] if the configuration is
     /// invalid, `time_to_maturity` is not a finite positive number, a
     /// mandatory time is not finite, or calibration produces invalid
-    /// transition probabilities.
+    /// transition probabilities, non-finite state prices, or relative
+    /// discount-factor errors above 0.1 bp. Discount targets must be finite
+    /// and strictly positive on the entire grid.
     pub fn calibrate_with_times(
         config: HullWhiteTreeConfig,
         discount_curve: &dyn Discounting,
@@ -292,6 +300,19 @@ impl HullWhiteTree {
         }
         let time_grid = Self::build_time_grid(config.steps, time_to_maturity, &refined_times)?;
         let n = time_grid.len() - 1;
+        let target_dfs: Vec<f64> = time_grid
+            .iter()
+            .map(|&time| {
+                let target = discount_curve.df(time);
+                if !target.is_finite() || target <= 0.0 {
+                    Err(Error::Validation(format!(
+                        "Hull-White calibration discount factor must be finite and positive at time {time}, got {target}"
+                    )))
+                } else {
+                    Ok(target)
+                }
+            })
+            .collect::<Result<_>>()?;
 
         let dts: Vec<f64> = time_grid.windows(2).map(|w| w[1] - w[0]).collect();
         let step_sigmas: Vec<f64> = dts
@@ -375,7 +396,7 @@ impl HullWhiteTree {
 
             // Calibrate α for the interval [t_step, t_next] to match the
             // discount factor at t_next.
-            let target_df = discount_curve.df(time_grid[step + 1]);
+            let target_df = target_dfs[step + 1];
             alpha[step] = Self::calibrate_alpha(
                 &state_prices[step],
                 j_min,
@@ -394,6 +415,16 @@ impl HullWhiteTree {
                 next_q[center + 1] += contribution * p_up;
                 next_q[center] += contribution * p_mid;
                 next_q[center - 1] += contribution * p_down;
+            }
+            let model_df: f64 = next_q.iter().sum();
+            let relative_error = (model_df - target_df).abs() / target_df;
+            if next_q.iter().any(|q| !q.is_finite() || *q < 0.0)
+                || !relative_error.is_finite()
+                || relative_error > 1e-5
+            {
+                return Err(Error::Validation(format!(
+                    "Hull-White calibration failed to reprice the discount curve at step {step}: model={model_df}, target={target_df}, relative error={relative_error} (maximum 0.1 bp)"
+                )));
             }
 
             branches.push(step_branches);
@@ -650,7 +681,15 @@ impl HullWhiteTree {
         target_df: f64,
         compounding: Compounding,
     ) -> Result<f64> {
-        match compounding {
+        if !target_df.is_finite()
+            || target_df <= 0.0
+            || curr_state_prices.iter().any(|q| !q.is_finite() || *q < 0.0)
+        {
+            return Err(Error::Validation(
+                "Hull-White calibration requires a finite positive discount target and finite non-negative state prices".into(),
+            ));
+        }
+        let alpha = match compounding {
             Compounding::Continuous => {
                 let mut weighted_sum = 0.0;
                 for (idx, &q) in curr_state_prices.iter().enumerate() {
@@ -658,12 +697,12 @@ impl HullWhiteTree {
                     let x_j = j as f64 * dx;
                     weighted_sum += q * (-x_j * dt).exp();
                 }
-                if weighted_sum <= 0.0 {
+                if !weighted_sum.is_finite() || weighted_sum <= 0.0 {
                     return Err(Error::Validation(
                         "Invalid state prices in tree calibration".into(),
                     ));
                 }
-                Ok(-(target_df / weighted_sum).ln() / dt)
+                (weighted_sum.ln() - target_df.ln()) / dt
             }
             _ => {
                 use finstack_quant_core::math::solver::{BrentSolver, Solver};
@@ -683,9 +722,15 @@ impl HullWhiteTree {
                 };
                 BrentSolver::new()
                     .solve(objective, initial_guess)
-                    .map_err(|e| Error::Validation(format!("HW alpha calibration failed: {e}")))
+                    .map_err(|e| Error::Validation(format!("HW alpha calibration failed: {e}")))?
             }
+        };
+        if !alpha.is_finite() {
+            return Err(Error::Validation(
+                "Hull-White calibration produced a non-finite drift adjustment".into(),
+            ));
         }
+        Ok(alpha)
     }
 
     /// Get configuration.
@@ -1137,6 +1182,50 @@ mod tests {
                 step,
                 t
             );
+        }
+    }
+
+    #[test]
+    fn calibration_rejects_invalid_later_discount_targets() {
+        struct InvalidLaterDiscount<'a> {
+            curve: &'a DiscountCurve,
+            target: f64,
+        }
+        impl Discounting for InvalidLaterDiscount<'_> {
+            fn id(&self) -> &finstack_quant_core::types::CurveId {
+                self.curve.id()
+            }
+            fn base_date(&self) -> finstack_quant_core::dates::Date {
+                self.curve.base_date()
+            }
+            fn df(&self, time: f64) -> f64 {
+                if time < 0.75 {
+                    self.curve.df(time)
+                } else {
+                    self.target
+                }
+            }
+        }
+        let curve = test_discount_curve();
+        for compounding in [Compounding::Continuous, Compounding::Simple] {
+            for target in [0.0, -0.1, f64::NAN, f64::INFINITY] {
+                let config = HullWhiteTreeConfig {
+                    compounding,
+                    ..HullWhiteTreeConfig::new(0.03, 0.01, 2)
+                };
+                assert!(
+                    HullWhiteTree::calibrate(
+                        config,
+                        &InvalidLaterDiscount {
+                            curve: &curve,
+                            target
+                        },
+                        1.0,
+                    )
+                    .is_err(),
+                    "compounding={compounding:?}, target={target}"
+                );
+            }
         }
     }
 

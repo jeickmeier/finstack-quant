@@ -914,12 +914,16 @@ impl RevolvingCredit {
     ///
     /// # Errors
     ///
-    /// Returns an error when `calendar_id` names an unknown calendar or the
-    /// business-day roll fails.
+    /// Returns an error when the settlement-day count exceeds the signed offset
+    /// range, the shifted date exceeds the calendar, `calendar_id` names an
+    /// unknown calendar, or the business-day roll fails.
     pub fn settlement_date(&self, as_of: Date) -> finstack_quant_core::Result<Date> {
         if self.settlement_days == 0 {
             return Ok(as_of);
         }
+        let settlement_days = i32::try_from(self.settlement_days).map_err(|_| {
+            finstack_quant_core::Error::Validation("settlement days exceed supported range".into())
+        })?;
         match self.calendar_id.as_deref() {
             Some(calendar_id) => {
                 let calendar = calendar_by_id(calendar_id).ok_or_else(|| {
@@ -927,9 +931,9 @@ impl RevolvingCredit {
                         id: format!("calendar:{calendar_id}"),
                     })
                 })?;
-                as_of.add_business_days(self.settlement_days as i32, calendar)
+                as_of.add_business_days(settlement_days, calendar)
             }
-            None => Ok(as_of.add_weekdays(self.settlement_days as i32)),
+            None => as_of.add_weekdays(settlement_days),
         }
     }
 
@@ -1326,6 +1330,16 @@ mod dependency_tests {
     use super::*;
     use finstack_quant_core::currency::Currency;
     use time::macros::date;
+
+    #[test]
+    fn date_offset_rejects_wrapping_settlement_days() {
+        let mut facility = RevolvingCredit::example().expect("example facility");
+        facility.settlement_days = u32::MAX;
+        for calendar in [None, Some("weekends_only".into())] {
+            facility.calendar_id = calendar;
+            assert!(facility.settlement_date(date!(2025 - 01 - 01)).is_err());
+        }
+    }
 
     #[test]
     fn hull_white_process_uses_canonical_acronym_spelling() {

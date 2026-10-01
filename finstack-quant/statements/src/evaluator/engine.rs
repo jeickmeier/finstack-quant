@@ -15,7 +15,7 @@ use crate::evaluator::results::{EvalStats, EvalWarning, StatementResult};
 use crate::evaluator::{
     capital_structure_runtime, capital_structure_runtime::dependent_closure, PeriodHistory,
 };
-use crate::types::{FinancialModelSpec, NodeId};
+use crate::types::{FinancialModelSpec, NodeId, NodeValueType};
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::expr::Expr;
 use indexmap::IndexMap;
@@ -41,17 +41,20 @@ pub struct PreparedEvaluation {
     /// evaluations are independent of the evaluator's mutable compiled cache
     /// (which other `evaluate` calls may overwrite).
     compiled_cache: std::sync::Arc<IndexMap<NodeId, Expr>>,
-    /// Fingerprint of the formula / where-clause text this plan was compiled
-    /// from, used to reject a model whose formulas have since changed.
+    /// Fingerprint of the timeline, node structure, forecasts and declared units
+    /// this plan was compiled from, rejecting changes beyond input values.
     formula_fingerprint: u64,
+    /// Canonical units inferred and validated when the plan was prepared.
+    node_value_types: IndexMap<NodeId, NodeValueType>,
 }
 
-/// Fingerprint the formula and where-clause text of every node.
+/// Fingerprint the evaluation timeline and each node's calculation structure.
 ///
 /// `PreparedEvaluation` snapshots *compiled* expressions, so a model whose
 /// formulas changed after `prepare` would silently evaluate the stale code.
-/// Comparing the node set cannot catch that — the nodes are identical, only
-/// their formulas differ — so the text itself is fingerprinted.
+/// Comparing the node set cannot catch changes in formulas, units, forecast
+/// parameters, observation availability or period dates, so these are all
+/// fingerprinted while mutable explicit observation values are excluded.
 ///
 /// `model.nodes` is an `IndexMap`, so iteration is insertion-ordered and the
 /// fingerprint is deterministic. It is only ever compared against another
@@ -59,10 +62,37 @@ pub struct PreparedEvaluation {
 fn formula_fingerprint(model: &FinancialModelSpec) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    for period in &model.periods {
+        period.id.hash(&mut hasher);
+        period.start.hash(&mut hasher);
+        period.end.hash(&mut hasher);
+        period.is_actual.hash(&mut hasher);
+    }
     for (node_id, spec) in &model.nodes {
         node_id.as_str().hash(&mut hasher);
+        spec.node_id.hash(&mut hasher);
+        spec.node_type.hash(&mut hasher);
         spec.formula_text.hash(&mut hasher);
         spec.where_text.hash(&mut hasher);
+        for (period, date) in &spec.availability_dates {
+            period.hash(&mut hasher);
+            date.hash(&mut hasher);
+        }
+        if let Some(forecast) = &spec.forecast {
+            forecast.method.hash(&mut hasher);
+            for (parameter, value) in &forecast.params {
+                parameter.hash(&mut hasher);
+                value.hash(&mut hasher);
+            }
+        }
+        match spec.value_type {
+            None => 0_u8.hash(&mut hasher),
+            Some(NodeValueType::Scalar) => 1_u8.hash(&mut hasher),
+            Some(NodeValueType::Monetary { currency }) => {
+                2_u8.hash(&mut hasher);
+                currency.hash(&mut hasher);
+            }
+        }
     }
     hasher.finish()
 }
@@ -257,12 +287,22 @@ impl Evaluator {
             model.periods.first(),
         ) {
             for (instrument_id, instrument) in insts {
-                let opening_balance = capital_structure_runtime::resolve_opening_balance(
-                    instrument.as_ref(),
-                    market_ctx,
-                    as_of_date,
-                    first_period.start,
-                )?;
+                let opening_balance =
+                    if crate::capital_structure::period_flows::is_debt_kind(instrument.key())? {
+                        capital_structure_runtime::resolve_opening_balance(
+                            instrument.as_ref(),
+                            market_ctx,
+                            as_of_date,
+                            first_period.start,
+                        )?
+                    } else {
+                        // Hedge notional sizes contractual coupons; it is not borrowing principal.
+                        let schedule = instrument.raw_cashflow_schedule(market_ctx, as_of_date)?;
+                        finstack_quant_core::money::Money::from((
+                            0_i64,
+                            schedule.get_notional().initial.currency(),
+                        ))
+                    };
 
                 state
                     .opening_balances
@@ -270,9 +310,10 @@ impl Evaluator {
             }
         }
 
-        let mut historical = std::sync::Arc::new(PeriodHistory::new(std::sync::Arc::clone(
-            &prepared.node_to_column,
-        )));
+        let mut historical = std::sync::Arc::new(PeriodHistory::with_periods(
+            std::sync::Arc::clone(&prepared.node_to_column),
+            &model.periods,
+        ));
         let mut historical_cs: std::sync::Arc<
             IndexMap<PeriodId, crate::capital_structure::CapitalStructureCashflows>,
         > = std::sync::Arc::new(IndexMap::new());
@@ -349,6 +390,7 @@ impl Evaluator {
         self.finalize_results(
             &mut results,
             model,
+            &prepared,
             EvalStats {
                 #[cfg(not(target_arch = "wasm32"))]
                 eval_time_ms: Some(start.elapsed().as_millis() as u64),
@@ -436,7 +478,9 @@ impl Evaluator {
     /// Returns an evaluation error if `prepared` does not cover exactly the
     /// model's current node set; rebuild it with [`prepare`](Self::prepare)
     /// after any structural change. It also propagates ordinary evaluation
-    /// errors for missing inputs, failed forecasts, formulas, and final checks.
+    /// errors for missing inputs, incompatible explicit scalar/currency types,
+    /// failed forecasts, formulas, and final checks. Declared units must remain
+    /// unchanged; rebuild the model and plan for a different currency or type.
     /// Callers must rebuild after formula changes as well: the plan deliberately
     /// reuses the compiled expressions captured at preparation time.
     ///
@@ -473,6 +517,7 @@ impl Evaluator {
             nodes = model.nodes.len(),
         )
         .entered();
+        let explicit_value_types = model.validate_explicit_values()?;
         self.forecast_cache.clear();
         self.visibility_cutoff = None;
         // Use the compiled expressions captured at prepare time, not whatever
@@ -511,16 +556,28 @@ impl Evaluator {
         // plan was built from and return a well-formed but wrong result.
         if formula_fingerprint(model) != prepared.formula_fingerprint {
             return Err(Error::eval(
-                "evaluate_prepared: a formula or where clause differs from the model the \
+                "evaluate_prepared: a formula, where clause, declared value type, period, or forecast differs from the model the \
                  prepared plan was built for. The plan holds compiled expressions, so \
                  evaluating would silently use the old formula. Rebuild the plan with \
                  `prepare` (only node *values* may differ between prepare and evaluate).",
             ));
         }
 
-        let mut historical = std::sync::Arc::new(PeriodHistory::new(std::sync::Arc::clone(
-            &prepared.node_to_column,
-        )));
+        // A directly constructed model need not declare its units. Once the
+        // declared structure matches, also preserve the units inferred by prepare.
+        for (node_id, actual) in explicit_value_types {
+            if prepared.node_value_types.get(&node_id) != Some(&actual) {
+                return Err(Error::eval(format!(
+                    "evaluate_prepared: input '{node_id}' has type {actual:?}, which differs \
+                     from its prepared value type; rebuild the model and plan"
+                )));
+            }
+        }
+
+        let mut historical = std::sync::Arc::new(PeriodHistory::with_periods(
+            std::sync::Arc::clone(&prepared.node_to_column),
+            &model.periods,
+        ));
         let historical_cs: std::sync::Arc<
             IndexMap<PeriodId, crate::capital_structure::CapitalStructureCashflows>,
         > = std::sync::Arc::new(IndexMap::new());
@@ -551,6 +608,7 @@ impl Evaluator {
         self.finalize_results(
             &mut results,
             model,
+            prepared,
             EvalStats {
                 eval_time_ms: None,
                 num_nodes: model.nodes.len(),
@@ -631,6 +689,10 @@ impl Evaluator {
 
         let prepared = self.init_eval_plan(model)?;
 
+        let empty_history = std::sync::Arc::new(PeriodHistory::with_periods(
+            std::sync::Arc::clone(&prepared.node_to_column),
+            &model.periods,
+        ));
         // Run paths — parallel via rayon on native targets, serial on wasm32
         // (rayon's thread pool is unavailable in single-threaded wasm).
         // Both paths are deterministic for a given seed.
@@ -643,9 +705,7 @@ impl Evaluator {
                 .wrapping_mul(6_364_136_223_846_793_005)
                 .wrapping_add(path_idx as u64);
             let mut mc_z_cache = McZCache::new();
-            let mut historical = std::sync::Arc::new(PeriodHistory::new(std::sync::Arc::clone(
-                &prepared.node_to_column,
-            )));
+            let mut historical = std::sync::Arc::clone(&empty_history);
             // Monte Carlo paths carry no capital-structure history.
             let historical_cs: std::sync::Arc<
                 IndexMap<PeriodId, crate::capital_structure::CapitalStructureCashflows>,
@@ -719,6 +779,11 @@ impl Evaluator {
     /// the topological evaluation order. Shared by [`evaluate_inner`](Self::evaluate_inner),
     /// [`prepare`](Self::prepare), and [`evaluate_monte_carlo`](Self::evaluate_monte_carlo).
     fn init_eval_plan(&mut self, model: &FinancialModelSpec) -> Result<PreparedEvaluation> {
+        // Public Rust models are mutable and may be constructed without the
+        // builder. Revalidate formulas and infer units before compiling, rather
+        // than trusting a validation that preceded the caller's last mutation.
+        let mut validated = model.clone();
+        validated.validate_semantics()?;
         self.compiled_cache = std::sync::Arc::new(IndexMap::new());
         self.forecast_cache.clear();
         self.visibility_cutoff = None;
@@ -739,6 +804,11 @@ impl Evaluator {
             dag,
             compiled_cache: std::sync::Arc::clone(&self.compiled_cache),
             formula_fingerprint: formula_fingerprint(model),
+            node_value_types: validated
+                .nodes
+                .iter()
+                .map(|(id, node)| (id.clone(), node.value_type.unwrap_or(NodeValueType::Scalar)))
+                .collect(),
         })
     }
 
@@ -747,10 +817,11 @@ impl Evaluator {
         &self,
         results: &mut StatementResult,
         model: &FinancialModelSpec,
+        prepared: &PreparedEvaluation,
         meta: EvalStats,
     ) -> Result<()> {
-        results.populate_value_types(model)?;
         results.meta = meta;
+        results.populate_value_types(&prepared.node_value_types);
         if let Some(suite) = &self.check_suite {
             results.check_report = Some(suite.run(model, results)?);
         }

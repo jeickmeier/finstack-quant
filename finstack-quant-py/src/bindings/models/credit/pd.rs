@@ -502,7 +502,7 @@ impl PyMasterScale {
 
 /// Build the `finstack_quant.models.credit.pd` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "pd")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "pd")?;
     m.setattr(
         "__doc__",
         "Probability of default: PiT/TtC conversion (Merton-Vasicek), central-tendency calibration, Basel IRB floor, and rating master scales.",
@@ -531,13 +531,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "pd",
-        "finstack_quant.models.credit",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
 
     Ok(())

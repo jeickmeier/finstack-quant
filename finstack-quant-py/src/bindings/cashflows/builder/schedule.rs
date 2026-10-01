@@ -534,7 +534,8 @@ impl PyCashFlowSchedule {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``scale`` is NaN or infinite.
+    ///     If ``scale`` is non-finite or a scaled cash amount or principal
+    ///     movement exceeds the Decimal range.
     #[pyo3(text_signature = "(self, scale)")]
     fn scale_amounts(&self, scale: f64) -> PyResult<Self> {
         self.inner
@@ -549,7 +550,8 @@ impl PyCashFlowSchedule {
     /// Raises
     /// ------
     /// ValueError
-    ///     If the schedule carries no principal flows after ``as_of``.
+    ///     If future principal repayments mix currencies or the day-count
+    ///     calculation fails. No future repayments returns zero.
     #[pyo3(text_signature = "(self, as_of)")]
     fn wal(&self, as_of: &Bound<'_, PyAny>) -> PyResult<f64> {
         self.inner.wal(extract_date(as_of)?).map_err(core_to_py)
@@ -657,7 +659,7 @@ impl PyCashFlowSchedule {
     /// ------
     /// ValueError
     ///     If ``pvs`` does not have one entry per flow or contains a
-    ///     non-finite value.
+    ///     non-finite value, or flow amounts mix currencies.
     #[pyo3(text_signature = "(self, pvs)")]
     fn calendar_year_ladder<'py>(
         &self,
@@ -680,6 +682,13 @@ impl PyCashFlowSchedule {
     }
 
     /// Serialize the canonical schedule to JSON.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If a flow's effective rate or projected index rate is non-finite,
+    ///     or the schedule cannot be serialized. Invalid rates are never
+    ///     encoded as absent.
     #[allow(clippy::wrong_self_convention)]
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
@@ -717,8 +726,9 @@ impl PyCashFlowSchedule {
     /// ----------
     /// outstanding : bool, default False
     ///     Append an ``outstanding`` column with the principal balance
-    ///     (float, in the flow currency) after the last principal event on or
-    ///     before each flow date, from ``outstanding_by_date``.
+    ///     (float, in the notional currency) after all economic principal
+    ///     events on or before each payment date. Before the first event,
+    ///     use the initial notional.
     ///
     /// Returns
     /// -------
@@ -731,7 +741,8 @@ impl PyCashFlowSchedule {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``outstanding=True`` and principal flows mix currencies.
+    ///     If ``outstanding=True`` and ``meta.issue_date`` is missing or
+    ///     principal flows mix currencies with the notional.
     #[allow(clippy::wrong_self_convention)]
     #[pyo3(signature = (outstanding=false), text_signature = "(self, outstanding=False)")]
     fn to_dataframe<'py>(&self, py: Python<'py>, outstanding: bool) -> PyResult<Bound<'py, PyAny>> {
@@ -794,17 +805,12 @@ impl PyCashFlowSchedule {
             pd.call_method1("to_datetime", (principal_dates,))?,
         )?;
         if outstanding {
-            // Display balances at cash settlement dates, using the separately
-            // reconstructed economic principal timeline.
-            let path = self.inner.outstanding_by_date().map_err(core_to_py)?;
-            let balances: Vec<Option<f64>> = flows
-                .iter()
-                .map(|f| {
-                    path.iter()
-                        .take_while(|(d, _)| *d <= f.date)
-                        .last()
-                        .map(|(_, m)| m.amount())
-                })
+            let balances: Vec<f64> = self
+                .inner
+                .outstanding_at_dates(&dates)
+                .map_err(core_to_py)?
+                .into_iter()
+                .map(|balance| balance.amount())
                 .collect();
             columns.set_item("outstanding", balances)?;
         }

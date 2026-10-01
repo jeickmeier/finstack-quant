@@ -420,7 +420,7 @@ mod tests {
         let mut d = start;
         while d < as_of {
             obs.push((d, fixing_rate));
-            d = d.add_weekdays(1);
+            d = d.add_weekdays(1).expect("valid date shift");
         }
         let fixings = ScalarTimeSeries::new(format!("FIXING:{}", fwd_id.as_str()), obs, None)
             .expect("fixings series");
@@ -477,7 +477,7 @@ mod tests {
         let mut acc = 1.0;
         let mut day = start;
         while day < end {
-            let next = day.add_weekdays(1);
+            let next = day.add_weekdays(1).expect("valid date shift");
             let step_end = if next > end { end } else { next };
             let dcf = DayCount::Act360
                 .year_fraction(day, step_end, DayCountContext::default())
@@ -927,7 +927,7 @@ mod tests {
         let mut d = start;
         while d < as_of {
             obs.push((d, fixing_rate));
-            d = d.add_weekdays(1);
+            d = d.add_weekdays(1).expect("valid date shift");
         }
         let fixings = ScalarTimeSeries::new(format!("FIXING:{}", fwd_id.as_str()), obs, None)
             .expect("fixings series");

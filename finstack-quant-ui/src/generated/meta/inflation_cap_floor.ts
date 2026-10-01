@@ -32,7 +32,8 @@ export default [
             "start_date": "2024-01-15",
             "strike": "0.03",
             "stub": "short_front",
-            "vol_surface_id": "USD-INFL-VOL"
+            "vol_surface_id": "USD-INFL-VOL",
+            "volatility_expiry": "reference_date"
           },
           "type": "inflation_cap_floor"
         },
@@ -502,7 +503,7 @@ export default [
   {
     "path": "#/$defs/d_2572320f93343dabe361/properties/day_count",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationCapFloor/properties/day_count",
-    "description": "Day count convention for accrual and option time.",
+    "description": "Day count convention for accrual. Option quote time always uses ACT/365F.",
     "ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#"
   },
@@ -533,12 +534,6 @@ export default [
     "description": "Inflation index/curve identifier (e.g., US-CPI-U).",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_2572320f93343dabe361/properties/inflation_nominal_correlation",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationCapFloor/properties/inflation_nominal_correlation",
-    "description": "Correlation between the inflation index and the nominal short rate,\nused in the YoY convexity/timing adjustment. `None` ⇒ treated as 0\n(the timing term vanishes; the pure inflation-vol Jensen convexity\n`σ_I²·τ` is still applied).",
-    "format": "double"
   },
   {
     "path": "#/$defs/d_2572320f93343dabe361/properties/instrument_pricing_overrides",
@@ -592,12 +587,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#"
   },
   {
-    "path": "#/$defs/d_2572320f93343dabe361/properties/nominal_rate_volatility",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationCapFloor/properties/nominal_rate_volatility",
-    "description": "Nominal short-rate volatility `σ_n` (annualized, absolute), used in the\nYoY timing term. `None` ⇒ the `ρ·σ_n` timing term is dropped.",
-    "format": "double"
-  },
-  {
     "path": "#/$defs/d_2572320f93343dabe361/properties/notional",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationCapFloor/properties/notional",
     "description": "Notional amount in quote currency.",
@@ -646,6 +635,14 @@ export default [
     "description": "Volatility surface identifier.",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_2572320f93343dabe361/properties/volatility_expiry",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationCapFloor/properties/volatility_expiry",
+    "default": "reference_date",
+    "description": "Clock used by the volatility surface's annualized quotes. This is\nindependent of CPI publication policy; changing it requires matching\nquotes, not merely relabelling the old surface.",
+    "ref": "#/$defs/InflationVolatilityExpiry",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationVolatilityExpiry"
   },
   {
     "path": "#/$defs/d_2701caf4934336a2dd86",
@@ -1260,7 +1257,7 @@ export default [
   {
     "path": "#/$defs/d_5c13df5a55f1da604df2",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding",
-    "description": "Compounding convention for interest rates.\n\nUsed to specify how interest rates should be quoted or converted.\nAll variants produce mathematically equivalent discount factors when\napplied consistently.\n\n# Relationship Between Conventions\n\nFor a given discount factor DF at time t, the rates under different\nconventions are related by:\n\n```text\nDF = e^(-r_cc × t)                    [Continuous]\n   = (1 + r_ann)^(-t)                 [Annual]\n   = (1 + r_per/n)^(-n×t)             [Periodic(n)]\n   = 1 / (1 + r_simple × t)           [Simple]\n```\n\n# Ordering of Rates\n\nFor positive rates and t > 0: `r_simple > r_annual > r_continuous`\n(less frequent compounding requires a higher quoted rate for the same DF)."
+    "description": "Compounding convention for interest rates.\n\nUsed to specify how interest rates should be quoted or converted.\nAll variants produce mathematically equivalent discount factors when\napplied consistently.\n\n# Relationship Between Conventions\n\nFor a given discount factor DF at time t, the rates under different\nconventions are related by:\n\n```text\nDF = e^(-r_cc × t)                    [Continuous]\n   = (1 + r_ann)^(-t)                 [Annual]\n   = (1 + r_per/n)^(-n×t)             [Periodic(n)]\n   = 1 / (1 + r_simple × t)           [Simple]\n```\n\n# Ordering of Rates\n\nFor a common discount factor below one, annual and simple rates both exceed\nthe continuous rate. Their ordering depends on the maturity `t` in years:\n`r_annual > r_simple` for `0 < t < 1`, they agree at `t = 1`, and\n`r_simple > r_annual` for `t > 1`."
   },
   {
     "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/0",
@@ -1551,6 +1548,23 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PikMode/oneOf/3",
     "const": "toggle",
     "description": "Deferred to the [`ToggleExerciseModel`] on the config.\nFalls back to `Cash` if no toggle model is set."
+  },
+  {
+    "path": "#/$defs/d_8299c717c823ee1759e5",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationVolatilityExpiry",
+    "description": "Expiry convention of the annualized inflation-option volatility surface."
+  },
+  {
+    "path": "#/$defs/d_8299c717c823ee1759e5/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationVolatilityExpiry/oneOf/0",
+    "const": "reference_date",
+    "description": "ACT/365F time to the lagged contractual end date. If CPI is still\nunpublished after this date, the quote clock is inconsistent and pricing\nfails instead of treating the unknown payoff as deterministic."
+  },
+  {
+    "path": "#/$defs/d_8299c717c823ee1759e5/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationVolatilityExpiry/oneOf/1",
+    "const": "publication_date",
+    "description": "ACT/365F time to publication of the final required CPI anchor. Requires\nexplicit publication dates for every outstanding monthly anchor and\na volatility surface quoted on this publication-expiry clock."
   },
   {
     "path": "#/$defs/d_8a837e6f142b34e8cfd4",
@@ -3777,7 +3791,7 @@ export default [
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/10",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/10",
     "const": "act_act_isma",
-    "description": "Actual/Actual (ICMA) day count convention.\n\nUses actual days in numerator and actual days in the coupon period\nas denominator, requiring knowledge of payment frequency.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251 - \"Actual/Actual (ICMA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ICMA\" (A007)\n- **Also known as**: Act/Act (ICMA), Act/Act (ISMA), ISMA-99\n\n# Algorithm\n\n1. Determine quasi-coupon periods based on payment frequency\n2. For each period: (actual days) / (actual days in coupon period)\n3. Sum fractions across periods\n\n# Usage\n\nStandard for:\n- International bonds with regular coupons\n- Eurobonds with semi-annual or annual payments\n- ICMA-governed securities\n\n# Requirements\n\nRequires `frequency` in [`DayCountContext`] to determine regular coupon periods.\nFor irregular first/last coupons, use\n[`act_act_isma_year_fraction_with_reference_period`].\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 15).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::July, 15).expect(\"Valid date\");\nlet frequency = Tenor::semi_annual(); // Semi-annual\n\nlet yf = DayCount::ActActIsma.year_fraction(\n    start,\n    end,\n    DayCountContext { frequency: Some(frequency), ..Default::default() }\n).expect(\"Year fraction calculation should succeed\");\n\n// Full semi-annual period = 0.5 year fraction (6 months / 12 months)\nassert!((yf - 0.5).abs() < 1e-6);\n```\n\n# References\n\n- ICMA (2010). \"ICMA Rule Book.\" Rule 251. `docs/REFERENCES.md#icma-rule-book`\n- ISMA (1999). \"Recommendations for Accrued Interest Calculations.\""
+    "description": "Actual/Actual (ICMA) day count convention.\n\nUses actual days in numerator and actual days in the coupon period\nas denominator, requiring knowledge of payment frequency.\nExplicit reference coupon boundaries must be unadjusted regular dates\nfrom the contractual nominal month grid, rather than payment dates.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251 - \"Actual/Actual (ICMA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ICMA\" (A007)\n- **Also known as**: Act/Act (ICMA), Act/Act (ISMA), ISMA-99\n\n# Algorithm\n\n1. Determine quasi-coupon periods based on payment frequency\n2. For each period: (actual days) / (actual days in coupon period)\n3. Sum fractions across periods\n\n# Usage\n\nStandard for:\n- International bonds with regular coupons\n- Eurobonds with semi-annual or annual payments\n- ICMA-governed securities\n\n# Requirements\n\nRequires `frequency` in [`DayCountContext`] to determine regular coupon periods.\nFor irregular first/last coupons, use\n[`act_act_isma_year_fraction_with_reference_period`].\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 15).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::July, 15).expect(\"Valid date\");\nlet frequency = Tenor::semi_annual(); // Semi-annual\n\nlet yf = DayCount::ActActIsma.year_fraction(\n    start,\n    end,\n    DayCountContext { frequency: Some(frequency), ..Default::default() }\n).expect(\"Year fraction calculation should succeed\");\n\n// Full semi-annual period = 0.5 year fraction (6 months / 12 months)\nassert!((yf - 0.5).abs() < 1e-6);\n```\n\n# References\n\n- ICMA (2010). \"ICMA Rule Book.\" Rule 251. `docs/REFERENCES.md#icma-rule-book`\n- ISMA (1999). \"Recommendations for Accrued Interest Calculations.\""
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/11",
@@ -3801,7 +3815,7 @@ export default [
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/3",
     "const": "act_365l",
-    "description": "Actual/365 Leap day count convention (Actual/365L) per ICMA Rule 251.\n\nYear fraction = (actual days) / (365 or 366), where the denominator\nrule depends on the coupon frequency supplied via [`DayCountContext`]:\n\n- **Annual** (or no frequency supplied): 366 if February 29 falls in\n  the interval `(start, end]` (exclusive of start, inclusive of end),\n  else 365.\n- **Non-annual**: 366 if the period END date falls in a leap year,\n  else 365.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251.1(i)(c)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365L\" (A008)\n- **Also known as**: Act/365L, ISMA-Year\n\nNote: this is **not** ACT/ACT AFB (Association Française des Banques),\nwhich uses a different (sub-period splitting) algorithm. The former\n`act_365afb` parse alias was removed because it conflated the two\nconventions. Use [`DayCount::ActActAfb`] for AFB / Actual/Actual Euro.\n\n# Usage\n\nUsed in:\n- GBP floating-rate notes\n- Some European bond markets\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\n// Period containing Feb 29, 2024 (leap year)\nlet start = Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2024, Month::March, 1).expect(\"Valid date\");\n\nlet yf = DayCount::Act365L.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n// 29 days / 366 (leap year denominator)\nassert_eq!(yf, 29.0 / 366.0);\n```"
+    "description": "Actual/365 Leap day count convention (Actual/365L) per ICMA Rule 251.\n\nYear fraction = (actual days) / (365 or 366), where the denominator\nrule depends on the coupon frequency and enclosing `coupon_period`\nsupplied via [`DayCountContext`]. Both are required:\n\n- **Annual**: 366 if February 29 falls in\n  `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),\n  else 365.\n- **Non-annual**: 366 if the next coupon date falls in a leap year,\n  else 365.\n\nPartial accrual keeps the enclosing coupon's denominator. Accrual\ndates outside that coupon are rejected; sum separate coupon slices\nfor calculations spanning multiple coupon periods.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251.1(i)(c)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365L\" (A008)\n- **Also known as**: Act/365L, ISMA-Year\n\nNote: this is **not** ACT/ACT AFB (Association Française des Banques),\nwhich uses a different (sub-period splitting) algorithm. The former\n`act_365afb` parse alias was removed because it conflated the two\nconventions. Use [`DayCount::ActActAfb`] for AFB / Actual/Actual Euro.\n\n# Usage\n\nUsed in:\n- GBP floating-rate notes\n- Some European bond markets\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};\nuse time::Month;\n\n// Period containing Feb 29, 2024 (leap year)\nlet start = Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2024, Month::March, 1).expect(\"Valid date\");\n\nlet ctx = DayCountContext {\n    frequency: Some(Tenor::annual()),\n    coupon_period: Some((start, end)),\n    ..DayCountContext::default()\n};\nlet yf = DayCount::Act365L.year_fraction(start, end, ctx).expect(\"Year fraction calculation should succeed\");\n// 29 days / 366 (leap year denominator)\nassert_eq!(yf, 29.0 / 366.0);\n```"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/4",
@@ -3831,7 +3845,7 @@ export default [
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/8",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/8",
     "const": "nl_365",
-    "description": "NL/365 (Actual/365 No Leap) day count convention.\n\nYear fraction = (actual days excluding any February 29) / 365\n\n# Standards Reference\n\n- **Also known as**: Act/365 No Leap, NL365, Actual/365NL\n- Counts the actual calendar days in `[start, end)` and removes every\n  February 29 that falls in the period, so a full leap year still\n  yields exactly 1.0.\n\n# Usage\n\nUsed in:\n- Some Canadian money-market and mortgage instruments\n- Legacy systems that ignore leap days for accrual\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\n// Full leap year 2024: 366 actual days, Feb 29 excluded → 365/365 = 1.0\nlet start = Date::from_calendar_date(2024, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\n\nlet yf = DayCount::Nl365.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\nassert_eq!(yf, 1.0);\n```"
+    "description": "NL/365 (Actual/365 No Leap) day count convention.\n\nYear fraction = (actual days excluding any February 29) / 365\n\n# Standards Reference\n\n- **Also known as**: Act/365 No Leap, NL365, Actual/365NL\n- Counts the actual calendar days in `(start, end]` and removes every\n  February 29 that falls in the period, so a full leap year still\n  yields exactly 1.0.\n\n# Usage\n\nUsed in:\n- Some Canadian money-market and mortgage instruments\n- Legacy systems that ignore leap days for accrual\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\n// Full leap year 2024: 366 actual days, Feb 29 excluded → 365/365 = 1.0\nlet start = Date::from_calendar_date(2024, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\n\nlet yf = DayCount::Nl365.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\nassert_eq!(yf, 1.0);\n```"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/9",
@@ -3865,7 +3879,7 @@ export default [
   {
     "path": "#/$defs/d_c8d5a8dc925586cc9b9d",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationLag",
-    "description": "Publication lag for inflation index reference dates.\n\nInflation indices are published with a delay (typically 2-4 weeks). Securities\nusing these indices incorporate a lag to ensure the reference index is published\nby the settlement date.\n\n# Standard Lags by Market\n\n- **US TIPS**: 3-month lag (reference index from 3 months prior)\n- **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)\n- **French OATi**: 3-month lag\n- **German index-linked**: 3-month lag\n\n# Rationale\n\nThe lag ensures:\n1. Reference index is published before settlement\n2. Index value is known at coupon payment date\n3. No estimation or forecasting required for payment calculation\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationLag;\n\nlet tips_lag = InflationLag::Months(3);  // US TIPS standard\nlet gilt_lag = InflationLag::Months(3);  // UK modern gilts\nlet no_lag = InflationLag::None;         // Inflation swaps (forecast-based)\n```"
+    "description": "Contractual observation lag for inflation index reference dates.\n\nInflation indices are published with a delay (typically 2-4 weeks). Securities\nusing these indices incorporate an observation lag to ensure the reference\nindex is published by settlement. This lag does not specify the actual\npublication date; use [`InflationIndex::with_publication_dates`] for that.\n\n# Standard Lags by Market\n\n- **US TIPS**: 3-month lag (reference index from 3 months prior)\n- **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)\n- **French OATi**: 3-month lag\n- **German index-linked**: 3-month lag\n\n# Rationale\n\nThe lag ensures:\n1. Reference index is published before settlement\n2. Index value is known at coupon payment date\n3. No estimation or forecasting required for payment calculation\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationLag;\n\nlet tips_lag = InflationLag::Months(3);  // US TIPS standard\nlet gilt_lag = InflationLag::Months(3);  // UK modern gilts\nlet no_lag = InflationLag::None;         // Inflation swaps (forecast-based)\n```"
   },
   {
     "path": "#/$defs/d_c8d5a8dc925586cc9b9d/oneOf/0",
@@ -4263,7 +4277,7 @@ export default [
     "path": "#/$defs/d_f80f2b90e7af690c5898/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/VarMethod/oneOf/1",
     "const": "taylor_approximation",
-    "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options)."
+    "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options).\nEquity Greeks are associated with their actual market-scalar identifier.\nInstruments with multiple underlying spots or ambiguous scalar ownership\nrequire full revaluation; aggregate gamma is not a multi-asset Hessian."
   },
   {
     "path": "#/$defs/d_fd618cd5743ec18a168f",

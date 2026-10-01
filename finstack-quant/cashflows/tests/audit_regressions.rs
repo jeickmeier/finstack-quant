@@ -33,6 +33,169 @@ fn close(actual: f64, expected: f64) {
 }
 
 #[test]
+fn act365l_balance_segments_preserve_the_full_coupon_denominator() {
+    use finstack_quant_core::dates::DayCount;
+    use finstack_quant_core::market_data::{context::MarketContext, term_structures::ForwardCurve};
+    for (issue, maturity, balance_change, frequency, first_days, last_days) in [
+        (
+            "2023-03-01",
+            "2024-03-01",
+            "2023-06-01",
+            json!({"count":1,"unit":"years"}),
+            92.0,
+            274.0,
+        ),
+        (
+            "2023-12-01",
+            "2024-03-01",
+            "2023-12-15",
+            json!({"count":3,"unit":"months"}),
+            14.0,
+            77.0,
+        ),
+    ] {
+        for floating in [false, true] {
+            let mut value = spec(issue, maturity);
+            value["coupon_program"][0]["spec"]["frequency"] = frequency.clone();
+            value["coupon_program"][0]["spec"]["day_count"] = json!("act_365l");
+            value["principal_events"] = json!([{
+                "date":balance_change, "payment_date":balance_change, "kind":"amortization",
+                "delta":{"amount":"-500000","currency":"USD"}
+            }]);
+            // Both contractual coupons use ACT/365L's 366-day denominator.
+            // Express the intended 10% coupon on the curve's ACT/365F basis:
+            // r_curve * days/365 = 10% * days/366.
+            let curve_rate = 0.1 * 365.0 / 366.0;
+            let curve = ForwardCurve::builder("TERM", if first_days == 92.0 { 1.0 } else { 0.25 })
+                .day_count(DayCount::Act365F)
+                .base_date(date(issue))
+                .knots([(0.0, curve_rate), (2.0, curve_rate)])
+                .build()
+                .expect("flat term curve");
+            let market = MarketContext::new().insert(curve);
+            if floating {
+                value["coupon_program"][0]["kind"] = json!("floating");
+                value["coupon_program"][0]["spec"]
+                    .as_object_mut()
+                    .expect("coupon")
+                    .remove("rate");
+                value["coupon_program"][0]["spec"]["rate_spec"] = json!({
+                    "forward_curve_id":"TERM", "spread_bp":"0", "reset_frequency":frequency,
+                    "reset_lag_days":0
+                });
+            }
+            let schedule = serde_json::from_value::<cf::CashflowScheduleBuildSpec>(value)
+                .expect("spec")
+                .build(Some(&market))
+                .expect("coupon schedule");
+            let coupons: Vec<_> = schedule.coupons().collect();
+            assert_eq!(coupons.len(), 2);
+            close(coupons[0].accrual_factor, first_days / 366.0);
+            close(coupons[1].accrual_factor, last_days / 366.0);
+            close(
+                coupons.iter().map(|flow| flow.amount.amount()).sum(),
+                1_000_000.0 * 0.1 * first_days / 366.0 + 500_000.0 * 0.1 * last_days / 366.0,
+            );
+        }
+    }
+}
+
+#[test]
+fn act365l_periodic_fees_use_actual_stub_boundaries_for_every_balance_segment() {
+    use finstack_quant_core::dates::{DayCount, DayCountContext, Tenor};
+    for (issue, maturity, change, stub, frequency, denominator) in [
+        // The ICMA reference includes Feb 29, but this short coupon does not.
+        (
+            "2024-03-01",
+            "2025-01-01",
+            "2024-06-01",
+            "short_front",
+            Tenor::annual(),
+            365.0,
+        ),
+        // A long first coupon begins before its adjacent ICMA reference.
+        (
+            "2023-12-01",
+            "2025-01-01",
+            "2024-01-15",
+            "long_front",
+            Tenor::annual(),
+            366.0,
+        ),
+        // The first balance segment ends before the full coupon's leap day.
+        (
+            "2023-03-01",
+            "2024-03-01",
+            "2023-06-01",
+            "short_front",
+            Tenor::annual(),
+            366.0,
+        ),
+        // A non-annual coupon crosses into a leap year after the first segment.
+        (
+            "2023-12-01",
+            "2024-03-01",
+            "2023-12-15",
+            "short_front",
+            Tenor::quarterly(),
+            366.0,
+        ),
+    ] {
+        for basis in ["point_in_time", "time_weighted_average"] {
+            let mut value = spec(issue, maturity);
+            value["coupon_program"] = json!([]);
+            value["fees"] = json!([{"periodic_bp":{
+                "base":"drawn", "bp":"100", "frequency":frequency,
+                "day_count":"act_365l", "business_day_convention":"unadjusted",
+                "calendar_id":"weekends_only", "stub":stub, "accrual_basis":basis
+            }}]);
+            value["principal_events"] = json!([{
+                "date":change, "payment_date":change, "kind":"amortization",
+                "delta":{"amount":"-500000","currency":"USD"}
+            }]);
+            let schedule = build(value);
+            let fees: Vec<_> = schedule
+                .get_flows()
+                .iter()
+                .filter(|flow| flow.kind == CFKind::Fee)
+                .collect();
+            assert_eq!(fees.len(), if basis == "point_in_time" { 1 } else { 2 });
+            let full_days = (date(maturity) - date(issue)).whole_days() as f64;
+            let first_days = (date(change) - date(issue)).whole_days() as f64;
+            let expected_amount = if basis == "point_in_time" {
+                10_000.0 * full_days / denominator
+            } else {
+                10_000.0 * first_days / denominator
+                    + 5_000.0 * (full_days - first_days) / denominator
+            };
+            close(
+                fees.iter().map(|flow| flow.amount.amount()).sum(),
+                expected_amount,
+            );
+            close(
+                fees.iter().map(|flow| flow.accrual_factor).sum(),
+                full_days / denominator,
+            );
+            for flow in fees {
+                let accrual = flow.accrual.as_ref().expect("fee accrual metadata");
+                assert_eq!(accrual.coupon_period, Some((date(issue), date(maturity))));
+                let context = DayCountContext {
+                    frequency: Some(frequency),
+                    coupon_period: accrual.coupon_period,
+                    ..Default::default()
+                };
+                close(
+                    flow.accrual_factor,
+                    DayCount::Act365L
+                        .year_fraction(accrual.start, accrual.end, context)
+                        .expect("segment retains its actual enclosing coupon"),
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn b13_adjusted_payment_does_not_delay_amortization_interest_base() {
     let mut v = spec("2025-02-15", "2026-02-15");
     v["notional"]["amort"] =
@@ -219,7 +382,11 @@ fn accrued_and_ex_coupon_follow_payment_date() {
         cf::accrued_interest(&raw, "2025-06-25", Some(&ex)).expect("cum"),
         100000.0 * 175.0 / 360.0,
     );
-    assert!(cf::accrued_interest(&raw, "2025-06-26", Some(&ex)).expect("ex") < 0.0);
+    close(
+        cf::accrued_interest(&raw, "2025-06-26", Some(&ex)).expect("record date"),
+        100000.0 * 176.0 / 360.0,
+    );
+    assert!(cf::accrued_interest(&raw, "2025-06-27", Some(&ex)).expect("ex") < 0.0);
 }
 #[test]
 fn bus252_accrual_retains_calendar() {
@@ -252,20 +419,39 @@ fn pik_funded_repayment_validates() {
 }
 #[test]
 fn funding_outflow_has_no_default_recovery_payment() {
+    struct Survival;
+    impl finstack_quant_core::market_data::traits::Survival for Survival {
+        fn id(&self) -> &finstack_quant_core::types::CurveId {
+            static ID: std::sync::LazyLock<finstack_quant_core::types::CurveId> =
+                std::sync::LazyLock::new(|| "test-survival".into());
+            &ID
+        }
+        fn sp(&self, _: f64) -> f64 {
+            0.8
+        }
+    }
     let mut v = spec("2025-01-01", "2026-01-01");
     v["coupon_program"] = json!([]);
     v["principal_events"] = json!([{"date":"2025-07-01", "payment_date": "2025-07-01","delta":{"amount":"100","currency":"USD"},"kind":"notional"}]);
     let s = build(v);
-    let draw = s
+    let draw_index = s
         .get_flows()
         .iter()
-        .find(|f| f.date == date("2025-07-01"))
+        .position(|f| f.date == date("2025-07-01"))
         .expect("draw");
-    close(
-        cf::aggregation::credit_adjusted_cashflow_pv(draw, 1.0, 0.8, Some(0.4), date("2025-01-01"))
-            .expect("PV"),
-        -80.0,
-    );
+    let pvs = cf::aggregation::credit_adjusted_cashflow_pvs(
+        s.get_flows(),
+        &vec![1.0; s.get_flows().len()],
+        Some(&Survival),
+        Some(0.4),
+        cf::aggregation::DateContext::new(
+            date("2025-01-01"),
+            finstack_quant_core::dates::DayCount::Act365F,
+            finstack_quant_core::dates::DayCountContext::default(),
+        ),
+    )
+    .expect("PV");
+    close(pvs[draw_index], -80.0);
 }
 #[test]
 fn issue_amortization_updates_fee_history() {

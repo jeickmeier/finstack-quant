@@ -497,6 +497,18 @@ impl crate::instruments::common_impl::traits::Instrument for InflationSwap {
         Ok((self.npv_raw(curves, as_of)?, self.notional.currency()))
     }
 
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        false
+    }
+
+    fn last_payment_date(
+        &self,
+        _curves: &MarketContext,
+        _as_of: Date,
+    ) -> finstack_quant_core::Result<Option<Date>> {
+        Ok(Some(self.adjusted_payment_date(self.maturity)?))
+    }
+
     fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
         Some(self.maturity)
     }
@@ -1029,6 +1041,22 @@ impl crate::instruments::common_impl::traits::Instrument for YoYInflationSwap {
         Ok((self.npv_raw(curves, as_of)?, self.notional.currency()))
     }
 
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        false
+    }
+
+    fn last_payment_date(
+        &self,
+        _curves: &MarketContext,
+        _as_of: Date,
+    ) -> finstack_quant_core::Result<Option<Date>> {
+        Ok(self.schedule()?.last().map(|(_, _, payment)| *payment))
+    }
+
+    fn expiry(&self) -> Option<Date> {
+        Some(self.maturity)
+    }
+
     fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
         Some(self.start_date)
     }
@@ -1121,6 +1149,96 @@ mod tests {
             .attributes(Attributes::new())
             .build()
             .expect("swap should build")
+    }
+
+    #[test]
+    fn inflation_theta_collects_settlement_cash_and_adjusted_final_payment() {
+        use crate::{instruments::PricingOptions, metrics::MetricId};
+        use time::macros::date;
+        let as_of = date!(2025 - 01 - 31);
+        let maturity = date!(2025 - 02 - 01);
+        let market = MarketContext::new()
+            .insert(sample_discount_curve(as_of))
+            .insert(
+                InflationCurve::builder("US-CPI")
+                    .base_date(as_of)
+                    .base_cpi(310.0)
+                    .knots([(0.0, 310.0), (1.0, 310.0)])
+                    .indexation_lag_months(0)
+                    .build()
+                    .expect("CPI curve"),
+            )
+            .insert_inflation_index(
+                "US-CPI",
+                InflationIndex::new(
+                    "US-CPI",
+                    vec![(date!(2024 - 01 - 01), 300.0), (maturity, 310.0)],
+                    Currency::USD,
+                )
+                .expect("published CPI")
+                .with_lag(InflationLag::None),
+            );
+        let mut swap = sample_swap(date!(2025 - 01 - 01), maturity);
+        swap.base_cpi = Some(300.0);
+        for (calendar, convention, days) in [
+            (None, BusinessDayConvention::Unadjusted, 1.0),
+            (
+                Some("weekends_only".into()),
+                BusinessDayConvention::Following,
+                3.0,
+            ),
+        ] {
+            swap.calendar_id = calendar;
+            swap.business_day_convention = convention;
+            swap.metric_pricing_overrides.theta_period =
+                Some(Tenor::new(1, finstack_quant_core::dates::TenorUnit::Weeks).expect("week"));
+            let result = swap
+                .price_with_metrics(
+                    &market,
+                    as_of,
+                    &[
+                        MetricId::Theta,
+                        MetricId::ThetaCarry,
+                        MetricId::ThetaPeriodDays,
+                    ],
+                    PricingOptions::default(),
+                )
+                .expect("theta");
+            assert!((result.value.amount() - 1_000_000.0 / 30.0).abs() < 1e-8);
+            assert!(result.metric(MetricId::Theta).expect("theta").abs() < 1e-8);
+            assert!(
+                (result.metric(MetricId::ThetaCarry).expect("carry") - result.value.amount()).abs()
+                    < 1e-8
+            );
+            assert_eq!(result.metric(MetricId::ThetaPeriodDays), Some(days));
+        }
+        let mut yoy = YoYInflationSwap::example().expect("YoY swap");
+        yoy.start_date = date!(2024 - 02 - 01);
+        yoy.maturity = maturity;
+        yoy.fixed_rate = Decimal::ZERO;
+        yoy.base_cpi = Some(300.0);
+        yoy.lag = Some(InflationLag::None);
+        yoy.calendar_id = Some("weekends_only".into());
+        yoy.business_day_convention = BusinessDayConvention::Following;
+        yoy.metric_pricing_overrides.theta_period = swap.metric_pricing_overrides.theta_period;
+        let result = yoy
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[
+                    MetricId::Theta,
+                    MetricId::ThetaCarry,
+                    MetricId::ThetaPeriodDays,
+                ],
+                PricingOptions::default(),
+            )
+            .expect("YoY theta");
+        assert!(result.metric(MetricId::Theta).expect("theta").abs() < 1e-8);
+        assert!(
+            (result.metric(MetricId::ThetaCarry).expect("carry") - result.value.amount()).abs()
+                < 1e-8
+        );
+        assert_eq!(result.metric(MetricId::ThetaPeriodDays), Some(3.0));
     }
 
     #[test]

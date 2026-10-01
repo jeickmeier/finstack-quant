@@ -471,6 +471,12 @@ impl PyCashFlow {
     }
 
     /// Serialize to the canonical JSON row format.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the effective rate or projected index rate is non-finite, or the
+    ///     row cannot be serialized. Invalid rates are never encoded as absent.
     #[allow(clippy::wrong_self_convention)]
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
@@ -536,7 +542,7 @@ fn py_is_cash_settlement_kind(kind: &Bound<'_, PyAny>) -> PyResult<bool> {
 
 /// Register the `finstack_quant.cashflows.primitives` submodule.
 pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let module = PyModule::new(py, "primitives")?;
+    let module = crate::bindings::module_utils::new_submodule(parent, "primitives")?;
     module.setattr(
         "__doc__",
         "Cashflow primitives: CashFlow, CFKind, settlement classification.",
@@ -557,13 +563,10 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
     )?;
     module.setattr("__all__", all)?;
 
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &module,
-        "primitives",
-        "finstack_quant.cashflows",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
     Ok(())
 }

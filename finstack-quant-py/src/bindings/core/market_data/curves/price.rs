@@ -67,6 +67,8 @@ impl PyPriceCurve {
     ///     (non-negative volatility-index levels in vol points, e.g. ``18.0``).
     /// spot_price : float, optional
     ///     Spot level at ``t = 0``; inferred from a ``t = 0`` knot when omitted.
+    ///     An explicit spot is inserted at zero if that knot is absent and
+    ///     must match any supplied zero-time knot.
     /// extrapolation : str, optional
     ///     Extrapolation policy; default ``"flat_zero"``.
     /// interp : str, optional
@@ -78,13 +80,14 @@ impl PyPriceCurve {
     /// ------
     /// ValueError
     ///     If fewer than two knots are given, a knot is non-finite or
-    ///     duplicated, spot cannot be inferred, a vol-index level is negative,
+    ///     duplicated, spot cannot be inferred or conflicts with a zero-time
+    ///     knot, a vol-index level is negative,
     ///     or a label is unknown.
     ///
     /// Example
     /// -------
     /// >>> from finstack_quant.core.market_data import PriceCurve
-    /// >>> curve = PriceCurve("WTI", "2025-01-01", [(0.0, 70.0), (1.0, 72.0)], spot_price=69.5)
+    /// >>> curve = PriceCurve("WTI", "2025-01-01", [(0.5, 70.0), (1.0, 72.0)], spot_price=69.5)
     /// >>> curve.spot_price
     /// 69.5
     #[new]

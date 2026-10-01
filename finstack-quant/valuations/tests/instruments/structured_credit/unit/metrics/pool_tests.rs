@@ -147,7 +147,8 @@ fn test_clo_warf_calculator_matches_weighted_average_factors() {
         as_of(),
         maturity_date(),
         "USD-OIS",
-    );
+    )
+    .expect("valid structured-credit dates");
     let mut context = metric_context(instrument);
 
     let warf = CloWarfCalculator.calculate(&mut context).unwrap();
@@ -177,7 +178,8 @@ fn test_clo_warf_calculator_uses_default_factor_for_missing_ratings() {
         as_of(),
         maturity_date(),
         "USD-OIS",
-    );
+    )
+    .expect("valid structured-credit dates");
     let mut context = metric_context(instrument);
 
     let warf = CloWarfCalculator.calculate(&mut context).unwrap();
@@ -206,7 +208,8 @@ fn test_rmbs_cpr_and_cdr_use_current_deal_seasoning() {
         Date::from_calendar_date(2025, Month::January, 1).unwrap(),
         maturity_date(),
         "USD-OIS",
-    );
+    )
+    .expect("valid structured-credit dates");
     instrument.credit_model.prepayment_spec = PrepaymentModelSpec::psa(1.0);
     instrument.credit_model.default_spec = DefaultModelSpec::sda(1.0);
 

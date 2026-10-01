@@ -125,6 +125,7 @@ fn clo(
     .expect("structure");
     let mut deal =
         StructuredCredit::new_clo("CLO-REINVEST", pool, tranches, close, maturity, "USD-OIS")
+            .expect("valid structured-credit dates")
             .with_calendar_id("nyse")
             .with_coverage_triggers(tests)
             .expect("coverage tests");
@@ -414,6 +415,7 @@ fn instrument_collateral_pools_cannot_reinvest() {
     .expect("tranche")])
     .expect("structure");
     let deal = StructuredCredit::new_clo("CLO-INSTR", pool, tranches, close, maturity, "USD-OIS")
+        .expect("valid structured-credit dates")
         .with_calendar_id("nyse");
     let err = run_simulation(&deal, &market(close), close)
         .expect_err("instrument pools reject reinvestment periods");

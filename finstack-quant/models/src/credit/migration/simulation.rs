@@ -39,6 +39,7 @@ use super::{
 ///
 /// The first entry always records the initial state at time 0.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(try_from = "RatingPathWire")]
 pub struct RatingPath {
     /// Transition events as (time, state_index) pairs, starting with (0.0, s₀).
     transitions: Vec<(f64, usize)>,
@@ -49,6 +50,61 @@ pub struct RatingPath {
     /// re-allocating the labels `Vec` and rebuilding the index map. The serde
     /// "rc" feature keeps the wire format identical to an inline `RatingScale`.
     scale: Arc<RatingScale>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RatingPathWire {
+    transitions: Vec<(f64, usize)>,
+    horizon: f64,
+    scale: Arc<RatingScale>,
+}
+
+impl TryFrom<RatingPathWire> for RatingPath {
+    type Error = MigrationError;
+
+    fn try_from(wire: RatingPathWire) -> Result<Self, Self::Error> {
+        if !wire.horizon.is_finite() || wire.horizon <= 0.0 {
+            return Err(MigrationError::InvalidHorizon(wire.horizon));
+        }
+        if !matches!(wire.transitions.first(), Some((time, _)) if *time == 0.0) {
+            return Err(MigrationError::InvalidPath(
+                "the first event must record the initial state at time zero".to_string(),
+            ));
+        }
+        for (index, &(time, state)) in wire.transitions.iter().enumerate() {
+            if state >= wire.scale.n_states() {
+                return Err(MigrationError::InvalidState {
+                    state,
+                    n_states: wire.scale.n_states(),
+                });
+            }
+            if !time.is_finite() || time < 0.0 || time > wire.horizon {
+                return Err(MigrationError::InvalidPath(format!(
+                    "event {index} time {time} must be finite and within [0, {}]",
+                    wire.horizon
+                )));
+            }
+            if index > 0 {
+                let (previous_time, previous_state) = wire.transitions[index - 1];
+                if time <= previous_time {
+                    return Err(MigrationError::InvalidPath(format!(
+                        "event {index} time must be strictly after the preceding event"
+                    )));
+                }
+                if Some(previous_state) == wire.scale.default_state() {
+                    return Err(MigrationError::InvalidPath(format!(
+                        "event {index} occurs after the absorbing default state"
+                    )));
+                }
+            }
+        }
+        Ok(Self {
+            transitions: wire.transitions,
+            horizon: wire.horizon,
+            scale: wire.scale,
+        })
+    }
 }
 
 impl RatingPath {

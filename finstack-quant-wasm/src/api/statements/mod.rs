@@ -73,18 +73,25 @@ pub fn model_node_ids(json: &str) -> Result<JsValue, JsValue> {
 
 /// Validate a `CheckSuiteSpec` JSON string.
 ///
-/// Deserializes the spec, re-serializes to canonical form, and
-/// returns the JSON string. Useful for client-side validation.
+/// Deserializes the spec, validates default configuration thresholds, and
+/// returns canonical JSON. Check-specific tolerances and formula references
+/// are validated when the suite runs against a model.
+///
+/// # Arguments
+///
+/// * `json` - Serialized `CheckSuiteSpec` with a suite name, optional checks,
+///   and optional configuration. Default tolerances and materiality thresholds
+///   must be finite and nonnegative; omitted configuration uses Rust defaults.
 ///
 /// # Errors
 ///
-/// Rejects malformed or schema-incompatible `json`, or failure to serialize
-/// the decoded check-suite specification.
-/// @param json - Canonical JSON string defining the object to deserialize or normalize.
+/// Rejects malformed or schema-incompatible `json`, negative or non-finite
+/// default configuration thresholds, or failure to serialize the decoded check-suite specification.
 #[wasm_bindgen(js_name = validateCheckSuiteSpecJson)]
 pub fn validate_check_suite_spec_json(json: &str) -> Result<String, JsValue> {
     let spec: finstack_quant_statements::checks::CheckSuiteSpec =
         serde_json::from_str(json).map_err(to_js_err)?;
+    spec.config.validate().map_err(to_js_err)?;
     serde_json::to_string(&spec).map_err(to_js_err)
 }
 

@@ -11,7 +11,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
-use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::{CreditDefaultSwap, Instrument};
 use finstack_quant_valuations::pricer::*;
 use std::collections::BTreeMap;
 use std::str::FromStr;
@@ -220,6 +220,30 @@ fn test_pricing_error_from_core_error() {
             assert!(message.contains("test"));
         }
         other => panic!("Expected InvalidInput, got {other:?}"),
+    }
+}
+
+#[test]
+fn cds_adapter_preserves_missing_market_data_and_context() {
+    let cds = CreditDefaultSwap::example().expect("CDS example");
+    let registry = standard_pricer_registry();
+    let key = PricerKey::new(InstrumentType::Cds, ModelKey::HazardRate);
+    let pricer = registry.get_pricer(key).expect("CDS hazard pricer");
+    let error = pricer
+        .price_dyn(&cds, &MarketContext::new(), date!(2024 - 01 - 15))
+        .expect_err("a CDS requires its discount curve");
+
+    match error {
+        PricingError::MissingMarketData {
+            missing_id,
+            context,
+        } => {
+            assert_eq!(missing_id, "USD-OIS");
+            assert_eq!(context.instrument_id.as_deref(), Some(cds.id()));
+            assert_eq!(context.instrument_type, Some(InstrumentType::Cds));
+            assert_eq!(context.model, Some(ModelKey::HazardRate));
+        }
+        other => panic!("expected MissingMarketData from the CDS adapter, got {other:?}"),
     }
 }
 

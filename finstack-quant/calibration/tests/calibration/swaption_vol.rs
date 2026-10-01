@@ -536,3 +536,122 @@ fn swaption_vol_settlement_lag_uses_canonical_tenor_axis() {
         .expect_err("raw settled-date year fraction must not become the cube coordinate");
     assert!(settled_error.to_string().contains("out of bounds"));
 }
+
+fn calibrate_flat_normal_cube(fixed_day_count: DayCount, tenor_years: i32) -> MarketContext {
+    let base_date = Date::from_calendar_date(2025, Month::January, 3).expect("base date");
+    let discount = DiscountCurve::builder("USD-OIS")
+        .base_date(base_date)
+        .day_count(DayCount::Act365F)
+        .knots([(0.0, 1.0), (10.0, (-0.05_f64 * 10.0).exp())])
+        .build()
+        .expect("discount curve");
+    let source_market = MarketContext::new().insert(discount);
+    let mut quotes = Vec::new();
+    for (expiry, maturity, vol) in [
+        (
+            Date::from_calendar_date(2025, Month::July, 2).expect("first expiry"),
+            Date::from_calendar_date(2025 + tenor_years, Month::July, 4).expect("first maturity"),
+            0.005,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::December, 29).expect("second expiry"),
+            Date::from_calendar_date(2025 + tenor_years, Month::December, 31)
+                .expect("second maturity"),
+            0.02,
+        ),
+    ] {
+        for strike in [0.04, 0.05, 0.06] {
+            quotes.push(MarketQuote::Vol(VolQuote::SwaptionVol {
+                id: QuoteId::new(format!("flat-{expiry}-{strike}")),
+                expiry,
+                maturity,
+                strike,
+                vol,
+                quote_type: VolQuoteType::Normal,
+                convention: SwaptionConventionId::new("USD"),
+            }));
+        }
+    }
+    let (prior_market, mut market_data) = cal_utils::split_market_context(&source_market);
+    cal_utils::extend_market_data(&mut market_data, &quotes);
+    let envelope = CalibrationEnvelope {
+        schema_url: None,
+        schema: finstack_quant_calibration::api::schema::CalibrationSchema::CURRENT,
+        plan: CalibrationPlan {
+            id: "dated-normal-cube".into(),
+            description: None,
+            quote_sets: [("normal".into(), cal_utils::quote_set_ids(&quotes))].into(),
+            settings: CalibrationConfig::default(),
+            steps: vec![CalibrationStep {
+                id: "normal".into(),
+                quote_set: "normal".into(),
+                params: StepParams::SwaptionVol(SwaptionVolParams {
+                    vol_surface_id: "DATED-NORMAL".into(),
+                    base_date,
+                    discount_curve_id: "USD-OIS".into(),
+                    forward_id: None,
+                    currency: Currency::USD,
+                    vol_convention: SwaptionVolConvention::Normal,
+                    sabr_beta: 0.0,
+                    target_expiries: vec![180.0 / 365.0, 360.0 / 365.0],
+                    target_tenors: vec![f64::from(tenor_years)],
+                    sabr_interpolation: Default::default(),
+                    calendar_id: Some("weekends_only".into()),
+                    fixed_day_count: Some(fixed_day_count),
+                    swap_index: Some("USD-SOFR-OIS".into()),
+                    vol_tolerance: Some(1e-6),
+                    sabr_extrapolation: SurfaceExtrapolationPolicy::Error,
+                    allow_sabr_missing_bucket_fallback: false,
+                }),
+            }],
+        },
+        market_data,
+        prior_market,
+    };
+    let result = engine::execute(&envelope).expect("dated normal cube calibration");
+    assert!(result.result.report.success, "{:?}", result.result.report);
+    assert!(result.result.step_reports["normal"].max_residual < 1e-6);
+    MarketContext::try_from(result.result.final_market).expect("restore calibrated market")
+}
+
+#[test]
+fn swaption_cube_expiry_clock_is_independent_of_fixed_leg_day_count() {
+    for fixed_day_count in [DayCount::Act360, DayCount::Thirty360] {
+        let context = calibrate_flat_normal_cube(fixed_day_count, 5);
+        let cube = context.get_vol_cube("DATED-NORMAL").expect("normal cube");
+        for (days, quoted) in [(180.0, 0.005), (360.0, 0.02)] {
+            let volatility = finstack_quant_models::volatility::get_cube_normal_vol(
+                &cube,
+                days / 365.0,
+                5.0,
+                0.05,
+            )
+            .expect("lookup on the swaption pricer's ACT/365F clock");
+            assert!(
+                (volatility - quoted).abs() < 1e-6,
+                "{fixed_day_count:?} fixed leg changed the option clock: {volatility} vs {quoted}"
+            );
+        }
+    }
+}
+
+#[test]
+fn swaption_cube_forward_honors_single_curve_floating_payment_lag() {
+    let context = calibrate_flat_normal_cube(DayCount::Act360, 1);
+    let cube = context.get_vol_cube("DATED-NORMAL").expect("normal cube");
+    let discount = context.get_discount("USD-OIS").expect("discount curve");
+    let start = Date::from_calendar_date(2025, Month::July, 4).expect("swap start");
+    let end = Date::from_calendar_date(2026, Month::July, 4).expect("swap end");
+    let accrual = DayCount::Act360
+        .year_fraction(start, end, DayCountContext::default())
+        .expect("contractual accrual");
+    // Both annual legs have the same delayed payment, so its discount factor
+    // cancels in the forward. The floating growth still ends at accrual end.
+    let expected =
+        (1.0 / discount.df_between_dates(start, end).expect("period DF") - 1.0) / accrual;
+    assert!(
+        (cube.forwards()[0] - expected).abs() < 1e-12,
+        "published cube forward {} differs from the underlying's par rate {expected}",
+        cube.forwards()[0]
+    );
+}

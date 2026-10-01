@@ -259,14 +259,16 @@ pub fn net_amounts_by_date(
 ///
 /// Accepts either a full [`PortfolioCashflows`] payload or a bare `by_date`
 /// map. Kind keys are opaque strings (reporting fixtures may use mixed-case
-/// labels such as `"Notional"`). Amounts may be JSON numbers or decimal
-/// strings.
+/// labels such as `"Notional"`). Money values use the canonical decimal-string
+/// amount and ISO currency representation.
 ///
 /// # Errors
 ///
 /// Returns [`Error::InvalidInput`] when `cashflows_json` is not JSON, when
-/// `currency` is not a known ISO code, or when the `by_date` value is not an
-/// object.
+/// `currency` or a bucket key is not a known ISO code, a date or money value
+/// is invalid, a money currency disagrees with its bucket, a total is not
+/// finite, or a date/currency/kind container is not an object. Every bucket is
+/// validated, including currencies other than the requested output currency.
 ///
 /// # Arguments
 ///
@@ -287,37 +289,56 @@ pub fn net_in_currency_by_date_json(
         ));
     };
 
-    let currency_code = currency.to_string();
     let mut out = Vec::new();
     for (date, per_currency) in by_date_obj {
-        let Some(ccy_map) = per_currency.get(&currency_code).and_then(|v| v.as_object()) else {
-            continue;
-        };
-        let mut acc = finstack_quant_core::math::summation::NeumaierAccumulator::new();
-        let mut saw_finite = false;
-        for kind_money in ccy_map.values() {
-            if let Some(amount) = json_money_amount(kind_money) {
-                if amount.is_finite() {
-                    acc.add(amount);
-                    saw_finite = true;
+        let parsed_date: finstack_quant_core::wire::DateWire =
+            serde_json::from_value(serde_json::Value::String(date.clone()))
+                .map_err(|e| Error::InvalidInput(format!("invalid cashflow date '{date}': {e}")))?;
+        let currencies = per_currency.as_object().ok_or_else(|| {
+            Error::InvalidInput(format!(
+                "cashflow date '{date}' must contain a currency object"
+            ))
+        })?;
+        for (code, per_kind) in currencies {
+            let bucket_currency = Currency::from_str(code).map_err(|e| {
+                Error::InvalidInput(format!("invalid cashflow currency '{code}': {e}"))
+            })?;
+            let kinds = per_kind.as_object().ok_or_else(|| {
+                Error::InvalidInput(format!(
+                    "cashflow bucket '{date}/{code}' must contain a kind object"
+                ))
+            })?;
+            let mut acc = finstack_quant_core::math::summation::NeumaierAccumulator::new();
+            for (kind, value) in kinds {
+                let money: Money = serde_json::from_value(value.clone()).map_err(|e| {
+                    Error::InvalidInput(format!(
+                        "invalid cashflow money at '{date}/{code}/{kind}': {e}"
+                    ))
+                })?;
+                if money.currency() != bucket_currency {
+                    return Err(Error::InvalidInput(format!(
+                        "cashflow money at '{date}/{code}/{kind}' has currency {}, expected {bucket_currency}",
+                        money.currency()
+                    )));
                 }
+                acc.add(money.amount());
+            }
+            let total = acc.total();
+            if !total.is_finite() {
+                return Err(Error::InvalidInput(format!(
+                    "cashflow total at '{date}/{code}' is not finite"
+                )));
+            }
+            if bucket_currency == currency && !kinds.is_empty() {
+                out.push((parsed_date.0, total));
             }
         }
-        if saw_finite {
-            out.push((date.clone(), acc.total()));
-        }
     }
-    out.sort_by(|a, b| a.0.cmp(&b.0));
-    Ok(out)
-}
-
-fn json_money_amount(value: &serde_json::Value) -> Option<f64> {
-    let amount = value.get("amount")?;
-    match amount {
-        serde_json::Value::Number(n) => n.as_f64(),
-        serde_json::Value::String(s) => s.parse().ok(),
-        _ => None,
-    }
+    out.sort_by_key(|row| row.0);
+    Ok(out
+        .into_iter()
+        .map(|(date, amount)| (date.to_string(), amount))
+        .collect())
 }
 
 /// Aggregate contractual portfolio cashflows while preserving `CFKind` classification.
@@ -1189,5 +1210,22 @@ mod tests {
                 ("2025-04-15".to_string(), 1_011_250.0),
             ]
         );
+    }
+    #[test]
+    fn json_netting_rejects_invalid_dates_money_and_bucket_currencies() {
+        for json in [
+            r#"{"not-a-date":{"USD":{"fixed":{"amount":"1","currency":"USD"}}}}"#,
+            r#"{"2025-02-30":{"USD":{"fixed":{"amount":"1","currency":"USD"}}}}"#,
+            r#"{"2025-01-01":{"USD":{"fixed":{"amount":"NaN","currency":"USD"}}}}"#,
+            r#"{"2025-01-01":{"USD":{"fixed":{"amount":"1","currency":"EUR"}}}}"#,
+            r#"{"2025-01-01":{"USD":{"fixed":{"amount":"1"}}}}"#,
+            r#"{"2025-01-01":{"USD":[]}}"#,
+            r#"{"2025-01-01":{"USD":{},"EUR":{"fixed":{"amount":"bad","currency":"EUR"}}}}"#,
+        ] {
+            assert!(
+                net_in_currency_by_date_json(json, "USD").is_err(),
+                "accepted {json}"
+            );
+        }
     }
 }

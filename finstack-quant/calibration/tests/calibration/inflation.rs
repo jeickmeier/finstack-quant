@@ -7,6 +7,7 @@ use finstack_quant_calibration::api::schema::{
 use finstack_quant_calibration::quotes::ids::QuoteId;
 use finstack_quant_calibration::quotes::inflation::InflationQuote;
 use finstack_quant_calibration::quotes::market_quote::MarketQuote;
+use finstack_quant_calibration::{CalibrationConfig, CalibrationMethod};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -14,8 +15,13 @@ use finstack_quant_core::market_data::scalars::{
     InflationIndex, InflationInterpolation, InflationLag,
 };
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::math::interp::InterpStyle;
+use finstack_quant_core::money::Money;
 use finstack_quant_core::HashMap;
+use finstack_quant_valuations::instruments::rates::inflation_swap::InflationSwap;
+use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::market::conventions::ids::InflationSwapConventionId;
+use rust_decimal::Decimal;
 
 use crate::calibration::calibration_support as cal_utils;
 use time::Month;
@@ -108,7 +114,6 @@ fn calibrated_market(index: Option<InflationIndex>, base_cpi: f64) -> (MarketCon
                 notional: 1.0,
                 method: Default::default(),
                 interpolation: Default::default(),
-                seasonal_factors: None,
             }),
         }],
     };
@@ -131,8 +136,12 @@ fn calibrated_market(index: Option<InflationIndex>, base_cpi: f64) -> (MarketCon
 fn inflation_quote_time_uses_lagged_fixing_date() {
     let (ctx, base_date, maturity) = calibrated_market(None, 100.0);
     let curve = ctx.get_inflation_curve("USD-CPI").expect("inflation curve");
-    let fixing_date = maturity.replace_day(1).expect("month start").add_months(-2);
-    let reference_date = base_date.add_months(-3);
+    let fixing_date = maturity
+        .replace_day(1)
+        .expect("month start")
+        .add_months(-2)
+        .expect("valid date shift");
+    let reference_date = base_date.add_months(-3).expect("valid date shift");
     let expected_t = DayCount::Act365F
         .year_fraction(reference_date, fixing_date, DayCountContext::default())
         .expect("clock");
@@ -150,16 +159,20 @@ fn inflation_quote_time_uses_lagged_fixing_date() {
 fn b17_inflation_curve_origin_matches_reference_cpi_date() {
     let (ctx, base_date, maturity) = calibrated_market(None, 100.0);
     let curve = ctx.get_inflation_curve("USD-CPI").expect("inflation curve");
-    let reference_date = base_date.add_months(-3);
+    let reference_date = base_date.add_months(-3).expect("valid date shift");
     assert_eq!(curve.base_date(), reference_date);
     assert_eq!(
         curve.cpi_on_date(reference_date).expect("reference CPI"),
         100.0
     );
-    let anchor0 = maturity.replace_day(1).expect("month start").add_months(-3);
+    let anchor0 = maturity
+        .replace_day(1)
+        .expect("month start")
+        .add_months(-3)
+        .expect("valid date shift");
     let cpi0 = curve.cpi_on_date(anchor0).expect("first CPI");
     let cpi1 = curve
-        .cpi_on_date(anchor0.add_months(1))
+        .cpi_on_date(anchor0.add_months(1).expect("valid date shift"))
         .expect("second CPI");
     let weight =
         f64::from(maturity.day() - 1) / f64::from(maturity.month().length(maturity.year()));
@@ -210,7 +223,6 @@ fn inflation_preflight_rejects_base_cpi_mismatch_with_fixings() {
                 notional: 1.0,
                 method: Default::default(),
                 interpolation: Default::default(),
-                seasonal_factors: None,
             }),
         }],
     };
@@ -257,5 +269,141 @@ fn b17_inflation_calibration_matches_observed_and_explicit_base_cpi() {
     assert_eq!(left.knots(), right.knots());
     for t in [0.0, 0.1, 1.0, 3.0, 5.0] {
         assert!((left.cpi(t) - right.cpi(t)).abs() < 1e-9, "{t}");
+    }
+}
+
+fn lag_calibration_params(lag: &str, method: CalibrationMethod) -> InflationCurveParams {
+    InflationCurveParams {
+        curve_id: "UK-RPI".into(),
+        currency: Currency::GBP,
+        base_date: time::macros::date!(2025 - 01 - 15),
+        discount_curve_id: "GBP-SONIA".into(),
+        index: "UK-RPI".to_string(),
+        observation_lag: lag.to_string(),
+        base_cpi: 100.0,
+        notional: 1.0,
+        method,
+        interpolation: InterpStyle::Linear,
+    }
+}
+
+fn lag_calibration_market() -> MarketContext {
+    MarketContext::new().insert(
+        DiscountCurve::builder("GBP-SONIA")
+            .base_date(time::macros::date!(2025 - 01 - 15))
+            .knots([(0.0, 1.0), (10.0, (-0.03_f64 * 10.0).exp())])
+            .build()
+            .expect("GBP discount curve"),
+    )
+}
+
+fn lag_calibration_quotes() -> Vec<MarketQuote> {
+    vec![MarketQuote::Inflation(InflationQuote::InflationSwap {
+        id: QuoteId::new("UK-RPI-ZCIS-5Y"),
+        maturity: time::macros::date!(2030 - 01 - 15),
+        rate: 0.02,
+        index: "UK-RPI".to_string(),
+        convention: InflationSwapConventionId::new("UK-RPI"),
+    })]
+}
+
+#[test]
+fn delivered_inflation_curve_preserves_lag_and_reprices_without_an_override() {
+    for method in [
+        CalibrationMethod::Bootstrap,
+        CalibrationMethod::GlobalSolve {
+            use_analytical_jacobian: false,
+        },
+    ] {
+        for (lag, expected_months) in [("2M", 2), ("none", 0)] {
+            let params = lag_calibration_params(lag, method.clone());
+            let (market, report) = cal_utils::execute_step(
+                &StepParams::Inflation(params.clone()),
+                &lag_calibration_quotes(),
+                &lag_calibration_market(),
+                &CalibrationConfig::default(),
+            )
+            .expect("calibrate inflation curve");
+            assert!(report.success, "{method:?}, {lag}: {report:?}");
+
+            let curve = market.get_inflation_curve("UK-RPI").expect("curve");
+            assert_eq!(curve.indexation_lag_months(), expected_months);
+            assert_eq!(
+                curve.base_date(),
+                params
+                    .base_date
+                    .add_months(-(expected_months as i32))
+                    .expect("lagged origin")
+            );
+
+            // No index history and no contractual lag override: pricing must
+            // inherit the same lag that calibrated the delivered curve.
+            let mut swap = InflationSwap::builder()
+                .id("DOWNSTREAM-RPI".into())
+                .notional(Money::new(1_000_000.0, Currency::GBP).expect("notional"))
+                .start_date(params.base_date)
+                .maturity(time::macros::date!(2030 - 01 - 15))
+                .fixed_rate(Decimal::new(2, 2))
+                .inflation_index_id("UK-RPI".into())
+                .discount_curve_id("GBP-SONIA".into())
+                .day_count(DayCount::OneOne)
+                .side(PayReceive::Pay)
+                .base_cpi(100.0)
+                .interpolation(InflationInterpolation::Step)
+                .calendar_id_opt(Some("gblo".into()))
+                .build()
+                .expect("downstream swap");
+            assert!(swap.lag.is_none());
+            let inherited_pv = swap
+                .npv_raw(&market, params.base_date)
+                .expect("inherited PV");
+            swap.lag = Some(lag.parse().expect("explicit lag"));
+            let explicit_pv = swap
+                .npv_raw(&market, params.base_date)
+                .expect("explicit PV");
+            assert!(
+                (inherited_pv - explicit_pv).abs() < 1e-9,
+                "{method:?}, {lag}: inherited={inherited_pv}, explicit={explicit_pv}"
+            );
+            assert!(
+                inherited_pv.abs() < 0.02,
+                "{method:?}, {lag}: calibrated swap PV={inherited_pv}"
+            );
+        }
+    }
+}
+
+#[test]
+fn inflation_calibration_rejects_unrepresentable_day_lags() {
+    let error = cal_utils::execute_step(
+        &StepParams::Inflation(lag_calibration_params("60D", CalibrationMethod::Bootstrap)),
+        &lag_calibration_quotes(),
+        &lag_calibration_market(),
+        &CalibrationConfig::default(),
+    )
+    .expect_err("day lag cannot survive in the delivered curve metadata");
+    assert!(
+        error.to_string().contains("day-based observation lags"),
+        "{error}"
+    );
+}
+
+#[test]
+fn inflation_params_reject_unsupported_seasonal_factors() {
+    let params = lag_calibration_params("2M", CalibrationMethod::Bootstrap);
+    for unsupported in [
+        serde_json::Value::Null,
+        serde_json::json!({
+            "monthly_adjustments": [0.01, -0.01, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        }),
+    ] {
+        let mut payload = serde_json::to_value(&params).expect("serialize params");
+        payload["seasonal_factors"] = unsupported;
+        // schema-rejection-test
+        let error = serde_json::from_value::<InflationCurveParams>(payload)
+            .expect_err("unsupported seasonal adjustment must not be silently ignored");
+        assert!(error
+            .to_string()
+            .contains("unknown field `seasonal_factors`"));
     }
 }

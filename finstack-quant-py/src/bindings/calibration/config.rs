@@ -92,33 +92,28 @@ impl PySolverConfig {
     /// Parameters
     /// ----------
     /// tolerance : float | None, default None
-    ///     Root-finder convergence tolerance (absolute, residual units).
+    ///     Finite, positive root-finder convergence tolerance in absolute
+    ///     residual units; ``None`` uses the Rust default.
     /// max_iterations : int | None, default None
     ///     Maximum iterations per knot solve.
     ///
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``tolerance`` is not positive or ``max_iterations`` is zero.
+    ///     If ``tolerance`` is non-finite or not positive, or
+    ///     ``max_iterations`` is zero.
     #[new]
     #[pyo3(signature = (tolerance = None, max_iterations = None))]
     #[pyo3(text_signature = "(tolerance=None, max_iterations=None)")]
     fn new(tolerance: Option<f64>, max_iterations: Option<usize>) -> PyResult<Self> {
         let mut inner = SolverConfig::default();
         if let Some(tolerance) = tolerance {
-            if !tolerance.is_finite() || tolerance <= 0.0 {
-                return Err(value_error(format!(
-                    "solver tolerance must be a positive finite number, got {tolerance}"
-                )));
-            }
             inner = inner.with_tolerance(tolerance);
         }
         if let Some(max_iterations) = max_iterations {
-            if max_iterations == 0 {
-                return Err(value_error("solver max_iterations must be at least 1"));
-            }
             inner = inner.with_max_iterations(max_iterations);
         }
+        inner.validate().map_err(core_to_py)?;
         Ok(Self::from_inner(inner))
     }
 
@@ -147,15 +142,23 @@ impl PySolverConfig {
 
     /// Rebuild from JSON produced by ``to_json``.
     ///
+    /// Parameters
+    /// ----------
+    /// json : str
+    ///     Solver settings JSON with finite, positive tolerance and a
+    ///     positive iteration count; omitted fields use Rust defaults.
+    ///
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``json`` is malformed or contains unknown solver fields.
+    ///     If ``json`` is malformed, contains unknown solver fields, or has
+    ///     non-finite or non-positive tolerance, or a non-positive iteration count.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json)
-            .map(Self::from_inner)
-            .map_err(|e| serde_json_to_py(e, "invalid SolverConfig JSON"))
+        let inner: SolverConfig = serde_json::from_str(json)
+            .map_err(|e| serde_json_to_py(e, "invalid SolverConfig JSON"))?;
+        inner.validate().map_err(core_to_py)?;
+        Ok(Self::from_inner(inner))
     }
 
     /// Pickle support through the JSON wire format.

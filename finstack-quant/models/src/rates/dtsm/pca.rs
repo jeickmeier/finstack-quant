@@ -26,13 +26,41 @@
 use nalgebra::{DMatrix, DVector, SymmetricEigen};
 use serde::{Deserialize, Serialize};
 
-use super::types::YieldPanel;
+use super::types::{validate_tenors, YieldPanel};
+
+fn validate_components(
+    eigenvalues: &[f64],
+    variance_explained: &[f64],
+    cumulative_variance: &[f64],
+) -> finstack_quant_core::Result<()> {
+    let k = eigenvalues.len();
+    if k == 0 || variance_explained.len() != k || cumulative_variance.len() != k {
+        return Err(finstack_quant_core::Error::Validation(
+            "YieldPca component eigenvalues and variance vectors must be nonempty and aligned"
+                .into(),
+        ));
+    }
+    if eigenvalues.iter().any(|v| !v.is_finite() || *v < 0.0)
+        || eigenvalues.windows(2).any(|pair| pair[0] < pair[1])
+        || variance_explained
+            .iter()
+            .chain(cumulative_variance.iter())
+            .any(|v| !v.is_finite() || *v < 0.0 || *v > 1.0 + 1e-10)
+        || cumulative_variance.windows(2).any(|pair| pair[0] > pair[1])
+    {
+        return Err(finstack_quant_core::Error::Validation(
+            "YieldPca requires descending non-negative finite eigenvalues and valid explained-variance fractions".into(),
+        ));
+    }
+    Ok(())
+}
 
 /// Serializable view of the leading components of a [`YieldPca`] fit.
 ///
 /// Produced by [`YieldPca::truncated`]; this is the wire form the language
 /// bindings hand out.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(try_from = "RawYieldPcaView")]
 pub struct YieldPcaView {
     /// Row-major loadings `loadings[tenor][k]` for the leading components.
     pub loadings: Vec<Vec<f64>>,
@@ -50,12 +78,64 @@ pub struct YieldPcaView {
     pub tenors: Vec<f64>,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawYieldPcaView {
+    loadings: Vec<Vec<f64>>,
+    scores: Vec<Vec<f64>>,
+    eigenvalues: Vec<f64>,
+    explained_variance_ratio: Vec<f64>,
+    cumulative_variance: Vec<f64>,
+    mean_change: Vec<f64>,
+    tenors: Vec<f64>,
+}
+
+impl TryFrom<RawYieldPcaView> for YieldPcaView {
+    type Error = finstack_quant_core::Error;
+
+    fn try_from(raw: RawYieldPcaView) -> finstack_quant_core::Result<Self> {
+        validate_tenors(&raw.tenors)?;
+        validate_components(
+            &raw.eigenvalues,
+            &raw.explained_variance_ratio,
+            &raw.cumulative_variance,
+        )?;
+        let (n, k) = (raw.tenors.len(), raw.eigenvalues.len());
+        if n < 2
+            || k > n
+            || raw.loadings.len() != n
+            || raw.mean_change.len() != n
+            || raw.scores.len() < 2
+            || raw
+                .loadings
+                .iter()
+                .chain(raw.scores.iter())
+                .any(|row| row.len() != k || row.iter().any(|v| !v.is_finite()))
+            || raw.mean_change.iter().any(|v| !v.is_finite())
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "YieldPcaView loadings, scores, means, tenors, and components must have aligned finite dimensions".into(),
+            ));
+        }
+        Ok(Self {
+            loadings: raw.loadings,
+            scores: raw.scores,
+            eigenvalues: raw.eigenvalues,
+            explained_variance_ratio: raw.explained_variance_ratio,
+            cumulative_variance: raw.cumulative_variance,
+            mean_change: raw.mean_change,
+            tenors: raw.tenors,
+        })
+    }
+}
+
 /// PCA decomposition of yield curve changes.
 ///
 /// See module-level documentation for details.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(try_from = "RawYieldPca")]
 pub struct YieldPca {
-    /// Eigenvalues in descending order (length min(T-1, N)).
+    /// Eigenvalues in descending order (one per tenor, including zero-variance components).
     eigenvalues: Vec<f64>,
     /// Loadings matrix: N tenors x K components (columns are eigenvectors).
     loadings: DMatrix<f64>,
@@ -69,6 +149,58 @@ pub struct YieldPca {
     cumulative_variance: Vec<f64>,
     /// Mean yield change vector (length N), subtracted before PCA.
     mean_change: DVector<f64>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawYieldPca {
+    eigenvalues: Vec<f64>,
+    loadings: DMatrix<f64>,
+    scores: DMatrix<f64>,
+    tenors: Vec<f64>,
+    variance_explained: Vec<f64>,
+    cumulative_variance: Vec<f64>,
+    mean_change: DVector<f64>,
+}
+
+impl TryFrom<RawYieldPca> for YieldPca {
+    type Error = finstack_quant_core::Error;
+
+    fn try_from(raw: RawYieldPca) -> finstack_quant_core::Result<Self> {
+        validate_tenors(&raw.tenors)?;
+        validate_components(
+            &raw.eigenvalues,
+            &raw.variance_explained,
+            &raw.cumulative_variance,
+        )?;
+        let n = raw.tenors.len();
+        if n < 2
+            || raw.eigenvalues.len() != n
+            || raw.loadings.shape() != (n, n)
+            || raw.scores.nrows() < 2
+            || raw.scores.ncols() != n
+            || raw.mean_change.len() != n
+            || raw
+                .loadings
+                .iter()
+                .chain(raw.scores.iter())
+                .chain(raw.mean_change.iter())
+                .any(|v| !v.is_finite())
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "YieldPca loadings, scores, means, tenors, and components must have aligned finite dimensions".into(),
+            ));
+        }
+        Ok(Self {
+            eigenvalues: raw.eigenvalues,
+            loadings: raw.loadings,
+            scores: raw.scores,
+            tenors: raw.tenors,
+            variance_explained: raw.variance_explained,
+            cumulative_variance: raw.cumulative_variance,
+            mean_change: raw.mean_change,
+        })
+    }
 }
 
 impl YieldPca {

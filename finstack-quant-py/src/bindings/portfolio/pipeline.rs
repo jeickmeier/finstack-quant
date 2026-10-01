@@ -165,7 +165,11 @@ fn aggregate_full_cashflows(
 ///     A :class:`PortfolioCashflows` ladder (fast path, no parse), full
 ///     cashflow-ladder JSON, or a ``{date: {ccy: {kind: money}}}`` object
 ///     (optionally wrapped as ``{"by_date": ...}``). Kind keys are opaque
-///     strings; amounts may be JSON numbers or decimal strings.
+///     strings; money objects require a finite decimal-string ``amount`` and
+///     a ``currency`` matching their enclosing bucket. Numeric JSON amounts
+///     are rejected by the canonical Money wire contract.
+///     Every ISO payment date and currency bucket is validated, including
+///     currencies other than the requested output currency.
 /// currency : Currency | str
 ///     ISO-4217 code selecting which per-date currency bucket to net.
 ///
@@ -180,8 +184,11 @@ fn aggregate_full_cashflows(
 /// TypeError
 ///     If ``cashflows`` is neither a ``PortfolioCashflows`` nor a string.
 /// ValueError
-///     If ``cashflows`` is not JSON, ``currency`` is unknown, or
-///     ``by_date`` is not an object.
+///     If the requested ``currency`` is unknown.
+/// PortfolioError
+///     If cashflow JSON is malformed, a date or currency bucket is invalid,
+///     a container is not an object, a money amount is malformed/non-finite,
+///     a money currency differs from its bucket, or a bucket total overflows.
 ///
 /// Examples
 /// --------

@@ -17,8 +17,9 @@
 //!   notional (~$30k protection-leg PV), this is ~$0.01 absolute = 3.3e-7
 //!   relative — Bloomberg/Markit-grade tight.
 //!
-//! - **Base correlation adapter**: residual = upfront_fraction_model - upfront_fraction_market
-//!   (dimensionless, where upfront_fraction = upfront_pct / 100).
+//! - **Base correlation adapter**: residual = complete quote-built tranche NPV /
+//!   tranche notional. The quoted `upfront_pct` is already a decimal fraction of
+//!   tranche notional, and its cashflow is discounted at contractual settlement.
 //!
 //! - **Swaption vol adapter**: residual = |model_vol - market_vol| in **decimal** units.
 //!   For Normal vols, quotes are in bp and are normalized to decimals (50bp → 0.0050).
@@ -87,18 +88,12 @@ pub const BBG_ZERO_TOL_BP_ULTRA_LONG: f64 = 100.0;
 /// Forward rate absolute tolerance used by parity tests (in rate decimals).
 pub const FWD_RATE_ABS_TOL: f64 = 1e-8;
 
-/// Base correlation upfront-fraction tolerance (dimensionless).
+/// Base correlation discounted upfront-fraction tolerance (dimensionless).
 ///
-/// Base-correlation calibration is a model fit, not a machine-precision bootstrap:
-/// a price->calibrate round-trip closes to ~1e-4 of upfront fraction, not 1e-10.
-/// The prior 1e-10 ("vendor-grade") bar only held because the test fixtures were
-/// bit-exact to a specific pricer build. The credit-derivatives accrual-on-default
-/// and protection-leg-timing corrections legitimately shifted tranche prices, after
-/// which the test's flat-context fixture pricing and the calibration's curve-context
-/// repricing differ by ~0.8 bp of upfront. 1e-3 (~10 bp of upfront) is the realistic,
-/// solver-consistent bar (it matches the base-correlation solver's validation
-/// tolerance). The residual ~0.8 bp inconsistency between the two tranche-pricing
-/// paths is tracked as a follow-up for deeper credit-derivatives reconciliation.
+/// The production fit budget is 10 bp of tranche notional after discounting the
+/// complete quoted contract, including its settlement upfront. Synthetic
+/// round-trips additionally assert tighter repricing and correlation recovery
+/// against the same contractual cashflows, using `BASE_CORR_SOLVER_TOL`.
 #[allow(dead_code)]
 pub const BASE_CORR_UPFRONT_FRAC_TOL: f64 = 1e-3;
 

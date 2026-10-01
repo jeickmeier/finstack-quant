@@ -136,7 +136,8 @@ fn auto_follows_normal_metadata_for_negative_forward() {
     let payment = date!(2024 - 07 - 01);
     let ctx = context_from(as_of, -0.005, 0.005).insert_surface(
         flat_vol_surface(0.005, "VOL")
-            .with_quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::Normal),
+            .with_quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::Normal)
+            .expect("valid quote convention"),
     );
     let auto = make_caplet(fixing, payment, -0.002, CapFloorVolType::Auto, true);
     let normal = make_caplet(fixing, payment, -0.002, CapFloorVolType::Normal, true);

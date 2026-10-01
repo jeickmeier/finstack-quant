@@ -16,14 +16,7 @@ use pyo3::types::PyList;
 
 /// Register the `finstack_quant.models` domain.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let module = PyModule::new(py, "models")?;
-    let qualified_name = crate::bindings::module_utils::set_submodule_package(
-        parent,
-        &module,
-        "models",
-        crate::bindings::module_utils::ROOT_PACKAGE,
-        crate::bindings::module_utils::ParentNameSource::Name,
-    )?;
+    let module = crate::bindings::module_utils::new_submodule(parent, "models")?;
     module.setattr(
         "__doc__",
         "Reusable analytical, Fourier, volatility, credit, correlation, rates, and Monte Carlo models.",
@@ -73,6 +66,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     module.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule_at(py, parent, &module, &qualified_name)?;
+    crate::bindings::module_utils::attach_submodule(
+        parent,
+        &module,
+        crate::bindings::module_utils::Exposure::Python,
+    )?;
     Ok(())
 }

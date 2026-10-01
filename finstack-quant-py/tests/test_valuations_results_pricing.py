@@ -17,11 +17,13 @@ from finstack_quant.core.types import Rate
 from finstack_quant.valuations import ValuationResult, instrument_cashflows
 from finstack_quant.valuations.instruments import (
     Bond,
+    CreditDefaultSwap,
     FixedLegSpec,
     FloatLegSpec,
     InterestRateSwap,
     MarketHistory,
     MetricPricingOverrides,
+    TermLoan,
     metric_metadata,
     price_instrument,
     validate_instrument_json,
@@ -217,6 +219,17 @@ def test_missing_curve_raises_key_error() -> None:
         price_instrument(_bond(), MarketContext(), AS_OF)
 
 
+@pytest.mark.parametrize("typed", [False, True])
+def test_cds_missing_curve_raises_key_error(typed: bool) -> None:
+    cds = CreditDefaultSwap.example()
+    if typed:
+        with pytest.raises(KeyError, match="USD-OIS"):
+            cds.price(MarketContext(), AS_OF)
+    else:
+        with pytest.raises(KeyError, match="USD-OIS"):
+            price_instrument(cds, MarketContext(), AS_OF)
+
+
 def test_validation_failure_raises_value_error() -> None:
     # A seasoned floating leg without a fixing series is a validation failure.
     start = datetime.date(2023, 7, 17)
@@ -408,6 +421,51 @@ def test_validate_instrument_json_merges_overrides_before_validation() -> None:
     assert validate_instrument_json(prepared) == prepared
     with pytest.raises(ValueError, match="invalid metric_pricing_overrides JSON"):
         validate_instrument_json(raw, metric_pricing_overrides="{")
+
+
+@pytest.mark.parametrize("patch", [{}, {"theta_day_basis": "trading_252"}])
+def test_partial_metric_override_patch_retains_existing_theta_period(patch: dict) -> None:
+    document = json.loads(_bond().to_json())
+    period = {"count": 1, "unit": "weeks"}
+    document["instrument"]["spec"]["metric_pricing_overrides"] = {"theta_period": period}
+    raw = json.dumps(document)
+    baseline = price_instrument(raw, _market(), AS_OF, metrics=["theta"])
+    prepared = json.loads(validate_instrument_json(raw, metric_pricing_overrides=patch))
+    assert prepared["instrument"]["spec"]["metric_pricing_overrides"]["theta_period"] == period
+    patched = price_instrument(raw, _market(), AS_OF, metrics=["theta"], metric_pricing_overrides=patch)
+    assert patched["theta"] == pytest.approx(baseline["theta"])
+
+
+def test_explicit_null_metric_override_patch_clears_theta_period() -> None:
+    document = json.loads(_bond().to_json())
+    document["instrument"]["spec"]["metric_pricing_overrides"] = {
+        "theta_period": {"count": 1, "unit": "weeks"},
+    }
+    raw = json.dumps(document)
+    patched = price_instrument(
+        raw, _market(), AS_OF, metrics=["theta"], metric_pricing_overrides={"theta_period": None}
+    )
+    baseline = price_instrument(_bond(), _market(), AS_OF, metrics=["theta"])
+    assert patched["theta"] == pytest.approx(baseline["theta"])
+
+
+@pytest.mark.parametrize(
+    ("quote_field", "low_quote", "high_quote"),
+    [("quoted_z_spread", 0.0, 0.05), ("quoted_clean_price_pct", 80.0, 110.0)],
+)
+def test_term_loan_cs01_uses_the_quote_anchor(quote_field: str, low_quote: float, high_quote: float) -> None:
+    results = []
+    for quote in (low_quote, high_quote):
+        document = json.loads(TermLoan.example().to_json())
+        document["instrument"]["spec"]["instrument_pricing_overrides"] = {
+            "market_quotes": {quote_field: quote},
+        }
+        result = price_instrument(
+            json.dumps(document), _market(), AS_OF, model="discounting", metrics=["cs01", "bucketed_cs01"]
+        )
+        assert result["bucketed_cs01"] == pytest.approx(result["cs01"])
+        results.append(result["cs01"])
+    assert results[0] != pytest.approx(results[1])
 
 
 def test_every_pricing_entry_point_accepts_the_same_metric_pricing_overrides_types() -> None:

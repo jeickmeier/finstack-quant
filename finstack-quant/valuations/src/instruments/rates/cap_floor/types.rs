@@ -573,6 +573,8 @@ impl CapFloor {
                         calendar: Some(fixing_calendar),
                         frequency: Some(self.frequency),
                         bus_basis: None,
+                        coupon_period: (self.day_count == DayCount::Act365L)
+                            .then_some((period.accrual_start, period.accrual_end)),
                         ..DayCountContext::default()
                     },
                 )?;
@@ -1027,6 +1029,7 @@ mod tests {
                 &fwd,
                 p.accrual_start,
                 p.accrual_end,
+                tau,
             )
             .expect("forward");
             let df = disc
@@ -1311,6 +1314,117 @@ mod tests {
             deps.curves.forward_curves.is_empty(),
             "single-curve overnight caps must not require a redundant forward curve"
         );
+    }
+
+    #[test]
+    fn act365l_overnight_cap_uses_each_adjusted_full_coupon() {
+        for (start, end, frequency, stub, denominator) in [
+            (
+                date(2023, 3, 1),
+                date(2024, 3, 2),
+                Tenor::annual(),
+                StubKind::LongFront,
+                366.0,
+            ),
+            (
+                date(2024, 3, 2),
+                date(2025, 1, 1),
+                Tenor::annual(),
+                StubKind::ShortFront,
+                365.0,
+            ),
+            (
+                date(2023, 12, 2),
+                date(2025, 1, 1),
+                Tenor::annual(),
+                StubKind::LongFront,
+                366.0,
+            ),
+            (
+                date(2023, 12, 2),
+                date(2024, 3, 2),
+                Tenor::quarterly(),
+                StubKind::ShortFront,
+                366.0,
+            ),
+        ] {
+            let as_of = start.previous_day().expect("valuation day");
+            let mut cap = CapFloor::new(
+                "ACT365L-OVERNIGHT-CAP",
+                RateOptionType::Cap,
+                Money::from((1_000_000_i64, Currency::USD)),
+                0.04,
+                start,
+                end,
+                Some(frequency),
+                DayCount::Act365L,
+                "TEST-DISC",
+                "USD-SOFR-OIS",
+                "TEST-VOL",
+            )
+            .expect("cap");
+            cap.stub = stub;
+            cap.calendar_id = Some("weekends_only".into());
+            cap.overnight_coupon = Some(OvernightCouponConvention {
+                compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
+                payment_lag_days: 3,
+                fixing_calendar_id: Some("weekends_only".into()),
+                payment_calendar_id: Some("weekends_only".into()),
+                spread_compounding: OvernightSpreadCompounding::Exclude,
+            });
+            let discount = DiscountCurve::builder("TEST-DISC")
+                .base_date(as_of)
+                .day_count(DayCount::Act365F)
+                .knots([(0.0, 1.0), (3.0, 1.0)])
+                .build()
+                .expect("flat discount curve");
+            let forward = ForwardCurve::builder("USD-SOFR-OIS", 1.0 / 365.0)
+                .base_date(as_of)
+                .day_count(DayCount::Act365F)
+                .knots([(0.0, 0.05), (3.0, 0.05)])
+                .build()
+                .expect("flat overnight curve");
+            let vol = VolSurface::builder("TEST-VOL")
+                .expiries(&[0.01, 3.0])
+                .strikes(&[0.01, 0.1])
+                .row(&[0.0, 0.0])
+                .row(&[0.0, 0.0])
+                .build()
+                .expect("zero volatility");
+            let market = MarketContext::new()
+                .insert(discount)
+                .insert(forward)
+                .insert_surface(vol);
+            let periods = cap.pricing_periods().expect("adjusted overnight periods");
+            assert_eq!(periods.len(), 1);
+            let period = periods[0];
+            let accrual =
+                (period.accrual_end - period.accrual_start).whole_days() as f64 / denominator;
+            assert!((period.accrual_year_fraction - accrual).abs() < 1e-14);
+            let calendar =
+                crate::cashflow::builder::calendar::resolve_calendar_strict("weekends_only")
+                    .expect("weekend calendar");
+            assert_eq!(
+                period.payment_date,
+                period
+                    .accrual_end
+                    .add_business_days(3, calendar)
+                    .expect("payment delay")
+            );
+            let mut factor = 1.0;
+            let mut day = period.accrual_start;
+            while day < period.accrual_end {
+                let next = day
+                    .add_business_days(1, calendar)
+                    .expect("next weekday")
+                    .min(period.accrual_end);
+                factor *= 1.0 + 0.05 * (next - day).whole_days() as f64 / denominator;
+                day = next;
+            }
+            let expected = 1_000_000.0 * (factor - 1.0 - 0.04 * accrual).max(0.0);
+            let value = cap.value(&market, as_of).expect("ACT/365L cap price");
+            assert!((value.amount() - expected).abs() < 1e-7, "{start} -> {end}");
+        }
     }
 
     #[test]

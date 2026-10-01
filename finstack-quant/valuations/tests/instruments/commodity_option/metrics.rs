@@ -428,3 +428,74 @@ fn test_commodity_option_dv01_and_bucketed_dv01() -> finstack_quant_core::Result
 
     Ok(())
 }
+
+#[test]
+fn commodity_option_zero_vol_delta_matches_resolved_forward_payoff(
+) -> finstack_quant_core::Result<()> {
+    use finstack_quant_valuations::instruments::{GreekBumps, OptionGreeksProvider};
+    for kind in [OptionType::Call, OptionType::Put] {
+        for f in [80.0, 100.0, 120.0] {
+            for explicit_quote in [false, true] {
+                let (mut option, base_market, as_of) = atm_commodity_option(kind);
+                option.quantity = 1000.0;
+                option.multiplier = 2.0;
+                option
+                    .instrument_pricing_overrides
+                    .market_quotes
+                    .implied_volatility = Some(0.0);
+                option.quoted_forward = explicit_quote.then_some(f);
+                let market = base_market
+                    .clone()
+                    .insert(flat_price_curve("CL-FWD", as_of, f, 2.0));
+                let delta = option
+                    .option_delta(&market, as_of, GreekBumps::default())?
+                    .expect("delta");
+                let df = market
+                    .get_discount("USD-OIS")?
+                    .df_between_dates(as_of, option.expiry)?;
+                let intrinsic_delta = match kind {
+                    OptionType::Call => f64::from(f > option.strike),
+                    OptionType::Put => -f64::from(f < option.strike),
+                };
+                assert!((delta - intrinsic_delta * df * 2000.0).abs() < 1e-9);
+                if f != option.strike {
+                    let mut up = option.clone();
+                    let mut down = option.clone();
+                    let (up_market, down_market) = if explicit_quote {
+                        up.quoted_forward = Some(f + 0.001);
+                        down.quoted_forward = Some(f - 0.001);
+                        (market.clone(), market.clone())
+                    } else {
+                        (
+                            base_market.clone().insert(flat_price_curve(
+                                "CL-FWD",
+                                as_of,
+                                f + 0.001,
+                                2.0,
+                            )),
+                            base_market.clone().insert(flat_price_curve(
+                                "CL-FWD",
+                                as_of,
+                                f - 0.001,
+                                2.0,
+                            )),
+                        )
+                    };
+                    let fd = (up.value(&up_market, as_of)?.amount()
+                        - down.value(&down_market, as_of)?.amount())
+                        / 0.002;
+                    assert!((delta - fd).abs() < 1e-5);
+                    option
+                        .instrument_pricing_overrides
+                        .market_quotes
+                        .implied_volatility = Some(1e-10);
+                    let limit = option
+                        .option_delta(&market, as_of, GreekBumps::default())?
+                        .expect("limit");
+                    assert!((limit - delta).abs() < 1e-9);
+                }
+            }
+        }
+    }
+    Ok(())
+}

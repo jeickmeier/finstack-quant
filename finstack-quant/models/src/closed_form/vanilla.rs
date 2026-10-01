@@ -255,8 +255,8 @@ pub fn bs_price_unchecked(
     let raw_price = match option_type {
         OptionType::Call => spot * exp_q_t * cdf_d1 - strike * exp_r_t * cdf_d2,
         OptionType::Put => {
-            let cdf_m_d1 = 1.0 - cdf_d1;
-            let cdf_m_d2 = 1.0 - cdf_d2;
+            let cdf_m_d1 = finstack_quant_core::math::norm_cdf(-d1);
+            let cdf_m_d2 = finstack_quant_core::math::norm_cdf(-d2);
             strike * exp_r_t * cdf_m_d2 - spot * exp_q_t * cdf_m_d1
         }
     };
@@ -436,8 +436,8 @@ pub fn bs_greeks_unchecked(
 
     let cdf_d1 = finstack_quant_core::math::norm_cdf(d1);
     let cdf_d2 = finstack_quant_core::math::norm_cdf(d2);
-    let cdf_m_d1 = 1.0 - cdf_d1;
-    let cdf_m_d2 = 1.0 - cdf_d2;
+    let cdf_m_d1 = finstack_quant_core::math::norm_cdf(-d1);
+    let cdf_m_d2 = finstack_quant_core::math::norm_cdf(-d2);
 
     let delta = match option_type {
         OptionType::Call => exp_q_t * cdf_d1,
@@ -576,6 +576,20 @@ pub fn bs_greeks(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn put_tail_price_and_greeks_retain_small_normal_probabilities() {
+        // Evaluating N(-d) retains the tail that 1 - N(d) rounds away. The
+        // independent erfc-form BSM reference is well within the f64 range.
+        let price = bs_price(100.0, 20.0, 0.0, 0.0, 0.2, 1.0, OptionType::Put).unwrap();
+        let expected = 4.550_576_920_194_906e-16;
+        assert!((price / expected - 1.0).abs() < 1e-6, "tail price={price}");
+        let greeks = bs_greeks(100.0, 10.0, 0.0, 0.0, 0.2, 1.0, OptionType::Put, 365.0).unwrap();
+        assert!(greeks.delta < 0.0);
+        assert!(greeks.rho_r < 0.0);
+        assert!(greeks.rho_q > 0.0);
+        assert!(greeks.vega > 0.0);
+    }
 
     #[test]
     fn test_bs_price_call_atm() {

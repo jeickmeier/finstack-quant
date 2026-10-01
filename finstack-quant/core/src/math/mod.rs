@@ -211,7 +211,8 @@ pub use random::{box_muller_transform, Pcg64Rng, RandomNumberGenerator};
 pub use solver::{BracketHint, BrentSolver, NewtonSolver, Solver};
 pub use solver_multi::{AnalyticalDerivatives, LevenbergMarquardtSolver};
 pub use special_functions::{
-    erf, ln_gamma, norm_cdf, norm_pdf, standard_normal_inv_cdf, student_t_cdf, student_t_inv_cdf,
+    erf, ln_gamma, log_norm_cdf, norm_cdf, norm_pdf, standard_normal_inv_cdf, student_t_cdf,
+    student_t_inv_cdf,
 };
 pub use stats::{
     correlation, covariance, finite_count, finite_max_or_nan, finite_min_or_nan, mean, mean_or_nan,

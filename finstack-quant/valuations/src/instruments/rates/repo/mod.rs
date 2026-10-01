@@ -1,11 +1,12 @@
 //! Repurchase agreements priced from the cash-lender perspective.
 //!
 //! [`Repo`] supports term, open-with-an-initial-maturity, and overnight
-//! contracts. Before settlement its contractual schedule contains a cash
-//! outflow on the business-day-adjusted start date and principal plus simple
-//! repo interest on the adjusted maturity date. [`CollateralType::Special`]
-//! may adjust the repo rate; the haircut determines required collateral but
-//! does not change those cashflows or base PV.
+//! contracts. Its full contractual schedule contains three classified entries
+//! on two business-day-adjusted payment dates: a `Notional` outflow at the
+//! start, then a `Notional` principal repayment and `Fixed` simple repo interest
+//! at maturity. Valuation-date filtering may omit settled entries.
+//! [`CollateralType::Special`] may adjust the repo rate; the haircut determines
+//! required collateral but does not change those cashflows or base PV.
 //!
 //! # Margining boundary
 //!

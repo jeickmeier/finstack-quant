@@ -111,7 +111,8 @@ fn test_clo_json_roundtrip() {
         Date::from_calendar_date(2024, Month::January, 1).unwrap(),
         maturity_date(),
         "USD-OIS",
-    );
+    )
+    .expect("valid structured-credit dates");
 
     // Act
     let json = serde_json::to_string(&original).expect("Serialization failed");
@@ -155,7 +156,8 @@ fn test_rmbs_credit_model_serialization() {
         Date::from_calendar_date(2024, Month::January, 1).unwrap(),
         maturity_date(),
         "USD-OIS",
-    );
+    )
+    .expect("valid structured-credit dates");
 
     // Set the credit model
     rmbs.credit_model.prepayment_spec = PrepaymentModelSpec::psa(1.5);
@@ -352,7 +354,8 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
     let tranches = TrancheStructure::new(vec![equity, senior]).unwrap();
 
     let mut deal =
-        StructuredCredit::new_clo("FULL-CLO", pool, tranches, closing, legal, "USD-SOFR-DISC");
+        StructuredCredit::new_clo("FULL-CLO", pool, tranches, closing, legal, "USD-SOFR-DISC")
+            .expect("valid structured-credit dates");
 
     deal.first_payment_date = first_payment;
     deal.frequency = Tenor::monthly();
@@ -590,6 +593,7 @@ fn waterfall_rules_round_trip_and_price_through_json() {
     ])
     .unwrap();
     let mut sc = StructuredCredit::new_abs("ABS-WF", pool, tranches, closing, mat, "USD-OIS")
+        .expect("valid structured-credit dates")
         .with_calendar_id("nyse");
     sc.waterfall_rules = Some(WaterfallRules {
         afc: Some(AfcSpec {

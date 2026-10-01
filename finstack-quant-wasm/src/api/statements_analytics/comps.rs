@@ -123,10 +123,12 @@ pub fn compute_multiple(
 /// # Errors
 ///
 /// Rejects when `peer_set` or `dimensions` cannot be decoded into its declared
-/// schema, when no scoring dimensions are supplied, or when the result cannot
-/// be serialized to JavaScript.
+/// schema, when a weight is negative/non-finite, no positive-weight dimension
+/// has usable data, the composite is non-finite, or the result cannot be
+/// serialized to JavaScript. Unusable dimensions are excluded; regression
+/// dimensions do not fall back to univariate scoring.
 /// @param peer_set - Comparable-company metric records used to score relative value.
-/// @param dimensions - Metric dimensions and weights; each has one optional `x_extractor` for single-factor regression, or null for distribution scoring.
+/// @param dimensions - Metric dimensions and finite non-negative relative weights (zero disables, positive usable weights are normalized); each has one optional `x_extractor` for single-factor regression, or null for distribution scoring.
 #[wasm_bindgen(js_name = scoreRelativeValue)]
 pub fn score_relative_value(peer_set: JsValue, dimensions: JsValue) -> Result<JsValue, JsValue> {
     let ps: fc::PeerSet = serde_wasm_bindgen::from_value(peer_set).map_err(to_js_err)?;

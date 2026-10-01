@@ -39,12 +39,12 @@ await init({ module_or_path: readFileSync(WASM_BG) });
 // Flat DF = 1 out to 4y, so discounting is a no-op and the arithmetic is
 // hand-checkable.
 const flatDiscount = () =>
-  new core.DiscountCurve(
-    'USD-OIS',
-    '2025-01-01',
-    [0.0, 1.0, 1.0, 1.0, 2.0, 1.0, 3.0, 1.0, 4.0, 1.0],
-    'log_linear'
-  );
+  new core.DiscountCurve({
+    id: 'USD-OIS',
+    baseDate: '2025-01-01',
+    knots: [0.0, 1.0, 1.0, 1.0, 2.0, 1.0, 3.0, 1.0, 4.0, 1.0],
+    interp: 'log_linear',
+  });
 
 const flatHazard = (lambda) =>
   new core.HazardCurve('HZ', '2025-01-01', [0.0, lambda, 30.0, lambda], 0.4);

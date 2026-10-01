@@ -73,7 +73,8 @@
 //!     *Review of Financial Studies*, 30(8), 2719-2760. `docs/REFERENCES.md#kerkhof-2005`
 
 use super::common::{build_interp, roll_knots, split_points};
-use crate::dates::{Date, DayCount, DayCountContext};
+use crate::dates::DateExt;
+use crate::dates::{Date, DayCount};
 use crate::market_data::bumps::{BumpSpec, BumpType, Bumpable};
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
 use crate::{error::InputError, math::interp::types::Interp, types::CurveId};
@@ -526,18 +527,17 @@ impl InflationCurve {
     /// - Base CPI is updated to the interpolated value at the roll time
     ///
     /// # Arguments
-    /// * `days` - Number of days to roll forward
+    /// * `days` - Signed calendar-day shift; negative values move the base date backward.
     ///
     /// # Returns
     /// A new inflation curve with shifted knots and updated base CPI.
     ///
     /// # Errors
     /// Returns an error if no knot points remain after filtering expired points.
+    /// Returns a validation error if the rolled base date exceeds the supported calendar range.
     pub fn roll_forward(&self, days: i64) -> crate::Result<Self> {
-        let new_base = self.base_date + time::Duration::days(days);
-        let dt_years =
-            self.day_count
-                .year_fraction(self.base_date, new_base, DayCountContext::default())?;
+        let new_base = self.base_date.add_days(days)?;
+        let dt_years = super::common::year_fraction_to(self.base_date, new_base, self.day_count)?;
 
         let new_base_cpi = self.cpi(dt_years);
 
@@ -599,6 +599,7 @@ impl InflationCurveBuilder {
     ///
     /// * `cpi` - Finite, strictly positive absolute index level at the base
     ///   date. Must equal any supplied zero-time CPI knot; validated at build.
+    ///   The builder inserts this level at zero when that knot is omitted.
     pub fn base_cpi(mut self, cpi: f64) -> Self {
         self.base_cpi = cpi;
         self
@@ -652,6 +653,8 @@ impl InflationCurveBuilder {
     /// levels rather than inflation rates. The selected interpolation and
     /// extrapolation policies govern later CPI lookups; the indexation lag is
     /// stored as metadata used by [`InflationCurve::cpi_with_lag`].
+    /// A missing zero-time knot is inserted with `base_cpi`, so interpolation
+    /// connects the known base level to the future CPI quotes.
     ///
     /// # Errors
     ///
@@ -687,7 +690,12 @@ impl InflationCurveBuilder {
                 "CPI knot at t=0 must equal base_cpi".to_string(),
             ));
         }
-        let (kvec, cvec): (Vec<f64>, Vec<f64>) = split_points(self.points);
+        let (mut kvec, mut cvec): (Vec<f64>, Vec<f64>) = split_points(self.points);
+        let origin = kvec.partition_point(|&t| t < 0.0);
+        if kvec.get(origin).is_none_or(|&t| t != 0.0) {
+            kvec.insert(origin, 0.0);
+            cvec.insert(origin, self.base_cpi);
+        }
         crate::math::interp::utils::validate_knots(&kvec)?;
         let knots = kvec.into_boxed_slice();
         let cpi_levels = cvec.into_boxed_slice();
@@ -789,6 +797,25 @@ mod tests {
     fn cpi_hits_knots() {
         let ic = sample_curve();
         assert!((ic.cpi(1.0) - 306.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn future_only_quotes_interpolate_from_base_cpi() {
+        let curve = InflationCurve::builder("CPI-ORIGIN")
+            .base_date(Date::from_calendar_date(2025, time::Month::January, 1).unwrap())
+            .base_cpi(300.0)
+            .knots([(1.0, 330.0), (2.0, 345.0)])
+            .build()
+            .unwrap();
+        assert_eq!(curve.knots(), &[0.0, 1.0, 2.0]);
+        assert!((curve.cpi(0.5) - (300.0_f64 * 330.0).sqrt()).abs() < 1e-12);
+        assert!((curve.cpi(1e-6) - 300.0 * 1.1_f64.powf(1e-6)).abs() < 1e-12);
+        assert!((curve.cpi(1.0) - 330.0).abs() < 1e-12);
+
+        let restored: InflationCurve =
+            serde_json::from_str(&serde_json::to_string(&curve).unwrap()).unwrap();
+        assert_eq!(restored.knots(), curve.knots());
+        assert_eq!(restored.cpi(0.5), curve.cpi(0.5));
     }
 
     #[test]

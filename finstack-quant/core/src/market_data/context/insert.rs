@@ -202,7 +202,17 @@ impl MarketContext {
         self
     }
 
-    /// Insert a credit index aggregate.
+    /// Insert a credit index aggregate using the context's canonical curves.
+    ///
+    /// Hazard, base-correlation, and issuer references are resolved by ID from
+    /// curves already in this context. The supplied references identify those
+    /// curves; their embedded values do not replace the canonical curves.
+    /// Insert replacement curves before inserting an updated index aggregate.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the aggregate's constituent, recovery, or issuer
+    /// invariants are invalid, or a referenced curve is absent or has the wrong type.
     ///
     /// # Examples
     /// ```rust
@@ -218,7 +228,7 @@ impl MarketContext {
     ///     .knots([(0.0, 0.01), (5.0, 0.015)])
     ///     .build()
     ///     .expect("HazardCurve builder should succeed"));
-    /// let base_corr = Arc::new(BaseCorrelationCurve::builder("CDX")
+    /// let base_corr = Arc::new(BaseCorrelationCurve::builder("CDX-BC")
     ///     .knots([(3.0, 0.25), (10.0, 0.55)])
     ///     .build()
     ///     .expect("BaseCorrelationCurve builder should succeed"));
@@ -226,20 +236,29 @@ impl MarketContext {
     ///     .num_constituents(125)
     ///     .recovery_rate(0.4)
     ///     .index_credit_curve(Arc::clone(&hazard))
-    ///     .base_correlation_curve(base_corr)
+    ///     .base_correlation_curve(Arc::clone(&base_corr))
     ///     .build()
     ///     .expect("CreditIndexData builder should succeed");
-    /// let ctx = MarketContext::new().insert_credit_index("CDX-IG", data);
+    /// let ctx = MarketContext::new()
+    ///     .insert(hazard)
+    ///     .insert(base_corr)
+    ///     .insert_credit_index("CDX-IG", data)
+    ///     .expect("index dependencies are present");
     /// assert!(ctx.get_credit_index("CDX-IG").is_ok());
     /// ```
     ///
     /// # Arguments
     ///
     /// * `id` - Lookup key stored as [`CurveId`].
-    /// * `data` - Constituent count, recovery, index hazard curve, and base correlation.
-    pub fn insert_credit_index(mut self, id: impl AsRef<str>, data: CreditIndexData) -> Self {
-        self.insert_credit_index_mut(id, data);
-        self
+    /// * `data` - Constituent count, recovery, and curve references. Each curve
+    ///   ID must resolve to the matching curve type already in this context.
+    pub fn insert_credit_index(
+        mut self,
+        id: impl AsRef<str>,
+        data: CreditIndexData,
+    ) -> crate::Result<Self> {
+        self.insert_credit_index_mut(id, data)?;
+        Ok(self)
     }
 
     /// Insert an FX matrix.
@@ -426,15 +445,31 @@ impl MarketContext {
 
     /// Insert a credit index aggregate, mutating in place.
     ///
-    /// Mirrors [`Self::insert_credit_index`] but takes `&mut self`.
+    /// Resolves every curve reference against the canonical context before
+    /// changing the index map. Failure leaves the context unchanged.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Lookup key for the credit index aggregate.
+    /// * `data` - Constituent data whose hazard, base-correlation, and issuer
+    ///   curve IDs must already resolve in this context to the matching types.
+    ///   Embedded curve values are replaced by those canonical references.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when constituent count, recovery, or issuer coverage
+    /// violates the builder's invariants, or a required curve is absent or has
+    /// the wrong type.
     pub fn insert_credit_index_mut(
         &mut self,
         id: impl AsRef<str>,
         data: CreditIndexData,
-    ) -> &mut Self {
+    ) -> crate::Result<&mut Self> {
+        data.validate()?;
+        let data = self.rebind_credit_index_data(&data)?;
         let key = CurveId::from(id.as_ref());
         Arc::make_mut(&mut self.credit_indices).insert(key, Arc::new(data));
-        self
+        Ok(self)
     }
 
     /// Insert an FX matrix, mutating in place.

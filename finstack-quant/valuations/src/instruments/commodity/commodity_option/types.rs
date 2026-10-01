@@ -63,6 +63,11 @@ pub enum CommodityPricingModel {
 /// - **American options**: Binomial tree (Leisen-Reimer) with cost-of-carry derived from
 ///   the forward/spot relationship
 ///
+/// Analytical delta measures currency per unit change in the resolved forward,
+/// holding discount factors and volatility fixed. At zero volatility or expiry,
+/// the intrinsic-payoff derivative is used; delta is defined as zero exactly at
+/// the strike, where the mathematical derivative does not exist.
+///
 /// # American Option Assumptions
 ///
 /// For American exercise, the model requires a spot price to build the binomial tree.
@@ -846,13 +851,17 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
             t,
             self.strike,
         )?;
-        if sigma <= 0.0 {
-            return Ok(Some(0.0));
-        }
-
         let forward = self.forward_price(market, as_of)?;
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
         let df = disc.df_between_dates(as_of, self.expiry)?;
+        if sigma <= 0.0 {
+            let intrinsic_delta = match self.option_type {
+                OptionType::Call => f64::from(forward > self.strike),
+                OptionType::Put => -f64::from(forward < self.strike),
+            };
+            return Ok(Some(intrinsic_delta * df * self.quantity * self.multiplier));
+        }
+
         let d1 = finstack_quant_models::d1_black76(forward, self.strike, sigma, t);
         let nd1 = norm_cdf(d1);
 

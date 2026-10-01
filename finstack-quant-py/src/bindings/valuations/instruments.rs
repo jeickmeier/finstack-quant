@@ -1282,14 +1282,16 @@ impl PyBond {
     #[pyo3(text_signature = "($self, config, discount_rate, as_of)")]
     fn price_merton_mc(
         &self,
+        py: Python<'_>,
         config: PyRef<'_, PyMertonMcConfig>,
         discount_rate: f64,
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<PyMertonMcResult> {
         let as_of = extract_date(as_of)?;
-        let result = self
-            .inner
-            .price_merton_mc(&config.inner, discount_rate, as_of)
+        let bond = self.inner.clone();
+        let config = config.inner.clone();
+        let result = py
+            .detach(move || bond.price_merton_mc(&config, discount_rate, as_of))
             .map_err(core_to_py)?;
         Ok(PyMertonMcResult::from_inner(result))
     }

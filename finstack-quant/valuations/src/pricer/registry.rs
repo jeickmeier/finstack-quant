@@ -1108,7 +1108,10 @@ mod tests {
             .register(RichBondPricer)
             .expect("unique test pricer registration");
         let mut cfg = FinstackConfig::default();
-        cfg.rounding.output_scale.overrides.insert(Currency::USD, 4);
+        cfg.rounding
+            .output_scale
+            .set_scale(Currency::USD, 4)
+            .expect("valid decimal scale");
 
         let result = registry
             .price_with_metrics(
@@ -1154,7 +1157,7 @@ mod tests {
             result
                 .meta
                 .rounding
-                .output_scale_by_currency
+                .get_output_scale_by_currency()
                 .get(&Currency::USD),
             Some(&4)
         );
@@ -1598,7 +1601,10 @@ mod tests {
         let registry = super::super::standard_pricer_registry();
 
         let mut cfg = FinstackConfig::default();
-        cfg.rounding.output_scale.overrides.insert(Currency::USD, 4);
+        cfg.rounding
+            .output_scale
+            .set_scale(Currency::USD, 4)
+            .expect("valid decimal scale");
 
         let result = registry
             .price_with_metrics(
@@ -1615,7 +1621,7 @@ mod tests {
             result
                 .meta
                 .rounding
-                .output_scale_by_currency
+                .get_output_scale_by_currency()
                 .get(&Currency::USD)
                 .copied(),
             Some(4),

@@ -367,12 +367,24 @@ pub fn apply_scenario_to_market(
 /// * `market_json` - JSON-serialized `MarketContext`.
 /// * `as_of` - Valuation date (ISO 8601).
 /// * `scenario_json` - JSON-serialized `ScenarioSpec`.
-/// * `method` - Attribution method: "parallel", "waterfall", "metrics_based", "taylor".
+/// * `method` - Attribution method: "parallel", "waterfall", "metrics_based", or "taylor";
+///   omit to use "parallel". "metrics_based" calculates the canonical registry's
+///   applicable subset of default attribution metrics at the opening snapshot;
+///   metrics unsupported by the instrument type are omitted, while failures
+///   calculating selected metrics throw.
+/// * `config_json` - Optional FinstackConfig JSON for horizon analysis; omit to use defaults.
+/// * `calendar_id` - Optional built-in holiday calendar (e.g. "nyse", "target") used to
+///   business-day adjust `time_roll_forward` targets under `business_days` mode.
+///   Omit for a weekends-only calendar; unknown identifiers throw.
 ///
 /// # Returns
 ///
-/// The `HorizonResult` as a structured JavaScript object, matching the Python
-/// binding's typed `HorizonResult`.
+/// Structured `HorizonResult` with currency-tagged endpoint values, attribution,
+/// scenario report, decimal total and annualized returns, and decimal factor
+/// contributions. Rust computes every derived value. Undefined derived values
+/// are `null`: total return and factor contributions require positive initial
+/// value and matching P&L currency; annualization also requires a positive
+/// horizon and total return at or above -100%.
 ///
 /// # Errors
 ///
@@ -381,10 +393,6 @@ pub fn apply_scenario_to_market(
 /// `calendar_id`; invalid, unsupported, or unresolved scenario operations;
 /// missing market data; pricing or attribution failures; or failure to
 /// serialize the horizon result to JavaScript.
-/// @param config_json - Optional FinstackConfig JSON for horizon analysis; omit to use defaults.
-/// @param calendar_id - Optional holiday calendar (e.g. "nyse", "target") used to
-///   business-day adjust `time_roll_forward` targets under `business_days` mode.
-///   Omit for a weekends-only calendar; unknown identifiers throw.
 #[wasm_bindgen(js_name = computeHorizonReturn)]
 pub fn compute_horizon_return(
     instrument_json: &str,
@@ -438,7 +446,7 @@ pub fn compute_horizon_return(
         .compute(&instrument, &market, date, &scenario)
         .map_err(to_js_err)?;
 
-    crate::utils::to_js_value(&result)
+    crate::utils::to_js_value(&result.to_json())
 }
 
 #[cfg(test)]

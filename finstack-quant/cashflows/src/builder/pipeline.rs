@@ -105,7 +105,11 @@ impl<'a> DateProcessor<'a> {
             linear_delta: self.amort_setup.linear_delta,
             percent_per: self.amort_setup.percent_per,
             percent_remaining: self.amort_setup.percent_remaining,
-            linear_between: self.amort_setup.linear_between,
+            linear_between: self.amort_setup.linear_between.and_then(|(start, end, _)| {
+                state
+                    .linear_between_installment
+                    .map(|installment| (start, end, installment))
+            }),
             step_remaining_map: &self.amort_setup.step_remaining_map,
             custom_principal_map: &self.amort_setup.custom_principal_map,
         };
@@ -115,7 +119,7 @@ impl<'a> DateProcessor<'a> {
             self.ctx.notional,
             &mut state.outstanding,
             &amort_params,
-            self.amort_setup.amort_dates.iter().max() == Some(&d),
+            self.amort_setup.final_amortization_date == Some(d),
             &mut state.flows,
         )?;
         for flow in &mut state.flows[first_flow..] {
@@ -134,7 +138,20 @@ impl<'a> DateProcessor<'a> {
         if let Some((_, balance)) = state.outstanding_history.last_mut() {
             *balance = state.outstanding;
         }
+        self.initialize_linear_between(self.ctx.issue, state);
         Ok(())
+    }
+
+    /// Fix equal installments from the balance after all start-date movements.
+    fn initialize_linear_between(&self, d: Date, state: &mut BuildState) {
+        if let Some((_, _, count)) = self
+            .amort_setup
+            .linear_between
+            .filter(|(start, _, _)| *start == d)
+        {
+            state.linear_between_installment =
+                Some(state.outstanding / Decimal::from(count as u64));
+        }
     }
 
     /// Emit fee flows (periodic and fixed).
@@ -179,7 +196,14 @@ impl<'a> DateProcessor<'a> {
                     .with_principal_delta(ev.delta)
                     .with_principal_date(ev.date),
                 );
-                state.outstanding += f64_to_decimal(ev.delta.amount())?;
+                state.outstanding = state
+                    .outstanding
+                    .checked_add(f64_to_decimal(ev.delta.amount())?)
+                    .ok_or_else(|| {
+                        finstack_quant_core::Error::Validation(
+                            "outstanding principal exceeds the supported decimal range".into(),
+                        )
+                    })?;
                 if state.outstanding < Decimal::ZERO {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "principal event on {} would make outstanding balance negative ({})",
@@ -224,15 +248,20 @@ impl<'a> DateProcessor<'a> {
         mut state: BuildState,
     ) -> finstack_quant_core::Result<BuildState> {
         let pik_to_add = self.emit_coupons(d, &mut state)?;
-
-        self.emit_amortization(d, &mut state)?;
-
         if pik_to_add > 0.0 {
-            state.outstanding += f64_to_decimal(pik_to_add)?;
+            state.outstanding = state
+                .outstanding
+                .checked_add(f64_to_decimal(pik_to_add)?)
+                .ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(
+                        "outstanding principal exceeds the supported decimal range".into(),
+                    )
+                })?;
         }
-
-        self.emit_fees(d, &mut state)?;
         self.process_principal_events(d, &mut state)?;
+        self.emit_amortization(d, &mut state)?;
+        self.emit_fees(d, &mut state)?;
+        self.initialize_linear_between(d, &mut state);
         self.handle_maturity(d, &mut state)?;
 
         debug_assert!(

@@ -91,7 +91,7 @@ fn estimate_to_js(est: &MoneyEstimate) -> Result<JsValue, JsValue> {
 /// Throws a JavaScript exception if `currency` is unknown; embedded defaults cannot be
 /// loaded when `num_steps` is omitted; `rate` or `div_yield` is non-finite;
 /// `kappa`, `theta`, `vol_of_vol`, or `v0` is non-finite or non-positive;
-/// `rho` is outside `[-1, 1]`; the expiry, step count, path count, or computed
+/// `rho` is outside `[-1, 1]`; a count is fractional or exceeds the wasm32 integer range; the expiry, step count, path count, or computed
 /// discount factor fails validation; a simulated discounted payoff is
 /// non-finite; or the result cannot be serialized.
 /// @param spot - Current spot price or exchange rate in the same units as the strike.
@@ -104,9 +104,9 @@ fn estimate_to_js(est: &MoneyEstimate) -> Result<JsValue, JsValue> {
 /// @param rho - Instantaneous correlation between the asset and variance shocks.
 /// @param v0 - Initial instantaneous variance in the Heston stochastic-volatility model.
 /// @param expiry - Time to option expiry in years on the model's annual time basis.
-/// @param num_paths - Number of simulated stochastic paths; larger values improve sampling precision.
+/// @param num_paths - Integer independent path estimators in [2, 10000000]; each antithetic pair counts once.
 /// @param seed - Deterministic random-number seed used to reproduce simulation output.
-/// @param num_steps - Number of time steps per simulated path.
+/// @param num_steps - Positive integer number of time steps per simulated path, at most 4294967295.
 /// @param currency - ISO-4217 currency code for the monetary amount or market convention.
 #[wasm_bindgen(js_name = priceHestonCall)]
 pub fn price_heston_call(
@@ -120,11 +120,15 @@ pub fn price_heston_call(
     rho: f64,
     v0: f64,
     expiry: f64,
-    num_paths: usize,
+    num_paths: f64,
     seed: u64,
-    num_steps: Option<usize>,
+    num_steps: Option<f64>,
     currency: Option<String>,
 ) -> Result<JsValue, JsValue> {
+    let num_paths = super::parse_usize(num_paths, "numPaths")?;
+    let num_steps = num_steps
+        .map(|value| super::parse_usize(value, "numSteps"))
+        .transpose()?;
     price_heston(
         true, spot, strike, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, expiry, num_paths,
         seed, num_steps, currency,
@@ -139,7 +143,7 @@ pub fn price_heston_call(
 /// Throws a JavaScript exception if `currency` is unknown; embedded defaults cannot be
 /// loaded when `num_steps` is omitted; `rate` or `div_yield` is non-finite;
 /// `kappa`, `theta`, `vol_of_vol`, or `v0` is non-finite or non-positive;
-/// `rho` is outside `[-1, 1]`; the expiry, step count, path count, or computed
+/// `rho` is outside `[-1, 1]`; a count is fractional or exceeds the wasm32 integer range; the expiry, step count, path count, or computed
 /// discount factor fails validation; a simulated discounted payoff is
 /// non-finite; or the result cannot be serialized.
 /// @param spot - Current spot price or exchange rate in the same units as the strike.
@@ -152,9 +156,9 @@ pub fn price_heston_call(
 /// @param rho - Instantaneous correlation between the asset and variance shocks.
 /// @param v0 - Initial instantaneous variance in the Heston stochastic-volatility model.
 /// @param expiry - Time to option expiry in years on the model's annual time basis.
-/// @param num_paths - Number of simulated stochastic paths; larger values improve sampling precision.
+/// @param num_paths - Integer independent path estimators in [2, 10000000]; each antithetic pair counts once.
 /// @param seed - Deterministic random-number seed used to reproduce simulation output.
-/// @param num_steps - Number of time steps per simulated path.
+/// @param num_steps - Positive integer number of time steps per simulated path, at most 4294967295.
 /// @param currency - ISO-4217 currency code for the monetary amount or market convention.
 #[wasm_bindgen(js_name = priceHestonPut)]
 pub fn price_heston_put(
@@ -168,11 +172,15 @@ pub fn price_heston_put(
     rho: f64,
     v0: f64,
     expiry: f64,
-    num_paths: usize,
+    num_paths: f64,
     seed: u64,
-    num_steps: Option<usize>,
+    num_steps: Option<f64>,
     currency: Option<String>,
 ) -> Result<JsValue, JsValue> {
+    let num_paths = super::parse_usize(num_paths, "numPaths")?;
+    let num_steps = num_steps
+        .map(|value| super::parse_usize(value, "numSteps"))
+        .transpose()?;
     price_heston(
         false, spot, strike, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, expiry, num_paths,
         seed, num_steps, currency,

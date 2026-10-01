@@ -2,7 +2,6 @@
 
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
-use std::str::FromStr;
 
 use finstack_quant_core::config::RoundingMode;
 use finstack_quant_core::currency::Currency;
@@ -48,7 +47,8 @@ fn decimal_type<'py>(py: Python<'py>) -> PyResult<&'py Bound<'py, PyType>> {
 /// Raises
 /// ------
 /// ValueError
-///     If *amount* is not finite / not parsable or *currency* is invalid.
+///     If *amount* is not finite, parsable, or exactly representable as a
+///     96-bit Decimal with at most 28 fractional digits, or *currency* is invalid.
 ///
 /// Examples
 /// --------
@@ -88,12 +88,7 @@ pub(crate) fn decimal_from_py(obj: &Bound<'_, PyAny>) -> PyResult<rust_decimal::
         return Err(PyTypeError::new_err("expected decimal.Decimal"));
     }
     let s: String = obj.str()?.extract()?;
-    parse_decimal_str(&s)
-}
-
-fn parse_decimal_str(s: &str) -> PyResult<rust_decimal::Decimal> {
-    rust_decimal::Decimal::from_str(s.trim())
-        .map_err(|e| value_error(format!("Invalid Decimal value {s:?}: {e}")))
+    finstack_quant_core::decimal::parse_decimal(&s).map_err(core_to_py)
 }
 
 /// Convert a Rust decimal into Python ``decimal.Decimal`` without using `f64`.
@@ -146,7 +141,7 @@ fn money_from_amount_with_config(
         return from_decimal(d).map_err(core_to_py);
     }
     if let Ok(text) = obj.cast::<PyString>() {
-        let d = parse_decimal_str(text.to_str()?)?;
+        let d = finstack_quant_core::decimal::parse_decimal(text.to_str()?).map_err(core_to_py)?;
         return from_decimal(d).map_err(core_to_py);
     }
     let amount: f64 = obj.extract().map_err(|_| PyTypeError::new_err(TYPE_MSG))?;
@@ -209,7 +204,7 @@ impl PyMoney {
 
     /// Construct from exact decimal text, rejecting inexact amounts.
     ///
-    /// Unlike general ``Money`` construction or JSON deserialization, this
+    /// Unlike JSON deserialization, this
     /// entry point never routes the amount through ``float`` or tolerates
     /// lossy re-rendering: the text must be exactly representable as a Rust
     /// ``Decimal`` (96-bit mantissa, at most 28 fractional digits). For
@@ -528,7 +523,7 @@ impl PyMoney {
 
 /// Register the `finstack_quant.core.money` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let module = PyModule::new(py, "money")?;
+    let module = crate::bindings::module_utils::new_submodule(parent, "money")?;
     module.setattr(
         "__doc__",
         "Currency-tagged money bindings (finstack-quant-core).",
@@ -538,13 +533,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let all = PyList::new(py, ["Money"])?;
     module.setattr("__all__", all)?;
 
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &module,
-        "money",
-        "finstack_quant.core",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
 
     Ok(())

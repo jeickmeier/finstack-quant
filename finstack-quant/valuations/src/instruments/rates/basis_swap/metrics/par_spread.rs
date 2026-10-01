@@ -137,24 +137,9 @@ impl MetricCalculator for ParSpreadCalculator {
             .pv_float_leg(&swap.reference_leg, curves.as_ref(), as_of)?
             .amount();
 
-        // PV of primary at zero spread - need to create a modified leg
-        let primary_leg_no_spread = crate::instruments::FloatLegSpec {
-            end_of_month: false,
-            fixing_calendar_id: None,
-            forward_curve_id: swap.primary_leg.forward_curve_id.to_owned(),
-            discount_curve_id: swap.primary_leg.discount_curve_id.to_owned(),
-            start: swap.primary_leg.start,
-            end: swap.primary_leg.end,
-            frequency: swap.primary_leg.frequency,
-            day_count: swap.primary_leg.day_count,
-            business_day_convention: swap.primary_leg.business_day_convention,
-            calendar_id: swap.primary_leg.calendar_id.clone(),
-            stub: swap.primary_leg.stub,
-            payment_lag_days: swap.primary_leg.payment_lag_days,
-            reset_lag_days: swap.primary_leg.reset_lag_days,
-            spread_bp: rust_decimal::Decimal::ZERO,
-            compounding: swap.primary_leg.compounding,
-        };
+        // Solve for this same contract: only the quoted spread changes.
+        let mut primary_leg_no_spread = swap.primary_leg.clone();
+        primary_leg_no_spread.spread_bp = rust_decimal::Decimal::ZERO;
         let pv_primary_no_spread = swap
             .pv_float_leg(&primary_leg_no_spread, curves.as_ref(), as_of)?
             .amount();

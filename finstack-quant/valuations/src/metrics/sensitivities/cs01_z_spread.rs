@@ -19,8 +19,8 @@
 //! where `PV_z(z) = Σ CF_i · DF(settlement, T_i) · shift(z, t_i)` and `shift`
 //! adds the spread `z` to the periodically-compounded zero rate (see
 //! [`z_spread_discount_factor`]). The anchor `z*` is solved so that `PV_z(z*)`
-//! reproduces the instrument's quoted price when one is supplied; otherwise the
-//! anchor is `z* = 0` (the model PV), so unquoted instruments report the
+//! reproduces the instrument's quoted price when one is supplied. An explicit
+//! quoted spread is used directly; otherwise the anchor is `z* = 0` (the model PV), so unquoted instruments report the
 //! spread sensitivity at the current market level.
 //!
 //! # Relationship to DV01
@@ -88,6 +88,11 @@ pub(crate) struct ZSpreadCs01Inputs {
 /// Instruments whose CS01 is computed via a z-spread (parallel discount-curve
 /// spread) bump because their pricer discounts on a single curve.
 pub(crate) trait ZSpreadCs01 {
+    /// Explicit quoted z-spread, in decimal units, used directly as the risk anchor.
+    fn z_spread_cs01_quoted_spread(&self) -> Option<f64> {
+        None
+    }
+
     /// Build the holder-view cashflow inputs for the z-spread bump.
     fn z_spread_cs01_inputs(
         &self,
@@ -144,9 +149,8 @@ fn price_at_spread(
     Ok(pv.total())
 }
 
-/// Present value with the base spread `base_z`, bumping only the flows whose
-/// index is in `bumped` by an additional `dz`.
-fn price_bucket_bumped(
+/// Central PV difference for one bucket, visiting only its assigned flows.
+fn bucket_pv_difference(
     cached: &[CachedFlow],
     base_z: f64,
     bumped: &[usize],
@@ -154,21 +158,27 @@ fn price_bucket_bumped(
     compounds_per_year: f64,
 ) -> finstack_quant_core::Result<f64> {
     let mut pv = NeumaierAccumulator::new();
-    for (i, (t, df_base, amt)) in cached.iter().enumerate() {
-        let z = if bumped.contains(&i) {
-            base_z + dz
-        } else {
-            base_z
-        };
-        let df_z = z_spread_discount_factor(*df_base, *t, z, compounds_per_year)?;
-        pv.add(amt * df_z);
+    for &i in bumped {
+        let (t, df_base, amt) = cached[i];
+        let up = z_spread_discount_factor(df_base, t, base_z + dz, compounds_per_year)?;
+        let down = z_spread_discount_factor(df_base, t, base_z - dz, compounds_per_year)?;
+        pv.add(amt * (up - down));
     }
     Ok(pv.total())
 }
 
 /// Solve the anchor spread `z*` so that `PV_z(z*)` matches `target` (a quoted
-/// dirty price). Falls back to `0.0` if the solve fails to converge.
-fn solve_anchor_spread(cached: &[CachedFlow], compounds_per_year: f64, target: f64) -> f64 {
+/// dirty price). Invalid quotes and failed solves are returned to the caller.
+fn solve_anchor_spread(
+    cached: &[CachedFlow],
+    compounds_per_year: f64,
+    target: f64,
+) -> finstack_quant_core::Result<f64> {
+    if !target.is_finite() {
+        return Err(finstack_quant_core::Error::Validation(
+            "z-spread anchor target must be finite".into(),
+        ));
+    }
     let objective = |z: f64| -> f64 {
         match price_at_spread(cached, z, compounds_per_year) {
             Ok(pv) => pv - target,
@@ -180,20 +190,14 @@ fn solve_anchor_spread(cached: &[CachedFlow], compounds_per_year: f64, target: f
     let solver = BrentSolver::new()
         .tolerance(1e-10)
         .initial_bracket_size(Some(0.05)); // ±500 bp
-                                           // A failed anchor solve must not silently anchor CS01 at the model-PV point
-                                           // (z=0): that computes the bucket sensitivities at the wrong base spread with
-                                           // no signal to the caller. Surface the failure as a warning before falling
-                                           // back so a bad mark / illiquid quote is observable in production.
-    solver.solve(objective, 0.0).unwrap_or_else(|err| {
-        tracing::warn!(
-            error = %err,
-            target,
-            "Z-spread anchor solve failed to converge; falling back to z=0.0 \
-             (CS01 buckets will be anchored at the model-PV point, not the \
-             quoted price)"
-        );
-        0.0
-    })
+    let spread = solver.solve(objective, 0.0)?;
+    let pv = price_at_spread(cached, spread, compounds_per_year)?;
+    if !pv.is_finite() || (pv - target).abs() > target.abs().max(1.0) * 1e-8 {
+        return Err(finstack_quant_core::Error::Validation(
+            "z-spread anchor solve did not reproduce the quoted dirty price".into(),
+        ));
+    }
+    Ok(spread)
 }
 
 /// Resolve the anchor spread for an instrument: solve to the quoted price when
@@ -205,12 +209,13 @@ fn anchor_spread<I: ZSpreadCs01>(
     cached: &[CachedFlow],
     compounds_per_year: f64,
 ) -> finstack_quant_core::Result<f64> {
-    Ok(
-        match instrument.z_spread_cs01_quoted_dirty(curves, as_of)? {
-            Some(target) => solve_anchor_spread(cached, compounds_per_year, target),
-            None => 0.0,
-        },
-    )
+    if let Some(spread) = instrument.z_spread_cs01_quoted_spread() {
+        return Ok(spread);
+    }
+    match instrument.z_spread_cs01_quoted_dirty(curves, as_of)? {
+        Some(target) => solve_anchor_spread(cached, compounds_per_year, target),
+        None => Ok(0.0),
+    }
 }
 
 /// Resolve the z-spread implied by an instrument's quoted price.
@@ -232,7 +237,7 @@ where
         &cached,
         inputs.compounds_per_year,
         target,
-    )))
+    )?))
 }
 
 /// Assign each cached flow to a key-rate bucket by its year fraction.
@@ -460,11 +465,9 @@ where
             let cs01 = if group.is_empty() {
                 0.0
             } else {
-                let pv_up =
-                    price_bucket_bumped(&cached, base_z, group, dz, inputs.compounds_per_year)?;
-                let pv_down =
-                    price_bucket_bumped(&cached, base_z, group, -dz, inputs.compounds_per_year)?;
-                sensitivity_central_diff(pv_up, pv_down, bump_bp)
+                let difference =
+                    bucket_pv_difference(&cached, base_z, group, dz, inputs.compounds_per_year)?;
+                sensitivity_central_diff(difference, 0.0, bump_bp)
             };
             series.push((label, cs01));
             total.add(cs01);
@@ -504,8 +507,16 @@ mod tests {
         let m = 1.0;
         let z_true = 0.0123;
         let target = price_at_spread(&cached, z_true, m).unwrap();
-        let z = solve_anchor_spread(&cached, m, target);
+        let z = solve_anchor_spread(&cached, m, target).unwrap();
         assert!((z - z_true).abs() < 1e-8, "z={z} z_true={z_true}");
+    }
+
+    #[test]
+    fn solve_anchor_spread_rejects_impossible_and_nonfinite_quotes() {
+        let cached = [(1.0, 0.97, 50.0), (3.0, 0.90, 1050.0)];
+        for target in [-100.0, f64::NAN, f64::INFINITY] {
+            assert!(solve_anchor_spread(&cached, 1.0, target).is_err());
+        }
     }
 
     /// Every flow is assigned to exactly one bucket (first boundary >= t, else
@@ -532,20 +543,24 @@ mod tests {
     /// over flows, each flow's contribution depends only on its own spread).
     #[test]
     fn bucketed_bumps_reconcile_to_parallel() {
-        let cached = vec![(0.5, 0.98, 100.0), (2.0, 0.92, 100.0), (5.0, 0.80, 1000.0)];
-        let buckets = vec![1.0, 3.0, 10.0];
+        let cached: Vec<_> = (1..=360)
+            .map(|i| {
+                let t = f64::from(i) / 12.0;
+                (t, (-0.04 * t).exp(), if i == 360 { 1100.0 } else { 100.0 })
+            })
+            .collect();
+        let buckets = vec![0.01, 1.0, 3.0, 10.0, 30.0];
         let groups = assign_buckets(&cached, &buckets);
         let m = 4.0;
         let dz = 1e-4;
 
-        let parallel =
-            price_at_spread(&cached, dz, m).unwrap() - price_at_spread(&cached, -dz, m).unwrap();
+        let base_z = 0.05;
+        let parallel = price_at_spread(&cached, base_z + dz, m).unwrap()
+            - price_at_spread(&cached, base_z - dz, m).unwrap();
 
         let mut bucket_sum = 0.0;
         for group in &groups {
-            let up = price_bucket_bumped(&cached, 0.0, group, dz, m).unwrap();
-            let down = price_bucket_bumped(&cached, 0.0, group, -dz, m).unwrap();
-            bucket_sum += up - down;
+            bucket_sum += bucket_pv_difference(&cached, base_z, group, dz, m).unwrap();
         }
 
         assert!(

@@ -10,12 +10,11 @@ use crate::recalibration::{
     RecalibrationProvider,
 };
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::market_data::bumps::{
-    BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
-};
+use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
+use std::cmp::Ordering;
 use std::sync::Arc;
 
 /// Historical shift for a single risk factor on a single date.
@@ -47,6 +46,18 @@ pub struct MarketScenario {
     pub shifts: Vec<RiskFactorShift>,
 }
 
+struct VolPointShift {
+    expiry: f64,
+    strike: f64,
+    amount: f64,
+}
+
+// Coordinates use exact numeric equality: signed zeros coincide, adjacent
+// floating-point values remain distinct, and NaN never matches a grid node.
+fn same_grid_coordinate(left: f64, right: f64) -> bool {
+    left.partial_cmp(&right) == Some(Ordering::Equal)
+}
+
 impl MarketScenario {
     /// Create a new market scenario.
     pub fn new(date: Date, shifts: Vec<RiskFactorShift>) -> Self {
@@ -60,6 +71,10 @@ impl MarketScenario {
     /// par-quote changes, replayed together for each hazard curve through the
     /// supplied calibration provider against the shifted dependency market.
     /// Equity and volatility shifts are multiplicative and additive, respectively.
+    /// Volatility coordinates must exactly match source-surface expiry and strike
+    /// nodes. Repeated coordinates sum their absolute volatility changes before
+    /// application; every other node is unchanged. Off-grid coordinates and
+    /// shifts producing negative volatility are rejected rather than mapped or floored.
     ///
     /// # Arguments
     ///
@@ -75,7 +90,8 @@ impl MarketScenario {
     /// # Errors
     ///
     /// Returns an error for non-finite shifts, invalid credit tenors, missing
-    /// dependencies or providers, or failed quote recalibration. The source
+    /// dependencies or providers, invalid volatility coordinates or resulting
+    /// volatilities, or failed quote recalibration. The source
     /// market remains unchanged on every failure.
     pub fn apply(
         &self,
@@ -88,15 +104,7 @@ impl MarketScenario {
         // shift-by-shift loop.
         let mut bumps: Vec<MarketBump> = Vec::with_capacity(self.shifts.len());
 
-        // `ImpliedVol` shocks carry (expiry, strike) point coordinates, but the
-        // bump machinery here supports only whole-surface parallel additive
-        // bumps. Applying each point shock as its own parallel bump would
-        // COMPOUND N point shocks into an N-fold surface move (the deferred
-        // rounds below re-apply same-id curve bumps, which is correct for
-        // key-rate shifts at different tenors but not for repeated parallel
-        // surface bumps). Approximate instead with ONE parallel bump per
-        // surface equal to the MEAN of that surface's point shifts.
-        let mut vol_shifts_by_surface: Vec<(CurveId, Vec<f64>)> = Vec::new();
+        let mut vol_shifts_by_surface: Vec<(CurveId, Vec<VolPointShift>)> = Vec::new();
         let mut credit_shifts: Vec<(CurveId, Vec<(f64, f64)>)> = Vec::new();
 
         for shift in &self.shifts {
@@ -149,45 +157,37 @@ impl MarketScenario {
                     pct: shift.shift * 100.0,
                     as_of: self.date,
                 },
-                RiskFactorType::ImpliedVol { vol_surface_id, .. } => {
+                RiskFactorType::ImpliedVol {
+                    vol_surface_id,
+                    expiry_years,
+                    strike,
+                } => {
+                    let point = VolPointShift {
+                        expiry: *expiry_years,
+                        strike: *strike,
+                        amount: shift.shift,
+                    };
                     match vol_shifts_by_surface
                         .iter_mut()
                         .find(|(id, _)| id == vol_surface_id)
                     {
-                        Some((_, shifts)) => shifts.push(shift.shift),
-                        None => {
-                            vol_shifts_by_surface.push((vol_surface_id.clone(), vec![shift.shift]))
+                        Some((_, shifts)) => {
+                            if let Some(existing) = shifts.iter_mut().find(|existing| {
+                                same_grid_coordinate(existing.expiry, *expiry_years)
+                                    && same_grid_coordinate(existing.strike, *strike)
+                            }) {
+                                existing.amount += shift.shift;
+                            } else {
+                                shifts.push(point);
+                            }
                         }
+                        None => vol_shifts_by_surface.push((vol_surface_id.clone(), vec![point])),
                     }
                     continue;
                 }
             };
 
             bumps.push(bump);
-        }
-
-        for (vol_surface_id, shifts) in vol_shifts_by_surface {
-            let count = shifts.len();
-            let mean_shift = shifts.iter().sum::<f64>() / count as f64;
-            if count > 1 {
-                tracing::warn!(
-                    vol_surface_id = vol_surface_id.as_str(),
-                    point_shocks = count,
-                    mean_shift,
-                    "scenario carries multiple ImpliedVol point shocks for one \
-                     surface; approximating with a single mean parallel bump \
-                     (point-level surface bumps are not supported here)"
-                );
-            }
-            bumps.push(MarketBump::Curve {
-                id: vol_surface_id,
-                spec: BumpSpec {
-                    mode: BumpMode::Additive,
-                    units: BumpUnits::Fraction,
-                    value: mean_shift,
-                    bump_type: BumpType::Parallel,
-                },
-            });
         }
 
         // `MarketContext::bump` classifies curve bumps into a `HashMap` keyed
@@ -215,6 +215,40 @@ impl MarketScenario {
             }
             bumped_market = bumped_market.bump(round)?;
             remaining = deferred;
+        }
+
+        for (surface_id, shifts) in vol_shifts_by_surface {
+            let mut surface = base_market.get_surface(&surface_id)?.as_ref().clone();
+            for VolPointShift {
+                expiry,
+                strike,
+                amount,
+            } in shifts
+            {
+                let row = surface
+                    .expiries()
+                    .iter()
+                    .position(|value| same_grid_coordinate(*value, expiry));
+                let column = surface
+                    .strikes()
+                    .iter()
+                    .position(|value| same_grid_coordinate(*value, strike));
+                let (Some(row), Some(column)) = (row, column) else {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "historical volatility point ({expiry}, {strike}) must exactly match a grid node on '{surface_id}'"
+                    )));
+                };
+                let new_vol = surface.vols()[row * surface.strikes().len() + column] + amount;
+                if !new_vol.is_finite() || new_vol < 0.0 {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "historical volatility point ({expiry}, {strike}) on '{surface_id}' must remain finite and nonnegative"
+                    )));
+                }
+                // Exact-coordinate validation above prevents this primitive's
+                // nearest-node mapping or zero floor from changing the shock.
+                surface.bump_point_absolute_in_place(expiry, strike, amount)?;
+            }
+            bumped_market = bumped_market.insert_surface(surface);
         }
 
         if !credit_shifts.is_empty() {
@@ -598,14 +632,10 @@ mod tests {
         Ok(())
     }
 
-    /// Multiple `ImpliedVol` point shocks on the SAME surface must not
-    /// compound into repeated full-surface parallel bumps (the deferred-round
-    /// mechanism exists for same-curve KEY-RATE shifts, which legitimately
-    /// stack at different tenors — not for whole-surface vol bumps). A
-    /// scenario with per-point vol changes is approximated by ONE parallel
-    /// bump equal to the mean point shift.
+    /// Opposing point shocks must preserve their coordinates rather than
+    /// cancelling as a parallel mean shift.
     #[test]
-    fn test_same_surface_vol_points_average_not_compound() -> Result<()> {
+    fn test_same_surface_vol_points_preserve_distinct_shocks() -> Result<()> {
         use finstack_quant_core::market_data::surfaces::VolSurface;
 
         let surface = VolSurface::builder("EQ-VOL")
@@ -633,22 +663,17 @@ mod tests {
                         expiry_years: 1.0,
                         strike: 110.0,
                     },
-                    shift: 0.04,
+                    shift: -0.02,
                 },
             ],
         );
 
         let bumped = scenario.apply(&base_market, None)?;
         let surface = bumped.get_surface("EQ-VOL")?;
-        let vol = finstack_quant_models::volatility::get_surface_vol(&surface, 0.5, 100.0)
-            .expect("grid point lookup should succeed");
-
-        // Mean of (+2, +4) vol points = +3 vol points, NOT the compounded +6.
-        assert!(
-            (vol - 0.23).abs() < 1e-9,
-            "same-surface vol point shocks must average into one parallel bump \
-             (expected 0.23), got {vol}"
-        );
+        for (actual, expected) in surface.vols().iter().zip([0.22, 0.20, 0.20, 0.18]) {
+            assert!((actual - expected).abs() < 1e-12);
+        }
+        assert_eq!(base_market.get_surface("EQ-VOL")?.vols(), &[0.20; 4]);
         Ok(())
     }
 
@@ -733,7 +758,66 @@ mod tests {
         let vol = finstack_quant_models::volatility::get_surface_vol(&bumped_surface, 1.0, 100.0)
             .expect("grid point lookup should succeed");
         assert!((vol - 0.23).abs() < 1e-9);
+        assert_eq!(bumped_surface.vols()[0], 0.20);
+        assert_eq!(bumped_surface.vols()[1], 0.22);
+        assert_eq!(bumped_surface.vols()[3], 0.23);
+        assert_eq!(
+            base_market.get_surface("EQ-VOL")?.vols(),
+            &[0.20, 0.22, 0.21, 0.23]
+        );
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_vol_point_coordinate_and_duplicate_policy() -> Result<()> {
+        use finstack_quant_core::market_data::surfaces::VolSurface;
+
+        assert!(same_grid_coordinate(0.0, -0.0));
+        assert!(!same_grid_coordinate(f64::NAN, f64::NAN));
+        let surface = VolSurface::builder("VOL")
+            .expiries(&[0.5, 1.0])
+            .strikes(&[100.0, 110.0])
+            .row(&[0.2, 0.2])
+            .row(&[0.2, 0.2])
+            .build()?;
+        let market = MarketContext::new().insert_surface(surface);
+        let point = |id: &str, expiry_years, strike, shift| RiskFactorShift {
+            factor: RiskFactorType::ImpliedVol {
+                vol_surface_id: id.into(),
+                expiry_years,
+                strike,
+            },
+            shift,
+        };
+        // Aggregate first: the temporary negative value from applying -0.3
+        // alone must not floor the node before the +0.2 duplicate arrives.
+        let duplicate = MarketScenario::new(
+            date!(2024 - 01 - 02),
+            vec![
+                point("VOL", 0.5, 100.0, -0.3),
+                point("VOL", 0.5, 100.0, 0.2),
+            ],
+        );
+        let shocked = duplicate.apply(&market, None)?;
+        assert!((shocked.get_surface("VOL")?.vols()[0] - 0.1).abs() < 1e-12);
+        assert_eq!(&shocked.get_surface("VOL")?.vols()[1..], &[0.2; 3]);
+
+        for invalid in [
+            point("VOL", 0.6, 100.0, 0.01),
+            point("VOL", 0.5, 105.0, 0.01),
+            point("VOL", 0.5, 100.0_f64.next_up(), 0.01),
+            point("MISSING", 0.5, 100.0, 0.01),
+            point("VOL", f64::NAN, 100.0, 0.01),
+            point("VOL", 0.5, 100.0, -0.21),
+        ] {
+            let scenario = MarketScenario::new(
+                date!(2024 - 01 - 02),
+                vec![point("VOL", 1.0, 110.0, 0.05), invalid],
+            );
+            assert!(scenario.apply(&market, None).is_err());
+            assert_eq!(market.get_surface("VOL")?.vols(), &[0.2; 4]);
+        }
         Ok(())
     }
 }

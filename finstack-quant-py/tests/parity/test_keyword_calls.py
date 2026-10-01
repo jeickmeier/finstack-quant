@@ -129,6 +129,8 @@ _CASES = _collect_cases()
 def test_documented_keyword_is_accepted(module: str, func: str, cls: str | None, param: str) -> None:
     target = _resolve(module, func, cls)
     if target is None:
+        if module == "finstack_quant.statements":
+            pytest.fail(f"public declaration {module}.{cls or ''}.{func} is absent at runtime")
         pytest.skip(f"{module}.{cls or ''}.{func} not importable at runtime")
     if param in {"args", "kwargs"}:
         pytest.skip("variadic")

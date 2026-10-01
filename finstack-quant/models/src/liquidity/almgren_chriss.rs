@@ -36,6 +36,7 @@ use super::types::LiquidityProfile;
 /// `eta` is the temporary impact coefficient, and `delta` is the power-law
 /// exponent (typically 0.5-0.6).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(try_from = "RawAlmgrenChrissModel")]
 pub struct AlmgrenChrissModel {
     /// Permanent impact coefficient (gamma).
     gamma: f64,
@@ -46,6 +47,22 @@ pub struct AlmgrenChrissModel {
     /// Power-law exponent for temporary impact (delta).
     /// Typically 0.5-0.6 for equities.
     delta: f64,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawAlmgrenChrissModel {
+    gamma: f64,
+    eta: f64,
+    delta: f64,
+}
+
+impl TryFrom<RawAlmgrenChrissModel> for AlmgrenChrissModel {
+    type Error = finstack_quant_core::Error;
+
+    fn try_from(raw: RawAlmgrenChrissModel) -> Result<Self> {
+        Self::new(raw.gamma, raw.eta, raw.delta)
+    }
 }
 
 impl AlmgrenChrissModel {
@@ -141,7 +158,11 @@ impl AlmgrenChrissModel {
     ///
     /// # Arguments
     ///
-    /// * `params` - Trade parameters including size, urgency, and market data.
+    /// * `params` - Signed finite trade quantity, positive execution horizon
+    ///   in trading days, positive daily decimal return volatility, and a
+    ///   positive reference price in currency per unit. An omitted reference
+    ///   price uses `params.profile.mid`; risk aversion does not affect this
+    ///   uniform-execution cost estimate.
     ///
     /// # Returns
     ///
@@ -149,19 +170,10 @@ impl AlmgrenChrissModel {
     ///
     /// # Errors
     ///
-    /// Returns a validation error for non-finite or non-positive trade inputs.
+    /// Returns a validation error for a non-finite quantity, non-positive or
+    /// non-finite horizon, volatility, or effective reference price.
     pub fn estimate_cost(&self, params: &TradeParams) -> Result<ImpactEstimate> {
-        if !params.quantity.is_finite() {
-            return Err(invalid_input("quantity must be finite"));
-        }
-        if !params.horizon_days.is_finite() || params.horizon_days <= 0.0 {
-            return Err(invalid_input("horizon_days must be finite and positive"));
-        }
-        if !params.daily_volatility.is_finite() || params.daily_volatility <= 0.0 {
-            return Err(invalid_input(
-                "daily_volatility must be finite and positive",
-            ));
-        }
+        params.validate()?;
 
         let q = params.quantity;
         let t = params.horizon_days;
@@ -209,8 +221,12 @@ impl AlmgrenChrissModel {
     ///
     /// # Arguments
     ///
-    /// * `params` - Trade parameters.
-    /// * `num_buckets` - Number of time intervals to divide execution into.
+    /// * `params` - Signed finite quantity to execute, positive horizon in
+    ///   trading days, daily decimal return volatility and reference price.
+    ///   An omitted price uses `params.profile.mid`; omitted risk aversion
+    ///   uses `1e-6`, while supplied risk aversion must be finite and non-negative.
+    /// * `num_buckets` - Positive number of equal time intervals spanning the
+    ///   execution horizon; determines the returned quantity vector length.
     ///
     /// # Returns
     ///
@@ -218,7 +234,9 @@ impl AlmgrenChrissModel {
     ///
     /// # Errors
     ///
-    /// Returns a validation error for invalid trade inputs or a zero bucket count.
+    /// Returns a validation error for invalid trade inputs (including a non-positive
+    /// or non-finite effective reference price), a zero bucket count, invalid
+    /// risk aversion, or nonlinear temporary impact.
     pub fn optimal_trajectory(
         &self,
         params: &TradeParams,
@@ -227,17 +245,7 @@ impl AlmgrenChrissModel {
         if num_buckets == 0 {
             return Err(invalid_input("num_buckets must be > 0"));
         }
-        if !params.quantity.is_finite() {
-            return Err(invalid_input("quantity must be finite"));
-        }
-        if !params.horizon_days.is_finite() || params.horizon_days <= 0.0 {
-            return Err(invalid_input("horizon_days must be finite and positive"));
-        }
-        if !params.daily_volatility.is_finite() || params.daily_volatility <= 0.0 {
-            return Err(invalid_input(
-                "daily_volatility must be finite and positive",
-            ));
-        }
+        params.validate()?;
 
         let q = params.quantity;
         let t = params.horizon_days;
@@ -381,6 +389,23 @@ fn stable_sinh_ratio(numerator: f64, denominator: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn deserialization_revalidates_model_parameters() {
+        let model = AlmgrenChrissModel::new(0.0, 0.001, 1.0).unwrap();
+        let json = serde_json::to_string(&model).unwrap();
+        assert_eq!(
+            serde_json::from_str::<AlmgrenChrissModel>(&json).unwrap(),
+            model
+        );
+        for invalid in [
+            r#"{"gamma":-1.0,"eta":-1.0,"delta":1.0}"#,
+            r#"{"gamma":0.0,"eta":0.0,"delta":1.0}"#,
+            r#"{"gamma":0.0,"eta":0.001,"delta":2.0}"#,
+        ] {
+            assert!(serde_json::from_str::<AlmgrenChrissModel>(invalid).is_err());
+        }
+    }
     use crate::liquidity::types::LiquidityProfile;
 
     fn test_profile() -> std::result::Result<LiquidityProfile, Box<dyn std::error::Error>> {
@@ -404,6 +429,23 @@ mod tests {
             risk_aversion: None,
             reference_price: None,
         })
+    }
+
+    #[test]
+    fn execution_rejects_invalid_reference_price_override_and_fallback(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let model = AlmgrenChrissModel::new(0.001, 0.01, 1.0)?;
+        for reference_price in [-100.0, 0.0, f64::NAN, f64::INFINITY] {
+            let mut params = test_params(1_000.0)?;
+            params.reference_price = Some(reference_price);
+            assert!(model.estimate_cost(&params).is_err());
+            assert!(model.optimal_trajectory(&params, 2).is_err());
+            params.reference_price = None;
+            params.profile.mid = reference_price;
+            assert!(model.estimate_cost(&params).is_err());
+            assert!(model.optimal_trajectory(&params, 2).is_err());
+        }
+        Ok(())
     }
 
     #[test]

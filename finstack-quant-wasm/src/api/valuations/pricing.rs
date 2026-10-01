@@ -66,7 +66,7 @@ pub(super) fn valuation_result_json(result: ValuationResult) -> Result<String, J
 /// JSON-compatible map/object conventions while preserving every 64-bit
 /// integer as JavaScript `BigInt`. In particular, Monte Carlo seeds span the
 /// full `u64` range and cannot be narrowed to a JavaScript `number`.
-fn valuation_result_value(result: &ValuationResult) -> Result<JsValue, JsValue> {
+pub(super) fn valuation_result_value(result: &ValuationResult) -> Result<JsValue, JsValue> {
     to_js_value_with_bigints(result)
 }
 
@@ -193,9 +193,11 @@ pub fn validate_valuation_result_json(json: &str) -> Result<String, JsValue> {
 /// # Arguments
 ///
 /// * `json` - Required `finstack_quant.instrument/1` envelope.
-/// * `metric_pricing_overrides` - Serialized metric-pricing override object merged before
-///   native instrument validation; `None` (omitted or null in JavaScript) retains
-///   the envelope configuration.
+/// * `metric_pricing_overrides` - Serialized JSON object patch applied before native
+///   validation. Only supplied fields replace stored overrides; `{}` preserves them.
+///   Supplied `bump_config` fields merge into the stored object. Explicit `null`
+///   clears nullable fields to their Rust fallback. Omitting the argument or
+///   passing JavaScript `null`/`undefined` retains the envelope configuration.
 ///
 /// # Errors
 ///
@@ -272,9 +274,11 @@ pub fn bond_from_cashflows_json(
 /// FI TRS duration DV01 requires `duration_id` and a finite signed scalar in years.
 /// Roll specialness is in basis points versus `repo_curve_id` (a discount curve),
 /// or the discount curve when omitted; implied financing is an ACT/360 decimal.
-/// @param metric_pricing_overrides - Optional JSON metric-pricing overrides merged into
-/// the envelope before validation. Omit, `null`, or `undefined` to use the
-/// envelope as-is.
+/// @param metric_pricing_overrides - Optional JSON object patch applied before validation.
+/// Only supplied fields replace stored overrides; `{}` preserves them. Supplied
+/// `bump_config` fields merge into the stored object. Explicit `null` clears
+/// nullable fields to their Rust fallback. Omit the argument or pass JavaScript
+/// `null`/`undefined` to retain the envelope configuration.
 /// @param market_history - Optional serialized market-history JSON required by
 /// historical risk metrics such as historical VaR.
 /// @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`,
@@ -471,9 +475,11 @@ pub fn listed_product_catalog(exchange: Option<String>) -> Result<JsValue, JsVal
 /// @param metrics - Optional canonical metric IDs such as `"ytm"`, `"dv01"`,
 /// `"hvar"`, or `"expected_shortfall"`. Omit, `null`, or `undefined` for a
 /// valuation-only result.
-/// @param metric_pricing_overrides - Optional JSON metric-pricing overrides merged into
-/// the envelope before validation. Omit, `null`, or `undefined` to use the
-/// envelope as-is.
+/// @param metric_pricing_overrides - Optional JSON object patch applied before validation.
+/// Only supplied fields replace stored overrides; `{}` preserves them. Supplied
+/// `bump_config` fields merge into the stored object. Explicit `null` clears
+/// nullable fields to their Rust fallback. Omit the argument or pass JavaScript
+/// `null`/`undefined` to retain the envelope configuration.
 /// @param market_history - Optional serialized market-history JSON required by
 /// historical risk metrics such as historical VaR.
 /// @returns Plain JavaScript `ValuationResult` (`instrument_id`, `as_of`,
@@ -911,7 +917,7 @@ mod tests {
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             correlation: 0.5,
             day_count: DayCount::Act365F,
-            index_id: None,
+            index_id: Some(finstack_quant_core::types::IndexId::new("USD-SOFR-OIS")),
             swap_fixed_frequency: None,
             swap_float_frequency: None,
             swap_fixed_day_count: None,
@@ -965,23 +971,18 @@ mod tests {
     pub(crate) fn cms_spread_market_context_json() -> String {
         use finstack_quant_core::dates::DayCount;
         use finstack_quant_core::market_data::context::MarketContext;
-        use finstack_quant_core::market_data::surfaces::{SabrParameterData, VolCube};
+        use finstack_quant_core::market_data::surfaces::VolSurface;
         use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 
-        fn sabr_cube(id: &str, alpha: f64, forward: f64) -> VolCube {
-            let params =
-                SabrParameterData::new(alpha, 0.5, -0.20, 0.40).expect("valid SABR params");
-            VolCube::builder(id)
+        fn flat_surface(id: &str, vol: f64) -> VolSurface {
+            VolSurface::builder(id)
                 .expiries(&[0.25, 1.0, 5.0])
-                .tenors(&[2.0, 10.0])
-                .node(params, forward)
-                .node(params, forward)
-                .node(params, forward)
-                .node(params, forward)
-                .node(params, forward)
-                .node(params, forward)
+                .strikes(&[0.01, 0.10])
+                .row(&[vol, vol])
+                .row(&[vol, vol])
+                .row(&[vol, vol])
                 .build()
-                .expect("vol cube")
+                .expect("flat Black surface")
         }
 
         let base = time::Date::from_calendar_date(2025, time::Month::January, 1).expect("date");
@@ -1000,8 +1001,8 @@ mod tests {
         let ctx = MarketContext::new()
             .insert(disc)
             .insert(fwd)
-            .insert_vol_cube(sabr_cube("USD-SWAPTION-VOL-10Y", 0.035, 0.045))
-            .insert_vol_cube(sabr_cube("USD-SWAPTION-VOL-2Y", 0.035, 0.030));
+            .insert_surface(flat_surface("USD-SWAPTION-VOL-10Y", 0.25))
+            .insert_surface(flat_surface("USD-SWAPTION-VOL-2Y", 0.20));
         serde_json::to_string(&ctx).expect("serialize")
     }
 

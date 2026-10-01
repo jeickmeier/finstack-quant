@@ -165,7 +165,9 @@ pub fn validate_typed_instrument_json(
 /// * `metric_pricing_overrides` - Optional `MetricPricingOverrides` JSON merged
 ///   into `instrument.spec.metric_pricing_overrides` by the
 ///   canonical pricing path before instrument validation; `None` retains the
-///   envelope configuration.
+///   envelope configuration. Only supplied fields replace stored values;
+///   omitted fields, including individual `bump_config` fields, are retained.
+///   Explicit `null` clears an optional field to its default behavior.
 ///
 /// # Errors
 ///
@@ -318,7 +320,9 @@ pub fn list_models_grouped() -> BTreeMap<String, Vec<String>> {
 ///
 /// * `instrument_json` - Required canonical v1 instrument envelope.
 /// * `metric_pricing_overrides` - Optional `MetricPricingOverrides` JSON merged
-///   into `instrument.spec.metric_pricing_overrides` before validation.
+///   into `instrument.spec.metric_pricing_overrides` before validation. Only
+///   supplied fields replace stored values; omitted fields, including individual
+///   `bump_config` fields, are retained. Explicit `null` clears optional fields.
 ///
 /// # Errors
 ///
@@ -617,7 +621,15 @@ fn instrument_json_for_pricing<'a>(
     let instrument_id = extract_spec_id_lossy(instrument_json);
     let id = instrument_id.as_deref();
 
-    let overrides: MetricPricingOverrides = serde_json::from_str(overrides_json).map_err(|e| {
+    let pricing_patch: Value = serde_json::from_str(overrides_json).map_err(|e| {
+        Error::Validation(with_id_suffix(
+            format!("invalid metric_pricing_overrides JSON: {e}"),
+            id,
+        ))
+    })?;
+    // Validate the canonical shape without materializing absent defaults into
+    // the patch: field presence determines which stored overrides are replaced.
+    let _: MetricPricingOverrides = serde_json::from_value(pricing_patch.clone()).map_err(|e| {
         Error::Validation(with_id_suffix(
             format!("invalid metric_pricing_overrides JSON: {e}"),
             id,
@@ -626,16 +638,9 @@ fn instrument_json_for_pricing<'a>(
     let mut document: Value = serde_json::from_str(instrument_json).map_err(|e| {
         Error::Validation(with_id_suffix(format!("invalid instrument JSON: {e}"), id))
     })?;
-    let pricing_patch = serde_json::to_value(&overrides).map_err(|e| {
-        Error::Validation(with_id_suffix(
-            format!("invalid metric_pricing_overrides JSON: {e}"),
-            id,
-        ))
-    })?;
-
     let patch = pricing_patch.as_object().cloned().ok_or_else(|| {
         Error::Validation(with_id_suffix(
-            "metric pricing overrides must serialize to an object".to_string(),
+            "metric pricing overrides must be an object".to_string(),
             id,
         ))
     })?;
@@ -658,7 +663,20 @@ fn instrument_json_for_pricing<'a>(
             id,
         ))
     })?;
-    metric_pricing_overrides.extend(patch);
+    for (key, value) in patch {
+        if key == "bump_config" {
+            if let (Some(existing), Some(provided)) = (
+                metric_pricing_overrides
+                    .get_mut(&key)
+                    .and_then(Value::as_object_mut),
+                value.as_object(),
+            ) {
+                existing.extend(provided.clone());
+                continue;
+            }
+        }
+        metric_pricing_overrides.insert(key, value);
+    }
 
     serde_json::to_string(&document)
         .map(Cow::Owned)
@@ -956,6 +974,41 @@ mod tests {
             parsed["instrument"]["spec"]["metric_pricing_overrides"]["breakeven_config"]["target"],
             "z_spread"
         );
+    }
+
+    #[test]
+    fn partial_metric_patch_preserves_absent_fields_and_nested_bumps() {
+        let mut document: Value = serde_json::from_str(&bond_instrument_json()).expect("json");
+        document["instrument"]["spec"]["metric_pricing_overrides"] = serde_json::json!({
+            "theta_period": {"count": 1, "unit": "weeks"},
+            "bump_config": {"rate_bump_bp": 2.0, "vol_bump_decimal": 0.02, "adaptive_bumps": true}
+        });
+        let json = document.to_string();
+        for patch in ["{}", r#"{"theta_day_basis":"trading_252"}"#] {
+            let merged = instrument_json_for_pricing(&json, Some(patch)).expect("merge");
+            let parsed: Value = serde_json::from_str(&merged).expect("json");
+            let overrides = &parsed["instrument"]["spec"]["metric_pricing_overrides"];
+            assert_eq!(
+                overrides["theta_period"],
+                document["instrument"]["spec"]["metric_pricing_overrides"]["theta_period"]
+            );
+            assert_eq!(
+                overrides["bump_config"],
+                document["instrument"]["spec"]["metric_pricing_overrides"]["bump_config"]
+            );
+        }
+
+        let merged = instrument_json_for_pricing(
+            &json,
+            Some(r#"{"bump_config":{"rate_bump_bp":3.0},"theta_period":null}"#),
+        )
+        .expect("merge");
+        let parsed: Value = serde_json::from_str(&merged).expect("json");
+        let overrides = &parsed["instrument"]["spec"]["metric_pricing_overrides"];
+        assert!(overrides["theta_period"].is_null());
+        assert_eq!(overrides["bump_config"]["rate_bump_bp"], 3.0);
+        assert_eq!(overrides["bump_config"]["vol_bump_decimal"], 0.02);
+        assert_eq!(overrides["bump_config"]["adaptive_bumps"], true);
     }
 
     #[test]

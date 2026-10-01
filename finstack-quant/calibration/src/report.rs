@@ -49,7 +49,8 @@ pub struct QuoteQuality {
 pub struct CalibrationDiagnostics {
     /// Per-quote quality metrics for each calibration instrument.
     pub per_quote: Vec<QuoteQuality>,
-    /// Condition number of the Jacobian's normal equations (J^T * J).
+    /// Condition number of the weighted Jacobian's normal equations (J^T * W * J).
+    /// `W` contains the configured residual weights; unweighted fits use identity.
     ///
     /// A high condition number (e.g., > 1e10) indicates an ill-conditioned
     /// calibration problem where small changes in market data can produce

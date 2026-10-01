@@ -23,18 +23,36 @@
       ],
       "forward_curve_id": "USD-LIBOR-3M",
       "funding_leg": {
-        "accrual_fractions": [
-          0.25,
-          0.25,
-          0.25,
-          0.25
-        ],
         "day_count": "30_360",
-        "payment_dates": [
-          "2025-06-20",
-          "2025-09-22",
-          "2025-12-22",
-          "2026-03-20"
+        "periods": [
+          {
+            "accrual_end": "2025-06-20",
+            "accrual_start": "2025-03-20",
+            "accrual_year_fraction": 0.25,
+            "payment_date": "2025-06-20",
+            "reset_date": "2025-03-20"
+          },
+          {
+            "accrual_end": "2025-09-22",
+            "accrual_start": "2025-06-20",
+            "accrual_year_fraction": 0.25,
+            "payment_date": "2025-09-22",
+            "reset_date": "2025-06-20"
+          },
+          {
+            "accrual_end": "2025-12-22",
+            "accrual_start": "2025-09-22",
+            "accrual_year_fraction": 0.25,
+            "payment_date": "2025-12-22",
+            "reset_date": "2025-09-22"
+          },
+          {
+            "accrual_end": "2026-03-20",
+            "accrual_start": "2025-12-22",
+            "accrual_year_fraction": 0.25,
+            "payment_date": "2026-03-20",
+            "reset_date": "2025-12-22"
+          }
         ],
         "rate": "0.03",
         "type": "fixed"

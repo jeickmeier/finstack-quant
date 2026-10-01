@@ -1,6 +1,5 @@
 //! Parametric factor risk decomposition using covariance-based Euler allocation.
 
-use super::math::cholesky;
 use super::types::{FactorContribution, PositionFactorContribution, RiskDecomposition};
 use crate::factor::{FactorCovarianceMatrix, RiskMeasure, SensitivityMatrix};
 
@@ -81,61 +80,10 @@ impl ParametricDecomposer {
             ));
         }
 
-        validate_finite_sensitivities(sensitivities)?;
-
-        let n = covariance.n_factors();
-        let data = covariance.as_slice();
-
-        // Verify finiteness, symmetry and positive semi-definiteness via the
-        // shared rank-tolerant Cholesky (`super::math::cholesky`), which
-        // judges symmetry against the matrix's own scale. A non-PSD
-        // covariance matrix can produce meaningless (negative) factor
-        // contributions that look like diversification benefits. The
-        // factorization accepts rank-deficient (PSD-but-not-PD) matrices — these arise naturally
-        // when users regularize a covariance matrix with shrinkage or when
-        // two factors are perfectly collinear at a given as-of.
-        //
-        // The error message includes the smallest diagonal entry (a cheap
-        // proxy for "where conditioning likely failed") and the matrix size
-        // so risk teams can diagnose whether they need shrinkage / ridge
-        // regularization without re-running an external tool.
-        if n > 0 {
-            let min_diag = (0..n)
-                .map(|i| data[i * n + i])
-                .fold(f64::INFINITY, f64::min);
-            let max_diag = (0..n)
-                .map(|i| data[i * n + i])
-                .fold(f64::NEG_INFINITY, f64::max);
-
-            // Cheap ill-conditioning proxy: a covariance whose variances span
-            // many orders of magnitude can produce numerically unstable Euler
-            // allocations even when Cholesky succeeds (a near-zero pivot still
-            // factorizes). Warn rather than reject — the matrix may be
-            // legitimately PSD — and never auto-regularize, which would
-            // silently alter the risk estimate.
-            const CONDITION_WARN_RATIO: f64 = 1e12;
-            if min_diag > 0.0 && max_diag / min_diag > CONDITION_WARN_RATIO {
-                tracing::warn!(
-                    n,
-                    min_diag,
-                    max_diag,
-                    "factor covariance diagonal spans >1e12; Euler risk \
-                     allocations may be numerically unstable — consider \
-                     Ledoit-Wolf shrinkage or ridge regularization"
-                );
-            }
-
-            cholesky(data, n).map_err(|e| {
-                finstack_quant_core::Error::Validation(format!(
-                    "Covariance matrix is not positive semi-definite \
-                     (n = {n}, min diagonal = {min_diag:.6e}, max diagonal = {max_diag:.6e}): \
-                     {e}. Consider Ledoit-Wolf shrinkage or a ridge regularization \
-                     of the covariance estimate."
-                ))
-            })?;
-        }
-
-        Ok(())
+        // Covariance is immutable and validates finiteness, symmetry and PSD
+        // on construction and deserialization. Re-factorizing it here adds a
+        // cubic pass and risks a different acceptance rule from its constructor.
+        validate_finite_sensitivities(sensitivities)
     }
 
     fn portfolio_exposures(sensitivities: &SensitivityMatrix) -> Vec<f64> {
@@ -351,6 +299,32 @@ mod tests {
     use crate::factor::{FactorCovarianceMatrix, FactorId, RiskMeasure};
 
     type TestResult = finstack_quant_core::Result<()>;
+
+    #[test]
+    fn mixed_scale_covariance_risk_is_invariant_to_factor_order() -> TestResult {
+        for (ids, data) in [
+            (
+                vec![FactorId::new("Low"), FactorId::new("High")],
+                vec![1e-6, 0.1, 0.1, 1e4],
+            ),
+            (
+                vec![FactorId::new("High"), FactorId::new("Low")],
+                vec![1e4, 0.1, 0.1, 1e-6],
+            ),
+        ] {
+            let covariance = FactorCovarianceMatrix::new(ids.clone(), data)?;
+            let mut sensitivities = SensitivityMatrix::zeros(vec!["position".into()], ids);
+            sensitivities.set_delta(0, 0, 1.0);
+            sensitivities.set_delta(0, 1, 1.0);
+            let result = ParametricDecomposer.decompose(
+                &sensitivities,
+                &covariance,
+                &RiskMeasure::Variance,
+            )?;
+            assert!((result.total_risk - 10000.200001).abs() < 1e-9);
+        }
+        Ok(())
+    }
 
     fn test_setup() -> finstack_quant_core::Result<(SensitivityMatrix, FactorCovarianceMatrix)> {
         let mut sensitivities = SensitivityMatrix::zeros(

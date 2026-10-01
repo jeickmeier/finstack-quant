@@ -299,6 +299,20 @@ mod tests {
     }
 
     #[test]
+    fn parameter_json_rejects_invalid_nested_hurst() {
+        let params = RoughBergomiParams::new(0.05, 0.02, make_hurst(0.1), 1.9, -0.9, make_xi())
+            .expect("valid parameters");
+        let mut json = serde_json::to_value(&params).expect("serialize parameters");
+        let restored: RoughBergomiParams =
+            serde_json::from_value(json.clone()).expect("valid nested Hurst exponent");
+        assert_eq!(restored.hurst, params.hurst);
+        for h in [-0.5, 0.0, 1.0, 1.5] {
+            json["hurst"]["h"] = serde_json::json!(h);
+            assert!(serde_json::from_value::<RoughBergomiParams>(json.clone()).is_err());
+        }
+    }
+
+    #[test]
     fn test_r_must_be_finite() {
         let res =
             RoughBergomiParams::new(f64::INFINITY, 0.02, make_hurst(0.1), 1.9, -0.9, make_xi());

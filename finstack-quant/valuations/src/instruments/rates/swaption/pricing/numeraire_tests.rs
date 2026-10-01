@@ -134,11 +134,9 @@ fn lmm_reference_european(
     let n = params.num_forwards;
     let process = LmmProcess::new(params.clone());
     let disc = LmmPredictorCorrector::new();
-    let maturity = *params.tenors.last().expect("tenors");
-
-    // Same exercise-aligned grid the engine builds for this single date.
+    // Same model/exercise-aligned grid the engine builds for this single date.
     let (grid, exercise_idx) =
-        build_exercise_aligned_grid(&[exercise_time], maturity, LMM_MIN_STEPS).expect("grid");
+        build_exercise_aligned_grid(&[exercise_time], params, LMM_MIN_STEPS).expect("grid");
     let ex_step = exercise_idx[0];
     let t_ex = grid.time(ex_step);
     let work_size = disc.work_size(&process);

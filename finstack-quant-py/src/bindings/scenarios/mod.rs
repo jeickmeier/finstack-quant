@@ -226,7 +226,7 @@ fn build_template_component(template_id: &str, component_id: &str) -> PyResult<P
 }
 
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "scenarios")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "scenarios")?;
     m.setattr(
         "__doc__",
         "Scenario specification, validation, composition, application, and built-in templates.",
@@ -276,13 +276,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "scenarios",
-        crate::bindings::module_utils::ROOT_PACKAGE,
-        crate::bindings::module_utils::ParentNameSource::Name,
+        crate::bindings::module_utils::Exposure::Python,
     )?;
 
     Ok(())

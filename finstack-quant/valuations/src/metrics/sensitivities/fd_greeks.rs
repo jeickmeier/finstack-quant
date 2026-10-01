@@ -1883,17 +1883,6 @@ mod tests {
         let expected = (first_slope + second_slope) * 0.01;
         assert!((vanna - expected).abs() < 1e-9);
     }
-    impl HasExpiry for crate::instruments::EquityOption {
-        fn expiry(&self) -> Date {
-            self.expiry
-        }
-    }
-    impl HasDayCount for crate::instruments::EquityOption {
-        fn day_count(&self) -> DayCount {
-            self.day_count
-        }
-    }
-
     #[test]
     fn generic_greeks_follow_the_active_override_without_a_surface() {
         use crate::instruments::EquityOption;

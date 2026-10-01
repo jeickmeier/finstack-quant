@@ -106,9 +106,10 @@ pub trait CashflowProvider: CashflowScheduleSource {
     /// The returned schedule:
     /// - Contains only flows with `date >= as_of`
     /// - Preserves fees, signed notionals, and all valid cash events
-    /// - Represents PIK capitalization as zero-cash notional rows with explicit
-    ///   principal deltas, preserving dated balances without paying PIK as cash
+    /// - Preserves PIK classification and accrued amounts; settlement views
+    ///   exclude these non-cash capitalizations
     /// - Carries the balance before `as_of` as the opening schedule notional
+    ///   with no amortization recipe, because the remaining rows are resolved
     /// - Is tagged `Projected` when amounts depend on market curve projection,
     ///   `Contractual` when all future amounts are fixed by contract terms
     ///
@@ -129,31 +130,77 @@ pub trait CashflowProvider: CashflowScheduleSource {
 
     /// Convenience: return flattened `(Date, Money)` flows derived from the canonical schedule.
     ///
-    /// Simply converts the [`CashFlowSchedule`] returned by
-    /// [`CashflowProvider::cashflow_schedule`] into a `Vec<(Date, Money)>`.
+    /// Extracts settlement rows from the [`CashFlowSchedule`] returned by
+    /// [`CashflowProvider::cashflow_schedule`]. Non-cash PIK and default
+    /// write-downs are excluded.
     /// Schedule signs represent instrument economics; position direction
     /// determines the portfolio-level sign.
     ///
     /// # Errors
     ///
-    /// Forwards any error returned by [`CashflowProvider::cashflow_schedule`].
+    /// Forwards errors from [`CashflowProvider::cashflow_schedule`].
     fn dated_cashflows(
         &self,
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<DatedFlows> {
         let schedule = self.cashflow_schedule(curves, as_of)?;
-        Ok(schedule
-            .flows
-            .iter()
-            .filter(|cf| is_cash_settlement_kind(cf.kind))
-            .filter(|cf| cf.amount.amount() != 0.0 || cf.principal_delta.is_none())
-            .map(|cf| (cf.date, cf.amount))
-            .collect())
+        Ok(settlement_rows(&schedule))
     }
 }
 
 impl<T> CashflowProvider for T where T: CashflowScheduleSource + ?Sized {}
+
+/// Extract currency-tagged settlement cash from a validated schedule.
+///
+/// Preserves schedule order and payment dates. PIK capitalizations and
+/// default write-downs are non-cash state changes and are omitted.
+///
+/// # Arguments
+///
+/// * `schedule` - Canonical classified schedule. Amounts, accrual metadata,
+///   row ordering, and issue-date consistency are validated. Single-currency
+///   principal paths also reconcile against the opening notional. Composite
+///   principal paths in multiple currencies cannot be reconciled against one
+///   representative notional; their native cash remains currency tagged.
+///
+/// # Errors
+///
+/// Returns the schedule validation error for invalid amounts, accrual
+/// metadata, currencies within a row, dates, or single-currency principal movements.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_cashflows::{dated_flows, schedule_from_dated_flows, ScheduleBuildOpts};
+/// use finstack_quant_cashflows::primitives::CFKind;
+/// use finstack_quant_core::{currency::Currency, dates::{Date, DayCount}, money::Money};
+/// use time::Month;
+///
+/// let date = Date::from_calendar_date(2025, Month::June, 15).expect("valid date");
+/// let schedule = schedule_from_dated_flows(
+///     vec![(date, Money::from((100_i64, Currency::USD)))],
+///     CFKind::Fixed,
+///     DayCount::Act360,
+///     ScheduleBuildOpts::default(),
+/// );
+/// assert_eq!(dated_flows(&schedule)?[0].1.currency(), Currency::USD);
+/// # Ok::<(), finstack_quant_core::Error>(())
+/// ```
+pub fn dated_flows(schedule: &CashFlowSchedule) -> finstack_quant_core::Result<DatedFlows> {
+    schedule.validate_native_cash()?;
+    Ok(settlement_rows(schedule))
+}
+
+fn settlement_rows(schedule: &CashFlowSchedule) -> DatedFlows {
+    schedule
+        .get_flows()
+        .iter()
+        .filter(|flow| is_cash_settlement_kind(flow.kind))
+        .filter(|flow| flow.amount.amount() != 0.0 || flow.principal_delta.is_none())
+        .map(|flow| (flow.date, flow.amount))
+        .collect()
+}
 
 /// Resolve the schedule-level notional from an optional `Money` hint and a
 /// fallback currency inferred from the flow list.
@@ -285,6 +332,132 @@ mod tests {
     use finstack_quant_core::money::Money;
     use time::Month;
 
+    #[test]
+    fn dated_flows_rejects_invalid_principal_state() {
+        let date = Date::from_calendar_date(2025, Month::June, 15).expect("valid date");
+        let mut schedule = schedule_from_dated_flows(
+            vec![(date, Money::from((150_i64, Currency::USD)))],
+            CFKind::Amortization,
+            DayCount::Act360,
+            ScheduleBuildOpts {
+                notional_hint: Some(Money::from((100_i64, Currency::USD))),
+                ..Default::default()
+            },
+        );
+
+        let error = dated_flows(&schedule).expect_err("over-amortization must fail");
+        assert!(error.to_string().contains("repayments exceed outstanding"));
+        let wire = serde_json::to_string(&schedule).expect("serialize schedule");
+        assert!(crate::dated_flows_json(&wire).is_err());
+
+        // Foreign fees and zero principal placeholders must not disable
+        // reconciliation of the actual USD principal path.
+        schedule.push_flow(CashFlow::new(
+            date,
+            None,
+            Money::from((10_i64, Currency::EUR)),
+            CFKind::Fee,
+            0.0,
+            None,
+        ));
+        schedule.push_flow(
+            CashFlow::new(
+                date,
+                None,
+                Money::from((0_i64, Currency::EUR)),
+                CFKind::Notional,
+                0.0,
+                None,
+            )
+            .with_principal_delta(Money::from((0_i64, Currency::EUR))),
+        );
+        let error = dated_flows(&schedule)
+            .expect_err("foreign non-principal rows cannot bypass balance checks");
+        assert!(error.to_string().contains("repayments exceed outstanding"));
+    }
+
+    #[test]
+    fn native_settlements_support_multiple_principal_currencies() {
+        let date = Date::from_calendar_date(2025, Month::June, 15).expect("valid date");
+        let schedule = schedule_from_dated_flows(
+            vec![
+                (date, Money::from((100_i64, Currency::USD))),
+                (date, Money::from((90_i64, Currency::EUR))),
+            ],
+            CFKind::Notional,
+            DayCount::Act360,
+            ScheduleBuildOpts {
+                notional_hint: Some(Money::from((100_i64, Currency::USD))),
+                ..Default::default()
+            },
+        );
+        assert!(matches!(
+            schedule.validate(),
+            Err(finstack_quant_core::Error::CurrencyMismatch { .. })
+        ));
+        let expected = vec![
+            (date, Money::from((100_i64, Currency::USD))),
+            (date, Money::from((90_i64, Currency::EUR))),
+        ];
+        assert_eq!(
+            dated_flows(&schedule).expect("native settlements"),
+            expected
+        );
+        let wire = serde_json::to_string(&schedule).expect("serialize schedule");
+        let json = crate::dated_flows_json(&wire).expect("native JSON settlements");
+        let decoded: Vec<crate::DatedFlowJson> = serde_json::from_str(&json).expect("dated rows");
+        assert_eq!(
+            decoded
+                .into_iter()
+                .map(|flow| (flow.date, flow.amount))
+                .collect::<DatedFlows>(),
+            expected
+        );
+    }
+
+    #[test]
+    fn dated_flows_omits_non_cash_state_and_matches_json() {
+        let date = Date::from_calendar_date(2025, Month::June, 15).expect("valid date");
+        let rows = [
+            (CFKind::Fixed, 10_i64),
+            (CFKind::Pik, 5),
+            (CFKind::DefaultedNotional, 20),
+        ]
+        .into_iter()
+        .map(|(kind, amount)| {
+            CashFlow::new(
+                date,
+                None,
+                Money::from((amount, Currency::USD)),
+                kind,
+                0.0,
+                None,
+            )
+        })
+        .collect();
+        let schedule = schedule_from_classified_flows(
+            rows,
+            DayCount::Act360,
+            ScheduleBuildOpts {
+                notional_hint: Some(Money::from((100_i64, Currency::USD))),
+                ..Default::default()
+            },
+        );
+
+        let typed = dated_flows(&schedule).expect("valid schedule");
+        assert_eq!(typed, vec![(date, Money::from((10_i64, Currency::USD)))]);
+        let wire = serde_json::to_string(&schedule).expect("serialize schedule");
+        let json = crate::dated_flows_json(&wire).expect("valid JSON extraction");
+        let decoded: Vec<crate::DatedFlowJson> = serde_json::from_str(&json).expect("dated rows");
+        assert_eq!(
+            decoded
+                .into_iter()
+                .map(|flow| (flow.date, flow.amount))
+                .collect::<DatedFlows>(),
+            typed
+        );
+    }
+
     struct DummyInstrument;
 
     impl CashflowScheduleSource for DummyInstrument {
@@ -385,11 +558,11 @@ mod tests {
                 flows,
                 DayCount::Act365F,
                 ScheduleBuildOpts {
+                    notional_hint: Some(Money::from((100_i64, Currency::USD))),
                     meta: CashFlowMeta {
                         representation: CashflowRepresentation::Projected,
                         ..Default::default()
                     },
-                    ..Default::default()
                 },
             ))
         }
@@ -412,17 +585,12 @@ mod tests {
         assert_eq!(schedule.flows[0].date, as_of);
         assert_eq!(schedule.flows[1].date, as_of + time::Duration::days(31));
         assert_eq!(schedule.flows[2].date, as_of + time::Duration::days(31));
-        assert!(schedule.flows.iter().all(|flow| flow.kind != CFKind::Pik));
         let capitalization = schedule
             .flows
             .iter()
-            .find(|f| f.principal_delta.is_some())
+            .find(|f| f.kind == CFKind::Pik)
             .expect("PIK principal movement");
-        assert_eq!(capitalization.amount.amount(), 0.0);
-        assert_eq!(
-            capitalization.principal_delta.map(|m| m.amount()),
-            Some(40.0)
-        );
+        assert_eq!(capitalization.amount.amount(), 40.0);
 
         let dated = instrument
             .dated_cashflows(&curves, as_of)

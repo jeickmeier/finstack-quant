@@ -545,13 +545,24 @@ pub fn twrr_linked(returns_json: &str, horizon_years: f64) -> Result<JsValue, Js
 }
 
 /// Compute money-weighted return via XIRR from dated cashflow JSON.
-/// @param cashflows_json - Dated cashflow JSON.
+///
+/// Returns the unique annualized decimal return under Act/365F, finite and
+/// greater than -1. Nonconventional streams are rejected rather than selecting
+/// one of their potentially multiple roots.
+///
+/// # Arguments
+///
+/// * `cashflows_json` - JSON array of date/amount records in investor signs
+///   (contributions negative, distributions and terminal value positive).
+///   Dates are sorted and equal-date amounts netted; remaining nonzero flows
+///   must change sign exactly once.
 ///
 /// # Errors
 ///
 /// Throws a JavaScript exception if `cashflowsJson` is malformed, contains an
-/// invalid date or insufficient cash flows for XIRR, or the numerical root
-/// cannot be found.
+/// invalid date or insufficient net cash flows, the nonzero net flows do not
+/// change sign exactly once, or no sufficiently accurate finite return greater
+/// than -1 can be found.
 #[wasm_bindgen(js_name = mwrXirr)]
 pub fn mwr_xirr(cashflows_json: &str) -> Result<f64, JsValue> {
     let cashflows: Vec<finstack_quant_portfolio::DatedCashflow> =

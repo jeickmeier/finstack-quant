@@ -42,6 +42,9 @@ pub enum VarMethod {
     /// Faster method - approximates P&L using pre-computed sensitivities.
     /// Good for linear instruments and large portfolios, but may be
     /// inaccurate for highly non-linear instruments (deep OTM options).
+    /// Equity Greeks are associated with their actual market-scalar identifier.
+    /// Instruments with multiple underlying spots or ambiguous scalar ownership
+    /// require full revaluation; aggregate gamma is not a multi-asset Hessian.
     TaylorApproximation,
 }
 
@@ -652,9 +655,13 @@ struct TaylorSensitivities {
     dv01: BucketedSeries,
     cs01: BucketedSeries,
     ir_convexity: f64,
-    equity_delta: f64,
-    equity_gamma: f64,
+    equity: HashMap<String, EquitySensitivity>,
     vega_rel: f64,
+}
+
+struct EquitySensitivity {
+    delta: f64,
+    gamma: f64,
 }
 
 impl Default for TaylorSensitivities {
@@ -664,8 +671,7 @@ impl Default for TaylorSensitivities {
             dv01: BucketedSeries::default(),
             cs01: BucketedSeries::default(),
             ir_convexity: 0.0,
-            equity_delta: 0.0,
-            equity_gamma: 0.0,
+            equity: HashMap::default(),
             vega_rel: 0.0,
         }
     }
@@ -816,6 +822,7 @@ fn compute_taylor_sensitivities(
     provider: Option<Arc<dyn crate::recalibration::RecalibrationProvider>>,
 ) -> Result<TaylorSensitivities> {
     let instrument_type = instrument.key();
+    let equity_spot_id = taylor_equity_spot_id(instrument)?;
     let registry = standard_registry();
     let instrument_arc = instrument_to_arc(instrument);
     let mut context = MetricContext::new(
@@ -864,7 +871,31 @@ fn compute_taylor_sensitivities(
     let has_equity_shares = registry.is_applicable(&MetricId::EquityShares, instrument_type);
     let has_vega = registry.is_applicable(&MetricId::Vega, instrument_type);
 
-    let delta = if has_delta {
+    let delta = if let Some(equity) = instrument
+        .as_any()
+        .downcast_ref::<crate::instruments::Equity>()
+    {
+        // Cash-equity value is linear in its source quote. This also preserves
+        // conversion from a foreign-currency quote without dividing a rounded
+        // present value by spot (or dividing by a valid zero equity price).
+        match equity_spot_id.as_deref() {
+            Some(spot_id) => match base_market.get_price(spot_id)? {
+                finstack_quant_core::market_data::scalars::MarketScalar::Price(quote) => {
+                    convert_money_to_reporting(
+                        Money::new(equity.effective_quantity(), quote.currency())?,
+                        base_value.currency(),
+                        base_market,
+                        as_of,
+                        "Historical VaR equity delta",
+                    )?
+                }
+                finstack_quant_core::market_data::scalars::MarketScalar::Unitless(_) => {
+                    equity.effective_quantity()
+                }
+            },
+            None => 0.0,
+        }
+    } else if has_delta {
         required_metric(&computed, &MetricId::Delta, true, instrument.id())?
     } else if has_index_delta {
         required_metric(&computed, &MetricId::IndexDelta, true, instrument.id())?
@@ -886,15 +917,62 @@ fn compute_taylor_sensitivities(
         0.0
     };
 
+    let mut equity = HashMap::default();
+    if let Some(spot_id) = equity_spot_id {
+        if !has_delta && !has_index_delta && !has_equity_shares {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Historical VaR Taylor approximation lacks a spot delta for '{}' on '{}'; use full revaluation",
+                instrument.id(), spot_id
+            )));
+        }
+        equity.insert(spot_id, EquitySensitivity { delta, gamma });
+    }
+
     Ok(TaylorSensitivities {
         currency: base_value.currency(),
         dv01,
         cs01,
         ir_convexity,
-        equity_delta: delta,
-        equity_gamma: gamma,
+        equity,
         vega_rel,
     })
+}
+
+/// Resolve the sole underlying for aggregate spot Greeks, without using display
+/// tickers or instrument IDs. Typed volatility dependencies distinguish spots
+/// from auxiliary scalars such as dividend yields. Without such metadata, only
+/// an unambiguous single scalar is supported.
+fn taylor_equity_spot_id(instrument: &dyn Instrument) -> Result<Option<String>> {
+    if let Some(equity) = instrument
+        .as_any()
+        .downcast_ref::<crate::instruments::Equity>()
+    {
+        return Ok(if equity.quoted_spot.is_some() {
+            None
+        } else {
+            equity.spot_id.as_ref().map(|id| id.as_str().to_owned())
+        });
+    }
+
+    let dependencies = instrument.market_dependencies()?;
+    let mut spots: Vec<String> = dependencies
+        .volatility_dependencies
+        .iter()
+        .filter_map(|dependency| dependency.spot_id.as_ref().map(|id| id.as_str().to_owned()))
+        .collect();
+    if spots.is_empty() {
+        spots = dependencies.market_scalar_ids;
+    }
+    spots.sort();
+    spots.dedup();
+    match spots.len() {
+        0 => Ok(None),
+        1 => Ok(spots.pop()),
+        _ => Err(finstack_quant_core::Error::Validation(format!(
+            "Historical VaR Taylor approximation cannot assign aggregate equity Greeks for '{}' to multiple market scalars ({}); use full revaluation",
+            instrument.id(), spots.join(", ")
+        ))),
+    }
 }
 
 /// Tolerance (in basis points) for treating a set of rate-bucket shifts as a
@@ -1005,20 +1083,16 @@ fn taylor_pnl_for_scenario(
                 pnl += cs01 * shift.shift * 10_000.0;
             }
             crate::metrics::risk::RiskFactorType::EquitySpot { ticker } => {
-                if sensitivities.equity_delta.abs() > 0.0 || sensitivities.equity_gamma.abs() > 0.0
-                {
-                    let spot = *spot_cache
-                        .entry(ticker.clone())
-                        .or_insert_with(|| spot_from_market(base_market, ticker).unwrap_or(-1.0));
-                    if spot <= 0.0 {
-                        return Err(finstack_quant_core::Error::Validation(format!(
-                            "Historical VaR missing positive finite spot for equity factor '{}'",
-                            ticker
-                        )));
-                    }
+                if let Some(equity) = sensitivities.equity.get(ticker) {
+                    let spot = if let Some(spot) = spot_cache.get(ticker) {
+                        *spot
+                    } else {
+                        let spot = spot_from_market(base_market, ticker)?;
+                        spot_cache.insert(ticker.clone(), spot);
+                        spot
+                    };
                     let d_spot = spot * shift.shift;
-                    pnl += sensitivities.equity_delta * d_spot
-                        + 0.5 * sensitivities.equity_gamma * d_spot * d_spot;
+                    pnl += equity.delta * d_spot + 0.5 * equity.gamma * d_spot * d_spot;
                 }
             }
             crate::metrics::risk::RiskFactorType::FxSpot { .. } => {
@@ -1131,11 +1205,15 @@ fn collect_bucketed_series(
     result
 }
 
-fn spot_from_market(market: &MarketContext, ticker: &str) -> Option<f64> {
-    market
-        .get_price(ticker)
-        .ok()
-        .map(crate::metrics::core::finite_difference::scalar_numeric_value)
+fn spot_from_market(market: &MarketContext, ticker: &str) -> Result<f64> {
+    let scalar = market.get_price(ticker)?;
+    let spot = crate::metrics::core::finite_difference::scalar_numeric_value(scalar);
+    if !spot.is_finite() || spot < 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "Historical VaR requires nonnegative finite spot for equity factor '{ticker}'"
+        )));
+    }
+    Ok(spot)
 }
 
 fn calculate_portfolio_var_taylor(
@@ -1258,6 +1336,206 @@ mod tests {
         usd_ois_market,
     };
     use time::macros::date;
+
+    #[test]
+    fn taylor_equity_pnl_uses_market_spot_ids_and_aggregates_shared_spots() -> Result<()> {
+        use crate::instruments::Equity;
+
+        let as_of = sample_as_of();
+        let mut a = Equity::new("position-a", "DISPLAY-A", Currency::USD)
+            .with_quantity(10.0)
+            .with_spot_id("SPOT-A")
+            .with_div_yield_id("DIV-A");
+        a.discount_curve_id = "USD-OIS".into();
+        let mut b = Equity::new("position-b", "DISPLAY-B", Currency::USD)
+            .with_quantity(-10.0)
+            .with_spot_id("SPOT-B");
+        b.discount_curve_id = "USD-OIS".into();
+        let mut second_a = a.clone();
+        second_a.id = "another-position-a".into();
+        second_a.quantity = Some(3.0);
+        let market = usd_ois_market(as_of)?
+            .insert_price("SPOT-A", MarketScalar::Unitless(100.0))
+            .insert_price("SPOT-B", MarketScalar::Unitless(80.0))
+            .insert_price("UNRELATED", MarketScalar::Unitless(500.0))
+            .insert_price("DIV-A", MarketScalar::Unitless(0.02));
+        let history = MarketHistory::new(
+            as_of,
+            1,
+            [("SPOT-A", -0.1), ("SPOT-B", 0.2), ("UNRELATED", -0.3)]
+                .into_iter()
+                .map(|(ticker, shift)| {
+                    MarketScenario::new(
+                        as_of,
+                        vec![RiskFactorShift {
+                            factor: RiskFactorType::EquitySpot {
+                                ticker: ticker.to_owned(),
+                            },
+                            shift,
+                        }],
+                    )
+                })
+                .collect(),
+        );
+
+        for (positions, expected) in [
+            (vec![&a, &b], vec![-160.0, -100.0, 0.0]),
+            (vec![&b], vec![-160.0, 0.0, 0.0]),
+            (vec![&a, &second_a], vec![-130.0, 0.0, 0.0]),
+        ] {
+            for method in [VarMethod::FullRevaluation, VarMethod::TaylorApproximation] {
+                let actual = calculate_var(
+                    &positions,
+                    &market,
+                    &history,
+                    as_of,
+                    &VarConfig::var_95().with_method(method),
+                    None,
+                )?;
+                for (actual, expected) in actual.pnl_distribution.iter().zip(&expected) {
+                    assert!(
+                        (actual - expected).abs() < 1e-9,
+                        "{method:?}: {actual} != {expected}"
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn taylor_quoted_equity_has_no_market_spot_sensitivity() -> Result<()> {
+        let as_of = sample_as_of();
+        let mut equity = crate::instruments::Equity::new("position", "DISPLAY", Currency::USD)
+            .with_quantity(10.0)
+            .with_spot_id("SPOT")
+            .with_quoted_spot(120.0);
+        equity.discount_curve_id = "USD-OIS".into();
+        let market = usd_ois_market(as_of)?.insert_price("SPOT", MarketScalar::Unitless(100.0));
+        let history = MarketHistory::new(
+            as_of,
+            1,
+            vec![MarketScenario::new(
+                as_of,
+                vec![RiskFactorShift {
+                    factor: RiskFactorType::EquitySpot {
+                        ticker: "SPOT".to_owned(),
+                    },
+                    shift: -0.5,
+                }],
+            )],
+        );
+        let result = calculate_var(
+            &[&equity],
+            &market,
+            &history,
+            as_of,
+            &VarConfig::var_95().with_method(VarMethod::TaylorApproximation),
+            None,
+        )?;
+        assert_eq!(result.pnl_distribution, vec![0.0]);
+        Ok(())
+    }
+
+    #[test]
+    fn taylor_multifactor_instrument_rejects_unkeyed_greeks() -> Result<()> {
+        let as_of = sample_as_of();
+        let basket = crate::instruments::Basket::example()?;
+        let market = usd_ois_market(as_of)?
+            .insert_price("AAPL-SPOT", MarketScalar::Unitless(100.0))
+            .insert_price("UST10Y-PRICE", MarketScalar::Unitless(100.0));
+        let history = MarketHistory::new(as_of, 1, vec![MarketScenario::new(as_of, vec![])]);
+        let error = calculate_var(
+            &[&basket],
+            &market,
+            &history,
+            as_of,
+            &VarConfig::var_95().with_method(VarMethod::TaylorApproximation),
+            None,
+        )
+        .expect_err("multiple scalar exposures cannot use an aggregate delta");
+        assert!(
+            error.to_string().contains("multiple market scalars"),
+            "{error}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn historical_vol_point_revaluation_matches_manual_surface() -> Result<()> {
+        let as_of = sample_as_of();
+        let option = crate::instruments::EquityOption::european(
+            "call",
+            "DISPLAY",
+            105.0,
+            date!(2025 - 01 - 01),
+            1.0,
+            Currency::USD,
+            crate::instruments::OptionType::Call,
+        )?;
+        let base_surface = VolSurface::builder("EQUITY-VOL")
+            .expiries(&[0.5, 1.5])
+            .strikes(&[100.0, 110.0])
+            .row(&[0.20, 0.23])
+            .row(&[0.24, 0.25])
+            .build()?;
+        let manual_surface = VolSurface::builder("EQUITY-VOL")
+            .expiries(&[0.5, 1.5])
+            .strikes(&[100.0, 110.0])
+            .row(&[0.21, 0.23])
+            .row(&[0.24, 0.23])
+            .build()?;
+        let market = usd_ois_market(as_of)?
+            .insert_price("EQUITY-SPOT", MarketScalar::Unitless(100.0))
+            .insert_price("EQUITY-DIVYIELD", MarketScalar::Unitless(0.0))
+            .insert_surface(base_surface);
+        let manual_market = market.clone().insert_surface(manual_surface);
+        let expected_pnl =
+            option.value(&manual_market, as_of)?.amount() - option.value(&market, as_of)?.amount();
+        assert!(
+            expected_pnl.abs() > 1e-6,
+            "fixture must produce a nonzero point-shock P&L"
+        );
+        let history = MarketHistory::new(
+            as_of,
+            1,
+            vec![MarketScenario::new(
+                as_of,
+                vec![
+                    RiskFactorShift {
+                        factor: RiskFactorType::ImpliedVol {
+                            vol_surface_id: "EQUITY-VOL".into(),
+                            expiry_years: 0.5,
+                            strike: 100.0,
+                        },
+                        shift: 0.01,
+                    },
+                    RiskFactorShift {
+                        factor: RiskFactorType::ImpliedVol {
+                            vol_surface_id: "EQUITY-VOL".into(),
+                            expiry_years: 1.5,
+                            strike: 110.0,
+                        },
+                        shift: -0.02,
+                    },
+                ],
+            )],
+        );
+        let actual = calculate_var(
+            &[&option],
+            &market,
+            &history,
+            as_of,
+            &VarConfig::var_95(),
+            None,
+        )?;
+        assert!((actual.pnl_distribution[0] - expected_pnl).abs() < 1e-12);
+        assert_eq!(
+            market.get_surface("EQUITY-VOL")?.vols(),
+            &[0.20, 0.23, 0.24, 0.25]
+        );
+        Ok(())
+    }
 
     #[test]
     fn bucketed_series_uses_decoded_curve_coordinates() {

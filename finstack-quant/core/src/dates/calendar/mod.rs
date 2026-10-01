@@ -6,11 +6,11 @@
 //!
 //! # Features
 //!
-//! - **26 built-in market calendars**: major exchanges, central banks, and
+//! - **27 built-in market calendars**: major exchanges, central banks, and
 //!   settlement systems, generated at build time from `data/calendars/*.json`
 //!   (see [`available_calendars`] for the exact identifier list)
 //! - **Rule-based definitions**: JSON-defined rules for transparency and auditability
-//! - **Cached rule evaluation**: validated years are materialized lazily into a
+//! - **Cached rule evaluation**: cached years are materialized lazily into a
 //!   process-wide holiday bitset and business-day prefix sums; out-of-range
 //!   dates continue to scan the calendar's `&'static` rules directly
 //! - **Composite calendars**: Combine multiple calendars for multi-currency schedules
@@ -19,11 +19,11 @@
 //!
 //! # Lookup Cost
 //!
-//! The first lookup for a calendar year inside the validated range materializes
+//! The first lookup for a calendar year inside the cache range materializes
 //! a 366-bit raw rule-holiday mask and business-day prefix sums. Subsequent
 //! holiday and business-day predicates are constant-time bit lookups, while
 //! interval counts combine at most one prefix-sum lookup per year. Dates outside
-//! the validated range retain direct rule scanning.
+//! the cache range retain direct rule scanning.
 //!
 //! The cache is an implementation detail: public predicates are unchanged.
 //! [`HolidayCalendar::is_holiday`] still applies each calendar's
@@ -32,9 +32,16 @@
 //!
 //! # Supported Date Range
 //!
-//! Holiday rules are validated for years **1970-2150**. Years outside this range
-//! still evaluate via the same rules (a one-time warning is emitted), but their
-//! accuracy is not guaranteed.
+//! The year cache and astronomical/lunar tables cover **1970-2150**. This is
+//! a computational range, not certification of market holidays throughout it.
+//! Published coverage is calendar-specific: SGSI moving holidays cover 2024-2027,
+//! NSE/BSE moving holidays cover 2024-2026, and Matariki dates end in 2052.
+//! Consult each generated calendar constant's source notes and the independent
+//! annual fixtures. Recurring rules outside published coverage may omit closures;
+//! the boolean predicate API cannot report an unsupported-year error.
+//! Years outside the cache range still evaluate directly and emit a one-time
+//! warning; table-based holidays may be unavailable. Trading, settlement,
+//! banking/accrual, and fixing-publication calendars are distinct contracts.
 //!
 //! # Key Concepts
 //!
@@ -47,7 +54,7 @@
 //!
 //! Many calendars include weekends in their holiday definitions for convenience,
 //! while others intentionally omit them. Regardless, [`HolidayCalendar::is_business_day`]
-//! always treats Saturday/Sunday as non-business days.
+//! uses the configured weekend rule (Saturday/Sunday for built-in calendars).
 //!
 //! **Guideline**: Use `is_business_day` for scheduling and date adjustments.
 //! Use `is_holiday` only when you need market-specific holiday information.
@@ -102,6 +109,7 @@
 pub(crate) mod algo;
 pub(crate) mod business_days;
 pub(crate) mod composite;
+mod jurisdictions;
 pub(crate) mod rule;
 pub(crate) mod types;
 mod year_cache;

@@ -5,7 +5,7 @@
 //! JS surface is nested under `models.credit`; wasm-bindgen exports remain flat
 //! and the hand-written facade establishes the public namespace.
 
-use crate::utils::{check_js_safe_count, parse_iso_date, to_js_err};
+use crate::utils::{parse_iso_date, to_js_err};
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::math::random::Pcg64Rng;
 use finstack_quant_models::credit::{
@@ -447,15 +447,15 @@ pub fn merton_to_hazard_curve_json(
 /// Simulate firm-asset paths and return a JSON payload with the time grid and
 /// row-major asset values.
 ///
-/// `num_paths` and `num_steps` must fit JavaScript's safe integer range
-/// (`Number.MAX_SAFE_INTEGER`, `2^53 - 1`): counts marshal across the wasm
-/// boundary as IEEE-754 doubles, so a larger value would round silently rather
-/// than fail loudly.
+/// `num_paths` and `num_steps` must be finite non-negative integers no greater
+/// than `4294967295`, the wasm32 `usize` limit. Validation happens before
+/// conversion so fractional or oversized JavaScript numbers cannot wrap.
 ///
 /// # Errors
 ///
 /// Throws a JavaScript exception if `model_json` is malformed, if path or step
-/// counts exceed the safe-integer range, if `num_steps` is zero, if `horizon`
+/// counts are non-finite, fractional, negative, or exceed `4294967295`, if
+/// `num_steps` is zero, if `horizon`
 /// is non-positive or non-finite, or if the result cannot be serialized to JSON.
 /// @param model_json - Serialized Merton structural-credit model produced by this API's model builder.
 /// @param num_paths - Number of Monte Carlo paths to simulate.
@@ -466,14 +466,14 @@ pub fn merton_to_hazard_curve_json(
 #[wasm_bindgen(js_name = mertonSimulatePathsJson)]
 pub fn merton_simulate_paths_json(
     model_json: &str,
-    num_paths: usize,
-    num_steps: usize,
+    num_paths: f64,
+    num_steps: f64,
     horizon: f64,
     seed: u64,
     antithetic: bool,
 ) -> Result<String, JsValue> {
-    check_js_safe_count(num_paths, "num_paths")?;
-    check_js_safe_count(num_steps, "num_steps")?;
+    let num_paths = super::parse_usize(num_paths, "numPaths")?;
+    let num_steps = super::parse_usize(num_steps, "numSteps")?;
     let model: MertonModel = serde_json::from_str(model_json).map_err(to_js_err)?;
     let mut rng = Pcg64Rng::new(seed);
     let paths = model
@@ -628,28 +628,27 @@ pub fn toggle_exercise_threshold_json(
 /// Build an optimal toggle-exercise model JSON payload.
 ///
 /// `nested_paths` is the Monte-Carlo path count for the nested optimal-exercise
-/// simulation. It is rejected if it exceeds `Number.MAX_SAFE_INTEGER` (`2^53-1`):
-/// `usize` counts marshal across the wasm boundary as IEEE-754 doubles, so a
-/// larger value would round silently rather than fail loudly.
+/// simulation. It must be a finite non-negative integer no greater than
+/// `4294967295`, the wasm32 `usize` limit; conversion occurs after validation.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `nested_paths` exceeds JavaScript's safe
-/// integer range or the model cannot be serialized to JSON.
-/// @param nested_paths - Number of nested Monte Carlo paths for continuation-value estimation; must fit JavaScript's safe integer range.
+/// Throws a JavaScript exception if `nested_paths` is non-finite, fractional,
+/// negative, exceeds `4294967295`, or the model cannot be serialized to JSON.
+/// @param nested_paths - Number of nested Monte Carlo paths for continuation-value estimation; must be a finite non-negative integer no greater than 4294967295.
 /// @param equity_discount_rate - Annual equity-holder discount rate used in the nested toggle decision.
 /// @param asset_vol - Annualized volatility of firm-asset returns, expressed as a decimal.
 /// @param risk_free_rate - Annualized risk-free rate expressed as a decimal, such as 0.05 for 5%.
 /// @param horizon - Forward-looking model horizon measured in years.
 #[wasm_bindgen(js_name = toggleExerciseOptimalJson)]
 pub fn toggle_exercise_optimal_json(
-    nested_paths: usize,
+    nested_paths: f64,
     equity_discount_rate: f64,
     asset_vol: f64,
     risk_free_rate: f64,
     horizon: f64,
 ) -> Result<String, JsValue> {
-    check_js_safe_count(nested_paths, "nested_paths")?;
+    let nested_paths = super::parse_usize(nested_paths, "nestedPaths")?;
     let model = ToggleExerciseModel::OptimalExercise(OptimalToggle {
         nested_paths,
         equity_discount_rate,
@@ -752,7 +751,8 @@ mod tests {
     #[test]
     fn toggle_exercise_optimal_json_accepts_reasonable_path_count() {
         // A normal nested-path count round-trips into a valid model payload.
-        let json = toggle_exercise_optimal_json(10_000, 0.10, 0.25, 0.04, 5.0).expect("model json");
+        let json =
+            toggle_exercise_optimal_json(10_000.0, 0.10, 0.25, 0.04, 5.0).expect("model json");
         let model: ToggleExerciseModel =
             serde_json::from_str(&json).expect("payload must deserialize");
         match model {
@@ -762,15 +762,16 @@ mod tests {
     }
 
     #[test]
-    #[cfg(target_pointer_width = "64")]
-    fn toggle_exercise_optimal_json_rejects_unsafe_path_count() {
-        // A `nested_paths` above Number.MAX_SAFE_INTEGER would round silently
-        // when marshaled as an f64; the binding must reject it instead.
-        let unsafe_count = crate::utils::MAX_SAFE_JS_INTEGER as usize + 1;
-        let result = toggle_exercise_optimal_json(unsafe_count, 0.10, 0.25, 0.04, 5.0);
-        assert!(
-            result.is_err(),
-            "nested_paths above 2^53-1 must be rejected, not silently rounded"
-        );
+    fn toggle_exercise_optimal_json_rejects_invalid_path_counts() {
+        for count in [
+            f64::NAN,
+            f64::INFINITY,
+            -1.0,
+            1.5,
+            4_294_967_296.0,
+            9_007_199_254_740_992.0,
+        ] {
+            assert!(toggle_exercise_optimal_json(count, 0.10, 0.25, 0.04, 5.0).is_err());
+        }
     }
 }

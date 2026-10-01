@@ -2,7 +2,8 @@
 //!
 //! Aggregation driver that walks every instrument in a
 //! [`crate::types::CapitalStructureSpec`], pulls per-instrument cashflows via
-//! [`finstack_quant_cashflows::CashflowProvider`], classifies them by `CFKind` into
+//! [`finstack_quant_valuations::instruments::Instrument`], classifies them using
+//! `CFKind` and the declared instrument kind into
 //! the [`CashflowBreakdown`] buckets, and rolls them into per-period totals
 //! both per-currency and (when FX is available) in the reporting currency.
 //!
@@ -12,10 +13,10 @@
 //! instrument payload through the valuations registry.
 
 use crate::error::Result;
-use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::fx::FxQuery;
+use finstack_quant_valuations::instruments::Instrument;
 use std::sync::Arc;
 
 /// Build a runtime instrument from a [`crate::types::DebtInstrumentSpec`].
@@ -26,7 +27,8 @@ use std::sync::Arc;
 /// # Arguments
 ///
 /// * `spec` - Debt-instrument specification with an ID and a registry-tagged
-///   JSON payload used to construct the runtime cashflow provider.
+///   JSON payload used to construct the runtime instrument. Its declared kind
+///   determines whether positive interest cashflows are debt payments or hedge receipts.
 ///
 /// # Errors
 ///
@@ -34,10 +36,10 @@ use std::sync::Arc;
 /// type or fails spec validation.
 pub fn build_instrument_from_spec(
     spec: &crate::types::DebtInstrumentSpec,
-) -> Result<Arc<dyn CashflowProvider + Send + Sync>> {
+) -> Result<Arc<dyn Instrument>> {
     let instrument: finstack_quant_valuations::instruments::InstrumentJson =
         spec.spec.clone().into();
-    instrument.into_cashflow_provider().map_err(|e| {
+    instrument.into_boxed().map(Arc::from).map_err(|e| {
         crate::error::Error::build(format!(
             "Failed to build debt instrument '{}': {e}",
             spec.id

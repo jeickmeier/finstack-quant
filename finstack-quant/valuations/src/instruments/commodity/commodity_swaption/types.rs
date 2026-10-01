@@ -24,7 +24,7 @@ use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::OptionType;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
-    calendar_by_id, BusinessDayConvention, Date, DayCount, DayCountContext, ScheduleBuilder, Tenor,
+    calendar_by_id, BusinessDayConvention, Date, DayCount, DayCountContext, Tenor,
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -42,6 +42,11 @@ use finstack_quant_core::Result;
 /// - Forward swap rate is the weighted average of forward commodity prices
 ///   over the swap period
 /// - Annuity factor captures the present value of a unit payment stream
+///
+/// Analytical delta measures currency per unit change in the annuity-weighted
+/// forward price, holding rates and volatility fixed. At zero volatility or
+/// expiry, delta uses the intrinsic-payoff derivative and is defined as zero
+/// exactly at the strike, where that derivative does not exist.
 ///
 /// # Examples
 ///
@@ -237,28 +242,24 @@ impl CommoditySwaption {
             .build()
     }
 
-    /// Generate the underlying swap payment schedule.
+    fn swap_periods(&self) -> Result<Vec<crate::cashflow::builder::periods::SchedulePeriod>> {
+        self.validate()?;
+        super::super::averaging::commodity_periods(
+            self.underlying_start_date,
+            self.underlying_maturity,
+            self.swap_frequency,
+            self.calendar_id.as_deref(),
+            self.business_day_convention,
+        )
+    }
+
+    /// Generate the adjusted underlying swap payment dates.
     pub fn swap_payment_schedule(&self) -> Result<Vec<Date>> {
-        let mut builder =
-            ScheduleBuilder::new(self.underlying_start_date, self.underlying_maturity)?
-                .frequency(self.swap_frequency)
-                .stub_rule(finstack_quant_core::dates::StubKind::ShortBack);
-
-        if let Some(ref cal_id) = self.calendar_id {
-            let cal = calendar_by_id(cal_id).ok_or_else(|| {
-                finstack_quant_core::Error::Validation(format!(
-                    "CommoditySwaption '{}' references unknown calendar_id '{cal_id}'",
-                    self.id
-                ))
-            })?;
-            builder = builder.adjust_with(self.business_day_convention, cal);
-        }
-
-        let schedule = builder.build()?;
-
-        let dates: Vec<Date> = schedule.into_iter().skip(1).collect();
-
-        Ok(dates)
+        Ok(self
+            .swap_periods()?
+            .into_iter()
+            .map(|period| period.payment_date)
+            .collect())
     }
 
     /// Compute the forward swap rate from the commodity forward curve.
@@ -293,12 +294,16 @@ impl CommoditySwaption {
     /// A forward-curve coverage failure on any observation date is propagated
     /// as a hard error — never silently substituted with spot (W-11 policy,
     /// matching the underlying swap).
+    ///
+    /// # Arguments
+    /// * `market` - Market snapshot containing the commodity price curve and quote-currency discount curve.
+    /// * `as_of` - Valuation date used to discount adjusted payments; contractual observation dates remain unchanged.
     pub fn forward_swap_rate(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
         let price_curve = market.get_price_curve(self.forward_curve_id.as_str())?;
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
-        let schedule = self.swap_payment_schedule()?;
+        let periods = self.swap_periods()?;
 
-        if schedule.is_empty() {
+        if periods.is_empty() {
             return Err(finstack_quant_core::Error::Validation(
                 "CommoditySwaption: underlying swap has no payment dates".to_string(),
             ));
@@ -326,37 +331,32 @@ impl CommoditySwaption {
         // coverage failures propagate (W-11).
         let get_price = |date: Date| -> Result<f64> { price_curve.price_on_date(date) };
 
-        let last_payment = schedule.last().copied();
-        let mut prev_period_end = self.underlying_start_date;
         let mut sum_fwd = 0.0;
         let mut weighted_fwd = 0.0;
         let mut weight_total = 0.0;
-        for &payment_date in &schedule {
-            // Period-average forward over the half-open settlement window —
-            // the same average the underlying floating leg settles on.
-            let include_end = Some(payment_date) == last_payment;
+        for period in &periods {
+            let include_end = period.accrual_end == self.underlying_maturity;
             let fwd = super::super::averaging::business_day_average_price(
                 get_price,
                 is_business_day,
-                prev_period_end,
-                payment_date,
+                period.accrual_start,
+                period.accrual_end,
                 include_end,
             )?;
 
             // Annuity weight DF_i — identical to the per-period term
             // accumulated in `annuity()`.
-            let weight = disc.df_between_dates(as_of, payment_date)?;
+            let weight = disc.df_between_dates(as_of, period.payment_date)?;
 
             sum_fwd += fwd;
             weighted_fwd += fwd * weight;
             weight_total += weight;
-            prev_period_end = payment_date;
         }
 
         // Guard against a zero (or negative) annuity denominator: fall back to
         // the equal-weighted mean.
         if weight_total <= 0.0 {
-            return Ok(sum_fwd / schedule.len() as f64);
+            return Ok(sum_fwd / periods.len() as f64);
         }
 
         Ok(weighted_fwd / weight_total)
@@ -370,6 +370,10 @@ impl CommoditySwaption {
     /// `quantity` is a per-period quantity, so the annuity must not carry a
     /// `τ_i` factor (the IR-swaption `Σ DF·τ` convention
     /// understated a monthly-settling swaption ~12×).
+    ///
+    /// # Arguments
+    /// * `market` - Market snapshot containing the quote-currency discount curve.
+    /// * `as_of` - Valuation date from which each adjusted payment is discounted.
     pub fn annuity(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
         let schedule = self.swap_payment_schedule()?;
@@ -564,7 +568,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
 
         let inputs = self.black76_inputs(market, as_of)?;
 
-        if inputs.time <= 0.0 {
+        if inputs.time <= 0.0 || inputs.sigma <= 0.0 {
             let intrinsic = match self.option_type {
                 OptionType::Call => {
                     if inputs.forward > self.fixed_price {
@@ -582,10 +586,6 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
                 }
             };
             return Ok(Some(intrinsic * inputs.annuity * self.quantity));
-        }
-
-        if inputs.sigma <= 0.0 {
-            return Ok(Some(0.0));
         }
 
         let d1 = finstack_quant_models::d1_black76(

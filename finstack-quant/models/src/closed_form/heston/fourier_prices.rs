@@ -1,21 +1,29 @@
-use super::params::HESTON_TAIL_DIAGNOSTIC_THRESHOLD;
-use super::quadrature::{
-    composite_gauss_legendre_grid, heston_pj_on_grid, heston_pj_with_diagnostics,
-};
+use super::params::HESTON_TAIL_LOG_TARGET;
 use super::{HestonFourierSettings, HestonPricingParams, HestonStripPricer};
+#[cfg(test)]
 use crate::closed_form::vanilla::bs_price_unchecked;
+#[cfg(test)]
 use crate::types::OptionType;
 use finstack_quant_core::{Error, Result};
-use tracing::warn;
 
 fn resolve_heston_settings(
     time: f64,
     params: &HestonPricingParams,
     settings: Option<&HestonFourierSettings>,
 ) -> HestonFourierSettings {
+    if let Some(settings) = settings {
+        return *settings;
+    }
+    let mut settings =
+        HestonFourierSettings::for_maturity_with_variance(time, params.v0.min(params.theta));
+    // Include the large-frequency Heston exponential tail alongside the
+    // Gaussian short-time bound. Neither bound alone covers both regimes.
+    let c_inf = (1.0 - params.rho * params.rho).sqrt()
+        * (params.v0 + params.kappa * params.theta * time)
+        / params.sigma_v;
+    settings.u_max = settings.u_max.max(HESTON_TAIL_LOG_TARGET / c_inf);
+    settings.panels = settings.u_max.ceil() as usize;
     settings
-        .copied()
-        .unwrap_or_else(|| HestonFourierSettings::for_maturity_with_variance(time, params.v0))
 }
 
 /// Price a European call option under the Heston model using Fourier inversion.
@@ -69,86 +77,56 @@ pub fn heston_call_price_fourier(
     params: &HestonPricingParams,
     settings: Option<&HestonFourierSettings>,
 ) -> Result<f64> {
-    if time <= 0.0 {
-        return Ok((spot - strike).max(0.0));
-    }
-
-    // This is the exact sigma_v -> 0 Heston limit, not a numerical fallback.
-    if params.sigma_v < 1e-10 {
-        return Ok(black_scholes_call(
-            spot,
-            strike,
-            time,
-            params.r,
-            params.q,
-            params.deterministic_avg_variance(time).sqrt(),
-        ));
-    }
-
-    let initial = resolve_heston_settings(time, params, settings);
-    let retry = HestonFourierSettings {
-        u_max: initial.u_max * 2.0,
-        panels: initial.panels.saturating_mul(2),
-        ..initial
-    };
-    for attempt in [initial, retry] {
-        if let Some(price) = heston_call_attempt(spot, strike, time, params, attempt) {
-            return Ok(price);
-        }
-    }
-
-    Err(Error::Calibration {
-        category: "heston_fourier".to_string(),
-        message: format!(
-            "Heston Fourier integration failed after 2 attempts for spot={spot}, \
-             strike={strike}, time={time}; characteristic-function corruption or \
-             a non-finite integral persisted"
-        ),
-    })
+    heston_call_prices_fourier(spot, &[strike], time, params, settings)?
+        .into_iter()
+        .next()
+        .ok_or_else(|| Error::Validation("Heston scalar pricing returned no result".to_string()))
 }
 
-fn heston_call_attempt(
+/// Validate the common market and model boundary before any limiting branch.
+pub(super) fn validate_heston_inputs(
     spot: f64,
-    strike: f64,
     time: f64,
     params: &HestonPricingParams,
-    settings: HestonFourierSettings,
-) -> Option<f64> {
-    let grid =
-        composite_gauss_legendre_grid(0.0, settings.u_max, settings.gl_order, settings.panels);
-    let (d1, d2) = match &grid {
-        Some(grid) => (
-            heston_pj_on_grid(1, spot, strike, time, params, &settings, grid),
-            heston_pj_on_grid(2, spot, strike, time, params, &settings, grid),
-        ),
-        None => (
-            heston_pj_with_diagnostics(1, spot, strike, time, params, &settings),
-            heston_pj_with_diagnostics(2, spot, strike, time, params, &settings),
-        ),
-    };
-    if d1.corrupted || d2.corrupted {
-        return None;
+) -> Result<()> {
+    for (name, value) in [
+        ("spot", spot),
+        ("v0", params.v0),
+        ("kappa", params.kappa),
+        ("theta", params.theta),
+        ("sigma_v", params.sigma_v),
+    ] {
+        if !value.is_finite() || value <= 0.0 {
+            return Err(Error::Validation(format!(
+                "Heston {name} must be finite and positive"
+            )));
+        }
     }
-
-    let tail = d1.tail_estimate.max(d2.tail_estimate);
-    let raw_p1_excursion = (d1.raw_probability - d1.raw_probability.clamp(0.0, 1.0)).abs();
-    let raw_p2_excursion = (d2.raw_probability - d2.raw_probability.clamp(0.0, 1.0)).abs();
-    let raw_excursion = raw_p1_excursion.max(raw_p2_excursion);
-    if tail > HESTON_TAIL_DIAGNOSTIC_THRESHOLD || raw_excursion > HESTON_TAIL_DIAGNOSTIC_THRESHOLD {
-        warn!(
-            spot,
-            strike,
-            time,
-            u_max = settings.u_max,
-            tail_estimate = tail,
-            raw_probability_excursion = raw_excursion,
-            "Heston Gil-Pelaez integral has a non-negligible truncation diagnostic"
-        );
+    for (name, value) in [
+        ("time", time),
+        ("r", params.r),
+        ("q", params.q),
+        ("rho", params.rho),
+    ] {
+        if !value.is_finite() {
+            return Err(Error::Validation(format!("Heston {name} must be finite")));
+        }
     }
-
-    let call_price = spot * (-params.q * time).exp() * d1.probability
-        - strike * (-params.r * time).exp() * d2.probability;
-    call_price.is_finite().then(|| call_price.max(0.0))
+    if params.rho <= -1.0 || params.rho >= 1.0 {
+        return Err(Error::Validation(
+            "Heston rho must be in (-1, 1)".to_string(),
+        ));
+    }
+    if time > 0.0
+        && [(-params.r * time).exp(), spot * (-params.q * time).exp()]
+            .iter()
+            .any(|value| !value.is_finite() || *value <= 0.0)
+    {
+        return Err(Error::Validation(
+            "Heston discounting must be finite and positive".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 /// Price a strip of European call options under the Heston model using shared
@@ -172,40 +150,63 @@ pub fn heston_call_prices_fourier(
     params: &HestonPricingParams,
     settings: Option<&HestonFourierSettings>,
 ) -> Result<Vec<f64>> {
+    validate_heston_inputs(spot, time, params)?;
+    for strike in strikes {
+        if !strike.is_finite() || *strike <= 0.0 {
+            return Err(Error::Validation(
+                "Heston strikes must be finite and positive".to_string(),
+            ));
+        }
+    }
+    if let Some(settings) = settings {
+        settings.validate()?;
+    }
     if time <= 0.0 {
         return Ok(strikes
             .iter()
             .map(|&strike| (spot - strike).max(0.0))
             .collect());
     }
-
-    if params.sigma_v < 1e-10 {
-        let avg_vol = params.deterministic_avg_variance(time).sqrt();
-        return Ok(strikes
-            .iter()
-            .map(|&strike| black_scholes_call(spot, strike, time, params.r, params.q, avg_vol))
-            .collect());
+    if strikes.is_empty() {
+        return Ok(Vec::new());
     }
 
-    let initial = resolve_heston_settings(time, params, settings);
-    let retry = HestonFourierSettings {
-        u_max: initial.u_max * 2.0,
-        panels: initial.panels.saturating_mul(2),
-        ..initial
-    };
-    for attempt in [initial, retry] {
-        let Some(pricer) = HestonStripPricer::new(spot, time, params, &attempt) else {
-            continue;
+    let mut grid = resolve_heston_settings(time, params, settings);
+    grid.validate()?;
+    let scale = spot * (-params.q * time).exp();
+    let mut previous: Option<Vec<f64>> = None;
+    // Require two resolved grids to agree. Widening the interval and halving
+    // panel width checks both truncation and quadrature resolution.
+    for _ in 0..6 {
+        if let Some(pricer) = HestonStripPricer::new(spot, time, params, &grid) {
+            if let Ok(prices) = pricer.price_calls(strikes) {
+                if let Some(previous) = &previous {
+                    if prices
+                        .iter()
+                        .zip(previous)
+                        .all(|(price, old)| (price - old).abs() <= 1e-9 * scale)
+                    {
+                        return Ok(prices);
+                    }
+                }
+                previous = Some(prices);
+            } else {
+                previous = None;
+            }
+        }
+        grid.u_max *= 2.0;
+        let Some(panels) = grid.panels.checked_mul(4) else {
+            break;
         };
-        if let Ok(prices) = pricer.price_calls(strikes) {
-            return Ok(prices);
+        grid.panels = panels;
+        if grid.validate().is_err() {
+            break;
         }
     }
-
-    strikes
-        .iter()
-        .map(|&strike| heston_call_price_fourier(spot, strike, time, params, Some(&retry)))
-        .collect()
+    Err(Error::Calibration {
+        category: "heston_fourier".to_string(),
+        message: format!("Heston Fourier integration did not converge within the quadrature work budget for spot={spot}, time={time}"),
+    })
 }
 
 /// Price a strip of European put options under the Heston model using shared
@@ -229,20 +230,13 @@ pub fn heston_put_prices_fourier(
     params: &HestonPricingParams,
     settings: Option<&HestonFourierSettings>,
 ) -> Result<Vec<f64>> {
-    if time <= 0.0 {
-        return Ok(strikes
-            .iter()
-            .map(|&strike| (strike - spot).max(0.0))
-            .collect());
-    }
-
     let call_prices = heston_call_prices_fourier(spot, strikes, time, params, settings)?;
     Ok(call_prices
         .into_iter()
         .zip(strikes.iter())
         .map(|(call_price, strike)| {
-            let forward = spot * (-params.q * time).exp();
-            let discount_k = *strike * (-params.r * time).exp();
+            let forward = spot * (-params.q * time.max(0.0)).exp();
+            let discount_k = *strike * (-params.r * time.max(0.0)).exp();
             (call_price - forward + discount_k).max(0.0)
         })
         .collect())
@@ -274,13 +268,9 @@ pub fn heston_put_price_fourier(
     params: &HestonPricingParams,
     settings: Option<&HestonFourierSettings>,
 ) -> Result<f64> {
-    if time <= 0.0 {
-        return Ok((strike - spot).max(0.0));
-    }
-
     let call_price = heston_call_price_fourier(spot, strike, time, params, settings)?;
-    let forward = spot * (-params.q * time).exp();
-    let discount_k = strike * (-params.r * time).exp();
+    let forward = spot * (-params.q * time.max(0.0)).exp();
+    let discount_k = strike * (-params.r * time.max(0.0)).exp();
     let put_price = call_price - forward + discount_k;
     if !put_price.is_finite() {
         return Err(Error::Calibration {
@@ -294,7 +284,8 @@ pub fn heston_put_price_fourier(
     Ok(put_price.max(0.0))
 }
 
-/// Black-Scholes call price for the exact deterministic-variance limit.
+/// Black-Scholes reference for deterministic-variance regression tests.
+#[cfg(test)]
 pub(super) fn black_scholes_call(
     spot: f64,
     strike: f64,

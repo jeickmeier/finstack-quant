@@ -253,6 +253,7 @@ fn attribution_schema_validates_non_empty_market_data() {
         },
         "quotes": [["EUR", "USD", 1.1]],
         "provider_quotes": [],
+        "provider_pinned_quotes": [],
         "pinned_quotes": []
     });
     market["prices"]["ACME-SPOT"] = json!({"unitless": 101.25});

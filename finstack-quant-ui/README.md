@@ -460,9 +460,10 @@ publishing have separate gates and evidence.
 
 ## Independent installation gate
 
-Registry items still install the published `finstack-quant-wasm@0.8.0`. The
-workspace's 0.9.0 binding artifact is unpublished; update the external registry
-pin when that npm version is available.
+Registry items pin `finstack-quant-wasm` to the version in
+`finstack-quant-wasm/package.json`; `mise run ui-gen` writes that pin into every
+registry item and `mise run ui-check` fails when they drift. The package is not
+published to npm, so local installs replace the pin with the workspace path.
 
 After a fresh `mise run wasm-pkg`, run `mise run ui-install`. It builds the registry,
 initializes a separate Next 16/Base UI application outside the repository for

@@ -7,7 +7,7 @@ use crate::warning::Warning;
 use finstack_quant_core::dates::{BusinessDayConvention, HolidayCalendar, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_statements::evaluator::Evaluator;
-use finstack_quant_statements::types::{AmountOrScalar, NodeId};
+use finstack_quant_statements::types::{AmountOrScalar, NodeId, NodeValueType};
 use finstack_quant_statements::FinancialModelSpec;
 
 /// Generate effect for a forecast-percent statement op.
@@ -87,13 +87,14 @@ pub fn apply_forecast_percent(
     })
 }
 
-/// Assign a scalar value to explicit forecasts in a node, optionally filtering periods.
-/// Actual periods are always preserved.
+/// Assign a value to explicit forecasts in a node, optionally filtering periods.
+/// Actual periods, monetary currency, and monetary versus scalar value types are preserved.
 ///
 /// # Arguments
 /// * `model` - Statement model containing period classifications and node values.
 /// * `node_id` - Exact node identifier; missing nodes return `NodeNotFound`.
-/// * `value` - Scalar replacing selected forecasts, in the node's units.
+/// * `value` - Finite numeric value replacing selected forecasts, in the node's
+///   existing units; monetary values retain their currency and use major units.
 /// * `period_filter` - Optional inclusive date bounds; only forecast periods
 ///   wholly contained in the interval change. `None` selects all forecasts.
 pub fn apply_forecast_assign(
@@ -105,6 +106,12 @@ pub fn apply_forecast_assign(
         finstack_quant_core::dates::Date,
     )>,
 ) -> Result<bool> {
+    if !value.is_finite() {
+        return Err(Error::Validation(format!(
+            "Forecast assignment must be finite, got {value}"
+        )));
+    }
+
     let allowed_period_ids: std::collections::HashSet<_> = model
         .periods
         .iter()
@@ -126,7 +133,12 @@ pub fn apply_forecast_assign(
         Some(values) => {
             for (period_id, val) in values.iter_mut() {
                 if allowed_period_ids.contains(period_id) {
-                    *val = AmountOrScalar::Scalar(value);
+                    *val = match val {
+                        AmountOrScalar::Scalar(_) => AmountOrScalar::Scalar(value),
+                        AmountOrScalar::Amount(money) => {
+                            AmountOrScalar::amount(value, money.currency())?
+                        }
+                    };
                 }
             }
             Ok(true)
@@ -148,7 +160,8 @@ pub fn apply_forecast_assign(
 /// * `binding` - Node, curve, maturity tenor, output compounding and day count.
 ///   Output day count changes quoting units while retaining the native curve's
 ///   accumulation factor at the same dates.
-/// * `model` - Statement model whose forecast rate values are replaced; actuals stay fixed.
+/// * `model` - Statement model whose scalar forecast rates are replaced; actuals stay fixed.
+///   Monetary target nodes are rejected because annualized rates are dimensionless.
 /// * `market` - Discount and forward curves used to obtain annualized decimal rates.
 /// * `calendar` - Optional calendar for ModifiedFollowing tenor date adjustments.
 pub fn update_rate_from_binding(
@@ -157,6 +170,24 @@ pub fn update_rate_from_binding(
     market: &MarketContext,
     calendar: Option<&dyn HolidayCalendar>,
 ) -> Result<bool> {
+    let node = model
+        .get_node(binding.node_id.as_str())
+        .ok_or_else(|| Error::NodeNotFound {
+            node_id: binding.node_id.as_str().to_string(),
+        })?;
+    if matches!(node.value_type, Some(NodeValueType::Monetary { .. }))
+        || node.values.as_ref().is_some_and(|values| {
+            values
+                .values()
+                .any(|value| matches!(value, AmountOrScalar::Amount(_)))
+        })
+    {
+        return Err(Error::Validation(format!(
+            "Rate binding node '{}' must contain dimensionless scalar rates; monetary targets are not supported",
+            binding.node_id
+        )));
+    }
+
     let curve_id = binding.curve_id.as_str();
 
     if let Ok(curve) = market.get_discount(curve_id) {
@@ -237,6 +268,14 @@ pub fn update_rate_from_binding(
         }
 
         let forward_simple = curve.rate(start_years);
+        let accumulation = 1.0 + forward_simple * accrual_years;
+        if !accumulation.is_finite() || accumulation <= 0.0 {
+            return Err(Error::Validation(format!(
+                "Forward curve '{curve_id}' has invalid simple accumulation factor \
+                 ({accumulation}); rate {forward_simple} over {accrual_years:.6}y \
+                 must produce a positive finite accumulation factor"
+            )));
+        }
         let output_accrual = Tenor::from_years(curve.tenor(), curve.day_count())?
             .to_years_with_context(
                 forward_start,
@@ -273,11 +312,27 @@ fn convert_continuous_rate(
         )));
     }
 
-    if comp == Compounding::Continuous {
-        return Ok(continuous_rate);
+    let discount_factor = Compounding::Continuous.df_from_rate(continuous_rate, year_fraction);
+    let accumulation = discount_factor.recip();
+    if !continuous_rate.is_finite() || !accumulation.is_finite() || accumulation <= 0.0 {
+        return Err(Error::Validation(format!(
+            "Continuous rate {continuous_rate} over {year_fraction}y must produce \
+             a positive finite accumulation factor"
+        )));
     }
 
-    Ok(Compounding::Continuous.convert_rate(continuous_rate, year_fraction, &comp))
+    let converted = if comp == Compounding::Continuous {
+        continuous_rate
+    } else {
+        comp.rate_from_df(discount_factor, year_fraction)
+    };
+    if !converted.is_finite() {
+        return Err(Error::Validation(format!(
+            "Rate conversion to {comp} produced a non-finite rate ({converted})"
+        )));
+    }
+
+    Ok(converted)
 }
 
 /// Re-evaluate the financial model to propagate scenario changes.

@@ -574,7 +574,9 @@ class CashFlow:
         Raises
         ------
         ValueError
-            If a field cannot be represented in JSON (non-finite float).
+            If an optional coupon rate or projected index rate is non-finite,
+            or another field cannot be serialized. Invalid rates are rejected
+            rather than serialized as absent metadata.
 
         Examples
         --------
@@ -629,7 +631,8 @@ class CashFlow:
         Raises
         ------
         ValueError
-            If the value holds a non-finite float that JSON cannot carry.
+            If an optional coupon rate or projected index rate is non-finite,
+            or another field cannot be serialized.
         """
         ...
 

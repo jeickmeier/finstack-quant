@@ -287,10 +287,12 @@ impl InflationLinkedBond {
     /// CPI print applies to its whole month, so a mid-month date must not
     /// interpolate between prints.
     pub(super) fn step_reference_month(date: Date, lag_months: u32) -> Result<Date> {
-        Ok(date
-            .replace_day(1)
+        let lag_months = i32::try_from(lag_months).map_err(|_| {
+            finstack_quant_core::Error::Validation("CPI lag months exceed supported range".into())
+        })?;
+        date.replace_day(1)
             .map_err(|_| finstack_quant_core::InputError::InvalidDateRange)?
-            .add_months(-(lag_months as i32)))
+            .add_months(-lag_months)
     }
 
     /// First-of-month anchor dates and interpolation weight for the official
@@ -300,8 +302,11 @@ impl InflationLinkedBond {
             Date::from_calendar_date(date.year(), date.month(), 1).map_err(|_| {
                 finstack_quant_core::Error::Input(finstack_quant_core::InputError::InvalidDateRange)
             })?;
-        let anchor0 = first_of_month.add_months(-(lag_months as i32));
-        let anchor1 = anchor0.add_months(1);
+        let lag_months = i32::try_from(lag_months).map_err(|_| {
+            finstack_quant_core::Error::Validation("CPI lag months exceed supported range".into())
+        })?;
+        let anchor0 = first_of_month.add_months(-lag_months)?;
+        let anchor1 = anchor0.add_months(1)?;
         let weight = (f64::from(date.day()) - 1.0) / f64::from(date.month().length(date.year()));
         Ok((anchor0, anchor1, weight))
     }

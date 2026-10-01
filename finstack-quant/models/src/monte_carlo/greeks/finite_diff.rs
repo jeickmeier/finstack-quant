@@ -341,25 +341,32 @@ where
     );
 
     let cfg = engine.config();
+    engine.validate_rng(rng)?;
+    McEngine::validate_scheme_pairing(process, disc)?;
+    engine.validate_payoff_schedule(payoff)?;
+    for state in initial_states {
+        engine.validate_runtime(process, state, discount_factor, None)?;
+    }
+    if cfg.target_ci_half_width.is_some() || cfg.path_capture.enabled {
+        return Err(finstack_quant_core::Error::Validation(
+            "paired finite-difference Greeks require a fixed path count and disabled path capture"
+                .to_string(),
+        ));
+    }
+    let mut prepared_disc = disc.clone();
+    prepared_disc.prepare(process, &cfg.time_grid);
+    let disc = &prepared_disc;
     let dim = process.dim();
     let num_factors = process.num_factors();
     let work_size = disc.work_size(process);
 
-    // Validate state shapes once.
-    for (i, s) in initial_states.iter().enumerate() {
-        if s.len() != dim {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "paired finite-diff initial_states[{i}].len() = {} does not match process dim = {}",
-                s.len(),
-                dim
-            )));
-        }
-    }
-
     let correlation = build_correlation_factor(process, disc)?;
     let mut payoff_local = payoff.clone();
+    let mut payoff_anti = cfg.antithetic.then(|| payoff.clone());
     let mut state = vec![0.0; dim];
+    let mut state_anti = vec![0.0; if cfg.antithetic { dim } else { 0 }];
     let mut z = vec![0.0; num_factors];
+    let mut z_anti = vec![0.0; if cfg.antithetic { num_factors } else { 0 }];
     let mut z_raw = vec![
         0.0;
         if correlation.is_some() {
@@ -369,6 +376,7 @@ where
         }
     ];
     let mut work = vec![0.0; work_size];
+    let mut work_anti = vec![0.0; if cfg.antithetic { work_size } else { 0 }];
 
     let mut per_state_values: Vec<Vec<f64>> = (0..n_states)
         .map(|_| Vec::with_capacity(cfg.num_paths))
@@ -386,20 +394,44 @@ where
         for (state_idx, s0) in initial_states.iter().enumerate() {
             let mut path_rng = base_split.clone();
             payoff_local.reset();
-            payoff_local.on_path_start(&mut path_rng);
-            let v = engine.simulate_path(
-                &mut path_rng,
-                process,
-                disc,
-                s0,
-                &mut payoff_local,
-                &mut state,
-                &mut z,
-                &mut z_raw,
-                &mut work,
-                correlation.as_ref(),
-                currency,
-            )?;
+            let v = if let Some(anti) = payoff_anti.as_mut() {
+                let mut mirror = crate::monte_carlo::traits::MirroredStream(path_rng.clone());
+                payoff_local.on_path_start(&mut path_rng);
+                anti.reset();
+                anti.on_path_start(&mut mirror);
+                engine.simulate_antithetic_pair(
+                    &mut path_rng,
+                    process,
+                    disc,
+                    s0,
+                    &mut payoff_local,
+                    anti,
+                    &mut state,
+                    &mut state_anti,
+                    &mut z,
+                    &mut z_anti,
+                    &mut z_raw,
+                    &mut work,
+                    &mut work_anti,
+                    correlation.as_ref(),
+                    currency,
+                )?
+            } else {
+                payoff_local.on_path_start(&mut path_rng);
+                engine.simulate_path(
+                    &mut path_rng,
+                    process,
+                    disc,
+                    s0,
+                    &mut payoff_local,
+                    &mut state,
+                    &mut z,
+                    &mut z_raw,
+                    &mut work,
+                    correlation.as_ref(),
+                    currency,
+                )?
+            };
             let discounted = v * discount_factor;
             if !discounted.is_finite() {
                 return Err(finstack_quant_core::Error::Validation(format!(
@@ -423,6 +455,10 @@ where
 ///
 /// Always runs serially (paired stderr requires deterministic per-path order).
 /// The pricer's `use_parallel` flag is honored only by [`finite_diff_delta`].
+/// When antithetic sampling is configured, each paired estimator averages
+/// the same two physical paths used by [`McEngine::price`]. Adaptive stopping
+/// and path capture are rejected because this helper needs a fixed set of
+/// paired observations and returns only the Greek summary.
 ///
 /// # Arguments
 ///
@@ -733,5 +769,90 @@ mod tests {
             assert_validation_contains(finite_diff_gamma(&inputs, spot, bump_size), expected);
             assert_validation_contains(finite_diff_gamma_crn(&inputs, spot, bump_size), expected);
         }
+    }
+
+    #[test]
+    fn paired_greeks_preserve_engine_validation() {
+        let rng = PhiloxRng::new(42);
+        let gbm = GbmProcess::with_params(RATE, DIVIDEND_YIELD, VOLATILITY).unwrap();
+        let disc = ExactGbm::new();
+        for (paths, maturity_step, discount_factor, message) in [
+            (0, 1, 1.0, "num_paths"),
+            (1, 1, 1.0, "num_paths"),
+            (8, 2, 1.0, "event at step 2"),
+            (8, 1, -1.0, "discount_factor"),
+        ] {
+            let engine = test_engine(paths);
+            let payoff = EuropeanCall::new(STRIKE, 1.0, maturity_step);
+            let inputs = FiniteDiffInputs {
+                engine: &engine,
+                rng: &rng,
+                process: &gbm,
+                disc: &disc,
+                payoff: &payoff,
+                currency: Currency::USD,
+                discount_factor,
+            };
+            for result in [
+                finite_diff_delta_crn(&inputs, SPOT, 0.01),
+                finite_diff_gamma_crn(&inputs, SPOT, 0.01),
+            ] {
+                assert_validation_contains(result, message);
+            }
+        }
+    }
+
+    #[test]
+    fn paired_greeks_reject_missing_dedicated_dividend_scheme() {
+        use crate::monte_carlo::discretization::EulerMaruyama;
+        use crate::monte_carlo::process::gbm_dividends::GbmWithDividends;
+
+        let engine = test_engine(8);
+        let rng = PhiloxRng::new(42);
+        let process = GbmWithDividends::with_params(RATE, 0.0, VOLATILITY, vec![]).unwrap();
+        let disc = EulerMaruyama::new();
+        let payoff = EuropeanCall::new(STRIKE, 1.0, 1);
+        let inputs = FiniteDiffInputs {
+            engine: &engine,
+            rng: &rng,
+            process: &process,
+            disc: &disc,
+            payoff: &payoff,
+            currency: Currency::USD,
+            discount_factor: 1.0,
+        };
+        assert_validation_contains(
+            finite_diff_delta_crn(&inputs, SPOT, 0.01),
+            "dedicated discretization",
+        );
+    }
+
+    #[test]
+    fn paired_greeks_honor_the_same_antithetic_estimator_as_engine_prices() {
+        let engine = McEngine::new(
+            McEngineConfig::uniform(64, EXPIRY, 1)
+                .unwrap()
+                .parallel(false)
+                .antithetic(true),
+        );
+        let rng = PhiloxRng::new(42);
+        let process = GbmProcess::with_params(RATE, DIVIDEND_YIELD, VOLATILITY).unwrap();
+        let disc = ExactGbm::new();
+        let payoff = EuropeanCall::new(STRIKE, 1.0, 1);
+        let inputs = FiniteDiffInputs {
+            engine: &engine,
+            rng: &rng,
+            process: &process,
+            disc: &disc,
+            payoff: &payoff,
+            currency: Currency::USD,
+            discount_factor: (-RATE * EXPIRY).exp(),
+        };
+        let delta = finite_diff_delta(&inputs, SPOT, 0.01).unwrap().0;
+        let delta_paired = finite_diff_delta_crn(&inputs, SPOT, 0.01).unwrap().0;
+        let gamma = finite_diff_gamma(&inputs, SPOT, 0.01).unwrap().0;
+        let gamma_paired = finite_diff_gamma_crn(&inputs, SPOT, 0.01).unwrap().0;
+        assert!((delta - delta_paired).abs() < 1e-12);
+        assert!((gamma - gamma_paired).abs() < 1e-12);
     }
 }

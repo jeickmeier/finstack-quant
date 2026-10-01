@@ -675,7 +675,9 @@ pub enum IdiosyncraticVolModel {
 
 /// Complete vol state for all factors and all issuers at the calibration date.
 ///
-/// Feeds `Σ(t) = D(t) · ρ · D(t)` and per-issuer idiosyncratic vol forecasts.
+/// Records unregularized per-factor variance estimates and drives per-issuer
+/// idiosyncratic volatility forecasts. Systematic covariance forecasts scale
+/// the calibrated covariance, preserving the selected covariance estimator.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct VolState {
@@ -858,32 +860,13 @@ pub struct CreditFactorModel {
     pub issuer_betas: Vec<IssuerBetaRow>,
     /// Factor level values at the calibration anchor date.
     pub anchor_state: LevelsAtAnchor,
-    /// Static factor correlation matrix `ρ` for `Σ(t) = D(t)·ρ·D(t)`.
+    /// Correlation estimate retained from covariance calibration.
     ///
-    /// **Which matrix is authoritative:** vol forecasting rebuilds
-    /// `Σ(t, h) = D·ρ·D` from this matrix plus `vol_state`; point-in-time
-    /// risk uses `config.covariance` directly. Under
-    /// [`CovarianceStrategy::Ridge`][crate::factor::credit::calibration::CovarianceStrategy::Ridge]
-    /// the two deliberately differ —
-    /// `config.covariance = D·ρ·D + α·I`, so its implied correlations are
-    /// shrunk relative to `ρ` by `σᵢσⱼ/√((σᵢ²+α)(σⱼ²+α))`.
-    ///
-    /// Under
-    /// [`CovarianceStrategy::LedoitWolf`][crate::factor::credit::calibration::CovarianceStrategy::LedoitWolf]
-    /// the divergence is larger still, and affects both the diagonal and the
-    /// off-diagonal: `config.covariance` is the shrinkage estimator's own
-    /// `periods_per_year · (δ*·μ·I + (1 − δ*)·S)`, computed once over the
-    /// complete-case rows (dates where every factor is observed), and is
-    /// authoritative for point-in-time risk. The rebuilt `D·ρ·D` instead
-    /// combines this same `ρ` with `vol_state` variances — which are
-    /// estimated per-factor over all available observations (not just the
-    /// complete-case subset) via whichever
-    /// [`VolModelChoice`][crate::factor::credit::calibration::VolModelChoice] was
-    /// configured (`Sample` or `Ewma`). Because the diagonals come from two
-    /// different estimators over two different observation sets, `D·ρ·D`
-    /// deliberately differs from `config.covariance` on **both** the
-    /// diagonal and the off-diagonal; treat it as an approximation for
-    /// horizon scaling, not as a substitute for `config.covariance`.
+    /// `config.covariance` is authoritative for both point-in-time risk and
+    /// horizon forecasts. Under ridge this correlation precedes the diagonal
+    /// ridge addition; under Ledoit-Wolf it is derived from the shrunk
+    /// covariance. Combining it with the unregularized `vol_state.factors`
+    /// does not generally reconstruct the selected covariance estimator.
     pub static_correlation: FactorCorrelationMatrix,
     /// EWMA or sample vol state at the anchor date.
     pub vol_state: VolState,

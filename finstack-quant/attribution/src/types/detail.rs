@@ -478,7 +478,7 @@ pub struct CarryDetail {
 /// # Attribution method coverage
 ///
 /// All four methods populate `carry_detail`: Parallel, Waterfall and Taylor
-/// via `apply_total_return_carry` (theta + coupon_income, with financing
+/// via `apply_total_return_carry` (theta + period economic cash, with financing
 /// identified separately when configured), MetricsBased from the carry
 /// decomposition metrics. `credit_carry_decomposition` is therefore emitted
 /// on any path whose `carry_detail.coupon_income` is populated when a

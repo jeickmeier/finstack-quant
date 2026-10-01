@@ -379,44 +379,20 @@ fn xirr_long_duration_30_years() {
 
 #[test]
 fn irr_handles_near_minus_one_singularity() {
-    // Cashflows that solve to r approaching -1 (near-total loss)
-    // Investment: -100, Return: 0.5 (99.5% loss)
-    let amounts = vec![-100.0, 0.5];
-    let result = irr(&amounts, None);
-
-    match result {
-        Ok(irr) => {
-            // IRR should be approximately -99.5%
-            assert!(
-                irr > -1.0,
-                "IRR must be greater than -100% (singularity): got {}",
-                irr
-            );
-            assert!(
-                irr < -0.9,
-                "IRR for 99.5% loss should be < -90%: got {}",
-                irr
-            );
-
-            // Verify NPV at computed IRR is approximately zero
-            let npv_at_irr = compute_periodic_npv(&amounts, irr);
-            assert!(
-                npv_at_irr.abs() < 1.0,
-                "NPV at IRR should be ~0, got {}",
-                npv_at_irr
-            );
-        }
-        Err(_) => {
-            // Acceptable to error on extreme cases near singularity
-            // The solver may fail to converge for r very close to -1
-        }
+    // These closed-form returns cover both the former Brent gap below -99%
+    // and the obsolete -99.9% economic loss floor.
+    for payoff in [0.5, 0.2, 0.01] {
+        let amounts = [-100.0, payoff];
+        let rate = irr(&amounts, None).expect("distressed unique return must converge");
+        assert!((rate - (payoff / 100.0 - 1.0)).abs() < 1e-12);
+        assert!(compute_periodic_npv(&amounts, rate).abs() < 1e-6);
     }
 }
 
 #[test]
 fn irr_handles_total_loss() {
     // Total loss scenario: invest 100, get 0 back
-    // This has no mathematical solution (would require r = -infinity)
+    // This has no finite solution above -1: the zero payoff cannot offset the investment.
     let amounts = [-100.0, 0.0];
     let result = irr(&amounts, None);
 
@@ -457,32 +433,22 @@ fn irr_handles_99_percent_loss() {
 // Edge Cases - Multiple Roots (Non-Conventional Cashflows)
 
 #[test]
-fn irr_multiple_sign_changes_is_not_rejected_as_ambiguous() {
+fn irr_multiple_sign_changes_is_rejected_as_potentially_ambiguous() {
     // Non-conventional cashflow pattern with multiple sign changes
     // These can have multiple mathematical IRR solutions
     // Pattern: -100, +320, -320, +100 (mining project style)
     let amounts = [-100.0, 320.0, -320.0, 100.0];
-    let result = irr(&amounts, None);
-    if let Err(err) = result {
-        assert!(
-            !err.to_string().contains("multiple sign changes"),
-            "solver should attempt a root instead of rejecting ambiguity: {err}"
-        );
-    }
+    let error = irr(&amounts, None).expect_err("nonconventional cashflows need an explicit policy");
+    assert!(error.to_string().contains("exactly one sign change"));
 }
 
 #[test]
-fn irr_two_sign_changes_pattern_is_not_rejected_as_ambiguous() {
+fn irr_two_sign_changes_pattern_is_rejected_as_potentially_ambiguous() {
     // Simpler two-sign-change pattern: invest, profit, reinvest
     // -100, +200, -50
     let amounts = [-100.0, 200.0, -50.0];
-    let result = irr(&amounts, None);
-    if let Err(err) = result {
-        assert!(
-            !err.to_string().contains("multiple sign changes"),
-            "solver should attempt a root instead of rejecting ambiguity: {err}"
-        );
-    }
+    let error = irr(&amounts, None).expect_err("nonconventional cashflows need an explicit policy");
+    assert!(error.to_string().contains("exactly one sign change"));
 }
 
 // Edge Cases - Extreme Returns
@@ -732,20 +698,15 @@ fn xirr_rejects_all_same_sign() {
 }
 
 #[test]
-fn xirr_attempts_unsorted_multi_sign_change_flows_after_sorting() {
+fn xirr_rejects_unsorted_multi_sign_change_flows_after_sorting() {
     let flows = [
         (d(2026, 1, 1), 250.0),
         (d(2025, 1, 1), -100.0),
         (d(2027, 1, 1), -175.0),
     ];
 
-    let result = xirr(&flows, None);
-    if let Err(err) = result {
-        assert!(
-            !err.to_string().contains("multiple sign changes"),
-            "dated multi-sign-change cashflows should be attempted after sorting: {err}"
-        );
-    }
+    let error = xirr(&flows, None).expect_err("time-ordered net flows have two sign changes");
+    assert!(error.to_string().contains("exactly one sign change"));
 }
 
 #[test]

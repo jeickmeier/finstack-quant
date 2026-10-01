@@ -7,8 +7,9 @@
 //!
 //! Generator extraction uses the real Schur decomposition: P = Q T Q^T where
 //! T is upper-triangular (all eigenvalues real). The logarithm is then:
-//! log(P) = Q · log(T) · Q^T, where log(T) is computed via Parlett's recurrence
-//! on the upper-triangular structure. Kreinin-Sidenius post-processing clamps
+//! log(P) = Q · log(T) · Q^T, where log(T) is computed by inverse scaling and
+//! squaring with a convergent full matrix series. This also handles repeated
+//! and clustered eigenvalues. Kreinin-Sidenius post-processing clamps
 //! any negative off-diagonal entries to zero and re-normalizes the diagonal.
 //!
 //! # References
@@ -157,7 +158,8 @@ impl GeneratorMatrix {
     ///
     /// # Arguments
     ///
-    /// * `p` - Probability or model parameter in the range required by the enclosing calculation.
+    /// * `p` - Row-stochastic transition probabilities over `p.horizon()` years;
+    ///   the extracted generator is annualized by that horizon.
     pub fn from_transition_matrix(p: &TransitionMatrix) -> Result<Self, MigrationError> {
         Self::from_transition_matrix_with_tol(p, 1e-2)
     }
@@ -170,15 +172,21 @@ impl GeneratorMatrix {
     /// - [`MigrationError::ComplexEigenvalues`] if P has complex eigenvalues.
     /// - [`MigrationError::NoValidGenerator`] if any eigenvalue is ≤ 0.
     /// - [`MigrationError::RoundTripError`] if ‖exp(Q) − P‖∞ exceeds `round_trip_tol`.
+    /// - [`MigrationError::InvalidTolerance`] if `round_trip_tol` is negative or non-finite.
     ///
     /// # Arguments
     ///
-    /// * `p` - Probability or model parameter in the range required by the enclosing calculation.
-    /// * `round_trip_tol` - Non-negative numerical tolerance for round-trip consistency checks.
+    /// * `p` - Row-stochastic transition probabilities over `p.horizon()` years;
+    ///   the extracted generator is annualized by that horizon.
+    /// * `round_trip_tol` - Finite, non-negative upper bound on the maximum
+    ///   absolute row-sum difference between `exp(Q * p.horizon())` and `p`.
     pub fn from_transition_matrix_with_tol(
         p: &TransitionMatrix,
         round_trip_tol: f64,
     ) -> Result<Self, MigrationError> {
+        if !round_trip_tol.is_finite() || round_trip_tol < 0.0 {
+            return Err(MigrationError::InvalidTolerance(round_trip_tol));
+        }
         // `matrix_log(P)` is the generator over the transition matrix's own
         // horizon. GeneratorMatrix is annualized, so recover Q from
         // P(h) = exp(Q * h) by dividing by h.
@@ -188,6 +196,7 @@ impl GeneratorMatrix {
         // The total clamped mass is stamped on the result for policy
         // visibility (regularization changes the generator's economics).
         let (q_corrected, regularization_l1) = kreinin_sidenius(q_data, &p.scale);
+        validate_generator(&q_corrected, &p.scale)?;
 
         let mut gen = GeneratorMatrix {
             data: q_corrected,
@@ -274,12 +283,12 @@ impl GeneratorMatrix {
     }
 }
 
-// Matrix logarithm via real Schur decomposition + Parlett's recurrence
+// Matrix logarithm via real Schur decomposition and inverse scaling and squaring.
 
 /// Compute log(M) for a matrix with all real positive eigenvalues.
 ///
-/// Uses the real Schur decomposition M = Q T Q^T, then applies Parlett's
-/// recurrence to compute log(T) for the upper-triangular T.
+/// Uses the real Schur decomposition M = Q T Q^T, then computes log(T) with
+/// triangular square roots and a full matrix series near the identity.
 ///
 /// Returns `Err` if:
 /// - The Schur form has complex eigenvalues (2×2 blocks remain after decomposition).
@@ -303,79 +312,91 @@ pub(crate) fn matrix_log(m: &DMatrix<f64>) -> Result<DMatrix<f64>, MigrationErro
 
     let (q, t) = schur.unpack();
 
-    // Compute log(T) using Parlett's recurrence for upper-triangular matrices.
-    let log_t = upper_triangular_log(&t, &eigenvalues)?;
+    let log_t = upper_triangular_log(&t)?;
 
     // log(M) = Q * log(T) * Q^T
     Ok(q.clone() * log_t * q.transpose())
 }
 
-/// Parlett's recurrence for the logarithm of an upper-triangular matrix.
+/// Inverse scaling and squaring for an upper-triangular matrix with a positive diagonal.
 ///
-/// For f(T) = log(T), commutativity L·T = T·L gives, for the $(i,j)$ entry
-/// (i < j):
+/// Repeated square roots bring `T` close to the identity, where
+/// `log(I + X) = X - X²/2 + X³/3 - ...` converges in matrix norm. Keeping
+/// whole matrix powers retains the nilpotent terms of repeated eigenvalues;
+/// no divided difference of nearly equal eigenvalues is needed.
 ///
-/// $$L_{ij} = T_{ij} \cdot \frac{L_{jj} - L_{ii}}{T_{jj} - T_{ii}}
-///           + \frac{\sum_{k=i+1}^{j-1}(T_{ik} L_{kj} - L_{ik} T_{kj})}{T_{jj} - T_{ii}}$$
-///
-/// (Cross-term sign verified against `scipy.linalg.logm`; it was previously
-/// implemented negated, which produced spurious round-trip error and masked
-/// genuine negative off-diagonals from Kreinin-Sidenius clamping —
-/// )
-///
-/// Reference: Higham, N. J. (2008). *Functions of Matrices: Theory and Computation*.
-/// SIAM. Equation (4.19).
-fn upper_triangular_log(
-    t: &DMatrix<f64>,
-    eigenvalues: &nalgebra::DVector<f64>,
-) -> Result<DMatrix<f64>, MigrationError> {
+/// Reference: Higham (2008), Chapter 11, inverse scaling and squaring.
+fn upper_triangular_log(t: &DMatrix<f64>) -> Result<DMatrix<f64>, MigrationError> {
     let n = t.nrows();
-    let mut l = DMatrix::zeros(n, n);
-
-    // Diagonal: L_ii = log(T_ii)
-    for i in 0..n {
-        l[(i, i)] = eigenvalues[i].ln();
+    let identity = DMatrix::identity(n, n);
+    let mut reduced = t.clone();
+    let mut multiplier = 1.0;
+    let mut delta = &reduced - &identity;
+    let mut delta_norm = infinity_norm(&delta);
+    for _ in 0..64 {
+        if delta_norm <= 0.25 {
+            break;
+        }
+        reduced = upper_triangular_sqrt(&reduced);
+        multiplier *= 2.0;
+        delta = &reduced - &identity;
+        delta_norm = infinity_norm(&delta);
+    }
+    if !delta_norm.is_finite() || delta_norm > 0.25 {
+        return Err(MigrationError::MatrixLogConvergence);
     }
 
-    // Superdiagonals: process by increasing offset k = j - i.
-    for k in 1..n {
-        for i in 0..(n - k) {
-            let j = i + k;
-            let denom = eigenvalues[j] - eigenvalues[i];
-
-            // Accumulate off-diagonal cross terms: Σ (T_ik L_kj − L_ik T_kj).
-            let mut cross = 0.0;
-            for m in (i + 1)..j {
-                cross += t[(i, m)] * l[(m, j)] - l[(i, m)] * t[(m, j)];
+    let mut logarithm = DMatrix::zeros(n, n);
+    let mut power = delta.clone();
+    for order in 1..=64 {
+        let coefficient = if order % 2 == 1 { 1.0 } else { -1.0 } / f64::from(order);
+        logarithm += power.scale(coefficient);
+        power = &power * &delta;
+        // Bound the entire uncomputed tail using submultiplicativity:
+        // sum_{j=k+1}∞ ||X^j||/j <= ||X^(k+1)|| / ((k+1)(1-||X||)).
+        let tail_bound = infinity_norm(&power) / (f64::from(order + 1) * (1.0 - delta_norm));
+        if tail_bound <= f64::EPSILON * infinity_norm(&logarithm) {
+            logarithm *= multiplier;
+            // Avoid accumulated diagonal rounding from repeated square roots.
+            for i in 0..n {
+                logarithm[(i, i)] = t[(i, i)].ln();
             }
-
-            if denom.abs() < 1e-12 {
-                // Degenerate (repeated eigenvalue): limit gives L_ij = T_ij / T_ii + cross.
-                //
-                // Limitations of this branch (doc-only note, 2026-06-09 core
-                //
-                // - It is exact only for the leading term of the log series.
-                //   For repeated eigenvalues with nontrivial nilpotent
-                //   structure (Jordan blocks of size > 2), higher-order terms
-                //   T_ij²/(2 T_ii²)… are dropped, so log(T) is approximate.
-                // - For *near*-repeated eigenvalues just above the 1e-12
-                //   threshold, the standard Parlett formula divides by a tiny
-                //   `denom` and suffers catastrophic cancellation; accuracy
-                //   degrades smoothly as eigenvalues coalesce. Higham (2008,
-                //   §11.6) recommends blocked Schur-Parlett with
-                //   inverse-scaling-and-squaring per block for such cases.
-                // Empirical annual transition matrices have well-separated
-                // eigenvalues, so this branch is rarely exercised; the
-                // round-trip ‖exp(Q) − P‖∞ check guards the final result.
-                l[(i, j)] = t[(i, j)] / eigenvalues[i] + cross / eigenvalues[i];
-            } else {
-                // Standard Parlett formula.
-                l[(i, j)] = t[(i, j)] * (l[(j, j)] - l[(i, i)]) / denom + cross / denom;
-            }
+            return Ok(logarithm);
         }
     }
+    Err(MigrationError::MatrixLogConvergence)
+}
 
-    Ok(l)
+/// Principal triangular square root, solving `R² = T` by superdiagonals.
+fn upper_triangular_sqrt(t: &DMatrix<f64>) -> DMatrix<f64> {
+    let n = t.nrows();
+    let mut root = DMatrix::zeros(n, n);
+    for i in 0..n {
+        root[(i, i)] = t[(i, i)].sqrt();
+    }
+    for offset in 1..n {
+        for i in 0..n - offset {
+            let j = i + offset;
+            let mut cross = 0.0;
+            for k in i + 1..j {
+                cross += root[(i, k)] * root[(k, j)];
+            }
+            root[(i, j)] = (t[(i, j)] - cross) / (root[(i, i)] + root[(j, j)]);
+        }
+    }
+    root
+}
+
+fn infinity_norm(m: &DMatrix<f64>) -> f64 {
+    m.row_iter()
+        .map(|row| row.iter().map(|value| value.abs()).sum::<f64>())
+        .fold(0.0, |norm, row_sum| {
+            if row_sum.is_finite() {
+                norm.max(row_sum)
+            } else {
+                f64::INFINITY
+            }
+        })
 }
 
 /// Apply Kreinin-Sidenius post-processing to produce a valid Q-matrix:

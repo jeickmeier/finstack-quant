@@ -78,7 +78,7 @@
               "type": "null"
             }
           ],
-          "description": "Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`)."
+          "description": "Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`).\nRequired for USD CMS; legacy contracts must name their legacy index explicitly."
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
@@ -177,24 +177,16 @@
       "oneOf": [
         {
           "additionalProperties": false,
-          "description": "Fixed rate funding leg.",
+          "description": "Fixed rate funding leg with explicit contractual periods.",
           "properties": {
-            "accrual_fractions": {
-              "description": "Accrual fractions for each period.",
-              "items": {
-                "format": "double",
-                "type": "number"
-              },
-              "type": "array"
-            },
             "day_count": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-              "description": "Day count convention."
+              "description": "Day count convention used to calculate period year fractions."
             },
-            "payment_dates": {
-              "description": "Payment dates for each period.",
+            "periods": {
+              "description": "Funding accrual and payment schedule, in chronological order.",
               "items": {
-                "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+                "$ref": "#/$defs/FundingPeriod"
               },
               "type": "array"
             },
@@ -210,36 +202,27 @@
           "required": [
             "type",
             "rate",
-            "payment_dates",
-            "accrual_fractions",
+            "periods",
             "day_count"
           ],
           "type": "object"
         },
         {
           "additionalProperties": false,
-          "description": "Floating rate funding leg.\n\n# Convention: no payment lag\n\nThis leg models each period by its `payment_dates` only and assumes the\n**accrual end equals the payment date** (no payment lag, no\naccrual-vs-pay adjustment). The pricer projects the floating forward over\n`[previous payment date, payment date]` and discounts to the payment\ndate. For funding with a genuine payment lag or accrual end ≠ payment\ndate, model the floating side as a full IRS float leg (which carries\nexplicit accrual start/end and payment dates) instead of this simplified\nfunding leg.",
+          "description": "Simple floating funding coupons with independent reset/accrual/payment dates.",
           "properties": {
-            "accrual_fractions": {
-              "description": "Accrual fractions for each period.",
-              "items": {
-                "format": "double",
-                "type": "number"
-              },
-              "type": "array"
-            },
             "day_count": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-              "description": "Day count convention."
+              "description": "Day count convention used to calculate period year fractions."
             },
             "forward_curve_id": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
               "description": "Forward curve for floating rate projection."
             },
-            "payment_dates": {
-              "description": "Payment dates for each period. Each is also treated as the period's\naccrual-end date (no payment lag — see the variant docs).",
+            "periods": {
+              "description": "Funding accrual, reset and payment schedule, in chronological order.",
               "items": {
-                "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+                "$ref": "#/$defs/FundingPeriod"
               },
               "type": "array"
             },
@@ -255,14 +238,48 @@
           "required": [
             "type",
             "spread_bp",
-            "payment_dates",
-            "accrual_fractions",
+            "periods",
             "day_count",
             "forward_curve_id"
           ],
           "type": "object"
         }
       ]
+    },
+    "FundingPeriod": {
+      "additionalProperties": false,
+      "description": "Contractual dates and accrual fraction of one CMS funding coupon.",
+      "properties": {
+        "accrual_end": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Exclusive accrual end, independent of payment-date adjustment."
+        },
+        "accrual_start": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Inclusive accrual start, independent of the CMS observation date."
+        },
+        "accrual_year_fraction": {
+          "description": "Positive year fraction measured using the funding leg day count.",
+          "format": "double",
+          "type": "number"
+        },
+        "payment_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Contractual payment date after business-day adjustment."
+        },
+        "reset_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Floating index observation date; ignored for fixed funding."
+        }
+      },
+      "required": [
+        "accrual_start",
+        "accrual_end",
+        "payment_date",
+        "reset_date",
+        "accrual_year_fraction"
+      ],
+      "type": "object"
     },
     "InstrumentSchema": {
       "const": "finstack_quant.instrument/1",
@@ -332,18 +349,36 @@
           ],
           "forward_curve_id": "USD-LIBOR-3M",
           "funding_leg": {
-            "accrual_fractions": [
-              0.25,
-              0.25,
-              0.25,
-              0.25
-            ],
             "day_count": "30_360",
-            "payment_dates": [
-              "2025-06-20",
-              "2025-09-22",
-              "2025-12-22",
-              "2026-03-20"
+            "periods": [
+              {
+                "accrual_end": "2025-06-20",
+                "accrual_start": "2025-03-20",
+                "accrual_year_fraction": 0.25,
+                "payment_date": "2025-06-20",
+                "reset_date": "2025-03-20"
+              },
+              {
+                "accrual_end": "2025-09-22",
+                "accrual_start": "2025-06-20",
+                "accrual_year_fraction": 0.25,
+                "payment_date": "2025-09-22",
+                "reset_date": "2025-06-20"
+              },
+              {
+                "accrual_end": "2025-12-22",
+                "accrual_start": "2025-09-22",
+                "accrual_year_fraction": 0.25,
+                "payment_date": "2025-12-22",
+                "reset_date": "2025-09-22"
+              },
+              {
+                "accrual_end": "2026-03-20",
+                "accrual_start": "2025-12-22",
+                "accrual_year_fraction": 0.25,
+                "payment_date": "2026-03-20",
+                "reset_date": "2025-12-22"
+              }
             ],
             "rate": "0.03",
             "type": "fixed"

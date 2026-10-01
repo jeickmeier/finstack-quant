@@ -23,18 +23,17 @@
 //! let pricer = SwaptionLsmcPricer::with_config(RateExoticMcConfig::default(), hw_process);
 //! ```
 
+use crate::instruments::rates::hw1f::hw1f_mc::money_estimate_from_pairs;
 use crate::instruments::rates::hw1f::mc_config::RateExoticMcConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::Result;
 use finstack_quant_models::monte_carlo::discretization::exact_hw1f::ExactHullWhite1F;
-use finstack_quant_models::monte_carlo::estimate::Estimate;
 use finstack_quant_models::monte_carlo::pricer::basis::BasisFunctions;
 use finstack_quant_models::monte_carlo::pricer::lsq::solve_least_squares;
 use finstack_quant_models::monte_carlo::process::ou::HullWhite1FProcess;
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::traits::{Discretization, RandomStream};
-use finstack_quant_models::monte_carlo::OnlineStats;
 use finstack_quant_models::monte_carlo::TimeGrid;
 
 fn regression_with_aux_basis<B: BasisFunctions>(
@@ -58,19 +57,7 @@ fn regression_with_aux_basis<B: BasisFunctions>(
         }
     }
 
-    let coeffs = solve_least_squares(&design, continuation_values, n, k)?;
-
-    let mut predictions = vec![0.0; n];
-    for i in 0..n {
-        basis.evaluate_with_aux(swap_rates[i], Some(aux_values[i]), &mut basis_vals);
-        predictions[i] = basis_vals
-            .iter()
-            .zip(coeffs.iter())
-            .map(|(basis_val, coeff)| basis_val * coeff)
-            .sum();
-    }
-
-    Ok(predictions)
+    solve_least_squares(&design, continuation_values, n, k)
 }
 
 /// LSMC pricer for Bermudan swaptions.
@@ -85,7 +72,7 @@ fn regression_with_aux_basis<B: BasisFunctions>(
 /// - Optional antithetic variates for variance reduction
 pub struct SwaptionLsmcPricer {
     /// Monte Carlo configuration (`num_paths`, `seed` and `antithetic` are
-    /// read here; the regression basis is supplied per call).
+    /// read here, together with `oos_lsmc`; the regression basis is supplied per call).
     config: RateExoticMcConfig,
     /// Hull-White process parameters
     hw_process: HullWhite1FProcess,
@@ -120,7 +107,16 @@ impl SwaptionLsmcPricer {
     ///
     /// # Returns
     ///
-    /// Statistical estimate of Bermudan swaption value
+    /// Statistical estimate of Bermudan swaption value. Antithetic pair means
+    /// are independent estimators; with `oos_lsmc`, only pricing streams enter
+    /// the estimate. Earlier exercise dates with at most `num_basis + 10`
+    /// in-the-money training paths are skipped (a conservative no-early-exercise
+    /// policy); final exercise always uses the pathwise positive payoff.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for no paths, no pricing streams in split-sample mode,
+    /// exercise indices outside the grid, or an exercise callback/regression failure.
     #[allow(clippy::too_many_arguments)]
     pub fn price_bermudan_with_grid<B, E>(
         &self,
@@ -135,6 +131,20 @@ impl SwaptionLsmcPricer {
         B: BasisFunctions,
         E: Fn(usize, f64) -> Result<(f64, f64, f64)>,
     {
+        if self.config.num_paths == 0 || (self.config.oos_lsmc && self.config.num_paths < 2) {
+            return Err(finstack_quant_core::Error::Validation(
+                "swaption LSMC requires at least one pricing stream".into(),
+            ));
+        }
+        if exercise_indices
+            .iter()
+            .any(|&step| step > time_grid.num_steps())
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "swaption exercise index lies outside the simulation grid".into(),
+            ));
+        }
+
         // Step 1: Generate short rate paths using the custom time grid
         let paths = self.generate_rate_paths_with_grid(initial_short_rate, time_grid)?;
 
@@ -147,22 +157,9 @@ impl SwaptionLsmcPricer {
             time_grid,
         )?;
 
-        // Step 3: Compute statistics
-        let mut stats = OnlineStats::new();
-        for &value in &values {
-            stats.update(value);
-        }
-
-        let estimate = Estimate::new(
-            stats.mean(),
-            stats.stderr(),
-            stats.confidence_interval(0.05),
-            self.config.num_paths,
-        )
-        .with_num_simulated_paths(values.len())
-        .with_std_dev(stats.std_dev());
-
-        MoneyEstimate::from_estimate(estimate, currency)
+        // Each antithetic pair is one estimator; train-only streams do not
+        // contribute to the price or its sampling statistics.
+        money_estimate_from_pairs(&values, self.config.split(), 1.0, currency)
     }
 
     /// Generate short rate paths using a custom time grid.
@@ -347,40 +344,46 @@ impl SwaptionLsmcPricer {
         let mut cashflows = vec![0.0; num_paths];
         let mut exercise_step_of = vec![0usize; num_paths];
 
-        // Initialize with terminal values (if not exercised, value is zero)
-        // For swaptions, terminal value is zero if not exercised
-
-        // Backward induction through exercise dates
         let mut sorted_exercise_steps = exercise_steps.to_vec();
         sorted_exercise_steps.sort_unstable();
-        sorted_exercise_steps.reverse(); // Go backward
+        sorted_exercise_steps.dedup();
+        sorted_exercise_steps.reverse();
+
+        // Final exercise is a pathwise payoff, not a continuation regression.
+        // Even a single rare ITM path must receive its terminal cashflow.
+        let Some((&terminal_step, earlier_steps)) = sorted_exercise_steps.split_first() else {
+            return Ok(cashflows);
+        };
+        for (i, path) in paths.iter().enumerate() {
+            cashflows[i] = exercise_value(terminal_step, path[terminal_step])?
+                .2
+                .max(0.0);
+            exercise_step_of[i] = terminal_step;
+        }
+        let split = self.config.split();
 
         // Pre-allocate regression buffers to avoid reallocations
         let mut regression_x = Vec::with_capacity(paths.len() / 2); // Swap rates
         let mut regression_annuity = Vec::with_capacity(paths.len() / 2);
         let mut regression_y = Vec::with_capacity(paths.len() / 2); // Discounted continuation values
-        let mut regression_immediate = Vec::with_capacity(paths.len() / 2);
-        let mut regression_indices = Vec::with_capacity(paths.len() / 2);
+        let mut basis_values = vec![0.0; basis.num_basis()];
 
-        for &exercise_step in &sorted_exercise_steps {
-            if exercise_step >= paths[0].len() {
-                continue;
-            }
-
+        for &exercise_step in earlier_steps {
             // Clear buffers for this exercise date (reuse capacity)
             regression_x.clear();
             regression_annuity.clear();
             regression_y.clear();
-            regression_indices.clear();
-            regression_immediate.clear();
 
             for (i, path) in paths.iter().enumerate() {
+                if !split.is_train(i) {
+                    continue;
+                }
                 let r_t = path[exercise_step];
 
                 let (swap_rate, annuity, immediate_value) = exercise_value(exercise_step, r_t)?;
 
                 // Only regress on ITM paths
-                if immediate_value > 1e-6 {
+                if immediate_value > 0.0 {
                     // Discount the realised future cashflow back to this
                     // exercise step by the PATHWISE numéraire ratio
                     // B(t) / B(t_future). Both B values are taken from the
@@ -399,29 +402,33 @@ impl SwaptionLsmcPricer {
                     regression_x.push(swap_rate);
                     regression_annuity.push(annuity);
                     regression_y.push(discounted_cf);
-                    regression_indices.push(i);
-                    regression_immediate.push(immediate_value);
                 }
             }
 
+            // With insufficient ITM training observations retain the later
+            // exercise policy. Comparing with realized future payoffs would
+            // introduce look-ahead bias.
             // Perform regression if we have enough ITM paths
             if regression_x.len() > basis.num_basis() + 10 {
-                let continuation_values = regression_with_aux_basis(
+                let coefficients = regression_with_aux_basis(
                     &regression_x,
                     &regression_annuity,
                     &regression_y,
                     basis,
                 )?;
 
-                // Exercise decision
-                for (j, &i) in regression_indices.iter().enumerate() {
-                    let immediate_value = regression_immediate[j];
-                    let continuation = continuation_values[j];
-
-                    // Exercise if immediate value > continuation value.
-                    // Record the exercise *step* so the final present value
-                    // can fetch the pathwise numéraire B(t_exercise).
-                    if immediate_value > continuation {
+                // Apply the train-fitted policy to both populations so the
+                // next regression sees consistent train-path continuation.
+                for (i, path) in paths.iter().enumerate() {
+                    let (swap_rate, annuity, immediate_value) =
+                        exercise_value(exercise_step, path[exercise_step])?;
+                    basis.evaluate_with_aux(swap_rate, Some(annuity), &mut basis_values);
+                    let continuation: f64 = basis_values
+                        .iter()
+                        .zip(&coefficients)
+                        .map(|(value, coefficient)| value * coefficient)
+                        .sum();
+                    if immediate_value > 0.0 && immediate_value > continuation {
                         cashflows[i] = immediate_value;
                         exercise_step_of[i] = exercise_step;
                     }
@@ -442,5 +449,150 @@ impl SwaptionLsmcPricer {
         }
 
         Ok(present_values)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use finstack_quant_models::monte_carlo::pricer::basis::PolynomialBasis;
+    use finstack_quant_models::monte_carlo::process::ou::HullWhite1FParams;
+
+    fn pricer(num_paths: usize, antithetic: bool, oos_lsmc: bool) -> SwaptionLsmcPricer {
+        SwaptionLsmcPricer::with_config(
+            RateExoticMcConfig {
+                num_paths,
+                antithetic,
+                oos_lsmc,
+                ..Default::default()
+            },
+            HullWhite1FProcess::new(HullWhite1FParams::new(0.03, 0.02, 0.03).expect("parameters")),
+        )
+    }
+
+    #[test]
+    fn final_exercise_preserves_sparse_itm_and_tiny_positive_payoffs() {
+        let grid = TimeGrid::from_times(vec![0.0, 1.0]).expect("grid");
+        let p = pricer(4, false, false);
+        let paths = vec![vec![0.0, -0.1], vec![0.0, 0.0], vec![0.0, 0.1]];
+        let values = p
+            .backward_induction_swaption_grid(
+                &paths,
+                &|_, r| Ok((r, 1.0, if r > 0.0 { 1e-8 } else { 0.0 })),
+                &[1],
+                &PolynomialBasis::new(2),
+                &grid,
+            )
+            .expect("terminal payoffs");
+        assert_eq!(values[0], 0.0);
+        assert_eq!(values[1], 0.0);
+        assert!((values[2] - 1e-8 * (-0.05_f64).exp()).abs() < 1e-20);
+    }
+
+    #[test]
+    fn sparse_earlier_regression_retains_terminal_exercise() {
+        let grid = TimeGrid::from_times(vec![0.0, 0.5, 1.0]).expect("grid");
+        let values = pricer(1, false, false)
+            .backward_induction_swaption_grid(
+                &[vec![0.0, 0.0, 0.0]],
+                &|step, r| Ok((r, 1.0, if step == 1 { 200.0 } else { 100.0 })),
+                &[1, 2],
+                &PolynomialBasis::new(2),
+                &grid,
+            )
+            .expect("sparse policy");
+        assert_eq!(values, vec![100.0]);
+    }
+
+    #[test]
+    fn antithetic_statistics_use_pairs_and_pricing_streams_only() {
+        let grid = TimeGrid::from_times(vec![0.0, 1.0]).expect("grid");
+        for oos in [false, true] {
+            let estimate = pricer(64, true, oos)
+                .price_bermudan_with_grid(
+                    |_, r| Ok((r, 1.0, ((0.03 + r) * 0.5).exp() * (100.0 + 100.0 * r))),
+                    0.03,
+                    &grid,
+                    &[1],
+                    &PolynomialBasis::new(2),
+                    Currency::USD,
+                )
+                .expect("paired estimate");
+            assert!((estimate.mean.amount() - 103.0).abs() < 1e-12);
+            assert!(estimate.stderr < 1e-12);
+            assert!(estimate.std_dev.expect("stddev") < 1e-12);
+            assert!((estimate.ci_95.0.amount() - 103.0).abs() < 1e-12);
+            assert!((estimate.ci_95.1.amount() - 103.0).abs() < 1e-12);
+            assert_eq!(estimate.num_paths, if oos { 32 } else { 64 });
+            assert_eq!(estimate.num_simulated_paths, estimate.num_paths * 2);
+        }
+    }
+
+    #[test]
+    fn independent_statistics_match_discounted_path_payoffs() {
+        let grid = TimeGrid::from_times(vec![0.0, 1.0]).expect("grid");
+        let p = pricer(64, false, false);
+        let paths = p.generate_rate_paths_with_grid(0.03, &grid).expect("paths");
+        let mut stats = finstack_quant_models::monte_carlo::OnlineStats::new();
+        for path in &paths {
+            stats.update(100.0 + 100.0 * path[1]);
+        }
+        let estimate = p
+            .price_bermudan_with_grid(
+                |_, r| Ok((r, 1.0, ((0.03 + r) * 0.5).exp() * (100.0 + 100.0 * r))),
+                0.03,
+                &grid,
+                &[1],
+                &PolynomialBasis::new(2),
+                Currency::USD,
+            )
+            .expect("independent estimate");
+        assert!((estimate.mean.amount() - stats.mean()).abs() < 1e-12);
+        assert!((estimate.stderr - stats.stderr()).abs() < 1e-12);
+        assert_eq!(estimate.num_paths, 64);
+        assert_eq!(estimate.num_simulated_paths, 64);
+    }
+
+    #[test]
+    fn pricing_streams_cannot_change_fitted_exercise_policy() {
+        // Train streams all continue to 100. Price streams can pay either 1
+        // or 1,000 at expiry; neither may affect the shared decision to reject
+        // 60 at the earlier date. Adjacent antithetic legs stay in one group.
+        let grid = TimeGrid::from_times(vec![0.0, 0.5, 1.0]).expect("grid");
+        let paths: Vec<_> = (0..64)
+            .map(|i| vec![0.0, 0.0, if (i / 2) % 2 == 0 { 0.0 } else { 1.0 }])
+            .collect();
+        let p = pricer(32, true, true);
+        for price_terminal in [1.0, 1000.0] {
+            let values = p
+                .backward_induction_swaption_grid(
+                    &paths,
+                    &|step, r| {
+                        Ok((
+                            r,
+                            1.0,
+                            if step == 1 {
+                                60.0
+                            } else if r == 0.0 {
+                                100.0
+                            } else {
+                                price_terminal
+                            },
+                        ))
+                    },
+                    &[1, 2],
+                    &PolynomialBasis::new(1),
+                    &grid,
+                )
+                .expect("split policy");
+            for (i, value) in values.iter().enumerate() {
+                let expected = if p.config.split().is_price(i) {
+                    price_terminal * (-0.25_f64).exp()
+                } else {
+                    100.0
+                };
+                assert!((value - expected).abs() < 1e-10);
+            }
+        }
     }
 }

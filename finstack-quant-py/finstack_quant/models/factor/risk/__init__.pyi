@@ -209,14 +209,15 @@ def evaluate_risk_budget(
         Position identifiers aligned with ``actual_var`` and
         ``target_var_pct``.
     actual_var : list[float]
-        Position component VaR amounts.
+        Finite position component VaR amounts.
     target_var_pct : list[float]
-        Target share of total portfolio VaR per position.
+        Finite target share in ``[0, 1]`` per position; shares must sum to one
+        within an absolute tolerance of ``0.05``.
     portfolio_var : float
-        Total portfolio VaR used to convert target percentages
+        Finite total portfolio VaR used to convert target percentages
         into target VaR amounts.
     utilization_threshold : float, default 1.2
-        Breach threshold for actual / target utilization. The default is
+        Positive finite breach threshold for actual / target utilization. The default is
         :data:`DEFAULT_UTILIZATION_THRESHOLD`, the Rust constant shared with
         the WASM binding.
 

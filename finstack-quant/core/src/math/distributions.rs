@@ -602,12 +602,17 @@ fn sample_gamma_with_max_attempts(
 
 /// Quantile function (inverse CDF) of the Chi-Squared distribution.
 ///
-/// Returns the value x such that P(X ≤ x) = p.
+/// Returns the value x such that P(X ≤ x) = p. Inversion is bracketed in
+/// log-space and checks the smaller tail's relative probability residual.
+/// Subnormal quantiles are rounded to the nearest representable `f64`;
+/// values below half the smallest positive `f64` return zero.
 ///
 /// # Arguments
 ///
-/// * `p` - Probability in [0, 1)
-/// * `df` - Degrees of freedom (k > 0)
+/// * `p` - Finite cumulative probability in `[0, 1)`. Zero returns zero.
+/// * `df` - Finite, strictly positive degrees of freedom; fractional values
+///   are accepted, including values below one. For nonzero `p`, numerical
+///   evaluation is limited to `df <= 1e8` to bound incomplete-gamma work.
 ///
 /// # Returns
 ///
@@ -617,7 +622,9 @@ fn sample_gamma_with_max_attempts(
 ///
 /// Returns [`Error::Validation`](crate::Error::Validation) if:
 /// - p ∉ [0, 1)
-/// - df ≤ 0
+/// - df is non-finite or not strictly positive
+/// - p is nonzero and df exceeds the numerical evaluation limit of `1e8`
+/// - a finite quantile cannot be resolved to the numerical tail tolerance
 ///
 /// # Examples
 ///
@@ -631,7 +638,8 @@ fn sample_gamma_with_max_attempts(
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 pub fn chi_squared_quantile(p: f64, df: f64) -> crate::Result<f64> {
-    use statrs::distribution::{ChiSquared, ContinuousCDF};
+    use super::solver::BrentSolver;
+    use statrs::function::gamma::{checked_gamma_ur, ln_gamma};
 
     if !(0.0..1.0).contains(&p) {
         return Err(crate::Error::Validation(format!(
@@ -639,19 +647,109 @@ pub fn chi_squared_quantile(p: f64, df: f64) -> crate::Result<f64> {
             p
         )));
     }
-    if df <= 0.0 {
+    if !df.is_finite() || df <= 0.0 {
         return Err(crate::Error::Validation(format!(
-            "Chi-squared degrees of freedom must be positive, got: {}",
+            "Chi-squared degrees of freedom must be finite and positive, got: {}",
             df
         )));
     }
-
-    match ChiSquared::new(df) {
-        Ok(chi2) => Ok(chi2.inverse_cdf(p)),
-        Err(_) => Err(crate::Error::Validation(
-            "Failed to create chi-squared distribution".to_string(),
-        )),
+    if p == 0.0 {
+        return Ok(0.0);
     }
+    // statrs' incomplete-gamma routines have no iteration budget; their
+    // series length grows with the shape and can stop making progress when
+    // incrementing huge shapes rounds away. This is an evaluation limit,
+    // not an approximation or a restriction on the mathematical distribution.
+    const MAX_EVALUATION_DF: f64 = 1e8;
+    if df > MAX_EVALUATION_DF {
+        return Err(crate::Error::Validation(format!(
+            "Chi-squared df={df} exceeds the numerical evaluation limit {MAX_EVALUATION_DF}"
+        )));
+    }
+
+    let shape = df / 2.0;
+    if shape == 0.0 {
+        // A subnormal df can halve to zero. Every quantile with representable
+        // p < 1 is then far below the smallest positive representable value.
+        return Ok(0.0);
+    }
+    let log_gamma_next = ln_gamma(shape + 1.0);
+    if !log_gamma_next.is_finite() {
+        return Err(crate::Error::Validation(
+            "Chi-squared degrees of freedom exceed the numerical evaluation range".into(),
+        ));
+    }
+    let lower_tail = p <= 0.5;
+    let log_probability = if lower_tail { p.ln() } else { (-p).ln_1p() };
+    let residual = |log_x: f64| {
+        let value = if lower_tail {
+            chi_squared_log_cdf(shape, log_x, log_gamma_next) - log_probability
+        } else {
+            let gamma_x = (log_x - std::f64::consts::LN_2).exp();
+            let survival = if gamma_x <= 1.0 {
+                // expm1 retains the complement when the log-CDF is near zero.
+                -chi_squared_log_cdf(shape, log_x, log_gamma_next).exp_m1()
+            } else {
+                checked_gamma_ur(shape, gamma_x).unwrap_or(f64::NAN)
+            };
+            log_probability - survival.ln()
+        };
+        // Tail probabilities may underflow at a remote bracket endpoint.
+        // Keep their sign without giving Brent an infinite residual.
+        value.clamp(-1_000.0, 1_000.0)
+    };
+
+    let log_min = f64::from_bits(1).ln() - std::f64::consts::LN_2;
+    if residual(log_min) >= 0.0 {
+        return Ok(0.0);
+    }
+    // This conservative upper bound exceeds the largest quantile requested
+    // by a representable p < 1, including very small degrees of freedom.
+    let log_max = (df + 64.0 * df.sqrt() + 128.0).ln();
+    let log_quantile = BrentSolver::new()
+        .tolerance(1e-13)
+        .max_iterations(256)
+        .solve_in_bracket(residual, log_min, log_max)
+        .map_err(|error| {
+            crate::Error::Validation(format!(
+                "Chi-squared quantile inversion failed for p={p}, df={df}: {error}"
+            ))
+        })?;
+    let quantile = log_quantile.exp();
+    let final_residual = residual(log_quantile);
+    if !quantile.is_finite() || !final_residual.is_finite() || final_residual.abs() > 1e-8 {
+        return Err(crate::Error::Validation(format!(
+            "Chi-squared quantile did not resolve the requested tail for p={p}, df={df}"
+        )));
+    }
+    Ok(quantile)
+}
+
+/// Log CDF evaluated without statrs' near-zero input cutoff.
+fn chi_squared_log_cdf(shape: f64, log_x: f64, log_gamma_next: f64) -> f64 {
+    use statrs::function::gamma::checked_gamma_lr;
+
+    let log_gamma_x = log_x - std::f64::consts::LN_2;
+    let gamma_x = log_gamma_x.exp();
+    // P(a,z) = P(a+1,z) + z^a exp(-z) / Gamma(a+1), DLMF 8.8.5.
+    // The explicit term retains small-x mass that statrs rounds to zero,
+    // while the dependency supplies the remaining incomplete-gamma value.
+    // https://dlmf.nist.gov/8.8.E5
+    let log_term = shape * log_gamma_x - gamma_x - log_gamma_next;
+    let shifted = if gamma_x == 0.0 {
+        0.0
+    } else {
+        checked_gamma_lr(shape + 1.0, gamma_x).unwrap_or(f64::NAN)
+    };
+    if log_term.is_nan() || !shifted.is_finite() {
+        return f64::NAN;
+    }
+    if shifted == 0.0 {
+        return log_term.min(0.0);
+    }
+    let log_shifted = shifted.ln();
+    let largest = log_term.max(log_shifted);
+    (largest + ((log_term - largest).exp() + (log_shifted - largest).exp()).ln()).min(0.0)
 }
 
 // Student's t Distribution (Sampler)
@@ -1078,6 +1176,91 @@ mod tests {
     }
 
     #[test]
+    fn chi_squared_quantile_matches_exponential_closed_form_in_both_tails() {
+        // Chi-square(2) is Exp(rate=1/2); this reference does not use an
+        // incomplete-gamma implementation or the quantile being tested.
+        for p in [1e-300_f64, 1e-100, 1e-12, 1e-6, 0.5, 0.99, 1.0 - 1e-12] {
+            let expected = -2.0 * (-p).ln_1p();
+            let actual = chi_squared_quantile(p, 2.0).expect("valid exponential quantile");
+            assert!(
+                (actual / expected - 1.0).abs() < 1e-11,
+                "p={p}: actual={actual}, expected={expected}"
+            );
+        }
+    }
+
+    #[test]
+    fn chi_squared_quantile_resolves_four_degree_lower_tail_mass() {
+        // For df=4, F(x) = 1 - exp(-y)*(1+y), y=x/2. Evaluate its
+        // independent Taylor expansion to avoid cancellation in tiny tails.
+        for p in [1e-300, 1e-100, 1e-12, 1e-6] {
+            let quantile = chi_squared_quantile(p, 4.0).expect("valid lower tail");
+            let y = quantile / 2.0;
+            let cdf =
+                y * y * (0.5 + y * (-1.0 / 3.0 + y * (1.0 / 8.0 + y * (-1.0 / 30.0 + y / 144.0))));
+            assert!(
+                (cdf / p - 1.0).abs() < 1e-10,
+                "p={p}: quantile={quantile}, cdf={cdf}"
+            );
+        }
+    }
+
+    #[test]
+    fn chi_squared_quantile_supports_fractional_degrees_and_subnormal_rounding() {
+        use statrs::function::gamma::ln_gamma;
+
+        for (df, p) in [(0.01, 0.5), (0.1, 0.5), (0.1, 1e-12), (2.00001, 1e-6)] {
+            let quantile = chi_squared_quantile(p, df).expect("valid fractional df");
+            assert!(quantile.is_finite() && quantile > 0.0);
+            let a = df / 2.0;
+            let y = quantile / 2.0;
+            // Independent quadrature of the defining gamma integral after
+            // substituting t = y*u^(1/a). The transformed integrand is smooth
+            // even for a < 1, without a singular endpoint or CDF recurrence.
+            let intervals = 1_024;
+            let integral: f64 = (0..intervals)
+                .map(|i| {
+                    let u = (f64::from(i) + 0.5) / f64::from(intervals);
+                    (-y * u.powf(1.0 / a)).exp()
+                })
+                .sum::<f64>()
+                / f64::from(intervals);
+            let cdf = (a * y.ln() - ln_gamma(a + 1.0)).exp() * integral;
+            assert!(
+                (cdf / p - 1.0).abs() < 1e-10,
+                "df={df}, p={p}: quantile={quantile}, integral CDF={cdf}"
+            );
+        }
+        assert_eq!(chi_squared_quantile(0.0, 0.01).expect("zero p"), 0.0);
+        assert_eq!(chi_squared_quantile(1e-12, 0.01).expect("underflow"), 0.0);
+        assert_eq!(
+            chi_squared_quantile(0.5, f64::from_bits(1)).expect("subnormal df"),
+            0.0
+        );
+        let smallest = f64::from_bits(1);
+        assert_eq!(
+            chi_squared_quantile(smallest, 2.0).expect("subnormal quantile"),
+            2.0 * smallest
+        );
+    }
+
+    #[test]
+    fn chi_squared_quantile_verifies_relative_upper_tail_accuracy() {
+        use statrs::distribution::{ChiSquared, ContinuousCDF};
+
+        let p = 1.0 - 1e-12;
+        for df in [0.01, 0.1, 1.0, 4.0, 30.0, 1_000.0] {
+            let x = chi_squared_quantile(p, df).expect("valid upper tail");
+            let survival = ChiSquared::new(df).expect("valid df").sf(x);
+            assert!(
+                (survival / (1.0 - p) - 1.0).abs() < 1e-9,
+                "df={df}: survival={survival}, target={}",
+                1.0 - p
+            );
+        }
+    }
+
+    #[test]
     fn test_chi_squared_quantile_validation() {
         // Invalid p
         assert!(chi_squared_quantile(-0.1, 5.0).is_err());
@@ -1087,6 +1270,14 @@ mod tests {
         // Invalid df
         assert!(chi_squared_quantile(0.5, 0.0).is_err());
         assert!(chi_squared_quantile(0.5, -1.0).is_err());
+        for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(chi_squared_quantile(0.5, invalid).is_err());
+            assert!(chi_squared_quantile(invalid, 5.0).is_err());
+        }
+        for unsupported in [1e8 + 1.0, 1e16, f64::MAX] {
+            assert!(chi_squared_quantile(0.5, unsupported).is_err());
+            assert_eq!(chi_squared_quantile(0.0, unsupported).expect("zero p"), 0.0);
+        }
     }
 
     // Student's t Distribution Tests

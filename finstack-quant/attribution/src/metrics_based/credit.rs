@@ -1,10 +1,7 @@
 use super::super::helpers::*;
 use super::super::types::*;
 use super::context::AttributionInputs;
-use super::shifts::{
-    average_over, credit_curve_abs_shift_bp, extract_keyrate_per_curve, twist_diagnostic_note,
-};
-use finstack_quant_core::market_data::diff::measure_per_tenor_credit_curve_shift;
+use super::shifts::{average_over, credit_curve_abs_shift_bp, twist_diagnostic_note};
 use finstack_quant_core::math::NeumaierAccumulator;
 use finstack_quant_valuations::metrics::MetricId;
 
@@ -42,8 +39,7 @@ pub(super) fn apply(
     //       correct for non-parallel (steepener / twist) credit-curve moves.
     //   (b) aggregate: Cs01 × avg(credit-curve move). Coarser; assumes parallel.
     let credit_curve_ids = &inputs.market_deps.curves.credit_curves;
-    let keyrate_cs01 =
-        extract_keyrate_per_curve(&inputs.val_t0.measures, credit_curve_ids, "bucketed_cs01");
+    let keyrate_cs01 = &inputs.credit_keyrates;
     let mut credit_has_data = false;
     // Mean par-spread shift fed to the credit-convexity (second-order) block.
     let mut credit_convexity_avg_shift_bp: Option<f64> = None;
@@ -53,33 +49,19 @@ pub(super) fn apply(
         // par-spread move. A credit-curve steepener is attributed per tenor
         // instead of collapsing to an average-shift × parallel-CS01 product —
         // so no twist guard / omit-on-twist workaround is needed.
-        // Mirrors the rates ladder (`rates.rs`): only set `credit_has_data`
-        // when at least one curve actually contributed. A non-empty
-        // `bucketed_cs01` map whose every curve was skipped (shift
-        // unmeasurable) must fall through to the aggregate Cs01 branch below
-        // instead of silently reporting zero credit P&L.
+        // Exact quote coordinates and complete coverage were validated
+        // before this stage; every supplied bucket contributes once.
         let mut credit_acc = NeumaierAccumulator::new();
         let mut shift_acc = NeumaierAccumulator::new();
         let mut shift_terms = 0usize;
         let mut curves_with_data = 0usize;
-        let mut curves_skipped: Vec<String> = Vec::new();
         for curve_id in credit_curve_ids {
             let Some(buckets) = keyrate_cs01.get(curve_id) else {
                 continue;
             };
-            let tenors: Vec<f64> = buckets.iter().map(|(t, _)| *t).collect();
-            let Ok(shifts) = measure_per_tenor_credit_curve_shift(
-                curve_id.as_str(),
-                inputs.market_t0,
-                inputs.market_t1,
-                &tenors,
-            ) else {
-                curves_skipped.push(curve_id.as_str().to_string());
-                continue;
-            };
-            for ((_, cs01), shift) in buckets.iter().zip(shifts.iter()) {
-                credit_acc.add(cs01 * shift);
-                shift_acc.add(*shift);
+            for bucket in buckets {
+                credit_acc.add(bucket.sensitivity * bucket.move_bp);
+                shift_acc.add(bucket.move_bp);
                 shift_terms += 1;
             }
             curves_with_data += 1;
@@ -100,13 +82,6 @@ pub(super) fn apply(
                 "Credit attribution computed using key-rate (per-tenor) BucketedCs01 across \
                      {} curve(s); non-parallel credit-curve moves are attributed per tenor",
                 curves_with_data
-            ));
-        }
-        if !curves_skipped.is_empty() {
-            attribution.meta.notes.push(format!(
-                "Credit curves with per-tenor BucketedCs01 but no measurable curve shift were \
-                     skipped in key-rate attribution: {}",
-                curves_skipped.join(", ")
             ));
         }
     }

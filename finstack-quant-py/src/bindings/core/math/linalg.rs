@@ -19,17 +19,16 @@ fn cholesky_err(e: impl std::fmt::Display) -> PyErr {
     CholeskyError::new_err(e.to_string())
 }
 
-/// Extract a `rows × cols` matrix (row-major flat buffer) from a C-contiguous
-/// NumPy array or a nested list.
+/// Extract a matrix in logical row-major order regardless of NumPy strides.
 fn extract_matrix(matrix: &Bound<'_, PyAny>) -> PyResult<(Vec<f64>, usize, usize)> {
     if let Ok(array) = matrix.extract::<PyReadonlyArray2<'_, f64>>() {
         let shape = array.shape();
         let (rows, cols) = (shape[0], shape[1]);
         let flat = match array.as_slice() {
-            Ok(slice) => slice.to_vec(),
-            // Strided views cannot borrow as a contiguous slice; fall back to
-            // logical-order iteration.
-            Err(_) => array.as_array().iter().copied().collect(),
+            Ok(slice) if array.is_c_contiguous() => slice.to_vec(),
+            // Fortran-contiguous slices expose column-major storage; strided
+            // views also need logical-order iteration before calling Rust.
+            _ => array.as_array().iter().copied().collect(),
         };
         return Ok((flat, rows, cols));
     }
@@ -49,7 +48,7 @@ fn extract_matrix(matrix: &Bound<'_, PyAny>) -> PyResult<(Vec<f64>, usize, usize
     Ok((rows.into_iter().flatten().collect(), nrows, ncols))
 }
 
-/// Extract an n×n matrix from a C-contiguous NumPy array or a nested list.
+/// Extract an n×n matrix from a NumPy array or a nested list.
 fn extract_square_matrix(matrix: &Bound<'_, PyAny>) -> PyResult<(Vec<f64>, usize)> {
     let (flat, rows, cols) = extract_matrix(matrix)?;
     if rows != cols {
@@ -65,10 +64,25 @@ fn extract_square_matrix(matrix: &Bound<'_, PyAny>) -> PyResult<(Vec<f64>, usize
 ///
 /// Accepts a square matrix as a ``numpy.ndarray`` (``float64``) or
 /// ``list[list[float]]`` and returns the lower-triangular factor in the same
-/// shape.
+/// shape. Rust normalizes the matrix before factorization and restores the
+/// factor's units afterwards. Numerical singularity is measured relative to
+/// the square root of the largest input diagonal magnitude: uniformly scaling
+/// A by a positive constant scales L by its square root.
 ///
-/// Raises ``CholeskyError`` when the matrix is not positive-definite, is singular,
-/// or has mismatched dimensions.
+/// # Arguments
+///
+/// * `matrix` - Finite symmetric positive-definite square matrix in logical row and column order; NumPy strides do not change that ordering.
+///
+/// # Returns
+///
+/// Lower-triangular factor L as a nested list, satisfying A = L L^T in the
+/// original variable order, with the factor's scale restored.
+///
+/// # Errors
+///
+/// Raises ``CholeskyError`` (a ``ValueError`` subclass) when the matrix is not
+/// positive-definite, is numerically singular, or contains non-finite entries.
+/// Raises ``ValueError`` when the input cannot be read as a square matrix.
 #[pyfunction]
 #[pyo3(text_signature = "(matrix)")]
 fn cholesky_decomposition(py: Python<'_>, matrix: &Bound<'_, PyAny>) -> PyResult<Vec<Vec<f64>>> {
@@ -82,10 +96,23 @@ fn cholesky_decomposition(py: Python<'_>, matrix: &Bound<'_, PyAny>) -> PyResult
 /// Solve a symmetric positive-definite linear system A x = b given the Cholesky
 /// factor L of A (where A = L L^T).
 ///
-/// Accepts L as a ``numpy.ndarray`` (``float64``) or ``list[list[float]]`` and b
-/// as ``list[float]``. Returns x as ``list[float]``.
+/// Returns x as ``list[float]``. The unused upper triangle of L is ignored.
+/// The singularity threshold is relative to the largest factor diagonal;
+/// uniformly scaling A and b preserves x when L is scaled by the square root
+/// of the same positive constant.
 ///
-/// Raises ``ValueError`` on dimension mismatch or a singular factor.
+/// # Arguments
+///
+/// * `chol` - Square lower-triangular Cholesky factor L as a nested list or float64 NumPy array; the consumed lower triangle must be finite.
+/// * `b` - Finite right-hand side sequence with one value per factor row.
+///
+/// # Errors
+///
+/// Raises ``ValueError`` for a non-square factor, dimension mismatch, a diagonal
+/// too close to zero relative to the largest diagonal magnitude, non-finite
+/// entries in the consumed lower triangle or right-hand side, or a non-finite
+/// substitution result (including overflow). Raises ``TypeError`` if ``b``
+/// contains values that cannot be converted to float.
 #[pyfunction]
 #[pyo3(text_signature = "(chol, b)")]
 fn cholesky_solve(py: Python<'_>, chol: &Bound<'_, PyAny>, b: Vec<f64>) -> PyResult<Vec<f64>> {
@@ -149,8 +176,27 @@ fn symmetric_eigen(
 /// variables, one observation per row) as ``list[list[float]]`` or a
 /// ``numpy.ndarray``. Returns ``(covariance, shrinkage)``: the ``n × n``
 /// shrunk covariance as nested lists and the intensity ``δ* ∈ [0, 1]``.
+/// Columns are demeaned and the sample covariance uses the divisor ``t``.
+/// Centered observations are normalized before computing second and fourth
+/// moments, then covariance units are restored. Uniformly rescaling all
+/// observations preserves the shrinkage intensity and rescales covariance by
+/// the square of that factor.
 ///
-/// Raises ``ValueError`` when ``t < 2``, ``n == 0``, or any entry is non-finite.
+/// # Arguments
+///
+/// * `observations` - Finite rectangular observation matrix with ``t >= 2`` rows and ``n >= 1`` columns; use comparable units across columns because the target pools their variances.
+///
+/// # Returns
+///
+/// Pair of the unannualized covariance matrix in squared observation units
+/// and its dimensionless shrinkage intensity. Constant observations produce
+/// a zero covariance matrix and zero intensity.
+///
+/// # Errors
+///
+/// Raises ``ValueError`` for an invalid matrix shape, ``t < 2``, ``n == 0``,
+/// non-finite entries, or centered observations or covariance entries that
+/// exceed the finite ``float64`` range.
 #[pyfunction]
 #[pyo3(text_signature = "(observations)")]
 fn ledoit_wolf_shrinkage(
@@ -169,7 +215,7 @@ fn ledoit_wolf_shrinkage(
 
 /// Build the `finstack_quant.core.math.linalg` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "linalg")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "linalg")?;
     m.setattr(
         "__doc__",
         "Linear algebra utilities: Cholesky decomposition, triangular solves, symmetric eigendecomposition, Ledoit-Wolf shrinkage.",
@@ -202,13 +248,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "linalg",
-        "finstack_quant.core.math",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
 
     Ok(())

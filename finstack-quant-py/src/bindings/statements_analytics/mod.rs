@@ -83,7 +83,7 @@ pub(crate) fn py_opt_str(value: Option<&str>) -> String {
 
 /// Register the `statements_analytics` submodule on the parent module.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "statements_analytics")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "statements_analytics")?;
     m.setattr(
         "__doc__",
         "Statement analysis: sensitivity, variance, scenarios, backtesting, goal seek, DCF/LBO, corporate analysis, reports, check suites, introspection, comparable-company analysis, ECL, corkscrew/scorecard extensions, and roll-forward/vintage/real-estate templates.",
@@ -213,13 +213,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "statements_analytics",
-        crate::bindings::module_utils::ROOT_PACKAGE,
-        crate::bindings::module_utils::ParentNameSource::Name,
+        crate::bindings::module_utils::Exposure::Python,
     )?;
 
     Ok(())

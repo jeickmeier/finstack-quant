@@ -58,11 +58,12 @@ impl RateBounds {
     ///
     /// # Errors
     ///
-    /// Returns an error if `min_rate > max_rate`.
+    /// Returns an error if either bound is non-finite or `min_rate > max_rate`.
     pub fn validate(&self) -> Result<()> {
-        if self.min_rate > self.max_rate {
+        if !self.min_rate.is_finite() || !self.max_rate.is_finite() || self.min_rate > self.max_rate
+        {
             return Err(Error::Validation(format!(
-                "RateBounds invalid: min_rate ({}) must be <= max_rate ({})",
+                "RateBounds invalid: min_rate ({}) and max_rate ({}) must be finite and min_rate <= max_rate",
                 self.min_rate, self.max_rate
             )));
         }
@@ -73,7 +74,7 @@ impl RateBounds {
     ///
     /// # Errors
     ///
-    /// Returns an error if `min_rate > max_rate`.
+    /// Returns an error if either bound is non-finite or `min_rate > max_rate`.
     pub fn new(min_rate: f64, max_rate: f64) -> Result<Self> {
         let bounds = Self { min_rate, max_rate };
         bounds.validate()?;
@@ -290,6 +291,25 @@ impl ValidationConfig {
     ///
     /// Returns an error if any constraints are violated (e.g. min > max, non-positive tolerances).
     pub fn validate(&self) -> Result<()> {
+        for (label, value) in [
+            ("min_forward_rate", self.min_forward_rate),
+            ("max_forward_rate", self.max_forward_rate),
+            ("tolerance", self.tolerance),
+            ("max_hazard_rate", self.max_hazard_rate),
+            ("min_cpi_growth", self.min_cpi_growth),
+            ("max_cpi_growth", self.max_cpi_growth),
+            ("min_fwd_inflation", self.min_fwd_inflation),
+            ("max_fwd_inflation", self.max_fwd_inflation),
+            ("max_volatility", self.max_volatility),
+            ("butterfly_upper_ratio", self.butterfly_upper_ratio),
+            ("butterfly_lower_ratio", self.butterfly_lower_ratio),
+        ] {
+            if !value.is_finite() {
+                return Err(Error::Validation(format!(
+                    "ValidationConfig invalid: {label} must be finite, got {value}"
+                )));
+            }
+        }
         if self.min_forward_rate > 0.0 {
             return Err(Error::Validation(format!(
                 "ValidationConfig invalid: min_forward_rate must be <= 0.0, got {}",
@@ -338,9 +358,12 @@ impl ValidationConfig {
                 self.max_volatility
             )));
         }
-        if self.butterfly_upper_ratio < self.butterfly_lower_ratio {
+        if self.butterfly_lower_ratio < 0.0
+            || self.butterfly_upper_ratio <= 0.0
+            || self.butterfly_upper_ratio < self.butterfly_lower_ratio
+        {
             return Err(Error::Validation(format!(
-                "ValidationConfig invalid: butterfly_upper_ratio ({}) must be >= butterfly_lower_ratio ({})",
+                "ValidationConfig invalid: butterfly_upper_ratio ({}) must be positive and >= non-negative butterfly_lower_ratio ({})",
                 self.butterfly_upper_ratio, self.butterfly_lower_ratio
             )));
         }

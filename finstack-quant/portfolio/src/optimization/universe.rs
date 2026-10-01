@@ -66,7 +66,9 @@ impl PositionFilter {
 /// The optimizer can allocate weight to candidates (up to `max_weight`).
 #[derive(Clone)]
 pub struct CandidatePosition {
-    /// Unique identifier for this candidate (becomes `PositionId` if traded).
+    /// Identifier that becomes `PositionId` if traded. Must be unique among
+    /// candidates and absent from the existing portfolio; optimization rejects
+    /// a collision.
     pub id: PositionId,
 
     /// Entity that would own this position.
@@ -96,6 +98,7 @@ impl CandidatePosition {
     /// # Arguments
     ///
     /// * `id` - Identifier that will become the optimized `PositionId` if selected.
+    ///   Must be unique among candidates and absent from the existing portfolio.
     /// * `entity_id` - Owning entity for the candidate.
     /// * `instrument` - Candidate instrument to trade.
     /// * `unit` - Quantity semantics for the candidate.
@@ -245,7 +248,7 @@ impl<'de> Deserialize<'de> for CandidatePosition {
 /// The trade universe consists of:
 ///
 /// 1. **Tradeable positions**: existing portfolio positions that can be adjusted
-/// 2. **Held positions**: existing positions locked at current weight
+/// 2. **Held positions**: existing positions locked at current weight and exact quantity
 /// 3. **Candidate positions**: new instruments that could be added
 ///
 /// Serializes with serde; candidate instruments travel as their canonical
@@ -259,12 +262,14 @@ pub struct TradeUniverse {
     pub tradeable_filter: PositionFilter,
 
     /// Filter for existing positions that are held constant.
-    /// Positions matching this filter keep their current weight.
+    /// Positions matching this filter keep their current weight and exact
+    /// quantity under every weighting scheme, including zero-PV holdings.
     /// Takes precedence over `tradeable_filter` if both match.
     pub held_filter: Option<PositionFilter>,
 
     /// Candidate instruments not currently in the portfolio.
-    /// These start with weight 0 and can be added by the optimizer.
+    /// These start with weight 0 and can be added by the optimizer. Their IDs
+    /// must be unique among candidates and absent from existing positions.
     pub candidates: Vec<CandidatePosition>,
 
     /// Whether candidates can receive negative weights (short selling).

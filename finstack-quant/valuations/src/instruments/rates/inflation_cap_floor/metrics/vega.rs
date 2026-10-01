@@ -17,7 +17,6 @@
 //! central difference yields sensitivity per *unit* absolute vol; dividing by
 //! `VOL_POINTS_PER_ABSOLUTE_VOL` (= 100) converts it to per-vol-point.
 
-use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::inflation_cap_floor::InflationCapFloor;
 use crate::metrics::bump_surface_vol_absolute;
 use crate::metrics::sensitivities::config as sens_config;
@@ -35,19 +34,15 @@ impl MetricCalculator for VegaCalculator {
         let option: &InflationCapFloor = context.instrument_as()?;
         let as_of = context.as_of;
 
-        if as_of >= option.maturity {
-            return Ok(0.0);
-        }
-
         // Bump vol surface up
         let curves_up =
             bump_surface_vol_absolute(&context.curves, option.vol_surface_id.as_str(), vol_bump)?;
-        let pv_up = option.value(&curves_up, as_of)?.amount();
+        let pv_up = context.reprice_raw(&curves_up, as_of)?;
 
         // Bump vol surface down
         let curves_down =
             bump_surface_vol_absolute(&context.curves, option.vol_surface_id.as_str(), -vol_bump)?;
-        let pv_down = option.value(&curves_down, as_of)?.amount();
+        let pv_down = context.reprice_raw(&curves_down, as_of)?;
 
         // Central difference per unit vol, rescaled to per vol point (1% = 0.01
         // absolute vol) to match the workspace vega convention.

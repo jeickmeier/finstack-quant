@@ -225,6 +225,71 @@ pub fn norm_cdf(x: f64) -> f64 {
     STANDARD_NORMAL.cdf(x)
 }
 
+/// Natural logarithm of the standard normal cumulative probability.
+///
+/// Evaluates `ln(P(Z <= x))` without first forming a probability that can
+/// underflow in the negative tail. Positive arguments use the complementary
+/// tail with `ln_1p` to retain probabilities close to one.
+///
+/// # Arguments
+///
+/// * `x` - Standardized, dimensionless normal variate. Any finite real value
+///   or infinity is accepted; NaN propagates.
+///
+/// # Returns
+///
+/// Log probability in `[-infinity, 0]`. Negative infinity maps to negative
+/// infinity and positive infinity maps to zero. Extremely negative finite
+/// arguments can return negative infinity when the log probability itself
+/// exceeds the representable floating-point range.
+///
+/// # Examples
+///
+/// ```
+/// use finstack_quant_core::math::special_functions::log_norm_cdf;
+/// assert!((log_norm_cdf(0.0) + 2.0_f64.ln()).abs() < 1e-14);
+/// assert!(log_norm_cdf(-40.0).is_finite());
+/// ```
+///
+/// # Numerical method
+///
+/// Uses the existing normal CDF in the central region and the asymptotic
+/// Mills-ratio expansion beyond ten standard deviations. For positive real
+/// arguments the omitted remainder is bounded by the first omitted term;
+/// see <https://dlmf.nist.gov/7.12.E1>.
+#[must_use]
+pub fn log_norm_cdf(x: f64) -> f64 {
+    if x.is_nan() {
+        return f64::NAN;
+    }
+    if x >= 0.0 {
+        return (-norm_cdf(-x)).ln_1p();
+    }
+    if x > -10.0 {
+        return norm_cdf(x).ln();
+    }
+
+    // Phi(-a) = phi(a)/a * (1 - 1/a² + 3/a⁴ - 15/a⁶ + ...).
+    // At a >= 10 the terms reach machine precision well before their
+    // asymptotic growth starts. Stop before growth even for future changes
+    // to the switching point.
+    let inverse_square = (1.0 / x).powi(2);
+    let mut term = 1.0_f64;
+    let mut sum = 1.0_f64;
+    for order in 1..100 {
+        let next = -term * f64::from(2 * order - 1) * inverse_square;
+        if next.abs() >= term.abs() {
+            break;
+        }
+        sum += next;
+        if next.abs() <= f64::EPSILON * sum.abs() {
+            break;
+        }
+        term = next;
+    }
+    -0.5 * x * x - (-x).ln() - 0.5 * (2.0 * std::f64::consts::PI).ln() + sum.ln()
+}
+
 // Precomputed 1/√(2π) for direct norm_pdf evaluation.
 const INV_SQRT_2PI: f64 = 0.398_942_280_401_432_7;
 
@@ -524,6 +589,28 @@ pub fn student_t_inv_cdf(p: f64, df: f64) -> crate::Result<f64> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn logarithmic_normal_cdf_preserves_underflowed_tails() {
+        // High-precision log(erfc(-x/sqrt(2))/2) reference values.
+        for (x, expected) in [
+            (-10.0, -53.231_285_150_512_47),
+            (-40.0, -804.608_442_013_753_8),
+            (-100.0, -5_005.524_208_694_205),
+        ] {
+            assert!((super::log_norm_cdf(x) - expected).abs() < 2e-12);
+        }
+        for x in [-9.999, -5.0, -1.0, 0.0, 1.0, 5.0] {
+            assert!((super::log_norm_cdf(x).exp() - super::norm_cdf(x)).abs() < 2e-15);
+        }
+        assert_eq!(super::log_norm_cdf(f64::NEG_INFINITY), f64::NEG_INFINITY);
+        assert_eq!(super::log_norm_cdf(f64::INFINITY), 0.0);
+        assert!(super::log_norm_cdf(f64::NAN).is_nan());
+        // The probability itself is unrepresentable, but its reflected
+        // product is an ordinary finite number.
+        let reflected = (800.0 + super::log_norm_cdf(-40.0)).exp();
+        assert!((reflected - 0.009_967_335_188_301_31).abs() < 2e-15);
+    }
+
     use super::*;
 
     #[test]

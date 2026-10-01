@@ -1,4 +1,4 @@
-use finstack_quant_core::math::norm_cdf;
+use finstack_quant_core::math::{log_norm_cdf, norm_cdf};
 use finstack_quant_core::{Error, Result};
 
 use super::{AssetDynamics, MertonBarrierType, MertonModel};
@@ -96,20 +96,33 @@ impl MertonModel {
         };
 
         let lambda_t = jump_intensity * horizon;
+        if lambda_t == 0.0 {
+            return vec![(1.0, log_drift * horizon, diffusion_var)];
+        }
         // Poisson tail beyond mean + 10 standard deviations carries less than
         // 1e-15 of the mass, which is below the accuracy of `norm_cdf`.
         let n_max = (lambda_t + 10.0 * lambda_t.sqrt()).ceil().max(20.0) as usize;
         let mut components = Vec::with_capacity(n_max + 1);
-        let mut weight = (-lambda_t).exp();
         for n in 0..=n_max {
-            if n > 0 {
-                weight *= lambda_t / n as f64;
-            }
             components.push((
-                weight,
+                0.0,
                 log_drift.mul_add(horizon, n as f64 * jump_mean),
                 jump_vol.mul_add(jump_vol * n as f64, diffusion_var),
             ));
+        }
+        // Start at the mode: exp(-lambda_t) underflows at about 746,
+        // even though probabilities near the mean are still substantial.
+        // statrs' log-factorial gives a finite mode probability, anchoring
+        // both recurrence directions without building large factorials.
+        let mode = lambda_t.floor() as usize;
+        let mode_log_weight = -lambda_t + mode as f64 * lambda_t.ln()
+            - statrs::function::factorial::ln_factorial(mode as u64);
+        components[mode].0 = mode_log_weight.exp();
+        for n in (1..=mode).rev() {
+            components[n - 1].0 = components[n].0 * n as f64 / lambda_t;
+        }
+        for n in (mode + 1)..=n_max {
+            components[n].0 = components[n - 1].0 * lambda_t / n as f64;
         }
         components
     }
@@ -137,30 +150,20 @@ impl MertonModel {
         // starting distance.
         let nu = log_drift - barrier_growth_rate;
         let x0 = (self.asset_value / self.debt_barrier).ln();
+        if x0 <= 0.0 {
+            return 1.0;
+        }
 
         let d_plus = (x0 + nu * horizon) / sigma_sqrt_t;
         let d_minus = (x0 - nu * horizon) / sigma_sqrt_t;
 
         // Black-Cox reflection term `exp(-2*nu*x0/sigma^2) * N(-d_minus)`.
-        // The exponential factor overflows to `+inf` for a large
-        // `|exponent|` (e.g. a strongly negative drift, or a low vol with a
-        // high rate). When `N(-d_minus)` simultaneously underflows to `0` the
-        // naive product is `inf * 0 = NaN`, which would survive the final
-        // `clamp(0, 1)`.
-        //
-        // The Gaussian tail `N(-d_minus)` decays as `exp(-d_minus^2/2)`,
-        // which dominates the (at most exponential-in-`d_minus`) power
-        // factor, so the term tends to `0` whenever `N(-d_minus)` does.
-        // Guard that case, then evaluate the surviving product in log-space
-        // so a genuinely large term overflows cleanly to `+inf` (and clamps
-        // to `1`) instead of producing a `NaN`.
+        // The exponential prefactor can offset an underflowing Gaussian
+        // tail, leaving a material probability. Evaluate the normal tail
+        // directly in log space; taking ln(norm_cdf(...)) has already lost
+        // that probability when the CDF rounds to zero.
         let exponent = -2.0 * nu / (sigma * sigma);
-        let nd_minus = norm_cdf(-d_minus);
-        let reflection_term = if nd_minus <= 0.0 {
-            0.0
-        } else {
-            (exponent * x0 + nd_minus.ln()).exp()
-        };
+        let reflection_term = (exponent * x0 + log_norm_cdf(-d_minus)).exp();
 
         let pd = norm_cdf(-d_plus) + reflection_term;
         if pd.is_nan() {
@@ -429,6 +432,46 @@ mod tests {
     use super::super::{AssetDynamics, MertonBarrierType, MertonModel};
 
     #[test]
+    fn large_poisson_mean_preserves_probability_mass_and_zero_jump_identity() {
+        let diffusion = MertonModel::new(100.0, 0.20, 80.0, 0.05).expect("valid diffusion");
+        for intensity in [700.0, 746.0, 1000.0] {
+            let jump_model = MertonModel::new_with_dynamics(
+                100.0,
+                0.20,
+                80.0,
+                0.05,
+                0.0,
+                MertonBarrierType::Terminal,
+                AssetDynamics::JumpDiffusion {
+                    jump_intensity: intensity,
+                    jump_mean: 0.0,
+                    jump_vol: 0.0,
+                },
+            )
+            .expect("valid jump model");
+            let mass: f64 = jump_model
+                .terminal_log_components(jump_model.log_drift(0.05), 1.0)
+                .iter()
+                .map(|(weight, _, _)| weight)
+                .sum();
+            assert!(
+                (mass - 1.0).abs() < 2e-12,
+                "intensity {intensity}: mass {mass}"
+            );
+            assert!(
+                (jump_model.default_probability(1.0) - diffusion.default_probability(1.0)).abs()
+                    < 2e-12
+            );
+            assert!(
+                (jump_model.debt_spread(1.0).expect("jump debt spread")
+                    - diffusion.debt_spread(1.0).expect("diffusion debt spread"))
+                .abs()
+                    < 2e-12
+            );
+        }
+    }
+
+    #[test]
     fn dd_textbook_values() {
         let m = MertonModel::new(100.0, 0.20, 80.0, 0.05).unwrap();
         let dd = m.distance_to_default(1.0);
@@ -484,6 +527,52 @@ mod tests {
             m_fp.default_probability(5.0) > m_term.default_probability(5.0),
             "First-passage PD should be higher than terminal PD"
         );
+    }
+
+    #[test]
+    fn first_passage_retains_reflection_when_normal_tail_underflows() {
+        let model = MertonModel::new_with_dynamics(
+            122.140_275_816_016_98,
+            0.01,
+            100.0,
+            0.05,
+            0.0,
+            MertonBarrierType::FirstPassage {
+                barrier_growth_rate: 0.25,
+            },
+            AssetDynamics::GeometricBrownian,
+        )
+        .expect("valid low-volatility structural model");
+
+        // d+ = -0.005, d- = 40.005, so Phi(-d-) underflows. The
+        // reflection term is nevertheless 0.009965966403866: independently
+        // integrate exp(-u - u²/(2*d-²))/d- over u >= 0 and multiply by
+        // phi(d+), which evaluates the scaled Mills ratio without overflow.
+        let expected = 0.511_960_669_494_607;
+        let actual = model.default_probability(1.0);
+        assert!(
+            (actual - expected).abs() < 5e-12,
+            "Black-Cox probability {actual} lost the reflection contribution"
+        );
+    }
+
+    #[test]
+    fn first_passage_is_certain_when_initial_assets_breach_barrier() {
+        for asset_value in [80.0, 100.0] {
+            let model = MertonModel::new_with_dynamics(
+                asset_value,
+                0.01,
+                100.0,
+                0.05,
+                0.0,
+                MertonBarrierType::FirstPassage {
+                    barrier_growth_rate: 0.0,
+                },
+                AssetDynamics::GeometricBrownian,
+            )
+            .expect("an initially defaulted model is supported");
+            assert!((model.default_probability(1.0) - 1.0).abs() < f64::EPSILON);
+        }
     }
 
     // Extreme parameter edge cases

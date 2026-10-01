@@ -11,9 +11,10 @@
 //! - `vol` is annualized lognormal volatility (decimal); `normal_vol` is an
 //!   absolute (Bachelier) volatility in the units of the forward.
 //! - `expiry` is time to expiry in years.
-//! - Greeks use the canonical Rust scaling: `vega` and `rho_*` are per-1% move,
-//!   `theta` is per day under ACT/365 (use 252 day-count via `theta_days_per_year` if you
-//!   want a business-day convention).
+//! - Black-Scholes Greeks use canonical Rust scaling: `vega` and `rho_*` are
+//!   per-1% move and `theta` is per day under ACT/365 (or 252 via
+//!   `theta_days_per_year`). Forward-option Greeks are undiscounted and their
+//!   `vega` is per unit volatility change.
 
 use crate::bindings::pandas_utils::{
     labeled_values_to_series, serde_object_to_single_row_dataframe,
@@ -22,13 +23,10 @@ use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_models::closed_form::implied_vol::{black76_implied_vol, bs_implied_vol};
 use finstack_quant_models::closed_form::{
-    asian_option_price_str, bachelier_call, bachelier_delta_call, bachelier_delta_put,
-    bachelier_gamma, bachelier_put, bachelier_vega, barrier_call_str, barrier_put_str, black_call,
-    black_delta_call, black_delta_put, black_gamma, black_put, black_shifted_call,
-    black_shifted_put, black_shifted_vega, black_vega, bs_greeks, bs_price,
-    checked_closed_form_value, heston_call_price_fourier, heston_put_price_fourier,
-    lookback_option_price_str, quanto_option_price, vanilla_expiry_payoff, BsGreeks,
-    HestonPricingParams,
+    asian_option_price_str, bachelier_greeks, bachelier_price, barrier_call_str, barrier_put_str,
+    black76_greeks, black76_price, black_shifted_price, black_shifted_vega, bs_greeks, bs_price,
+    heston_call_price_fourier, heston_put_price_fourier, lookback_option_price_str,
+    quanto_option_price, vanilla_expiry_payoff, BsGreeks, ForwardGreeks, HestonPricingParams,
 };
 use finstack_quant_models::OptionType;
 use pyo3::prelude::*;
@@ -527,8 +525,7 @@ fn black76_implied_vol_wrapper(
 /// Raises
 /// ------
 /// ValueError
-///     If the inputs produce a non-finite price (for example a negative or
-///     non-finite volatility or forward).
+///     If an input is non-finite, forward, strike, or discount factor is not positive, volatility or expiry is negative, or the price is non-finite.
 ///
 /// Examples
 /// --------
@@ -549,12 +546,7 @@ fn black76_price_wrapper(
     vol: f64,
     is_call: bool,
 ) -> PyResult<f64> {
-    let undiscounted = if is_call {
-        black_call(forward, strike, vol, expiry)
-    } else {
-        black_put(forward, strike, vol, expiry)
-    };
-    checked_closed_form_value(df * undiscounted, "Black-76 price").map_err(core_to_py)
+    black76_price(forward, strike, df, expiry, vol, OptionType::from(is_call)).map_err(core_to_py)
 }
 
 /// Black-76 forward Greeks ``{"delta", "gamma", "vega"}`` (undiscounted).
@@ -584,7 +576,7 @@ fn black76_price_wrapper(
 /// Raises
 /// ------
 /// ValueError
-///     If any Greek is non-finite for the supplied inputs.
+///     If an input is non-finite, forward or strike is not positive, volatility or expiry is negative, or the result is non-finite.
 ///
 /// Examples
 /// --------
@@ -606,18 +598,9 @@ fn black76_greeks_wrapper<'py>(
     vol: f64,
     is_call: bool,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let delta = if is_call {
-        black_delta_call(forward, strike, vol, expiry)
-    } else {
-        black_delta_put(forward, strike, vol, expiry)
-    };
-    forward_greeks_dict(
-        py,
-        delta,
-        black_gamma(forward, strike, vol, expiry),
-        black_vega(forward, strike, vol, expiry),
-        "Black-76",
-    )
+    let greeks = black76_greeks(forward, strike, expiry, vol, OptionType::from(is_call))
+        .map_err(core_to_py)?;
+    forward_greeks_dict(py, greeks)
 }
 
 // bachelier_price / bachelier_greeks
@@ -647,7 +630,7 @@ fn black76_greeks_wrapper<'py>(
 /// Raises
 /// ------
 /// ValueError
-///     If the inputs produce a non-finite price.
+///     If an input is non-finite, normal volatility or expiry is negative, or the result is non-finite.
 ///
 /// Examples
 /// --------
@@ -667,12 +650,14 @@ fn bachelier_price_wrapper(
     expiry: f64,
     is_call: bool,
 ) -> PyResult<f64> {
-    let value = if is_call {
-        bachelier_call(forward, strike, normal_vol, expiry)
-    } else {
-        bachelier_put(forward, strike, normal_vol, expiry)
-    };
-    checked_closed_form_value(value, "Bachelier price").map_err(core_to_py)
+    bachelier_price(
+        forward,
+        strike,
+        normal_vol,
+        expiry,
+        OptionType::from(is_call),
+    )
+    .map_err(core_to_py)
 }
 
 /// Bachelier (normal-model) forward Greeks ``{"delta", "gamma", "vega"}``.
@@ -702,7 +687,7 @@ fn bachelier_price_wrapper(
 /// Raises
 /// ------
 /// ValueError
-///     If any Greek is non-finite for the supplied inputs.
+///     If an input is non-finite, normal volatility or expiry is negative, or the result is non-finite.
 ///
 /// Examples
 /// --------
@@ -723,34 +708,25 @@ fn bachelier_greeks_wrapper<'py>(
     expiry: f64,
     is_call: bool,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let delta = if is_call {
-        bachelier_delta_call(forward, strike, normal_vol, expiry)
-    } else {
-        bachelier_delta_put(forward, strike, normal_vol, expiry)
-    };
-    forward_greeks_dict(
-        py,
-        delta,
-        bachelier_gamma(forward, strike, normal_vol, expiry),
-        bachelier_vega(forward, strike, normal_vol, expiry),
-        "Bachelier",
+    let greeks = bachelier_greeks(
+        forward,
+        strike,
+        normal_vol,
+        expiry,
+        OptionType::from(is_call),
     )
+    .map_err(core_to_py)?;
+    forward_greeks_dict(py, greeks)
 }
 
 fn forward_greeks_dict<'py>(
     py: Python<'py>,
-    delta: f64,
-    gamma: f64,
-    vega: f64,
-    model: &str,
+    greeks: ForwardGreeks,
 ) -> PyResult<Bound<'py, PyDict>> {
-    for (name, value) in [("delta", delta), ("gamma", gamma), ("vega", vega)] {
-        checked_closed_form_value(value, &format!("{model} {name}")).map_err(core_to_py)?;
-    }
     let out = PyDict::new(py);
-    out.set_item("delta", delta)?;
-    out.set_item("gamma", gamma)?;
-    out.set_item("vega", vega)?;
+    out.set_item("delta", greeks.delta)?;
+    out.set_item("gamma", greeks.gamma)?;
+    out.set_item("vega", greeks.vega)?;
     Ok(out)
 }
 
@@ -786,8 +762,7 @@ fn forward_greeks_dict<'py>(
 /// Raises
 /// ------
 /// ValueError
-///     If the inputs produce a non-finite price (for example a shifted
-///     forward or strike that is not positive).
+///     If an input is non-finite, shifted forward or strike is not positive, volatility or expiry is negative, or the result is non-finite.
 ///
 /// Examples
 /// --------
@@ -804,12 +779,15 @@ fn black_shifted_price_wrapper(
     shift: f64,
     is_call: bool,
 ) -> PyResult<f64> {
-    let value = if is_call {
-        black_shifted_call(forward, strike, vol, expiry, shift)
-    } else {
-        black_shifted_put(forward, strike, vol, expiry, shift)
-    };
-    checked_closed_form_value(value, "shifted Black price").map_err(core_to_py)
+    black_shifted_price(
+        forward,
+        strike,
+        vol,
+        expiry,
+        shift,
+        OptionType::from(is_call),
+    )
+    .map_err(core_to_py)
 }
 
 /// Shifted (displaced) Black vega per unit (1.0) change in ``vol``.
@@ -835,7 +813,7 @@ fn black_shifted_price_wrapper(
 /// Raises
 /// ------
 /// ValueError
-///     If the inputs produce a non-finite vega.
+///     If an input is non-finite, shifted forward or strike is not positive, volatility or expiry is negative, or the result is non-finite.
 ///
 /// Examples
 /// --------
@@ -851,11 +829,7 @@ fn black_shifted_vega_wrapper(
     expiry: f64,
     shift: f64,
 ) -> PyResult<f64> {
-    checked_closed_form_value(
-        black_shifted_vega(forward, strike, vol, expiry, shift),
-        "shifted Black vega",
-    )
-    .map_err(core_to_py)
+    black_shifted_vega(forward, strike, vol, expiry, shift).map_err(core_to_py)
 }
 
 // barrier_call / barrier_put

@@ -227,7 +227,7 @@ pub(crate) fn attribute_pnl_waterfall(
     // repeated factor would find the market already rolled, measure ~0, and
     // silently overwrite the genuine first-pass P&L (the real move would leak
     // into the residual); a repeated Carry would additionally double-count
-    // coupon income into `total_pnl` via `apply_total_return_carry`.
+    // period economic cash into `total_pnl` via `apply_total_return_carry`.
     {
         let mut seen = std::collections::HashSet::new();
         for factor in &factor_order {
@@ -348,8 +348,7 @@ pub(crate) fn attribute_pnl_waterfall(
                 for w in &carry_inputs.warnings {
                     attribution.meta.notes.push(w.clone());
                 }
-                // Carry inputs reprice Accrued/YTM/flat-curve; count one extra.
-                ctx.count_extra_repricing();
+                ctx.num_repricings += carry_inputs.num_repricings;
 
                 apply_total_return_carry(&mut attribution, theta, carry_inputs)?;
             }
@@ -423,13 +422,6 @@ struct WaterfallContext<'a> {
 impl<'a> WaterfallContext<'a> {
     fn num_repricings(&self) -> usize {
         self.num_repricings
-    }
-
-    /// Count a pricing performed outside `apply_factor` (e.g. the carry
-    /// helper's `price_with_metrics` call) so `meta.num_repricings` reflects
-    /// true pricing cost.
-    fn count_extra_repricing(&mut self) {
-        self.num_repricings += 1;
     }
 
     /// Apply the credit cascade as a sequence of per-step bumps replacing the

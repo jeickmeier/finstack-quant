@@ -60,7 +60,7 @@ fn splitmix64_finalize(mut z: u64) -> u64 {
 pub(crate) fn parse_seed_json(value: &serde_json::Value) -> Option<u64> {
     value.as_u64().or_else(|| {
         let f = value.as_f64()?;
-        if !f.is_finite() || f.fract() != 0.0 || f < 0.0 || f > u64::MAX as f64 {
+        if !f.is_finite() || f.fract() != 0.0 || f < 0.0 || f >= u64::MAX as f64 {
             return None;
         }
         Some(f as u64)
@@ -253,7 +253,8 @@ fn validate_lognormal_base(base_value: f64, context: &str) -> Result<()> {
 /// * `forecast_periods` - Periods to simulate
 /// * `params` - JSON parameter map containing `mean`, `std_dev`, and `seed`
 ///
-/// `mean` and `std_dev` describe the underlying log-return distribution.
+/// `mean` is the continuously compounded expected-growth drift: the expected
+/// log return is `mean - 0.5 * std_dev²`. `std_dev` is log-return volatility.
 /// `seed` must be integer-like and is required for deterministic sampling.
 ///
 /// # Returns

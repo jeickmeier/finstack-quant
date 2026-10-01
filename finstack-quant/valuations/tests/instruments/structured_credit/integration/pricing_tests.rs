@@ -120,6 +120,7 @@ fn test_structured_credit_value_computation() {
         maturity_date(),
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     let market = MarketContext::new().insert(flat_discount_curve(0.04, test_date()));
@@ -144,6 +145,7 @@ fn test_structured_credit_dirty_price() {
         maturity_date(),
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     let market = MarketContext::new().insert(flat_discount_curve(0.04, test_date()));
@@ -179,6 +181,7 @@ fn test_structured_credit_clean_price() {
         maturity_date(),
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     let market = MarketContext::new().insert(flat_discount_curve(0.04, test_date()));
@@ -219,6 +222,7 @@ fn test_structured_credit_tranche_cashflows_generated() {
         maturity_date(),
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     let market = MarketContext::new().insert(flat_discount_curve(0.04, test_date()));
@@ -239,6 +243,7 @@ fn test_structured_credit_tranche_value_computation() {
         maturity_date(),
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     let market = MarketContext::new().insert(flat_discount_curve(0.04, test_date()));
@@ -263,6 +268,7 @@ fn test_structured_credit_full_metric_suite() {
         maturity_date(),
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     let market = MarketContext::new().insert(flat_discount_curve(0.04, test_date()));
@@ -334,6 +340,7 @@ fn test_prepayment01_default01_nonzero_for_curve_specs() {
         maturity_date(),
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
     sc.credit_model.prepayment_spec = PrepaymentModelSpec::psa(1.5);
     sc.credit_model.default_spec = DefaultModelSpec::sda(1.0);
@@ -374,6 +381,7 @@ fn test_scenario_price_shock_scales_structured_credit_pv_and_dollar_risk_once() 
         maturity_date(),
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
     baseline.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.06);
     baseline.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.02);
@@ -435,6 +443,7 @@ fn test_structured_credit_registry_exposes_clo_warf() {
         maturity_date(),
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     let market = MarketContext::new().insert(flat_discount_curve(0.04, test_date()));
@@ -464,6 +473,7 @@ fn test_structured_credit_registry_exposes_cmbs_dscr() {
         maturity_date(),
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
     sc.pool.assets[0].noi =
         Some(Money::new(625_000.0, Currency::USD).expect("valid money fixture"));
@@ -494,6 +504,7 @@ fn test_structured_credit_registry_wal_matches_cashflow_wal() {
         maturity_date(),
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     let market = MarketContext::new().insert(flat_discount_curve(0.04, test_date()));
@@ -543,6 +554,7 @@ fn test_structured_credit_empty_metrics_request() {
         maturity_date(),
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     let market = MarketContext::new().insert(flat_discount_curve(0.04, test_date()));
@@ -572,6 +584,7 @@ fn test_structured_credit_metric_dependency_resolution() {
         maturity_date(),
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     let market = MarketContext::new().insert(flat_discount_curve(0.04, test_date()));
@@ -613,6 +626,7 @@ fn test_structured_credit_pool_balance_cleanup() {
         maturity_date(),
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     let market = MarketContext::new().insert(flat_discount_curve(0.04, test_date()));
@@ -641,6 +655,7 @@ fn test_sensitivity01_units_reconcile_with_reprice() {
         maturity_date(),
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
     sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.06);
     sc.credit_model.recovery_spec.rate = 0.40;

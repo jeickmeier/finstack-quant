@@ -77,7 +77,8 @@ fn test_apply_deal_defaults_sets_expected_assumptions() {
             closing,
             legal,
             "USD-OIS",
-        );
+        )
+        .expect("valid structured-credit dates");
 
         assert_eq!(sc.deal_type, deal_type);
         assert_eq!(sc.frequency, expected_frequency);
@@ -109,7 +110,8 @@ fn clo_registry_profile_is_the_single_source_of_clo_defaults() {
         test_date(),
         maturity_date(),
         "USD-OIS",
-    );
+    )
+    .expect("valid structured-credit dates");
     let defaults = CreditModelConfig::default();
     assert_eq!(
         format!("{:?}", clo.credit_model.prepayment_spec),
@@ -148,7 +150,8 @@ fn test_prepayment_spec_shapes_drive_monthly_rates() {
         Date::from_calendar_date(2024, Month::January, 1).unwrap(),
         maturity_date(),
         "USD-OIS",
-    );
+    )
+    .expect("valid structured-credit dates");
 
     sc.credit_model.prepayment_spec = PrepaymentModelSpec::abs(0.02);
     let abs_rate = sc.calculate_smm(1).unwrap();
@@ -177,7 +180,8 @@ fn test_default_spec_shapes_drive_monthly_rates() {
         Date::from_calendar_date(2024, Month::January, 1).unwrap(),
         maturity_date(),
         "USD-OIS",
-    );
+    )
+    .expect("valid structured-credit dates");
 
     sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.12);
     let cdr_rate = sc.calculate_default_rate(1).unwrap();
@@ -213,7 +217,8 @@ fn test_current_loss_percentage_handles_zero_balance_and_offsets() {
         Date::from_calendar_date(2024, Month::January, 1).unwrap(),
         maturity_date(),
         "USD-OIS",
-    );
+    )
+    .expect("valid structured-credit dates");
     assert_eq!(sc_zero.current_loss_percentage().unwrap(), 0.0);
 
     let mut pool = create_pool_with_balance(1_000_000.0);
@@ -226,7 +231,8 @@ fn test_current_loss_percentage_handles_zero_balance_and_offsets() {
         Date::from_calendar_date(2024, Month::January, 1).unwrap(),
         maturity_date(),
         "USD-OIS",
-    );
+    )
+    .expect("valid structured-credit dates");
     // Denominator is original balance approximated as:
     // current_balance + cumulative_defaults + cumulative_prepayments
     // = 1,000,000 + 50,000 + 0 = 1,050,000

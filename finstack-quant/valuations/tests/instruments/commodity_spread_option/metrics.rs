@@ -118,3 +118,56 @@ fn test_commodity_spread_option_dv01_and_bucketed_dv01() -> finstack_quant_core:
 
     Ok(())
 }
+
+#[test]
+fn commodity_spread_vega_bumps_each_market_surface_once() -> finstack_quant_core::Result<()> {
+    use finstack_quant_core::market_data::bumps::{
+        BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
+    };
+    for shared_surface in [false, true] {
+        for bump in [0.005, 0.01, 0.02] {
+            let (mut option, market, as_of) = spread_call();
+            option.quantity = 1000.0;
+            if shared_surface {
+                option.leg2_vol_surface_id = option.leg1_vol_surface_id.clone();
+            }
+            option.metric_pricing_overrides = Default::default();
+            option.metric_pricing_overrides =
+                option.metric_pricing_overrides.with_vol_bump_decimal(bump);
+            let pv = option.value(&market, as_of)?;
+            let mut context = MetricContext::new(
+                Arc::new(option.clone()),
+                Arc::new(market.clone()),
+                as_of,
+                pv,
+                MetricContext::default_config(),
+            );
+            context.set_metric_pricing_overrides(Some(option.metric_pricing_overrides.clone()));
+            let actual =
+                standard_registry().compute(&[MetricId::Vega], &mut context)?[&MetricId::Vega];
+            let shock = |shift| {
+                let mut ids = vec![option.leg1_vol_surface_id.clone()];
+                if !shared_surface {
+                    ids.push(option.leg2_vol_surface_id.clone());
+                }
+                market.bump(ids.into_iter().map(|id| MarketBump::Curve {
+                    id,
+                    spec: BumpSpec {
+                        bump_type: BumpType::Parallel,
+                        mode: BumpMode::Additive,
+                        units: BumpUnits::Fraction,
+                        value: shift,
+                    },
+                }))
+            };
+            let expected = (option.value(&shock(bump)?, as_of)?.amount()
+                - option.value(&shock(-bump)?, as_of)?.amount())
+                / (2.0 * bump * 100.0);
+            assert!(
+                (actual - expected).abs() < 1e-8,
+                "actual={actual}, expected={expected}"
+            );
+        }
+    }
+    Ok(())
+}

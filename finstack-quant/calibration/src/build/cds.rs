@@ -5,8 +5,8 @@ use crate::build::BuildCtx;
 use crate::quotes::cds::CdsQuote;
 use crate::quotes::ids::Pillar;
 use finstack_quant_core::dates::{
-    next_cds_date, next_semiannual_cds_maturity, prev_cds_semiannual_roll, BusinessDayConvention,
-    Date, DateExt,
+    is_cds_date, next_cds_date, next_semiannual_cds_maturity, prev_cds_date,
+    prev_cds_semiannual_roll, BusinessDayConvention, Date, DateExt, Tenor,
 };
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -25,6 +25,36 @@ pub(crate) struct CdsResolvedDates {
     pub(crate) spot: Date,
     pub(crate) start: Date,
     pub(crate) maturity: Date,
+}
+
+/// Return the unadjusted quarterly coupon anchor on or before the trade date.
+///
+/// Cash settlement and protection step-in do not determine the coupon period.
+///
+/// # Arguments
+///
+/// * `trade_date` - Trade date selecting the current quarterly CDS coupon
+///   period; a trade on a roll date starts accrual on that date.
+pub(crate) fn cds_accrual_start(trade_date: Date) -> Result<Date> {
+    if is_cds_date(trade_date) {
+        Ok(trade_date)
+    } else {
+        prev_cds_date(trade_date)
+    }
+}
+
+/// Resolve an on-the-run tenor to its post-2015 CDS scheduled termination date.
+///
+/// # Arguments
+///
+/// * `trade_date` - Trade date selecting the semiannual March/September roll
+///   on or before the trade, independently of cash settlement.
+/// * `tenor` - Contract tenor added to that unadjusted roll before extending
+///   to the next standard June/December twentieth maturity.
+pub(crate) fn resolve_cds_tenor_maturity(trade_date: Date, tenor: &Tenor) -> Result<Date> {
+    let roll = prev_cds_semiannual_roll(trade_date)?;
+    let raw = tenor.add_to_date(roll, None, BusinessDayConvention::Unadjusted)?;
+    next_semiannual_cds_maturity(raw)
 }
 
 /// Resolve CDS quote dates without requiring callers to inspect the boxed instrument.
@@ -60,23 +90,17 @@ fn resolve_cds_dates(
         i32::from(conv.settlement_days),
         conv.business_day_convention,
     )?;
-    // CDS Start: Market standard is the prior CDS roll (20th of Mar/Jun/Sep/Dec).
-    // Use the CDS IMM roll date on or before spot.
-    let roll_anchor = spot.add_months(-3);
-    let start = next_cds_date(roll_anchor);
+    // Anchor premium accrual to the trade date. Cash settlement may cross a
+    // coupon roll and must not move accrual or protection into the future.
+    let start = cds_accrual_start(ctx.as_of())?;
 
     let maturity = match pillar {
-        Pillar::Tenor(t) => {
-            // Post-2015 ISDA semi-annual roll convention.
-            let roll = prev_cds_semiannual_roll(ctx.as_of());
-            let raw = t.add_to_date(roll, None, BusinessDayConvention::Unadjusted)?;
-            next_semiannual_cds_maturity(raw)
-        }
+        Pillar::Tenor(t) => resolve_cds_tenor_maturity(ctx.as_of(), t)?,
         Pillar::Date(d) => {
             // Enforce IMM alignment using the unadjusted input date.
             // Do NOT business-day adjust before roll selection, as that can push
             // the date past the 20th and cause next_cds_date to return the next quarter.
-            next_cds_date(*d - time::Duration::days(1))
+            next_cds_date(d.add_days(-1)?)?
         }
     };
 
@@ -109,8 +133,11 @@ fn resolve_cds_dates(
 /// # CDS Date Conventions
 ///
 /// Premium accrual starts on the quarterly CDS roll date (20th of March, June,
-/// September, December) on or before spot. For tenor pillars, the scheduled
-/// termination date follows the post-2015 ISDA semi-annual roll: the
+/// September, December) on or before the trade date, without business-day
+/// adjustment. Upfront cash settles separately at the convention's settlement
+/// date; protection step-in follows the selected CDS valuation convention.
+/// For tenor pillars, the scheduled termination date follows the post-2015
+/// ISDA semi-annual roll: the
 /// semi-annual roll anchor (20-Mar/20-Sep) on or before the trade date, plus
 /// the tenor, extended to the next standard maturity (20-Jun/20-Dec). Explicit
 /// date pillars are snapped to the quarterly IMM grid unchanged.

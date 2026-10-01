@@ -84,7 +84,12 @@ impl DecompositionConfig {
         Self::parametric(0.99)
     }
 
-    /// Historical simulation configuration.
+    /// Historical simulation configuration with exact empirical-tail ES weights.
+    ///
+    /// # Arguments
+    ///
+    /// * `confidence` - VaR and ES confidence as a decimal probability, such
+    ///   as `0.99`. Decomposition validates that it is finite and in `(0.5, 1)`.
     pub fn historical(confidence: f64) -> Self {
         Self {
             confidence,
@@ -168,7 +173,8 @@ pub struct PositionEsContribution {
     /// CES_i = w_i * (Sigma * w)_i / sigma_p * phi(z_alpha) / (1 - alpha)
     /// ```
     ///
-    /// Historical: average of position-level losses in tail scenarios.
+    /// Historical: probability-weighted position P&L over the exact loss-tail
+    /// mass. Boundary ties share their tail weight equally.
     /// ```text
     /// CES_i = E[L_i | L_portfolio > VaR_portfolio]
     /// ```
@@ -545,15 +551,16 @@ fn validate_decomposition_inputs(
     }
 
     // Finiteness, symmetry and positive semi-definiteness via the
-    // rank-tolerant Cholesky shared with the factor-level engine
-    // (`ParametricDecomposer`). A strict positive-definite factorization
+    // pivoted Cholesky supplied by core. The factor-level engine instead
+    // consumes an immutable, already validated `FactorCovarianceMatrix`. A
+    // strict positive-definite factorization
     // would reject rank-deficient PSD covariance — perfectly collinear
     // positions, factor structure `B Σ_f Bᵀ + D` with singular `Σ_f`, or
     // sample covariance with fewer observations than positions — all of
     // which are valid risk inputs: Euler allocation only requires
     // `σ_p = √(wᵀΣw) ≥ 0`.
     if n > 0 {
-        super::math::cholesky(covariance, n)?;
+        super::math::validate_covariance(covariance, n)?;
     }
 
     Ok(())
@@ -823,15 +830,16 @@ impl ParametricPositionDecomposer {
 /// Historical simulation position-level VaR decomposer.
 ///
 /// Decomposes VaR and ES by attributing portfolio losses to individual
-/// positions within tail scenarios. The Euler property holds approximately
-/// (exact in the limit of infinite scenarios).
+/// positions within the exact empirical tail mass. Position ES contributions
+/// use the same probability weights as portfolio ES and sum to its total.
 ///
 /// # Algorithm
 ///
 /// 1. Compute portfolio P&L for each scenario: PnL_p(s) = sum_i PnL_i(s)
 /// 2. Sort scenarios by portfolio P&L (ascending = worst first)
-/// 3. Identify tail: scenarios where PnL_p <= -VaR_p
-/// 4. Component ES: CES_i = mean(-PnL_i(s)) for s in tail
+/// 3. Assign exactly `(1-confidence) * n_scenarios` observations of tail mass,
+///    sharing fractional boundary mass equally across tied portfolio P&Ls.
+/// 4. Component ES: weighted mean of each position's signed P&L in that tail.
 /// 5. Component VaR: CVaR_i = CES_i * (VaR_p / ES_p)  (Tasche scaling)
 ///
 /// # References
@@ -896,9 +904,8 @@ impl HistoricalPositionDecomposer {
             });
         }
 
-        // Number of tail scenarios: shared snapped-ceil convention (see
-        // `super::tail_scenario_count`), matching `SimulationDecomposer`.
-        // Require at least two tail observations like the simulation engine:
+        // Number of tail scenarios needed to locate the boundary (see
+        // `super::tail_scenario_count`). Require at least two tail observations:
         // a one-scenario tail collapses VaR and ES onto a single extreme
         // observation and cannot support a VaR/ES split.
         let n_tail = super::tail_scenario_count(config.confidence, n_scenarios);
@@ -952,40 +959,51 @@ impl HistoricalPositionDecomposer {
         //
         // Loss convention (workspace-wide): VaR/ES follow the P&L sign, so
         // losses are negative. Clamp to zero only when the quantile P&L is
-        // actually a gain (extremely low confidence levels), matching
-        // `SimulationDecomposer::tail_risk_decomposition`.
+        // actually a gain.
         let var_idx = (n_tail - 1).min(n_scenarios - 1);
         let portfolio_var = portfolio_pnls[var_idx].1.min(0.0);
 
-        // Portfolio ES: average signed P&L in the tail scenarios.
-        let raw_portfolio_es: f64 = portfolio_pnls[..n_tail]
-            .iter()
-            .map(|(_, pnl)| pnl)
-            .sum::<f64>()
-            / n_tail as f64;
-        let portfolio_es = raw_portfolio_es.min(0.0);
+        // ES integrates exactly (1-confidence) of the empirical probability
+        // mass. Including an entire fractional boundary observation changes
+        // the risk measure when the same empirical sample is duplicated.
+        let raw_tail_mass = (1.0 - config.confidence) * n_scenarios as f64;
+        let tail_mass =
+            if (raw_tail_mass - raw_tail_mass.round()).abs() < super::TAIL_COUNT_SNAP_TOLERANCE {
+                raw_tail_mass.round()
+            } else {
+                raw_tail_mass
+            };
+        let boundary_pnl = portfolio_pnls[var_idx].1;
+        let before_boundary = portfolio_pnls.partition_point(|(_, pnl)| *pnl < boundary_pnl);
+        let after_boundary = portfolio_pnls.partition_point(|(_, pnl)| *pnl <= boundary_pnl);
+        let boundary_weight =
+            (tail_mass - before_boundary as f64) / (after_boundary - before_boundary) as f64;
 
-        // Per-position Component ES: average of position-level losses in tail.
-        //
-        // A previous Rayon shard at `n_tail * n >= 100_000` lost throughput
-        // versus this serial fold on measured books (400–600 positions ×
-        // 4,000 scenarios). Keep the order-deterministic serial accumulation
-        // over the sorted tail of `portfolio_pnls`.
+        // All scenarios tied at the boundary receive the same fractional
+        // weight, so position allocation cannot depend on their input order.
+        let mut raw_portfolio_es = 0.0;
         let mut component_es_vec = vec![0.0; n];
-        for &(s, _) in &portfolio_pnls[..n_tail] {
+        for (rank, &(s, pnl)) in portfolio_pnls[..after_boundary].iter().enumerate() {
+            let weight = if rank < before_boundary {
+                1.0
+            } else {
+                boundary_weight
+            };
+            raw_portfolio_es += weight * pnl;
             let row_start = s * n;
             for i in 0..n {
-                component_es_vec[i] += position_pnls[row_start + i];
+                component_es_vec[i] += weight * position_pnls[row_start + i];
             }
         }
+        raw_portfolio_es /= tail_mass;
+        let portfolio_es = raw_portfolio_es.min(0.0);
         for ces in component_es_vec.iter_mut() {
-            *ces /= n_tail as f64;
+            *ces /= tail_mass;
         }
 
         // Gain-clamp Euler consistency: when the tail mean is a gain the
         // total ES clamps to zero above, so the components must be zeroed in
-        // the same branch or they no longer sum to the total (matching
-        // `SimulationDecomposer::tail_risk_decomposition`).
+        // the same branch or they no longer sum to the total.
         if raw_portfolio_es > 0.0 {
             component_es_vec.fill(0.0);
         }
@@ -1063,6 +1081,49 @@ mod tests {
 
     type TestResult = finstack_quant_core::Result<()>;
 
+    #[test]
+    fn historical_es_is_invariant_to_empirical_sample_replication() -> TestResult {
+        let mut pnls = vec![0.0; 250];
+        pnls[..3].copy_from_slice(&[-100.0, -50.0, -10.0]);
+        let doubled: Vec<f64> = pnls.iter().flat_map(|&pnl| [pnl, pnl]).collect();
+        for sample in [&pnls, &doubled] {
+            let result = HistoricalPositionDecomposer.decompose_from_pnls(
+                sample,
+                &["P".into()],
+                sample.len(),
+                &DecompositionConfig::historical(0.99),
+            )?;
+            // The exact 1% tail is 2.5 observations: -100, -50, half of -10.
+            assert!((result.portfolio_es + 62.0).abs() < 1e-12);
+            assert!((result.es_contributions[0].component_es + 62.0).abs() < 1e-12);
+            assert_eq!(result.portfolio_var, -10.0);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn historical_es_boundary_ties_allocate_independently_of_input_order() -> TestResult {
+        // 99% of 250 scenarios leaves 2.5 observations in the tail. The two
+        // -50 scenarios have different position composition and share the
+        // remaining 1.5 observations of mass equally.
+        let mut pnls = vec![0.0; 500];
+        pnls[..6].copy_from_slice(&[-100.0, 0.0, -50.0, 0.0, 0.0, -50.0]);
+        let mut reordered = pnls.clone();
+        reordered[2..6].copy_from_slice(&[0.0, -50.0, -50.0, 0.0]);
+        for sample in [&pnls, &reordered] {
+            let result = HistoricalPositionDecomposer.decompose_from_pnls(
+                sample,
+                &["A".into(), "B".into()],
+                250,
+                &DecompositionConfig::historical(0.99),
+            )?;
+            assert!((result.portfolio_es + 70.0).abs() < 1e-12);
+            assert!((result.es_contributions[0].component_es + 55.0).abs() < 1e-12);
+            assert!((result.es_contributions[1].component_es + 15.0).abs() < 1e-12);
+        }
+        Ok(())
+    }
+
     // Parametric tests
 
     #[test]
@@ -1108,7 +1169,7 @@ mod tests {
 
     /// Workspace sign convention: VaR and ES follow the P&L sign, so losses
     /// are reported as **negative** numbers — matching the factor-level
-    /// engines (`ParametricDecomposer`, `SimulationDecomposer`) and
+    /// engine (`ParametricDecomposer`) and
     /// `analytics::value_at_risk`. Component/marginal contributions carry
     /// the same sign so Euler exhaustion holds with signed totals.
     #[test]
@@ -1153,7 +1214,7 @@ mod tests {
 
     /// Historical decomposition follows the same losses-negative convention:
     /// the VaR is the signed P&L at the tail quantile, ES the signed tail
-    /// mean, matching `SimulationDecomposer::tail_risk_decomposition`.
+    /// probability-weighted mean over the exact empirical tail.
     #[test]
     fn historical_var_and_es_report_losses_as_negative() -> TestResult {
         // 200 scenarios, single position, P&L = -50..149 (worst = -50).

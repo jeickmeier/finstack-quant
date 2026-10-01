@@ -50,9 +50,10 @@ pub enum RecoveryModel {
 /// Models the relationship between the accreted notional and the recovery
 /// rate in default. As PIK accrual increases the notional relative to the
 /// original base, recovery declines according to the chosen [`RecoveryModel`].
+/// Deserialization enforces the same parameter invariants as the constructors.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "RawDynamicRecoverySpec")]
 pub struct DynamicRecoverySpec {
     /// Base (reference) recovery rate `R_0`.
     base_recovery: f64,
@@ -62,136 +63,197 @@ pub struct DynamicRecoverySpec {
     model: RecoveryModel,
 }
 
+#[derive(Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "json-schema", schemars(rename = "DynamicRecoverySpec"))]
+#[serde(deny_unknown_fields)]
+struct RawDynamicRecoverySpec {
+    /// Base (reference) recovery rate `R_0`.
+    base_recovery: f64,
+    /// Base (reference) notional `N_0`.
+    base_notional: f64,
+    /// Recovery model governing the notional-to-recovery mapping.
+    model: RecoveryModel,
+}
+
+impl TryFrom<RawDynamicRecoverySpec> for DynamicRecoverySpec {
+    type Error = Error;
+
+    fn try_from(raw: RawDynamicRecoverySpec) -> Result<Self> {
+        Self::new(raw.base_recovery, raw.base_notional, raw.model)
+    }
+}
+
 impl DynamicRecoverySpec {
-    /// Validate base parameters common to all non-constant models.
-    fn validate(base_recovery: f64, base_notional: f64) -> Result<()> {
+    fn new(base_recovery: f64, base_notional: f64, model: RecoveryModel) -> Result<Self> {
         if !(0.0..=1.0).contains(&base_recovery) {
             return Err(InputError::Invalid.into());
         }
-        if base_notional <= 0.0 {
+        if !base_notional.is_finite() || base_notional <= 0.0 {
             return Err(InputError::NonPositiveValue.into());
         }
-        Ok(())
+        match model {
+            RecoveryModel::InversePower { exponent }
+                if !exponent.is_finite() || exponent <= 0.0 || exponent > 1.0 =>
+            {
+                return Err(Error::Validation(
+                    "inverse-power recovery exponent must be finite and in (0, 1]".into(),
+                ));
+            }
+            RecoveryModel::LinearDecline { sensitivity, .. }
+                if !sensitivity.is_finite() || sensitivity < 0.0 =>
+            {
+                return Err(Error::Validation(
+                    "linear-decline recovery sensitivity must be finite and non-negative".into(),
+                ));
+            }
+            _ => {}
+        }
+        if let RecoveryModel::FlooredInverse { floor }
+        | RecoveryModel::LinearDecline { floor, .. } = model
+        {
+            if !floor.is_finite() || !(0.0..=base_recovery).contains(&floor) {
+                return Err(Error::Validation(format!(
+                    "recovery floor must be finite and in [0, {base_recovery}], got {floor}"
+                )));
+            }
+        }
+        Ok(Self {
+            base_recovery,
+            base_notional,
+            model,
+        })
     }
 
     /// Create a constant recovery spec (ignores notional changes).
     ///
     /// This produces identical results to fixed-recovery pricing.
     ///
+    /// # Arguments
+    ///
+    /// * `recovery` - Finite fraction of outstanding notional recovered on
+    ///   default, in `[0, 1]`.
+    ///
     /// # Errors
     ///
     /// Returns an error if `recovery` is outside `[0, 1]`.
     pub fn constant(recovery: f64) -> Result<Self> {
-        if !(0.0..=1.0).contains(&recovery) {
-            return Err(InputError::Invalid.into());
-        }
-        Ok(Self {
-            base_recovery: recovery,
-            base_notional: 1.0,
-            model: RecoveryModel::Constant,
-        })
+        Self::new(recovery, 1.0, RecoveryModel::Constant)
     }
 
     /// Create an inverse-linear recovery spec.
     ///
     /// `R(N) = R_0 * (N_0 / N)`, clamped to `[0, R_0]`.
     ///
+    /// # Arguments
+    ///
+    /// * `base_recovery` - Finite recovery fraction at the reference notional,
+    ///   in `[0, 1]`.
+    /// * `base_notional` - Finite positive reference debt amount, in the same
+    ///   monetary units as subsequent notional queries.
+    ///
     /// # Errors
     ///
     /// Returns an error if `base_recovery` is outside `[0, 1]` or
-    /// `base_notional <= 0`.
+    /// `base_notional` is non-finite or non-positive.
     pub fn inverse_linear(base_recovery: f64, base_notional: f64) -> Result<Self> {
-        Self::validate(base_recovery, base_notional)?;
-        Ok(Self {
-            base_recovery,
-            base_notional,
-            model: RecoveryModel::InverseLinear,
-        })
+        Self::new(base_recovery, base_notional, RecoveryModel::InverseLinear)
     }
 
     /// Create an inverse-power recovery spec.
     ///
     /// `R(N) = R_0 * (N_0 / N)^exponent`, clamped to `[0, R_0]`.
     ///
+    /// # Arguments
+    ///
+    /// * `base_recovery` - Finite reference recovery fraction in `[0, 1]`.
+    /// * `base_notional` - Finite positive reference debt amount in the query
+    ///   notional's monetary units.
+    /// * `exponent` - Finite dilution exponent in `(0, 1]`; values below one
+    ///   soften recovery's decline relative to inverse-linear dilution.
+    ///
     /// # Errors
     ///
     /// Returns an error if `base_recovery` is outside `[0, 1]`,
-    /// `base_notional <= 0`, or `exponent <= 0`.
+    /// the reference notional is non-finite or non-positive, or `exponent`
+    /// is not finite and in `(0, 1]`.
     pub fn inverse_power(base_recovery: f64, base_notional: f64, exponent: f64) -> Result<Self> {
-        Self::validate(base_recovery, base_notional)?;
-        if exponent <= 0.0 {
-            return Err(InputError::NonPositiveValue.into());
-        }
-        Ok(Self {
+        Self::new(
             base_recovery,
             base_notional,
-            model: RecoveryModel::InversePower { exponent },
-        })
+            RecoveryModel::InversePower { exponent },
+        )
     }
 
     /// Create a floored inverse recovery spec.
     ///
     /// `R(N) = max(floor, R_0 * (N_0 / N))`, clamped to `[0, R_0]`.
     ///
+    /// # Arguments
+    ///
+    /// * `base_recovery` - Finite reference recovery fraction in `[0, 1]`.
+    /// * `base_notional` - Finite positive reference debt amount in the query
+    ///   notional's monetary units.
+    /// * `floor` - Finite minimum recovery fraction in `[0, base_recovery]`.
+    ///
     /// # Errors
     ///
     /// Returns an error if `base_recovery` is outside `[0, 1]`,
-    /// `base_notional <= 0`, or `floor` is negative.
+    /// the reference notional is non-finite or non-positive, or `floor` is
+    /// not finite and in `[0, base_recovery]`.
     pub fn floored_inverse(base_recovery: f64, base_notional: f64, floor: f64) -> Result<Self> {
-        Self::validate(base_recovery, base_notional)?;
-        if floor < 0.0 {
-            return Err(InputError::NegativeValue.into());
-        }
-        if floor > base_recovery {
-            return Err(Error::Validation(format!(
-                "floored_inverse: floor ({floor}) must not exceed base_recovery \
-                 ({base_recovery}) — the outer clamp would silently disable it"
-            )));
-        }
-        Ok(Self {
+        Self::new(
             base_recovery,
             base_notional,
-            model: RecoveryModel::FlooredInverse { floor },
-        })
+            RecoveryModel::FlooredInverse { floor },
+        )
     }
 
     /// Create a linear-decline recovery spec.
     ///
     /// `R(N) = clamp(R_0 * (1 - sensitivity * (N/N_0 - 1)), floor, R_0)`.
     ///
+    /// # Arguments
+    ///
+    /// * `base_recovery` - Finite reference recovery fraction in `[0, 1]`.
+    /// * `base_notional` - Finite positive reference debt amount in the query
+    ///   notional's monetary units.
+    /// * `sensitivity` - Finite non-negative decline per unit increase in the
+    ///   current-to-reference notional ratio; zero keeps recovery constant.
+    /// * `floor` - Finite minimum recovery fraction in `[0, base_recovery]`.
+    ///
     /// # Errors
     ///
     /// Returns an error if `base_recovery` is outside `[0, 1]`,
-    /// `base_notional <= 0`, or `floor` is negative.
+    /// the reference notional is non-finite or non-positive, the sensitivity
+    /// is non-finite or negative, or the floor lies outside `[0, base_recovery]`.
     pub fn linear_decline(
         base_recovery: f64,
         base_notional: f64,
         sensitivity: f64,
         floor: f64,
     ) -> Result<Self> {
-        Self::validate(base_recovery, base_notional)?;
-        if floor < 0.0 {
-            return Err(InputError::NegativeValue.into());
-        }
-        if floor > base_recovery {
-            return Err(Error::Validation(format!(
-                "linear_decline: floor ({floor}) must not exceed base_recovery \
-                 ({base_recovery}) — the outer clamp would silently disable it"
-            )));
-        }
-        Ok(Self {
+        Self::new(
             base_recovery,
             base_notional,
-            model: RecoveryModel::LinearDecline { sensitivity, floor },
-        })
+            RecoveryModel::LinearDecline { sensitivity, floor },
+        )
     }
 
     /// Compute recovery rate given current accreted notional.
     ///
     /// All results are clamped to `[0.0, base_recovery]`.
+    ///
+    /// # Arguments
+    ///
+    /// * `current_notional` - Current accreted debt amount in the reference
+    ///   notional's monetary units; a non-positive amount returns zero.
     pub fn recovery_at_notional(&self, current_notional: f64) -> f64 {
         if current_notional <= 0.0 {
             return 0.0;
+        }
+        if current_notional <= self.base_notional || self.base_recovery == 0.0 {
+            return self.base_recovery;
         }
         let raw = match self.model {
             RecoveryModel::Constant => self.base_recovery,
@@ -206,6 +268,9 @@ impl DynamicRecoverySpec {
                 inv.max(floor)
             }
             RecoveryModel::LinearDecline { sensitivity, floor } => {
+                if sensitivity == 0.0 {
+                    return self.base_recovery;
+                }
                 let ratio = current_notional / self.base_notional;
                 let r = self.base_recovery * (1.0 - sensitivity * (ratio - 1.0));
                 r.max(floor)
@@ -233,6 +298,73 @@ impl DynamicRecoverySpec {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn deserialization_rejects_recovery_that_would_overpay_or_panic() {
+        for recovery in [-0.1, 1.5] {
+            let json = serde_json::json!({
+                "base_recovery": recovery,
+                "base_notional": 100.0,
+                "model": "constant"
+            });
+            assert!(serde_json::from_value::<DynamicRecoverySpec>(json).is_err());
+        }
+    }
+
+    #[test]
+    fn constructors_and_wire_reject_invalid_model_parameters() {
+        for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(DynamicRecoverySpec::inverse_linear(0.4, invalid).is_err());
+            assert!(DynamicRecoverySpec::inverse_power(0.4, 100.0, invalid).is_err());
+            assert!(DynamicRecoverySpec::floored_inverse(0.4, 100.0, invalid).is_err());
+            assert!(DynamicRecoverySpec::linear_decline(0.4, 100.0, invalid, 0.1).is_err());
+        }
+        assert!(DynamicRecoverySpec::inverse_power(0.4, 100.0, 1.1).is_err());
+        assert!(DynamicRecoverySpec::linear_decline(0.4, 100.0, -0.1, 0.1).is_err());
+        for model in [
+            serde_json::json!({"inverse_power": {"exponent": -0.5}}),
+            serde_json::json!({"inverse_power": {"exponent": 1.1}}),
+            serde_json::json!({"floored_inverse": {"floor": 0.5}}),
+            serde_json::json!({"linear_decline": {"sensitivity": -1.0, "floor": 0.1}}),
+        ] {
+            let json = serde_json::json!({
+                "base_recovery": 0.4,
+                "base_notional": 100.0,
+                "model": model
+            });
+            assert!(serde_json::from_value::<DynamicRecoverySpec>(json).is_err());
+        }
+    }
+
+    #[test]
+    fn valid_models_round_trip_without_changing_recovery() {
+        for spec in [
+            DynamicRecoverySpec::constant(0.4).expect("constant"),
+            DynamicRecoverySpec::inverse_linear(0.4, 100.0).expect("inverse"),
+            DynamicRecoverySpec::inverse_power(0.4, 100.0, 0.5).expect("power"),
+            DynamicRecoverySpec::floored_inverse(0.4, 100.0, 0.1).expect("floor"),
+            DynamicRecoverySpec::linear_decline(0.4, 100.0, 0.5, 0.1).expect("decline"),
+        ] {
+            let restored: DynamicRecoverySpec = serde_json::from_value(
+                serde_json::to_value(spec).expect("serialize valid recovery"),
+            )
+            .expect("deserialize valid recovery");
+            assert_eq!(restored, spec);
+            assert!(
+                (restored.recovery_at_notional(150.0) - spec.recovery_at_notional(150.0)).abs()
+                    < f64::EPSILON
+            );
+        }
+    }
+
+    #[test]
+    fn zero_recovery_and_zero_sensitivity_remain_constant_at_extreme_notionals() {
+        let zero = DynamicRecoverySpec::inverse_linear(0.0, f64::MAX).expect("zero recovery");
+        assert!(zero.recovery_at_notional(f64::MIN_POSITIVE).abs() < f64::EPSILON);
+        let constant = DynamicRecoverySpec::linear_decline(0.4, f64::MIN_POSITIVE, 0.0, 0.1)
+            .expect("zero sensitivity");
+        assert!((constant.recovery_at_notional(f64::MAX) - 0.4).abs() < f64::EPSILON);
+    }
 
     /// A `floor` above `base_recovery` is inoperative — the outer
     /// `clamp(0, base_recovery)` silently overrides it — so the constructors

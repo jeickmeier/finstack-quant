@@ -32,7 +32,7 @@ pub const EXPORTS: &[&str] = &[
 /// date : datetime.date | str
 ///     Anchor date.
 /// n : int
-///     Signed number of business days to move.
+///     Signed 32-bit number of business days to move.
 /// calendar : HolidayCalendar | str
 ///     Holiday calendar object or registry id (``"usny"``; ``"nyse+gblo"``
 ///     joins calendars).
@@ -47,8 +47,11 @@ pub const EXPORTS: &[&str] = &[
 /// KeyError
 ///     If ``calendar`` names an unknown calendar.
 /// ValueError
-///     If ``date`` is invalid or no business day is found within the
-///     bounded (100-day) search window.
+///     If ``date`` is invalid, the shift exceeds the supported date range,
+///     or no business day is found within the bounded (100-day) search window.
+///
+/// OverflowError
+///     If the offset is outside the signed 32-bit integer range.
 ///
 /// Examples
 /// --------
@@ -81,7 +84,7 @@ fn py_add_business_days<'py>(
 /// date : datetime.date | str
 ///     Anchor date.
 /// n : int
-///     Signed number of weekdays to move; ``0`` returns ``date`` unchanged.
+///     Signed 32-bit number of weekdays to move; ``0`` returns ``date`` unchanged.
 ///
 /// Returns
 /// -------
@@ -91,7 +94,10 @@ fn py_add_business_days<'py>(
 /// Raises
 /// ------
 /// ValueError
-///     If ``date`` is not a valid calendar date or ISO string.
+///     If ``date`` is invalid or the shifted date exceeds the supported calendar range.
+///
+/// OverflowError
+///     If the offset is outside the signed 32-bit integer range.
 ///
 /// Examples
 /// --------
@@ -106,7 +112,7 @@ fn py_add_weekdays<'py>(
     date: &Bound<'py, PyAny>,
     n: i32,
 ) -> PyResult<Bound<'py, PyAny>> {
-    date_to_py(py, py_to_date(date)?.add_weekdays(n))
+    date_to_py(py, py_to_date(date)?.add_weekdays(n).map_err(core_to_py)?)
 }
 
 /// Add ``months`` to ``date``, clamping to the last valid day of the target month.
@@ -116,7 +122,7 @@ fn py_add_weekdays<'py>(
 /// date : datetime.date | str
 ///     Anchor date.
 /// months : int
-///     Signed number of calendar months (Jan 31 + 1 gives Feb 28/29).
+///     Signed 32-bit number of calendar months (Jan 31 + 1 gives Feb 28/29).
 ///
 /// Returns
 /// -------
@@ -126,7 +132,10 @@ fn py_add_weekdays<'py>(
 /// Raises
 /// ------
 /// ValueError
-///     If ``date`` is not a valid calendar date or ISO string.
+///     If ``date`` is invalid or the shifted date exceeds the supported calendar range.
+///
+/// OverflowError
+///     If the offset is outside the signed 32-bit integer range.
 ///
 /// Examples
 /// --------
@@ -141,7 +150,10 @@ fn py_add_months<'py>(
     date: &Bound<'py, PyAny>,
     months: i32,
 ) -> PyResult<Bound<'py, PyAny>> {
-    date_to_py(py, py_to_date(date)?.add_months(months))
+    date_to_py(
+        py,
+        py_to_date(date)?.add_months(months).map_err(core_to_py)?,
+    )
 }
 
 /// Last day of the month containing ``date``.

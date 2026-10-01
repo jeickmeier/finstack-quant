@@ -9,13 +9,15 @@ from __future__ import annotations
 
 from datetime import date, datetime
 import json
+import math
 import pickle
 
 import pandas as pd
 import pytest
 
 from finstack_quant.core.config import FinstackConfig
-from finstack_quant.core.market_data import DiscountCurve, MarketContext
+from finstack_quant.core.dates import DayCount, Tenor
+from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, MarketContext
 from finstack_quant.scenarios import (
     ApplicationReport,
     ApplicationResult,
@@ -226,6 +228,22 @@ def test_compute_horizon_return_typed_inputs_and_result_surface() -> None:
     from_json = compute_horizon_return(_deposit_json(), _market(), date(2025, 1, 15), spec.to_json())
     assert isinstance(result, HorizonResult)
     assert result.to_json() == from_json.to_json()
+    payload = json.loads(result.to_json())
+    assert payload["total_return"] == result.total_return
+    assert payload["annualized_return"] == result.annualized_return
+    assert set(payload["factor_contributions"]) == {
+        "carry",
+        "rates_curves",
+        "credit_curves",
+        "inflation_curves",
+        "correlations",
+        "fx",
+        "volatility",
+        "market_scalars",
+        "model_parameters",
+    }
+    for factor, contribution in payload["factor_contributions"].items():
+        assert contribution == result.factor_contribution(factor)
     assert result.currency == "USD"
     assert result.horizon_days == 31
     assert result.total_return == pytest.approx(result.attribution.total_pnl / result.initial_value)
@@ -238,7 +256,91 @@ def test_compute_horizon_return_typed_inputs_and_result_surface() -> None:
     assert result.explain().startswith("Horizon Total Return:")
     assert repr(result).startswith("HorizonResult(total_return=")
     assert result._repr_html_() is not None
-    assert HorizonResult.from_json(result.to_json()).total_return == result.total_return
+    assert HorizonResult.from_json(result.to_json()).to_json() == result.to_json()
+    assert pickle.loads(pickle.dumps(result)).to_json() == result.to_json()  # noqa: S301 - own result
+
+
+def test_horizon_json_uses_null_for_undefined_derived_returns() -> None:
+    result = compute_horizon_return(_deposit_json(), _market(), "2025-08-15", ScenarioSpec("matured", []))
+    payload = json.loads(result.to_json())
+    assert result.initial_value == 0
+    assert payload["total_return"] is None
+    assert payload["annualized_return"] is None
+    assert all(value is None for value in payload["factor_contributions"].values())
+    assert HorizonResult.from_json(result.to_json()).to_json() == result.to_json()
+
+
+@pytest.mark.parametrize("method", ["parallel", "waterfall", "metrics_based", "taylor"])
+@pytest.mark.parametrize("instrument_kind", ["deposit", "bond"])
+def test_horizon_methods_support_standard_fixed_income_instruments(method: str, instrument_kind: str) -> None:
+    instrument = (
+        Bond.fixed("HORIZON-BOND", 100.0, 0.05, "2024-01-01", "2034-01-01", "none", "USD-OIS", currency="USD")
+        if instrument_kind == "bond"
+        else _deposit_json()
+    )
+    result = compute_horizon_return(instrument, _market(), AS_OF, _up_25(), method=method)
+    assert result.initial_value > 0
+    assert result.terminal_value > 0
+    assert result.currency == "USD"
+    assert math.isfinite(result.total_return)
+    payload = json.loads(result.to_json())
+    assert payload["total_return"] == result.total_return
+    assert payload["annualized_return"] is None
+    assert all(value is not None and math.isfinite(value) for value in payload["factor_contributions"].values())
+
+
+@pytest.mark.parametrize("method", ["parallel", "waterfall", "metrics_based", "taylor"])
+@pytest.mark.parametrize("issue_date", ["2025-01-02", "2025-01-03"])
+def test_floating_horizons_preserve_opening_and_crossed_fixings(method: str, issue_date: str) -> None:
+    origin = "2025-01-02"
+    market = MarketContext()
+    market.insert(DiscountCurve("USD-OIS", origin, [(0.0, 1.0), (1.0, 0.95), (2.0, 0.9)], day_count="act_365f"))
+    market.insert(
+        ForwardCurve(
+            "USD-SOFR-3M",
+            0.25,
+            origin,
+            [(0.0, 0.03), (1.0, 0.03), (2.0, 0.03)],
+            day_count="act_360",
+            reset_lag=0,
+        )
+    )
+    bond = Bond.floating(
+        "HORIZON-FRN",
+        1_000_000.0,
+        "USD-SOFR-3M",
+        150.0,
+        issue_date,
+        "2026-01-03",
+        Tenor.quarterly(),
+        DayCount.ACT_360,
+        "USD-OIS",
+        currency="USD",
+    )
+    original = bond.to_json()
+    envelope = json.loads(original)
+    envelope["instrument"]["spec"]["cashflow_spec"]["floating"]["rate_spec"]["reset_lag_days"] = 0
+    instrument = Bond.from_json(json.dumps(envelope))
+    instrument_before = instrument.to_json()
+    market_before = market.to_json()
+    scenario = ScenarioSpec("crossed-reset", [OperationSpec.time_roll_forward("4D", False, "calendar_days")])
+    opening = instrument.price(market, origin).value
+    rolled = apply_scenario_to_market(scenario, market, origin, instruments=[instrument])
+    assert rolled.instruments is not None
+    closing = Bond.from_json(rolled.instruments[0]).price(rolled.market, rolled.report.time_roll["new_date"]).value
+
+    result = compute_horizon_return(instrument, market, origin, scenario, method=method)
+    payload = json.loads(result.to_json())
+    assert payload["initial_value"] == json.loads(opening.to_json())
+    assert payload["terminal_value"] == json.loads(closing.to_json())
+    assert math.isfinite(result.initial_value)
+    assert math.isfinite(result.terminal_value)
+    assert math.isfinite(result.total_return)
+    assert result.horizon_days == 4
+    assert result.warnings == []
+    assert bond.to_json() == original
+    assert instrument.to_json() == instrument_before
+    assert market.to_json() == market_before
 
 
 def test_compute_horizon_return_config_and_method_handling() -> None:
@@ -252,8 +354,31 @@ def test_compute_horizon_return_config_and_method_handling() -> None:
     assert with_json_config.total_return == pytest.approx(default.total_return)
     with pytest.raises(ValueError, match="Unknown attribution method"):
         compute_horizon_return(_deposit_json(), _market(), AS_OF, spec, method="bogus")
-    with pytest.raises(KeyError):
+    with pytest.raises(KeyError, match="not-a-calendar"):
         compute_horizon_return(_deposit_json(), _market(), AS_OF, spec, calendar_id="not-a-calendar")
+
+
+def test_horizon_annualization_preserves_losses_beyond_initial_capital() -> None:
+    result = compute_horizon_return(_deposit_json(), _market(), AS_OF, _up_25())
+    payload = json.loads(result.to_json())
+    payload["initial_value"]["amount"] = "100"
+    payload["terminal_value"]["amount"] = "-120"
+    payload["attribution"]["total_pnl"]["amount"] = "-220"
+    payload["horizon_days"] = 365
+    loss = HorizonResult.from_json(json.dumps(payload))
+    assert loss.total_return == pytest.approx(-2.2)
+    assert loss.annualized_return is None
+    # Serialized derived fields came from the original result; Rust recomputes
+    # them from the changed endpoint and P&L values when serializing again.
+    loss_json = json.loads(loss.to_json())
+    assert loss_json["total_return"] == pytest.approx(-2.2)
+    assert loss_json["annualized_return"] is None
+
+    payload["terminal_value"]["amount"] = "0"
+    payload["attribution"]["total_pnl"]["amount"] = "-100"
+    total_loss = HorizonResult.from_json(json.dumps(payload))
+    assert total_loss.total_return == -1.0
+    assert total_loss.annualized_return == -1.0
 
 
 def test_compute_horizon_return_rejects_instrument_scoped_operations() -> None:

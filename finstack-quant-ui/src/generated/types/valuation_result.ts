@@ -628,7 +628,7 @@ export interface DBbbaabd9311C14F65E9B {
  */
 export interface D_55Fd8D302833A65D16F6 {
   /**
-   * Ingest scale map snapshot by currency code.
+   * Validated ingest scale snapshot by currency code, with values in `0..=28`.
    */
   ingest_scale_by_currency: {
     [k: string]: number;
@@ -638,7 +638,7 @@ export interface D_55Fd8D302833A65D16F6 {
    */
   mode: "bankers" | "away_from_zero" | "toward_zero" | "floor" | "ceil";
   /**
-   * Output scale map snapshot by currency code.
+   * Validated output scale snapshot by currency code, with values in `0..=28`.
    */
   output_scale_by_currency: {
     [k: string]: number;

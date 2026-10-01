@@ -3,12 +3,13 @@
 //! The contract keeps all economics explicit: exercise style, premium
 //! margining, cash versus futures delivery, multiplier, contract count, and
 //! the post-exercise lifecycle are all contractual inputs. European options
-//! use Black-76 or Bachelier directly. American Black-76 options use the shared
-//! multiplicative tree with zero futures drift; American normal options use an
-//! additive recombining futures lattice.
+//! use Black-76 or Bachelier directly. The same expectation prices American
+//! cash-settled options with a fixed payment date: waiting dominates exercise
+//! under deterministic rates and martingale futures prices. Future-delivery
+//! American options use a multiplicative or additive recombining futures lattice.
 
 use crate::instruments::common_impl::parameters::{ExerciseStyle, OptionMarketParams, OptionType};
-use crate::instruments::{Position, SettlementType};
+use crate::instruments::Position;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -52,7 +53,8 @@ pub enum FutureOptionPremiumStyle {
 pub enum FutureOptionSettlement {
     /// Cash payment of intrinsic value on the supplied date.
     Cash {
-        /// Date on which the fixed exercise payoff is paid.
+        /// Date on which the fixed exercise payoff is paid, including after
+        /// early exercise; this date is not relative to the exercise date.
         #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
@@ -83,13 +85,6 @@ pub enum FutureOptionSettlement {
 }
 
 impl FutureOptionSettlement {
-    fn settlement_type(&self) -> SettlementType {
-        match self {
-            Self::Cash { .. } => SettlementType::Cash,
-            Self::Future { .. } => SettlementType::Physical,
-        }
-    }
-
     pub(crate) fn terminal_date(&self) -> Date {
         match self {
             Self::Cash { payment_date } => *payment_date,
@@ -500,11 +495,18 @@ impl FutureOptionTerms {
     ) -> finstack_quant_core::Result<f64> {
         let t = self.time_to_expiry(as_of)?;
         let df = self.pricing_discount_factor(market, as_of)?;
-        if self.exercise_style == ExerciseStyle::European {
+        if self.exercise_style == ExerciseStyle::European
+            || matches!(self.settlement, FutureOptionSettlement::Cash { .. })
+        {
+            // Every exercise time has the same contractual cash payment date.
+            // Convexity and the martingale futures price make waiting optimal.
             return self.european_unit_price(futures_price, volatility, t, df);
         }
         if t <= 0.0 || volatility <= 0.0 {
-            return Ok(self.intrinsic(futures_price));
+            // Delivery has exercise-time VM economics. With deterministic
+            // futures and the lattice's constant effective rate, either
+            // immediate exercise or waiting to expiry is optimal.
+            return Ok(self.intrinsic(futures_price) * df.max(1.0));
         }
         let rate = if self.premium_style == FutureOptionPremiumStyle::FuturesStyle {
             0.0
@@ -625,7 +627,8 @@ impl FutureOptionTerms {
     /// # Arguments
     ///
     /// * `instrument_id` - Concrete asset-class instrument identifier used in lifecycle errors.
-    /// * `tree_steps` - Optional American lattice step count; defaults to 401.
+    /// * `tree_steps` - Optional lattice step count for American future
+    ///   delivery; defaults to 401. Fixed-date cash settlement is analytic.
     /// * `implied_volatility` - Flat option volatility from
     ///   `instrument_pricing_overrides.market_quotes.implied_volatility`: decimal
     ///   lognormal for Black-76, futures-price points per square-root year for
@@ -664,6 +667,10 @@ impl FutureOptionTerms {
 
     /// Cash delta for a one-point move in the underlying futures price.
     ///
+    /// After delivery, live futures-price delta remains until last trading.
+    /// Once official settlement fixes the mark, that live-price delta is zero;
+    /// a missing required official settlement price returns a validation error.
+    ///
     /// # Arguments
     ///
     /// * `tree_steps` - Optional American lattice step count; defaults to 201
@@ -683,16 +690,27 @@ impl FutureOptionTerms {
         self.validate()?;
         if let Some(exercise) = self.exercise {
             if as_of >= exercise.date {
-                return Ok(
-                    if self.is_in_the_money(exercise.futures_price)
-                        && self.settlement.settlement_type() == SettlementType::Physical
-                        && as_of <= self.settlement.terminal_date()
-                    {
-                        self.exercise_direction() * self.contracts * self.multiplier
-                    } else {
-                        0.0
-                    },
-                );
+                return match self.settlement {
+                    FutureOptionSettlement::Future {
+                        underlying_last_trading_date,
+                        underlying_settlement_date,
+                        underlying_settlement_price,
+                    } if as_of <= underlying_settlement_date => {
+                        if as_of > underlying_last_trading_date {
+                            underlying_settlement_price.ok_or_else(|| {
+                                finstack_quant_core::Error::Validation(format!(
+                                    "FutureOptionTerms requires underlying_settlement_price after underlying last trading date {underlying_last_trading_date}"
+                                ))
+                            })?;
+                            Ok(0.0)
+                        } else if self.is_in_the_money(exercise.futures_price) {
+                            Ok(self.exercise_direction() * self.contracts * self.multiplier)
+                        } else {
+                            Ok(0.0)
+                        }
+                    }
+                    _ => Ok(0.0),
+                };
             }
         }
         if as_of >= self.expiry {
@@ -815,12 +833,7 @@ mod tests {
 
     fn market(rate: f64) -> MarketContext {
         MarketContext::new().insert(
-            DiscountCurve::builder("USD-OIS")
-                .base_date(date!(2026 - 01 - 01))
-                .day_count(DayCount::Act365F)
-                .knots([(0.0, 1.0), (2.0, (-2.0 * rate).exp())])
-                .build()
-                .expect("discount curve"),
+            DiscountCurve::flat("USD-OIS", date!(2026 - 01 - 01), rate).expect("discount curve"),
         )
     }
 
@@ -1062,5 +1075,196 @@ mod tests {
         assert!(error
             .to_string()
             .contains("requires an exercise/expiry observation"));
+    }
+
+    #[test]
+    fn fixed_date_cash_american_matches_european_and_recorded_exercise() {
+        let as_of = date!(2026 - 01 - 01);
+        let id = InstrumentId::new("CASH-SETTLEMENT");
+        for model in [FutureOptionModel::Black76, FutureOptionModel::Normal] {
+            for kind in [OptionType::Call, OptionType::Put] {
+                for rate in [-0.05, 0.0, 0.05] {
+                    let market = market(rate);
+                    for payment_date in [date!(2027 - 01 - 01), date!(2027 - 02 - 01)] {
+                        for premium_style in [
+                            FutureOptionPremiumStyle::PremiumPaid,
+                            FutureOptionPremiumStyle::FuturesStyle,
+                        ] {
+                            for position in [Position::Long, Position::Short] {
+                                let mut terms = option(model, kind);
+                                terms.futures_price = if kind == OptionType::Call {
+                                    110.0
+                                } else {
+                                    90.0
+                                };
+                                terms.position = position;
+                                terms.premium_style = premium_style;
+                                terms.option_reference_price = Some(1.25);
+                                terms.settlement = FutureOptionSettlement::Cash { payment_date };
+                                for sigma in [0.0, 1e-10, vol(model).expect("vol")] {
+                                    terms.exercise_style = ExerciseStyle::European;
+                                    let european = terms
+                                        .npv_raw(&id, None, Some(sigma), &market, as_of)
+                                        .expect("European");
+                                    terms.exercise_style = ExerciseStyle::American;
+                                    let american = terms
+                                        .npv_raw(&id, None, Some(sigma), &market, as_of)
+                                        .expect("American");
+                                    assert!((american - european).abs() < 1e-12);
+                                    if sigma == 0.0 {
+                                        let df = if premium_style
+                                            == FutureOptionPremiumStyle::PremiumPaid
+                                        {
+                                            market
+                                                .get_discount("USD-OIS")
+                                                .expect("curve")
+                                                .df_between_dates(as_of, payment_date)
+                                                .expect("df")
+                                        } else {
+                                            1.0
+                                        };
+                                        let reference = if premium_style
+                                            == FutureOptionPremiumStyle::FuturesStyle
+                                        {
+                                            1.25
+                                        } else {
+                                            0.0
+                                        };
+                                        let expected =
+                                            position.sign() * 10.0 * (10.0 * df - reference);
+                                        assert!((american - expected).abs() < 1e-10);
+                                        let mut exercised = terms.clone();
+                                        exercised.exercise = Some(
+                                            FutureOptionExercise::new(as_of, terms.futures_price)
+                                                .expect("exercise"),
+                                        );
+                                        let settled = exercised
+                                            .npv_raw(&id, None, None, &market, as_of)
+                                            .expect("recorded");
+                                        assert!((settled - american).abs() < 1e-12);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn future_delivery_american_zero_vol_retains_exercise_economics() {
+        let as_of = date!(2026 - 01 - 01);
+        let id = InstrumentId::new("FUTURE-DELIVERY");
+        for model in [FutureOptionModel::Black76, FutureOptionModel::Normal] {
+            for kind in [OptionType::Call, OptionType::Put] {
+                for rate in [-0.05, 0.0, 0.05] {
+                    let market = market(rate);
+                    for premium_style in [
+                        FutureOptionPremiumStyle::PremiumPaid,
+                        FutureOptionPremiumStyle::FuturesStyle,
+                    ] {
+                        let mut terms = option(model, kind);
+                        terms.futures_price = if kind == OptionType::Call {
+                            110.0
+                        } else {
+                            90.0
+                        };
+                        terms.premium_style = premium_style;
+                        terms.option_reference_price = Some(1.25);
+                        terms.settlement = FutureOptionSettlement::Future {
+                            underlying_last_trading_date: date!(2027 - 02 - 01),
+                            underlying_settlement_date: date!(2027 - 02 - 02),
+                            underlying_settlement_price: None,
+                        };
+                        let european = terms
+                            .npv_raw(&id, None, Some(0.0), &market, as_of)
+                            .expect("European");
+                        terms.exercise_style = ExerciseStyle::American;
+                        let american = terms
+                            .npv_raw(&id, None, Some(0.0), &market, as_of)
+                            .expect("American");
+                        let tiny = terms
+                            .npv_raw(&id, None, Some(1e-6), &market, as_of)
+                            .expect("tiny sigma");
+                        let df = terms.pricing_discount_factor(&market, as_of).expect("df");
+                        let expected = terms
+                            .position_value_from_unit_quote(10.0 * df.max(1.0))
+                            .expect("scaled value");
+                        assert!((american - expected).abs() < 1e-10);
+                        assert!(
+                            (american - tiny).abs() < 1e-5,
+                            "{model:?}: zero={american}, tiny={tiny}"
+                        );
+                        assert!(american >= european - 1e-10);
+                        if rate > 0.0 && premium_style == FutureOptionPremiumStyle::PremiumPaid {
+                            assert!(american > european);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn delivered_future_delta_stops_when_official_settlement_fixes_the_mark() {
+        let market = market(0.0);
+        let id = InstrumentId::new("DELIVERED");
+        for kind in [OptionType::Call, OptionType::Put] {
+            for position in [Position::Long, Position::Short] {
+                let mut terms = option(FutureOptionModel::Black76, kind);
+                terms.position = position;
+                terms.expiry = date!(2026 - 06 - 01);
+                terms.futures_price = 105.0;
+                let official_exercise = if kind == OptionType::Call {
+                    110.0
+                } else {
+                    90.0
+                };
+                terms.exercise = Some(
+                    FutureOptionExercise::new(terms.expiry, official_exercise).expect("exercise"),
+                );
+                terms.settlement = FutureOptionSettlement::Future {
+                    underlying_last_trading_date: date!(2026 - 06 - 05),
+                    underlying_settlement_date: date!(2026 - 06 - 10),
+                    underlying_settlement_price: Some(108.0),
+                };
+                for as_of in [
+                    date!(2026 - 06 - 04),
+                    date!(2026 - 06 - 05),
+                    date!(2026 - 06 - 06),
+                    date!(2026 - 06 - 10),
+                    date!(2026 - 06 - 11),
+                ] {
+                    let delta = terms.cash_delta(None, None, &market, as_of).expect("delta");
+                    let mut up = terms.clone();
+                    let mut down = terms.clone();
+                    up.futures_price += 0.01;
+                    down.futures_price -= 0.01;
+                    let fd = (up.npv_raw(&id, None, None, &market, as_of).expect("up")
+                        - down.npv_raw(&id, None, None, &market, as_of).expect("down"))
+                        / 0.02;
+                    assert!((delta - fd).abs() < 1e-8);
+                    if as_of > date!(2026 - 06 - 05) {
+                        assert_eq!(delta, 0.0);
+                    } else {
+                        assert_eq!(delta, terms.exercise_direction() * 10.0);
+                    }
+                }
+                if let FutureOptionSettlement::Future {
+                    underlying_settlement_price,
+                    ..
+                } = &mut terms.settlement
+                {
+                    *underlying_settlement_price = None;
+                }
+                assert!(terms
+                    .cash_delta(None, None, &market, date!(2026 - 06 - 06))
+                    .is_err());
+                assert!(terms
+                    .npv_raw(&id, None, None, &market, date!(2026 - 06 - 06))
+                    .is_err());
+            }
+        }
     }
 }

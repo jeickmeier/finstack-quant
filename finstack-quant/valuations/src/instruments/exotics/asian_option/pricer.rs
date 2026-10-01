@@ -21,128 +21,111 @@ use finstack_quant_models::monte_carlo::process::gbm::{GbmParams, GbmProcess};
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use finstack_quant_models::monte_carlo::variance_reduction::control_variate::apply_control_variate;
 
-/// Result of mapping an Asian option's fixing dates onto a uniform MC time
-/// grid.
+/// Exact simulation grid and one event index for every future fixing.
+/// Repeated indices retain contractual observations sharing a model time.
 pub(super) struct FixingGrid {
-    /// Number of uniform time steps for the MC simulation.
-    pub(super) num_steps: usize,
-    /// Distinct, sorted grid step indices — one per future fixing date.
+    pub(super) time_grid: finstack_quant_models::monte_carlo::TimeGrid,
     pub(super) fixing_steps: Vec<usize>,
 }
 
 impl FixingGrid {
-    /// Effective future-fixing times on the MC grid: step `k` corresponds to
-    /// the simulated time `k · T / num_steps`. These are the times the MC
-    /// actually samples the spot at — and the times the analytic control
-    /// variate must use to stay consistent with the simulation.
-    fn future_times(&self, t: f64) -> Vec<f64> {
-        if self.num_steps == 0 {
-            return Vec::new();
-        }
-        let dt = t / self.num_steps as f64;
+    fn future_times(&self) -> Vec<f64> {
         self.fixing_steps
             .iter()
-            .map(|&step| step as f64 * dt)
+            .map(|&step| self.time_grid.times()[step])
             .collect()
     }
 }
 
-/// Map an Asian option's future fixing dates onto a uniform MC time grid,
-/// guaranteeing **one distinct grid step per fixing date** (W-04).
-///
-/// The naive mapping `step = round(t_i / T · num_steps)` followed by `dedup()`
-/// silently merges two distinct fixings whenever the grid is too coarse to
-/// resolve the gap between them — the MC then averages over fewer observations
-/// than the contract specifies. This helper refines the grid (increases
-/// `num_steps`) until every future fixing rounds to a distinct step; if the
-/// fixings are pathologically close it falls back to assigning consecutive
-/// steps so the count is still preserved.
-///
-/// Returns the chosen `num_steps` and the sorted distinct step indices. The
-/// length of `fixing_steps` is the **effective** future-fixing count that MC
-/// actually averages over (W-06) — it excludes fixings at or before `as_of`.
-pub(super) fn map_fixings_to_distinct_steps(
+/// Insert contractual fixing times into the simulation grid, retaining their
+/// multiplicity when the instrument's day count maps dates to the same time.
+pub(super) fn map_fixings_to_steps(
     fixing_dates: &[Date],
     day_count: finstack_quant_core::dates::DayCount,
     as_of: Date,
     t: f64,
     base_num_steps: usize,
 ) -> finstack_quant_core::Result<FixingGrid> {
-    // Collect future fixing times (strictly after as_of, on or before expiry).
-    let mut fixing_times: Vec<f64> = Vec::new();
-    for &fixing_date in fixing_dates {
-        let fixing_t = day_count.year_fraction(as_of, fixing_date, DayCountContext::default())?;
-        if fixing_t > 0.0 && fixing_t <= t {
-            fixing_times.push(fixing_t);
-        }
-    }
-    fixing_times.sort_by(|a, b| a.total_cmp(b));
-
-    let n_fixings = fixing_times.len();
-    if n_fixings == 0 || t <= 0.0 {
-        return Ok(FixingGrid {
-            num_steps: base_num_steps.max(1),
-            fixing_steps: Vec::new(),
-        });
-    }
-
-    // The grid must have at least one step per fixing.
-    let mut num_steps = base_num_steps.max(n_fixings);
-
-    // Round each fixing time onto the grid; refine until all steps are
-    // distinct. Cap the refinement so a degenerate schedule cannot blow up the
-    // grid size.
-    let max_steps = base_num_steps.saturating_mul(8).max(n_fixings * 4).max(16);
-    let round_steps = |num_steps: usize| -> Vec<usize> {
-        fixing_times
-            .iter()
-            .map(|&ft| {
-                let step = (ft / t * num_steps as f64).round() as usize;
-                step.clamp(1, num_steps)
-            })
-            .collect::<Vec<_>>()
-    };
-
-    loop {
-        let steps = round_steps(num_steps);
-        let mut distinct = steps.clone();
-        distinct.sort_unstable();
-        distinct.dedup();
-        if distinct.len() == n_fixings {
-            return Ok(FixingGrid {
-                num_steps,
-                fixing_steps: distinct,
-            });
-        }
-        if num_steps >= max_steps {
-            break;
-        }
-        num_steps = (num_steps * 2).min(max_steps);
-    }
-
-    // Fallback: fixings too close to resolve even on the refined grid. Assign
-    // consecutive steps so the effective fixing count is still preserved
-    // (W-04/W-06). Anchor on the rounded positions, then push collisions to the
-    // next free slot.
-    num_steps = max_steps.max(n_fixings);
-    let rounded = round_steps(num_steps);
-    let mut assigned: Vec<usize> = Vec::with_capacity(n_fixings);
-    let mut next_free = 1usize;
-    for &want in &rounded {
-        let slot = want.max(next_free).min(num_steps);
-        assigned.push(slot);
-        next_free = slot + 1;
-    }
-    // If the tail overflowed past num_steps, repack from the top.
-    if assigned.last().copied().unwrap_or(0) > num_steps {
-        for (i, slot) in assigned.iter_mut().enumerate() {
-            *slot = num_steps - (n_fixings - 1 - i);
-        }
-    }
+    let fixing_times = fixing_dates
+        .iter()
+        .filter(|&&date| date > as_of)
+        .map(|&date| day_count.year_fraction(as_of, date, DayCountContext::default()))
+        .collect::<finstack_quant_core::Result<Vec<_>>>()?;
+    let time_grid = finstack_quant_models::monte_carlo::TimeGrid::uniform_with_required_times(
+        t,
+        base_num_steps.max(1) as f64 / t,
+        base_num_steps.max(1),
+        &fixing_times,
+    )?;
+    let fixing_steps = fixing_times
+        .iter()
+        .map(|&time| {
+            time_grid
+                .times()
+                .iter()
+                .position(|&node| (node - time).abs() < 1e-10)
+                .ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(format!(
+                        "Asian fixing time {time} is outside the simulation grid"
+                    ))
+                })
+        })
+        .collect::<finstack_quant_core::Result<Vec<_>>>()?;
     Ok(FixingGrid {
-        num_steps,
-        fixing_steps: assigned,
+        time_grid,
+        fixing_steps,
     })
+}
+
+/// Cumulative asset carry at each contractual date, in the instrument's clock.
+/// The same schedule drives the simulation and geometric log moments.
+fn asian_drift_and_fixing_multipliers(
+    asian: &AsianOption,
+    market: &MarketContext,
+    as_of: Date,
+    q: f64,
+) -> finstack_quant_core::Result<(
+    finstack_quant_models::monte_carlo::process::gbm::DriftSchedule,
+    Vec<f64>,
+)> {
+    let discount = market.get_discount(asian.discount_curve_id.as_str())?;
+    let mut dates: Vec<Date> = asian
+        .fixing_dates
+        .iter()
+        .copied()
+        .filter(|&date| date > as_of)
+        .collect();
+    dates.push(asian.expiry);
+    dates.sort_unstable();
+    dates.dedup();
+    let mut times = vec![0.0];
+    let mut cumulative = vec![0.0];
+    for date in dates {
+        let time = asian
+            .day_count
+            .year_fraction(as_of, date, DayCountContext::default())?;
+        let carry = -discount.df_between_dates(as_of, date)?.ln() - q * time;
+        let last = times.len() - 1;
+        if time.total_cmp(&times[last]) != std::cmp::Ordering::Equal {
+            times.push(time);
+            cumulative.push(carry);
+        }
+    }
+    let drift =
+        finstack_quant_models::monte_carlo::process::gbm::DriftSchedule::new(times, cumulative)?;
+    let multipliers = asian
+        .fixing_dates
+        .iter()
+        .filter(|&&date| date > as_of)
+        .map(|&date| {
+            let time = asian
+                .day_count
+                .year_fraction(as_of, date, DayCountContext::default())?;
+            let carry = -discount.df_between_dates(as_of, date)?.ln() - q * time;
+            Ok((carry - drift.cumulative(time)).exp())
+        })
+        .collect::<finstack_quant_core::Result<Vec<_>>>()?;
+    Ok((drift, multipliers))
 }
 
 /// Compensated (Neumaier) sample mean of `xs`.
@@ -205,7 +188,7 @@ fn compensated_covariance(xs: &[f64], ys: &[f64], mean_x: f64, mean_y: f64) -> f
 /// * `v = σ² · ΣᵢΣⱼ min(t_i, t_j) / N²`   (variance of `ln G`)
 /// * `E[G] = exp(μ + v/2)`
 ///
-/// The drift uses `r` and discounting uses `df` so the value is consistent
+/// The fallback drift uses `r` and discounting uses `df` so the value is consistent
 /// with how the MC simulates and discounts (the unseasoned case reduces to the
 /// standard Kemna-Vorst control). When the MC attaches a time-varying drift
 /// schedule (curve-implied forwards on a non-flat curve), the same schedule
@@ -227,6 +210,7 @@ fn seasoned_geometric_asian_control(
     future_times: &[f64],
     is_call: bool,
     drift_schedule: Option<&finstack_quant_models::monte_carlo::process::gbm::DriftSchedule>,
+    fixing_multipliers: Option<&[f64]>,
 ) -> f64 {
     let k = future_times.len();
     let n_total = hist_count + k;
@@ -243,12 +227,13 @@ fn seasoned_geometric_asian_control(
     // engine applies step by step.
     let mut mean_acc = finstack_quant_core::math::NeumaierAccumulator::new();
     mean_acc.add(hist_prod_log);
-    for &t_i in future_times {
+    for (index, &t_i) in future_times.iter().enumerate() {
         let drift_to_t = match drift_schedule {
             Some(schedule) => schedule.cumulative(t_i) - 0.5 * sigma * sigma * t_i,
             None => constant_drift * t_i,
         };
-        mean_acc.add(ln_spot + drift_to_t);
+        let log_multiplier = fixing_multipliers.map_or(0.0, |scales| scales[index].ln());
+        mean_acc.add(ln_spot + drift_to_t + log_multiplier);
     }
     let mu = mean_acc.total() / n;
 
@@ -377,41 +362,18 @@ impl AsianOptionMcPricer {
             &inst.instrument_pricing_overrides,
         )?;
 
-        // Map fixing dates to time steps, guaranteeing one distinct grid step
-        // per fixing (W-04). The grid is refined as needed so no two distinct
-        // fixings are silently merged.
-        let steps_per_year = base_cfg.steps_per_year;
-        let base_num_steps = ((t * steps_per_year).round() as usize).max(base_cfg.min_steps);
-        let fixing_grid = map_fixings_to_distinct_steps(
-            &inst.fixing_dates,
-            inst.day_count,
-            as_of,
-            t,
-            base_num_steps,
-        )?;
-        let num_steps = fixing_grid.num_steps;
-
-        // Time-varying drift: project each MC step with the curve-implied
-        // forward drift so per-fixing spots (which drive the Asian average)
-        // are unbiased on a non-flat rate curve. On a flat curve this is
-        // bit-equivalent to the constant `(r - q)` drift.
-        let drift_schedule = std::sync::Arc::new(
-            crate::instruments::common_impl::helpers::build_gbm_drift_schedule(
-                disc_curve.as_ref(),
-                as_of,
-                r,
-                q,
-                t,
-                num_steps,
-            )?,
-        );
+        // Exact event times prevent time-grid resolution from changing the
+        // average. Equal model times share a simulated state but retain weight.
+        let base_num_steps =
+            ((t * base_cfg.steps_per_year).round() as usize).max(base_cfg.min_steps);
+        let fixing_grid =
+            map_fixings_to_steps(&inst.fixing_dates, inst.day_count, as_of, t, base_num_steps)?;
+        let (drift, fixing_multipliers) =
+            asian_drift_and_fixing_multipliers(inst, curves, as_of, q)?;
+        let drift_schedule = std::sync::Arc::new(drift);
         let process = process.with_drift_schedule(std::sync::Arc::clone(&drift_schedule));
-
-        // Effective future-fixing times on the MC grid. The seasoned geometric
-        // control variate (W-07) is built on exactly these times, so its
-        // implied fixing count is the *effective* future-fixing count — not
-        // the contract total — which is the W-06 fix.
-        let future_fixing_times = fixing_grid.future_times(t);
+        let future_fixing_times = fixing_grid.future_times();
+        let time_grid = fixing_grid.time_grid;
         let fixing_steps = fixing_grid.fixing_steps;
 
         let averaging = inst.averaging_method;
@@ -433,18 +395,19 @@ impl AsianOptionMcPricer {
         config.seed = seed;
 
         // If arithmetic averaging, apply geometric-Asian control variate for variance reduction
-        let result_money = match (inst.averaging_method, inst.option_type) {
-            (
-                crate::instruments::exotics::asian_option::types::AveragingMethod::Arithmetic,
-                crate::instruments::OptionType::Call,
-            ) => {
-                // Use path capture to get per-path discounted payoffs for covariance
-                let mut cfg_cap = config;
-                cfg_cap.path_capture = PathCaptureConfig::all().with_payoffs();
-                let pricer_cap = PathDependentPricer::new(cfg_cap);
+        let result_money =
+            match (inst.averaging_method, inst.option_type) {
+                (
+                    crate::instruments::exotics::asian_option::types::AveragingMethod::Arithmetic,
+                    crate::instruments::OptionType::Call,
+                ) => {
+                    // Use path capture to get per-path discounted payoffs for covariance
+                    let mut cfg_cap = config;
+                    cfg_cap.path_capture = PathCaptureConfig::all().with_payoffs();
+                    let pricer_cap = PathDependentPricer::new(cfg_cap);
 
-                // Arithmetic payoff
-                let arith_payoff = AsianCall::with_history(
+                    // Arithmetic payoff
+                    let arith_payoff = AsianCall::with_history(
                     inst.strike,
                     inst.quantity,
                     finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Arithmetic,
@@ -452,19 +415,18 @@ impl AsianOptionMcPricer {
                     hist_sum,
                     hist_prod_log,
                     hist_count,
-                )?;
-                let arith_full = pricer_cap.price_with_paths(
-                    &process,
-                    spot,
-                    t,
-                    num_steps,
-                    &arith_payoff,
-                    inst.currency,
-                    discount_factor,
-                )?;
+                )?.with_fixing_multipliers(&fixing_multipliers)?;
+                    let arith_full = pricer_cap.price_with_paths_and_grid(
+                        &process,
+                        spot,
+                        time_grid.clone(),
+                        &arith_payoff,
+                        inst.currency,
+                        discount_factor,
+                    )?;
 
-                // Geometric payoff (same RNG via same seed)
-                let geom_payoff = AsianCall::with_history(
+                    // Geometric payoff (same RNG via same seed)
+                    let geom_payoff = AsianCall::with_history(
                     inst.strike,
                     inst.quantity,
                     finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Geometric,
@@ -472,105 +434,105 @@ impl AsianOptionMcPricer {
                     hist_sum,
                     hist_prod_log,
                     hist_count,
-                )?;
-                let geom_full = pricer_cap.price_with_paths(
-                    &process,
-                    spot,
-                    t,
-                    num_steps,
-                    &geom_payoff,
-                    inst.currency,
-                    discount_factor,
-                )?;
-
-                // Extract per-path discounted payoffs
-                // paths should be Some when path_capture is enabled in price_with_paths
-                let xs: Vec<f64> = arith_full
-                    .paths
-                    .as_ref()
-                    .ok_or_else(|| {
-                        finstack_quant_core::Error::Validation(
-                            "Path capture enabled but paths not captured".into(),
-                        )
-                    })?
-                    .paths
-                    .iter()
-                    .map(|p| p.final_value)
-                    .collect();
-                let ys: Vec<f64> = geom_full
-                    .paths
-                    .as_ref()
-                    .ok_or_else(|| {
-                        finstack_quant_core::Error::Validation(
-                            "Path capture enabled but paths not captured".into(),
-                        )
-                    })?
-                    .paths
-                    .iter()
-                    .map(|p| p.final_value)
-                    .collect();
-
-                let n = xs.len();
-                // Compensated (Neumaier) sample moments — the control-variate
-                // estimator sums up to `num_paths` terms, so naive summation
-                // would lose precision at large path counts (W-05).
-                let mean_x = compensated_mean(&xs);
-                let mean_y = compensated_mean(&ys);
-                let var_x = compensated_variance(&xs, mean_x);
-                let var_y = compensated_variance(&ys, mean_y);
-                let cov_xy = compensated_covariance(&xs, &ys, mean_x, mean_y);
-
-                // Analytical value of geometric Asian (control).
-                //
-                // The standard geometric-Asian closed form has no seasoning
-                // adjustment, so it is only a valid control when the option is
-                // unseasoned. For a seasoned arithmetic Asian the seasoning-
-                // aware analytic control variate is used instead (see below).
-
-                // Seasoning-aware analytic control variate (W-07). The
-                // geometric Asian is priced on the *exact* future fixing times
-                // the MC samples, with the past fixings' fixed log-product
-                // folded in, so it is the true mean of the simulated geometric
-                // payoff for both seasoned and unseasoned options. The seasoned
-                // path therefore keeps the variance reduction instead of
-                // discarding the geometric pass.
-                // The MC payoffs (xs/ys) are notional-scaled while the
-                // closed form is per unit notional, so the control mean must
-                // be scaled to the same units before the CV adjustment.
-                let control_analytical = inst.quantity
-                    * seasoned_geometric_asian_control(
+                )?.with_fixing_multipliers(&fixing_multipliers)?;
+                    let geom_full = pricer_cap.price_with_paths_and_grid(
+                        &process,
                         spot,
-                        inst.strike,
-                        r,
-                        q,
-                        sigma,
+                        time_grid,
+                        &geom_payoff,
+                        inst.currency,
                         discount_factor,
-                        hist_prod_log,
-                        hist_count,
-                        &future_fixing_times,
-                        true,
-                        Some(drift_schedule.as_ref()),
-                    );
-                let adj = apply_control_variate(
-                    mean_x,
-                    var_x,
-                    mean_y,
-                    var_y,
-                    cov_xy,
-                    control_analytical,
-                    n,
-                );
-                MoneyEstimate::from_estimate(adj, inst.currency)?.mean
-            }
-            (
-                crate::instruments::exotics::asian_option::types::AveragingMethod::Arithmetic,
-                crate::instruments::OptionType::Put,
-            ) => {
-                let mut cfg_cap = config;
-                cfg_cap.path_capture = PathCaptureConfig::all().with_payoffs();
-                let pricer_cap = PathDependentPricer::new(cfg_cap);
+                    )?;
 
-                let arith_payoff = AsianPut::with_history(
+                    // Extract per-path discounted payoffs
+                    // paths should be Some when path_capture is enabled in price_with_paths
+                    let xs: Vec<f64> = arith_full
+                        .paths
+                        .as_ref()
+                        .ok_or_else(|| {
+                            finstack_quant_core::Error::Validation(
+                                "Path capture enabled but paths not captured".into(),
+                            )
+                        })?
+                        .paths
+                        .iter()
+                        .map(|p| p.final_value)
+                        .collect();
+                    let ys: Vec<f64> = geom_full
+                        .paths
+                        .as_ref()
+                        .ok_or_else(|| {
+                            finstack_quant_core::Error::Validation(
+                                "Path capture enabled but paths not captured".into(),
+                            )
+                        })?
+                        .paths
+                        .iter()
+                        .map(|p| p.final_value)
+                        .collect();
+
+                    let n = xs.len();
+                    // Compensated (Neumaier) sample moments — the control-variate
+                    // estimator sums up to `num_paths` terms, so naive summation
+                    // would lose precision at large path counts (W-05).
+                    let mean_x = compensated_mean(&xs);
+                    let mean_y = compensated_mean(&ys);
+                    let var_x = compensated_variance(&xs, mean_x);
+                    let var_y = compensated_variance(&ys, mean_y);
+                    let cov_xy = compensated_covariance(&xs, &ys, mean_x, mean_y);
+
+                    // Analytical value of geometric Asian (control).
+                    //
+                    // The standard geometric-Asian closed form has no seasoning
+                    // adjustment, so it is only a valid control when the option is
+                    // unseasoned. For a seasoned arithmetic Asian the seasoning-
+                    // aware analytic control variate is used instead (see below).
+
+                    // Seasoning-aware analytic control variate (W-07). The
+                    // geometric Asian is priced on the *exact* future fixing times
+                    // the MC samples, with the past fixings' fixed log-product
+                    // folded in, so it is the true mean of the simulated geometric
+                    // payoff for both seasoned and unseasoned options. The seasoned
+                    // path therefore keeps the variance reduction instead of
+                    // discarding the geometric pass.
+                    // The MC payoffs (xs/ys) are notional-scaled while the
+                    // closed form is per unit notional, so the control mean must
+                    // be scaled to the same units before the CV adjustment.
+                    let control_analytical = inst.quantity
+                        * seasoned_geometric_asian_control(
+                            spot,
+                            inst.strike,
+                            r,
+                            q,
+                            sigma,
+                            discount_factor,
+                            hist_prod_log,
+                            hist_count,
+                            &future_fixing_times,
+                            true,
+                            Some(drift_schedule.as_ref()),
+                            Some(&fixing_multipliers),
+                        );
+                    let adj = apply_control_variate(
+                        mean_x,
+                        var_x,
+                        mean_y,
+                        var_y,
+                        cov_xy,
+                        control_analytical,
+                        n,
+                    );
+                    MoneyEstimate::from_estimate(adj, inst.currency)?.mean
+                }
+                (
+                    crate::instruments::exotics::asian_option::types::AveragingMethod::Arithmetic,
+                    crate::instruments::OptionType::Put,
+                ) => {
+                    let mut cfg_cap = config;
+                    cfg_cap.path_capture = PathCaptureConfig::all().with_payoffs();
+                    let pricer_cap = PathDependentPricer::new(cfg_cap);
+
+                    let arith_payoff = AsianPut::with_history(
                     inst.strike,
                     inst.quantity,
                     finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Arithmetic,
@@ -578,18 +540,17 @@ impl AsianOptionMcPricer {
                     hist_sum,
                     hist_prod_log,
                     hist_count,
-                )?;
-                let arith_full = pricer_cap.price_with_paths(
-                    &process,
-                    spot,
-                    t,
-                    num_steps,
-                    &arith_payoff,
-                    inst.currency,
-                    discount_factor,
-                )?;
+                )?.with_fixing_multipliers(&fixing_multipliers)?;
+                    let arith_full = pricer_cap.price_with_paths_and_grid(
+                        &process,
+                        spot,
+                        time_grid.clone(),
+                        &arith_payoff,
+                        inst.currency,
+                        discount_factor,
+                    )?;
 
-                let geom_payoff = AsianPut::with_history(
+                    let geom_payoff = AsianPut::with_history(
                     inst.strike,
                     inst.quantity,
                     finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Geometric,
@@ -597,130 +558,130 @@ impl AsianOptionMcPricer {
                     hist_sum,
                     hist_prod_log,
                     hist_count,
-                )?;
-                let geom_full = pricer_cap.price_with_paths(
-                    &process,
-                    spot,
-                    t,
-                    num_steps,
-                    &geom_payoff,
-                    inst.currency,
-                    discount_factor,
-                )?;
-
-                // paths should be Some when path_capture is enabled in price_with_paths
-                let xs: Vec<f64> = arith_full
-                    .paths
-                    .as_ref()
-                    .ok_or_else(|| {
-                        finstack_quant_core::Error::Validation(
-                            "Path capture enabled but paths not captured".into(),
-                        )
-                    })?
-                    .paths
-                    .iter()
-                    .map(|p| p.final_value)
-                    .collect();
-                let ys: Vec<f64> = geom_full
-                    .paths
-                    .as_ref()
-                    .ok_or_else(|| {
-                        finstack_quant_core::Error::Validation(
-                            "Path capture enabled but paths not captured".into(),
-                        )
-                    })?
-                    .paths
-                    .iter()
-                    .map(|p| p.final_value)
-                    .collect();
-                let n = xs.len();
-                // Compensated (Neumaier) sample moments (W-05).
-                let mean_x = compensated_mean(&xs);
-                let mean_y = compensated_mean(&ys);
-                let var_x = compensated_variance(&xs, mean_x);
-                let var_y = compensated_variance(&ys, mean_y);
-                let cov_xy = compensated_covariance(&xs, &ys, mean_x, mean_y);
-
-                // Seasoning-aware analytic control variate (W-07) — see the
-                // call branch above for the rationale.
-                // Scale the per-unit closed form to the notional-scaled MC
-                // payoff units (see the call branch above).
-                let control_analytical = inst.quantity
-                    * seasoned_geometric_asian_control(
+                )?.with_fixing_multipliers(&fixing_multipliers)?;
+                    let geom_full = pricer_cap.price_with_paths_and_grid(
+                        &process,
                         spot,
-                        inst.strike,
-                        r,
-                        q,
-                        sigma,
+                        time_grid,
+                        &geom_payoff,
+                        inst.currency,
                         discount_factor,
-                        hist_prod_log,
-                        hist_count,
-                        &future_fixing_times,
-                        false,
-                        Some(drift_schedule.as_ref()),
+                    )?;
+
+                    // paths should be Some when path_capture is enabled in price_with_paths
+                    let xs: Vec<f64> = arith_full
+                        .paths
+                        .as_ref()
+                        .ok_or_else(|| {
+                            finstack_quant_core::Error::Validation(
+                                "Path capture enabled but paths not captured".into(),
+                            )
+                        })?
+                        .paths
+                        .iter()
+                        .map(|p| p.final_value)
+                        .collect();
+                    let ys: Vec<f64> = geom_full
+                        .paths
+                        .as_ref()
+                        .ok_or_else(|| {
+                            finstack_quant_core::Error::Validation(
+                                "Path capture enabled but paths not captured".into(),
+                            )
+                        })?
+                        .paths
+                        .iter()
+                        .map(|p| p.final_value)
+                        .collect();
+                    let n = xs.len();
+                    // Compensated (Neumaier) sample moments (W-05).
+                    let mean_x = compensated_mean(&xs);
+                    let mean_y = compensated_mean(&ys);
+                    let var_x = compensated_variance(&xs, mean_x);
+                    let var_y = compensated_variance(&ys, mean_y);
+                    let cov_xy = compensated_covariance(&xs, &ys, mean_x, mean_y);
+
+                    // Seasoning-aware analytic control variate (W-07) — see the
+                    // call branch above for the rationale.
+                    // Scale the per-unit closed form to the notional-scaled MC
+                    // payoff units (see the call branch above).
+                    let control_analytical = inst.quantity
+                        * seasoned_geometric_asian_control(
+                            spot,
+                            inst.strike,
+                            r,
+                            q,
+                            sigma,
+                            discount_factor,
+                            hist_prod_log,
+                            hist_count,
+                            &future_fixing_times,
+                            false,
+                            Some(drift_schedule.as_ref()),
+                            Some(&fixing_multipliers),
+                        );
+                    let adj = apply_control_variate(
+                        mean_x,
+                        var_x,
+                        mean_y,
+                        var_y,
+                        cov_xy,
+                        control_analytical,
+                        n,
                     );
-                let adj = apply_control_variate(
-                    mean_x,
-                    var_x,
-                    mean_y,
-                    var_y,
-                    cov_xy,
-                    control_analytical,
-                    n,
-                );
-                MoneyEstimate::from_estimate(adj, inst.currency)?.mean
-            }
-            // Geometric averaging (no CV needed) or fallback path
-            _ => {
-                let pricer = PathDependentPricer::new(config);
-                match inst.option_type {
-                    crate::instruments::OptionType::Call => {
-                        let payoff = AsianCall::with_history(
-                            inst.strike,
-                            inst.quantity,
-                            averaging,
-                            fixing_steps,
-                            hist_sum,
-                            hist_prod_log,
-                            hist_count,
-                        )?;
-                        pricer
-                            .price(
-                                &process,
-                                spot,
-                                t,
-                                num_steps,
-                                &payoff,
-                                inst.currency,
-                                discount_factor,
+                    MoneyEstimate::from_estimate(adj, inst.currency)?.mean
+                }
+                // Geometric averaging (no CV needed) or fallback path
+                _ => {
+                    let pricer = PathDependentPricer::new(config);
+                    match inst.option_type {
+                        crate::instruments::OptionType::Call => {
+                            let payoff = AsianCall::with_history(
+                                inst.strike,
+                                inst.quantity,
+                                averaging,
+                                fixing_steps,
+                                hist_sum,
+                                hist_prod_log,
+                                hist_count,
                             )?
-                            .mean
-                    }
-                    crate::instruments::OptionType::Put => {
-                        let payoff = AsianPut::with_history(
-                            inst.strike,
-                            inst.quantity,
-                            averaging,
-                            fixing_steps,
-                            hist_sum,
-                            hist_prod_log,
-                            hist_count,
-                        )?;
-                        pricer
-                            .price(
-                                &process,
-                                spot,
-                                t,
-                                num_steps,
-                                &payoff,
-                                inst.currency,
-                                discount_factor,
+                            .with_fixing_multipliers(&fixing_multipliers)?;
+                            pricer
+                                .price_with_grid(
+                                    &process,
+                                    spot,
+                                    time_grid,
+                                    &payoff,
+                                    inst.currency,
+                                    discount_factor,
+                                )?
+                                .mean
+                        }
+                        crate::instruments::OptionType::Put => {
+                            let payoff = AsianPut::with_history(
+                                inst.strike,
+                                inst.quantity,
+                                averaging,
+                                fixing_steps,
+                                hist_sum,
+                                hist_prod_log,
+                                hist_count,
                             )?
-                            .mean
+                            .with_fixing_multipliers(&fixing_multipliers)?;
+                            pricer
+                                .price_with_grid(
+                                    &process,
+                                    spot,
+                                    time_grid,
+                                    &payoff,
+                                    inst.currency,
+                                    discount_factor,
+                                )?
+                                .mean
+                        }
                     }
                 }
-            }
-        };
+            };
 
         Ok(result_money)
     }
@@ -764,9 +725,7 @@ pub(crate) fn compute_pv(
 }
 
 use crate::instruments::common_impl::helpers::collect_black_scholes_inputs;
-use finstack_quant_models::closed_form::asian::{
-    arithmetic_asian_tw_price_times, geometric_asian_price_times,
-};
+use finstack_quant_models::closed_form::asian::arithmetic_asian_tw_price_times;
 
 /// Geometric Asian option analytical pricer.
 pub struct AsianOptionAnalyticalGeometricPricer;
@@ -875,19 +834,24 @@ impl Pricer for AsianOptionAnalyticalGeometricPricer {
         })?;
         let df = (-r * t).exp();
         let is_call = matches!(asian.option_type, crate::instruments::OptionType::Call);
-        let price = geometric_asian_price_times(
+        let (drift, multipliers) = asian_drift_and_fixing_multipliers(asian, market, as_of, q)
+            .map_err(|error| {
+                PricingError::from_core(error, PricingErrorContext::from_instrument(asian))
+            })?;
+        let price = seasoned_geometric_asian_control(
             spot,
             asian.strike,
-            t,
-            df,
+            r,
             q,
             sigma,
+            df,
+            0.0,
+            0,
             &fixing_times,
             is_call,
-        )
-        .map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+            Some(&drift),
+            Some(&multipliers),
+        );
 
         let pv = Money::new(price * asian.quantity, asian.currency).map_err(|error| {
             crate::pricer::PricingError::from_core(
@@ -1849,11 +1813,8 @@ mod tests {
         assert!(err.to_string().contains("SPX-VOL"));
     }
 
-    /// W-04: distinct fixing dates must map to distinct grid steps. With a
-    /// coarse base grid the naive `round()` mapping collapses fixings that are
-    /// close together onto the same step; the helper must refine the grid (or
-    /// fall back to consecutive steps) so the effective fixing count is never
-    /// silently reduced.
+    /// Distinct fixing times are inserted exactly even on a coarse base grid;
+    /// no contractual observation is lost or shifted to an arbitrary free slot.
     #[test]
     fn w04_close_fixings_map_to_distinct_steps() {
         let as_of = date(2025, 1, 1);
@@ -1865,7 +1826,7 @@ mod tests {
 
         // A deliberately coarse base grid (4 steps) cannot resolve 12 monthly
         // fixings — the naive round()+dedup() would merge several of them.
-        let grid = map_fixings_to_distinct_steps(&fixing_dates, DayCount::Act365F, as_of, t, 4)
+        let grid = map_fixings_to_steps(&fixing_dates, DayCount::Act365F, as_of, t, 4)
             .expect("fixing grid");
 
         assert_eq!(
@@ -1886,9 +1847,9 @@ mod tests {
         assert!(
             grid.fixing_steps
                 .iter()
-                .all(|&s| s >= 1 && s <= grid.num_steps),
+                .all(|&s| s >= 1 && s <= grid.time_grid.num_steps()),
             "every fixing step must lie in [1, num_steps={}]",
-            grid.num_steps
+            grid.time_grid.num_steps()
         );
     }
 
@@ -1902,10 +1863,10 @@ mod tests {
         let t = DayCount::Act365F
             .year_fraction(as_of, date(2026, 1, 1), DayCountContext::default())
             .expect("year fraction");
-        let grid = map_fixings_to_distinct_steps(&fixing_dates, DayCount::Act365F, as_of, t, 252)
+        let grid = map_fixings_to_steps(&fixing_dates, DayCount::Act365F, as_of, t, 252)
             .expect("fixing grid");
         assert_eq!(grid.fixing_steps.len(), 3);
-        assert!(grid.num_steps >= 252);
+        assert!(grid.time_grid.num_steps() >= 252);
     }
 
     /// W-05: the compensated covariance/variance helpers must stay accurate
@@ -1967,6 +1928,7 @@ mod tests {
             &future_times,
             true,
             None,
+            None,
         );
         let kv_call = geometric_asian_call(spot, strike, t, r, q, sigma, n);
         assert!(
@@ -1986,6 +1948,7 @@ mod tests {
             0,
             &future_times,
             false,
+            None,
             None,
         );
         let kv_put = geometric_asian_put(spot, strike, t, r, q, sigma, n);
@@ -2026,6 +1989,7 @@ mod tests {
             &future_times,
             true,
             None,
+            None,
         );
         let call_high = seasoned_geometric_asian_control(
             spot,
@@ -2039,6 +2003,7 @@ mod tests {
             &future_times,
             true,
             None,
+            None,
         );
 
         assert!(call_low.is_finite() && call_low >= 0.0);
@@ -2049,5 +2014,336 @@ mod tests {
              ({call_high}) must be worth more than one with lower past fixings \
              ({call_low})"
         );
+    }
+
+    #[test]
+    fn coincident_model_times_preserve_all_asian_fixings() {
+        let as_of = date(2025, 1, 1);
+        let expiry = date(2025, 1, 31);
+        let curves = market(as_of, 100.0, 0.0, 0.0, 0.0);
+        for averaging in [AveragingMethod::Arithmetic, AveragingMethod::Geometric] {
+            for option_type in [OptionType::Call, OptionType::Put] {
+                let strike = if option_type == OptionType::Call {
+                    95.0
+                } else {
+                    105.0
+                };
+                let mut option = asian_option(
+                    averaging,
+                    option_type,
+                    expiry,
+                    strike,
+                    vec![as_of, date(2025, 1, 30), expiry],
+                );
+                option.day_count = DayCount::ThirtyE360;
+                option.past_fixings = vec![(as_of, 90.0)];
+                option.instrument_pricing_overrides.model_config.mc_paths = Some(16);
+                let average = match averaging {
+                    AveragingMethod::Arithmetic => (90.0 + 100.0 + 100.0) / 3.0,
+                    AveragingMethod::Geometric => {
+                        ((90.0_f64.ln() + 2.0 * 100.0_f64.ln()) / 3.0).exp()
+                    }
+                };
+                let expected = if option_type == OptionType::Call {
+                    average - strike
+                } else {
+                    strike - average
+                };
+                let actual = option.npv_mc(&curves, as_of).expect("MC price").amount();
+                assert!(
+                    (actual - expected).abs() < 1e-10,
+                    "{averaging:?} {option_type:?}: {actual} vs {expected}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn asian_grid_contains_exact_close_fixings_and_equal_time_weights() {
+        let as_of = date(2025, 1, 1);
+        let dates = [date(2025, 12, 30), date(2025, 12, 31)];
+        let grid = map_fixings_to_steps(&dates, DayCount::Act365F, as_of, 1.0, 2).expect("grid");
+        for (&fixing, &time) in dates.iter().zip(grid.future_times().iter()) {
+            let expected = DayCount::Act365F
+                .year_fraction(as_of, fixing, DayCountContext::default())
+                .expect("time");
+            assert!((time - expected).abs() < 1e-14);
+        }
+        let expiry = date(2025, 1, 31);
+        let t = DayCount::ThirtyE360
+            .year_fraction(as_of, expiry, DayCountContext::default())
+            .expect("time");
+        let grid = map_fixings_to_steps(
+            &[date(2025, 1, 30), expiry],
+            DayCount::ThirtyE360,
+            as_of,
+            t,
+            2,
+        )
+        .expect("grid");
+        assert_eq!(grid.fixing_steps.len(), 2);
+        assert_eq!(grid.fixing_steps[0], grid.fixing_steps[1]);
+    }
+
+    #[test]
+    fn geometric_asian_uses_dated_forward_and_separate_payment_discount() {
+        let as_of = date(2025, 1, 1);
+        let fixing = date(2025, 7, 2);
+        let expiry = date(2026, 1, 1);
+        let mut option = asian_option(
+            AveragingMethod::Geometric,
+            OptionType::Call,
+            expiry,
+            95.0,
+            vec![fixing],
+        );
+        option.instrument_pricing_overrides.model_config.mc_paths = Some(16);
+        for terminal_df in [0.9, 0.8] {
+            let curve = DiscountCurve::builder("USD-OIS")
+                .base_date(as_of)
+                .day_count(DayCount::Act365F)
+                .knots([(0.0, 1.0), (0.5, 1.0), (1.0, terminal_df), (2.0, 0.7)])
+                .build()
+                .expect("curve");
+            let curves = market(as_of, 100.0, 0.0, 0.0, 0.0).insert(curve);
+            let expected = 5.0 * terminal_df;
+            let actual = AsianOptionAnalyticalGeometricPricer::new()
+                .price_dyn(&option, &curves, as_of)
+                .expect("analytical")
+                .value
+                .amount();
+            let mc = option.npv_mc(&curves, as_of).expect("MC").amount();
+            assert!((actual - expected).abs() < 1e-10, "{actual} vs {expected}");
+            assert!((mc - expected).abs() < 1e-10, "{mc} vs {expected}");
+        }
+    }
+
+    #[test]
+    fn coincident_asian_times_retain_each_dated_forward() {
+        let as_of = date(2025, 1, 1);
+        let expiry = date(2025, 1, 31);
+        let earlier = date(2025, 1, 30);
+        let curves = market(as_of, 100.0, 0.0, 0.05, 0.0);
+        let discount = curves.get_discount("USD-OIS").expect("curve");
+        let first = 100.0 / discount.df_between_dates(as_of, earlier).expect("first DF");
+        let second = 100.0 / discount.df_between_dates(as_of, expiry).expect("second DF");
+        let payment_df = discount
+            .df_between_dates(as_of, expiry)
+            .expect("payment DF");
+        assert_ne!(first, second);
+        for averaging in [AveragingMethod::Arithmetic, AveragingMethod::Geometric] {
+            let mut option = asian_option(
+                averaging,
+                OptionType::Call,
+                expiry,
+                95.0,
+                vec![as_of, earlier, expiry],
+            );
+            option.day_count = DayCount::ThirtyE360;
+            option.past_fixings = vec![(as_of, 90.0)];
+            option.instrument_pricing_overrides.model_config.mc_paths = Some(16);
+            let average = match averaging {
+                AveragingMethod::Arithmetic => (90.0 + first + second) / 3.0,
+                AveragingMethod::Geometric => {
+                    ((90.0_f64.ln() + first.ln() + second.ln()) / 3.0).exp()
+                }
+            };
+            let expected = (average - 95.0) * payment_df;
+            let actual = option.npv_mc(&curves, as_of).expect("MC").amount();
+            assert!(
+                (actual - expected).abs() < 1e-10,
+                "{averaging:?}: {actual} vs {expected}"
+            );
+        }
+    }
+
+    #[test]
+    fn heston_asian_preserves_coincident_dates_and_dated_forwards() {
+        let as_of = date(2025, 1, 1);
+        let expiry = date(2025, 1, 31);
+        let earlier = date(2025, 1, 30);
+        let curves = market(as_of, 100.0, 0.0, 0.05, 0.0)
+            .insert_price("HESTON_KAPPA", MarketScalar::Unitless(2.0))
+            .insert_price("HESTON_THETA", MarketScalar::Unitless(1e-20))
+            .insert_price("HESTON_SIGMA_V", MarketScalar::Unitless(1e-12))
+            .insert_price("HESTON_RHO", MarketScalar::Unitless(0.0))
+            .insert_price("HESTON_V0", MarketScalar::Unitless(1e-20));
+        let discount = curves.get_discount("USD-OIS").expect("curve");
+        let first = 100.0 / discount.df_between_dates(as_of, earlier).expect("first DF");
+        let second = 100.0 / discount.df_between_dates(as_of, expiry).expect("second DF");
+        let payment_df = discount
+            .df_between_dates(as_of, expiry)
+            .expect("payment DF");
+        let pricer = crate::instruments::exotics::asian_option::heston_mc_pricer::AsianOptionHestonMcPricer::new();
+        for averaging in [AveragingMethod::Arithmetic, AveragingMethod::Geometric] {
+            let mut option = asian_option(
+                averaging,
+                OptionType::Call,
+                expiry,
+                95.0,
+                vec![as_of, earlier, expiry],
+            );
+            option.day_count = DayCount::ThirtyE360;
+            option.past_fixings = vec![(as_of, 90.0)];
+            option.instrument_pricing_overrides.model_config.mc_paths = Some(16);
+            let average = match averaging {
+                AveragingMethod::Arithmetic => (90.0 + first + second) / 3.0,
+                AveragingMethod::Geometric => {
+                    ((90.0_f64.ln() + first.ln() + second.ln()) / 3.0).exp()
+                }
+            };
+            let expected = (average - 95.0) * payment_df;
+            let actual = pricer
+                .price_dyn(&option, &curves, as_of)
+                .expect("Heston MC")
+                .value
+                .amount();
+            assert!(
+                (actual - expected).abs() < 1e-6,
+                "{averaging:?}: {actual} vs {expected}"
+            );
+        }
+    }
+
+    #[test]
+    fn positive_vol_coincident_fixing_control_matches_log_moment_oracle_and_mc() {
+        let as_of = date(2025, 1, 1);
+        let expiry = date(2025, 1, 31);
+        let first = date(2025, 1, 30);
+        let sigma = 0.35;
+        let mut option = asian_option(
+            AveragingMethod::Geometric,
+            OptionType::Call,
+            expiry,
+            95.0,
+            vec![as_of, first, expiry],
+        );
+        option.day_count = DayCount::ThirtyE360;
+        option.past_fixings = vec![(as_of, 90.0)];
+        let curves = market(as_of, 100.0, sigma, 0.04, 0.0);
+        let discount = curves.get_discount("USD-OIS").expect("curve");
+        let df = discount
+            .df_between_dates(as_of, expiry)
+            .expect("payment DF");
+        let f1 = 100.0 / discount.df_between_dates(as_of, first).expect("first DF");
+        let f2 = 100.0 / df;
+        let t = 29.0 / 360.0;
+        // Both future fixings share the same Brownian increment: their sum
+        // has variance 4*sigma^2*T, rather than 2*sigma^2*T.
+        let variance = 4.0 * sigma * sigma * t / 9.0;
+        let mean_log = (90.0_f64.ln() + f1.ln() + f2.ln()) / 3.0 - sigma * sigma * t / 3.0;
+        let expected_g = (mean_log + 0.5 * variance).exp();
+        let d2 = (mean_log - option.strike.ln()) / variance.sqrt();
+        let expected = df
+            * (expected_g * finstack_quant_core::math::norm_cdf(d2 + variance.sqrt())
+                - option.strike * finstack_quant_core::math::norm_cdf(d2));
+        let grid = map_fixings_to_steps(&option.fixing_dates, option.day_count, as_of, t, 2)
+            .expect("grid");
+        let times = grid.future_times();
+        let (drift, multipliers) =
+            asian_drift_and_fixing_multipliers(&option, &curves, as_of, 0.0).expect("carry");
+        let control = seasoned_geometric_asian_control(
+            100.0,
+            option.strike,
+            -df.ln() / t,
+            0.0,
+            sigma,
+            df,
+            90.0_f64.ln(),
+            1,
+            &times,
+            true,
+            Some(&drift),
+            Some(&multipliers),
+        );
+        assert!(
+            (control - expected).abs() < 1e-12,
+            "control={control}, oracle={expected}"
+        );
+        let process = GbmProcess::new(GbmParams::new(-df.ln() / t, 0.0, sigma).expect("GBM"))
+            .with_drift_schedule(std::sync::Arc::new(drift));
+        let payoff = AsianCall::with_history(
+            option.strike,
+            1.0,
+            AveragingMethod::Geometric,
+            grid.fixing_steps,
+            90.0,
+            90.0_f64.ln(),
+            1,
+        )
+        .expect("payoff")
+        .with_fixing_multipliers(&multipliers)
+        .expect("dated scaling");
+        let config = PathDependentPricerConfig {
+            num_paths: 40_000,
+            seed: 20260930,
+            use_parallel: false,
+            use_sobol: false,
+            antithetic: false,
+            ..Default::default()
+        };
+        let result = PathDependentPricer::new(config)
+            .price_with_grid(&process, 100.0, grid.time_grid, &payoff, Currency::USD, df)
+            .expect("MC");
+        assert!(
+            (result.mean.amount() - expected).abs() < 5.0 * result.stderr,
+            "MC={}, oracle={expected}, sampling stderr={}",
+            result.mean.amount(),
+            result.stderr
+        );
+    }
+
+    #[test]
+    fn nonflat_multifixing_geometric_asian_matches_joint_normal_moment_oracle() {
+        let as_of = date(2025, 1, 1);
+        let expiry = date(2026, 1, 1);
+        let t1 = 91.0 / 365.0;
+        let t2 = 273.0 / 365.0;
+        let (sigma, q) = (0.30, 0.01);
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (t1, 0.99), (t2, 0.90), (1.0, 0.85)])
+            .interp(InterpStyle::LogLinear)
+            .build()
+            .expect("curve");
+        let curves = market(as_of, 100.0, sigma, 0.0, q).insert(curve);
+        // For two distinct observations, Cov(log S1, log S2)=sigma^2*t1.
+        let f1 = 100.0 * (-q * t1).exp() / 0.99;
+        let f2 = 100.0 * (-q * t2).exp() / 0.90;
+        let mean_log = 0.5 * (f1.ln() + f2.ln()) - 0.25 * sigma * sigma * (t1 + t2);
+        let variance = 0.25 * sigma * sigma * (3.0 * t1 + t2);
+        let expected_g = (mean_log + 0.5 * variance).exp();
+        let d2 = (mean_log - 100.0_f64.ln()) / variance.sqrt();
+        let d1 = d2 + variance.sqrt();
+        for option_type in [OptionType::Call, OptionType::Put] {
+            let option = asian_option(
+                AveragingMethod::Geometric,
+                option_type,
+                expiry,
+                100.0,
+                vec![date(2025, 4, 2), date(2025, 10, 1)],
+            );
+            let expected = 0.85
+                * match option_type {
+                    OptionType::Call => {
+                        expected_g * finstack_quant_core::math::norm_cdf(d1)
+                            - 100.0 * finstack_quant_core::math::norm_cdf(d2)
+                    }
+                    OptionType::Put => {
+                        100.0 * finstack_quant_core::math::norm_cdf(-d2)
+                            - expected_g * finstack_quant_core::math::norm_cdf(-d1)
+                    }
+                };
+            let actual = AsianOptionAnalyticalGeometricPricer::new()
+                .price_dyn(&option, &curves, as_of)
+                .expect("analytic")
+                .value
+                .amount();
+            assert!(
+                (actual - expected).abs() < 1e-11,
+                "{option_type:?}: {actual} vs {expected}"
+            );
+        }
     }
 }

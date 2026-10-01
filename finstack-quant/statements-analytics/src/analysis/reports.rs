@@ -15,7 +15,7 @@
 //! println!("{report}");
 //! ```
 
-use finstack_quant_core::dates::PeriodId;
+use finstack_quant_core::dates::{PeriodId, PeriodKind};
 use finstack_quant_core::table::{TableColumn, TableColumnData, TableColumnRole, TableEnvelope};
 use finstack_quant_statements::evaluator::StatementResult;
 use indexmap::IndexMap;
@@ -275,10 +275,14 @@ impl fmt::Display for PLSummaryReport<'_> {
 
 /// Trailing-twelve-month sum of `node_id` ending at (and including) `at`.
 ///
-/// Returns `None` unless a full window (`periods_per_year` of `at`, e.g. 4
-/// quarters or 1 annual period) of finite values is available at or before
-/// `at`. Incomplete windows (for example Q1 of a quarterly model) are skipped
-/// rather than annualized from a partial year.
+/// Requires a complete contiguous year of finite values in consistent units.
+/// Annual, semiannual, quarterly and monthly windows use 1, 2, 4 and 12
+/// periods, including fiscal identifiers. Gregorian daily windows use the
+/// calendar year ending immediately after `at`, including leap days; a
+/// February 29 boundary maps to February 28 in the prior year.
+/// Weekly windows and fiscal daily windows return `None`: these results do
+/// not contain the calendar dates needed to resolve a full calendar year.
+/// Incomplete windows are unavailable rather than annualized from partial data.
 ///
 /// # Arguments
 ///
@@ -286,22 +290,54 @@ impl fmt::Display for PLSummaryReport<'_> {
 ///   and contribute a value at each period in the trailing window.
 /// * `node_id` - Statement node whose period values are summed (typically a
 ///   flow such as EBITDA or interest expense), in the model's reporting units.
-/// * `at` - Inclusive window end. Window length is `at.kind().periods_per_year()`.
+/// * `at` - Inclusive reporting-period end. Gregorian daily windows cover a
+///   calendar year; fixed-frequency windows cover the documented period count.
 pub(crate) fn trailing_sum_at(
     results: &StatementResult,
     node_id: &str,
     at: &PeriodId,
 ) -> Option<f64> {
+    let count = match at.kind() {
+        PeriodKind::Weekly => return None,
+        PeriodKind::Daily if at.is_fiscal() => return None,
+        PeriodKind::Daily => {
+            let end = time::Date::from_ordinal_date(at.year, at.index)
+                .ok()?
+                .checked_add(time::Duration::days(1))?;
+            let year = end.year().checked_sub(1)?;
+            let start = time::Date::from_calendar_date(year, end.month(), end.day())
+                .or_else(|_| time::Date::from_calendar_date(year, end.month(), 28))
+                .ok()?;
+            usize::try_from((end - start).whole_days()).ok()?
+        }
+        _ => usize::from(at.periods_per_year()),
+    };
     let mut period = *at;
     let mut total = 0.0;
-    for index in 0..at.kind().periods_per_year() {
+    let unit = super::units::node_unit_at(results, node_id, at).ok()?;
+    for index in 0..count {
+        if super::units::node_unit_at(results, node_id, &period).ok()? != unit {
+            return None;
+        }
         let value = results.get(node_id, &period)?;
         if !value.is_finite() {
             return None;
         }
         total += value;
-        if index + 1 < at.kind().periods_per_year() {
-            period = period.prev().ok()?;
+        if index + 1 < count {
+            if period.is_fiscal() {
+                // These fixed-frequency fiscal identifiers have the same
+                // capacity in every year, so no fiscal date convention is
+                // required to step them. Daily and weekly were excluded above.
+                if period.index > 1 {
+                    period.index -= 1;
+                } else {
+                    period.year = period.year.checked_sub(1)?;
+                    period.index = at.periods_per_year();
+                }
+            } else {
+                period = period.prev().ok()?;
+            }
         }
     }
     total.is_finite().then_some(total)
@@ -310,21 +346,26 @@ pub(crate) fn trailing_sum_at(
 /// Leverage ratio (total debt / TTM EBITDA) at `at`. `None` if inputs missing
 /// or TTM EBITDA is zero.
 fn leverage_at(results: &StatementResult, at: &PeriodId) -> Option<f64> {
+    super::units::validate_matching_units(results, "total_debt", "ebitda", at).ok()?;
     let debt = results.get("total_debt", at)?;
     let ebitda = trailing_sum_at(results, "ebitda", at)?;
-    (ebitda != 0.0).then_some(debt / ebitda)
+    let ratio = debt / ebitda;
+    (debt.is_finite() && ebitda > 0.0 && ratio.is_finite()).then_some(ratio)
 }
 
 /// Interest coverage (TTM EBITDA / TTM interest expense) at `at`. `None` if
 /// inputs missing or TTM interest is zero.
 fn interest_coverage_at(results: &StatementResult, at: &PeriodId) -> Option<f64> {
+    super::units::validate_matching_units(results, "ebitda", "interest_expense", at).ok()?;
     let ebitda = trailing_sum_at(results, "ebitda", at)?;
     let interest = trailing_sum_at(results, "interest_expense", at)?;
-    (interest != 0.0).then_some(ebitda / interest)
+    let ratio = ebitda / interest;
+    (interest > 0.0 && ratio.is_finite()).then_some(ratio)
 }
 
 /// One period's structured credit metrics. Each metric is `None` when it
-/// cannot be computed for that period (e.g. an incomplete TTM window).
+/// cannot be computed for that period (e.g. an incomplete TTM window, mixed
+/// scalar/monetary representations, or different input currencies).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CreditAssessmentPoint {
     /// Period identifier rendered as a string (e.g. `"2025Q4"`).
@@ -372,7 +413,17 @@ impl CreditAssessment {
     ///
     /// The series spans every period (≤ `period`) present on any of the driver
     /// nodes (`ebitda`, `total_debt`, `interest_expense`, `free_cash_flow`),
-    /// in ascending order.
+    /// in ascending order. Ratios are unavailable for incompatible node types
+    /// or currencies, incomplete trailing years, or non-positive denominators.
+    /// Gregorian daily windows use a calendar year including leap days.
+    /// Fiscal fixed-frequency windows are supported; weekly and fiscal daily
+    /// ratios are unavailable because these results lack calendar-period dates.
+    ///
+    /// # Arguments
+    ///
+    /// * `results` - Evaluated statement values with monetary/scalar metadata
+    ///   preserved so ratios only compare like units and currencies.
+    /// * `period` - Inclusive reporting period ending each trailing-year window.
     pub fn compute(results: &StatementResult, period: PeriodId) -> Self {
         let mut periods: std::collections::BTreeSet<PeriodId> = std::collections::BTreeSet::new();
         for node in ["ebitda", "total_debt", "interest_expense", "free_cash_flow"] {
@@ -391,7 +442,9 @@ impl CreditAssessment {
                 period: period.to_string(),
                 leverage_ratio: leverage_at(results, period),
                 interest_coverage: interest_coverage_at(results, period),
-                free_cash_flow: results.get("free_cash_flow", period),
+                free_cash_flow: results
+                    .get("free_cash_flow", period)
+                    .filter(|value| value.is_finite()),
             })
             .collect();
 
@@ -399,7 +452,9 @@ impl CreditAssessment {
             period: period.to_string(),
             leverage_ratio: leverage_at(results, &period),
             interest_coverage: interest_coverage_at(results, &period),
-            free_cash_flow: results.get("free_cash_flow", &period),
+            free_cash_flow: results
+                .get("free_cash_flow", &period)
+                .filter(|value| value.is_finite()),
             series,
         }
     }
@@ -700,5 +755,114 @@ mod tests {
 
         assert_eq!(report.calculate_leverage_ratio(), Some(3.0));
         assert_eq!(report.calculate_interest_coverage(), Some(10.0));
+    }
+
+    #[test]
+    fn fiscal_quarterly_credit_window_crosses_year_boundary() {
+        let mut results = StatementResult::new();
+        for label in ["FY2024Q3", "FY2024Q4", "FY2025Q1", "FY2025Q2"] {
+            let period: PeriodId = label.parse().expect("fiscal quarter");
+            results
+                .nodes
+                .entry("ebitda".into())
+                .or_default()
+                .insert(period, 1.0);
+            results
+                .nodes
+                .entry("interest_expense".into())
+                .or_default()
+                .insert(period, 0.5);
+        }
+        let at: PeriodId = "FY2025Q2".parse().expect("fiscal quarter");
+        results
+            .nodes
+            .entry("total_debt".into())
+            .or_default()
+            .insert(at, 4.0);
+        let assessment = CreditAssessment::compute(&results, at);
+        assert_eq!(assessment.leverage_ratio, Some(1.0));
+        assert_eq!(assessment.interest_coverage, Some(2.0));
+        results
+            .nodes
+            .get_mut("ebitda")
+            .expect("ebitda")
+            .swap_remove(&"FY2024Q4".parse::<PeriodId>().expect("quarter"));
+        assert_eq!(CreditAssessment::compute(&results, at).leverage_ratio, None);
+    }
+
+    #[test]
+    fn daily_credit_windows_use_calendar_years_including_leap_days() {
+        for (year, days) in [(2024, 366), (2025, 365)] {
+            let mut results = StatementResult::new();
+            for ordinal in 1..=days {
+                let period = PeriodId::day(year, ordinal).expect("day");
+                results
+                    .nodes
+                    .entry("ebitda".into())
+                    .or_default()
+                    .insert(period, 1.0);
+            }
+            let at = PeriodId::day(year, days).expect("last day");
+            results
+                .nodes
+                .entry("total_debt".into())
+                .or_default()
+                .insert(at, f64::from(days));
+            assert_eq!(
+                CreditAssessment::compute(&results, at).leverage_ratio,
+                Some(1.0)
+            );
+            // A gap near the beginning must not be replaced with a shorter
+            // 252-observation financial-market annualization window.
+            results
+                .nodes
+                .get_mut("ebitda")
+                .expect("ebitda")
+                .swap_remove(&PeriodId::day(year, 1).expect("day"));
+            assert_eq!(CreditAssessment::compute(&results, at).leverage_ratio, None);
+        }
+    }
+
+    #[test]
+    fn daily_rolling_year_handles_february_boundaries() {
+        use time::{Date, Month};
+        for (start, end, expected) in [
+            (
+                (2023, Month::February, 28),
+                (2024, Month::February, 29),
+                366.0,
+            ),
+            ((2023, Month::March, 1), (2024, Month::March, 1), 366.0),
+            ((2024, Month::March, 1), (2025, Month::March, 1), 365.0),
+        ] {
+            let mut date = Date::from_calendar_date(start.0, start.1, start.2).expect("start");
+            let end = Date::from_calendar_date(end.0, end.1, end.2).expect("end");
+            let mut results = StatementResult::new();
+            while date < end {
+                let period = PeriodId::from_date(date, PeriodKind::Daily);
+                results
+                    .nodes
+                    .entry("ebitda".into())
+                    .or_default()
+                    .insert(period, 1.0);
+                date = date.next_day().expect("next day");
+            }
+            let at = PeriodId::from_date(end.previous_day().expect("last day"), PeriodKind::Daily);
+            assert_eq!(trailing_sum_at(&results, "ebitda", &at), Some(expected));
+        }
+    }
+
+    #[test]
+    fn ambiguous_weekly_and_fiscal_daily_credit_windows_are_unavailable() {
+        for label in ["2025W52", "FY2025W52", "FY2025D365"] {
+            let at: PeriodId = label.parse().expect("period");
+            let mut results = StatementResult::new();
+            results
+                .nodes
+                .entry("ebitda".into())
+                .or_default()
+                .insert(at, 1.0);
+            assert_eq!(trailing_sum_at(&results, "ebitda", &at), None);
+        }
     }
 }

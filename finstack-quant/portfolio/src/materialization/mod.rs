@@ -27,7 +27,7 @@ use finstack_quant_core::contract::{
 };
 use finstack_quant_core::{HashMap, HashSet};
 use finstack_quant_valuations::instruments::{InstrumentEnvelope, MarketDependencies};
-use serde::de::{IgnoredAny, SeqAccess, Visitor};
+use serde::de::{IgnoredAny, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer};
 
 pub use cache::InstrumentArtifactCache;
@@ -64,7 +64,7 @@ struct ValidatedInput {
     dependency_count: usize,
 }
 
-/// Allocation-free preflight counts for the two resource-bounded arrays.
+/// Allocation-free preflight counts for resource-bounded collections.
 ///
 /// All other fields are ignored here and validated by the canonical typed
 /// deserialization immediately afterward. A malformed document is likewise
@@ -75,6 +75,43 @@ struct MaterializationCollectionCounts {
     instruments: SequenceCount,
     #[serde(default)]
     positions: SequenceCount,
+    #[serde(default)]
+    portfolio: PortfolioCollectionCounts,
+}
+
+#[derive(Default, Deserialize)]
+struct PortfolioCollectionCounts {
+    #[serde(default)]
+    books: MapCount,
+}
+
+#[derive(Default)]
+struct MapCount(usize);
+
+impl<'de> Deserialize<'de> for MapCount {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct MapCountVisitor;
+        impl<'de> Visitor<'de> for MapCountVisitor {
+            type Value = MapCount;
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("a JSON object")
+            }
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                let mut count = 0usize;
+                while map.next_entry::<IgnoredAny, IgnoredAny>()?.is_some() {
+                    count = count.saturating_add(1);
+                }
+                Ok(MapCount(count))
+            }
+        }
+        deserializer.deserialize_map(MapCountVisitor)
+    }
 }
 
 #[derive(Default)]
@@ -362,7 +399,7 @@ impl Portfolio {
         let mut instruments = Vec::new();
         let mut artifact_id_by_hash: HashMap<String, String> = HashMap::default();
         let mut positions = Vec::with_capacity(self.positions.len());
-        let mut books = self.books.clone();
+        let books = self.books.clone();
 
         for position in &self.positions {
             let instrument_json = position.instrument.to_instrument_json().ok_or_else(|| {
@@ -390,16 +427,6 @@ impl Portfolio {
                 artifact_id_by_hash.insert(content_hash, artifact_id.clone());
                 artifact_id
             };
-
-            if let Some(book_id) = &position.book_id {
-                let book = books.get_mut(book_id).ok_or_else(|| {
-                    Error::validation(format!(
-                        "Position '{}' references non-existent book '{}'",
-                        position.position_id, book_id
-                    ))
-                })?;
-                book.add_position(position.position_id.clone());
-            }
 
             positions.push(MaterializedPosition {
                 id: position.position_id.clone(),
@@ -558,7 +585,8 @@ fn enforce_materialization_collection_limits(
         return Ok(());
     };
     enforce_count_limit("artifacts", counts.instruments.0, limits.max_artifacts)?;
-    enforce_count_limit("positions", counts.positions.0, limits.max_positions)
+    enforce_count_limit("positions", counts.positions.0, limits.max_positions)?;
+    enforce_count_limit("books", counts.portfolio.books.0, crate::book::MAX_BOOKS)
 }
 
 fn validate_position_semantics(
@@ -720,165 +748,10 @@ fn validate_portfolio_envelope_invariants(
         }
     }
 
-    let mut position_books: HashMap<&PositionId, &crate::book::BookId> = HashMap::default();
-    let mut child_parents: HashMap<&crate::book::BookId, &crate::book::BookId> = HashMap::default();
-    for (book_id, book) in &bundle.portfolio.books {
-        if book_id != &book.id {
-            report.push_bounded(
-                limits,
-                Diagnostic::new(
-                    "portfolio/book-id-mismatch",
-                    LoadPhase::Semantic,
-                    Severity::Error,
-                    format!(
-                        "book map key '{book_id}' does not match embedded id '{}'",
-                        book.id
-                    ),
-                )
-                .with_pointer(format!("/portfolio/books/{book_id}/id")),
-            );
-        }
-        if let Some(parent_id) = &book.parent_id {
-            if !bundle.portfolio.books.contains_key(parent_id) {
-                report.push_bounded(
-                    limits,
-                    Diagnostic::new(
-                        "portfolio/book-missing-parent",
-                        LoadPhase::Semantic,
-                        Severity::Error,
-                        format!("book '{book_id}' references missing parent '{parent_id}'"),
-                    )
-                    .with_pointer(format!("/portfolio/books/{book_id}/parent_id")),
-                );
-            }
-        }
-        for (position_index, position_id) in book.position_ids.iter().enumerate() {
-            if !positions.contains_key(position_id) {
-                report.push_bounded(
-                    limits,
-                    Diagnostic::new(
-                        "portfolio/book-missing-position",
-                        LoadPhase::Semantic,
-                        Severity::Error,
-                        format!(
-                            "book '{book_id}' references non-existent position '{position_id}'"
-                        ),
-                    )
-                    .with_pointer(format!(
-                        "/portfolio/books/{book_id}/position_ids/{position_index}"
-                    ))
-                    .with_position_id(position_id.to_string()),
-                );
-            }
-            if let Some(first_book) = position_books.insert(position_id, book_id) {
-                report.push_bounded(
-                    limits,
-                    Diagnostic::new(
-                        "portfolio/position-multiple-books",
-                        LoadPhase::Semantic,
-                        Severity::Error,
-                        format!(
-                            "position '{position_id}' is assigned to books '{first_book}' and '{book_id}'"
-                        ),
-                    )
-                    .with_pointer(format!(
-                        "/portfolio/books/{book_id}/position_ids/{position_index}"
-                    ))
-                    .with_position_id(position_id.to_string()),
-                );
-            }
-        }
-        for (child_index, child_id) in book.child_book_ids.iter().enumerate() {
-            let pointer = format!("/portfolio/books/{book_id}/child_book_ids/{child_index}");
-            let Some(child) = bundle.portfolio.books.get(child_id) else {
-                report.push_bounded(
-                    limits,
-                    Diagnostic::new(
-                        "portfolio/book-missing-child",
-                        LoadPhase::Semantic,
-                        Severity::Error,
-                        format!("book '{book_id}' references missing child '{child_id}'"),
-                    )
-                    .with_pointer(pointer),
-                );
-                continue;
-            };
-            if let Some(first_parent) = child_parents.insert(child_id, book_id) {
-                report.push_bounded(
-                    limits,
-                    Diagnostic::new(
-                        "portfolio/book-multiple-parents",
-                        LoadPhase::Semantic,
-                        Severity::Error,
-                        format!(
-                            "book '{child_id}' is listed by parents '{first_parent}' and '{book_id}'"
-                        ),
-                    )
-                    .with_pointer(pointer.clone()),
-                );
-            }
-            if child.parent_id.as_ref() != Some(book_id) {
-                report.push_bounded(
-                    limits,
-                    Diagnostic::new(
-                        "portfolio/book-parent-child-mismatch",
-                        LoadPhase::Semantic,
-                        Severity::Error,
-                        format!(
-                            "book '{book_id}' lists '{child_id}' as child, but its parent is {:?}",
-                            child.parent_id
-                        ),
-                    )
-                    .with_pointer(pointer),
-                );
-            }
-        }
-    }
-
-    for (book_id, book) in &bundle.portfolio.books {
-        if let Some(parent_id) = &book.parent_id {
-            if let Some(parent) = bundle.portfolio.books.get(parent_id) {
-                if !parent.child_book_ids.contains(book_id) {
-                    report.push_bounded(
-                        limits,
-                        Diagnostic::new(
-                            "portfolio/book-parent-child-mismatch",
-                            LoadPhase::Semantic,
-                            Severity::Error,
-                            format!(
-                                "book '{book_id}' names parent '{parent_id}', but the parent does not list it as a child"
-                            ),
-                        )
-                        .with_pointer(format!("/portfolio/books/{book_id}/parent_id")),
-                    );
-                }
-            }
-        }
-
-        let mut visited = HashSet::default();
-        visited.insert(book_id);
-        let mut current = book.parent_id.as_ref();
-        while let Some(parent_id) = current {
-            if !visited.insert(parent_id) {
-                report.push_bounded(
-                    limits,
-                    Diagnostic::new(
-                        "portfolio/book-cycle",
-                        LoadPhase::Semantic,
-                        Severity::Error,
-                        format!("cycle detected in book hierarchy at '{parent_id}'"),
-                    )
-                    .with_pointer(format!("/portfolio/books/{book_id}/parent_id")),
-                );
-                break;
-            }
-            current = bundle
-                .portfolio
-                .books
-                .get(parent_id)
-                .and_then(|parent| parent.parent_id.as_ref());
-        }
-    }
+    let position_ids: HashSet<_> = positions.keys().copied().collect();
+    crate::book::validate_books(&bundle.portfolio.books, &position_ids, |diagnostic| {
+        report.push_bounded(limits, diagnostic);
+    });
 }
 
 fn missing_artifact_diagnostic(index: usize, position: &MaterializedPosition) -> Diagnostic {

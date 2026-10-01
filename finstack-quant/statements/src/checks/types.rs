@@ -258,6 +258,39 @@ impl Default for CheckConfig {
     }
 }
 
+impl CheckConfig {
+    /// Validate numeric tolerances and the advisory materiality threshold.
+    ///
+    /// All three numeric settings must be finite and nonnegative. Zero is
+    /// accepted for exact comparisons or to disable a relative/materiality term.
+    ///
+    /// # Errors
+    ///
+    /// Returns an invalid-input error for a negative, NaN, or infinite setting.
+    pub fn validate(&self) -> crate::Result<()> {
+        for (name, value) in [
+            ("default_tolerance", self.default_tolerance),
+            (
+                "default_relative_tolerance",
+                self.default_relative_tolerance,
+            ),
+            ("materiality_threshold", self.materiality_threshold),
+        ] {
+            validate_nonnegative_finite(name, value)?;
+        }
+        Ok(())
+    }
+}
+
+pub(crate) fn validate_nonnegative_finite(name: &str, value: f64) -> crate::Result<()> {
+    if !value.is_finite() || value < 0.0 {
+        return Err(crate::Error::invalid_input(format!(
+            "{name} must be finite and nonnegative; got {value}"
+        )));
+    }
+    Ok(())
+}
+
 /// Return the effective tolerance to apply to a diff, given an optional
 /// per-check absolute override and a reference magnitude used for the
 /// relative tolerance.

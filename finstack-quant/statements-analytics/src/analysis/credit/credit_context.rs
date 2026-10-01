@@ -104,7 +104,8 @@ pub struct CreditNumeratorNodes<'a> {
 ///
 /// Returns an error when either numerator node or instrument cashflows use a
 /// currency different from `reporting_currency`, or any consumed value is
-/// non-finite.
+/// non-finite. Contradictory numeric/monetary numerator projections and
+/// non-finite denominator sums or computed ratios also fail.
 ///
 /// # Examples
 ///
@@ -210,6 +211,16 @@ pub fn compute_credit_context(
         let Some(cf) = inst_data.get(&period.id) else {
             continue;
         };
+        for node in [numerators.cfads, numerators.interest_coverage] {
+            if let Some(NodeValueType::Monetary { currency }) =
+                crate::analysis::units::node_unit_at(statement, node, &period.id)?
+            {
+                if currency != reporting_currency {
+                    return Err(Error::currency_mismatch(reporting_currency, currency));
+                }
+            }
+        }
+        cf.validate_currency_invariant()?;
         let instrument_currency = cf.interest_expense_cash.currency();
         if instrument_currency != reporting_currency {
             return Err(Error::currency_mismatch(
@@ -234,6 +245,25 @@ pub fn compute_credit_context(
                 period.id
             )));
         }
+        let ratio = |numerator: f64, denominator: f64| -> Result<Option<f64>> {
+            if !denominator.is_finite() {
+                return Err(Error::eval(format!(
+                    "Credit denominator for instrument '{instrument_id}' is non-finite in period {}",
+                    period.id
+                )));
+            }
+            if denominator <= 0.0 {
+                return Ok(None);
+            }
+            let value = numerator / denominator;
+            if !value.is_finite() {
+                return Err(Error::eval(format!(
+                    "Credit ratio for instrument '{instrument_id}' is non-finite in period {}",
+                    period.id
+                )));
+            }
+            Ok(Some(value))
+        };
 
         if let Some(&reference_value) = reference_by_period.get(&period.id) {
             if !reference_value.is_finite() {
@@ -243,8 +273,8 @@ pub fn compute_credit_context(
                     period.id
                 )));
             }
-            if reference_value > 0.0 {
-                ltv.push((period.id, balance / reference_value));
+            if let Some(value) = ratio(balance, reference_value)? {
+                ltv.push((period.id, value));
             }
         }
 
@@ -256,16 +286,16 @@ pub fn compute_credit_context(
                 )));
             }
             let debt_service_cash = interest_cash + principal;
-            if debt_service_cash > 0.0 {
-                dscr.push((period.id, cfads / debt_service_cash));
+            if let Some(value) = ratio(cfads, debt_service_cash)? {
+                dscr.push((period.id, value));
             }
             let debt_service_total = interest_total + principal;
-            if debt_service_total > 0.0 {
-                dscr_total.push((period.id, cfads / debt_service_total));
+            if let Some(value) = ratio(cfads, debt_service_total)? {
+                dscr_total.push((period.id, value));
             }
             let debt_service_incl_fees = interest_cash + principal + fees;
-            if debt_service_incl_fees > 0.0 {
-                dscr_incl_fees.push((period.id, cfads / debt_service_incl_fees));
+            if let Some(value) = ratio(cfads, debt_service_incl_fees)? {
+                dscr_incl_fees.push((period.id, value));
             }
         }
 
@@ -276,8 +306,8 @@ pub fn compute_credit_context(
                     numerators.interest_coverage, period.id
                 )));
             }
-            if interest_total > 0.0 {
-                interest_coverage.push((period.id, numerator / interest_total));
+            if let Some(value) = ratio(numerator, interest_total)? {
+                interest_coverage.push((period.id, value));
             }
         }
     }
@@ -330,6 +360,101 @@ mod tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_statements::capital_structure::CashflowBreakdown;
     use indexmap::IndexMap;
+
+    #[test]
+    fn rejects_foreign_principal_fees_and_debt_balance() {
+        for field in ["principal", "fees", "balance"] {
+            let (result, mut cs, periods) = make_result_and_cs();
+            let cashflow = cs
+                .by_instrument
+                .get_mut("BOND-001")
+                .unwrap()
+                .get_mut(&periods[0].id)
+                .unwrap();
+            let foreign = Money::from((100_i64, Currency::EUR));
+            match field {
+                "principal" => cashflow.principal_payment = foreign,
+                "fees" => cashflow.fees = foreign,
+                _ => cashflow.debt_balance = foreign,
+            }
+            let error = compute_credit_context(
+                &result,
+                &cs,
+                "BOND-001",
+                CreditNumeratorNodes {
+                    cfads: "cfads",
+                    interest_coverage: "ebitda",
+                },
+                Currency::USD,
+                &periods,
+                None,
+            )
+            .unwrap_err();
+            assert!(
+                error.to_string().contains("Currency mismatch"),
+                "{field}: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn finite_inputs_cannot_produce_infinite_credit_ratios() {
+        let (mut result, mut cs, periods) = make_result_and_cs();
+        let calculate = |result: &StatementResult,
+                         cs: &CapitalStructureCashflows,
+                         refs: Option<&[(PeriodId, f64)]>| {
+            compute_credit_context(
+                result,
+                cs,
+                "BOND-001",
+                CreditNumeratorNodes {
+                    cfads: "cfads",
+                    interest_coverage: "ebitda",
+                },
+                Currency::USD,
+                &periods,
+                refs,
+            )
+        };
+        assert!(calculate(&result, &cs, Some(&[(periods[0].id, 1e-320)])).is_err());
+        result
+            .nodes
+            .get_mut("cfads")
+            .unwrap()
+            .insert(periods[0].id, f64::MAX);
+        let cf = cs
+            .by_instrument
+            .get_mut("BOND-001")
+            .unwrap()
+            .get_mut(&periods[0].id)
+            .unwrap();
+        cf.interest_expense_cash = Money::new(0.1, Currency::USD).unwrap();
+        cf.principal_payment = Money::from((0_i64, Currency::USD));
+        assert!(calculate(&result, &cs, None).is_err());
+    }
+
+    #[test]
+    fn rejects_contradictory_monetary_numerator_projection() {
+        let (mut result, cs, periods) = make_result_and_cs();
+        result.monetary_nodes.insert(
+            "cfads".into(),
+            IndexMap::from([(periods[0].id, Money::from((1_i64, Currency::USD)))]),
+        );
+        let error = compute_credit_context(
+            &result,
+            &cs,
+            "BOND-001",
+            CreditNumeratorNodes {
+                cfads: "cfads",
+                interest_coverage: "ebitda",
+            },
+            Currency::USD,
+            &periods,
+            None,
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("contradictory"));
+    }
 
     fn make_result_and_cs() -> (StatementResult, CapitalStructureCashflows, Vec<Period>) {
         let mut result = StatementResult::new();

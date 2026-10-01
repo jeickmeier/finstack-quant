@@ -235,10 +235,8 @@ impl HullWhite1FParams {
     /// Time-average of the piecewise-constant θ over `[t, t + dt]`.
     ///
     /// Integrates θ exactly across any knot boundaries inside the step and
-    /// divides by `dt`. Sampling θ at the step start instead introduces an
-    /// O(dt) local bias whenever a simulation step straddles a θ knot (e.g.
-    /// on event-aligned grids whose nodes are not θ breakpoints); using the
-    /// step-average reduces this to O(dt²).
+    /// divides by `dt`. This is an ordinary arithmetic average; the exact
+    /// Hull-White transition uses exponential weighting instead.
     ///
     /// # Arguments
     ///
@@ -263,6 +261,28 @@ impl HullWhite1FParams {
         }
         integral += self.theta_at_time(seg_start) * (t_end - seg_start);
         integral / dt
+    }
+
+    /// Exact deterministic OU forcing over one step:
+    /// `κ ∫ exp(-κ(t+dt-s)) θ(s) ds`, integrated segment by segment.
+    pub(crate) fn theta_mean_contribution(&self, t: f64, dt: f64) -> f64 {
+        let end = t + dt;
+        let mut start = t;
+        let mut contribution = 0.0;
+        for boundary in self.theta_times.iter().copied().chain(std::iter::once(end)) {
+            if boundary <= start {
+                continue;
+            }
+            let segment_end = boundary.min(end);
+            let weight = (-self.kappa * (end - segment_end)).exp()
+                * -(-self.kappa * (segment_end - start)).exp_m1();
+            contribution += self.theta_at_time(start) * weight;
+            start = segment_end;
+            if start >= end {
+                break;
+            }
+        }
+        contribution
     }
 }
 

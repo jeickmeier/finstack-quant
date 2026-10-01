@@ -29,7 +29,7 @@ pub struct TradeParams {
     /// Almgren-Chriss trajectory solver).
     pub risk_aversion: Option<f64>,
 
-    /// Reference price used to convert the return-space volatility
+    /// Finite, strictly positive reference price used to convert the return-space volatility
     /// `daily_volatility` into a currency-space risk term (execution risk,
     /// variance, etc.).
     ///
@@ -43,6 +43,30 @@ pub struct TradeParams {
 }
 
 impl TradeParams {
+    /// Validate the inputs consumed by execution-cost and trajectory models.
+    pub(crate) fn validate(&self) -> finstack_quant_core::Result<()> {
+        if !self.quantity.is_finite() {
+            return Err(super::invalid_input("quantity must be finite"));
+        }
+        if !self.horizon_days.is_finite() || self.horizon_days <= 0.0 {
+            return Err(super::invalid_input(
+                "horizon_days must be finite and positive",
+            ));
+        }
+        if !self.daily_volatility.is_finite() || self.daily_volatility <= 0.0 {
+            return Err(super::invalid_input(
+                "daily_volatility must be finite and positive",
+            ));
+        }
+        let reference_price = self.effective_reference_price();
+        if !reference_price.is_finite() || reference_price <= 0.0 {
+            return Err(super::invalid_input(
+                "reference_price must be finite and positive",
+            ));
+        }
+        Ok(())
+    }
+
     /// Return the reference price used to convert return-space volatility
     /// into currency units, falling back to `profile.mid` when unset.
     pub fn effective_reference_price(&self) -> f64 {

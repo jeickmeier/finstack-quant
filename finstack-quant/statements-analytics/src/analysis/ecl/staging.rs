@@ -174,8 +174,12 @@ pub struct StagingConfig {
     pub pd_delta_absolute: f64,
 
     /// Relative PD increase threshold for SICR (e.g., 2.0 = PD doubled).
-    /// Applied as: current_pd / origination_pd > threshold.
-    pub pd_delta_relative: f64,
+    /// `Some(threshold)` applies current_pd / origination_pd > threshold;
+    /// the threshold must be finite and non-negative. `None` disables this
+    /// trigger. Positive current PD against zero origination PD is undefined
+    /// and errors when this trigger is enabled; both PDs zero mean no increase.
+    /// Default: `Some(2.0)`.
+    pub pd_delta_relative: Option<f64>,
 
     /// Rating downgrade notches that trigger Stage 2 (IFRS 9 B5.5.17(f):
     /// external credit rating downgrade as a SICR indicator).
@@ -232,6 +236,31 @@ pub struct StagingConfig {
     pub cure_periods_stage3_to_2: u32,
 }
 
+impl StagingConfig {
+    /// Validate the enabled quantitative SICR thresholds.
+    ///
+    /// The absolute threshold is a non-negative decimal PD increase. An
+    /// enabled relative threshold is a non-negative multiplier; `None`
+    /// disables that test. Both enabled thresholds must be finite.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for a negative or non-finite threshold.
+    pub fn validate(&self) -> Result<()> {
+        if !self.pd_delta_absolute.is_finite()
+            || self.pd_delta_absolute < 0.0
+            || self
+                .pd_delta_relative
+                .is_some_and(|threshold| !threshold.is_finite() || threshold < 0.0)
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "Enabled staging thresholds must be non-negative and finite".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// Count downgrade notches between two rating labels on the configured scale.
 ///
 /// Returns `None` when either label is absent from the scale (the trigger is
@@ -270,8 +299,16 @@ fn rating_downgrade_notches(orig: &str, curr: &str, config: &StagingConfig) -> O
 ///
 /// * `exposure` - Credit exposure with DPD, ratings, qualitative flags, and
 ///   prior-stage information used by the classification waterfall.
-/// * `pd_source` - PD term structure used to compare origination and current
-///   lifetime default risk when SICR testing is required.
+/// * `current_pd_source` - Reporting-date PD curves, keyed by current rating,
+///   returning decimal probabilities in `[0, 1]` over remaining maturity in
+///   years, capped at `MAX_SICR_HORIZON_YEARS` (30 years).
+/// * `origination_pd_source` - Initial-recognition PD curves, keyed by
+///   origination rating, returning cumulative decimal default probabilities
+///   from initial recognition. The comparison uses the conditional probability
+///   for the remaining window, given survival to `elapsed_years`. Retain this
+///   snapshot separately even when the rating is unchanged.
+/// * `elapsed_years` - Finite, non-negative years from initial recognition to
+///   the reporting date, on the same time basis as `origination_pd_source`.
 /// * `config` - Staging policy thresholds, backstops, and curing conditions.
 ///
 /// # Returns
@@ -281,30 +318,71 @@ fn rating_downgrade_notches(orig: &str, curr: &str, config: &StagingConfig) -> O
 ///
 /// # Errors
 ///
-/// Propagates PD-term-structure lookup errors when both origination and
-/// current ratings are present on the PD source and the SICR comparison
-/// requires cumulative probabilities. A rating that is absent from the
-/// source skips the PD-delta test (same as an unknown notch label) and
-/// does not fail the run.
+/// Returns a validation error for invalid elapsed time, a supplied rating
+/// absent from its respective source, or invalid origination probabilities
+/// (including zero survival to the reporting date), or an unrepresentable
+/// relative PD ratio when that trigger is enabled (including positive current
+/// PD against zero origination PD). Both PDs zero mean no increase.
+/// Propagates curve lookup
+/// errors. Stage 3 backstops do not require PD lookups. If either exposure
+/// rating is `None`, the PD-delta test is explicitly skipped; rating, DPD,
+/// qualitative, and curing triggers still apply.
 pub fn classify_stage(
     exposure: &Exposure,
-    pd_source: &dyn PdTermStructure,
+    current_pd_source: &dyn PdTermStructure,
+    origination_pd_source: &dyn PdTermStructure,
+    elapsed_years: f64,
     config: &StagingConfig,
 ) -> Result<StageResult> {
+    if !elapsed_years.is_finite() || elapsed_years < 0.0 {
+        return Err(finstack_quant_core::Error::Validation(
+            "elapsed_years must be finite and non-negative".into(),
+        ));
+    }
     classify_stage_with_pds(exposure, config, || {
+        for (rating, source, snapshot) in [
+            (
+                exposure.origination_rating.as_ref(),
+                origination_pd_source,
+                "origination",
+            ),
+            (
+                exposure.current_rating.as_ref(),
+                current_pd_source,
+                "current",
+            ),
+        ] {
+            if let Some(rating) = rating {
+                if !source.contains_rating(rating) {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "{snapshot} rating '{rating}' is absent from its PD source"
+                    )));
+                }
+            }
+        }
         let (Some(orig), Some(curr)) = (&exposure.origination_rating, &exposure.current_rating)
         else {
             return Ok(None);
         };
-        if !pd_source.contains_rating(orig) || !pd_source.contains_rating(curr) {
-            return Ok(None);
-        }
         let horizon = exposure
             .remaining_maturity_years
             .min(MAX_SICR_HORIZON_YEARS);
+        let end_years = elapsed_years + horizon;
+        if !end_years.is_finite() {
+            return Err(finstack_quant_core::Error::Validation(
+                "elapsed_years plus SICR horizon must be finite".into(),
+            ));
+        }
+        let orig_start = origination_pd_source.cumulative_pd(orig, elapsed_years)?;
+        let orig_end = origination_pd_source.cumulative_pd(orig, end_years)?;
+        if !(0.0..1.0).contains(&orig_start) || !(orig_start..=1.0).contains(&orig_end) {
+            return Err(finstack_quant_core::Error::Validation(
+                "Origination PDs must be finite and non-decreasing in [0, 1], with positive survival at elapsed_years".into(),
+            ));
+        }
         Ok(Some((
-            pd_source.cumulative_pd(orig, horizon)?,
-            pd_source.cumulative_pd(curr, horizon)?,
+            (orig_end - orig_start) / (1.0 - orig_start),
+            current_pd_source.cumulative_pd(curr, horizon)?,
         )))
     })
 }
@@ -314,15 +392,10 @@ pub(super) fn classify_stage_with_pds(
     config: &StagingConfig,
     pds: impl FnOnce() -> Result<Option<(f64, f64)>>,
 ) -> Result<StageResult> {
-    if !exposure.remaining_maturity_years.is_finite()
-        || exposure.remaining_maturity_years < 0.0
-        || !config.pd_delta_absolute.is_finite()
-        || config.pd_delta_absolute < 0.0
-        || config.pd_delta_relative.is_nan()
-        || config.pd_delta_relative < 0.0
-    {
+    config.validate()?;
+    if !exposure.remaining_maturity_years.is_finite() || exposure.remaining_maturity_years < 0.0 {
         return Err(finstack_quant_core::Error::Validation(
-            "Staging maturity and thresholds must be non-negative and finite (positive infinity disables relative PD)".into(),
+            "Staging maturity must be non-negative and finite".into(),
         ));
     }
     let mut triggers = Vec::new();
@@ -371,13 +444,19 @@ pub(super) fn classify_stage_with_pds(
             });
         }
 
-        if orig_pd > 0.0 {
-            let ratio = curr_pd / orig_pd;
-            if ratio > config.pd_delta_relative {
-                triggers.push(StagingTrigger::PdDeltaRelative {
-                    ratio,
-                    threshold: config.pd_delta_relative,
-                });
+        if let Some(threshold) = config.pd_delta_relative {
+            // Both zero means no increase. Otherwise the ratio must be
+            // representable, including when its original-PD denominator is zero.
+            if orig_pd > 0.0 || curr_pd > 0.0 {
+                let ratio = curr_pd / orig_pd;
+                if !ratio.is_finite() {
+                    return Err(finstack_quant_core::Error::Validation(
+                        "Relative PD ratio is not representable as a finite value".into(),
+                    ));
+                }
+                if ratio > threshold {
+                    triggers.push(StagingTrigger::PdDeltaRelative { ratio, threshold });
+                }
             }
         }
     }
@@ -562,8 +641,8 @@ mod tests {
     /// trigger can fire.
     fn downgrade_only_config(notches: u32) -> StagingConfig {
         StagingConfig {
-            pd_delta_absolute: 10.0, // unreachable (cum PDs are <= 1)
-            pd_delta_relative: 1e12, // unreachable
+            pd_delta_absolute: 10.0,       // unreachable (cum PDs are <= 1)
+            pd_delta_relative: Some(1e12), // unreachable
             rating_downgrade_notches: notches,
             ..StagingConfig::default()
         }
@@ -580,6 +659,8 @@ mod tests {
         let result = classify_stage(
             &exposure,
             &make_multi_rating_curves(),
+            &make_multi_rating_curves(),
+            0.0,
             &downgrade_only_config(3),
         )
         .unwrap();
@@ -604,6 +685,8 @@ mod tests {
         let result = classify_stage(
             &exposure,
             &make_multi_rating_curves(),
+            &make_multi_rating_curves(),
+            0.0,
             &downgrade_only_config(3),
         )
         .unwrap();
@@ -616,6 +699,8 @@ mod tests {
         let result = classify_stage(
             &upgraded,
             &make_multi_rating_curves(),
+            &make_multi_rating_curves(),
+            0.0,
             &downgrade_only_config(1),
         )
         .unwrap();
@@ -650,7 +735,7 @@ mod tests {
                 ),
             ],
         };
-        let result = classify_stage(&exposure, &pd, &config).unwrap();
+        let result = classify_stage(&exposure, &pd, &pd, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage2);
         assert!(result.triggers.iter().any(|t| matches!(
             t,
@@ -670,13 +755,13 @@ mod tests {
         exposure.current_rating = Some("BBB".to_string());
         let pd = make_multi_rating_curves();
         let mut config = downgrade_only_config(0); // threshold 0 must never fire
-        let result = classify_stage(&exposure, &pd, &config).unwrap();
+        let result = classify_stage(&exposure, &pd, &pd, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage1);
 
         config = downgrade_only_config(3);
         config.rating_scale_labels = Some(vec!["AAA".to_string(), "D".to_string()]);
         // Ratings absent from the configured scale: skipped.
-        let result = classify_stage(&exposure, &pd, &config).unwrap();
+        let result = classify_stage(&exposure, &pd, &pd, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage1);
     }
 
@@ -760,7 +845,7 @@ mod tests {
         let config = StagingConfig::default();
         let exposure = base_exposure();
 
-        let result = classify_stage(&exposure, &curve, &config).unwrap();
+        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage1);
         assert!(!result.cured);
     }
@@ -772,7 +857,7 @@ mod tests {
         let mut exposure = base_exposure();
         exposure.days_past_due = 90;
 
-        let result = classify_stage(&exposure, &curve, &config).unwrap();
+        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage3);
         assert!(matches!(
             result.triggers[0],
@@ -790,7 +875,7 @@ mod tests {
         let mut exposure = base_exposure();
         exposure.days_past_due = 30;
 
-        let result = classify_stage(&exposure, &curve, &config).unwrap();
+        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage2);
         assert!(result.triggers.iter().any(|t| matches!(
             t,
@@ -810,7 +895,7 @@ mod tests {
         exposure.origination_rating = Some("A".to_string());
         exposure.current_rating = Some("BB".to_string());
 
-        let result = classify_stage(&exposure, &curves, &config).unwrap();
+        let result = classify_stage(&exposure, &curves, &curves, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage2);
         assert!(result
             .triggers
@@ -825,7 +910,7 @@ mod tests {
         let mut exposure = base_exposure();
         exposure.qualitative_flags.watchlist = true;
 
-        let result = classify_stage(&exposure, &curve, &config).unwrap();
+        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage2);
         assert!(result
             .triggers
@@ -843,7 +928,7 @@ mod tests {
         let mut exposure = base_exposure();
         exposure.qualitative_flags.watchlist = true;
 
-        let result = classify_stage(&exposure, &curve, &config).unwrap();
+        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
         // With qualitative triggers disabled, watchlist alone doesn't trigger Stage 2
         assert_eq!(result.stage, Stage::Stage1);
     }
@@ -856,7 +941,7 @@ mod tests {
         exposure.previous_stage = Some(Stage::Stage2);
         exposure.consecutive_performing_periods = 3;
 
-        let result = classify_stage(&exposure, &curve, &config).unwrap();
+        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage1);
         assert!(result.cured);
     }
@@ -869,7 +954,7 @@ mod tests {
         exposure.previous_stage = Some(Stage::Stage2);
         exposure.consecutive_performing_periods = 2; // Need 3
 
-        let result = classify_stage(&exposure, &curve, &config).unwrap();
+        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage2);
         assert!(!result.cured);
     }
@@ -885,7 +970,7 @@ mod tests {
         // enough for Stage 3 → Stage 2 but not yet Stage 2 → Stage 1.
         exposure.consecutive_performing_periods = 12;
 
-        let result = classify_stage(&exposure, &curve, &config).unwrap();
+        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage2);
         assert!(result.cured);
     }
@@ -899,7 +984,7 @@ mod tests {
         // 12 + 3 = fully cured from Stage 3 all the way to Stage 1.
         exposure.consecutive_performing_periods = 15;
 
-        let result = classify_stage(&exposure, &curve, &config).unwrap();
+        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage1);
         assert!(result.cured);
     }
@@ -920,7 +1005,7 @@ mod tests {
         exposure.consecutive_performing_periods = 3; // < 12 = cure_periods_stage3_to_2
         exposure.qualitative_flags.watchlist = true; // fires a Stage-2 trigger
 
-        let result = classify_stage(&exposure, &curve, &config).unwrap();
+        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(
             result.stage,
             Stage::Stage3,
@@ -940,7 +1025,7 @@ mod tests {
         exposure.consecutive_performing_periods = 12; // == cure_periods_stage3_to_2
         exposure.qualitative_flags.watchlist = true;
 
-        let result = classify_stage(&exposure, &curve, &config).unwrap();
+        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage2);
     }
 
@@ -953,7 +1038,7 @@ mod tests {
         let mut exposure = base_exposure();
         exposure.qualitative_flags.bankruptcy = true;
 
-        let result = classify_stage(&exposure, &curve, &config).unwrap();
+        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage3);
         assert!(result
             .triggers
@@ -972,12 +1057,12 @@ mod tests {
         exposure_distressed
             .qualitative_flags
             .distressed_modification = true;
-        let r = classify_stage(&exposure_distressed, &curve, &config).unwrap();
+        let r = classify_stage(&exposure_distressed, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(r.stage, Stage::Stage3);
 
         let mut exposure_forbearance = base_exposure();
         exposure_forbearance.qualitative_flags.forbearance = true;
-        let r = classify_stage(&exposure_forbearance, &curve, &config).unwrap();
+        let r = classify_stage(&exposure_forbearance, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(r.stage, Stage::Stage2);
     }
 
@@ -993,7 +1078,7 @@ mod tests {
         let mut exposure = base_exposure();
         exposure.qualitative_flags.bankruptcy = true;
 
-        let result = classify_stage(&exposure, &curve, &config).unwrap();
+        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
         // Without DPD and with Stage-3 qualitatives disabled, the
         // obligor falls back through the Stage-2 waterfall. Bankruptcy
         // is not one of the SICR flags, so we end up at Stage 1.
@@ -1001,21 +1086,87 @@ mod tests {
     }
 
     #[test]
-    fn missing_rating_on_raw_curve_skips_pd_delta() {
-        // A → BBB on a BBB-only curve: PD-delta is skipped (A is absent),
-        // and a 1-notch downgrade is below the default 3-notch threshold.
+    fn supplied_ratings_missing_from_snapshot_are_errors() {
         let curve = make_pd_curve();
         let config = StagingConfig::default();
         let mut exposure = base_exposure();
         exposure.origination_rating = Some("A".to_string());
-        exposure.current_rating = Some("BBB".to_string());
+        assert!(classify_stage(&exposure, &curve, &curve, 0.0, &config).is_err());
+        exposure.origination_rating = Some("BBB".to_string());
+        exposure.current_rating = Some("A".to_string());
+        assert!(classify_stage(&exposure, &curve, &curve, 0.0, &config).is_err());
+    }
 
-        let result = classify_stage(&exposure, &curve, &config).unwrap();
+    #[test]
+    fn absent_exposure_rating_explicitly_uses_non_pd_triggers() {
+        let curve = make_pd_curve();
+        let config = StagingConfig::default();
+        let mut exposure = base_exposure();
+        exposure.origination_rating = None;
+        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage1);
-        assert!(result
+        exposure.days_past_due = 30;
+        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
+        assert_eq!(result.stage, Stage::Stage2);
+    }
+
+    #[test]
+    fn staging_rejects_invalid_age_or_no_origination_survival() {
+        let curve = make_pd_curve();
+        let exposure = base_exposure();
+        let config = StagingConfig::default();
+        for age in [-0.1, f64::NAN, f64::INFINITY] {
+            assert!(classify_stage(&exposure, &curve, &curve, age, &config).is_err());
+        }
+        let exhausted = RawPdCurve::new("BBB", vec![(0.0, 0.0), (1.0, 1.0)]).unwrap();
+        assert!(classify_stage(&exposure, &curve, &exhausted, 1.0, &config).is_err());
+    }
+
+    #[test]
+    fn staging_rejects_unrepresentable_relative_pd_ratio() {
+        let exposure = base_exposure();
+        let mut config = StagingConfig::default();
+        assert!(classify_stage_with_pds(&exposure, &config, || Ok(Some((1e-320, 1.0)))).is_err());
+        config.pd_delta_relative = None;
+        let result =
+            classify_stage_with_pds(&exposure, &config, || Ok(Some((1e-320, 1.0)))).unwrap();
+        assert_eq!(result.stage, Stage::Stage2);
+        assert!(serde_json::to_string(&result).is_ok());
+    }
+
+    #[test]
+    fn zero_origination_pd_requires_a_defined_or_disabled_relative_test() {
+        let exposure = base_exposure();
+        let mut config = StagingConfig::default();
+        // The 0.1 pp absolute increase is below the default absolute trigger.
+        assert!(classify_stage_with_pds(&exposure, &config, || Ok(Some((0.0, 0.001)))).is_err());
+        let unchanged =
+            classify_stage_with_pds(&exposure, &config, || Ok(Some((0.0, 0.0)))).unwrap();
+        assert_eq!(unchanged.stage, Stage::Stage1);
+        assert!(unchanged
             .triggers
             .iter()
-            .all(|t| !matches!(t, StagingTrigger::PdDeltaAbsolute { .. })));
+            .all(|trigger| !matches!(trigger, StagingTrigger::PdDeltaRelative { .. })));
+        config.pd_delta_relative = None;
+        let absolute_only =
+            classify_stage_with_pds(&exposure, &config, || Ok(Some((0.0, 0.001)))).unwrap();
+        assert_eq!(absolute_only.stage, Stage::Stage1);
+    }
+
+    #[test]
+    fn disabled_relative_threshold_round_trips_and_infinite_threshold_fails() {
+        let config = StagingConfig {
+            pd_delta_relative: None,
+            ..StagingConfig::default()
+        };
+        let json = serde_json::to_string(&config).unwrap();
+        let restored: StagingConfig = serde_json::from_str(&json).unwrap();
+        assert!(restored.pd_delta_relative.is_none());
+        let invalid = StagingConfig {
+            pd_delta_relative: Some(f64::INFINITY),
+            ..StagingConfig::default()
+        };
+        assert!(classify_stage_with_pds(&base_exposure(), &invalid, || Ok(None)).is_err());
     }
 
     #[test]
@@ -1043,7 +1194,7 @@ mod tests {
         exposure.origination_rating = Some("A".to_string());
         exposure.current_rating = Some("BB".to_string());
 
-        let result = classify_stage(&exposure, &map, &config).unwrap();
+        let result = classify_stage(&exposure, &map, &map, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage2);
         assert!(result
             .triggers

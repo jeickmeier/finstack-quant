@@ -26,7 +26,6 @@ use finstack_quant_core::{Error, Result};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use std::sync::OnceLock;
 
 /// Narrow a composite's requested metric list to the subset one leg supports.
 ///
@@ -57,26 +56,11 @@ fn metrics_supported_by_leg(
     registry.applicable_subset(metrics, instrument.key())
 }
 
-/// Runtime cache of boxed composite legs. Not serialized.
-#[derive(Default)]
-pub(super) struct BoxedLegCache(OnceLock<Vec<Box<dyn Instrument>>>);
-
-impl Clone for BoxedLegCache {
-    fn clone(&self) -> Self {
-        Self::default()
-    }
-}
-
-impl std::fmt::Debug for BoxedLegCache {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("BoxedLegCache")
-    }
-}
-
-/// Priceable composite instrument containing an unresolved policy and immutable state.
+/// Priceable composite instrument containing an unresolved policy and resolved state.
 ///
-/// Valuation and risk use `state` exactly as stored. Call [`Self::rebalance`]
-/// to obtain a distinct instrument; this type does not mutate in place.
+/// Valuation and risk use the current `spec` and `state` exactly as stored.
+/// Call [`Self::rebalance`] to obtain a distinct instrument with newly resolved
+/// quantities. Direct field edits must preserve the specification/state invariants.
 ///
 /// # Examples
 ///
@@ -113,10 +97,6 @@ pub struct CompositeInstrument {
     /// Applied to the composite value after leg aggregation.
     #[serde(default, skip_serializing_if = "ScenarioPricingOverrides::is_empty")]
     pub scenario_pricing_overrides: ScenarioPricingOverrides,
-    /// Boxed legs materialized once per instance.
-    #[serde(skip)]
-    #[cfg_attr(feature = "json-schema", schemars(skip))]
-    pub(super) boxed_legs: BoxedLegCache,
 }
 
 impl CompositeInstrument {
@@ -139,26 +119,17 @@ impl CompositeInstrument {
             instrument_pricing_overrides: InstrumentPricingOverrides::default(),
             metric_pricing_overrides: MetricPricingOverrides::default(),
             scenario_pricing_overrides: ScenarioPricingOverrides::default(),
-            boxed_legs: BoxedLegCache::default(),
         };
         instrument.validate_invariants()?;
         Ok(instrument)
     }
 
-    fn boxed_legs(&self) -> Result<&[Box<dyn Instrument>]> {
-        if let Some(legs) = self.boxed_legs.0.get() {
-            return Ok(legs.as_slice());
-        }
-        let legs = self
-            .spec
+    fn boxed_legs(&self) -> Result<Vec<Box<dyn Instrument>>> {
+        self.spec
             .legs
             .iter()
             .map(|leg| leg.instrument.as_ref().clone().into_boxed())
-            .collect::<Result<Vec<_>>>()?;
-        let _ = self.boxed_legs.0.set(legs);
-        self.boxed_legs.0.get().map(Vec::as_slice).ok_or_else(|| {
-            Error::Internal("boxed composite legs cache missing after initialization".into())
-        })
+            .collect()
     }
 
     /// Return a canonical fixed-quantity long/short equity example.
@@ -517,7 +488,7 @@ impl CompositeInstrument {
     /// Clone `leg` with this composite's metric overrides applied as defaults.
     ///
     /// Returns `None` when there is nothing to apply, so callers keep using
-    /// the cached leg.
+    /// the materialized leg.
     fn leg_with_metric_defaults(&self, leg: &dyn Instrument) -> Option<Box<dyn Instrument>> {
         if self.metric_pricing_overrides.is_empty() {
             return None;
@@ -658,3 +629,91 @@ crate::impl_empty_cashflow_provider!(
     CompositeInstrument,
     crate::cashflow::builder::CashflowRepresentation::Placeholder
 );
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use time::macros::date;
+
+    fn assert_current_definition(composite: &CompositeInstrument, expected: f64) {
+        let market = MarketContext::new();
+        let as_of = date!(2025 - 01 - 01);
+        composite.validate_invariants().expect("valid composite");
+        for _ in 0..2 {
+            assert_eq!(
+                composite.value(&market, as_of).expect("value").amount(),
+                expected
+            );
+        }
+        let copy = composite.clone();
+        let decoded: CompositeInstrument =
+            serde_json::from_str(&serde_json::to_string(composite).expect("serialize composite"))
+                .expect("deserialize composite");
+        for equivalent in [&copy, &decoded] {
+            assert_eq!(
+                equivalent.value(&market, as_of).expect("value").amount(),
+                expected
+            );
+            assert_eq!(
+                equivalent
+                    .market_dependencies()
+                    .expect("dependencies")
+                    .market_scalar_ids,
+                composite
+                    .market_dependencies()
+                    .expect("dependencies")
+                    .market_scalar_ids,
+            );
+        }
+    }
+
+    #[test]
+    fn composite_values_current_legs_after_nested_edit_reorder_and_resize() {
+        let mut composite = CompositeInstrument::example().expect("example");
+        assert_current_definition(&composite, 10.0);
+
+        let InstrumentJson::Equity(equity) = composite.spec.legs[0].instrument.as_mut() else {
+            panic!("equity example leg")
+        };
+        equity.quoted_spot = Some(200.0);
+        equity.spot_id = Some("CURRENT-LONG-SPOT".into());
+        assert_current_definition(&composite, 110.0);
+        assert!(composite
+            .market_dependencies()
+            .expect("dependencies")
+            .market_scalar_ids
+            .contains(&"CURRENT-LONG-SPOT".to_string()));
+
+        composite.spec.legs.swap(0, 1);
+        composite.state.resolved_legs.swap(0, 1);
+        assert_current_definition(&composite, 110.0);
+
+        let added_equity = crate::instruments::Equity::new("THIRD", "THIRD", Currency::USD)
+            .with_quantity(1.0)
+            .with_quoted_spot(25.0);
+        composite.spec.legs.push(CompositeLegSpec::new(
+            "THIRD",
+            InstrumentJson::Equity(added_equity),
+            2.0,
+        ));
+        composite
+            .state
+            .resolved_legs
+            .push(super::super::spec_support::ResolvedCompositeLeg {
+                instrument_id: "THIRD".into(),
+                quantity: 2.0,
+            });
+        assert_current_definition(&composite, 160.0);
+        let removed_leg = composite.spec.legs.remove(0);
+        let removed_state = composite.state.resolved_legs.remove(0);
+        assert_current_definition(&composite, 250.0);
+        composite.spec.legs.push(removed_leg);
+        composite.state.resolved_legs.push(removed_state);
+        assert_current_definition(&composite, 160.0);
+
+        composite.spec.legs.pop();
+        assert!(composite
+            .value(&MarketContext::new(), date!(2025 - 01 - 01))
+            .is_err());
+    }
+}

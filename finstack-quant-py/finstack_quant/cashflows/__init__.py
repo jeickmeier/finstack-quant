@@ -9,8 +9,6 @@ Examples:
 
 """
 
-import sys as _sys
-
 from finstack_quant.finstack_quant import cashflows as _cashflows
 
 accrual = _cashflows.accrual
@@ -19,20 +17,6 @@ builder = _cashflows.builder
 fixings = _cashflows.fixings
 primitives = _cashflows.primitives
 schema = _cashflows.schema
-
-_submodules = {
-    "accrual": accrual,
-    "aggregation": aggregation,
-    "builder": builder,
-    "fixings": fixings,
-    "primitives": primitives,
-    "schema": schema,
-}
-
-for _name, _mod in _submodules.items():
-    _key = f"finstack_quant.cashflows.{_name}"
-    if _key not in _sys.modules:
-        _sys.modules[_key] = _mod
 
 ScheduleBuildOpts = _cashflows.ScheduleBuildOpts
 build_cashflow_schedule = _cashflows.build_cashflow_schedule
@@ -48,22 +32,6 @@ cpr_to_smm = _cashflows.cpr_to_smm
 smm_to_cpr = _cashflows.smm_to_cpr
 cdr_to_mdr = _cashflows.cdr_to_mdr
 mdr_to_cdr = _cashflows.mdr_to_cdr
-
-for _fn in (
-    "accrued_interest",
-    "build_cashflow_schedule",
-    "build_cashflow_schedule_json",
-    "cdr_to_mdr",
-    "cpr_to_smm",
-    "dated_flows",
-    "dated_flows_json",
-    "mdr_to_cdr",
-    "schedule_from_classified_flows",
-    "schedule_from_dated_flows",
-    "smm_to_cpr",
-    "validate_cashflow_schedule_json",
-):
-    globals()[_fn].__module__ = __name__
 
 __all__: list[str] = [
     "ScheduleBuildOpts",

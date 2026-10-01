@@ -95,6 +95,8 @@ structured_credit/
 embedded registry in
 [`data/assumptions/structured_credit_assumptions.v1.json`](../../../../data/assumptions/structured_credit_assumptions.v1.json)
 (fee defaults, PSA/SDA parameters, concentration limits, standard speeds).
+They return `Result<StructuredCredit>` and reject closing dates whose first
+registry payment period exceeds the supported calendar range.
 
 ## Constructing a deal
 
@@ -110,7 +112,7 @@ let clo = StructuredCredit::new_clo(
     closing_date,
     legal_maturity,
     "USD-OIS",
-);
+).expect("closing date supports the first registry payment period");
 
 // Or start from the canonical example.
 let deal = StructuredCredit::example().expect("example");

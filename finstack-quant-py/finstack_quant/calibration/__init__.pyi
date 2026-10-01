@@ -66,15 +66,17 @@ class SolverConfig:
         Parameters
         ----------
         tolerance : float | None
-            Absolute residual tolerance in the target's own units (decimal rate,
-            price, or volatility depending on the step). Rust default when None.
+            Finite, positive absolute residual tolerance in the target's own
+            units (decimal rate, price, or volatility depending on the step).
+            Rust default when None.
         max_iterations : int | None
             Maximum root-finder iterations per pillar. Rust default when None.
 
         Raises
         ------
         ValueError
-            If ``tolerance`` is not strictly positive or ``max_iterations`` is zero.
+            If ``tolerance`` is non-finite or not strictly positive, or
+            ``max_iterations`` is zero.
 
         """
 
@@ -127,7 +129,9 @@ class SolverConfig:
         Parameters
         ----------
         json : str
-            Compact or pretty JSON produced by :meth:`to_json`.
+            Compact or pretty solver settings JSON with finite, positive
+            tolerance and a positive iteration count. Omitted fields use
+            Rust defaults.
 
         Returns
         -------
@@ -137,7 +141,8 @@ class SolverConfig:
         Raises
         ------
         ValueError
-            If ``json`` is malformed or carries unknown fields.
+            If ``json`` is malformed, carries unknown fields, or supplies a
+            non-finite or non-positive tolerance, or a non-positive iteration count.
 
         Examples
         --------
@@ -762,8 +767,8 @@ class RateQuote:
         rate : float
             Par fixed rate as a decimal per annum.
         spread_decimal : float | None, default None
-            Additive basis spread on the floating leg, decimal per annum
-            (``0.0005`` for 5 bp). Omitted when None.
+            Finite additive basis spread on the floating leg, decimal per annum
+            (``0.0005`` for 5 bp). Omitted when None; NaN and infinities are rejected.
 
         Returns
         -------
@@ -773,7 +778,8 @@ class RateQuote:
         Raises
         ------
         ValueError
-            If a field is empty or the quote fails Rust-side validation.
+            If the rate or supplied spread is non-finite, or the quote fails
+            Rust-side validation.
 
         Examples:
         --------
@@ -1425,6 +1431,8 @@ class CalibrationStep:
             Identifier of the produced curve; defaults to ``id``.
         params : Any
             Extra ``StepParams`` fields following the Rust step schema.
+            ``target_expiries`` are ACT/365F years from ``base_date``;
+            ``fixed_day_count`` controls coupon accrual fractions only.
 
         Returns
         -------
@@ -1542,15 +1550,20 @@ class CalibrationStep:
         currency : str
             ISO 4217 code of the curve currency.
         base_date : str
-            Curve base date as an ISO date string.
+            Valuation and calibration-instrument start date as an ISO date string.
+            The curve's reference CPI date is this date minus ``observation_lag``.
         discount_curve_id : str
             Identifier of the discount curve solved in an earlier step.
         index : str
             Inflation index identifier, for example ``"US-CPI-U"``.
         observation_lag : str
-            Index observation lag as a tenor code, for example ``"3M"``.
+            Whole-month observation lag, for example ``"3M"``, up to 255 months.
+            No lag accepts ``""``, ``"none"``, ``"0"``, ``"0M"``, or ``"0D"``;
+            parsing is case-insensitive. Calibration rejects nonzero day lags.
         base_cpi : float
-            Index level at ``base_date``, in index points.
+            Contractual reference CPI at the start date, in index points, after
+            observation lag and monthly interpolation. Supplied index fixings must
+            reproduce this level, including their seasonality adjustment.
         quotes : list[RateQuote | CdsQuote | VolQuote] | None, default None
             Zero-coupon inflation swap quotes attached inline.
         quote_set : str | None, default None
@@ -1866,6 +1879,7 @@ class CalibrationStep:
         id: str,
         discount_curve_id: str,
         forward_curve_id: str,
+        index_id: str,
         currency: str,
         base_date: str,
         quotes: list[Quote] | None = None,
@@ -1879,11 +1893,19 @@ class CalibrationStep:
         id : str
             Unique step identifier.
         discount_curve_id : str
-            Identifier of the discounting curve.
+            Identifier of the discounting curve and output-key prefix. Scalar fits
+            write ``"{discount_curve_id}_CAPFLOOR_HW1F_KAPPA"`` and
+            ``"{discount_curve_id}_CAPFLOOR_HW1F_SIGMA"``. Piecewise fits write the
+            same kappa scalar and the sigma series
+            ``"{discount_curve_id}_CAPFLOOR_HW1F_SIGMA_SCHEDULE"``.
         forward_curve_id : str
             Identifier of the curve projecting the caplet forwards.
+        index_id : str
+            Term-rate index identifier, for example ``"EUR-EURIBOR-3M"``. Its
+            conventions determine settlement, fixing and payment dates, calendars,
+            and accrual fractions. Calibration rejects overnight indices.
         currency : str
-            ISO 4217 code of the model currency.
+            ISO 4217 code of the model currency; must match the index conventions.
         base_date : str
             Model base date as an ISO date string.
         quotes : list[RateQuote | CdsQuote | VolQuote] | None, default None
@@ -1911,9 +1933,10 @@ class CalibrationStep:
         >>> from finstack_quant.calibration import CalibrationStep
         >>> CalibrationStep.cap_floor_hull_white(
         ...     "hw_cf",
-        ...     "usd_ois",
-        ...     "usd_3m",
-        ...     "USD",
+        ...     "eur_ois",
+        ...     "eur_3m",
+        ...     "EUR-EURIBOR-3M",
+        ...     "EUR",
         ...     "2024-06-28",
         ...     quote_set="caps",
         ...     fit_tolerance=1e-4,
@@ -3542,7 +3565,9 @@ class CalibrationResult:
         Parameters
         ----------
         json : str
-            Result JSON produced by :meth:`to_json`.
+            Result JSON using schema ``finstack_quant.calibration/1``. The
+            canonical loader limits input to 64 MiB, JSON nesting to 96
+            containers, and retained diagnostics to 256 findings.
 
         Returns
         -------
@@ -3551,10 +3576,15 @@ class CalibrationResult:
 
         Raises
         ------
-        CalibrationEnvelopeError
-            If the JSON is malformed, the schema marker is wrong, or unknown
-            fields are present. The exception's ``diagnostics`` list carries a
-            JSON pointer, message and expected value for each failure.
+        ContractValidationError
+            If the JSON or envelope shape is invalid, unknown fields are
+            present, the schema marker is missing, malformed, or unsupported,
+            or nested market restoration fails. Structured market
+            failures carry pointer-level findings in the ``report`` attribute.
+        ContractLimitExceededError
+            If the input exceeds the canonical byte or nesting-depth limits.
+        ValueError
+            If an invalid nested value cannot be restored.
 
         Examples
         --------

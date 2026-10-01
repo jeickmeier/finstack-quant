@@ -133,8 +133,23 @@ pub(super) fn build_overnight_coupon(
                         observation_date,
                         DayCountContext::default(),
                     )?;
+                    let curve_end_time = forward.day_count().year_fraction(
+                        forward.base_date(),
+                        observation_end,
+                        DayCountContext::default(),
+                    )?;
                     let accrual = f64::from(tenor_days) / day_count_basis;
-                    let base_index_rate = forward.rate_period(curve_time, curve_time + accrual);
+                    let curve_accrual = curve_end_time - curve_time;
+                    let base_index_rate =
+                        forward.rate_period(curve_time, curve_end_time) * curve_accrual / accrual;
+                    if !curve_accrual.is_finite()
+                        || curve_accrual <= 0.0
+                        || !base_index_rate.is_finite()
+                    {
+                        return Err(Error::Validation(format!(
+                            "bond hazard LSMC has an invalid projection interval for overnight observation {observation_date} to {observation_end}"
+                        )));
+                    }
                     let base_df = discount.df_between_dates(observation_date, observation_end)?;
                     if !base_df.is_finite() || base_df <= 0.0 {
                         return Err(Error::Validation(format!(
@@ -405,6 +420,9 @@ pub(super) fn static_balance_delta(flow: &CashFlow, terminal_redemption: bool) -
     if terminal_redemption {
         return None;
     }
+    if let Some(delta) = flow.principal_delta {
+        return Some(delta.amount());
+    }
     match flow.kind {
         CFKind::Pik => Some(flow.amount.amount()),
         CFKind::Amortization
@@ -417,6 +435,13 @@ pub(super) fn static_balance_delta(flow: &CashFlow, terminal_redemption: bool) -
     }
 }
 
+pub(super) fn is_terminal_redemption(flow: &CashFlow, final_date: Option<Date>) -> bool {
+    flow.kind == CFKind::Notional
+        && flow.amount.amount() > 0.0
+        && flow.principal_delta.is_none()
+        && final_date.is_some_and(|date| flow.date == date)
+}
+
 pub(super) fn scheduled_outstanding_after(
     bond: &Bond,
     flows: &[CashFlow],
@@ -424,15 +449,15 @@ pub(super) fn scheduled_outstanding_after(
     final_redemption_date: Option<Date>,
 ) -> Result<f64> {
     let mut outstanding = bond.notional.amount();
-    for flow in flows.iter().filter(|flow| flow.date <= date) {
+    for flow in flows.iter().filter(|flow| flow.get_balance_date() <= date) {
         if flow.kind == CFKind::Notional
             && flow.date == bond.issue_date
             && flow.amount.amount() < 0.0
+            && flow.principal_delta.is_none()
         {
             continue;
         }
-        let terminal_redemption = flow.kind == CFKind::Notional
-            && final_redemption_date.is_some_and(|redemption| flow.date == redemption);
+        let terminal_redemption = is_terminal_redemption(flow, final_redemption_date);
         if let Some(delta) = static_balance_delta(flow, terminal_redemption) {
             outstanding += delta;
         }

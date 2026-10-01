@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { isDeepStrictEqual } from "node:util";
-import { itemMetadata, metadataInputs } from "./registry-metadata.mjs";
+import { itemMetadata, metadataInputs, pinWasm } from "./registry-metadata.mjs";
 import { loadRegistry } from "shadcn/registry";
 import { shadcnItems, shadcnClosure, checkShadcn } from "./shadcn.mjs";
 
@@ -153,7 +153,7 @@ export async function checkRegistry(cwd) {
   checkImports(registry.items, contents);
   const graph = checkGraph(registry.items),
     inputs = await metadataInputs(cwd);
-  for (const item of registry.items)
+  for (const item of registry.items) {
     if (
       !isDeepStrictEqual(
         { categories: item.categories, meta: item.meta },
@@ -161,6 +161,16 @@ export async function checkRegistry(cwd) {
       )
     )
       throw new Error(`Registry metadata drift: ${item.name}`);
+    if (
+      !isDeepStrictEqual(
+        item.dependencies,
+        pinWasm(item.dependencies, inputs.wasmVersion),
+      )
+    )
+      throw new Error(
+        `Registry WASM pin drift: ${item.name} must depend on finstack-quant-wasm@${inputs.wasmVersion}`,
+      );
+  }
   const generated = await readdir(path.join(cwd, "src/generated"), {
     recursive: true,
     withFileTypes: true,

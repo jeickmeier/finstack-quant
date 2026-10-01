@@ -3386,6 +3386,11 @@ export interface ScheduleParams {
   /**
    * Whether end-of-month rolling should be preserved when generating the
    * schedule.
+   *
+   * Incompatible with explicit IMM roll rules. With ACT/ACT ICMA, the
+   * regular grid anchor must be month-end: maturity for front stubs, or
+   * start for back stubs and schedules without stubs. An irregular opposite
+   * endpoint remains supported.
    */
   end_of_month?: boolean;
   frequency: Tenor;

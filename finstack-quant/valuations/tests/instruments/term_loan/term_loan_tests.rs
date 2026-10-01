@@ -354,10 +354,10 @@ fn term_loan_pik_toggle_and_cash_sweep() {
     let market = mc();
     let sched = loan.cashflow_schedule(&market, issue).unwrap();
     assert!(!sched.get_flows().is_empty());
-    // Holder-view schedules omit PIK accretion because it capitalizes into
-    // outstanding rather than paying cash to the holder.
+    // Canonical schedules retain PIK classification for accrual and balance
+    // replay, while dated settlement views exclude its non-cash amount.
     let has_pik = sched.get_flows().iter().any(|cf| cf.kind == CFKind::Pik);
-    assert!(!has_pik);
+    assert!(has_pik);
 
     let cash_coupon_dates: Vec<_> = sched
         .get_flows()

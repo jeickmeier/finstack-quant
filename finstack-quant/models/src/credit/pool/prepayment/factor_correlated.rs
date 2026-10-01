@@ -23,7 +23,7 @@
 //! - Factor loading (β): 0.3-0.5
 //! - CPR volatility (σ): 0.15-0.30
 
-use super::super::clamped_cpr_to_smm;
+use super::super::{clamped_cpr_to_smm, expected_shocked_smm};
 use super::traits::StochasticPrepayment;
 use finstack_quant_cashflows::builder::smm_to_cpr;
 use finstack_quant_cashflows::builder::specs::{PrepaymentCurve, PrepaymentModelSpec};
@@ -119,14 +119,10 @@ impl StochasticPrepayment for FactorCorrelatedPrepay {
 
     fn expected_smm(&self, seasoning: u32) -> f64 {
         let base_cpr = self.base_cpr_at_seasoning(seasoning);
-
-        // Jensen correction for the lognormal factor shock:
-        // E[exp(β × Z × σ)] = exp(0.5 × β² × σ²) for Z ~ N(0,1), so the
-        // unconditional mean CPR is base × that factor. Matches the
-        // Richard-Roll model's `expected_smm` so the reported expectation
-        // is consistent with the simulated mean.
-        let jensen = (0.5 * (self.factor_loading * self.cpr_volatility).powi(2)).exp();
-        clamped_cpr_to_smm((base_cpr * jensen).clamp(0.0, 1.0))
+        if base_cpr < 1e-10 {
+            return 0.0;
+        }
+        expected_shocked_smm(base_cpr, self.factor_loading * self.cpr_volatility)
     }
 
     fn factor_loading(&self) -> f64 {
@@ -141,6 +137,21 @@ impl StochasticPrepayment for FactorCorrelatedPrepay {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn expected_smm_matches_conditional_rate_with_clipping_and_nonlinear_conversion() {
+        let model = FactorCorrelatedPrepay::new(PrepaymentModelSpec::constant_cpr(0.20), 1.0, 1.0);
+        let step = 0.0001;
+        let integrated: f64 = (0..200_000)
+            .map(|i| {
+                let z = -10.0 + (f64::from(i) + 0.5) * step;
+                let density = (-0.5 * z * z).exp() / (2.0 * std::f64::consts::PI).sqrt();
+                model.conditional_smm(30, &[z], 0.05, 1.0) * density * step
+            })
+            .sum();
+        assert!((model.expected_smm(30) - integrated).abs() < 2e-6);
+        assert!(model.expected_smm(30) > 0.08);
+    }
 
     #[test]
     fn test_factor_correlated_creation() {

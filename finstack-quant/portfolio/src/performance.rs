@@ -262,16 +262,22 @@ pub fn twrr_linked(
 /// boundary.
 ///
 /// The returned annualized rate uses the core XIRR helper's `Act/365F` basis.
+/// Net dated flows must change sign exactly once. Nonconventional streams
+/// with additional sign changes are rejected because their return can be
+/// ambiguous; this function does not select among multiple roots.
 ///
 /// # Arguments
 ///
 /// * `cashflows` - Dated investor-perspective cashflows: contributions are
-///   negative and withdrawals or terminal value are positive.
+///   negative and withdrawals or terminal value are positive. Dates may be
+///   unsorted; equal dates are netted and zeros removed before requiring
+///   exactly one sign change.
 ///
 /// # Errors
 ///
 /// Propagates XIRR validation and numerical-solver errors, including an
-/// insufficient or invalid cashflow series and failure to find a root.
+/// insufficient or invalid cashflow series, more than one net sign change,
+/// and failure to find an accurate finite return greater than -1.
 pub fn mwr_xirr(cashflows: &[(Date, f64)]) -> finstack_quant_core::Result<f64> {
     finstack_quant_core::cashflow::xirr(cashflows, None)
 }

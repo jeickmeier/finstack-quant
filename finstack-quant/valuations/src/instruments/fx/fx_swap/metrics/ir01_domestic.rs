@@ -45,14 +45,19 @@ impl MetricCalculator for DomesticIR01 {
             let df_dom_near_b = ctx.df_dom_near * (-bump * t_near).exp();
             let df_dom_far_b = ctx.df_dom_far * (-bump * t_far).exp();
 
-            // Far rate uses bumped domestic DF in parity if not fixed
+            let near_rate = match fx_swap.near_rate {
+                Some(rate) => rate,
+                None => FxSwapPricingContext::calculate_cip_forward(
+                    ctx.model_spot,
+                    df_dom_near_b,
+                    ctx.df_for_near,
+                )?,
+            };
             let far_rate = match fx_swap.far_rate {
                 Some(rate) => rate,
                 None => FxSwapPricingContext::calculate_cip_forward(
-                    ctx.contract_near_rate,
-                    df_dom_near_b,
+                    ctx.model_spot,
                     df_dom_far_b,
-                    ctx.df_for_near,
                     ctx.df_for_far,
                 )?,
             };
@@ -61,12 +66,8 @@ impl MetricCalculator for DomesticIR01 {
             let pv_for_leg = ctx.pv_foreign_leg_base();
 
             // Domestic leg PV with bumped DFs
-            let pv_dom_leg = ctx.pv_domestic_leg_with_params(
-                ctx.contract_near_rate,
-                far_rate,
-                df_dom_near_b,
-                df_dom_far_b,
-            );
+            let pv_dom_leg =
+                ctx.pv_domestic_leg_with_params(near_rate, far_rate, df_dom_near_b, df_dom_far_b);
 
             Ok(pv_for_leg * ctx.model_spot + pv_dom_leg)
         };

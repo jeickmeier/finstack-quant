@@ -310,52 +310,7 @@ impl Money {
     /// assert_eq!(money.amount_decimal().to_string(), "1.245");
     /// ```
     pub fn from_decimal_str(amount: &str, currency: Currency) -> Result<Self, Error> {
-        use rust_decimal::Decimal;
-        let invalid = |error| {
-            Error::Validation(format!(
-                "money amount must be exactly representable as Decimal: {error}"
-            ))
-        };
-        let out_of_range = || {
-            Error::Validation("money amount must be exactly representable as Decimal".to_string())
-        };
-        let decimal = if let Some((mantissa, exponent)) = amount.split_once(['e', 'E']) {
-            let parsed = Decimal::from_str_exact(mantissa).map_err(invalid)?;
-            let exponent = exponent.parse::<i64>().map_err(|error| {
-                Error::Validation(format!("invalid scientific exponent: {error}"))
-            })?;
-            let mut coefficient = parsed.mantissa();
-            if coefficient == 0 {
-                Decimal::ZERO
-            } else {
-                let mut scale = i64::from(parsed.scale())
-                    .checked_sub(exponent)
-                    .ok_or_else(out_of_range)?;
-                while scale > i64::from(Decimal::MAX_SCALE) && coefficient % 10 == 0 {
-                    coefficient /= 10;
-                    scale -= 1;
-                }
-                let scale = if scale < 0 {
-                    let shift = u32::try_from(scale.unsigned_abs()).map_err(|_| out_of_range())?;
-                    if shift > Decimal::MAX_SCALE {
-                        return Err(out_of_range());
-                    }
-                    coefficient = coefficient
-                        .checked_mul(10_i128.pow(shift))
-                        .ok_or_else(out_of_range)?;
-                    0
-                } else {
-                    u32::try_from(scale)
-                        .ok()
-                        .filter(|scale| *scale <= Decimal::MAX_SCALE)
-                        .ok_or_else(out_of_range)?
-                };
-                Decimal::try_from_i128_with_scale(coefficient, scale).map_err(invalid)?
-            }
-        } else {
-            Decimal::from_str_exact(amount).map_err(invalid)?
-        };
-        Self::from_decimal(decimal, currency)
+        Self::from_decimal(crate::decimal::parse_decimal(amount)?, currency)
     }
 
     /// Construct from an exact Decimal using the configured ingest rounding policy.
@@ -374,7 +329,7 @@ impl Money {
         currency: Currency,
         cfg: &FinstackConfig,
     ) -> Result<Self, Error> {
-        let scale = cfg.ingest_scale(currency).min(28) as i32;
+        let scale = cfg.ingest_scale(currency) as i32;
         Self::from_decimal(
             super::rounding::round_decimal(amount, scale, cfg.rounding.mode),
             currency,
@@ -854,8 +809,8 @@ impl Money {
     /// let mut cfg = FinstackConfig::default();
     /// cfg.rounding
     ///     .output_scale
-    ///     .overrides
-    ///     .insert(Currency::USD, 4);
+    ///     .set_scale(Currency::USD, 4)
+    ///     .expect("supported decimal scale");
     /// assert_eq!(amt.format_with_config(&cfg), "USD 10.0000");
     /// ```
     ///
@@ -1275,7 +1230,10 @@ mod tests {
     #[test]
     fn try_new_with_config_succeeds_for_finite_values() {
         let mut cfg = FinstackConfig::default();
-        cfg.rounding.ingest_scale.overrides.insert(Currency::USD, 3);
+        cfg.rounding
+            .ingest_scale
+            .set_scale(Currency::USD, 3)
+            .expect("valid decimal scale");
         let m = Money::new_with_config(1.2345, Currency::USD, &cfg).expect("Finite should succeed");
         assert!((m.amount() - 1.234).abs() < 1e-9);
     }
@@ -1289,7 +1247,10 @@ mod tests {
     #[test]
     fn try_new_with_config_honors_ingest_scale_override() {
         let mut cfg = FinstackConfig::default();
-        cfg.rounding.ingest_scale.overrides.insert(Currency::USD, 2);
+        cfg.rounding
+            .ingest_scale
+            .set_scale(Currency::USD, 2)
+            .expect("valid decimal scale");
         let m = Money::new_with_config(10.999, Currency::USD, &cfg).expect("Finite should succeed");
         assert!((m.amount() - 11.00).abs() < 1e-12);
     }

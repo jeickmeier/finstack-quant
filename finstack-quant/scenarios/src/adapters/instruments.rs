@@ -184,8 +184,12 @@ where
         return 0;
     };
 
+    // Composite cloning preserves frozen state and overrides while clearing
+    // its boxed-leg cache. Mutate this distinct definition, then replace the
+    // original only when a descendant actually changed.
+    let mut rebuilt = composite.clone();
     let mut changed = 0usize;
-    for leg in &mut composite.spec.legs {
+    for leg in &mut rebuilt.spec.legs {
         let Ok(mut child) = leg.instrument.as_ref().clone().into_boxed() else {
             continue;
         };
@@ -197,6 +201,9 @@ where
             *leg.instrument = updated;
             changed += child_changed;
         }
+    }
+    if changed > 0 {
+        *instrument = Box::new(rebuilt);
     }
     changed
 }

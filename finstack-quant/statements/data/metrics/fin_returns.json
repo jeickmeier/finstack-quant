@@ -26,7 +26,7 @@
       "id": "roic",
       "name": "Return on Invested Capital",
       "formula": "(revenue - cogs - opex - depreciation - amortization - taxes) / (total_debt + total_equity)",
-      "description": "NOPAT as percentage of invested capital. NOPAT is approximated as EBIT minus reported taxes (rather than EBIT times one minus a marginal tax rate), which is exact when there is no debt tax shield and slightly understates ROIC otherwise. CONVENTION: `opex` excludes depreciation and amortization.",
+      "description": "NOPAT as percentage of invested capital. NOPAT is approximated as EBIT minus reported taxes (rather than EBIT times one minus a marginal tax rate). With a deductible interest expense and otherwise identical tax assumptions, this overstates operating ROIC by the interest tax shield divided by invested capital. CONVENTION: `opex` excludes depreciation and amortization.",
       "category": "returns",
       "unit_type": "percentage",
       "requires": ["revenue", "cogs", "opex", "depreciation", "amortization", "taxes", "total_debt", "total_equity"],

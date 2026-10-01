@@ -96,6 +96,7 @@ fn npl_deal(spec: LiquidationSpec) -> StructuredCredit {
     .expect("structure");
     let mut deal =
         StructuredCredit::new_rmbs("NPL-T18", pool, tranches, close(), maturity(), "USD-OIS")
+            .expect("valid structured-credit dates")
             .with_calendar_id("nyse");
     deal.fees = None;
     deal.loss_allocation = Some(LossAllocationPolicy::ParPreserving);

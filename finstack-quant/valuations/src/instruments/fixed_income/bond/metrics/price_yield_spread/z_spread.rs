@@ -166,6 +166,11 @@ impl BondZSpreadPricingKernel {
         };
         let disc = curves.get_discount(&bond.discount_curve_id)?;
         let day_count = disc.day_count();
+        let periods = if day_count == finstack_quant_core::dates::DayCount::Act365L {
+            crate::instruments::fixed_income::bond::pricing::time_basis::bond_coupon_periods(bond)?
+        } else {
+            Vec::new()
+        };
         let cached_flows = spread_flows
             .iter()
             .filter(|(date, _)| *date > quote_date)
@@ -174,7 +179,12 @@ impl BondZSpreadPricingKernel {
                     // Supply the coupon frequency so ICMA-style curve day
                     // counts (which require a reference frequency) don't
                     // hard-error; ignored by ACT/30-360 conventions.
-                    let t = day_count.year_fraction(
+                    let t = if day_count == finstack_quant_core::dates::DayCount::Act365L {
+                        crate::instruments::fixed_income::bond::pricing::time_basis::act365l_year_fraction(
+                            bond.cashflow_spec.frequency(), &periods, quote_date, *date,
+                        )?
+                    } else {
+                        day_count.year_fraction(
                         quote_date,
                         *date,
                         DayCountContext {
@@ -184,7 +194,8 @@ impl BondZSpreadPricingKernel {
                             ),
                             ..DayCountContext::default()
                         },
-                    )?;
+                        )?
+                    };
                     let df_base = disc.df_between_dates(quote_date, *date)?;
                     Ok((t, df_base, amount.amount()))
                 },

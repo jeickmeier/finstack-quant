@@ -172,6 +172,8 @@
       "convention": "act_365l",
       "start_date": "2024-01-01",
       "end_date": "2024-03-01",
+      "frequency": "1Y",
+      "coupon_period": ["2024-01-01", "2024-03-01"],
       "expected": {
         "actual_days": 60,
         "denominator": 366,
@@ -186,6 +188,8 @@
       "convention": "act_365l",
       "start_date": "2024-03-01",
       "end_date": "2024-06-01",
+      "frequency": "1Y",
+      "coupon_period": ["2024-03-01", "2024-06-01"],
       "expected": {
         "actual_days": 92,
         "denominator": 365,
@@ -200,6 +204,8 @@
       "convention": "act_365l",
       "start_date": "2024-01-01",
       "end_date": "2024-02-28",
+      "frequency": "1Y",
+      "coupon_period": ["2024-01-01", "2024-02-28"],
       "expected": {
         "actual_days": 58,
         "denominator": 365,

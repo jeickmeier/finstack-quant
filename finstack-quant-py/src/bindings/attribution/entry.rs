@@ -50,8 +50,10 @@ fn build_spec(
     method: &Bound<'_, PyAny>,
     options: AttributionOptions<'_, '_>,
 ) -> PyResult<AttributionSpec> {
-    let market_t0 = MarketContextState::from(&*extract_market_ref(py, market_t0)?);
-    let market_t1 = MarketContextState::from(&*extract_market_ref(py, market_t1)?);
+    let market_t0 =
+        MarketContextState::try_from(&*extract_market_ref(py, market_t0)?).map_err(core_to_py)?;
+    let market_t1 =
+        MarketContextState::try_from(&*extract_market_ref(py, market_t1)?).map_err(core_to_py)?;
     let as_of_t0 = extract_date(as_of_t0)?;
     let as_of_t1 = extract_date(as_of_t1)?;
     let method: AttributionMethod = serde_json::from_value(py_to_json_value(py, method, "method")?)
@@ -153,7 +155,8 @@ fn build_spec(
 /// ------
 /// ValueError
 ///     If an input JSON, the method or config cannot be parsed, a date is
-///     malformed, or attribution validation / pricing fails.
+///     malformed, the FX provider cannot supply a coherent market snapshot,
+///     or attribution validation / pricing fails.
 /// KeyError
 ///     If a required curve, market item, calendar, or FX leg is missing.
 /// RuntimeError
@@ -255,7 +258,8 @@ pub(crate) fn attribute_pnl(
 /// ------
 /// ValueError
 ///     If any input cannot be parsed or an instrument's attribution fails
-///     validation / pricing, or a result mixes currencies across factors.
+///     validation / pricing, the FX provider cannot supply a coherent market
+///     snapshot, or a result mixes currencies across factors.
 /// KeyError
 ///     If a required curve, market item, calendar, or FX leg is missing.
 /// RuntimeError
@@ -474,6 +478,7 @@ pub(crate) fn attribute_pnl_envelope_json(py: Python<'_>, spec_json: &str) -> Py
 /// ------
 /// ValueError
 ///     If the spec is malformed, ``as_of`` is missing for a DataFrame,
+///     numeric inputs or derived weights, contributions, or aggregates are non-finite,
 ///     positions are empty, weighting modes are mixed, or benchmark inputs
 ///     are incomplete, or a Brinson group has zero net weight but nonzero
 ///     return contribution. Split offsetting long/short positions into distinct groups.
@@ -546,7 +551,7 @@ pub(crate) fn validate_attribution_json(json: &str) -> PyResult<String> {
 /// ------
 /// ValueError
 ///     If ``spec_json`` is malformed or violates the weighting / benchmark
-///     invariants.
+///     invariants, or a derived weight, contribution, or aggregate is non-finite.
 #[pyfunction]
 pub(crate) fn validate_return_contribution_json(spec_json: &str) -> PyResult<String> {
     finstack_quant_attribution::validate_return_contribution_json(spec_json).map_err(core_to_py)

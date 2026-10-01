@@ -91,16 +91,15 @@ use finstack_quant_core::math::fractional::HurstExponent;
 /// Cheyette + rough stochastic volatility model parameters.
 ///
 /// Encapsulates all inputs required to define the Cheyette dynamics with a
-/// rough vol driver.  The forward variance curve `sigma_base` and the initial
-/// forward rate curve `phi` are marked `#[serde(skip)]` because they are
-/// typically reconstructed from market data rather than round-tripped through
-/// plain-text serialization.
+/// rough vol driver. Serialization preserves both the base-volatility curve
+/// and initial-forward curve; deserialization validates the complete model
+/// through the same constructor used for market inputs.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(try_from = "RawCheyetteRoughVolParams")]
 pub struct CheyetteRoughVolParams {
     /// Mean reversion of the short rate (κ > 0).
     pub kappa: f64,
     /// Base volatility term structure σ₀(t) for the rate process.
-    #[serde(skip, default)]
     pub sigma_base: ForwardVarianceCurve,
     /// Hurst exponent H ∈ (0, 0.5) for the rough vol driver.
     pub hurst: HurstExponent,
@@ -109,11 +108,42 @@ pub struct CheyetteRoughVolParams {
     /// Correlation between rate and vol innovations ρ ∈ [-1, 1].
     pub rho: f64,
     /// Time knots for the initial forward rate curve φ(t) = f(0, t).
-    #[serde(skip)]
     phi_times: Vec<f64>,
     /// Value knots for the initial forward rate curve φ(t) = f(0, t).
-    #[serde(skip)]
     phi_values: Vec<f64>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawCheyetteRoughVolParams {
+    kappa: f64,
+    sigma_base: ForwardVarianceCurve,
+    hurst: HurstExponent,
+    eta: f64,
+    rho: f64,
+    phi_times: Vec<f64>,
+    phi_values: Vec<f64>,
+}
+
+impl TryFrom<RawCheyetteRoughVolParams> for CheyetteRoughVolParams {
+    type Error = finstack_quant_core::Error;
+
+    fn try_from(raw: RawCheyetteRoughVolParams) -> finstack_quant_core::Result<Self> {
+        if raw.phi_times.len() != raw.phi_values.len() {
+            return Err(finstack_quant_core::Error::Validation(
+                "CheyetteRoughVol phi times and values must have equal length".to_string(),
+            ));
+        }
+        let phi_points: Vec<_> = raw.phi_times.into_iter().zip(raw.phi_values).collect();
+        Self::new(
+            raw.kappa,
+            raw.sigma_base,
+            raw.hurst,
+            raw.eta,
+            raw.rho,
+            &phi_points,
+        )
+    }
 }
 
 impl CheyetteRoughVolParams {
@@ -380,6 +410,66 @@ mod tests {
             &make_phi_points(),
         );
         assert!(params.is_ok());
+    }
+
+    #[test]
+    fn serde_round_trip_preserves_required_curves_and_path_state() {
+        let params = CheyetteRoughVolParams::new(
+            0.03,
+            ForwardVarianceCurve::from_points(&[(0.0, 0.005), (2.0, 0.008)]).expect("valid curve"),
+            make_hurst(0.1),
+            1.5,
+            -0.3,
+            &make_phi_points(),
+        )
+        .expect("valid parameters");
+        let json = serde_json::to_string(&params).expect("serialize parameters");
+        let restored: CheyetteRoughVolParams =
+            serde_json::from_str(&json).expect("deserialize parameters");
+        for time in [0.0, 0.5, 2.0, 10.0, 35.0] {
+            assert_eq!(params.phi(time), restored.phi(time));
+            assert_eq!(
+                params.sigma_base.value(time),
+                restored.sigma_base.value(time)
+            );
+        }
+        let process = CheyetteRoughVolProcess::new(restored);
+        let mut state = PathState::new(1, 5.0);
+        process.populate_path_state(&[0.005, 0.001], &mut state);
+        assert_eq!(
+            state.get(state_keys::SHORT_RATE),
+            Some(0.005 + params.phi(5.0))
+        );
+    }
+
+    #[test]
+    fn serde_rejects_missing_or_invalid_required_curves() {
+        let params = CheyetteRoughVolParams::new(
+            0.03,
+            make_sigma_base(),
+            make_hurst(0.1),
+            1.5,
+            -0.3,
+            &make_phi_points(),
+        )
+        .expect("valid parameters");
+        let value = serde_json::to_value(params).expect("serialize parameters");
+        for field in ["sigma_base", "phi_times", "phi_values"] {
+            let mut missing = value.clone();
+            missing.as_object_mut().expect("object").remove(field);
+            assert!(serde_json::from_value::<CheyetteRoughVolParams>(missing).is_err());
+        }
+        for (field, invalid) in [
+            ("phi_times", serde_json::json!([])),
+            ("phi_values", serde_json::json!([])),
+            ("phi_times", serde_json::json!([0.0, 5.0, 3.0])),
+            ("kappa", serde_json::json!(-0.03)),
+            ("rho", serde_json::json!(1.1)),
+        ] {
+            let mut malformed = value.clone();
+            malformed[field] = invalid;
+            assert!(serde_json::from_value::<CheyetteRoughVolParams>(malformed).is_err());
+        }
     }
 
     #[test]

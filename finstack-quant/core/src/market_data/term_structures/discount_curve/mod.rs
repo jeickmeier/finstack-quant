@@ -57,8 +57,9 @@
 //! 1. **Model uncertainty**: Extrapolated forward rates are not market-implied.
 //!    For tenors 2× beyond the last knot, consider the extrapolation unreliable.
 //!
-//! 2. **Risk sensitivity**: Greeks computed in extrapolated regions may be
-//!    misleading. The curve has no sensitivity to rates beyond its last pillar.
+//! 2. **Risk sensitivity**: Greeks computed in extrapolated regions depend on
+//!    the extrapolation assumption. Continuous zero-rate shocks still act at
+//!    their specified maturities beyond the final source pillar.
 //!
 //! 3. **Regulatory considerations**: Basel III/IV and Solvency II have specific
 //!    requirements for ultra-long rate extrapolation (Smith-Wilson, UFR methods).
@@ -106,6 +107,7 @@
 
 mod builder;
 mod curve;
+mod evaluation;
 mod traits;
 mod transform;
 mod validation;
@@ -142,6 +144,8 @@ pub struct DiscountCurve {
     /// Discount factors (unitless).
     pub(crate) dfs: Box<[f64]>,
     pub(crate) interp: Interp,
+    /// Exact accumulated roll and continuous zero-rate shock evaluation.
+    transform: Option<evaluation::CurveTransform>,
     /// Interpolation style (stored for serialization and bumping)
     pub(crate) style: InterpStyle,
     /// Extrapolation policy (stored for serialization and bumping)
@@ -205,6 +209,9 @@ struct RawDiscountCurve {
     pub calibration_ois_cutoff_days: Option<i32>,
     /// Opaque FX policy stamp; see [`DiscountCurve::fx_policy`].
     pub fx_policy: Option<String>,
+    /// Canonical source interpolation and accumulated continuous transformations.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transform: Option<evaluation::CurveTransform>,
 }
 
 impl From<DiscountCurve> for RawDiscountCurve {
@@ -229,6 +236,7 @@ impl From<DiscountCurve> for RawDiscountCurve {
             rate_calibration: curve.rate_calibration,
             calibration_ois_cutoff_days: curve.calibration_ois_cutoff_days,
             fx_policy: curve.fx_policy,
+            transform: curve.transform,
         }
     }
 }
@@ -237,7 +245,7 @@ impl TryFrom<RawDiscountCurve> for DiscountCurve {
     type Error = crate::Error;
 
     fn try_from(state: RawDiscountCurve) -> crate::Result<Self> {
-        DiscountCurve::builder(state.id)
+        let mut curve = DiscountCurve::builder(state.id)
             .base_date(state.base)
             .day_count(state.day_count)
             .knots(state.knot_points)
@@ -251,7 +259,11 @@ impl TryFrom<RawDiscountCurve> for DiscountCurve {
                 allow_non_monotonic: state.allow_non_monotonic,
                 forward_floor: state.min_forward_rate,
             })
-            .build()
+            .build()?;
+        if let Some(transform) = state.transform {
+            curve.restore_transform(transform)?;
+        }
+        Ok(curve)
     }
 }
 

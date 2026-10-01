@@ -2,7 +2,7 @@
 //!
 //! Built-in calendars evaluate a linear rule list per date. Materializing each
 //! year once into a 366-bit holiday mask plus an inclusive business-day prefix
-//! makes `is_holiday` O(1) and Bus/252 counting O(years) inside the validated
+//! makes `is_holiday` O(1) and Bus/252 counting O(years) inside the cache
 //! range [`BASE_YEAR`, `END_YEAR`].
 
 use std::sync::{OnceLock, RwLock};
@@ -144,7 +144,7 @@ fn count_by_scan(cal: &Calendar, start: Date, end: Date) -> i32 {
 }
 
 /// Business days in `[start, end)` using per-year prefix sums when the
-/// half-open interval lies inside the validated year range.
+/// half-open interval lies inside the cache year range.
 pub(super) fn count_business_days_cached(cal: &Calendar, start: Date, end: Date) -> i32 {
     if start >= end {
         return 0;

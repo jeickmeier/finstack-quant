@@ -63,7 +63,9 @@ impl MetricCalculator for MoosmullerYtmCalculator {
             })
         })?;
 
-        crate::instruments::fixed_income::bond::pricing::ytm_solver::solve_ytm(
+        let bond: &Bond = context.instrument_as()?;
+        crate::instruments::fixed_income::bond::pricing::ytm_solver::solve_bond_ytm(
+            bond,
             flows,
             quote_ctx.quote_date,
             dirty,

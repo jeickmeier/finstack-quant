@@ -718,11 +718,11 @@
       "properties": {
         "ingest_scale_by_currency": {
           "additionalProperties": {
-            "format": "uint32",
+            "maximum": 28,
             "minimum": 0,
             "type": "integer"
           },
-          "description": "Ingest scale map snapshot by currency code.",
+          "description": "Validated ingest scale snapshot by currency code, with values in `0..=28`.",
           "type": "object"
         },
         "mode": {
@@ -731,11 +731,11 @@
         },
         "output_scale_by_currency": {
           "additionalProperties": {
-            "format": "uint32",
+            "maximum": 28,
             "minimum": 0,
             "type": "integer"
           },
-          "description": "Output scale map snapshot by currency code.",
+          "description": "Validated output scale snapshot by currency code, with values in `0..=28`.",
           "type": "object"
         },
         "tolerances": {

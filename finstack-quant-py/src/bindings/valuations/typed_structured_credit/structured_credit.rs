@@ -123,7 +123,7 @@ impl PyStructuredCredit {
     /// Raises
     /// ------
     /// ValueError
-    ///     If the deal fails pricing validation.
+    ///     If the deal fails pricing validation or its first registry payment period exceeds the supported calendar range.
     ///
     /// Examples
     /// --------
@@ -179,7 +179,8 @@ impl PyStructuredCredit {
             extract_date(closing_date)?,
             extract_date(maturity)?,
             discount_curve_id,
-        );
+        )
+        .map_err(core_to_py)?;
         if let Some(calendar_id) = calendar_id {
             inner = inner.with_calendar_id(calendar_id);
         }
@@ -214,7 +215,8 @@ impl PyStructuredCredit {
             extract_date(closing_date)?,
             extract_date(maturity)?,
             discount_curve_id,
-        );
+        )
+        .map_err(core_to_py)?;
         if let Some(calendar_id) = calendar_id {
             inner = inner.with_calendar_id(calendar_id);
         }
@@ -249,7 +251,8 @@ impl PyStructuredCredit {
             extract_date(closing_date)?,
             extract_date(maturity)?,
             discount_curve_id,
-        );
+        )
+        .map_err(core_to_py)?;
         if let Some(calendar_id) = calendar_id {
             inner = inner.with_calendar_id(calendar_id);
         }
@@ -284,7 +287,8 @@ impl PyStructuredCredit {
             extract_date(closing_date)?,
             extract_date(maturity)?,
             discount_curve_id,
-        );
+        )
+        .map_err(core_to_py)?;
         if let Some(calendar_id) = calendar_id {
             inner = inner.with_calendar_id(calendar_id);
         }

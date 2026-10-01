@@ -63,6 +63,7 @@ fn create_deal(id: &str, balance: f64) -> StructuredCredit {
         legal_maturity(),
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse")
 }
 

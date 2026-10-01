@@ -46,7 +46,9 @@ const SOBOL_QMC_REPLICATES: usize = 16;
 /// Configuration for path-dependent option pricing.
 #[derive(Debug, Clone)]
 pub struct PathDependentPricerConfig {
-    /// Number of Monte Carlo paths
+    /// Independent Monte Carlo estimators; at least two are required. With
+    /// antithetic sampling each estimator averages two physical paths. For
+    /// Sobol sampling this is the total point budget across independent scrambles.
     pub num_paths: usize,
     /// Random seed
     pub seed: u64,
@@ -191,7 +193,7 @@ impl PathDependentPricerConfig {
     ///
     /// Returns [`finstack_quant_core::Error::Validation`] when:
     ///
-    /// - `num_paths == 0`,
+    /// - `num_paths < 2` (sampling uncertainty requires two independent estimators),
     /// - `chunk_size == 0`,
     /// - `use_sobol && use_parallel` (Sobol cannot be split into independent
     ///   per-thread streams),
@@ -200,9 +202,10 @@ impl PathDependentPricerConfig {
     /// - sampled path capture is enabled with `count == 0` or
     ///   `count > num_paths`.
     pub fn validate(&self) -> Result<()> {
-        if self.num_paths == 0 {
+        if self.num_paths < 2 {
             return Err(finstack_quant_core::Error::Validation(
-                "PathDependentPricerConfig: num_paths must be greater than zero".to_string(),
+                "PathDependentPricerConfig: num_paths must provide at least two independent estimators"
+                    .to_string(),
             ));
         }
         if self.chunk_size == 0 {
@@ -374,6 +377,14 @@ impl PathDependentPricer {
             antithetic: false,
         };
         let engine = McEngine::new(engine_config);
+        engine.validate_runtime(
+            process,
+            &initial_state,
+            discount_factor,
+            Some(&process.metadata()),
+        )?;
+        McEngine::validate_scheme_pairing(process, &disc)?;
+        engine.validate_payoff_schedule(payoff)?;
 
         let num_factors = process.num_factors();
         let num_steps = time_grid.num_steps();
@@ -413,7 +424,7 @@ impl PathDependentPricer {
         // replicate means — the only statistically valid error estimate for
         // QMC (points within one scrambled sequence are dependent by
         // construction, so a plain sample stderr over them is meaningless).
-        let replicates = SOBOL_QMC_REPLICATES.min(self.config.num_paths.max(1));
+        let replicates = SOBOL_QMC_REPLICATES.min(self.config.num_paths);
         let base_paths = self.config.num_paths / replicates;
         let remainder = self.config.num_paths % replicates;
 
@@ -522,8 +533,8 @@ impl PathDependentPricer {
 
         // Mean and stderr across replicate means (valid RQMC error estimate);
         // `num_paths` and `std_dev` keep the per-path semantics for
-        // reporting. With fewer than two replicates the stderr is undefined
-        // (NaN), matching plain-MC behavior at one path.
+        // reporting. Configuration validation guarantees at least two
+        // independent replicate means for sampling uncertainty.
         let estimate = Estimate::new(
             replicate_means.mean(),
             replicate_means.stderr(),
@@ -790,6 +801,45 @@ impl PathDependentPricer {
     where
         P: Payoff,
     {
+        self.price_with_paths_and_grid(
+            process,
+            initial_spot,
+            TimeGrid::uniform(time_to_maturity, num_steps)?,
+            payoff,
+            currency,
+            discount_factor,
+        )
+    }
+
+    /// Price with captured paths on a grid containing the contractual events.
+    ///
+    /// # Arguments
+    ///
+    /// * `process` - GBM dynamics, including any cumulative carry schedule.
+    /// * `initial_spot` - Positive initial asset price in payoff price units.
+    /// * `time_grid` - Simulation times in the process clock, starting at zero.
+    ///   Include every required observation time; equal-time observations are
+    ///   represented by their multiplicity in the payoff.
+    /// * `payoff` - Path payoff observing the supplied grid's event indices.
+    /// * `currency` - Currency of the returned estimate and captured payoffs.
+    /// * `discount_factor` - Present-value factor from payoff payment to valuation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid simulation inputs, antithetic capture, or
+    /// failures evaluating the process or payoff.
+    pub fn price_with_paths_and_grid<P>(
+        &self,
+        process: &GbmProcess,
+        initial_spot: f64,
+        time_grid: TimeGrid,
+        payoff: &P,
+        currency: Currency,
+        discount_factor: f64,
+    ) -> Result<MonteCarloResult>
+    where
+        P: Payoff,
+    {
         self.config.validate()?;
         // Path capture is incompatible with antithetic pairing (the engine
         // rejects the combination); fail loudly instead of silently pricing
@@ -803,7 +853,6 @@ impl PathDependentPricer {
             ));
         }
         if self.config.use_sobol {
-            let time_grid = TimeGrid::uniform(time_to_maturity, num_steps)?;
             return self.price_with_sobol(
                 process,
                 initial_spot,
@@ -813,8 +862,6 @@ impl PathDependentPricer {
                 discount_factor,
             );
         }
-
-        let time_grid = TimeGrid::uniform(time_to_maturity, num_steps)?;
 
         let engine_config = McEngineConfig {
             num_paths: self.config.num_paths,
@@ -867,13 +914,20 @@ impl PathDependentPricer {
     ///
     /// # Caveat
     ///
-    /// The LR estimator differentiates the path density only. For payoffs
-    /// whose *functional form* depends explicitly on σ (e.g. barrier payoffs
-    /// with a σ-dependent Brownian-bridge crossing correction), the
-    /// `E[∂f/∂σ]` term is not captured: the reported vega covers the
-    /// distributional σ-sensitivity but omits the payoff's explicit
-    /// σ-dependence. Prefer the CRN finite-difference helpers in
-    /// [`crate::monte_carlo::greeks::finite_diff`] when that term matters.
+    /// The LR estimator differentiates the path density only. Payoffs must
+    /// opt in through [`Payoff::supports_lrm_greeks`], confirming that they
+    /// have no explicit dependence on initial spot or volatility. Time-zero
+    /// observations and continuous barrier corrections are rejected; use the
+    /// CRN finite-difference helpers in [`crate::monte_carlo::greeks::finite_diff`]
+    /// for payoffs with explicit parameter dependence. The supplied rate,
+    /// dividend yield, and volatility must match the process; time-varying
+    /// drift schedules are unsupported by this constant-parameter score.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for unsupported payoff sensitivity, Sobol
+    /// sampling, antithetic sampling, a drift schedule, or score parameters
+    /// that differ from the GBM process. Propagates simulation errors.
     ///
     /// # Arguments
     ///
@@ -905,6 +959,31 @@ impl PathDependentPricer {
         P: Payoff,
     {
         self.config.validate()?;
+        if !payoff.supports_lrm_greeks() {
+            return Err(Error::Validation(
+                "LRM Greeks require a payoff independent of initial spot and volatility \
+                 when post-zero spots are fixed; use common-random-number finite differences \
+                 for time-zero observations, continuous barrier corrections, or custom payoffs \
+                 without a verified density-only sensitivity contract"
+                    .to_string(),
+            ));
+        }
+        if self.config.use_sobol {
+            return Err(Error::Validation(
+                "price_with_lrm_greeks does not support Sobol sampling".to_string(),
+            ));
+        }
+        let params = process.params();
+        let mismatched_parameters = [(rate, params.r), (div_yield, params.q), (vol, params.sigma)]
+            .into_iter()
+            .any(|(score, parameter)| {
+                !score.is_finite() || !parameter.is_finite() || (score - parameter).abs() > 0.0
+            });
+        if process.drift_schedule().is_some() || mismatched_parameters {
+            return Err(Error::Validation(
+                "LRM score parameters must match a GBM process with constant drift".to_string(),
+            ));
+        }
         // LRM Greeks require full path capture, which is incompatible with
         // antithetic pairing; fail loudly rather than silently changing the
         // estimator the caller configured.
@@ -1138,10 +1217,31 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_rejects_zero_paths() {
-        let cfg = PathDependentPricerConfig::new(0);
-        let err = cfg.validate().expect_err("zero paths must be rejected");
-        assert!(err.to_string().contains("num_paths"));
+    fn test_validate_requires_two_independent_estimators() {
+        for antithetic in [false, true] {
+            for num_paths in [0, 1] {
+                let cfg = PathDependentPricerConfig::new(num_paths)
+                    .with_parallel(false)
+                    .with_sobol(false)
+                    .with_antithetic(antithetic);
+                let err = cfg.validate().expect_err("too few independent estimators");
+                assert!(err.to_string().contains("num_paths"));
+            }
+            PathDependentPricerConfig::new(2)
+                .with_parallel(false)
+                .with_sobol(false)
+                .with_antithetic(antithetic)
+                .validate()
+                .expect("two estimators, including two antithetic pairs");
+        }
+        for num_paths in [0, 1, 2] {
+            let result = PathDependentPricerConfig::new(num_paths)
+                .with_parallel(false)
+                .with_antithetic(false)
+                .with_sobol(true)
+                .validate();
+            assert_eq!(result.is_ok(), num_paths >= 2);
+        }
     }
 
     use crate::monte_carlo::paths::PathSamplingMethod;
@@ -1153,6 +1253,73 @@ mod tests {
     use finstack_quant_core::currency::Currency;
 
     use crate::monte_carlo::payoff::lookback::{Lookback, LookbackDirection};
+
+    #[test]
+    fn sobol_reuses_engine_payoff_and_runtime_validation() {
+        let gbm = GbmProcess::with_params(0.0, 0.0, 0.2).unwrap();
+        for (paths, maturity_step, discount_factor, message) in [
+            (32, 2, 1.0, "event at step 2"),
+            (32, 1, -1.0, "discount_factor"),
+            (
+                crate::monte_carlo::engine::MAX_NUM_PATHS + 1,
+                1,
+                1.0,
+                "maximum",
+            ),
+        ] {
+            let pricer = PathDependentPricer::new(
+                PathDependentPricerConfig::new(paths)
+                    .with_parallel(false)
+                    .with_antithetic(false)
+                    .with_sobol(true),
+            );
+            let payoff = EuropeanCall::new(100.0, 1.0, maturity_step);
+            let error = pricer
+                .price(&gbm, 100.0, 1.0, 1, &payoff, Currency::USD, discount_factor)
+                .expect_err("specialized Sobol pricing must preserve engine validation");
+            assert!(error.to_string().contains(message), "{error}");
+        }
+    }
+
+    #[test]
+    fn lrm_rejects_initial_spot_observations_before_simulation() {
+        let pricer =
+            PathDependentPricer::new(PathDependentPricerConfig::new(2).with_parallel(false));
+        let gbm = GbmProcess::with_params(0.0, 0.0, 0.2).unwrap();
+        let asian = AsianCall::new(90.0, 1.0, AveragingMethod::Arithmetic, vec![0]).unwrap();
+        let asian_error = pricer
+            .price_with_lrm_greeks(
+                &gbm,
+                100.0,
+                1.0,
+                1,
+                &asian,
+                Currency::USD,
+                1.0,
+                0.0,
+                0.0,
+                0.2,
+            )
+            .expect_err("a time-zero fixing has an explicit spot derivative");
+        let lookback = Lookback::new(LookbackDirection::Call, 90.0, 1.0, 1);
+        let lookback_error = pricer
+            .price_with_lrm_greeks(
+                &gbm,
+                100.0,
+                1.0,
+                1,
+                &lookback,
+                Currency::USD,
+                1.0,
+                0.0,
+                0.0,
+                0.2,
+            )
+            .expect_err("the initial lookback extremum has an explicit spot derivative");
+        for error in [asian_error, lookback_error] {
+            assert!(error.to_string().contains("common-random-number"));
+        }
+    }
 
     #[test]
     fn test_path_dependent_pricer_asian() {
@@ -1493,7 +1660,7 @@ mod tests {
 
     #[test]
     fn test_sobol_rejects_excessive_dimension() {
-        let config = PathDependentPricerConfig::new(1)
+        let config = PathDependentPricerConfig::new(2)
             .with_seed(17)
             .with_parallel(false)
             .with_sobol(true)

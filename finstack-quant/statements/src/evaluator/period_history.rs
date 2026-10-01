@@ -4,9 +4,11 @@
 //! columns. Lookups use column indices — no per-period `String` maps.
 
 use crate::types::NodeId;
-use finstack_quant_core::dates::PeriodId;
+use finstack_quant_core::dates::{Period, PeriodId, PeriodKind};
 use indexmap::IndexMap;
+use std::collections::BTreeMap;
 use std::sync::Arc;
+use time::Date;
 
 /// Columnar history of evaluated node values, one row per period.
 #[derive(Debug, Clone, Default)]
@@ -14,6 +16,8 @@ pub struct PeriodHistory {
     node_to_column: Arc<IndexMap<NodeId, usize>>,
     period_index: IndexMap<PeriodId, usize>,
     rows: Vec<Vec<Option<f64>>>,
+    period_bounds: Arc<IndexMap<PeriodId, (Date, Date)>>,
+    periods_by_start: Arc<BTreeMap<(PeriodKind, bool, Date), PeriodId>>,
 }
 
 impl PeriodHistory {
@@ -29,7 +33,54 @@ impl PeriodHistory {
             node_to_column,
             period_index: IndexMap::new(),
             rows: Vec::new(),
+            period_bounds: Arc::default(),
+            periods_by_start: Arc::default(),
         }
+    }
+
+    /// Create history retaining the model's explicit calendar boundaries.
+    ///
+    /// Fiscal daily identifiers alone do not identify Gregorian dates or leap
+    /// years. The shared bounds preserve that information through historical
+    /// expression evaluation without copying the model timeline per context.
+    pub(crate) fn with_periods(
+        node_to_column: Arc<IndexMap<NodeId, usize>>,
+        periods: &[Period],
+    ) -> Self {
+        let mut history = Self::new(node_to_column);
+        history.period_bounds = Arc::new(
+            periods
+                .iter()
+                .map(|period| (period.id, (period.start, period.end)))
+                .collect(),
+        );
+        history.periods_by_start = Arc::new(
+            periods
+                .iter()
+                .map(|period| {
+                    (
+                        (period.id.kind(), period.id.is_fiscal(), period.start),
+                        period.id,
+                    )
+                })
+                .collect(),
+        );
+        history
+    }
+
+    /// Explicit start and exclusive end dates for a model period.
+    pub(crate) fn period_bounds(&self, period: &PeriodId) -> Option<(Date, Date)> {
+        self.period_bounds.get(period).copied()
+    }
+
+    /// Model period starting on a given date at a matching frequency/calendar.
+    pub(crate) fn period_starting_on(
+        &self,
+        date: Date,
+        kind: PeriodKind,
+        fiscal: bool,
+    ) -> Option<PeriodId> {
+        self.periods_by_start.get(&(kind, fiscal, date)).copied()
     }
 
     /// Build history from the named per-period maps used by tests and the

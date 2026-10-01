@@ -26,7 +26,7 @@
 
 use super::factors::{MarketRestoreFlags, MarketSnapshot};
 use super::helpers::*;
-use super::metrics_based::extract_keyrate_per_curve;
+use super::metrics_based::{extract_credit_keyrates, CreditKeyRateBucket};
 use super::model_params;
 use super::types::*;
 use crate::policy_map::map_policy;
@@ -35,9 +35,7 @@ use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::diff::{
-    measure_credit_curve_shift, measure_per_tenor_credit_curve_shift, TenorSamplingMethod,
-};
+use finstack_quant_core::market_data::diff::{measure_credit_curve_shift, TenorSamplingMethod};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
@@ -112,21 +110,23 @@ impl TaylorAttributionConfig {
     /// (Press et al., *Numerical Recipes*, §5.7) and can overflow the Decimal
     /// arithmetic used for repriced values.
     pub fn validate(&self) -> Result<()> {
-        if self.rate_bump_bp < 0.01 || self.rate_bump_bp > 100.0 {
+        if !self.rate_bump_bp.is_finite() || !(0.01..=100.0).contains(&self.rate_bump_bp) {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Rate bump size must lie in [0.01, 100] bp (below 0.01bp the second-difference \
                  gamma is cancellation noise), got {:.6}",
                 self.rate_bump_bp
             )));
         }
-        if self.credit_spread_bump_bp < 0.01 || self.credit_spread_bump_bp > 100.0 {
+        if !self.credit_spread_bump_bp.is_finite()
+            || !(0.01..=100.0).contains(&self.credit_spread_bump_bp)
+        {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Credit bump size must lie in [0.01, 100] bp (below 0.01bp the second-difference \
                  gamma is cancellation noise), got {:.6}",
                 self.credit_spread_bump_bp
             )));
         }
-        if self.vol_bump < 1e-4 || self.vol_bump > 0.20 {
+        if !self.vol_bump.is_finite() || !(1e-4..=0.20).contains(&self.vol_bump) {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Volatility bump size must lie in [1e-4, 0.20] absolute vol (below 1e-4 the \
                  second-difference volga is cancellation noise), got {:.6}",
@@ -137,10 +137,8 @@ impl TaylorAttributionConfig {
     }
 }
 
-/// Record a successful Taylor factor result. `repricings` is the actual number
-/// of bump-and-reprice calls the factor performed — a key-rate factor bumps
-/// every bucket up and down, so it is far more than the 2 a single parallel
-/// bump would cost.
+/// Record a Taylor factor result and its attempted pricing calls, including
+/// calls that returned an error before the factor completed.
 ///
 /// On failure the factor is recorded in `notes` and `result_invalid` is set:
 /// every factor routed through here is backed by a curve/surface that appears
@@ -159,13 +157,13 @@ fn record_taylor_factor_result(
     notes: &mut Vec<String>,
     result_invalid: &mut bool,
 ) {
+    *num_repricings += repricings;
     match result {
         Ok(result) => {
             total_explained.add(result.explained_pnl);
             if let Some(g) = result.gamma_pnl {
                 total_explained.add(g);
             }
-            *num_repricings += repricings;
             factors.push(result);
         }
         Err(e) => {
@@ -227,9 +225,8 @@ pub(crate) struct TaylorFactorResult {
     /// non-parallel moves it deliberately differs from
     /// `sensitivity × market_move`.
     pub explained_pnl: f64,
-    /// Second-order (gamma) P&L if requested: ½ × γ_par × Δ̄², where γ_par is
-    /// measured from a single parallel up/down reprice and Δ̄ is the
-    /// sensitivity-weighted average bucket move.
+    /// Second-order P&L if requested. Key-rate curve factors measure curvature
+    /// along the observed bucket moves, including cross-bucket effects.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gamma_pnl: Option<f64>,
 }
@@ -239,10 +236,9 @@ pub(crate) struct TaylorFactorResult {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub(crate) struct TaylorAttributionResult {
     /// Actual P&L on a total-return basis: `PV_T1 − PV_T0` plus the period
-    /// coupon income captured by the theta factor. The explained factors
-    /// include coupon income (theta is total-return), so `actual_pnl` uses the
-    /// same basis — otherwise `unexplained` would be biased by exactly the
-    /// period coupons. When theta computation fails the coupon component is
+    /// economic cash captured by the theta factor, including returned principal.
+    /// The explained factors include that cash, so `actual_pnl` uses the same
+    /// total-return basis. When theta computation fails the cash component is
     /// unavailable and `actual_pnl` degrades to the price-only difference
     /// (recorded in `notes`).
     pub actual_pnl: f64,
@@ -266,6 +262,8 @@ pub(crate) struct TaylorAttributionResult {
     /// cashflows.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub theta_coupon_income: Option<f64>,
+    /// All realized period receipts, including returned principal.
+    pub theta_cash_paid: Option<f64>,
     /// Diagnostic notes accumulated during factor computation (failed factors,
     /// surface-averaged vol moves, missing T0 FX). Threaded into
     /// `PnlAttribution::meta.notes` by `attribute_pnl_taylor`.
@@ -339,10 +337,8 @@ fn compute_taylor_result(
     let mut num_repricings: usize = 2;
     let mut notes: Vec<String> = Vec::new();
     let mut result_invalid = false;
-    // Extra parallel up/down reprice per curve factor when gamma is requested.
-    let gamma_repricings = if config.include_gamma { 2 } else { 0 };
 
-    // Rate sensitivities (parallel DV01 per discount curve)
+    // Rate sensitivities (key-rate DV01 per discount curve)
     let market_deps = instrument_t0.market_dependencies()?;
     // A risky discount curve belongs to the credit factor even though its
     // storage family also makes it a discount dependency.
@@ -355,22 +351,22 @@ fn compute_taylor_result(
         .collect();
     let recalibration_provider = CachedRecalibrationProvider::new();
     let compute_rate = |curve_id: &CurveId| {
-        (
-            curve_id.clone(),
-            compute_curve_factor(
-                CurveKind::Discount,
-                &instrument_t0,
-                market_t0,
-                market_t1,
-                as_of_t0,
-                pv_t0,
-                curve_id,
-                config,
-            ),
-        )
+        let mut repricings = 0;
+        let result = compute_curve_factor(
+            CurveKind::Discount,
+            &instrument_t0,
+            market_t0,
+            market_t1,
+            as_of_t0,
+            pv_t0,
+            curve_id,
+            config,
+            &mut repricings,
+        );
+        (curve_id.clone(), result, repricings)
     };
     let rate_results = map_policy(execution_policy, &rate_curve_ids, compute_rate);
-    for (curve_id, result) in rate_results {
+    for (curve_id, result, repricings) in rate_results {
         record_taylor_factor_result(
             "rate",
             &curve_id,
@@ -378,34 +374,34 @@ fn compute_taylor_result(
             &mut factors,
             &mut total_explained,
             &mut num_repricings,
-            2 * KEY_RATE_BUCKETS_YEARS.len() + gamma_repricings,
+            repricings,
             &mut notes,
             &mut result_invalid,
         );
     }
 
-    // Forward curve sensitivities (parallel bump per forward curve)
+    // Forward curve sensitivities (key-rate DV01 per projection curve)
     let compute_forward = |curve_id: &CurveId| {
-        (
-            curve_id.clone(),
-            compute_curve_factor(
-                CurveKind::Forward,
-                &instrument_t0,
-                market_t0,
-                market_t1,
-                as_of_t0,
-                pv_t0,
-                curve_id,
-                config,
-            ),
-        )
+        let mut repricings = 0;
+        let result = compute_curve_factor(
+            CurveKind::Forward,
+            &instrument_t0,
+            market_t0,
+            market_t1,
+            as_of_t0,
+            pv_t0,
+            curve_id,
+            config,
+            &mut repricings,
+        );
+        (curve_id.clone(), result, repricings)
     };
     let forward_results = map_policy(
         execution_policy,
         &market_deps.curves.forward_curves,
         compute_forward,
     );
-    for (curve_id, result) in forward_results {
+    for (curve_id, result, repricings) in forward_results {
         record_taylor_factor_result(
             "forward",
             &curve_id,
@@ -413,7 +409,7 @@ fn compute_taylor_result(
             &mut factors,
             &mut total_explained,
             &mut num_repricings,
-            2 * KEY_RATE_BUCKETS_YEARS.len() + gamma_repricings,
+            repricings,
             &mut notes,
             &mut result_invalid,
         );
@@ -429,6 +425,7 @@ fn compute_taylor_result(
     let credit_keyrate = if credit_curves.is_empty() {
         None
     } else {
+        num_repricings += 1;
         instrument_t0
             .price_with_metrics(
                 market_t0,
@@ -437,7 +434,16 @@ fn compute_taylor_result(
                 finstack_quant_valuations::instruments::PricingOptions::default()
                     .with_recalibration_provider(Arc::new(CachedRecalibrationProvider::new())),
             )
-            .map(|vr| extract_keyrate_per_curve(&vr.measures, credit_curves, "bucketed_cs01"))
+            .and_then(|vr| {
+                extract_credit_keyrates(
+                    &vr.measures,
+                    credit_curves,
+                    market_t0,
+                    market_t1,
+                    &recalibration_provider,
+                )
+                .map_err(Into::into)
+            })
             .map_err(|error| {
                 result_invalid = true;
                 notes.push(format!(
@@ -448,27 +454,36 @@ fn compute_taylor_result(
             .ok()
     };
     let compute_credit = |curve_id: &CurveId| {
+        if credit_keyrate.is_none() {
+            return (
+                curve_id.clone(),
+                Err(finstack_quant_core::Error::Validation(
+                    "credit risk unavailable after bucket validation failed".into(),
+                )),
+                0,
+            );
+        }
         let keyrate = credit_keyrate
             .as_ref()
             .and_then(|m| m.get(curve_id))
             .map(|v| v.as_slice());
-        (
-            curve_id.clone(),
-            compute_credit_factor(CreditFactorInputs {
-                instrument: &instrument_t0,
-                market_t0,
-                market_t1,
-                as_of_t0,
-                pv_t0,
-                curve_id,
-                config,
-                keyrate,
-                recalibration_provider: &recalibration_provider,
-            }),
-        )
+        let mut repricings = 0;
+        let result = compute_credit_factor(CreditFactorInputs {
+            instrument: &instrument_t0,
+            market_t0,
+            market_t1,
+            as_of_t0,
+            pv_t0,
+            curve_id,
+            config,
+            keyrate,
+            recalibration_provider: &recalibration_provider,
+            repricings: &mut repricings,
+        });
+        (curve_id.clone(), result, repricings)
     };
     let credit_results = map_policy(execution_policy, credit_curves, compute_credit);
-    for (curve_id, result) in credit_results {
+    for (curve_id, result, repricings) in credit_results {
         record_taylor_factor_result(
             "credit",
             &curve_id,
@@ -476,7 +491,7 @@ fn compute_taylor_result(
             &mut factors,
             &mut total_explained,
             &mut num_repricings,
-            2 + gamma_repricings,
+            repricings,
             &mut notes,
             &mut result_invalid,
         );
@@ -512,22 +527,22 @@ fn compute_taylor_result(
     }
     let compute_vol =
         |dependency: &finstack_quant_valuations::instruments::VolatilityDependency| {
-            (
-                dependency.vol_surface_id.clone(),
-                compute_vol_factor(
-                    &instrument_t0,
-                    market_t0,
-                    market_t1,
-                    as_of_t0,
-                    pv_t0,
-                    dependency,
-                    reference_expiry_years,
-                    config,
-                ),
-            )
+            let mut repricings = 0;
+            let result = compute_vol_factor(
+                &instrument_t0,
+                market_t0,
+                market_t1,
+                as_of_t0,
+                pv_t0,
+                dependency,
+                reference_expiry_years,
+                config,
+                &mut repricings,
+            );
+            (dependency.vol_surface_id.clone(), result, repricings)
         };
     let vol_results = map_policy(execution_policy, &surface_dependencies, compute_vol);
-    for (vol_surface_id, result) in vol_results {
+    for (vol_surface_id, result, repricings) in vol_results {
         record_taylor_factor_result(
             "vol",
             &vol_surface_id,
@@ -535,7 +550,7 @@ fn compute_taylor_result(
             &mut factors,
             &mut total_explained,
             &mut num_repricings,
-            2,
+            repricings,
             &mut notes,
             &mut result_invalid,
         );
@@ -555,10 +570,16 @@ fn compute_taylor_result(
                     .to_string(),
             );
         }
-        match compute_fx_factor(instrument, market_t0, market_t1, as_of_t1, pv_t1) {
+        match compute_fx_factor(
+            instrument,
+            market_t0,
+            market_t1,
+            as_of_t1,
+            pv_t1,
+            &mut num_repricings,
+        ) {
             Ok(result) => {
                 total_explained.add(result.explained_pnl);
-                num_repricings += 1;
                 factors.push(result);
             }
             Err(e) => {
@@ -625,14 +646,22 @@ fn compute_taylor_result(
         .cloned()
         .unwrap_or_else(|| instrument.model_params_snapshot());
     if !matches!(params_t0, ModelParamsSnapshot::None) {
+        let result = compute_model_params_factor(
+            instrument,
+            market_t1,
+            as_of_t1,
+            pv_t1,
+            &params_t0,
+            &mut num_repricings,
+        );
         record_taylor_factor_result(
             "model-parameter",
             &CurveId::new("ModelParameters"),
-            compute_model_params_factor(instrument, market_t1, as_of_t1, pv_t1, &params_t0),
+            result,
             &mut factors,
             &mut total_explained,
             &mut num_repricings,
-            1,
+            0,
             &mut notes,
             &mut result_invalid,
         );
@@ -642,15 +671,24 @@ fn compute_taylor_result(
     // also carries `coupon_income` so `attribute_pnl_taylor` can split theta
     // into PV-only and coupon components without re-collecting cashflows.
     let mut theta_coupon_income: Option<f64> = None;
-    match compute_theta_factor(&instrument_t0, market_t0, as_of_t0, as_of_t1, pv_t0) {
+    let mut theta_cash_paid: Option<f64> = None;
+    match compute_theta_factor(
+        &instrument_t0,
+        market_t0,
+        as_of_t0,
+        as_of_t1,
+        pv_t0,
+        &mut num_repricings,
+    ) {
         Ok(outcome) => {
             let ThetaFactorOutcome {
                 factor: result,
                 coupon_income,
+                cash_paid,
             } = outcome;
             total_explained.add(result.explained_pnl);
-            num_repricings += 1;
             theta_coupon_income = Some(coupon_income);
+            theta_cash_paid = Some(cash_paid);
             factors.push(result);
         }
         Err(e) => {
@@ -659,16 +697,15 @@ fn compute_taylor_result(
                 "Taylor attribution: theta factor computation failed"
             );
             notes.push(format!(
-                "Taylor theta factor failed: {e}; actual_pnl excludes period coupon income"
+                "Taylor theta factor failed: {e}; actual_pnl excludes period cash receipts"
             ));
             result_invalid = true;
         }
     }
 
-    // Total-return basis: the theta factor's explained P&L includes period
-    // coupon income, so the actual P&L it is reconciled against must include
-    // it too — otherwise `unexplained` is biased by exactly the coupons paid.
-    let actual_pnl = actual_pnl + theta_coupon_income.unwrap_or(0.0);
+    // Total-return basis: reconcile the theta factor and actual P&L against
+    // all economic cash received, including returned principal.
+    let actual_pnl = actual_pnl + theta_cash_paid.unwrap_or(0.0);
 
     let total_explained = total_explained.total();
     let unexplained = actual_pnl - total_explained;
@@ -691,6 +728,7 @@ fn compute_taylor_result(
         pv_t0,
         pv_t1,
         theta_coupon_income,
+        theta_cash_paid,
         notes,
         result_invalid,
     })
@@ -859,13 +897,16 @@ pub(crate) fn attribute_pnl_taylor(
                 &mut attribution.meta.notes,
                 &mut non_finite_detected,
             );
-            let theta_only = Money::new(factor_money.amount() - ci.amount(), ccy)?;
+            let cash_paid = Money::new(taylor.theta_cash_paid.unwrap_or(0.0), ccy)?;
+            let theta_only = Money::new(factor_money.amount() - cash_paid.amount(), ccy)?;
             // Taylor path: delta_accrued and flat_window_diff are unavailable (no repricing).
             let carry_inputs = TotalReturnCarryInputs {
-                cash_paid: ci,
+                cash_paid,
+                income_cash_paid: ci,
                 delta_accrued: None,
                 flat_window_diff: None,
                 funding_cost: None,
+                num_repricings: 0,
                 warnings: Vec::new(),
             };
             apply_total_return_carry(&mut attribution, theta_only, carry_inputs)?;
@@ -925,14 +966,19 @@ fn directional_gamma_pnl(
     bump_bp: f64,
     moves_bp: &[f64],
     bumped_market: impl Fn(f64) -> Result<MarketContext>,
+    repricings: &mut usize,
 ) -> Result<f64> {
     let max_move = moves_bp.iter().map(|m| m.abs()).fold(0.0_f64, f64::max);
     if max_move == 0.0 {
         return Ok(0.0);
     }
     let scale = (bump_bp / max_move).min(1.0);
-    let up = reprice_instrument(instrument, &bumped_market(scale)?, as_of_t0)?;
-    let down = reprice_instrument(instrument, &bumped_market(-scale)?, as_of_t0)?;
+    let bumped_up = bumped_market(scale)?;
+    *repricings += 1;
+    let up = reprice_instrument(instrument, &bumped_up, as_of_t0)?;
+    let bumped_down = bumped_market(-scale)?;
+    *repricings += 1;
+    let down = reprice_instrument(instrument, &bumped_down, as_of_t0)?;
     Ok(0.5 * (up.amount() - 2.0 * pv_t0.amount() + down.amount()) / scale.powi(2))
 }
 
@@ -1017,6 +1063,7 @@ fn compute_curve_factor(
     pv_t0: Money,
     curve_id: &CurveId,
     config: &TaylorAttributionConfig,
+    repricings: &mut usize,
 ) -> Result<TaylorFactorResult> {
     // Realized per-tenor moves on the standard bucket grid (bp).
     let per_tenor_move_bp: Vec<f64> = match kind {
@@ -1048,12 +1095,14 @@ fn compute_curve_factor(
             id: curve_id.clone(),
             spec: key_rate_bump_spec(i, config.rate_bump_bp),
         }])?;
+        *repricings += 1;
         let pv_up = reprice_instrument(instrument, &up, as_of_t0)?;
 
         let down = market_t0.bump([MarketBump::Curve {
             id: curve_id.clone(),
             spec: key_rate_bump_spec(i, -config.rate_bump_bp),
         }])?;
+        *repricings += 1;
         let pv_down = reprice_instrument(instrument, &down, as_of_t0)?;
 
         let dv01 = (pv_up.amount() - pv_down.amount()) / (2.0 * config.rate_bump_bp);
@@ -1088,6 +1137,7 @@ fn compute_curve_factor(
                     scale,
                 )
             },
+            repricings,
         )?)
     } else {
         None
@@ -1106,24 +1156,13 @@ fn compute_curve_factor(
     })
 }
 
-/// Compute credit (CS01) attribution for a single credit curve.
-///
-/// The credit curve may be a `HazardCurve` or a `DiscountCurve` serving a
-/// credit role. [`measure_credit_curve_shift`] /
-/// [`measure_per_tenor_credit_curve_shift`] measure the move in whichever basis
-/// the instrument's own CS01 is defined on — par CDS spread for a hazard curve,
-/// zero rate for a discount-style credit curve — so the move always pairs
-/// unit-correctly with the CS01 (pairing a par-spread CS01 with a hazard-rate
-/// move would overstate by 1/(1−R)).
-///
-/// When per-tenor CS01 is available (`keyrate`, from `BucketedCs01`), the
-/// explained P&L is the key-rate sum `Σ_tenor CS01_t × Δs_t` — correct for
-/// non-parallel (steepener / twist) credit-curve moves. Otherwise it falls back
-/// to a parallel bump: an aggregate CS01 times the average credit-curve move.
+/// Apply a parallel credit spread bump in basis points.
+/// Hazard curves replay their calibrated par CDS quotes; discount curves
+/// serving a credit role bump their zero rates in the same units.
 fn bump_credit_market(
     market: &MarketContext,
     curve_id: &CurveId,
-    bump: QuoteBump,
+    bump_bp: f64,
     provider: &dyn RecalibrationProvider,
 ) -> Result<MarketContext> {
     if let Ok(hazard) = market.get_hazard(curve_id.as_str()) {
@@ -1147,21 +1186,66 @@ fn bump_credit_market(
             doc_clause: None,
             cds_valuation_convention: None,
             deal_quote_override: None,
-            action: HazardRecalibrationAction::SpreadBump(bump),
+            action: HazardRecalibrationAction::SpreadBump(QuoteBump::ParallelBp(bump_bp)),
         })?;
         return Ok(market.clone().insert(bumped.as_ref().clone()));
     }
     market.get_discount(curve_id.as_str())?;
-    match bump {
-        QuoteBump::ParallelBp(bp) => market.bump([MarketBump::Curve {
-            id: curve_id.clone(),
-            spec: BumpSpec::parallel_bp(bp),
-        }]),
-        QuoteBump::TenorsBp(targets) => {
-            let tenors: Vec<_> = targets.iter().map(|(tenor, _)| *tenor).collect();
-            let moves: Vec<_> = targets.iter().map(|(_, bp)| *bp).collect();
-            bump_curve_direction(market, curve_id, &tenors, &moves, 1.0)
+    market.bump([MarketBump::Curve {
+        id: curve_id.clone(),
+        spec: BumpSpec::parallel_bp(bump_bp),
+    }])
+}
+
+/// Compose an observed credit direction using exact replay quote indices.
+fn bump_credit_keyrates(
+    market: &MarketContext,
+    curve_id: &CurveId,
+    buckets: &[CreditKeyRateBucket],
+    scale: f64,
+    provider: &dyn RecalibrationProvider,
+) -> Result<MarketContext> {
+    if let Ok(hazard) = market.get_hazard(curve_id.as_str()) {
+        let recipe = hazard.hazard_calibration().ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "Taylor credit gamma requires a replay recipe for '{curve_id}'"
+            ))
+        })?;
+        let params: finstack_quant_calibration::api::schema::HazardCurveParams =
+            serde_json::from_value(recipe.hazard_params.clone()).map_err(|error| {
+                finstack_quant_core::Error::Validation(format!(
+                    "invalid hazard parameters: {error}"
+                ))
+            })?;
+        let mut bumped = market.clone();
+        for bucket in buckets {
+            let quote_index = bucket.quote_index.ok_or_else(|| {
+                finstack_quant_core::Error::Validation(
+                    "Taylor quote-space gamma requires exact replay quote indices".into(),
+                )
+            })?;
+            let source = Arc::new(bumped.clone());
+            let hazard = source.get_hazard(curve_id.as_str())?;
+            let rebuilt = provider.rebuild_hazard_curve(&HazardRecalibrationRequest {
+                hazard,
+                source_market: Arc::clone(&source),
+                target_market: source,
+                discount_curve_id: params.discount_curve_id.clone(),
+                doc_clause: None,
+                cds_valuation_convention: None,
+                deal_quote_override: None,
+                action: HazardRecalibrationAction::ExactQuoteIndexBump {
+                    quote_index,
+                    bump_bp: bucket.move_bp * scale,
+                },
+            })?;
+            bumped = bumped.insert(rebuilt);
         }
+        Ok(bumped)
+    } else {
+        let tenors: Vec<_> = buckets.iter().map(|bucket| bucket.tenor_years).collect();
+        let moves: Vec<_> = buckets.iter().map(|bucket| bucket.move_bp).collect();
+        bump_curve_direction(market, curve_id, &tenors, &moves, scale)
     }
 }
 
@@ -1173,10 +1257,13 @@ struct CreditFactorInputs<'a> {
     pv_t0: Money,
     curve_id: &'a CurveId,
     config: &'a TaylorAttributionConfig,
-    keyrate: Option<&'a [(f64, f64)]>,
+    keyrate: Option<&'a [CreditKeyRateBucket]>,
     recalibration_provider: &'a dyn RecalibrationProvider,
+    repricings: &'a mut usize,
 }
 
+/// Sum every paired quote-space CS01 and exact quote move when buckets exist.
+/// Aggregate CS01 uses an average spread shift when no bucket risk is supplied.
 fn compute_credit_factor(inputs: CreditFactorInputs<'_>) -> Result<TaylorFactorResult> {
     let CreditFactorInputs {
         instrument,
@@ -1188,20 +1275,20 @@ fn compute_credit_factor(inputs: CreditFactorInputs<'_>) -> Result<TaylorFactorR
         config,
         keyrate,
         recalibration_provider,
+        repricings,
     } = inputs;
 
     // Key-rate path: per-tenor CS01 × per-tenor credit-curve move.
     if let Some(buckets) = keyrate.filter(|b| !b.is_empty()) {
-        let tenors: Vec<f64> = buckets.iter().map(|(t, _)| *t).collect();
-        let shifts =
-            measure_per_tenor_credit_curve_shift(curve_id.as_str(), market_t0, market_t1, &tenors)?;
+        let shifts: Vec<f64> = buckets.iter().map(|bucket| bucket.move_bp).collect();
         let explained = finstack_quant_core::math::neumaier_sum(
             buckets
                 .iter()
-                .zip(shifts.iter())
-                .map(|((_, cs01), shift)| cs01 * shift),
+                .map(|bucket| bucket.sensitivity * bucket.move_bp),
         );
-        let total_cs01 = finstack_quant_core::math::neumaier_sum(buckets.iter().map(|(_, c)| *c));
+        let total_cs01 = finstack_quant_core::math::neumaier_sum(
+            buckets.iter().map(|bucket| bucket.sensitivity),
+        );
         let avg_move = if shifts.is_empty() {
             0.0
         } else {
@@ -1215,19 +1302,15 @@ fn compute_credit_factor(inputs: CreditFactorInputs<'_>) -> Result<TaylorFactorR
                 config.credit_spread_bump_bp,
                 &shifts,
                 |scale| {
-                    bump_credit_market(
+                    bump_credit_keyrates(
                         market_t0,
                         curve_id,
-                        QuoteBump::TenorsBp(
-                            tenors
-                                .iter()
-                                .zip(&shifts)
-                                .map(|(t, movement)| (*t, movement * scale))
-                                .collect(),
-                        ),
+                        buckets,
+                        scale,
                         recalibration_provider,
                     )
                 },
+                repricings,
             )?)
         } else {
             None
@@ -1246,16 +1329,18 @@ fn compute_credit_factor(inputs: CreditFactorInputs<'_>) -> Result<TaylorFactorR
     let bumped_up = bump_credit_market(
         market_t0,
         curve_id,
-        QuoteBump::ParallelBp(config.credit_spread_bump_bp),
+        config.credit_spread_bump_bp,
         recalibration_provider,
     )?;
+    *repricings += 1;
     let pv_up = reprice_instrument(instrument, &bumped_up, as_of_t0)?;
     let bumped_down = bump_credit_market(
         market_t0,
         curve_id,
-        QuoteBump::ParallelBp(-config.credit_spread_bump_bp),
+        -config.credit_spread_bump_bp,
         recalibration_provider,
     )?;
+    *repricings += 1;
     let pv_down = reprice_instrument(instrument, &bumped_down, as_of_t0)?;
 
     // Central difference CS01: O(h²) accuracy, $ per bp of credit-curve move.
@@ -1307,13 +1392,16 @@ fn compute_vol_factor(
     dependency: &finstack_quant_valuations::instruments::VolatilityDependency,
     reference_expiry_years: Option<f64>,
     config: &TaylorAttributionConfig,
+    repricings: &mut usize,
 ) -> Result<TaylorFactorResult> {
     let vol_surface_id = &dependency.vol_surface_id;
     let bumped_up = bump_surface_vol_absolute(market_t0, vol_surface_id.as_str(), config.vol_bump)?;
+    *repricings += 1;
     let pv_up = reprice_instrument(instrument, &bumped_up, as_of_t0)?;
 
     let bumped_down =
         bump_surface_vol_absolute(market_t0, vol_surface_id.as_str(), -config.vol_bump)?;
+    *repricings += 1;
     let pv_down = reprice_instrument(instrument, &bumped_down, as_of_t0)?;
 
     // Central difference vega in $ per vol point.
@@ -1377,10 +1465,12 @@ fn compute_fx_factor(
     market_t1: &MarketContext,
     as_of_t1: Date,
     pv_t1: Money,
+    repricings: &mut usize,
 ) -> Result<TaylorFactorResult> {
     let fx_snapshot = MarketSnapshot::extract(market_t0, MarketRestoreFlags::FX);
     let market_with_t0_fx =
         MarketSnapshot::restore_market(market_t1, &fx_snapshot, MarketRestoreFlags::FX);
+    *repricings += 1;
     let pv_with_t0_fx = reprice_instrument(instrument, &market_with_t0_fx, as_of_t1)?;
 
     // FX-exposure P&L: value with the actual T1 FX minus value with T0 FX
@@ -1421,11 +1511,13 @@ fn compute_restored_family_factor(
     market_t1: &MarketContext,
     as_of_t1: Date,
     pv_t1: Money,
-    flags: MarketRestoreFlags,
-    factor_name: &str,
+    family: (MarketRestoreFlags, &str),
+    repricings: &mut usize,
 ) -> Result<TaylorFactorResult> {
+    let (flags, factor_name) = family;
     let snapshot = MarketSnapshot::extract(market_t0, flags);
     let market_with_t0 = MarketSnapshot::restore_market(market_t1, &snapshot, flags);
+    *repricings += 1;
     let pv_with_t0 = reprice_instrument(instrument, &market_with_t0, as_of_t1)?;
     let explained = pv_t1.amount() - pv_with_t0.amount();
     Ok(TaylorFactorResult {
@@ -1459,22 +1551,24 @@ fn record_restored_family_factor(
     if !snapshot_has_family(&t0_snap, flags) && !snapshot_has_family(&t1_snap, flags) {
         return;
     }
+    let mut repricings = 0;
+    let result = compute_restored_family_factor(
+        instrument,
+        market_t0,
+        market_t1,
+        as_of_t1,
+        pv_t1,
+        (flags, factor_name),
+        &mut repricings,
+    );
     record_taylor_factor_result(
         factor_kind,
         &CurveId::new(factor_name),
-        compute_restored_family_factor(
-            instrument,
-            market_t0,
-            market_t1,
-            as_of_t1,
-            pv_t1,
-            flags,
-            factor_name,
-        ),
+        result,
         factors,
         total_explained,
         num_repricings,
-        1,
+        repricings,
         notes,
         result_invalid,
     );
@@ -1488,8 +1582,10 @@ fn compute_model_params_factor(
     as_of_t1: Date,
     pv_t1: Money,
     params_t0: &ModelParamsSnapshot,
+    repricings: &mut usize,
 ) -> Result<TaylorFactorResult> {
     let instrument_t0 = model_params::with_model_params(instrument, params_t0)?;
+    *repricings += 1;
     let pv_with_t0 = reprice_instrument(&instrument_t0, market_t1, as_of_t1)?;
     let explained = pv_t1.amount() - pv_with_t0.amount();
     Ok(TaylorFactorResult {
@@ -1503,31 +1599,34 @@ fn compute_model_params_factor(
 
 /// Coupon income for the theta period — surfaced separately so
 /// `attribute_pnl_taylor` can re-use it when splitting `theta_pnl` into the
-/// pure PV move and the realized cashflow component (instead of calling
-/// `collect_cashflows_in_period` again, which would re-traverse the
+/// pure PV move, coupon income and returned principal (instead of calling
+/// `collect_period_cash` again, which would re-traverse the
 /// instrument's cashflow schedule and risk silent desync if the schedule path
 /// is non-deterministic).
 struct ThetaFactorOutcome {
     factor: TaylorFactorResult,
     coupon_income: f64,
+    cash_paid: f64,
 }
 
 /// Compute theta (time decay + realized cashflows) by repricing at T1 date
-/// with T0 market, then adding any coupon payments in the period.
+/// with T0 market, then adding all economic receipts in the period.
 fn compute_theta_factor(
     instrument: &Arc<dyn Instrument>,
     market_t0: &MarketContext,
     as_of_t0: Date,
     as_of_t1: Date,
     pv_t0: Money,
+    repricings: &mut usize,
 ) -> Result<ThetaFactorOutcome> {
-    use finstack_quant_valuations::metrics::collect_cashflows_in_period;
+    use finstack_quant_valuations::metrics::collect_period_cash;
 
+    *repricings += 1;
     let pv_t0_at_t1 = reprice_instrument(instrument, market_t0, as_of_t1)?;
     let pv_diff = pv_t0_at_t1.amount() - pv_t0.amount();
     let days = (as_of_t1 - as_of_t0).whole_days() as f64;
 
-    let coupon_income = collect_cashflows_in_period(
+    let cash = collect_period_cash(
         instrument.as_ref(),
         market_t0,
         as_of_t0,
@@ -1535,7 +1634,9 @@ fn compute_theta_factor(
         pv_t0.currency(),
     )?;
 
-    let theta_pnl = pv_diff + coupon_income;
+    let coupon_income = cash.income.amount();
+    let cash_paid = cash.total.amount();
+    let theta_pnl = pv_diff + cash_paid;
     let theta_per_day = if days.abs() > 0.0 {
         theta_pnl / days
     } else {
@@ -1560,6 +1661,7 @@ fn compute_theta_factor(
             gamma_pnl: None,
         },
         coupon_income,
+        cash_paid,
     })
 }
 
@@ -1606,6 +1708,28 @@ mod tests {
 
         config.vol_bump = -0.01;
         assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn taylor_config_rejects_every_non_finite_bump() {
+        for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            for config in [
+                TaylorAttributionConfig {
+                    rate_bump_bp: invalid,
+                    ..Default::default()
+                },
+                TaylorAttributionConfig {
+                    credit_spread_bump_bp: invalid,
+                    ..Default::default()
+                },
+                TaylorAttributionConfig {
+                    vol_bump: invalid,
+                    ..Default::default()
+                },
+            ] {
+                assert!(config.validate().is_err());
+            }
+        }
     }
 
     #[test]
@@ -2484,6 +2608,7 @@ mod tests {
                 include_gamma: true,
                 ..Default::default()
             },
+            &mut 0,
         )
         .unwrap();
         let expected = 0.5
@@ -2633,7 +2758,7 @@ mod tests {
         let bumped = bump_credit_market(
             &market,
             &CurveId::new("HAZ"),
-            QuoteBump::ParallelBp(10.0),
+            10.0,
             &CachedRecalibrationProvider::new(),
         )
         .unwrap();
@@ -2651,7 +2776,7 @@ mod tests {
         let error = bump_credit_market(
             &missing,
             &CurveId::new("BARE"),
-            QuoteBump::ParallelBp(10.0),
+            10.0,
             &CachedRecalibrationProvider::new(),
         )
         .unwrap_err();
@@ -2706,6 +2831,9 @@ mod tests {
             None,
         )
         .expect("taylor attribution should succeed");
+
+        // Endpoints, one metric evaluation, two directional gamma prices and theta.
+        assert_eq!(result.num_repricings, 6);
 
         let factor = result
             .factors
@@ -3078,6 +3206,8 @@ mod tests {
             )
             .expect("failed period cashflow collection should retain diagnostic attribution");
 
+            // Failed cash collection follows an attempted theta valuation.
+            assert_eq!(result.num_repricings, 3);
             assert!(result.result_invalid);
             assert_eq!(result.theta_coupon_income, None);
             assert!(result
@@ -3086,7 +3216,7 @@ mod tests {
                 .all(|factor| factor.factor_name != "Theta"));
             assert!(result.notes.iter().any(|note| {
                 note.contains(expected_error)
-                    && note.contains("actual_pnl excludes period coupon income")
+                    && note.contains("actual_pnl excludes period cash receipts")
             }));
 
             let attribution = crate::attribute_pnl(

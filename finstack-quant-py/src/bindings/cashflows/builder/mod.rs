@@ -112,7 +112,7 @@ pub(crate) fn mdr_to_cdr(mdr: f64) -> PyResult<f64> {
 
 /// Register the `finstack_quant.cashflows.builder` submodule.
 pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let module = PyModule::new(py, "builder")?;
+    let module = crate::bindings::module_utils::new_submodule(parent, "builder")?;
     module.setattr(
         "__doc__",
         "Composable cashflow builder: coupon/fee/amortization specs, CashFlowBuilder, CashFlowSchedule.",
@@ -167,13 +167,10 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
     )?;
     module.setattr("__all__", all)?;
 
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &module,
-        "builder",
-        "finstack_quant.cashflows",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
     Ok(())
 }

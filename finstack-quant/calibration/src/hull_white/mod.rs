@@ -23,9 +23,11 @@
 //!
 //! # Swaption Pricing
 //!
-//! European swaptions are priced analytically using the Jamshidian (1989)
-//! decomposition, which expresses a coupon bond option as a portfolio of
-//! zero-coupon bond options under the HW1F model.
+//! Contractual European swaptions integrate the full fixed and floating
+//! exercise value under the Gaussian exercise-date forward measure. This
+//! preserves floating payment lags, fixing dates, and compounded coupon
+//! adjustments. Synthetic zero-lag schedules use the Jamshidian (1989)
+//! coupon-bond decomposition into zero-coupon bond options.
 //!
 //! The zero-coupon bond option volatility is:
 //!
@@ -56,30 +58,42 @@ use crate::solver::traits::GlobalSolveTarget;
 use crate::CalibrationReport;
 
 mod cap_floor;
+mod cap_schedule;
+mod contractual_swaption;
+mod curves;
 mod pricing;
 mod quotes;
 mod swaption;
 mod targets;
 
 pub use cap_floor::{
+    bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn,
+    calibrate_hull_white_to_cap_floors_with_fn, PiecewiseSigmaCalibrationConfig,
+};
+pub use cap_schedule::{CapFloorSchedule, CapletSchedule};
+pub use curves::{
     bootstrap_hull_white_sigma_schedule_to_cap_floors, calibrate_hull_white_to_cap_floors,
-    PiecewiseSigmaCalibrationConfig,
+    calibrate_hull_white_to_swaptions,
 };
 pub use finstack_quant_models::rates::hull_white::{
     capfloor_hw1f_scalar_keys, capfloor_hw1f_sigma_schedule_key, hw1f_scalar_keys,
     HullWhiteCalibrationParams, HullWhiteParams,
 };
 pub use quotes::{
-    CapFloorCalibrationConfig, CapFloorQuote, SwapFrequency, SwaptionQuote, SwaptionSchedule,
+    CapFloorCalibrationConfig, CapFloorQuote, SwapFrequency, SwaptionFloatingPeriod, SwaptionQuote,
+    SwaptionSchedule,
 };
-pub use swaption::calibrate_hull_white_to_swaptions;
+pub use swaption::calibrate_hull_white_to_swaptions_with_fn;
 
 #[cfg(test)]
-pub(crate) use pricing::hw1f_cap_floor_implied_normal_vol;
+pub(crate) use contractual_swaption::price as contractual_swaption_price;
+#[cfg(test)]
 pub(crate) use pricing::{
-    bachelier_cap_floor_price, hw1f_cap_floor_price, hw1f_cap_floor_price_with_model,
-    CapFloorPriceSpec,
+    bachelier_cap_floor_price, hw1f_cap_floor_price, scheduled_cap_floor_implied_normal_vol,
+    scheduled_cap_floor_price, CapFloorPriceSpec,
 };
+#[cfg(test)]
+pub(crate) use pricing::{hw1f_cap_floor_implied_normal_vol, hw1f_cap_floor_price_with_model};
 #[cfg(test)]
 pub(crate) use swaption::{compute_swap_annuity_and_rate, hw1f_swaption_price};
 

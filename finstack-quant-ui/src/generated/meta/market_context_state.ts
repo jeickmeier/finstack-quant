@@ -360,8 +360,36 @@ export default [
   {
     "path": "#/$defs/d_29287993dab35875106b/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolQuoteType/oneOf/1",
+    "const": "shifted_black_lognormal",
+    "description": "Displaced Black volatility; per-expiry displacements accompany the grid."
+  },
+  {
+    "path": "#/$defs/d_29287993dab35875106b/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolQuoteType/oneOf/2",
     "const": "normal",
     "description": "Normal (Bachelier) implied volatility, absolute rate units."
+  },
+  {
+    "path": "#/$defs/d_2a71f59be0c75aa6f427",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/PiecewiseLinearAdjustment",
+    "description": "A flat function representation: repeated shocks merge on a breakpoint union\nrather than forming a recursively nested transformation history."
+  },
+  {
+    "path": "#/$defs/d_2a71f59be0c75aa6f427/properties/initial_value",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/PiecewiseLinearAdjustment/properties/initial_value",
+    "description": "Constant value before the first breakpoint.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_2a71f59be0c75aa6f427/properties/segments",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/PiecewiseLinearAdjustment/properties/segments",
+    "description": "Sorted, merged linear segments."
+  },
+  {
+    "path": "#/$defs/d_2a71f59be0c75aa6f427/properties/segments/items",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/PiecewiseLinearAdjustment/properties/segments/items",
+    "ref": "#/$defs/CurveAdjustmentSegment",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveAdjustmentSegment"
   },
   {
     "path": "#/$defs/d_33ee2f2e4664717e30ef",
@@ -540,6 +568,28 @@ export default [
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationInterpolation/oneOf/1",
     "const": "linear",
     "description": "Linear interpolation between monthly observations.\n\nStandard for TIPS and most inflation-linked bonds.\nAssumes constant daily inflation rate within each month."
+  },
+  {
+    "path": "#/$defs/d_683ec38b8d36db5534bc",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveAdjustmentSegment"
+  },
+  {
+    "path": "#/$defs/d_683ec38b8d36db5534bc/properties/slope",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveAdjustmentSegment/properties/slope",
+    "description": "Function slope on this segment.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_683ec38b8d36db5534bc/properties/start",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveAdjustmentSegment/properties/start",
+    "description": "Segment origin in the source curve's time coordinates.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_683ec38b8d36db5534bc/properties/value",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveAdjustmentSegment/properties/value",
+    "description": "Right-hand function value at the segment origin.",
+    "format": "double"
   },
   {
     "path": "#/$defs/d_687d85aab3f98d958ef7",
@@ -839,6 +889,43 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_7bf68715545bd3d2b581",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DiscountCurveTransform",
+    "description": "Source interpolation and a single accumulated transformation, never a chain\nof nested curves. The adjustment is stored as its piecewise-linear derivative\nso evaluating beyond a completed triangular shock does not subtract large\nquadratic polynomials."
+  },
+  {
+    "path": "#/$defs/d_7bf68715545bd3d2b581/properties/adjustment",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DiscountCurveTransform/properties/adjustment",
+    "description": "Cumulative derivative of the additive log-discount adjustment.",
+    "ref": "#/$defs/PiecewiseLinearAdjustment",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/PiecewiseLinearAdjustment"
+  },
+  {
+    "path": "#/$defs/d_7bf68715545bd3d2b581/properties/offset",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DiscountCurveTransform/properties/offset",
+    "description": "Current origin in the source interpolation's year-fraction coordinates.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_7bf68715545bd3d2b581/properties/source_points",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DiscountCurveTransform/properties/source_points",
+    "description": "Original, untransformed interpolation pillars."
+  },
+  {
+    "path": "#/$defs/d_7bf68715545bd3d2b581/properties/source_points/items",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DiscountCurveTransform/properties/source_points/items"
+  },
+  {
+    "path": "#/$defs/d_7bf68715545bd3d2b581/properties/source_points/items/prefixItems/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DiscountCurveTransform/properties/source_points/items/prefixItems/0",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_7bf68715545bd3d2b581/properties/source_points/items/prefixItems/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DiscountCurveTransform/properties/source_points/items/prefixItems/1",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_7fbd5a62c7c39ad98666",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxConfig",
     "description": "Configuration for [`FxMatrix`](crate::money::fx::FxMatrix) behaviour.\n\nControls triangulation and caching."
@@ -964,6 +1051,24 @@ export default [
     "description": "The secondary axis is swap tenor or another maturity-style bucket."
   },
   {
+    "path": "#/$defs/d_952d2539685fe1adf99e",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationPublicationWire"
+  },
+  {
+    "path": "#/$defs/d_952d2539685fe1adf99e/properties/publication_date",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationPublicationWire/properties/publication_date",
+    "description": "Inclusive date on which the observation must be available.",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
+  },
+  {
+    "path": "#/$defs/d_952d2539685fe1adf99e/properties/reference_month",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationPublicationWire/properties/reference_month",
+    "description": "First calendar day of the reference month.",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
+  },
+  {
     "path": "#/$defs/d_9ba58a59f23c169d3a67",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolInterpolationMode",
     "description": "Interpolation contract for vol surfaces."
@@ -984,6 +1089,16 @@ export default [
     "path": "#/$defs/d_9d04eee9f565b9c40882",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolSurface",
     "description": "Volatility surface defined on expiry × strike grid.\n\nInternally stores volatilities in row-major order as a boxed slice."
+  },
+  {
+    "path": "#/$defs/d_9d04eee9f565b9c40882/properties/displacements",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolSurface/properties/displacements",
+    "description": "Additive displacements in forward/strike units, one per expiry for shifted Black quotes."
+  },
+  {
+    "path": "#/$defs/d_9d04eee9f565b9c40882/properties/displacements/items",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolSurface/properties/displacements/items",
+    "format": "double"
   },
   {
     "path": "#/$defs/d_9d04eee9f565b9c40882/properties/expiries",
@@ -1219,6 +1334,21 @@ export default [
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/0/properties/rate_calibration/anyOf/1"
   },
   {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/0/properties/transform",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/0/properties/transform",
+    "description": "Canonical source interpolation and accumulated continuous transformations."
+  },
+  {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/0/properties/transform/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/0/properties/transform/anyOf/0",
+    "ref": "#/$defs/DiscountCurveTransform",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DiscountCurveTransform"
+  },
+  {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/0/properties/transform/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/0/properties/transform/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/0/properties/type",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/0/properties/type",
     "const": "discount"
@@ -1321,6 +1451,21 @@ export default [
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/1/properties/tenor",
     "description": "Index tenor in years",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/1/properties/transform",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/1/properties/transform",
+    "description": "Canonical source interpolation and cumulative continuous transformations."
+  },
+  {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/1/properties/transform/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/1/properties/transform/anyOf/0",
+    "ref": "#/$defs/ForwardCurveTransform",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ForwardCurveTransform"
+  },
+  {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/1/properties/transform/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/1/properties/transform/anyOf/1"
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/1/properties/type",
@@ -1919,7 +2064,7 @@ export default [
     "path": "#/$defs/d_ac3149b00d5253379c16/oneOf/10",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DayCount/oneOf/10",
     "const": "act_act_isma",
-    "description": "Actual/Actual (ICMA) day count convention.\n\nUses actual days in numerator and actual days in the coupon period\nas denominator, requiring knowledge of payment frequency.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251 - \"Actual/Actual (ICMA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ICMA\" (A007)\n- **Also known as**: Act/Act (ICMA), Act/Act (ISMA), ISMA-99\n\n# Algorithm\n\n1. Determine quasi-coupon periods based on payment frequency\n2. For each period: (actual days) / (actual days in coupon period)\n3. Sum fractions across periods\n\n# Usage\n\nStandard for:\n- International bonds with regular coupons\n- Eurobonds with semi-annual or annual payments\n- ICMA-governed securities\n\n# Requirements\n\nRequires `frequency` in [`DayCountContext`] to determine regular coupon periods.\nFor irregular first/last coupons, use\n[`act_act_isma_year_fraction_with_reference_period`].\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 15).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::July, 15).expect(\"Valid date\");\nlet frequency = Tenor::semi_annual(); // Semi-annual\n\nlet yf = DayCount::ActActIsma.year_fraction(\n    start,\n    end,\n    DayCountContext { frequency: Some(frequency), ..Default::default() }\n).expect(\"Year fraction calculation should succeed\");\n\n// Full semi-annual period = 0.5 year fraction (6 months / 12 months)\nassert!((yf - 0.5).abs() < 1e-6);\n```\n\n# References\n\n- ICMA (2010). \"ICMA Rule Book.\" Rule 251. `docs/REFERENCES.md#icma-rule-book`\n- ISMA (1999). \"Recommendations for Accrued Interest Calculations.\""
+    "description": "Actual/Actual (ICMA) day count convention.\n\nUses actual days in numerator and actual days in the coupon period\nas denominator, requiring knowledge of payment frequency.\nExplicit reference coupon boundaries must be unadjusted regular dates\nfrom the contractual nominal month grid, rather than payment dates.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251 - \"Actual/Actual (ICMA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ICMA\" (A007)\n- **Also known as**: Act/Act (ICMA), Act/Act (ISMA), ISMA-99\n\n# Algorithm\n\n1. Determine quasi-coupon periods based on payment frequency\n2. For each period: (actual days) / (actual days in coupon period)\n3. Sum fractions across periods\n\n# Usage\n\nStandard for:\n- International bonds with regular coupons\n- Eurobonds with semi-annual or annual payments\n- ICMA-governed securities\n\n# Requirements\n\nRequires `frequency` in [`DayCountContext`] to determine regular coupon periods.\nFor irregular first/last coupons, use\n[`act_act_isma_year_fraction_with_reference_period`].\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 15).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::July, 15).expect(\"Valid date\");\nlet frequency = Tenor::semi_annual(); // Semi-annual\n\nlet yf = DayCount::ActActIsma.year_fraction(\n    start,\n    end,\n    DayCountContext { frequency: Some(frequency), ..Default::default() }\n).expect(\"Year fraction calculation should succeed\");\n\n// Full semi-annual period = 0.5 year fraction (6 months / 12 months)\nassert!((yf - 0.5).abs() < 1e-6);\n```\n\n# References\n\n- ICMA (2010). \"ICMA Rule Book.\" Rule 251. `docs/REFERENCES.md#icma-rule-book`\n- ISMA (1999). \"Recommendations for Accrued Interest Calculations.\""
   },
   {
     "path": "#/$defs/d_ac3149b00d5253379c16/oneOf/11",
@@ -1943,7 +2088,7 @@ export default [
     "path": "#/$defs/d_ac3149b00d5253379c16/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DayCount/oneOf/3",
     "const": "act_365l",
-    "description": "Actual/365 Leap day count convention (Actual/365L) per ICMA Rule 251.\n\nYear fraction = (actual days) / (365 or 366), where the denominator\nrule depends on the coupon frequency supplied via [`DayCountContext`]:\n\n- **Annual** (or no frequency supplied): 366 if February 29 falls in\n  the interval `(start, end]` (exclusive of start, inclusive of end),\n  else 365.\n- **Non-annual**: 366 if the period END date falls in a leap year,\n  else 365.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251.1(i)(c)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365L\" (A008)\n- **Also known as**: Act/365L, ISMA-Year\n\nNote: this is **not** ACT/ACT AFB (Association Française des Banques),\nwhich uses a different (sub-period splitting) algorithm. The former\n`act_365afb` parse alias was removed because it conflated the two\nconventions. Use [`DayCount::ActActAfb`] for AFB / Actual/Actual Euro.\n\n# Usage\n\nUsed in:\n- GBP floating-rate notes\n- Some European bond markets\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\n// Period containing Feb 29, 2024 (leap year)\nlet start = Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2024, Month::March, 1).expect(\"Valid date\");\n\nlet yf = DayCount::Act365L.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n// 29 days / 366 (leap year denominator)\nassert_eq!(yf, 29.0 / 366.0);\n```"
+    "description": "Actual/365 Leap day count convention (Actual/365L) per ICMA Rule 251.\n\nYear fraction = (actual days) / (365 or 366), where the denominator\nrule depends on the coupon frequency and enclosing `coupon_period`\nsupplied via [`DayCountContext`]. Both are required:\n\n- **Annual**: 366 if February 29 falls in\n  `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),\n  else 365.\n- **Non-annual**: 366 if the next coupon date falls in a leap year,\n  else 365.\n\nPartial accrual keeps the enclosing coupon's denominator. Accrual\ndates outside that coupon are rejected; sum separate coupon slices\nfor calculations spanning multiple coupon periods.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251.1(i)(c)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365L\" (A008)\n- **Also known as**: Act/365L, ISMA-Year\n\nNote: this is **not** ACT/ACT AFB (Association Française des Banques),\nwhich uses a different (sub-period splitting) algorithm. The former\n`act_365afb` parse alias was removed because it conflated the two\nconventions. Use [`DayCount::ActActAfb`] for AFB / Actual/Actual Euro.\n\n# Usage\n\nUsed in:\n- GBP floating-rate notes\n- Some European bond markets\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};\nuse time::Month;\n\n// Period containing Feb 29, 2024 (leap year)\nlet start = Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2024, Month::March, 1).expect(\"Valid date\");\n\nlet ctx = DayCountContext {\n    frequency: Some(Tenor::annual()),\n    coupon_period: Some((start, end)),\n    ..DayCountContext::default()\n};\nlet yf = DayCount::Act365L.year_fraction(start, end, ctx).expect(\"Year fraction calculation should succeed\");\n// 29 days / 366 (leap year denominator)\nassert_eq!(yf, 29.0 / 366.0);\n```"
   },
   {
     "path": "#/$defs/d_ac3149b00d5253379c16/oneOf/4",
@@ -1973,7 +2118,7 @@ export default [
     "path": "#/$defs/d_ac3149b00d5253379c16/oneOf/8",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DayCount/oneOf/8",
     "const": "nl_365",
-    "description": "NL/365 (Actual/365 No Leap) day count convention.\n\nYear fraction = (actual days excluding any February 29) / 365\n\n# Standards Reference\n\n- **Also known as**: Act/365 No Leap, NL365, Actual/365NL\n- Counts the actual calendar days in `[start, end)` and removes every\n  February 29 that falls in the period, so a full leap year still\n  yields exactly 1.0.\n\n# Usage\n\nUsed in:\n- Some Canadian money-market and mortgage instruments\n- Legacy systems that ignore leap days for accrual\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\n// Full leap year 2024: 366 actual days, Feb 29 excluded → 365/365 = 1.0\nlet start = Date::from_calendar_date(2024, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\n\nlet yf = DayCount::Nl365.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\nassert_eq!(yf, 1.0);\n```"
+    "description": "NL/365 (Actual/365 No Leap) day count convention.\n\nYear fraction = (actual days excluding any February 29) / 365\n\n# Standards Reference\n\n- **Also known as**: Act/365 No Leap, NL365, Actual/365NL\n- Counts the actual calendar days in `(start, end]` and removes every\n  February 29 that falls in the period, so a full leap year still\n  yields exactly 1.0.\n\n# Usage\n\nUsed in:\n- Some Canadian money-market and mortgage instruments\n- Legacy systems that ignore leap days for accrual\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\n// Full leap year 2024: 366 actual days, Feb 29 excluded → 365/365 = 1.0\nlet start = Date::from_calendar_date(2024, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\n\nlet yf = DayCount::Nl365.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\nassert_eq!(yf, 1.0);\n```"
   },
   {
     "path": "#/$defs/d_ac3149b00d5253379c16/oneOf/9",
@@ -2988,7 +3133,7 @@ export default [
   {
     "path": "#/$defs/d_c4332f1bbc1cebe4fd90",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationLag",
-    "description": "Publication lag for inflation index reference dates.\n\nInflation indices are published with a delay (typically 2-4 weeks). Securities\nusing these indices incorporate a lag to ensure the reference index is published\nby the settlement date.\n\n# Standard Lags by Market\n\n- **US TIPS**: 3-month lag (reference index from 3 months prior)\n- **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)\n- **French OATi**: 3-month lag\n- **German index-linked**: 3-month lag\n\n# Rationale\n\nThe lag ensures:\n1. Reference index is published before settlement\n2. Index value is known at coupon payment date\n3. No estimation or forecasting required for payment calculation\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationLag;\n\nlet tips_lag = InflationLag::Months(3);  // US TIPS standard\nlet gilt_lag = InflationLag::Months(3);  // UK modern gilts\nlet no_lag = InflationLag::None;         // Inflation swaps (forecast-based)\n```"
+    "description": "Contractual observation lag for inflation index reference dates.\n\nInflation indices are published with a delay (typically 2-4 weeks). Securities\nusing these indices incorporate an observation lag to ensure the reference\nindex is published by settlement. This lag does not specify the actual\npublication date; use [`InflationIndex::with_publication_dates`] for that.\n\n# Standard Lags by Market\n\n- **US TIPS**: 3-month lag (reference index from 3 months prior)\n- **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)\n- **French OATi**: 3-month lag\n- **German index-linked**: 3-month lag\n\n# Rationale\n\nThe lag ensures:\n1. Reference index is published before settlement\n2. Index value is known at coupon payment date\n3. No estimation or forecasting required for payment calculation\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationLag;\n\nlet tips_lag = InflationLag::Months(3);  // US TIPS standard\nlet gilt_lag = InflationLag::Months(3);  // UK modern gilts\nlet no_lag = InflationLag::None;         // Inflation swaps (forecast-based)\n```"
   },
   {
     "path": "#/$defs/d_c4332f1bbc1cebe4fd90/oneOf/0",
@@ -3066,7 +3211,7 @@ export default [
   {
     "path": "#/$defs/d_e771e792357014c84cb9",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationIndex",
-    "description": "Inflation index time series with lagging and seasonality.\n\nWraps historical CPI/RPI observations with market-standard conventions for\nlag application and interpolation. Used for pricing TIPS, linkers, and\ninflation derivatives.\n\n# Components\n\n- **Observations**: Historical index levels by publication date\n- **Interpolation**: Daily interpolation between monthly observations\n- **Lag**: Publication lag (typically 3 months for TIPS)\n- **Seasonality**: Optional monthly adjustment factors\n\n# Interpolation Methods\n\n- **Step**: Last observation carried forward (conservative)\n- **Linear**: Daily interpolation between months (TIPS standard)\n\n# Lag Application\n\nReference index calculation applies lag before interpolation:\n```text\nFor settlement date T with 3-month lag:\n1. Reference date = T - 3 months\n2. Find bracketing CPI observations\n3. Interpolate linearly between them\n```\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::{\n    InflationIndex, InflationInterpolation, InflationLag,\n};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\n// US CPI-U observations\nlet observations = vec![\n    (Date::from_calendar_date(2023, Month::September, 30).expect(\"Valid date\"), 296.8),\n    (Date::from_calendar_date(2023, Month::October, 31).expect(\"Valid date\"), 297.4),\n    (Date::from_calendar_date(2023, Month::November, 30).expect(\"Valid date\"), 298.1),\n    (Date::from_calendar_date(2023, Month::December, 31).expect(\"Valid date\"), 299.0),\n    (Date::from_calendar_date(2024, Month::January, 31).expect(\"Valid date\"), 300.5),\n    (Date::from_calendar_date(2024, Month::February, 29).expect(\"Valid date\"), 302.1),\n    (Date::from_calendar_date(2024, Month::March, 31).expect(\"Valid date\"), 303.8),\n    (Date::from_calendar_date(2024, Month::April, 30).expect(\"Valid date\"), 304.1),\n];\n\nlet index = InflationIndex::new(\"US-CPI-U\", observations, Currency::USD)\n    .expect(\"Index creation should succeed\")\n    .with_interpolation(InflationInterpolation::Linear)\n    .with_lag(InflationLag::Months(3)); // TIPS standard\n\n// Calculate inflation ratio for TIPS coupon indexation\nlet base_date = Date::from_calendar_date(2024, Month::January, 15).expect(\"Valid date\");\nlet settle_date = Date::from_calendar_date(2024, Month::June, 15).expect(\"Valid date\");\nlet ratio = index.ratio(base_date, settle_date).expect(\"Ratio calculation should succeed\");\nassert!(ratio >= 1.0); // Inflation adjustment factor\n```\n\n# Thread Safety\n\nImmutable after construction; safe to share via `Arc<InflationIndex>`.\n\n# References\n\n- **TIPS Mechanics**:\n  - US Treasury (2024). \"TIPS In Depth.\" treasurydirect.gov. `docs/REFERENCES.md#deacon-derry-mirfendereski-2004`\n  - Deacon, M., Derry, A., & Mirfendereski, D. (2004). *Inflation-Indexed Securities*\n    (2nd ed.). Wiley Finance. Chapter 2 (Index-linked bond mechanics). `docs/REFERENCES.md#deacon-derry-mirfendereski-2004`\n\n- **Index Lagging**:\n  - Kerkhof, J. (2005). \"Inflation Derivatives Explained.\" *Journal of Derivatives\n    Accounting*, 2(1), 1-19. `docs/REFERENCES.md#kerkhof-2005`\n  - Hurd, M., & Relleen, J. (2006). \"Estimating the Inflation Risk Premium.\"\n    Bank of England Quarterly Bulletin, Q2 2006. `docs/REFERENCES.md#kerkhof-2005`"
+    "description": "Inflation index time series with lagging and seasonality.\n\nWraps historical CPI/RPI observations with market-standard conventions for\nlag application and interpolation. Used for pricing TIPS, linkers, and\ninflation derivatives.\n\n# Components\n\n- **Observations**: Index levels labelled by reference date/month\n- **Interpolation**: Daily interpolation between monthly observations\n- **Lag**: Contractual observation lag (typically 3 months for TIPS)\n- **Publication dates**: Optional explicit availability dates by reference month\n- **Seasonality**: Optional monthly adjustment factors\n\n# Interpolation Methods\n\n- **Step**: Last observation carried forward (conservative)\n- **Linear**: Daily interpolation between months (TIPS standard)\n\n# Lag Application\n\nReference index calculation applies lag before interpolation:\n```text\nFor settlement date T with 3-month lag:\n1. Reference date = T - 3 months\n2. Find bracketing CPI observations\n3. Interpolate linearly between them\n```\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::{\n    InflationIndex, InflationInterpolation, InflationLag,\n};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\n// US CPI-U observations\nlet observations = vec![\n    (Date::from_calendar_date(2023, Month::September, 30).expect(\"Valid date\"), 296.8),\n    (Date::from_calendar_date(2023, Month::October, 31).expect(\"Valid date\"), 297.4),\n    (Date::from_calendar_date(2023, Month::November, 30).expect(\"Valid date\"), 298.1),\n    (Date::from_calendar_date(2023, Month::December, 31).expect(\"Valid date\"), 299.0),\n    (Date::from_calendar_date(2024, Month::January, 31).expect(\"Valid date\"), 300.5),\n    (Date::from_calendar_date(2024, Month::February, 29).expect(\"Valid date\"), 302.1),\n    (Date::from_calendar_date(2024, Month::March, 31).expect(\"Valid date\"), 303.8),\n    (Date::from_calendar_date(2024, Month::April, 30).expect(\"Valid date\"), 304.1),\n];\n\nlet index = InflationIndex::new(\"US-CPI-U\", observations, Currency::USD)\n    .expect(\"Index creation should succeed\")\n    .with_interpolation(InflationInterpolation::Linear)\n    .with_lag(InflationLag::Months(3)); // TIPS standard\n\n// Calculate inflation ratio for TIPS coupon indexation\nlet base_date = Date::from_calendar_date(2024, Month::January, 15).expect(\"Valid date\");\nlet settle_date = Date::from_calendar_date(2024, Month::June, 15).expect(\"Valid date\");\nlet ratio = index.ratio(base_date, settle_date).expect(\"Ratio calculation should succeed\");\nassert!(ratio >= 1.0); // Inflation adjustment factor\n```\n\n# Thread Safety\n\nImmutable after construction; safe to share via `Arc<InflationIndex>`.\n\n# References\n\n- **TIPS Mechanics**:\n  - US Treasury (2024). \"TIPS In Depth.\" treasurydirect.gov. `docs/REFERENCES.md#deacon-derry-mirfendereski-2004`\n  - Deacon, M., Derry, A., & Mirfendereski, D. (2004). *Inflation-Indexed Securities*\n    (2nd ed.). Wiley Finance. Chapter 2 (Index-linked bond mechanics). `docs/REFERENCES.md#deacon-derry-mirfendereski-2004`\n\n- **Index Lagging**:\n  - Kerkhof, J. (2005). \"Inflation Derivatives Explained.\" *Journal of Derivatives\n    Accounting*, 2(1), 1-19. `docs/REFERENCES.md#kerkhof-2005`\n  - Hurd, M., & Relleen, J. (2006). \"Estimating the Inflation Risk Premium.\"\n    Bank of England Quarterly Bulletin, Q2 2006. `docs/REFERENCES.md#kerkhof-2005`"
   },
   {
     "path": "#/$defs/d_e771e792357014c84cb9/properties/currency",
@@ -3115,6 +3260,17 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_e771e792357014c84cb9/properties/publication_dates",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationIndex/properties/publication_dates",
+    "description": "Explicit monthly observation availability; no release dates are inferred."
+  },
+  {
+    "path": "#/$defs/d_e771e792357014c84cb9/properties/publication_dates/items",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationIndex/properties/publication_dates/items",
+    "ref": "#/$defs/InflationPublicationWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationPublicationWire"
+  },
+  {
     "path": "#/$defs/d_e771e792357014c84cb9/properties/seasonality",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationIndex/properties/seasonality",
     "description": "Optional seasonality factors"
@@ -3150,6 +3306,48 @@ export default [
     "description": "Whether the original solve requested its specialized Jacobian."
   },
   {
+    "path": "#/$defs/d_f401c4e712e4f497feef",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ForwardCurveTransform"
+  },
+  {
+    "path": "#/$defs/d_f401c4e712e4f497feef/properties/adjustment",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ForwardCurveTransform/properties/adjustment",
+    "description": "Cumulative additive rate adjustment in source time coordinates.",
+    "ref": "#/$defs/PiecewiseLinearAdjustment",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/PiecewiseLinearAdjustment"
+  },
+  {
+    "path": "#/$defs/d_f401c4e712e4f497feef/properties/offset",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ForwardCurveTransform/properties/offset",
+    "description": "Current curve origin in the source curve's year-fraction coordinates.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_f401c4e712e4f497feef/properties/scale",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ForwardCurveTransform/properties/scale",
+    "description": "Accumulated parallel multiplicative factor on the source interpolation.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_f401c4e712e4f497feef/properties/source_points",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ForwardCurveTransform/properties/source_points",
+    "description": "Original interpolation pillars, independent of current curve samples."
+  },
+  {
+    "path": "#/$defs/d_f401c4e712e4f497feef/properties/source_points/items",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ForwardCurveTransform/properties/source_points/items"
+  },
+  {
+    "path": "#/$defs/d_f401c4e712e4f497feef/properties/source_points/items/prefixItems/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ForwardCurveTransform/properties/source_points/items/prefixItems/0",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_f401c4e712e4f497feef/properties/source_points/items/prefixItems/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ForwardCurveTransform/properties/source_points/items/prefixItems/1",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_f9d22f9148b706cb0598",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/SeriesInterpolation",
     "description": "Interpolation strategy for [`ScalarTimeSeries`].\n\n# Examples\n```rust\nuse finstack_quant_core::market_data::scalars::{ScalarTimeSeries, SeriesInterpolation};\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet series = ScalarTimeSeries::new(\n    \"TS\",\n    vec![\n        (Date::from_calendar_date(2024, Month::January, 1).expect(\"Valid date\"), 100.0),\n        (Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\"), 105.0),\n    ],\n    None,\n)\n.expect(\"Series creation should succeed\");\nlet stepped = series.clone().with_interpolation(SeriesInterpolation::Step);\nlet mid_date = Date::from_calendar_date(2024, Month::January, 15).expect(\"Valid date\");\nassert_eq!(stepped.value_on(mid_date).expect(\"Value lookup should succeed\"), 100.0);\n```"
@@ -3169,7 +3367,7 @@ export default [
   {
     "path": "#/$defs/d_fcf72b7d10aedbfe8482",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxMatrixState",
-    "description": "Serializable state of an FxMatrix.\nContains the configuration and cached quotes that can be persisted and restored."
+    "description": "Serializable state of an FxMatrix.\nContains the configuration and cached quotes that can be persisted and restored.\nSerialization fails with an ordinary serializer error if any captured\nexplicit or provider rate is non-finite or non-positive, including rates\nthat overflow after a mutable underlying provider changes under a shock."
   },
   {
     "path": "#/$defs/d_fcf72b7d10aedbfe8482/properties/config",
@@ -3212,6 +3410,42 @@ export default [
   {
     "path": "#/$defs/d_fcf72b7d10aedbfe8482/properties/pinned_quotes/items/prefixItems/4",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxMatrixState/properties/pinned_quotes/items/prefixItems/4",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_fcf72b7d10aedbfe8482/properties/provider_pinned_quotes",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxMatrixState/properties/provider_pinned_quotes",
+    "description": "Captured date/policy-scoped provider quotes. These override captured\npair-global provider quotes for their scope while remaining below\nexplicit matrix quotes in either direction. Required even when empty."
+  },
+  {
+    "path": "#/$defs/d_fcf72b7d10aedbfe8482/properties/provider_pinned_quotes/items",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxMatrixState/properties/provider_pinned_quotes/items"
+  },
+  {
+    "path": "#/$defs/d_fcf72b7d10aedbfe8482/properties/provider_pinned_quotes/items/prefixItems/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxMatrixState/properties/provider_pinned_quotes/items/prefixItems/0",
+    "ref": "#/$defs/Currency",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Currency"
+  },
+  {
+    "path": "#/$defs/d_fcf72b7d10aedbfe8482/properties/provider_pinned_quotes/items/prefixItems/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxMatrixState/properties/provider_pinned_quotes/items/prefixItems/1",
+    "ref": "#/$defs/Currency",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Currency"
+  },
+  {
+    "path": "#/$defs/d_fcf72b7d10aedbfe8482/properties/provider_pinned_quotes/items/prefixItems/2",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxMatrixState/properties/provider_pinned_quotes/items/prefixItems/2"
+  },
+  {
+    "path": "#/$defs/d_fcf72b7d10aedbfe8482/properties/provider_pinned_quotes/items/prefixItems/3",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxMatrixState/properties/provider_pinned_quotes/items/prefixItems/3",
+    "ref": "#/$defs/FxConversionPolicy",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxConversionPolicy"
+  },
+  {
+    "path": "#/$defs/d_fcf72b7d10aedbfe8482/properties/provider_pinned_quotes/items/prefixItems/4",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxMatrixState/properties/provider_pinned_quotes/items/prefixItems/4",
     "format": "double"
   },
   {

@@ -1810,13 +1810,7 @@ pub(crate) const EXPORTS: &[&str] = &[
 
 /// Register the ``finstack_quant.valuations.composite`` submodule.
 pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let module = PyModule::new(py, "composite")?;
-    let qual = crate::bindings::module_utils::set_submodule_package_by_package(
-        parent,
-        &module,
-        "composite",
-        "finstack_quant.valuations",
-    )?;
+    let module = crate::bindings::module_utils::new_submodule(parent, "composite")?;
     module.setattr(
         "__doc__",
         "Resolved cross-asset composite instruments, primitive exposures, and dated history. Pricing uses frozen quantities; initialize covers fixed_quantity without a separate initialize_fixed binding.",
@@ -1833,5 +1827,9 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
     module.add_function(wrap_pyfunction!(py_history, &module)?)?;
     module.add_function(wrap_pyfunction!(py_history_from_spec, &module)?)?;
     module.setattr("__all__", PyList::new(py, EXPORTS)?)?;
-    crate::bindings::module_utils::register_submodule_at(py, parent, &module, &qual)
+    crate::bindings::module_utils::attach_submodule(
+        parent,
+        &module,
+        crate::bindings::module_utils::Exposure::Python,
+    )
 }

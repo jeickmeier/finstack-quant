@@ -174,6 +174,35 @@ pub(crate) fn cny_date(year: i32) -> Option<Date> {
 // `mid_autumn_date_for_year`, and `is_mid_autumn_date` helpers.
 include!("../../generated/festivals_generated.rs");
 
+fn festival_date(year: i32, month_day: Option<(u8, u8)>) -> Option<Date> {
+    month_day.and_then(|(m, d)| Date::from_calendar_date(year, Month::try_from(m).ok()?, d).ok())
+}
+
+/// Buddha's birthday (eighth day of the fourth lunar month), for 1970–2150.
+pub(crate) fn buddhas_birthday_date(year: i32) -> Option<Date> {
+    festival_date(year, buddhas_birthday_date_for_year(year))
+}
+
+/// Chung Yeung (ninth day of the ninth lunar month), for 1970–2150.
+pub(crate) fn chung_yeung_date(year: i32) -> Option<Date> {
+    festival_date(year, chung_yeung_date_for_year(year))
+}
+
+/// Ching Ming solar term in Hong Kong local time, for 1970–2150.
+pub(crate) fn qing_ming_date(year: i32) -> Option<Date> {
+    festival_date(year, qing_ming_date_for_year(year))
+}
+
+/// Vernal equinox in Japan local time, projected for 1970–2150.
+pub(crate) fn vernal_equinox_jp_date(year: i32) -> Option<Date> {
+    festival_date(year, vernal_equinox_jp_date_for_year(year))
+}
+
+/// Autumnal equinox in Japan local time, projected for 1970–2150.
+pub(crate) fn autumnal_equinox_jp_date(year: i32) -> Option<Date> {
+    festival_date(year, autumnal_equinox_jp_date_for_year(year))
+}
+
 /// Returns the Dragon Boat Festival (端午节) date for a given year, if available.
 ///
 /// Celebrated on the 5th day of the 5th Chinese lunar month (typically late May
@@ -285,7 +314,7 @@ mod tests {
     }
 
     /// The O(1) form must agree with the day-stepping reference for every
-    /// (year, month, weekday, n) in the validated calendar range.
+    /// (year, month, weekday, n) in the cache calendar range.
     #[test]
     fn nth_weekday_matches_day_stepping_reference_over_full_year_range() {
         const MONTHS: [Month; 12] = [

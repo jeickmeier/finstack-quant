@@ -35,7 +35,7 @@ export type Date = string;
  */
 export type Id1 = string;
 /**
- * Day count convention.
+ * Day count convention used to calculate period year fractions.
  */
 export type DayCount1 =
   | "one_one"
@@ -52,11 +52,27 @@ export type DayCount1 =
   | "act_act_afb"
   | "bus_252";
 /**
+ * ISO 8601 calendar date string.
+ */
+export type Date1 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date2 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date3 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date4 = string;
+/**
  * Fixed coupon rate as a decimal annual rate (0.03 = 3%).
  */
 export type Decimal1 = string;
 /**
- * Day count convention.
+ * Day count convention used to calculate period year fractions.
  */
 export type DayCount2 =
   | "one_one"
@@ -435,36 +451,28 @@ export interface D_3Dbd4A1Aab74E98Eef06 {
    */
   funding_leg:
     | {
-        /**
-         * Accrual fractions for each period.
-         */
-        accrual_fractions: number[];
         day_count: DayCount1;
         /**
-         * Payment dates for each period.
+         * Funding accrual and payment schedule, in chronological order.
          */
-        payment_dates: Date[];
+        periods: DD1C6696E73834B17D83F[];
         rate: Decimal1;
         type: "fixed";
       }
     | {
-        /**
-         * Accrual fractions for each period.
-         */
-        accrual_fractions: number[];
         day_count: DayCount2;
         forward_curve_id: Id2;
         /**
-         * Payment dates for each period. Each is also treated as the period's
-         * accrual-end date (no payment lag — see the variant docs).
+         * Funding accrual, reset and payment schedule, in chronological order.
          */
-        payment_dates: Date[];
+        periods: DD1C6696E73834B17D83F[];
         spread_bp: Decimal2;
         type: "floating";
       };
   id: Id3;
   /**
    * Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`).
+   * Required for USD CMS; legacy contracts must name their legacy index explicitly.
    */
   index_id?: Id4 | null;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
@@ -526,6 +534,19 @@ export interface Tenor {
    * or years.
    */
   unit: "days" | "weeks" | "months" | "years";
+}
+/**
+ * Contractual dates and accrual fraction of one CMS funding coupon.
+ */
+export interface DD1C6696E73834B17D83F {
+  accrual_end: Date1;
+  accrual_start: Date2;
+  /**
+   * Positive year fraction measured using the funding leg day count.
+   */
+  accrual_year_fraction: number;
+  payment_date: Date3;
+  reset_date: Date4;
 }
 /**
  * Instrument-owned pricing inputs.

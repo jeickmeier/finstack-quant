@@ -12,22 +12,45 @@ use crate::evaluator::formula::{
     build_context_for_period, eval_error, evaluate_formula, evaluate_integer_arg,
     evaluate_non_negative_integer_arg, require_args,
 };
-use crate::evaluator::formula_helpers::get_historical_column_value;
 use crate::evaluator::results::EvalWarning;
-use finstack_quant_core::dates::PeriodId;
+use finstack_quant_core::dates::{DayCount, DayCountContext, PeriodId, PeriodKind};
 use finstack_quant_core::expr::{Expr, ExprNode};
 use finstack_quant_core::math::ZERO_TOLERANCE;
+use time::{Date, Duration, Weekday};
 
 /// Offset exactly in calendar periods, independent of the number of stored observations.
 /// Out-of-range dates have no observation and return `None` without a linear walk.
-pub(crate) fn offset_period(mut period: PeriodId, offset: i32) -> Option<PeriodId> {
-    use finstack_quant_core::dates::PeriodKind;
-    use time::{Date, Duration, Weekday};
-    if period.is_fiscal() {
-        // Fiscal daily/week lengths require a fiscal calendar, unavailable here.
-        if matches!(period.kind(), PeriodKind::Daily | PeriodKind::Weekly) {
-            return None;
+pub(crate) fn offset_period(context: &EvaluationContext, offset: i32) -> Option<PeriodId> {
+    let mut period = context.period_id;
+    if offset == 0 {
+        return Some(period);
+    }
+    if period.is_fiscal() && period.kind() == PeriodKind::Daily {
+        if let Some((start, _)) = context.history.period_bounds(&period) {
+            let target = start.checked_add(Duration::days(i64::from(offset)))?;
+            return context
+                .history
+                .period_starting_on(target, PeriodKind::Daily, true);
         }
+        // A standalone context can resolve a same-year backward offset from
+        // the identifiers alone. Crossing a fiscal daily year requires the
+        // actual model dates retained by `PeriodHistory::with_periods`.
+        let index = i64::from(period.index) + i64::from(offset);
+        if offset < 0 && index >= 1 {
+            period.index = index as u16;
+            return Some(period);
+        }
+        return None;
+    }
+    if period.is_fiscal() && period.kind() == PeriodKind::Weekly {
+        // Core's fiscal weeks are seven-day blocks from the fiscal-year
+        // start, followed by a shortened final block: ceil(365/7) and
+        // ceil(366/7) both equal 53. Count the final block as one period;
+        // subtracting seven Gregorian days across it would skip W53.
+        let ordinal = i64::from(period.year) * 53 + i64::from(period.index) - 1 + i64::from(offset);
+        period.year = i32::try_from(ordinal.div_euclid(53)).ok()?;
+        period.index = (ordinal.rem_euclid(53) + 1) as u16;
+        return Some(period);
     }
     match period.kind() {
         PeriodKind::Daily | PeriodKind::Weekly => {
@@ -59,6 +82,43 @@ pub(crate) fn offset_period(mut period: PeriodId, offset: i32) -> Option<PeriodI
     }
 }
 
+/// Read an expression at an earlier calendar slot without compressing gaps.
+fn historical_expression_value(
+    expr: &Expr,
+    target_period: PeriodId,
+    context: &EvaluationContext,
+    node_id: Option<&str>,
+) -> Result<f64> {
+    match &expr.node {
+        ExprNode::Column(name) => Ok(context
+            .get_historical_value(name, &target_period)
+            .unwrap_or(f64::NAN)),
+        ExprNode::CsRef {
+            component,
+            instrument_or_total,
+        } => {
+            if !context
+                .historical_capital_structure_cashflows
+                .contains_key(&target_period)
+            {
+                return Ok(f64::NAN);
+            }
+            context.get_historical_cs_value(component, instrument_or_total, &target_period)
+        }
+        _ => {
+            if !context.history.contains_key(&target_period)
+                && !context
+                    .historical_capital_structure_cashflows
+                    .contains_key(&target_period)
+            {
+                return Ok(f64::NAN);
+            }
+            let mut historical = build_context_for_period(target_period, context)?;
+            evaluate_formula(expr, &mut historical, node_id)
+        }
+    }
+}
+
 pub(crate) fn eval_lag(
     args: &[Expr],
     context: &mut EvaluationContext,
@@ -72,24 +132,10 @@ pub(crate) fn eval_lag(
         return evaluate_formula(&args[0], context, node_id);
     }
 
-    let Some(target_period) = offset_period(context.period_id, -lag_periods) else {
+    let Some(target_period) = offset_period(context, -lag_periods) else {
         return Ok(f64::NAN);
     };
-
-    if let ExprNode::Column(node_name) = &args[0].node {
-        if let Some(value) = get_historical_column_value(context, node_name, &target_period) {
-            Ok(value)
-        } else {
-            Ok(f64::NAN)
-        }
-    } else if !context.history.contains_key(&target_period) {
-        // Target period precedes the model history: return NaN like the
-        // column path instead of erroring against an empty context.
-        Ok(f64::NAN)
-    } else {
-        let mut hist_ctx = build_context_for_period(target_period, context)?;
-        evaluate_formula(&args[0], &mut hist_ctx, node_id)
-    }
+    historical_expression_value(&args[0], target_period, context, node_id)
 }
 
 pub(crate) fn eval_lead(node_id: Option<&str>) -> Result<f64> {
@@ -126,34 +172,15 @@ pub(crate) fn eval_diff(
         return Ok(if v.is_finite() { 0.0 } else { f64::NAN });
     }
 
-    let Some(target_period) = offset_period(context.period_id, -lag_periods) else {
+    let Some(target_period) = offset_period(context, -lag_periods) else {
         return Ok(f64::NAN);
     };
-
-    if let ExprNode::Column(node_name) = &args[0].node {
-        let current_value = context.get_value(node_name)?;
-        if current_value.is_nan() {
-            return Ok(f64::NAN);
-        }
-        if let Some(lagged_value) = get_historical_column_value(context, node_name, &target_period)
-        {
-            Ok(current_value - lagged_value)
-        } else {
-            Ok(f64::NAN)
-        }
-    } else {
-        let current_value = evaluate_formula(&args[0], context, node_id)?;
-        if current_value.is_nan() {
-            return Ok(f64::NAN);
-        }
-        if !context.history.contains_key(&target_period) {
-            // Mirror the column path: missing history yields NaN, not an error.
-            return Ok(f64::NAN);
-        }
-        let mut hist_ctx = build_context_for_period(target_period, context)?;
-        let lagged_value = evaluate_formula(&args[0], &mut hist_ctx, node_id)?;
-        Ok(current_value - lagged_value)
+    let current_value = evaluate_formula(&args[0], context, node_id)?;
+    if current_value.is_nan() {
+        return Ok(f64::NAN);
     }
+    let lagged_value = historical_expression_value(&args[0], target_period, context, node_id)?;
+    Ok(current_value - lagged_value)
 }
 
 pub(crate) fn eval_pct_change(
@@ -182,25 +209,14 @@ pub(crate) fn eval_pct_change(
         return Ok(if v.is_finite() { 0.0 } else { f64::NAN });
     }
 
-    let Some(target_period) = offset_period(context.period_id, -lag_periods) else {
+    let Some(target_period) = offset_period(context, -lag_periods) else {
         return Ok(f64::NAN);
     };
-
-    let (current_value, lagged_value) = if let ExprNode::Column(node_name) = &args[0].node {
-        let current = context.get_value(node_name)?;
-        let lagged =
-            get_historical_column_value(context, node_name, &target_period).unwrap_or(f64::NAN);
-        (current, lagged)
-    } else {
-        let current = evaluate_formula(&args[0], context, node_id)?;
-        if !context.history.contains_key(&target_period) {
-            // Mirror the column path: missing history yields NaN, not an error.
-            return Ok(f64::NAN);
-        }
-        let mut hist_ctx = build_context_for_period(target_period, context)?;
-        let lagged = evaluate_formula(&args[0], &mut hist_ctx, node_id)?;
-        (current, lagged)
-    };
+    let current_value = evaluate_formula(&args[0], context, node_id)?;
+    if current_value.is_nan() {
+        return Ok(f64::NAN);
+    }
+    let lagged_value = historical_expression_value(&args[0], target_period, context, node_id)?;
 
     if current_value.is_nan() || lagged_value.is_nan() {
         return Ok(f64::NAN);
@@ -263,56 +279,87 @@ pub(crate) fn eval_growth_rate(
         ));
     }
     let periods = periods_raw.round() as i32;
-
-    if let ExprNode::Column(node_name) = &args[0].node {
-        let current_value = context.get_value(node_name)?;
-        if current_value.is_nan() {
-            return Ok(f64::NAN);
-        }
-
-        let Some(target_period) = offset_period(context.period_id, -periods) else {
-            return Ok(f64::NAN);
-        };
-        if let Some(start_value) = get_historical_column_value(context, node_name, &target_period) {
-            if start_value.abs() < ZERO_TOLERANCE {
-                tracing::warn!(
-                    "growth_rate() division by near-zero base value in period {:?}",
-                    context.period_id
-                );
-                if let Some(id) = node_id {
-                    context.push_warning(EvalWarning::DivisionByZero {
-                        node_id: id.to_string(),
-                        period: context.period_id,
-                    });
-                }
-                return Ok(f64::NAN);
-            }
-            // CAGR is undefined for non-positive bases: with a negative start
-            // value the ratio sign flips, so improving losses would report
-            // negative growth (and vice versa). Policy: return NaN whenever
-            // start_value <= 0.
-            if start_value < 0.0 {
-                return Ok(f64::NAN);
-            }
-            let ratio = current_value / start_value;
-            if !ratio.is_finite() || ratio < 0.0 {
-                return Ok(f64::NAN);
-            }
-            let exponent = 1.0 / periods as f64;
-            let growth = ratio.powf(exponent) - 1.0;
-            if growth.is_finite() {
-                Ok(growth)
-            } else {
-                Ok(f64::NAN)
-            }
-        } else {
-            Ok(f64::NAN)
-        }
-    } else {
-        Err(eval_error(
+    if periods == 0 {
+        return Err(eval_error(
             node_id,
-            "growth_rate() currently supports only simple column references; use an intermediate node for complex expressions",
-        ))
+            "growth_rate() periods must be a positive integer",
+        ));
+    }
+
+    let current_value = evaluate_formula(&args[0], context, node_id)?;
+    if !current_value.is_finite() {
+        return Ok(f64::NAN);
+    }
+    let Some(target_period) = offset_period(context, -periods) else {
+        return Ok(f64::NAN);
+    };
+    let start_value = historical_expression_value(&args[0], target_period, context, node_id)?;
+    if start_value.abs() < ZERO_TOLERANCE {
+        tracing::warn!(
+            "growth_rate() division by near-zero base value in period {:?}",
+            context.period_id
+        );
+        if let Some(id) = node_id {
+            context.push_warning(EvalWarning::DivisionByZero {
+                node_id: id.to_string(),
+                period: context.period_id,
+            });
+        }
+        return Ok(f64::NAN);
+    }
+    // A non-positive base cannot define a compound growth rate. In
+    // particular, improving losses must not be reported as negative growth.
+    if !start_value.is_finite() || start_value < 0.0 {
+        return Ok(f64::NAN);
+    }
+    let ratio = current_value / start_value;
+    if !ratio.is_finite() || ratio < 0.0 {
+        return Ok(f64::NAN);
+    }
+    let elapsed_years = match context.period_kind {
+        PeriodKind::Daily | PeriodKind::Weekly => {
+            let start = period_observation_date(target_period, context).ok_or_else(|| {
+                eval_error(
+                    node_id,
+                    "growth_rate() requires explicit dates for fiscal daily/weekly periods",
+                )
+            })?;
+            let end = period_observation_date(context.period_id, context).ok_or_else(|| {
+                eval_error(
+                    node_id,
+                    "growth_rate() requires explicit dates for fiscal daily/weekly periods",
+                )
+            })?;
+            DayCount::ActAct.year_fraction(start, end, DayCountContext::default())?
+        }
+        _ => periods as f64 / f64::from(context.period_kind.periods_per_year()),
+    };
+    if !elapsed_years.is_finite() || elapsed_years <= 0.0 {
+        return Err(eval_error(
+            node_id,
+            "growth_rate() requires increasing observation dates",
+        ));
+    }
+    let growth = ratio.powf(1.0 / elapsed_years) - 1.0;
+    Ok(if growth.is_finite() { growth } else { f64::NAN })
+}
+
+/// Daily and weekly observations belong to the final included period date.
+/// Model bounds take precedence so a fiscal year's shortened final week has
+/// its actual length. Standalone Gregorian contexts can derive their dates.
+fn period_observation_date(period: PeriodId, context: &EvaluationContext) -> Option<Date> {
+    if let Some((_, end)) = context.history.period_bounds(&period) {
+        return end.previous_day();
+    }
+    if period.is_fiscal() {
+        return None;
+    }
+    match period.kind() {
+        PeriodKind::Daily => Date::from_ordinal_date(period.year, period.index).ok(),
+        PeriodKind::Weekly => {
+            Date::from_iso_week_date(period.year, period.index as u8, Weekday::Sunday).ok()
+        }
+        _ => None,
     }
 }
 
@@ -334,20 +381,8 @@ pub(crate) fn eval_shift(
         return Ok(f64::NAN);
     }
 
-    let Some(target_period) = offset_period(context.period_id, -shift_periods) else {
+    let Some(target_period) = offset_period(context, -shift_periods) else {
         return Ok(f64::NAN);
     };
-
-    if let ExprNode::Column(node_name) = &args[0].node {
-        if let Some(value) = get_historical_column_value(context, node_name, &target_period) {
-            Ok(value)
-        } else {
-            Ok(f64::NAN)
-        }
-    } else {
-        Err(eval_error(
-            node_id,
-            "shift() requires a column reference as first argument; use an intermediate node for complex expressions",
-        ))
-    }
+    historical_expression_value(&args[0], target_period, context, node_id)
 }

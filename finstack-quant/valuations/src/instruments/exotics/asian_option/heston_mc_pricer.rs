@@ -20,7 +20,6 @@ use finstack_quant_models::monte_carlo::payoff::asian::{AsianCall, AsianPut};
 use finstack_quant_models::monte_carlo::process::heston::HestonProcess;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::seed;
-use finstack_quant_models::monte_carlo::TimeGrid;
 
 /// Asian option Heston Monte Carlo pricer.
 ///
@@ -51,6 +50,7 @@ impl AsianOptionHestonMcPricer {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<(Money, f64)> {
+        inst.validate_past_fixings(as_of)?;
         // Time to maturity
         let t = inst
             .day_count
@@ -111,24 +111,35 @@ impl AsianOptionHestonMcPricer {
         let process = HestonProcess::new(heston_params);
         let discretization = QeHeston::new();
 
-        // Build time grid. Map fixing dates to time steps via the shared
-        // helper so each distinct fixing gets its own grid step (W-04) — the
-        // naive round()+dedup() merged distinct fixings on a coarse grid.
+        // Insert each fixing time exactly and retain repeated observations at
+        // shared diffusion times.
         let base_num_steps = ((t * self.steps_per_year).round() as usize).max(self.min_steps);
-        let fixing_grid =
-            crate::instruments::exotics::asian_option::pricer::map_fixings_to_distinct_steps(
-                &inst.fixing_dates,
-                inst.day_count,
-                as_of,
-                t,
-                base_num_steps,
-            )?;
-        let num_steps = fixing_grid.num_steps;
+        let fixing_grid = crate::instruments::exotics::asian_option::pricer::map_fixings_to_steps(
+            &inst.fixing_dates,
+            inst.day_count,
+            as_of,
+            t,
+            base_num_steps,
+        )?;
+        let time_grid = fixing_grid.time_grid;
         let fixing_steps = fixing_grid.fixing_steps;
 
-        let averaging = inst.averaging_method;
+        // The Heston engine has constant carry r-q. Deterministic observation
+        // scaling gives every fixing its dated forward without changing the
+        // common stochastic variance path or the declared diffusion clock.
+        let fixing_multipliers = inst
+            .fixing_dates
+            .iter()
+            .filter(|&&date| date > as_of)
+            .map(|&date| {
+                let time = inst
+                    .day_count
+                    .year_fraction(as_of, date, DayCountContext::default())?;
+                Ok((-disc_curve.df_between_dates(as_of, date)?.ln() - r * time).exp())
+            })
+            .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 
-        let time_grid = TimeGrid::uniform(t, num_steps)?;
+        let averaging = inst.averaging_method;
 
         let num_paths = inst
             .instrument_pricing_overrides
@@ -171,7 +182,8 @@ impl AsianOptionHestonMcPricer {
                     )
                 } else {
                     AsianCall::new(inst.strike, inst.quantity, averaging, fixing_steps)
-                }?;
+                }?
+                .with_fixing_multipliers(&fixing_multipliers)?;
                 let result = engine.price(
                     &rng,
                     &process,
@@ -196,7 +208,8 @@ impl AsianOptionHestonMcPricer {
                     )
                 } else {
                     AsianPut::new(inst.strike, inst.quantity, averaging, fixing_steps)
-                }?;
+                }?
+                .with_fixing_multipliers(&fixing_multipliers)?;
                 let result = engine.price(
                     &rng,
                     &process,

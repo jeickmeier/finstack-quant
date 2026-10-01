@@ -79,14 +79,18 @@ use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
 use pyo3::Bound;
 
+use crate::bindings::module_utils::{attach_submodule, new_submodule, Exposure};
+
 pub(crate) fn register<'py>(py: Python<'py>, parent: &Bound<'py, PyModule>) -> PyResult<()> {
-    let module = PyModule::new(py, "analytics")?;
+    // Named by its public path (`finstack_quant.analytics`) from creation, so the
+    // functions added below report that `__module__`.
+    let module = new_submodule(parent, "analytics")?;
     module.add_function(wrap_pyfunction!(sharpe, &module)?)?;
     module.add_function(wrap_pyfunction!(max_drawdown, &module)?)?;
     module.setattr("__all__", PyList::new(py, ["sharpe", "max_drawdown"])?)?;
-    parent.add_submodule(&module)?;
-    parent.setattr("analytics", &module)?;
-    Ok(())
+    // `Python`: `finstack_quant/analytics/__init__.py` re-exports it and owns the
+    // import path. Use `Exposure::Compiled` when no Python file exists there.
+    attach_submodule(parent, &module, Exposure::Python)
 }
 ```
 
@@ -95,11 +99,18 @@ Rules:
 - Set `__all__` via `PyList` directly in registration; do not return export lists.
 - Keep `__all__` exhaustive and sorted; expose only public APIs.
 - Every module sets `__doc__`.
+- Create compiled modules with `module_utils::new_submodule` and finish with
+  `module_utils::attach_submodule`; never `PyModule::new`, and never set
+  `__name__`, `__package__` or `__module__` afterwards. Every compiled module is
+  named by its public path (`finstack_quant.models.credit.lgd`), never the
+  extension-internal `finstack_quant.finstack_quant.…`;
+  `finstack-quant-py/tests/test_module_names.py` enforces it.
 
 ### Python Package Root
 
 `finstack-quant-py/finstack_quant/__init__.py` exposes the 14 Rust domains plus
-the pure-Python `reporting` namespace, the compiled `schema` submodule and
+the pure-Python `reporting` namespace, the workspace-wide `schema` registry
+(`schema.py`, re-exporting the umbrella crate's compiled module) and
 `__version__`:
 
 ```python

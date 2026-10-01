@@ -58,9 +58,10 @@ class linalg:
     Correlation-matrix validation lives in
     :func:`finstack_quant.models.correlation.validate_correlation_matrix`.
 
-    Matrix inputs accept either nested ``list[list[float]]`` (row-major
-    square matrices) or C-contiguous ``numpy.ndarray`` (``float64``) arrays;
-    vectors are ``list[float]``.
+    Matrix inputs accept nested ``list[list[float]]`` or two-dimensional
+    ``numpy.ndarray`` (``float64``) arrays. NumPy inputs use logical row and
+    column order for C-contiguous, Fortran-contiguous, transposed and strided
+    layouts; vectors are ``list[float]``.
 
     Examples
     --------
@@ -71,7 +72,12 @@ class linalg:
     """
 
     SINGULAR_THRESHOLD: float
-    """Threshold below which a diagonal element is considered singular."""
+    """Relative factor-diagonal cutoff for numerical singularity.
+
+    Decomposition scales this fraction by the square root of the largest
+    input diagonal magnitude; substitution scales it by the largest factor
+    diagonal magnitude.
+    """
 
     DIAGONAL_TOLERANCE: float
     """Tolerance for diagonal element checks in correlation matrices."""
@@ -83,8 +89,8 @@ class linalg:
         """
         Cholesky decomposition failure.
 
-        Raised when the input matrix is not positive-definite, is singular,
-        or has mismatched dimensions. Inherits from ``ValueError``.
+        Raised when the input matrix is not positive-definite, is numerically
+        singular, or contains non-finite entries. Inherits from ``ValueError``.
 
         Examples
         --------
@@ -146,21 +152,29 @@ class linalg:
         Compute the Cholesky decomposition L of a symmetric positive-definite
         matrix such that A = L L^T.
 
+        Rust normalizes the matrix before factorization and restores the
+        factor's units afterwards. Numerical singularity is measured relative
+        to the square root of the largest input diagonal magnitude. Uniformly
+        scaling A by a positive constant scales L by its square root.
+
         Parameters
         ----------
         matrix : list[list[float]] or numpy.ndarray
-            Square symmetric positive-definite matrix.
+            Finite symmetric positive-definite square matrix in logical row
+            and column order; NumPy strides do not change that ordering.
 
         Returns
         -------
         list[list[float]]
-            Lower-triangular Cholesky factor L.
+            Lower-triangular factor L in the original variable order, with its
+            scale restored so that A = L L^T.
 
         Raises
         ------
         CholeskyError
-            If the matrix is not positive-definite, is singular, or has
-            mismatched dimensions.
+            If the matrix is not positive-definite, is numerically singular,
+            or contains non-finite entries. This exception is a ``ValueError``
+            subclass.
         ValueError
             If the input is not a square matrix.
 
@@ -181,12 +195,18 @@ class linalg:
         Solve a symmetric positive-definite linear system A x = b given
         the Cholesky factor L of A (where A = L L^T).
 
+        The singularity threshold is relative to the largest factor diagonal.
+        Uniformly scaling A and b preserves x when L is scaled by the square
+        root of the same positive constant.
+
         Parameters
         ----------
         chol : list[list[float]] or numpy.ndarray
-            Lower-triangular Cholesky factor L.
-        b : list[float]
-            Right-hand side vector.
+            Square Cholesky factor L; its consumed lower triangle must be
+            finite. The unused upper triangle is ignored. NumPy inputs use
+            logical row and column order regardless of strides.
+        b : Sequence[float] or numpy.ndarray
+            Finite right-hand side vector with one value per factor row.
 
         Returns
         -------
@@ -196,9 +216,13 @@ class linalg:
         Raises
         ------
         ValueError
-            On dimension mismatch, a non-square factor, or a singular
-            (near-zero diagonal) factor. ``CholeskyError`` is reserved for
-            ``cholesky_decomposition``.
+            On dimension mismatch, a non-square factor, a diagonal too close
+            to zero relative to the largest diagonal magnitude, non-finite
+            lower-triangle or right-hand-side entries, or a non-finite
+            substitution result (including overflow). ``CholeskyError`` is
+            reserved for ``cholesky_decomposition``.
+        TypeError
+            If ``b`` contains values that cannot be converted to float.
 
         Examples
         --------
@@ -253,24 +277,35 @@ class linalg:
         """
         Ledoit-Wolf (2004) shrinkage of a sample covariance toward a scaled identity.
 
+        Columns are demeaned and the sample covariance uses the divisor ``t``.
+        Centered observations are normalized before computing second and
+        fourth moments, then covariance units are restored. Uniformly rescaling
+        all observations preserves the shrinkage intensity and rescales
+        covariance by the square of that factor.
+
         Parameters
         ----------
         observations : list[list[float]] or numpy.ndarray
             ``t x n`` matrix: ``t`` observations (rows) of ``n`` variables
-            (columns), ``t >= 2``, ``n >= 1``.
+            (columns), ``t >= 2``, ``n >= 1``; every entry must be finite. Use
+            comparable units across columns because the target pools their
+            variances.
 
         Returns
         -------
         tuple[list[list[float]], float]
             ``(covariance, shrinkage)``: the ``n x n`` shrunk covariance
             ``delta * mu * I + (1 - delta) * S`` and the optimal intensity
-            ``delta`` in ``[0, 1]``.
+            ``delta`` in ``[0, 1]``. The covariance is unannualized and restored
+            to squared observation units. Constant observations produce a zero
+            covariance matrix and zero intensity.
 
         Raises
         ------
         ValueError
             If ``t < 2``, ``n == 0``, rows are ragged, or any entry is
-            non-finite.
+            non-finite; also if centered observations or covariance entries
+            exceed the finite ``float64`` range.
 
         Examples
         --------
@@ -288,7 +323,9 @@ class stats:
     NaN-sentinel summaries, log returns and realized variance.
 
     Vector parameters accept any ``Sequence[float]`` or a 1-D ``float64``
-    NumPy array.
+    NumPy array, including strided or reversed views. Inputs are copied before
+    Rust computation releases the GIL; sorting operations do not mutate the
+    caller's array. Invalid series types or dimensions raise ``TypeError``.
 
     Examples
     --------
@@ -313,9 +350,11 @@ class stats:
         tuple[float, float]
             ``(mean, variance)``; ``(0.0, 0.0)`` for empty input.
 
-        Notes
-        -----
-        This function does not raise.
+        Raises
+        ------
+        TypeError
+            If a series is not one-dimensional or contains values that cannot
+            be converted to float.
 
         Examples
         --------
@@ -341,9 +380,11 @@ class stats:
         float
             Mean, or ``nan`` when *data* is empty.
 
-        Notes
-        -----
-        This function does not raise.
+        Raises
+        ------
+        TypeError
+            If a series is not one-dimensional or contains values that cannot
+            be converted to float.
 
         Examples
         --------
@@ -369,9 +410,11 @@ class stats:
         float
             Unbiased variance, or ``nan``.
 
-        Notes
-        -----
-        This function does not raise.
+        Raises
+        ------
+        TypeError
+            If a series is not one-dimensional or contains values that cannot
+            be converted to float.
 
         Examples
         --------
@@ -397,9 +440,11 @@ class stats:
         float
             Square root of the unbiased variance, or ``nan``.
 
-        Notes
-        -----
-        This function does not raise.
+        Raises
+        ------
+        TypeError
+            If a series is not one-dimensional or contains values that cannot
+            be converted to float.
 
         Examples
         --------
@@ -425,9 +470,11 @@ class stats:
         float
             Median, or ``nan``.
 
-        Notes
-        -----
-        This function does not raise.
+        Raises
+        ------
+        TypeError
+            If a series is not one-dimensional or contains values that cannot
+            be converted to float.
 
         Examples
         --------
@@ -455,9 +502,11 @@ class stats:
         float
             Quantile value, or ``nan`` for empty/non-finite data or a NaN probability.
 
-        Notes
-        -----
-        This function does not raise.
+        Raises
+        ------
+        TypeError
+            If a series is not one-dimensional or contains values that cannot
+            be converted to float.
 
         Examples
         --------
@@ -483,9 +532,11 @@ class stats:
         float
             Smallest finite value, or ``nan``.
 
-        Notes
-        -----
-        This function does not raise.
+        Raises
+        ------
+        TypeError
+            If a series is not one-dimensional or contains values that cannot
+            be converted to float.
 
         Examples
         --------
@@ -511,9 +562,11 @@ class stats:
         float
             Largest finite value, or ``nan``.
 
-        Notes
-        -----
-        This function does not raise.
+        Raises
+        ------
+        TypeError
+            If a series is not one-dimensional or contains values that cannot
+            be converted to float.
 
         Examples
         --------
@@ -539,9 +592,11 @@ class stats:
         int
             Count of finite entries.
 
-        Notes
-        -----
-        This function does not raise.
+        Raises
+        ------
+        TypeError
+            If a series is not one-dimensional or contains values that cannot
+            be converted to float.
 
         Examples
         --------
@@ -569,9 +624,11 @@ class stats:
             ``len(prices) - 1`` returns; invalid windows yield ``nan``, and
             fewer than two prices yield an empty list.
 
-        Notes
-        -----
-        This function does not raise.
+        Raises
+        ------
+        TypeError
+            If a series is not one-dimensional or contains values that cannot
+            be converted to float.
 
         Examples
         --------
@@ -614,6 +671,9 @@ class stats:
         ValueError
             If *method* is unknown or needs OHLC data, a price is non-positive
             or non-finite, or *annualization_factor* is not positive.
+        TypeError
+            If a series is not one-dimensional or contains values that cannot
+            be converted to float.
 
         Examples
         --------
@@ -666,6 +726,9 @@ class stats:
         ValueError
             If the four series differ in length, *method* is unknown, prices
             are invalid, or *annualization_factor* is not positive.
+        TypeError
+            If a series is not one-dimensional or contains values that cannot
+            be converted to float.
 
         Examples
         --------
@@ -703,7 +766,13 @@ class stats:
 
         Notes
         -----
-        This method does not raise; an empty series returns ``0.0``.
+        An empty series returns ``0.0``.
+
+        Raises
+        ------
+        TypeError
+            If ``data`` is not a one-dimensional numeric sequence or contains
+            values that cannot be converted to float.
 
         Examples
         --------
@@ -732,7 +801,13 @@ class stats:
 
         Notes
         -----
-        This method does not raise; fewer than two observations return ``0.0``.
+        Fewer than two observations return ``0.0``.
+
+        Raises
+        ------
+        TypeError
+            If ``data`` is not a one-dimensional numeric sequence or contains
+            values that cannot be converted to float.
 
         Examples
         --------
@@ -761,7 +836,13 @@ class stats:
 
         Notes
         -----
-        This method does not raise; an empty series returns ``0.0``.
+        An empty series returns ``0.0``.
+
+        Raises
+        ------
+        TypeError
+            If ``data`` is not a one-dimensional numeric sequence or contains
+            values that cannot be converted to float.
 
         Examples
         --------
@@ -794,7 +875,14 @@ class stats:
 
         Notes
         -----
-        This method does not raise; unequal lengths return ``NaN``.
+        Unequal lengths return ``NaN``; fewer than two observations or a
+        constant series return ``0.0``.
+
+        Raises
+        ------
+        TypeError
+            If either series is not one-dimensional or contains values that
+            cannot be converted to float.
 
         Examples
         --------
@@ -825,7 +913,14 @@ class stats:
 
         Notes
         -----
-        This method does not raise; unequal lengths return ``NaN``.
+        Unequal lengths return ``NaN``; fewer than two observations return
+        ``0.0``.
+
+        Raises
+        ------
+        TypeError
+            If either series is not one-dimensional or contains values that
+            cannot be converted to float.
 
         Examples
         --------
@@ -857,7 +952,15 @@ class stats:
 
         Notes
         -----
-        This method does not raise; empty data, ``q`` outside ``[0, 1]``, or non-finite inputs return ``NaN``.
+        Empty data, ``q`` outside ``[0, 1]``, or non-finite inputs return
+        ``NaN``. Caller storage is never reordered.
+
+        Raises
+        ------
+        TypeError
+            If ``data`` is not a one-dimensional numeric sequence or contains
+            values that cannot be converted to float, or ``q`` cannot be
+            converted to float.
 
         Examples
         --------
@@ -972,6 +1075,34 @@ class special_functions:
         >>> from finstack_quant.core.math import special_functions
         >>> round(special_functions.norm_cdf(0.0), 10)
         0.5
+        """
+        ...
+
+    @staticmethod
+    def log_norm_cdf(x: float) -> float:
+        """Natural log of the standard normal CDF, preserving negative-tail precision.
+
+        Parameters
+        ----------
+        x : float
+            Threshold in standard-deviation units; infinities are accepted and NaN propagates.
+
+        Returns
+        -------
+        float
+            Natural log probability. Returns negative infinity at negative infinity
+            and zero at positive infinity.
+
+        Raises
+        ------
+        None
+            This scalar function returns a floating-point result for every float input.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.math import special_functions
+        >>> round(special_functions.log_norm_cdf(-40.0), 6)
+        -804.608442
         """
         ...
 

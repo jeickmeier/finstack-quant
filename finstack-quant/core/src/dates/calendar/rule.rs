@@ -96,7 +96,7 @@ use time::{Date, Duration, Month, Weekday};
 /// # Standards Reference
 ///
 /// - **US exchanges / OPM**: FriIfSatMonIfSun (NYSE, NASDAQ, federal workforce)
-/// - **Federal Reserve / SOFR / Fedwire**: MonIfSun (Sunday → Monday only; banks
+/// - **Federal Reserve / Fedwire**: MonIfSun (Sunday → Monday only; banks
 ///   are open the Friday before a Saturday holiday — see Federal Reserve Board,
 ///   "K.8 Holidays Observed by the Federal Reserve System")
 /// - **UK markets**: NextMonday (LSE, UK Bank Holidays)
@@ -124,7 +124,7 @@ pub enum Observed {
 
     /// Sunday → following Monday; Saturday → **no substitute**.
     ///
-    /// Federal Reserve convention (basis for SOFR/Fedwire business days): when a
+    /// Federal Reserve convention (basis for Fedwire business days): when a
     /// fixed holiday falls on a Saturday, banks remain open the preceding
     /// Friday; only Sunday holidays move to Monday.
     ///
@@ -401,8 +401,8 @@ pub enum Rule {
     /// Qing Ming Festival (清明节, Tomb-Sweeping Day).
     ///
     /// One of the 24 solar terms in the traditional Chinese calendar,
-    /// typically falling around April 4-5. Computed using solar longitude
-    /// formula.
+    /// typically falling around April 4-5. Uses an astronomical date table
+    /// in UTC+8 for years 1970-2150.
     ///
     /// # Markets
     /// Public holiday in Mainland China, Hong Kong, Taiwan.
@@ -410,8 +410,8 @@ pub enum Rule {
 
     /// Buddha's Birthday (Vesak, 佛誕).
     ///
-    /// Celebrated on the 8th day of the 4th Chinese lunar month. Approximated
-    /// as Chinese New Year + 95 days.
+    /// Celebrated on the 8th day of the 4th Chinese lunar month. Uses an exact
+    /// lunar-calendar date table for years 1970-2150, including leap months.
     ///
     /// # Markets
     /// Public holiday in Hong Kong, Macau, and some other Asian markets.
@@ -441,23 +441,39 @@ pub enum Rule {
 
     /// Vernal Equinox Day (春分の日, Shunbun no Hi).
     ///
-    /// Japanese national holiday around March 20-21, computed using
-    /// astronomical formula from the National Astronomical Observatory of Japan.
+    /// Japanese national holiday around March 20-21. Uses astronomical dates
+    /// in UTC+9 for 1970-2150; future dates remain subject to official announcement.
     ///
     /// # Reference
-    /// - Formula valid for years 1900-2100
-    /// - Source: Japan National Astronomical Observatory (国立天文台)
+    /// - Historical dates validated against the Japanese Cabinet Office list
     VernalEquinoxJP,
 
     /// Autumnal Equinox Day (秋分の日, Shūbun no Hi).
     ///
-    /// Japanese national holiday around September 22-23, computed using
-    /// astronomical formula from the National Astronomical Observatory of Japan.
+    /// Japanese national holiday around September 22-23. Uses astronomical dates
+    /// in UTC+9 for 1970-2150; future dates remain subject to official announcement.
     ///
     /// # Reference
-    /// - Formula valid for years 1900-2100
-    /// - Source: Japan National Astronomical Observatory (国立天文台)
+    /// - Historical dates validated against the Japanese Cabinet Office list
     AutumnalEquinoxJP,
+
+    /// Hong Kong general holidays, including lunar festivals, Sunday
+    /// substitutions and additional holidays when two holidays coincide.
+    ///
+    /// Includes HKSAR-era adoption dates and the 1983/2012 changes to lunar
+    /// holiday substitution. Lunar and solar dates are tabulated for 1970–2150.
+    /// Includes recurring colonial holidays; exceptional weather closures and
+    /// discretionary historical substitutions require explicit dated rules.
+    HongKongPublicHolidays,
+
+    /// Japanese national holidays, Sunday substitutes and citizens' holidays.
+    ///
+    /// Applies historical adoption dates, Happy Monday transitions, the
+    /// 1973/2007 substitution rules and announced imperial/Olympic exceptions.
+    /// Recurring rules and equinox tables cover the computational 1970–2150 range.
+    /// Future equinox dates are astronomical projections pending announcement.
+    /// Bank/exchange New Year closures must be supplied separately.
+    JapanPublicHolidays,
 
     /// Effective-date wrapper that gates an inner rule to a closed range of
     /// calendar years.
@@ -548,96 +564,6 @@ impl Rule {
             observed: Observed::None,
         }
     }
-}
-
-/// Calculate Qing Ming (Tomb-Sweeping Day) based on solar term calculations.
-///
-/// Qing Ming is one of the 24 solar terms in the traditional Chinese calendar,
-/// typically falling around April 4-5 when the sun reaches celestial longitude 15°.
-///
-/// The formula uses mean solar longitude calculations with epoch 1900.
-/// Accurate for years 1900-2100.
-///
-/// # Constants
-/// - Base offset: 5.59 days into April
-/// - Slope: 0.2422 days per year (accounts for calendar drift)
-/// - Epoch: 1900 (reference year for calculation)
-fn qing_ming_day(year: i32) -> u8 {
-    const QINGMING_BASE: f64 = 5.59;
-    const QINGMING_SLOPE: f64 = 0.2422;
-    const QINGMING_EPOCH: i32 = 1900;
-
-    let y = (year - QINGMING_EPOCH) as f64;
-    (QINGMING_BASE + QINGMING_SLOPE * y - (y / 4.0).floor()) as u8
-}
-
-// Helper for Buddha's Birthday approximation (CNY +95 days)
-fn buddhas_birthday_date(year: i32) -> Option<Date> {
-    algo::cny_date(year).map(|cny| cny + Duration::days(95))
-}
-
-/// Calculate Vernal Equinox Day for Japan.
-///
-/// Uses the formula from Japan's National Astronomical Observatory (NAO)
-/// for approximating the date of the vernal (spring) equinox, which is
-/// a national holiday in Japan.
-///
-/// The formula is based on astronomical calculations with epoch 1980.
-/// Accurate for years 1900-2100.
-///
-/// # Constants
-/// - Epoch: 1980 (reference year for NAO formula)
-/// - Base: 20.8431 days into March
-/// - Slope: 0.242194 days per year (accounts for precession)
-///
-/// # Reference
-/// Japan National Astronomical Observatory (国立天文台)
-fn vernal_equinox_jp(year: i32) -> Option<Date> {
-    if !(1900..=2100).contains(&year) {
-        return None;
-    }
-    const VERNAL_EPOCH: i32 = 1980;
-    const VERNAL_BASE: f64 = 20.8431;
-    const VERNAL_SLOPE: f64 = 0.242194;
-
-    let y = (year - VERNAL_EPOCH) as f64;
-    let day = (VERNAL_BASE + VERNAL_SLOPE * y - (y / 4.0).floor()).floor() as u8;
-    let day = day.clamp(1, 31);
-    Date::from_calendar_date(year, Month::March, day)
-        .or_else(|_| Date::from_calendar_date(year, Month::March, 21))
-        .ok()
-}
-
-/// Calculate Autumnal Equinox Day for Japan.
-///
-/// Uses the formula from Japan's National Astronomical Observatory (NAO)
-/// for approximating the date of the autumnal (fall) equinox, which is
-/// a national holiday in Japan.
-///
-/// The formula is based on astronomical calculations with epoch 1980.
-/// Accurate for years 1900-2100.
-///
-/// # Constants
-/// - Epoch: 1980 (reference year for NAO formula)
-/// - Base: 23.2488 days into September
-/// - Slope: 0.242194 days per year (accounts for precession)
-///
-/// # Reference
-/// Japan National Astronomical Observatory (国立天文台)
-fn autumnal_equinox_jp(year: i32) -> Option<Date> {
-    if !(1900..=2100).contains(&year) {
-        return None;
-    }
-    const AUTUMNAL_EPOCH: i32 = 1980;
-    const AUTUMNAL_BASE: f64 = 23.2488;
-    const AUTUMNAL_SLOPE: f64 = 0.242194;
-
-    let y = (year - AUTUMNAL_EPOCH) as f64;
-    let day = (AUTUMNAL_BASE + AUTUMNAL_SLOPE * y - (y / 4.0).floor()).floor() as u8;
-    let day = day.clamp(1, 30); // September has 30 days
-    Date::from_calendar_date(year, Month::September, day)
-        .or_else(|_| Date::from_calendar_date(year, Month::September, 23))
-        .ok()
 }
 
 #[inline]
@@ -836,12 +762,19 @@ impl Rule {
             Rule::ChineseNewYear => algo::is_cny(date),
             Rule::DragonBoat => algo::is_dragon_boat(date),
             Rule::MidAutumn => algo::is_mid_autumn(date),
-            Rule::QingMing => {
-                date.month() == Month::April && date.day() == qing_ming_day(date.year())
+            Rule::QingMing => algo::qing_ming_date(date.year()) == Some(date),
+            Rule::BuddhasBirthday => algo::buddhas_birthday_date(date.year()) == Some(date),
+            Rule::VernalEquinoxJP => {
+                algo::vernal_equinox_jp_date(date.year()).is_some_and(|d| d == date)
             }
-            Rule::BuddhasBirthday => buddhas_birthday_date(date.year()) == Some(date),
-            Rule::VernalEquinoxJP => vernal_equinox_jp(date.year()).is_some_and(|d| d == date),
-            Rule::AutumnalEquinoxJP => autumnal_equinox_jp(date.year()).is_some_and(|d| d == date),
+            Rule::AutumnalEquinoxJP => {
+                algo::autumnal_equinox_jp_date(date.year()).is_some_and(|d| d == date)
+            }
+            Rule::HongKongPublicHolidays | Rule::JapanPublicHolidays => {
+                let mut holidays = smallvec::SmallVec::<[Date; 32]>::new();
+                self.materialize_year(date.year(), &mut holidays);
+                holidays.contains(&date)
+            }
             Rule::Effective {
                 from_year,
                 to_year,
@@ -942,25 +875,27 @@ impl Rule {
                 }
             }
             Rule::QingMing => {
-                if let Ok(d) = Date::from_calendar_date(year, Month::April, qing_ming_day(year)) {
+                if let Some(d) = algo::qing_ming_date(year) {
                     out.push(d);
                 }
             }
             Rule::BuddhasBirthday => {
-                if let Some(d) = buddhas_birthday_date(year) {
+                if let Some(d) = algo::buddhas_birthday_date(year) {
                     out.push(d);
                 }
             }
             Rule::VernalEquinoxJP => {
-                if let Some(d) = vernal_equinox_jp(year) {
+                if let Some(d) = algo::vernal_equinox_jp_date(year) {
                     out.push(d);
                 }
             }
             Rule::AutumnalEquinoxJP => {
-                if let Some(d) = autumnal_equinox_jp(year) {
+                if let Some(d) = algo::autumnal_equinox_jp_date(year) {
                     out.push(d);
                 }
             }
+            Rule::HongKongPublicHolidays => super::jurisdictions::hong_kong(year, out),
+            Rule::JapanPublicHolidays => super::jurisdictions::japan(year, out),
             Rule::Effective {
                 from_year,
                 to_year,

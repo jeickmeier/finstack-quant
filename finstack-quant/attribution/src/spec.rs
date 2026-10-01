@@ -303,8 +303,8 @@ impl AttributionSpec {
         if let Some(ref cfg) = self.config {
             if let Some(scale) = cfg.rounding_scale {
                 if let Some(ccy) = instrument_currency {
-                    config.rounding.output_scale.overrides.insert(ccy, scale);
-                    config.rounding.ingest_scale.overrides.insert(ccy, scale);
+                    config.rounding.output_scale.set_scale(ccy, scale)?;
+                    config.rounding.ingest_scale.set_scale(ccy, scale)?;
                 }
             }
             if let Some(rate_bump_bp) = cfg.rate_bump_bp {
@@ -752,9 +752,10 @@ mod tests {
         )
         .expect("Bond::fixed should succeed with valid parameters");
 
-        let market = MarketContextState::from(
+        let market = MarketContextState::try_from(
             &finstack_quant_core::market_data::context::MarketContext::new(),
-        );
+        )
+        .expect("coherent market snapshot");
         let spec = AttributionSpec {
             instrument: InstrumentJson::Bond(bond),
             market_t0: market.clone(),

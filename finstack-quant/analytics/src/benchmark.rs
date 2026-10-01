@@ -15,8 +15,8 @@ use finstack_quant_core::math::{neumaier_sum, NeumaierAccumulator};
 use nalgebra::DMatrix;
 
 // Recompute the four sliding-window sums (sr, sb, srb, sb²) every 64 steps to
-// bound drift from incremental add/remove updates without turning the whole
-// calculation into O(n * window). The greeks kernel maintains four cross-term
+// bound drift from incremental add/remove updates without recomputing every
+// ordinary window. The greeks kernel maintains four cross-term
 // sums that compound floating-point error roughly proportionally to the number
 // of running quantities, so we recompute roughly 16× more often than the
 // single-mean rolling kernels in `risk_metrics::rolling`
@@ -42,8 +42,8 @@ const ROLLING_GREEKS_RECOMPUTE_INTERVAL: usize = 64;
 /// unchanged while making the cancelled quantities `O(variation)` instead of
 /// `O(level)`. This is the standard shifted-data formulation for one-pass
 /// variance (Chan, Golub & LeVeque 1983, "Algorithms for Computing the Sample
-/// Variance"); it costs one subtraction per element and preserves the O(n)
-/// sliding-window update between rebuilds. Rebuilds reset both origins to the
+/// Variance"); it costs one subtraction per element and preserves constant-cost
+/// sliding-window updates between rebuilds. Rebuilds reset both origins to the
 /// first observation in the current window, including after variance collapses.
 ///
 /// The mean-dependent parts of alpha need the unshifted sums; the caller
@@ -593,6 +593,11 @@ pub struct RollingGreeks {
 /// running sums as soon as a non-finite value exits the window). Use
 /// [`multi_factor_greeks`] when strict regression input validation is
 /// required.
+///
+/// Updates take constant time between full-window rebuilds, which occur at
+/// least every 64 windows and when cancellation or non-finite sums require
+/// recovery. Periodic rebuilds cost `O(n + n * window / 64)` overall; repeated
+/// recovery rebuilds can cost `O(n * window)`.
 pub(crate) fn rolling_greeks(
     returns: &[f64],
     benchmark: &[f64],
@@ -622,7 +627,7 @@ pub(crate) fn rolling_greeks(
             window,
             count,
             recompute_interval = ROLLING_GREEKS_RECOMPUTE_INTERVAL,
-            "rolling greeks using incremental O(n) path"
+            "rolling greeks using incremental updates with periodic window rebuilds"
         );
     }
     let mut out_dates = Vec::with_capacity(count);
@@ -630,7 +635,7 @@ pub(crate) fn rolling_greeks(
     let mut betas = Vec::with_capacity(count);
     let rf_period = crate::returns::periodic_risk_free_rate(risk_free_rate, ann_factor);
 
-    // Incremental O(n) sliding-window OLS via running sums.
+    // Constant-cost sliding-window OLS updates between full-window rebuilds.
     //
     // Recenter on rebuilds so that observations which have left the window
     // cannot set the scale of cancellation indefinitely.
@@ -1026,6 +1031,7 @@ where
 /// - any portfolio or factor return is non-finite
 /// - any factor length differs from `returns.len()`
 /// - the factor matrix is singular or numerically rank deficient
+/// - a coefficient, annualized intercept, or residual volatility is non-finite
 ///
 /// # References
 ///
@@ -1121,6 +1127,15 @@ pub(crate) fn multi_factor_greeks(
     let alpha_per_period = beta[0];
     let factor_betas: Vec<f64> = beta[1..].to_vec();
 
+    // Both goodness-of-fit sums use the same response scale, which cancels
+    // from their ratio. Squaring residuals in original units can overflow
+    // even when the resulting standard deviation is representable.
+    let response_scale = y.iter().map(|value| value.abs()).fold(0.0, f64::max);
+    let response_scale = if response_scale > 0.0 {
+        response_scale
+    } else {
+        1.0
+    };
     let mut response_stats = OnlineStats::new();
     let mut ss_res = 0.0_f64;
     for (t, &r) in y.iter().enumerate().take(n) {
@@ -1129,9 +1144,11 @@ pub(crate) fn multi_factor_greeks(
             let fj = factors[j][t];
             y_hat += factor_betas[j] * fj;
         }
-        let residual = r - y_hat;
+        crate::regression::ensure_finite(&[y_hat])?;
+        let scaled_response = r / response_scale;
+        let residual = scaled_response - y_hat / response_scale;
         ss_res += residual * residual;
-        response_stats.update(r);
+        response_stats.update(scaled_response);
     }
 
     // Online variance preserves exact zero for constant observations, even
@@ -1144,14 +1161,18 @@ pub(crate) fn multi_factor_greeks(
     };
     let dof = n as f64 - k as f64 - 1.0;
     let residual_var = if dof > 0.0 { ss_res / dof } else { 0.0 };
-    let residual_vol = residual_var.sqrt() * ann_factor.sqrt();
+    let residual_vol = residual_var.sqrt() * response_scale * ann_factor.sqrt();
     let alpha = alpha_per_period * ann_factor;
+    crate::regression::ensure_finite(&[alpha, residual_vol])?;
 
     let adjusted_r_squared = if dof > 0.0 && r_sq.is_finite() {
         1.0 - (1.0 - r_sq) * (n as f64 - 1.0) / dof
     } else {
         f64::NAN
     };
+    if ss_tot > 0.0 {
+        crate::regression::ensure_finite(&[r_sq, adjusted_r_squared])?;
+    }
 
     Ok(MultiFactorResult {
         alpha,
@@ -1835,6 +1856,8 @@ mod tests {
 /// return is also zero (matching the [`sharpe`](crate::risk_metrics) /
 /// `information_ratio` zero-denominator convention). A `NaN` beta (e.g.
 /// from a zero-variance benchmark) propagates to a `NaN` ratio.
+/// Non-finite annualized excess return also returns `NaN`, including when
+/// `risk_free_rate` is non-finite, before applying the zero-beta convention.
 ///
 /// Excess return uses the same geometric rf decompounding as
 /// [`crate::risk_metrics::sharpe`]:
@@ -1849,6 +1872,9 @@ mod tests {
 #[must_use]
 pub(crate) fn treynor(ann_return: f64, risk_free_rate: f64, beta: f64, ann_factor: f64) -> f64 {
     let excess = crate::returns::annualized_excess_return(ann_return, risk_free_rate, ann_factor);
+    if !excess.is_finite() {
+        return f64::NAN;
+    }
     if beta.abs() < 1e-10 {
         return if excess > 0.0 {
             f64::INFINITY

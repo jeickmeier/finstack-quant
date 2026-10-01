@@ -518,7 +518,10 @@ impl DiscountCurve {
     #[must_use]
     #[inline]
     pub fn df(&self, t: f64) -> f64 {
-        self.interp.interp(t)
+        self.transform.as_ref().map_or_else(
+            || self.interp.interp(t),
+            |transform| transform.df(&self.interp, t),
+        )
     }
 
     /// Raw knot times (t) in **years** passed at construction.
@@ -584,19 +587,25 @@ impl DiscountCurve {
             rate_calibration: None,
             calibration_ois_cutoff_days: None,
             fx_policy: None,
+            transform: None,
         }
     }
 
     /// Create a builder pre-populated with this curve's data but a new ID.
     pub fn to_builder_with_id(&self, new_id: impl Into<CurveId>) -> DiscountCurveBuilder {
-        self.metadata_builder(new_id)
-            .knots(self.knots.iter().copied().zip(self.dfs.iter().copied()))
+        let mut builder = self
+            .metadata_builder(new_id)
+            .knots(self.knots.iter().copied().zip(self.dfs.iter().copied()));
+        builder.transform = self.transform.clone();
+        builder
     }
 
     /// Rebuild this curve with replacement knots while preserving all metadata.
     ///
     /// This retains interpolation, extrapolation, validation policy, calibration
-    /// provenance, minimum forward tenor, and FX policy.
+    /// provenance, minimum forward tenor, and FX policy. Replacement pillars
+    /// define a new interpolation; previous roll and shock transformations are
+    /// not reapplied to these replacement discount factors.
     ///
     /// # Errors
     ///

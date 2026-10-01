@@ -9,7 +9,7 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
-use crate::types::FinancialModelSpec;
+use crate::types::NodeId;
 
 /// Results from evaluating a financial model.
 ///
@@ -238,57 +238,27 @@ impl StatementResult {
         self.get(node_id, period).unwrap_or(default)
     }
 
-    /// Infer and populate node value types and monetary node maps from a model.
+    /// Populate monetary maps using the plan's validated and inferred units.
     ///
-    /// For each node, determines whether it is monetary or scalar based on:
-    /// 1. Explicit `value_type` on the node spec (highest priority)
-    /// 2. Inferred from the node's input values (currency homogeneity)
-    /// 3. Default to scalar
+    /// # Arguments
     ///
-    /// Populates `node_value_types` and `monetary_nodes` on this result.
-    pub(crate) fn populate_value_types(&mut self, model: &FinancialModelSpec) -> Result<()> {
-        for (node_id, node_spec) in &model.nodes {
+    /// * `value_types` - Canonical units for every evaluated node, captured by
+    ///   semantic validation when the evaluation plan was prepared.
+    pub(crate) fn populate_value_types(&mut self, value_types: &IndexMap<NodeId, NodeValueType>) {
+        for (node_id, value_type) in value_types {
             let node_id_str = node_id.as_str();
-
-            if let Some(value_type) = &node_spec.value_type {
-                self.node_value_types
-                    .insert(node_id_str.to_string(), *value_type);
-
-                if let NodeValueType::Monetary { currency } = value_type {
-                    if let Some(period_map) = self.nodes.get(node_id_str) {
-                        let (money_map, skipped) =
-                            monetary_map_skipping_nonfinite(period_map, *currency, node_id_str);
-                        self.monetary_nodes
-                            .insert(node_id_str.to_string(), money_map);
-                        self.meta.warnings.extend(skipped);
-                    }
+            self.node_value_types
+                .insert(node_id_str.to_string(), *value_type);
+            if let NodeValueType::Monetary { currency } = value_type {
+                if let Some(period_map) = self.nodes.get(node_id_str) {
+                    let (money_map, skipped) =
+                        monetary_map_skipping_nonfinite(period_map, *currency, node_id_str);
+                    self.monetary_nodes
+                        .insert(node_id_str.to_string(), money_map);
+                    self.meta.warnings.extend(skipped);
                 }
-            } else if let Some(values) = &node_spec.values {
-                if let Some(NodeValueType::Monetary { currency }) =
-                    crate::types::infer_series_value_type(values.values())?
-                {
-                    self.node_value_types.insert(
-                        node_id_str.to_string(),
-                        NodeValueType::Monetary { currency },
-                    );
-
-                    if let Some(period_map) = self.nodes.get(node_id_str) {
-                        let (money_map, skipped) =
-                            monetary_map_skipping_nonfinite(period_map, currency, node_id_str);
-                        self.monetary_nodes
-                            .insert(node_id_str.to_string(), money_map);
-                        self.meta.warnings.extend(skipped);
-                    }
-                } else {
-                    self.node_value_types
-                        .insert(node_id_str.to_string(), NodeValueType::Scalar);
-                }
-            } else {
-                self.node_value_types
-                    .insert(node_id_str.to_string(), NodeValueType::Scalar);
             }
         }
-        Ok(())
     }
 
     /// Export to a long-format table.
@@ -325,14 +295,12 @@ impl StatementResult {
     }
 }
 
-/// Build a `PeriodId -> Money` map for a monetary node, skipping any
-/// non-finite (`NaN`/`±Inf`) cell.
+/// Build a `PeriodId -> Money` map, skipping cells outside Money's finite range.
 ///
 /// The evaluator deliberately stores non-finite results (e.g. a division by
-/// zero) and surfaces them as warnings rather than aborting. `Money::new`
-/// asserts finiteness and would panic on those cells, so this uses
-/// `Money::new` and returns a `NonFiniteValue` warning per skipped cell
-/// instead. Returns the money map and the warnings for the skipped cells.
+/// zero) and already surfaces them as warnings rather than aborting. Finite
+/// values can also exceed Money's representable decimal range; conversion
+/// emits a warning for those cells without duplicating non-finite diagnostics.
 fn monetary_map_skipping_nonfinite(
     period_map: &IndexMap<PeriodId, f64>,
     currency: finstack_quant_core::currency::Currency,
@@ -345,11 +313,12 @@ fn monetary_map_skipping_nonfinite(
             Ok(money) => {
                 money_map.insert(*period_id, money);
             }
-            Err(_) => skipped.push(EvalWarning::NonFiniteValue {
+            Err(_) if v.is_finite() => skipped.push(EvalWarning::NonFiniteValue {
                 node_id: node_id.to_string(),
                 period: *period_id,
                 value: v,
             }),
+            Err(_) => {}
         }
     }
     (money_map, skipped)

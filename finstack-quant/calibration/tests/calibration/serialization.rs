@@ -163,7 +163,6 @@ fn step_params_v2_roundtrip_for_all_variants() {
         notional: 1.0,
         method: CalibrationMethod::Bootstrap,
         interpolation: Default::default(),
-        seasonal_factors: None,
     });
     let _ = roundtrip_json(&inflation);
 

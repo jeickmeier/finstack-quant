@@ -38,6 +38,7 @@ pub trait CurveValidator: Send + Sync {
 
     /// Run all validations defined in this trait.
     fn validate(&self, config: &ValidationConfig) -> Result<()> {
+        config.validate()?;
         self.validate_no_arbitrage(config)?;
         self.validate_monotonicity(config)?;
         self.validate_bounds(config)?;
@@ -53,26 +54,32 @@ impl CurveValidator for DiscountCurve {
         }
 
         let max_knot_arbi = self.knots().last().copied().unwrap_or(0.0);
+        // Include spot and every calibrated knot: a static tenor grid alone
+        // omits short curves and can average away violations between pillars.
+        let mut points: Vec<f64> = std::iter::once(0.0)
+            .chain(self.knots().iter().copied())
+            .chain(
+                DF_ARBI_POINTS
+                    .iter()
+                    .copied()
+                    .filter(|&time| time < max_knot_arbi),
+            )
+            .collect();
+        points.sort_by(f64::total_cmp);
+        points.dedup();
 
-        for i in 0..DF_ARBI_POINTS.len() - 1 {
-            let t1 = DF_ARBI_POINTS[i];
-            let t2 = DF_ARBI_POINTS[i + 1];
-            if t2 > max_knot_arbi + 0.01 {
-                break;
-            }
+        for segment in points.windows(2) {
+            let t1 = segment[0];
+            let t2 = segment[1];
 
             let df1 = self.df(t1);
             let df2 = self.df(t2);
 
-            // Calculate instantaneous forward rate using continuous compounding.
-            // The simple-compounded form (df1/df2 - 1)/(t2-t1) is wildly imprecise
-            // on the coarse DF_ARBI_POINTS grid (gaps up to 10 years); at a 10y
-            // gap and 5% rates it overestimates by ~30% relative, producing false
-            // "unreasonably high" rejections or masking real arbitrage.
-            // The guard `df2 < df1` ensures `df2/df1 < 1`, so `ln(df2/df1) < 0`
-            // and the negation produces a positive forward rate.
-            if df1 > 0.0 && df2 > 0.0 && df2 < df1 {
-                let fwd_rate = -(df2 / df1).ln() / (t2 - t1);
+            // Signed continuously compounded segment forward. Rising discount
+            // factors still have to satisfy the configured negative-rate floor.
+            // Subtract logarithms to avoid overflow/underflow in df1 / df2.
+            if df1.is_finite() && df2.is_finite() && df1 > 0.0 && df2 > 0.0 {
+                let fwd_rate = (df1.ln() - df2.ln()) / (t2 - t1);
 
                 // Forward rates should be positive (allowing small negative for technical reasons)
                 if fwd_rate < config.min_forward_rate {

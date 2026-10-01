@@ -83,23 +83,49 @@ impl Default for EvalOpts {
 /// protected by `Mutex`. For parallel evaluation, either share a
 /// single instance (concurrent `eval()` calls will serialize on the scratch
 /// `Mutex`) or clone for independent scratch buffers per thread.
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug)]
 pub struct CompiledExpr {
-    /// Underlying expression AST.
-    pub ast: Expr,
+    /// Immutable expression AST from which every execution plan is derived.
+    ast: Expr,
     /// Optional execution plan for complex expressions.
     pub(crate) plan: Option<ExecutionPlan>,
     /// Small scratch arena to reuse temporary buffers within hot paths.
-    #[serde(skip, default = "default_scratch")]
     pub(super) scratch: Mutex<ScratchArena>,
     /// Lazily-built fallback plan, populated on first `eval()` when `plan` is None.
     /// Prevents rebuilding the DAG on every call for expressions created via `new()`.
-    #[serde(skip)]
     lazy_plan: OnceLock<ExecutionPlan>,
 }
 
-fn default_scratch() -> Mutex<ScratchArena> {
-    Mutex::new(ScratchArena::default())
+impl serde::Serialize for CompiledExpr {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("CompiledExpr", 2)?;
+        state.serialize_field("ast", &self.ast)?;
+        state.serialize_field("meta", &self.plan.as_ref().map(|plan| &plan.meta))?;
+        state.end()
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for CompiledExpr {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(serde::Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Input {
+            ast: Expr,
+            meta: Option<crate::config::ResultsMeta>,
+        }
+        let input = <Input as serde::Deserialize>::deserialize(deserializer)?;
+        match input.meta {
+            Some(meta) => Self::with_planning(input.ast, meta).map_err(serde::de::Error::custom),
+            None => Ok(Self::new(input.ast)),
+        }
+    }
 }
 
 /// Tiny reusable scratch buffers for hot evaluation paths.
@@ -131,6 +157,21 @@ impl Clone for CompiledExpr {
 }
 
 impl CompiledExpr {
+    /// Borrow the immutable expression tree used by this compiled evaluator.
+    ///
+    /// Construct a new evaluator to change the formula. Serialization persists
+    /// this tree and optional result metadata; execution plans are rebuilt from
+    /// the tree when deserializing rather than accepting cached plan overrides.
+    ///
+    /// ```compile_fail
+    /// use finstack_quant_core::expr::{CompiledExpr, Expr};
+    /// let mut compiled = CompiledExpr::new(Expr::literal(1.0));
+    /// compiled.ast = Expr::literal(2.0);
+    /// ```
+    pub fn get_ast(&self) -> &Expr {
+        &self.ast
+    }
+
     /// Construct a new compiled expression from an AST.
     ///
     /// Accepts any [`Expr`], including statements-layer functions (`Ttm`,

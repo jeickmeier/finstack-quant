@@ -25,6 +25,10 @@ impl CheckReportRenderer {
     ///   Nodes: total_assets, total_liabilities, total_equity
     /// …
     /// ```
+    ///
+    /// # Arguments
+    ///
+    /// * `report` - Completed check results and summary counts to format.
     pub fn render_text(report: &CheckReport) -> String {
         let s = &report.summary;
         let mut out = String::with_capacity(1024);
@@ -81,6 +85,12 @@ impl CheckReportRenderer {
     /// Render the report as basic HTML with inline styles.
     ///
     /// Suitable for display in Jupyter notebooks or embedded reports.
+    /// Report text is HTML-escaped; it cannot supply markup.
+    ///
+    /// # Arguments
+    ///
+    /// * `report` - Completed check results whose identifiers, messages, and
+    ///   labels are inserted as escaped HTML text.
     pub fn render_html(report: &CheckReport) -> String {
         let s = &report.summary;
         let mut out = String::with_capacity(2048);
@@ -117,18 +127,25 @@ impl CheckReportRenderer {
 
                 out.push_str(&format!(
                     "<li><strong>{}</strong>{period_str}<br/>{}\n",
-                    f.check_id, f.message,
+                    escape_html_text(&f.check_id),
+                    escape_html_text(&f.message),
                 ));
 
                 if let Some(ref m) = f.materiality {
                     out.push_str(&format!(
                         "<br/><em>Materiality: {:.2} ({:.2}% of {})</em>\n",
-                        m.absolute, m.relative_pct, m.reference_label,
+                        m.absolute,
+                        m.relative_pct,
+                        escape_html_text(&m.reference_label),
                     ));
                 }
 
                 if !f.nodes.is_empty() {
-                    let node_list: Vec<&str> = f.nodes.iter().map(|n| n.as_str()).collect();
+                    let node_list: Vec<String> = f
+                        .nodes
+                        .iter()
+                        .map(|n| escape_html_text(n.as_str()))
+                        .collect();
                     out.push_str(&format!(
                         "<br/><small>Nodes: {}</small>\n",
                         node_list.join(", ")
@@ -144,4 +161,12 @@ impl CheckReportRenderer {
         out.push_str("</div>\n");
         out
     }
+}
+
+fn escape_html_text(text: &str) -> String {
+    // All callers insert element text, so only these three characters can
+    // introduce markup. No attribute or URL escaping is needed here.
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }

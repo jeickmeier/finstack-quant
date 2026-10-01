@@ -505,9 +505,10 @@ mod tests {
     fn spec_with_config(config: AttributionConfig) -> AttributionSpec {
         let bond = finstack_quant_valuations::instruments::Bond::example()
             .expect("test bond should build");
-        let market = finstack_quant_core::market_data::context::MarketContextState::from(
+        let market = finstack_quant_core::market_data::context::MarketContextState::try_from(
             &MarketContext::new(),
-        );
+        )
+        .expect("coherent market snapshot");
         AttributionSpec {
             instrument: InstrumentJson::Bond(bond),
             market_t0: market.clone(),
@@ -555,14 +556,14 @@ mod tests {
             finstack_config
                 .rounding
                 .output_scale
-                .overrides
+                .get_overrides()
                 .get(&Currency::EUR),
             Some(&6)
         );
         assert!(!finstack_config
             .rounding
             .output_scale
-            .overrides
+            .get_overrides()
             .contains_key(&Currency::USD));
         assert_eq!(probe.successful_valuations(), 1);
         assert_eq!(instrument.valuation_calls(), 1);

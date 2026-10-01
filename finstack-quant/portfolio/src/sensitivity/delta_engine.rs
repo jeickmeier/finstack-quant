@@ -24,13 +24,18 @@ pub struct DeltaBasedEngine {
 
 impl DeltaBasedEngine {
     /// Create a new delta-based engine with the provided bump configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `bump_config` - Factor-specific central-bump sizes in each factor's
+    ///   canonical basis-point or percent convention.
     #[must_use]
     pub fn new(bump_config: BumpSizeConfig) -> Self {
         Self { bump_config }
     }
 
     fn compute_factor_column(
-        &self,
+        bump_config: &BumpSizeConfig,
         positions: &[(String, &dyn Instrument, f64)],
         affected_positions: &[bool],
         factor: &FactorDefinition,
@@ -38,9 +43,8 @@ impl DeltaBasedEngine {
         as_of: Date,
         base_currency: Currency,
     ) -> Result<Vec<f64>> {
-        let (bump_size, bump_units) = self
-            .bump_config
-            .bump_size_with_unit_for_factor(&factor.id, &factor.factor_type);
+        let (bump_size, bump_units) =
+            bump_config.bump_size_with_unit_for_factor(&factor.id, &factor.factor_type);
         if !bump_size.is_finite() || bump_size.abs() < f64::EPSILON {
             return Err(InputError::Invalid.into());
         }
@@ -74,7 +78,14 @@ impl DeltaBasedEngine {
                         factor.id.as_str()
                     )));
                 }
-                Ok((pv_up - pv_down) / (2.0 * bump_size) * *weight)
+                let delta = (pv_up - pv_down) / (2.0 * bump_size) * *weight;
+                if !delta.is_finite() {
+                    return Err(Error::Validation(format!(
+                        "non-finite weighted sensitivity for position '{position_id}' on factor '{}' ({delta}); check the position weight and bumped PV difference",
+                        factor.id.as_str()
+                    )));
+                }
+                Ok(delta)
             })
             .collect()
     }
@@ -271,43 +282,102 @@ impl FactorSensitivityEngine for DeltaBasedEngine {
         as_of: Date,
         base_currency: Currency,
     ) -> Result<SensitivityMatrix> {
-        let position_ids = positions.iter().map(|(id, _, _)| id.clone()).collect();
-        let factor_ids = factors.iter().map(|factor| factor.id.clone()).collect();
-        let mut matrix = SensitivityMatrix::zeros(position_ids, factor_ids);
-        let repricing_plan = FactorRepricingPlan::build(positions, factors, market);
-
-        let compute_column = |(factor_index, factor): (usize, &FactorDefinition)| {
-            self.compute_factor_column(
-                positions,
-                repricing_plan.affected(factor_index),
-                factor,
-                market,
-                as_of,
-                base_currency,
-            )
-        };
-
-        #[cfg(not(target_arch = "wasm32"))]
-        let column_results: Vec<Result<Vec<f64>>> = {
-            use rayon::prelude::*;
-            factors.par_iter().enumerate().map(compute_column).collect()
-        };
-
-        #[cfg(target_arch = "wasm32")]
-        let column_results: Vec<Result<Vec<f64>>> =
-            factors.iter().enumerate().map(compute_column).collect();
-        let columns = column_results
-            .into_iter()
-            .collect::<Result<Vec<Vec<f64>>>>()?;
-
-        for (factor_idx, column) in columns.iter().enumerate() {
-            for (position_idx, value) in column.iter().enumerate() {
-                matrix.set_delta(position_idx, factor_idx, *value);
-            }
-        }
-
-        Ok(matrix)
+        compute_delta_sensitivities(
+            &self.bump_config,
+            positions,
+            factors,
+            market,
+            as_of,
+            base_currency,
+        )
     }
+}
+
+/// Compute a factor matrix with two central endpoint prices per affected position.
+///
+/// # Arguments
+///
+/// * `bump_config` - Central bump magnitudes in each factor's canonical units.
+/// * `positions` - Ordered `(id, instrument, weight)` rows; weights are finite,
+///   signed instrument-unit multipliers applied to the unscaled central delta.
+/// * `factors` - Ordered factor definitions selecting the market inputs to bump.
+/// * `market` - Base market snapshot used to construct both endpoint markets.
+/// * `as_of` - Valuation date for instrument pricing and spot FX lookup.
+/// * `base_currency` - Reporting currency for all converted endpoint PVs.
+///
+/// # Errors
+///
+/// Rejects non-finite weights, endpoint PVs, and final weighted sensitivities,
+/// and invalid bump sizes. Propagates pricing, market-bump, and FX failures.
+pub(super) fn compute_delta_sensitivities(
+    bump_config: &BumpSizeConfig,
+    positions: &[(String, &dyn Instrument, f64)],
+    factors: &[FactorDefinition],
+    market: &MarketContext,
+    as_of: Date,
+    base_currency: Currency,
+) -> Result<SensitivityMatrix> {
+    validate_position_weights(positions)?;
+    let position_ids = positions.iter().map(|(id, _, _)| id.clone()).collect();
+    let factor_ids = factors.iter().map(|factor| factor.id.clone()).collect();
+    let mut matrix = SensitivityMatrix::zeros(position_ids, factor_ids);
+    let repricing_plan = FactorRepricingPlan::build(positions, factors, market);
+
+    let compute_column = |(factor_index, factor): (usize, &FactorDefinition)| {
+        DeltaBasedEngine::compute_factor_column(
+            bump_config,
+            positions,
+            repricing_plan.affected(factor_index),
+            factor,
+            market,
+            as_of,
+            base_currency,
+        )
+    };
+
+    #[cfg(not(target_arch = "wasm32"))]
+    let column_results: Vec<Result<Vec<f64>>> = {
+        use rayon::prelude::*;
+        factors.par_iter().enumerate().map(compute_column).collect()
+    };
+
+    #[cfg(target_arch = "wasm32")]
+    let column_results: Vec<Result<Vec<f64>>> =
+        factors.iter().enumerate().map(compute_column).collect();
+    let columns = column_results
+        .into_iter()
+        .collect::<Result<Vec<Vec<f64>>>>()?;
+
+    for (factor_idx, column) in columns.iter().enumerate() {
+        for (position_idx, value) in column.iter().enumerate() {
+            matrix.set_delta(position_idx, factor_idx, *value);
+        }
+    }
+
+    Ok(matrix)
+}
+
+/// Reject position weights that cannot produce a finite risk representation.
+///
+/// # Arguments
+///
+/// * `positions` - Typed position rows with finite signed instrument-unit weights.
+///   Zero and negative weights are accepted; NaN and infinities are rejected.
+///
+/// # Errors
+///
+/// Returns a validation error naming the first non-finite weight's position.
+pub(super) fn validate_position_weights(
+    positions: &[(String, &dyn Instrument, f64)],
+) -> Result<()> {
+    for (position_id, _, weight) in positions {
+        if !weight.is_finite() {
+            return Err(Error::Validation(format!(
+                "position '{position_id}' weight must be finite, got {weight}"
+            )));
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

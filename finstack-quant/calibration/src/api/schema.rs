@@ -12,7 +12,6 @@
 use crate::api::market_datum::MarketDatum;
 use crate::api::prior_market::PriorMarketObject;
 use crate::config::{CalibrationConfig, CalibrationMethod, RatesStepConventions};
-use crate::hull_white::SwapFrequency;
 use crate::quotes::ids::QuoteId;
 use crate::CalibrationReport;
 use finstack_quant_cashflows::builder::specs::RollRule;
@@ -591,7 +590,15 @@ impl StepParams {
         match self {
             StepParams::Discount(p) => StepIo {
                 kind: "discount",
-                reads: Vec::new(),
+                reads: [
+                    p.pricing_discount_id.as_ref(),
+                    p.pricing_forward_id.as_ref(),
+                ]
+                .into_iter()
+                .flatten()
+                .filter(|id| *id != &p.curve_id)
+                .map(ToString::to_string)
+                .collect(),
                 writes: vec![p.curve_id.to_string()],
                 primary_output: StepPrimaryOutput::Curve(p.curve_id.clone()),
             },
@@ -618,8 +625,14 @@ impl StepParams {
                 reads: p
                     .discount_curve_id
                     .as_ref()
-                    .map(|id| vec![id.to_string()])
-                    .unwrap_or_default(),
+                    .map(ToString::to_string)
+                    .into_iter()
+                    .chain(
+                        p.spot_override
+                            .is_none()
+                            .then(|| p.underlying_ticker.clone()),
+                    )
+                    .collect(),
                 writes: vec![p.vol_surface_id.clone()],
                 primary_output: StepPrimaryOutput::Surface(CurveId::from(
                     p.vol_surface_id.as_str(),
@@ -627,7 +640,9 @@ impl StepParams {
             },
             StepParams::SwaptionVol(p) => StepIo {
                 kind: "swaption_vol",
-                reads: vec![p.discount_curve_id.to_string()],
+                reads: std::iter::once(p.discount_curve_id.to_string())
+                    .chain(p.forward_id.clone())
+                    .collect(),
                 writes: vec![p.vol_surface_id.clone()],
                 primary_output: StepPrimaryOutput::Surface(CurveId::from(
                     p.vol_surface_id.as_str(),
@@ -637,8 +652,8 @@ impl StepParams {
                 let curve_id = CurveId::from(format!("{}_CORR", p.index_id));
                 StepIo {
                     kind: "base_correlation",
-                    reads: vec![p.discount_curve_id.to_string()],
-                    writes: vec![curve_id.to_string()],
+                    reads: vec![p.discount_curve_id.to_string(), p.index_id.clone()],
+                    writes: vec![curve_id.to_string(), p.index_id.clone()],
                     primary_output: StepPrimaryOutput::Curve(curve_id),
                 }
             }
@@ -656,12 +671,13 @@ impl StepParams {
                 }
             }
             StepParams::HullWhite(p) => {
-                let scalar_key = format!("{}_HW1F", p.curve_id.as_str());
+                let (kappa_key, sigma_key) =
+                    crate::hull_white::hw1f_scalar_keys(p.curve_id.as_str());
                 StepIo {
                     kind: "hull_white",
                     reads: vec![p.curve_id.to_string()],
-                    writes: vec![scalar_key.clone()],
-                    primary_output: StepPrimaryOutput::Scalar(scalar_key),
+                    writes: vec![kappa_key.clone(), sigma_key],
+                    primary_output: StepPrimaryOutput::Scalar(kappa_key),
                 }
             }
             StepParams::CapFloorHullWhite(p) => {
@@ -669,12 +685,21 @@ impl StepParams {
                 if p.forward_curve_id != p.discount_curve_id {
                     reads.push(p.forward_curve_id.to_string());
                 }
-                let scalar_key = format!("{}_CAPFLOOR_HW1F", p.discount_curve_id.as_str());
+                let (kappa_key, sigma_key) =
+                    crate::hull_white::capfloor_hw1f_scalar_keys(p.discount_curve_id.as_str());
+                let volatility_key = match p.volatility_mode {
+                    HullWhiteVolatilityMode::Scalar => sigma_key,
+                    HullWhiteVolatilityMode::Piecewise => {
+                        crate::hull_white::capfloor_hw1f_sigma_schedule_key(
+                            p.discount_curve_id.as_str(),
+                        )
+                    }
+                };
                 StepIo {
                     kind: "cap_floor_hull_white",
                     reads,
-                    writes: vec![scalar_key.clone()],
-                    primary_output: StepPrimaryOutput::Scalar(scalar_key),
+                    writes: vec![kappa_key.clone(), volatility_key],
+                    primary_output: StepPrimaryOutput::Scalar(kappa_key),
                 }
             }
             StepParams::SviSurface(p) => StepIo {
@@ -682,8 +707,14 @@ impl StepParams {
                 reads: p
                     .discount_curve_id
                     .as_ref()
-                    .map(|id| vec![id.to_string()])
-                    .unwrap_or_default(),
+                    .map(ToString::to_string)
+                    .into_iter()
+                    .chain(
+                        p.spot_override
+                            .is_none()
+                            .then(|| p.underlying_ticker.clone()),
+                    )
+                    .collect(),
                 writes: vec![p.vol_surface_id.clone()],
                 primary_output: StepPrimaryOutput::Surface(CurveId::from(
                     p.vol_surface_id.as_str(),
@@ -909,7 +940,8 @@ pub struct InflationCurveParams {
     pub discount_curve_id: CurveId,
     /// Reference index (e.g. "USA-CPI-U").
     pub index: String,
-    /// Observation lag (e.g. "3M").
+    /// Month observation lag (e.g. "3M"); "none" means zero months.
+    /// Day-based lags are unsupported because output curves carry month lags.
     ///
     /// Overrides the quote convention's lag and must match any supplied index
     /// lag. The same lag determines the output curve's reference-date origin and the dates
@@ -935,34 +967,6 @@ pub struct InflationCurveParams {
     #[serde(default = "default_interp_linear")]
     #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub interpolation: InterpStyle,
-
-    /// Optional seasonal adjustment factors for deseasonalizing CPI observations.
-    ///
-    /// When provided, the calibrator will:
-    /// 1. Deseasonalize input CPI levels using the monthly factors
-    /// 2. Fit the smooth zero-coupon curve to deseasonalized levels
-    /// 3. Reseasonalize the output CPI path
-    ///
-    /// Monthly adjustments are additive to log CPI level. They should approximately
-    /// sum to zero over 12 months.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub seasonal_factors: Option<SeasonalFactors>,
-}
-
-/// Monthly seasonal adjustment factors for inflation curves.
-///
-/// Used to deseasonalize CPI observations before fitting a smooth
-/// zero-coupon inflation curve, then reseasonalize the output.
-/// Monthly adjustments should approximately sum to zero.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct SeasonalFactors {
-    /// Monthly adjustment factors (Jan=index 0 through Dec=index 11).
-    /// These are additive adjustments to the log CPI level.
-    pub monthly_adjustments: [f64; 12],
 }
 
 /// Parameters for volatility surface calibration step.
@@ -1063,7 +1067,8 @@ pub struct SwaptionVolParams {
     /// SABR beta parameter (typically 0.0 for normal, 1.0 for lognormal).
     #[serde(default = "default_sabr_beta")]
     pub sabr_beta: f64,
-    /// Target expiry times (in years) for the surface grid.
+    /// Target option expiry times in ACT/365F years from `base_date`, independent
+    /// of the fixed-leg coupon day-count convention.
     #[serde(default)]
     pub target_expiries: Vec<f64>,
     /// Target tenor times (in years) for the surface grid.
@@ -1075,7 +1080,8 @@ pub struct SwaptionVolParams {
     /// Optional calendar identifier for date adjustments.
     #[serde(default)]
     pub calendar_id: Option<String>,
-    /// Optional day count convention for fixed leg calculations.
+    /// Optional day count convention for fixed-leg coupon accrual only.
+    /// Option expiry and variance always use ACT/365F.
     #[serde(default)]
     #[cfg_attr(feature = "ts_export", ts(type = "string | null"))]
     pub fixed_day_count: Option<DayCount>,
@@ -1141,7 +1147,8 @@ pub struct BaseCorrelationParams {
     pub index_id: String,
     /// Series number of the credit index.
     pub series: u16,
-    /// Maturity of the tranches in years.
+    /// Finite positive CDS tenor in years, representable as a whole number of months.
+    /// Quotes must resolve to the same CDS convention maturity as this tenor.
     pub maturity_years: f64,
     /// Base date for the calibration.
     #[serde(with = "finstack_quant_core::wire::date")]
@@ -1337,10 +1344,11 @@ pub struct CapFloorHullWhiteStepParams {
     /// Optional initial guess for short-rate volatility σ when solving both κ and σ.
     #[serde(default)]
     pub initial_sigma: Option<f64>,
-    /// Payment frequency used to decompose quoted caps/floors into caplets.
-    #[serde(default)]
+    /// Term-rate index defining settlement, reset tenor, accrual day count,
+    /// calendar, business-day adjustments, and payment lag for caplets.
+    /// Its currency must match `currency`; overnight indices are unsupported.
     #[cfg_attr(feature = "ts_export", ts(type = "string"))]
-    pub payment_frequency: SwapFrequency,
+    pub index_id: IndexId,
     /// Scalar or expiry-bootstraped piecewise short-rate volatility calibration.
     #[serde(default)]
     pub volatility_mode: HullWhiteVolatilityMode,
@@ -1381,8 +1389,10 @@ pub struct SviSurfaceParams {
     /// Optional spot price override.
     #[serde(default)]
     pub spot_override: Option<f64>,
-    /// Optional continuous dividend yield; defaults to the market scalar
-    /// `"<underlying_ticker>-DIVYIELD"` or zero.
+    /// Optional continuous dividend yield in decimal units. Without an override,
+    /// uses the unitless market scalar `"<underlying_ticker>-DIVYIELD"`. When a
+    /// discount curve is supplied, a matching cash-dividend schedule may supply
+    /// carry instead; otherwise an explicit yield is required.
     #[serde(default)]
     pub dividend_yield_override: Option<f64>,
 }
@@ -1402,13 +1412,17 @@ pub enum SwaptionVolConvention {
     /// Lognormal (Black) volatility in decimal units.
     ///
     /// Example: `0.20` means 20% Black volatility.
+    /// Requires `black_lognormal` quotes and positive forwards/strikes;
+    /// calibration does not introduce a displacement automatically.
     #[default]
     Lognormal,
     /// Shifted lognormal (Black) volatility in decimal units, with an explicit shift.
     ///
-    /// Example: `0.20` means 20% Black volatility.
+    /// Example: `0.20` means 20% Black volatility on displaced forward/strike
+    /// coordinates. Requires `shifted_black_lognormal` quotes.
     ShiftedLognormal {
-        /// Shift amount for negative rate handling
+        /// Finite positive additive shift in decimal rate units, applied to
+        /// both forwards and strikes and retained in calibrated artifacts.
         shift: f64,
     },
 }
@@ -1491,7 +1505,7 @@ pub struct XccyBasisParams {
     /// Identifier for the pre-calibrated domestic discount curve.
     #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub domestic_discount_id: CurveId,
-    /// Calibration method to use.
+    /// Sequential bootstrap method. `GlobalSolve` is unsupported and rejected.
     #[serde(default)]
     pub method: CalibrationMethod,
     /// Interpolation style for the constructed foreign discount curve.

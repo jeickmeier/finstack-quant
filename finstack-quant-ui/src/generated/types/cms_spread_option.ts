@@ -368,9 +368,14 @@ export interface D_0D3Ba76A27808304A535 {
  *
  * # Pricing Approach
  *
- * 1. Each CMS rate has SABR marginal distribution (reuses CMS option SABR calibration)
- * 2. Joint distribution via Gaussian copula with rank correlation
- * 3. CMS convexity adjustment applied to each leg via static replication
+ * 1. Each CMS rate has a lognormal payment-measure marginal from a flat-strike
+ *    Black volatility surface (or a tenor-axis ATM surface).
+ * 2. A Gaussian copula couples the two rates.
+ * 3. The shared first-order CMS convexity approximation sets each marginal mean.
+ *
+ * Nonflat smiles and SABR cubes are unsupported and return a validation error.
+ * The registered `StaticReplication` model key selects this approximation;
+ * it does not implement SABR smile replication.
  *
  * # References
  *
@@ -391,8 +396,9 @@ export interface DFf58Eb1D8C0Cb6416B15 {
   /**
    * Rate-index convention-registry key of the underlying CMS swaps (e.g. `EUR-ESTR-OIS`).
    *
-   * When set, provides default values for the fixed/float frequency and
-   * day count. Individual fields still override the convention when set.
+   * Required for USD CMS; other supported currencies use their registered
+   * overnight-index default when omitted. Supplies calendar, settlement lag
+   * and default leg conventions. Individual leg fields override the index.
    */
   index_id?: Id3 | null;
   instrument_pricing_overrides?: InstrumentPricingOverrides;

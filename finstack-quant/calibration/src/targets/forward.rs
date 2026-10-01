@@ -1194,6 +1194,19 @@ mod tests {
 
         assert_eq!(act365f.day_count(), DayCount::Act365F);
         assert_eq!(act360.day_count(), DayCount::Act360);
+        let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let start = base_date + time::Duration::days(90);
+        let end = base_date + time::Duration::days(180);
+        for curve in [&act365f, &act360] {
+            let growth = curve.df_on_date_curve(start).expect("start DF")
+                / curve.df_on_date_curve(end).expect("end DF")
+                - 1.0;
+            let index_rate = growth / (90.0 / 360.0);
+            assert!(
+                (index_rate - 0.04).abs() < 1e-8,
+                "a curve-clock change must preserve the quoted ACT/360 rate; got {index_rate}"
+            );
+        }
         let recipe = act365f
             .rate_calibration()
             .expect("forward target must stamp replay recipe");
@@ -1225,6 +1238,93 @@ mod tests {
             .knots()
             .iter()
             .any(|time| (*time - 90.0 / 360.0).abs() < 1e-12));
+    }
+
+    #[test]
+    fn futures_recover_contractual_rate_across_curve_clocks() {
+        let base_date = Date::from_calendar_date(2025, Month::January, 2).expect("date");
+        let expiry = Date::from_calendar_date(2025, Month::June, 30).expect("expiry");
+        let discount = DiscountCurve::builder("USD-OIS")
+            .base_date(base_date)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (2.0, (-0.03_f64 * 2.0).exp())])
+            .build()
+            .expect("discount curve");
+        for contract in ["CME:ED", "CME:SR1"] {
+            let quote = MarketQuote::Rates(RateQuote::Futures {
+                id: QuoteId::new(contract),
+                contract: IrFutureContractId::new(contract),
+                expiry,
+                price: 96.0,
+                convexity_adjustment: 0.0,
+            });
+            for curve_day_count in [DayCount::Act360, DayCount::Act365F] {
+                let params = ForwardCurveParams {
+                    curve_id: CurveId::new("USD-FWD"),
+                    currency: Currency::USD,
+                    base_date,
+                    tenor_years: 0.25,
+                    discount_curve_id: CurveId::new("USD-OIS"),
+                    method: CalibrationMethod::GlobalSolve {
+                        use_analytical_jacobian: false,
+                    },
+                    interpolation: InterpStyle::Linear,
+                    conventions: crate::RatesStepConventions {
+                        curve_day_count: Some(curve_day_count),
+                        ois_compounding: None,
+                    },
+                };
+                let (market, report) = ForwardCurveTarget::solve(
+                    &params,
+                    std::slice::from_ref(&quote),
+                    &MarketContext::new().insert(discount.clone()),
+                    &CalibrationConfig::default(),
+                )
+                .expect("future calibration");
+                assert!(report.success, "{}", report.convergence_reason);
+                let prepared = prepare_rate_calibration_quotes_with_ois_override(
+                    std::slice::from_ref(&quote),
+                    base_date,
+                    discount_and_forward_curve_ids("USD-OIS", "USD-FWD"),
+                    Some(curve_day_count),
+                    1_000_000.0,
+                    None,
+                )
+                .expect("prepared future");
+                let CalibrationQuote::Rates(prepared) = &prepared.quotes[0] else {
+                    unreachable!("rate quote");
+                };
+                let future = prepared
+                    .instrument
+                    .as_any()
+                    .downcast_ref::<InterestRateFuture>()
+                    .expect("future instrument");
+                let (_, start, end) = future.resolve_dates().expect("reference dates");
+                let curve = market.get_forward("USD-FWD").expect("delivered curve");
+                let accrual = future
+                    .day_count
+                    .year_fraction(start, end, DayCountContext::default())
+                    .expect("contractual accrual");
+                let index_rate = if contract == "CME:ED" {
+                    // Term futures are quoted from full-period projection growth.
+                    (curve.df_on_date_curve(start).expect("start DF")
+                        / curve.df_on_date_curve(end).expect("end DF")
+                        - 1.0)
+                        / accrual
+                } else {
+                    // One quote produces a flat raw forward. Every daily term in
+                    // the arithmetic average therefore has this contractual rate.
+                    let curve_accrual = curve_day_count
+                        .year_fraction(start, end, DayCountContext::default())
+                        .expect("curve accrual");
+                    curve.rate(0.0) * curve_accrual / accrual
+                };
+                assert!(
+                    (index_rate - 0.04).abs() < 1e-8,
+                    "{contract} on {curve_day_count:?} quotes {index_rate}, expected ACT/360 4%"
+                );
+            }
+        }
     }
 
     #[test]

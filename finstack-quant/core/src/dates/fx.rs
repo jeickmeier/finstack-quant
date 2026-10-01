@@ -42,11 +42,10 @@
 
 use crate::currency::Currency;
 use crate::dates::{
-    adjust, calendar_by_id_strict, BusinessDayConvention, CompositeCalendar, Date, HolidayCalendar,
-    WEEKENDS_ONLY,
+    adjust, calendar_by_id_strict, BusinessDayConvention, CompositeCalendar, Date, DateExt,
+    HolidayCalendar, WEEKENDS_ONLY,
 };
 use crate::{Error, Result};
-use time::Duration;
 
 /// Standard FX spot lag in business days for a currency pair.
 ///
@@ -159,7 +158,7 @@ fn advance_business_days(
     let mut iters = 0;
 
     while count < n_days && iters < max_iters {
-        date += Duration::days(1);
+        date = date.add_days(1)?;
         if is_business_day(date) {
             count += 1;
         }
@@ -208,6 +207,7 @@ fn advance_business_days(
 /// Returns an error if:
 /// - Either calendar ID is not recognized (see [`resolve_calendar`])
 /// - Too many iterations needed (>5x the requested days), suggesting a calendar configuration issue
+/// - Advancing would exceed the supported date range
 ///
 /// For FX cross pairs that do not involve USD (e.g. EUR/JPY), USD-good days
 /// matter because the cross settles as two USD legs. This helper implements the
@@ -284,8 +284,9 @@ pub fn add_joint_business_days(
 ///
 /// # Errors
 ///
-/// Returns an error if any calendar ID is unrecognized, or if the iteration
-/// limit is exceeded (suggesting a calendar configuration issue).
+/// Returns an error if any calendar ID is unrecognized, the date would leave
+/// the supported range, or the iteration limit is exceeded (suggesting a
+/// calendar configuration issue).
 ///
 /// # Examples
 ///
@@ -349,7 +350,7 @@ pub fn fx_spot_date(
     let mut count = 0u32;
 
     while count < lag_magnitude && iters < max_iters {
-        date += Duration::days(direction);
+        date = date.add_days(direction)?;
         if intermediate_good(date) {
             count += 1;
         }
@@ -359,7 +360,7 @@ pub fn fx_spot_date(
     // Roll the candidate value date in the requested direction until it is
     // good in all calendars.
     while !final_good(date) && iters < max_iters {
-        date += Duration::days(direction);
+        date = date.add_days(direction)?;
         iters += 1;
     }
 
@@ -489,6 +490,21 @@ mod tests {
 
     static JAN_29_HOLIDAY: Jan29Holiday = Jan29Holiday;
     static JAN_30_AND_31_HOLIDAYS: Jan30And31Holidays = Jan30And31Holidays;
+
+    #[test]
+    fn fx_date_range_boundaries_return_errors() {
+        assert!(add_joint_business_days(Date::MAX, 1, None, None, None).is_err());
+        assert!(fx_spot_date(Date::MAX, 1, None, None, None).is_err());
+        assert!(fx_spot_date(Date::MIN, -1, None, None, None).is_err());
+        assert_eq!(
+            add_joint_business_days(Date::MAX, 0, None, None, None).unwrap(),
+            Date::MAX
+        );
+        assert_eq!(
+            fx_spot_date(Date::MIN, 0, None, None, None).unwrap(),
+            Date::MIN
+        );
+    }
 
     #[test]
     fn fx_standard_settlement_days_t1_pairs_and_default() {

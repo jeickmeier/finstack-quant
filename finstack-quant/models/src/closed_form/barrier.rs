@@ -141,7 +141,8 @@
 //! - Monte Carlo barrier pricing for discrete monitoring and exotic payoffs
 
 use crate::volatility::black::d1_d2;
-use finstack_quant_core::math::special_functions::norm_cdf;
+use finstack_quant_core::math::integration::adaptive_simpson;
+use finstack_quant_core::math::special_functions::{log_norm_cdf, norm_cdf};
 use finstack_quant_core::types::{BarrierType, PayoutTiming};
 
 /// Parameters for barrier option pricing.
@@ -382,26 +383,26 @@ fn barrier_helper(
         return Ok(barrier_helper_zero_vol(params, eta, phi));
     }
 
-    let mu = (rate - div_yield - 0.5 * vol * vol) / (vol * vol);
-
-    // Guard against overflow in (H/S)^(2μ) terms. The exponent 2μ·ln(H/S) can
-    // exceed the f64 overflow threshold (~709) for extreme parameters (very low
-    // vol, very long tenor, large barrier/spot ratio). In that regime, fall back
-    // to the deterministic (zero-vol) limit which is the correct mathematical
-    // limit as σ → 0⁺.
-    let log_barrier_spot = (barrier / spot).ln();
-    let max_exponent = (2.0 * (mu + 1.0).abs() * log_barrier_spot.abs())
-        .max(2.0 * mu.abs() * log_barrier_spot.abs());
-    if !max_exponent.is_finite() || max_exponent > 700.0 {
-        return Ok(barrier_helper_zero_vol(params, eta, phi));
+    // Every in-the-money terminal path has already crossed these barriers.
+    // Preserve this exact payoff identity independently of reflection numerics.
+    if (phi > 0.0 && eta > 0.0 && strike >= barrier)
+        || (phi < 0.0 && eta < 0.0 && strike <= barrier)
+    {
+        return Ok(vanilla_option_price(
+            spot, strike, time, rate, div_yield, vol, eta,
+        ));
     }
 
+    let mu = (rate - div_yield - 0.5 * vol * vol) / (vol * vol);
+    let log_barrier_spot = (barrier / spot).ln();
+    let sigma_sqrt_t = vol * time.sqrt();
+
     // d1/d2 intentionally inline: Merton barrier x,x1,y,y1 terms — not d1/d2
-    let x = (spot / strike).ln() / (vol * time.sqrt()) + (1.0 + mu) * vol * time.sqrt();
-    let x1 = (spot / barrier).ln() / (vol * time.sqrt()) + (1.0 + mu) * vol * time.sqrt();
-    let y = (barrier * barrier / (spot * strike)).ln() / (vol * time.sqrt())
-        + (1.0 + mu) * vol * time.sqrt();
-    let y1 = (barrier / spot).ln() / (vol * time.sqrt()) + (1.0 + mu) * vol * time.sqrt();
+    let x = (spot / strike).ln() / sigma_sqrt_t + (1.0 + mu) * sigma_sqrt_t;
+    let x1 = -log_barrier_spot / sigma_sqrt_t + (1.0 + mu) * sigma_sqrt_t;
+    let y =
+        (2.0 * log_barrier_spot + (spot / strike).ln()) / sigma_sqrt_t + (1.0 + mu) * sigma_sqrt_t;
+    let y1 = log_barrier_spot / sigma_sqrt_t + (1.0 + mu) * sigma_sqrt_t;
 
     let discount = (-rate * time).exp();
     let forward_discount = (-div_yield * time).exp();
@@ -415,27 +416,16 @@ fn barrier_helper(
     let b = option_sign * spot * forward_discount * norm_cdf(option_sign * x1)
         - option_sign * strike * discount * norm_cdf(option_sign * (x1 - vol * time.sqrt()));
 
+    // Evaluate powers and Gaussian tails together in log space. The powers
+    // alone can overflow while the complete reflected claims remain finite.
+    let log_asset_reflection = spot.ln() - div_yield * time + 2.0 * (mu + 1.0) * log_barrier_spot;
+    let log_cash_reflection = strike.ln() - rate * time + 2.0 * mu * log_barrier_spot;
     let c = option_sign
-        * spot
-        * forward_discount
-        * (barrier / spot).powf(2.0 * (mu + 1.0))
-        * norm_cdf(barrier_sign * y)
-        - option_sign
-            * strike
-            * discount
-            * (barrier / spot).powf(2.0 * mu)
-            * norm_cdf(barrier_sign * (y - vol * time.sqrt()));
-
+        * ((log_asset_reflection + log_norm_cdf(barrier_sign * y)).exp()
+            - (log_cash_reflection + log_norm_cdf(barrier_sign * (y - sigma_sqrt_t))).exp());
     let d = option_sign
-        * spot
-        * forward_discount
-        * (barrier / spot).powf(2.0 * (mu + 1.0))
-        * norm_cdf(barrier_sign * y1)
-        - option_sign
-            * strike
-            * discount
-            * (barrier / spot).powf(2.0 * mu)
-            * norm_cdf(barrier_sign * (y1 - vol * time.sqrt()));
+        * ((log_asset_reflection + log_norm_cdf(barrier_sign * y1)).exp()
+            - (log_cash_reflection + log_norm_cdf(barrier_sign * (y1 - sigma_sqrt_t))).exp());
 
     let is_call = eta > 0.0;
 
@@ -501,6 +491,10 @@ pub fn barrier_touch_probability(
     vol: f64,
     is_up: bool,
 ) -> f64 {
+    if (is_up && spot >= barrier) || (!is_up && spot <= barrier) {
+        return 1.0;
+    }
+
     if time <= 0.0 {
         return if deterministic_barrier_crossed(spot, barrier, time, rate, div_yield, is_up) {
             1.0
@@ -522,54 +516,27 @@ pub fn barrier_touch_probability(
     let log_barrier_ratio = (barrier / spot).ln();
     let log_power = 2.0 * nu * log_barrier_ratio / (vol * vol);
 
-    if sigma_sqrt_t <= 1e-8 || log_power > 700.0 || !log_power.is_finite() {
-        return if deterministic_barrier_crossed(spot, barrier, time, rate, div_yield, is_up) {
-            1.0
-        } else {
-            0.0
-        };
-    }
-
-    let power_term = log_power.exp();
-
-    if is_up {
-        if spot >= barrier {
-            return 1.0;
-        }
+    let (d1, d2) = if is_up {
         // Up barrier (H > S)
         // P(max S > H)
         let x = log_barrier_ratio; // Positive
-        let d1 = (-x + nu * time) / sigma_sqrt_t;
-        let d2 = (-x - nu * time) / sigma_sqrt_t;
-        let p = norm_cdf(d1) + power_term * norm_cdf(d2);
-        if p.is_finite() {
-            p.clamp(0.0, 1.0)
-        } else if deterministic_barrier_crossed(spot, barrier, time, rate, div_yield, is_up) {
-            1.0
-        } else {
-            0.0
-        }
+        (
+            (-x + nu * time) / sigma_sqrt_t,
+            (-x - nu * time) / sigma_sqrt_t,
+        )
     } else {
-        if spot <= barrier {
-            return 1.0;
-        }
         // Down barrier (H < S)
         // P(min S < H) — first-passage formula (Shreve, Theorem 7.2.1):
         //   P = N((h − νT)/(σ√T)) + e^{2νh/σ²} N((h + νT)/(σ√T))
         // Note: the ±ν signs differ from the up-barrier case because
         // P(min ≤ h) and P(max ≥ h) are structurally different formulas.
         let log_h_s = log_barrier_ratio; // Negative
-        let d1 = (log_h_s - nu * time) / sigma_sqrt_t;
-        let d2 = (log_h_s + nu * time) / sigma_sqrt_t;
-        let p = norm_cdf(d1) + power_term * norm_cdf(d2);
-        if p.is_finite() {
-            p.clamp(0.0, 1.0)
-        } else if deterministic_barrier_crossed(spot, barrier, time, rate, div_yield, is_up) {
-            1.0
-        } else {
-            0.0
-        }
-    }
+        (
+            (log_h_s - nu * time) / sigma_sqrt_t,
+            (log_h_s + nu * time) / sigma_sqrt_t,
+        )
+    };
+    (norm_cdf(d1) + (log_power + log_norm_cdf(d2)).exp()).clamp(0.0, 1.0)
 }
 
 /// Calculate value of a rebate paid at maturity.
@@ -630,9 +597,10 @@ fn barrier_rebate_at_expiry(params: &BarrierParams, rebate: f64, barrier_type: B
 ///   `rebate · E[e^{-r·τ} 1{τ≤T}]`
 ///   via the Rubinstein–Reiner discounted first-passage value.
 ///
-/// Returns a `NaN` sentinel when the at-hit closed form is undefined
-/// (`μ² + 2r/σ² < 0`, requiring an extremely negative rate relative to σ²),
-/// matching this module's invalid-input convention.
+/// Negative rates are supported, including the region where the usual
+/// real-valued closed form has an imaginary square root. In that region,
+/// the discounted first-passage expectation is evaluated by quadrature.
+/// Returns a `NaN` sentinel if that quadrature fails to converge.
 ///
 /// # Arguments
 ///
@@ -673,9 +641,9 @@ pub fn barrier_rebate(
 /// η  = +1 (down barrier), −1 (up barrier)
 /// ```
 ///
-/// Already-breached barriers return `1.0` (immediate payment). Degenerate
-/// inputs (`T ≤ 0`, `σ ≤ 0`) return `0.0`; an undefined domain
-/// (`μ² + 2r/σ² < 0`) returns `NaN`.
+/// Already-breached barriers return `1.0` (immediate payment). Zero volatility
+/// discounts at the deterministic crossing time. When `μ² + 2r/σ² < 0`,
+/// integrate the first-passage distribution instead of using a complex root.
 fn discounted_touch_value(params: &BarrierParams, is_up: bool) -> f64 {
     let BarrierParams {
         spot,
@@ -695,31 +663,65 @@ fn discounted_touch_value(params: &BarrierParams, is_up: bool) -> f64 {
     if already_breached {
         return 1.0;
     }
-    let sigma_sqrt_t = vol * time.max(0.0).sqrt();
-    if time <= 0.0 || sigma_sqrt_t <= 0.0 {
-        // No diffusion left: the barrier can only be reached deterministically.
-        return if deterministic_barrier_crossed(spot, barrier, time, rate, div_yield, is_up) {
-            (-rate * time.max(0.0)).exp()
-        } else {
-            0.0
-        };
+    if time <= 0.0 {
+        return 0.0;
     }
-
-    let sigma2 = vol * vol;
-    let mu = (rate - div_yield - sigma2 / 2.0) / sigma2;
-    let lambda_sq = mu * mu + 2.0 * rate / sigma2;
-    if lambda_sq < 0.0 {
-        return f64::NAN;
-    }
-    let lambda = lambda_sq.sqrt();
-
     let log_hs = (barrier / spot).ln();
-    let z = log_hs / sigma_sqrt_t + lambda * sigma_sqrt_t;
-    let z_prime = log_hs / sigma_sqrt_t - lambda * sigma_sqrt_t;
+    if vol <= 0.0 {
+        if !deterministic_barrier_crossed(spot, barrier, time, rate, div_yield, is_up) {
+            return 0.0;
+        }
+        let hit_time = log_hs / (rate - div_yield);
+        return (-rate * hit_time).exp();
+    }
+
+    let sigma_sqrt_t = vol * time.sqrt();
+    let sigma2 = vol * vol;
+    let nu = rate - div_yield - sigma2 / 2.0;
+    let discriminant = nu * nu + 2.0 * rate * sigma2;
+    if discriminant < 0.0 {
+        // For r < 0, integration by parts gives the nonnegative decomposition
+        // V = F(T) + (-r) ∫₀ᵀ exp(-rt) [F(T) - F(t)] dt.
+        // Normalize by F(T) and integrate over [0,1] for relative accuracy.
+        let hit_probability =
+            barrier_touch_probability(spot, barrier, time, rate, div_yield, vol, is_up);
+        if hit_probability == 0.0 {
+            return 0.0;
+        }
+        let integral = adaptive_simpson(
+            |u| {
+                let p =
+                    barrier_touch_probability(spot, barrier, time * u, rate, div_yield, vol, is_up);
+                (-rate * time * u).exp() * (1.0 - p / hit_probability).clamp(0.0, 1.0)
+            },
+            0.0,
+            1.0,
+            1e-12,
+            48,
+        );
+        return integral
+            .map(|value| hit_probability * (1.0 - rate * time * value))
+            .unwrap_or(f64::NAN);
+    }
+    let root = discriminant.sqrt();
+
+    let z = (log_hs + root * time) / sigma_sqrt_t;
+    let z_prime = (log_hs - root * time) / sigma_sqrt_t;
     let eta = if is_up { -1.0 } else { 1.0 };
-    let s_over_h = spot / barrier;
-    let value = s_over_h.powf(-(mu + lambda)) * norm_cdf(eta * z)
-        + s_over_h.powf(-(mu - lambda)) * norm_cdf(eta * z_prime);
+    // Rationalize the cancelling root when volatility is small: ν² - root²
+    // equals -2rσ², so the small exponent retains its deterministic limit.
+    let power_plus = if nu < 0.0 {
+        -2.0 * rate / (nu - root)
+    } else {
+        (nu + root) / sigma2
+    };
+    let power_minus = if nu > 0.0 {
+        -2.0 * rate / (nu + root)
+    } else {
+        (nu - root) / sigma2
+    };
+    let value = (power_plus * log_hs + log_norm_cdf(eta * z)).exp()
+        + (power_minus * log_hs + log_norm_cdf(eta * z_prime)).exp();
     if value.is_finite() {
         value.clamp(0.0, 1.0_f64.max((-rate * time).exp()))
     } else {
@@ -767,7 +769,7 @@ pub fn up_out_call(
 
     let params = BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol);
     match barrier_helper(&params, 1.0, 1.0) {
-        Ok(up_in) => (vanilla - up_in).max(0.0),
+        Ok(up_in) => (vanilla - up_in).clamp(0.0, f64::INFINITY),
         Err(_) => f64::NAN,
     }
 }
@@ -845,7 +847,7 @@ pub fn down_out_call(
 
     let params = BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol);
     match barrier_helper(&params, 1.0, -1.0) {
-        Ok(down_in) => (vanilla - down_in).max(0.0),
+        Ok(down_in) => (vanilla - down_in).clamp(0.0, f64::INFINITY),
         Err(_) => f64::NAN,
     }
 }
@@ -985,7 +987,7 @@ pub fn down_out_put(
 
     let params = BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol);
     match barrier_helper(&params, -1.0, -1.0) {
-        Ok(down_in) => (vanilla - down_in).max(0.0),
+        Ok(down_in) => (vanilla - down_in).clamp(0.0, f64::INFINITY),
         Err(_) => f64::NAN,
     }
 }
@@ -1063,7 +1065,7 @@ pub fn up_out_put(
 
     let params = BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol);
     match barrier_helper(&params, -1.0, 1.0) {
-        Ok(up_in) => (vanilla - up_in).max(0.0),
+        Ok(up_in) => (vanilla - up_in).clamp(0.0, f64::INFINITY),
         Err(_) => f64::NAN,
     }
 }
@@ -1104,6 +1106,164 @@ pub fn barrier_put_continuous(params: &BarrierParams, barrier_type: BarrierType)
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn low_volatility_barriers_preserve_exact_payoff_identities() {
+        // Every ITM call path crosses an upper barrier below its strike;
+        // every ITM put path crosses a lower barrier above its strike.
+        for (rate, barrier, eta) in [(0.1_f64, 150.0, 1.0), (-0.1_f64, 75.0, -1.0)] {
+            let time = 5.0;
+            let strike = 100.0 * (rate * time).exp();
+            let vanilla = vanilla_option_price(100.0, strike, time, rate, 0.0, 0.01, eta);
+            let (knock_in, knock_out) = if eta > 0.0 {
+                (
+                    up_in_call(100.0, strike, barrier, time, rate, 0.0, 0.01),
+                    up_out_call(100.0, strike, barrier, time, rate, 0.0, 0.01),
+                )
+            } else {
+                (
+                    down_in_put(100.0, strike, barrier, time, rate, 0.0, 0.01),
+                    down_out_put(100.0, strike, barrier, time, rate, 0.0, 0.01),
+                )
+            };
+            assert!(vanilla > 0.5);
+            assert_eq!(knock_in, vanilla);
+            assert_eq!(knock_out, 0.0);
+        }
+    }
+
+    #[test]
+    fn touch_probability_retains_diffusion_when_reflection_power_overflows() {
+        // Place the barrier at the median terminal spot. Here the reflected
+        // power is exp(800), but P(hit) = 1/2 + exp(800) Phi(-40).
+        let vol = 0.005;
+        let rate = 0.1 + 0.5 * vol * vol;
+        let probability =
+            barrier_touch_probability(100.0, 100.0 * 0.1_f64.exp(), 1.0, rate, 0.0, vol, true);
+        assert!(
+            (probability - 0.509_967_335_188_301_3).abs() < 1e-11,
+            "nonzero diffusion must not become a deterministic hit: {probability}"
+        );
+    }
+
+    #[test]
+    fn low_volatility_barrier_prices_match_conditional_bridge_integrals() {
+        use finstack_quant_core::math::integration::simpson_rule;
+        use finstack_quant_core::math::special_functions::norm_pdf;
+
+        // These are the nontrivial strike/barrier regimes. Integrate over the
+        // terminal normal shock and condition on Brownian-bridge survival.
+        for (log_barrier, strike, is_up, eta) in
+            [(0.1_f64, 105.0_f64, true, 1.0), (-0.1, 95.0, false, -1.0)]
+        {
+            let vol = 0.005;
+            let variance = vol * vol;
+            let rate = log_barrier + 0.5 * variance;
+            let barrier = 100.0 * log_barrier.exp();
+            let strike_shock = ((strike / 100.0).ln() - log_barrier) / vol;
+            let (lower, upper) = if is_up {
+                (strike_shock.max(-12.0), 0.0)
+            } else {
+                (0.0, strike_shock.min(12.0))
+            };
+            let expected = (-rate).exp()
+                * simpson_rule(
+                    |z| {
+                        let log_terminal = log_barrier + vol * z;
+                        let terminal = 100.0 * log_terminal.exp();
+                        let survival = -(-2.0 * log_barrier * (log_barrier - log_terminal)
+                            / variance)
+                            .exp_m1();
+                        (eta * (terminal - strike)).max(0.0) * survival * norm_pdf(z)
+                    },
+                    lower,
+                    upper,
+                    20_000,
+                )
+                .expect("valid conditional bridge integration");
+            let actual = if is_up {
+                up_out_call(100.0, strike, barrier, 1.0, rate, 0.0, vol)
+            } else {
+                down_out_put(100.0, strike, barrier, 1.0, rate, 0.0, vol)
+            };
+            assert!(expected > 1.0);
+            assert!(
+                (actual - expected).abs() < 1e-9,
+                "barrier={barrier}: analytical {actual} vs bridge integral {expected}"
+            );
+        }
+    }
+
+    #[test]
+    fn at_hit_rebates_discount_at_the_deterministic_crossing_time() {
+        for (barrier, rate, dividend, barrier_type) in [
+            (105.0_f64, 0.1, 0.0, BarrierType::UpAndOut),
+            (95.0_f64, 0.1, 0.2, BarrierType::DownAndOut),
+            (95.0_f64, -0.1, 0.0, BarrierType::DownAndOut),
+        ] {
+            let hit_time = (barrier / 100.0).ln() / (rate - dividend);
+            let expected = (-rate * hit_time).exp();
+            for vol in [0.0, 1e-6, 1e-4] {
+                let params = BarrierParams::new(100.0, 100.0, barrier, 2.0, rate, dividend, vol);
+                let actual = barrier_rebate(&params, 1.0, barrier_type, PayoutTiming::AtHit);
+                assert!(
+                    (actual - expected).abs() < 1e-6,
+                    "vol={vol}: at-hit {actual} must converge to {expected} at tau={hit_time}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn negative_rate_at_hit_rebates_match_first_passage_density() {
+        use finstack_quant_core::math::integration::simpson_rule;
+
+        // Include both sides of the real-root boundary at q = 0. The direct
+        // density integral is independent of the CDF integration-by-parts path.
+        for dividend in [-0.02_f64, -1e-8, 0.0, 1e-8] {
+            for (barrier, is_up, barrier_type) in [
+                (110.0_f64, true, BarrierType::UpAndOut),
+                (90.0_f64, false, BarrierType::DownAndOut),
+            ] {
+                let params = BarrierParams::new(100.0, 100.0, barrier, 1.0, -0.02, dividend, 0.2);
+                let distance = (barrier / params.spot).ln().abs();
+                let nu = params.rate - params.div_yield - 0.5 * params.vol * params.vol;
+                let signed_drift = if is_up { nu } else { -nu };
+                let expected = simpson_rule(
+                    |t| {
+                        if t == 0.0 {
+                            return 0.0;
+                        }
+                        distance / (params.vol * (std::f64::consts::TAU * t * t * t).sqrt())
+                            * (-(distance - signed_drift * t).powi(2)
+                                / (2.0 * params.vol * params.vol * t)
+                                - params.rate * t)
+                                .exp()
+                    },
+                    0.0,
+                    params.time,
+                    20_000,
+                )
+                .expect("valid first-passage density integration");
+                let actual = barrier_rebate(&params, 1.0, barrier_type, PayoutTiming::AtHit);
+                let p_hit = barrier_touch_probability(
+                    params.spot,
+                    barrier,
+                    params.time,
+                    params.rate,
+                    dividend,
+                    params.vol,
+                    is_up,
+                );
+                assert!(actual >= p_hit - 1e-12);
+                assert!(actual <= (-params.rate * params.time).exp() * p_hit + 1e-12);
+                assert!(
+                    (actual - expected).abs() < 1e-10,
+                    "q={dividend}, barrier={barrier}: at-hit {actual} vs density {expected}"
+                );
+            }
+        }
+    }
 
     #[test]
     fn test_barrier_in_plus_out_equals_vanilla() {

@@ -42,10 +42,10 @@ pub struct ForecastMetrics {
     /// [`ForecastMetrics::mape_effective_n`] records how many samples were
     /// used so callers can tell a low MAPE from a MAPE that was computed on
     /// very few points. Very small non-zero actuals can still dominate the
-    /// metric. If `mape_effective_n == 0`, `mape` is `NaN`; prefer
+    /// metric. If `mape_effective_n == 0`, `mape` is `None`; prefer
     /// [`ForecastMetrics::smape`] in that case.
     /// Lower is better.
-    pub mape: f64,
+    pub mape: Option<f64>,
 
     /// Number of samples that actually contributed to MAPE (i.e. had
     /// `|actual| >= ZERO_TOLERANCE`). Always `<= n`.
@@ -54,11 +54,11 @@ pub struct ForecastMetrics {
     /// Symmetric Mean Absolute Percentage Error:
     /// `mean( |a - f| / ((|a| + |f|) / 2) ) × 100`.
     ///
-    /// Always well-defined when at least one of `|a|` or `|f|` is positive,
-    /// and always bounded in `[0, 200]`. Preferred over MAPE when the actual
-    /// series contains zeros or near-zeros. Terms where both `a` and `f`
-    /// are within `ZERO_TOLERANCE` of zero are skipped.
-    pub smape: f64,
+    /// Bounded in `[0, 200]` for available observations. Preferred over MAPE
+    /// when the actual series contains zeros or near-zeros. Terms whose
+    /// denominator is below `ZERO_TOLERANCE` are skipped. Returns `None` when
+    /// every denominator is below that threshold.
+    pub smape: Option<f64>,
 
     /// Root Mean Squared Error: sqrt(average((actual - forecast)²))
     ///
@@ -80,23 +80,24 @@ impl ForecastMetrics {
     /// # use finstack_quant_statements_analytics::analysis::ForecastMetrics;
     /// let metrics = ForecastMetrics {
     ///     mae: 2.5,
-    ///     mape: 3.7,
+    ///     mape: Some(3.7),
     ///     mape_effective_n: 10,
-    ///     smape: 3.5,
+    ///     smape: Some(3.5),
     ///     rmse: 3.2,
     ///     n: 10,
     /// };
     /// println!("{}", metrics.summary());
     /// ```
     pub fn summary(&self) -> String {
-        let mape_str = if self.mape.is_nan() {
-            "n/a".to_string()
-        } else {
-            format!("{:.2}%", self.mape)
-        };
+        let mape_str = self
+            .mape
+            .map_or_else(|| "n/a".to_string(), |v| format!("{v:.2}%"));
+        let smape_str = self
+            .smape
+            .map_or_else(|| "n/a".to_string(), |v| format!("{v:.2}%"));
         format!(
-            "MAE: {:.2}, MAPE: {} (eff_n={}), sMAPE: {:.2}%, RMSE: {:.2} (n={})",
-            self.mae, mape_str, self.mape_effective_n, self.smape, self.rmse, self.n
+            "MAE: {:.2}, MAPE: {} (eff_n={}), sMAPE: {}, RMSE: {:.2} (n={})",
+            self.mae, mape_str, self.mape_effective_n, smape_str, self.rmse, self.n
         )
     }
 }
@@ -105,19 +106,24 @@ impl ForecastMetrics {
 ///
 /// # Arguments
 ///
-/// * `actual` - Actual observed values
-/// * `forecast` - Forecasted/predicted values
+/// * `actual` - Non-empty finite observed values in consistent units. Negative
+///   observations are accepted; near-zero values do not contribute to MAPE.
+/// * `forecast` - Finite predictions in the same units, aligned one-for-one with
+///   `actual` and of equal length.
 ///
 /// # Returns
 ///
-/// [`ForecastMetrics`] containing MAE, MAPE, and RMSE.
+/// [`ForecastMetrics`] containing MAE and RMSE in input units and optional
+/// MAPE/sMAPE in percent. Percentage metrics are `None` when no sample has an
+/// eligible denominator; JSON serializes those values as `null`.
 ///
 /// # Errors
 ///
 /// Returns an error if:
 /// - Arrays have different lengths
 /// - Arrays are empty
-/// - MAPE calculation encounters division by zero
+/// - Either array contains a non-finite value
+/// - Metric arithmetic overflows to a non-finite value
 ///
 /// # Example
 ///
@@ -146,6 +152,9 @@ pub fn backtest_forecast(actual: &[f64], forecast: &[f64]) -> Result<ForecastMet
     if actual.is_empty() {
         return Err(Error::forecast("Cannot compute metrics on empty arrays"));
     }
+    if actual.iter().chain(forecast).any(|v| !v.is_finite()) {
+        return Err(Error::forecast("Actual and forecast values must be finite"));
+    }
 
     let n = actual.len();
 
@@ -169,11 +178,7 @@ pub fn backtest_forecast(actual: &[f64], forecast: &[f64]) -> Result<ForecastMet
                     (sum + ((a - f).abs() / a.abs()) * 100.0, count + 1)
                 }
             });
-    let mape = if mape_effective_n > 0 {
-        mape_sum / mape_effective_n as f64
-    } else {
-        f64::NAN
-    };
+    let mape = (mape_effective_n > 0).then(|| mape_sum / mape_effective_n as f64);
 
     // Symmetric MAPE: well-defined even when some `a` are zero, so we
     // report it alongside MAPE as a second-line defence. Skip terms
@@ -183,18 +188,14 @@ pub fn backtest_forecast(actual: &[f64], forecast: &[f64]) -> Result<ForecastMet
             .iter()
             .zip(forecast.iter())
             .fold((0.0_f64, 0_usize), |(sum, count), (a, f)| {
-                let denom = (a.abs() + f.abs()) * 0.5;
+                let denom = a.abs() * 0.5 + f.abs() * 0.5;
                 if denom < ZERO_TOLERANCE {
                     (sum, count)
                 } else {
                     (sum + ((a - f).abs() / denom) * 100.0, count + 1)
                 }
             });
-    let smape = if smape_count > 0 {
-        smape_sum / smape_count as f64
-    } else {
-        f64::NAN
-    };
+    let smape = (smape_count > 0).then(|| smape_sum / smape_count as f64);
 
     // Root Mean Squared Error
     let mse = actual
@@ -208,6 +209,13 @@ pub fn backtest_forecast(actual: &[f64], forecast: &[f64]) -> Result<ForecastMet
         / n as f64;
 
     let rmse = mse.sqrt();
+    if !mae.is_finite()
+        || !rmse.is_finite()
+        || mape.is_some_and(|v| !v.is_finite())
+        || smape.is_some_and(|v| !v.is_finite())
+    {
+        return Err(Error::forecast("Forecast metric arithmetic overflowed"));
+    }
 
     Ok(ForecastMetrics {
         mae,
@@ -231,7 +239,7 @@ mod tests {
         let metrics = backtest_forecast(&actual, &forecast).expect("test should succeed");
 
         assert_eq!(metrics.mae, 0.0);
-        assert_eq!(metrics.mape, 0.0);
+        assert_eq!(metrics.mape, Some(0.0));
         assert_eq!(metrics.rmse, 0.0);
         assert_eq!(metrics.n, 3);
     }
@@ -270,7 +278,7 @@ mod tests {
         let metrics = backtest_forecast(&actual, &forecast).expect("test should succeed");
 
         // MAPE: (10/100 + 20/200) * 100 / 2 = (0.1 + 0.1) * 100 / 2 = 10.0
-        assert!((metrics.mape - 10.0).abs() < 1e-10);
+        assert!((metrics.mape.expect("MAPE available") - 10.0).abs() < 1e-10);
     }
 
     #[test]
@@ -306,7 +314,6 @@ mod tests {
 
         // Should not panic or produce inf/nan
         let metrics = backtest_forecast(&actual, &forecast).expect("test should succeed");
-        assert!(!metrics.mape.is_nan());
-        assert!(!metrics.mape.is_infinite());
+        assert!(metrics.mape.expect("MAPE available").is_finite());
     }
 }

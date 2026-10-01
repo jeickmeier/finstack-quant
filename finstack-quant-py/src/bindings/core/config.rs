@@ -334,28 +334,32 @@ impl PyFinstackConfig {
         Ok(self.inner.ingest_scale(extract_currency(currency)?))
     }
 
-    /// Override the output decimal scale for ``currency``.
+    /// Override the output decimal scale for ``currency`` within ``0..=28``.
+    ///
+    /// Raises ``ValueError`` for an unknown currency or unsupported scale,
+    /// leaving the configuration unchanged.
     #[pyo3(text_signature = "(self, currency, scale)")]
     fn set_output_scale(&mut self, currency: &Bound<'_, PyAny>, scale: u32) -> PyResult<()> {
         let ccy = extract_currency(currency)?;
         self.inner
             .rounding
             .output_scale
-            .overrides
-            .insert(ccy, scale);
-        Ok(())
+            .set_scale(ccy, scale)
+            .map_err(core_to_py)
     }
 
-    /// Override the ingest decimal scale for ``currency``.
+    /// Override the ingest decimal scale for ``currency`` within ``0..=28``.
+    ///
+    /// Raises ``ValueError`` for an unknown currency or unsupported scale,
+    /// leaving the configuration unchanged.
     #[pyo3(text_signature = "(self, currency, scale)")]
     fn set_ingest_scale(&mut self, currency: &Bound<'_, PyAny>, scale: u32) -> PyResult<()> {
         let ccy = extract_currency(currency)?;
         self.inner
             .rounding
             .ingest_scale
-            .overrides
-            .insert(ccy, scale);
-        Ok(())
+            .set_scale(ccy, scale)
+            .map_err(core_to_py)
     }
 
     /// Explicit output-scale overrides as ``{iso_code: scale}``.
@@ -364,7 +368,7 @@ impl PyFinstackConfig {
         self.inner
             .rounding
             .output_scale
-            .overrides
+            .get_overrides()
             .iter()
             .map(|(ccy, scale)| (ccy.to_string(), *scale))
             .collect()
@@ -376,7 +380,7 @@ impl PyFinstackConfig {
         self.inner
             .rounding
             .ingest_scale
-            .overrides
+            .get_overrides()
             .iter()
             .map(|(ccy, scale)| (ccy.to_string(), *scale))
             .collect()
@@ -477,8 +481,8 @@ impl PyFinstackConfig {
         format!(
             "FinstackConfig(rounding_mode={:?}, output_scale_overrides={}, ingest_scale_overrides={}, extensions={})",
             self.inner.rounding.mode.to_string(),
-            self.inner.rounding.output_scale.overrides.len(),
-            self.inner.rounding.ingest_scale.overrides.len(),
+            self.inner.rounding.output_scale.get_overrides().len(),
+            self.inner.rounding.ingest_scale.get_overrides().len(),
             self.inner.extensions.keys().count()
         )
     }
@@ -486,7 +490,7 @@ impl PyFinstackConfig {
 
 /// Register the `finstack_quant.core.config` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "config")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "config")?;
     m.setattr(
         "__doc__",
         "Configuration types from finstack-quant-core (rounding, tolerances, FinstackConfig).",
@@ -498,13 +502,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let all = PyList::new(py, ["FinstackConfig", "RoundingMode", "ToleranceConfig"])?;
     m.setattr("__all__", all)?;
 
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "config",
-        "finstack_quant.core",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
 
     Ok(())

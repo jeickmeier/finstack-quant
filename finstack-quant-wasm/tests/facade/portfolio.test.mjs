@@ -93,6 +93,62 @@ test('portfolio namespace exposes exactly the pinned contract surface', () => {
   }
 });
 
+test('portfolio.decomposeFactorRisk consumes the canonical Python monetary matrix wire', () => {
+  const sensitivities = {
+    base_currency: 'EUR',
+    position_ids: ['A', 'B'],
+    factor_ids: ['F'],
+    data: [[2.0], [3.0]],
+  };
+  const covariance = JSON.stringify({ factor_ids: ['F'], n: 1, data: [0.04] });
+  const result = assertStructured(
+    portfolio.decomposeFactorRisk(JSON.stringify(sensitivities), covariance),
+    'factor decomposition'
+  );
+  assert.ok(Math.abs(result.total_risk - 1.0) < 1e-12);
+  assert.deepEqual(
+    result.position_factor_contributions.map((row) => row.position_id),
+    ['A', 'B']
+  );
+  assert.ok(
+    Math.abs(
+      result.position_factor_contributions.reduce((sum, row) => sum + row.risk_contribution, 0) -
+        result.total_risk
+    ) < 1e-12
+  );
+  assert.equal(result.measure, 'variance');
+  for (const measure of [
+    'volatility',
+    { var: { confidence: 0.99 } },
+    { expected_shortfall: { confidence: 0.975 } },
+  ]) {
+    const measured = portfolio.decomposeFactorRisk(
+      JSON.stringify(sensitivities),
+      covariance,
+      JSON.stringify(measure)
+    );
+    assert.deepEqual(measured.measure, measure);
+    assert.ok(Number.isFinite(measured.total_risk));
+  }
+});
+
+test('portfolio.decomposeFactorRisk rejects malformed matrices and missing reporting currency', () => {
+  const valid = { base_currency: 'USD', position_ids: ['P'], factor_ids: ['F'], data: [[2.0]] };
+  const covariance = JSON.stringify({ factor_ids: ['F'], n: 1, data: [0.04] });
+  for (const data of [[], [[], []], [[]], [[2.0, 3.0]], [2.0], [[null]]]) {
+    assert.throws(() =>
+      portfolio.decomposeFactorRisk(JSON.stringify({ ...valid, data }), covariance)
+    );
+  }
+  for (const extra of [{ n_factors: 1 }, { unexpected: true }, { base_currency: 'BAD' }]) {
+    assert.throws(() =>
+      portfolio.decomposeFactorRisk(JSON.stringify({ ...valid, ...extra }), covariance)
+    );
+  }
+  const missingCurrency = { position_ids: ['P'], factor_ids: ['F'], data: [[2.0]] };
+  assert.throws(() => portfolio.decomposeFactorRisk(JSON.stringify(missingCurrency), covariance));
+});
+
 // Runtime arity gate. `index.d.ts` is hand-maintained, so a declaration with
 // the wrong argument count would compile clean for a TypeScript caller while
 // the extra argument is silently discarded at the JS boundary. Pinning
@@ -504,11 +560,11 @@ test('portfolio.cellReturnsFromReference rejects an astronomically large duratio
 });
 
 const flatCurveKnots = (id) =>
-  new core.DiscountCurve(
+  new core.DiscountCurve({
     id,
-    '2024-01-01',
-    [0.0, 1.0, 0.25, 0.99004983, 0.5, 0.98019867, 1.25, 0.95122942, 1.5, 0.94176453]
-  );
+    baseDate: '2024-01-01',
+    knots: [0.0, 1.0, 0.25, 0.99004983, 0.5, 0.98019867, 1.25, 0.95122942, 1.5, 0.94176453],
+  });
 
 test('portfolio.cellReturnsFromCurves reproduces the flat-curve pure-carry golden', () => {
   const start = flatCurveKnots('UST');
@@ -529,16 +585,16 @@ test('portfolio.cellReturnsFromCurves reproduces the flat-curve pure-carry golde
 // `DiscountCurve` arguments is not a no-op, unlike the pure-carry golden
 // above whose start === end.
 test('portfolio.cellReturnsFromCurves distinguishes start and end curves under rising rates', () => {
-  const start = new core.DiscountCurve(
-    'UST',
-    '2024-01-01',
-    [0.0, 1.0, 0.5, 0.98019867, 1.5, 0.94176453]
-  );
-  const end = new core.DiscountCurve(
-    'UST',
-    '2024-01-01',
-    [0.0, 1.0, 0.25, 0.9875778, 1.25, 0.93941306]
-  );
+  const start = new core.DiscountCurve({
+    id: 'UST',
+    baseDate: '2024-01-01',
+    knots: [0.0, 1.0, 0.5, 0.98019867, 1.5, 0.94176453],
+  });
+  const end = new core.DiscountCurve({
+    id: 'UST',
+    baseDate: '2024-01-01',
+    knots: [0.0, 1.0, 0.25, 0.9875778, 1.25, 0.93941306],
+  });
   const table = portfolio.cellReturnsFromCurves(
     start,
     end,
@@ -553,8 +609,8 @@ test('portfolio.cellReturnsFromCurves distinguishes start and end curves under r
 
 test('portfolio.cellReturnsFromCurves fails closed when a cell matures inside the holding period', () => {
   const knots = [0.0, 1.0, 0.25, 0.99004983, 0.5, 0.98019867];
-  const start = new core.DiscountCurve('UST', '2024-01-01', knots);
-  const end = new core.DiscountCurve('UST', '2024-01-01', knots);
+  const start = new core.DiscountCurve({ id: 'UST', baseDate: '2024-01-01', knots });
+  const end = new core.DiscountCurve({ id: 'UST', baseDate: '2024-01-01', knots });
   assert.throws(() =>
     portfolio.cellReturnsFromCurves(start, end, 0.25, 0.5, 'UST', JSON.stringify({ width: 0.25 }))
   );

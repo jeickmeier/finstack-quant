@@ -14,7 +14,7 @@ use pyo3::types::{PyList, PyModule};
 
 /// Register the `finstack_quant.core.dates` submodule on the parent module.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "dates")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "dates")?;
     m.setattr(
         "__doc__",
         "Date, calendar, and schedule utilities from finstack-quant-core.",
@@ -48,13 +48,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let all = PyList::new(py, &all_names)?;
     m.setattr("__all__", all)?;
 
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "dates",
-        "finstack_quant.core",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
 
     Ok(())

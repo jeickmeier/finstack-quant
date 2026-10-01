@@ -122,7 +122,7 @@ impl McEngine {
     /// Processes with dynamics a generic scheme cannot see (discrete
     /// dividends, jumps) declare a [`StochasticProcess::dedicated_scheme`];
     /// pairing them with anything else silently simulates the diffusion only.
-    pub(super) fn validate_scheme_pairing<P, D>(process: &P, disc: &D) -> Result<()>
+    pub(crate) fn validate_scheme_pairing<P, D>(process: &P, disc: &D) -> Result<()>
     where
         P: StochasticProcess,
         D: Discretization<P>,
@@ -146,7 +146,7 @@ impl McEngine {
     /// A maturity or fixing step beyond the grid would silently never fire
     /// (terminal spots stay 0.0, Asian averages shrink), so reject the
     /// configuration up front.
-    pub(super) fn validate_payoff_schedule<F: Payoff>(&self, payoff: &F) -> Result<()> {
+    pub(crate) fn validate_payoff_schedule<F: Payoff>(&self, payoff: &F) -> Result<()> {
         if let Some(max_step) = payoff.max_event_step() {
             let steps = self.config.time_grid.num_steps();
             if max_step > steps {
@@ -160,21 +160,21 @@ impl McEngine {
         Ok(())
     }
 
-    pub(super) fn validate_runtime<R, P>(
+    pub(crate) fn validate_runtime<P>(
         &self,
-        rng: &R,
         process: &P,
         initial_state: &[f64],
         discount_factor: f64,
         process_params: Option<&ProcessParams>,
     ) -> Result<()>
     where
-        R: RandomStream,
         P: StochasticProcess,
     {
-        if self.config.num_paths == 0 {
+        if self.config.num_paths < 2 {
             return Err(finstack_quant_core::Error::Validation(
-                "Monte Carlo num_paths must be greater than zero".to_string(),
+                "Monte Carlo num_paths must be at least 2 independent estimators; \
+                 each antithetic pair counts as one estimator"
+                    .to_string(),
             ));
         }
 
@@ -248,28 +248,6 @@ impl McEngine {
             }
         }
 
-        if rng.is_quasi_random() {
-            return Err(finstack_quant_core::Error::Validation(
-                "the generic Monte Carlo engine does not support quasi-random streams \
-                 (e.g. SobolRng): it consumes draws step-by-step, destroying the \
-                 per-path low-discrepancy point structure, and reports an i.i.d. \
-                 standard error that is statistically invalid over dependent QMC \
-                 points. Use PathDependentPricer with use_sobol=true, which draws one \
-                 Sobol point per path and estimates the error across independently \
-                 scrambled replicates, or switch to PhiloxRng."
-                    .to_string(),
-            ));
-        }
-
-        if self.config.use_parallel && !rng.supports_splitting() {
-            return Err(finstack_quant_core::Error::Validation(
-                "Parallel Monte Carlo requires a splittable RNG (e.g., PhiloxRng); \
-                 the supplied generator reports supports_splitting() = false — use \
-                 serial mode (use_parallel: false) or switch to PhiloxRng."
-                    .to_string(),
-            ));
-        }
-
         if self.config.path_capture.enabled {
             if self.config.antithetic {
                 return Err(finstack_quant_core::Error::Validation(
@@ -298,8 +276,35 @@ impl McEngine {
             }
         }
 
+        process.validate_time_grid(&self.config.time_grid)?;
         if let Some(params) = process_params {
             params.validate()?;
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn validate_rng<R: RandomStream>(&self, rng: &R) -> Result<()> {
+        if rng.is_quasi_random() {
+            return Err(finstack_quant_core::Error::Validation(
+                "the generic Monte Carlo engine does not support quasi-random streams \
+                 (e.g. SobolRng): it consumes draws step-by-step, destroying the \
+                 per-path low-discrepancy point structure, and reports an i.i.d. \
+                 standard error that is statistically invalid over dependent QMC \
+                 points. Use PathDependentPricer with use_sobol=true, which draws one \
+                 Sobol point per path and estimates the error across independently \
+                 scrambled replicates, or switch to PhiloxRng."
+                    .to_string(),
+            ));
+        }
+
+        if self.config.use_parallel && !rng.supports_splitting() {
+            return Err(finstack_quant_core::Error::Validation(
+                "Parallel Monte Carlo requires a splittable RNG (e.g., PhiloxRng); \
+                 the supplied generator reports supports_splitting() = false — use \
+                 serial mode (use_parallel: false) or switch to PhiloxRng."
+                    .to_string(),
+            ));
         }
 
         Ok(())
@@ -340,7 +345,7 @@ impl McEngine {
     ///
     /// Returns an error when:
     ///
-    /// * `num_paths == 0`
+    /// * `num_paths < 2` independent estimators, including antithetic pair means
     /// * `chunk_size == 0`
     /// * `initial_state.len() != process.dim()`
     /// * `discount_factor` is not finite or is negative
@@ -421,7 +426,8 @@ impl McEngine {
         )
         .entered();
 
-        self.validate_runtime(rng, process, initial_state, discount_factor, None)?;
+        self.validate_rng(rng)?;
+        self.validate_runtime(process, initial_state, discount_factor, None)?;
         Self::validate_scheme_pairing(process, disc)?;
         self.validate_payoff_schedule(payoff)?;
 
@@ -534,8 +540,8 @@ impl McEngine {
         D: Discretization<P> + Clone,
         F: Payoff,
     {
+        self.validate_rng(rng)?;
         self.validate_runtime(
-            rng,
             process,
             initial_state,
             discount_factor,

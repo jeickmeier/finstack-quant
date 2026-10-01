@@ -707,9 +707,15 @@ export interface D_9F54E6F1A3C511F443A0 {
   monitoring_start_date?: Date1 | null;
   notional: Money;
   /**
-   * Observed barrier state for expired options.
+   * Processed barrier-monitoring state through the valuation date.
    *
-   * Historical monitoring must be supplied explicitly for expired contracts.
+   * `Some(true)` records a breach whose at-hit rebate has already settled,
+   * including a hit processed on the valuation date. That rebate is not a
+   * remaining claim at expiry. An at-expiry rebate remains due on expiry.
+   * `Some(false)` records no breach in the processed monitoring history.
+   * Historical monitoring must be supplied explicitly for seasoned and
+   * expired contracts. Same-day unpaid at-hit claims require a separate
+   * cash receivable; this boolean does not represent pending settlement.
    */
   observed_barrier_breached?: boolean | null;
   /**

@@ -292,7 +292,7 @@ fn portfolio_wrap_uses_scale_factor_weight_for_eur_fx_factor() -> Result<()> {
             pricing_mode: PricingMode::DeltaBased,
             risk_measure: RiskMeasure::Variance,
             bump_config: None,
-            unmatched_policy: Some(UnmatchedPolicy::Residual),
+            unmatched_policy: Some(UnmatchedPolicy::Warn),
         })
         .build()?;
 

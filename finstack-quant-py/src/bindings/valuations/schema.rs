@@ -318,14 +318,11 @@ fn canonical_json(instance: &Value) -> PyResult<String> {
     })
 }
 
-schema_registry_functions!(
-    finstack_quant_valuations::schema::artifacts_slice(),
-    "finstack_quant.valuations.schema"
-);
+schema_registry_functions!(finstack_quant_valuations::schema::artifacts_slice());
 
 /// Register the `finstack_quant.valuations.schema` Python namespace.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "schema")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "schema")?;
     m.setattr("__doc__", MODULE_DOC)?;
     add_registry_functions(&m)?;
 
@@ -347,22 +344,15 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "validate_instrument_type_json",
         "valuation_result_schema",
     ];
-    for name in exports {
-        m.getattr(name)?
-            .setattr("__module__", "finstack_quant.valuations.schema")?;
-    }
 
     let all = PyList::new(py, exports)?;
     m.setattr("__all__", all)?;
-    // Explicit public path: unlike its sibling subpackages this module has no
-    // pure-Python shim, so it owns `finstack_quant.valuations.schema` itself.
-    // Deriving from the parent's `__package__` would put it on the extension's
-    // private path, where `import finstack_quant.valuations.schema` cannot see it.
-    crate::bindings::module_utils::register_submodule_at(
-        py,
+    // Unlike its sibling subpackages this module has no pure-Python shim, so the
+    // compiled module itself owns `finstack_quant.valuations.schema`.
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "finstack_quant.valuations.schema",
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
 
     Ok(())

@@ -203,13 +203,10 @@ fn test_pricing_after_maturity() {
         .fixed_rate(0.03)
         .build();
 
-    // Matured deposits have no future cashflows under the signed canonical
-    // schedule (as_of filtering removes all past flows). Pricing returns an error.
-    let result = dep.value(&ctx, base);
-    assert!(
-        result.is_err(),
-        "Matured deposit should return error (no future cashflows)"
-    );
+    // The instrument retains its currency even after all scheduled cash settles.
+    let result = dep.value(&ctx, base).expect("settled deposit value");
+    assert_eq!(result, Money::from((0_i64, Currency::USD)));
+    assert_eq!(dep.value_raw(&ctx, base).expect("settled raw value"), 0.0);
 }
 
 #[test]

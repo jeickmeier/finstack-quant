@@ -76,6 +76,7 @@ fn build_sc(id: &str, pool_balance: f64) -> StructuredCredit {
         legal_maturity(),
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse")
 }
 
@@ -230,6 +231,7 @@ fn enable_stochastic_populates_specs_for_each_deal_family() {
             legal_maturity(),
             "USD-OIS",
         )
+        .expect("valid structured-credit dates")
     };
 
     for mut sc in [
@@ -489,6 +491,7 @@ fn mc_variance_no_catastrophic_cancellation_on_large_pv_deal() {
         maturity,
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     // Factor-correlated default spec: moderate base CDR with inter-path
@@ -615,6 +618,7 @@ fn philox_rng_discipline_determinism_and_stream_identity() {
         maturity,
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.02);
@@ -1064,6 +1068,7 @@ fn stochastic_waterfall_matches_independent_cashflow_vectors() {
             .unwrap();
             let mut sc =
                 StructuredCredit::new_abs("REFERENCE", pool, tranches, start, end, "USD-OIS")
+                    .expect("valid structured-credit dates")
                     .with_calendar_id("nyse");
             sc.frequency = Tenor::quarterly();
             sc.first_payment_date = date!(2024 - 04 - 02);

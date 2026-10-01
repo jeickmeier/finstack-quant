@@ -35,10 +35,11 @@ fn cap_floor_conflicting_quotes_keep_all_residuals_in_any_order() {
                 is_normal_vol: true,
             })
             .collect();
-        let (_, report) = calibrate_hull_white_to_cap_floors(
+        let (_, report) = calibrate_hull_white_to_cap_floors_with_fn(
             &df,
             &df,
             &quotes,
+            None,
             CapFloorCalibrationConfig {
                 fit_tolerance: 1e-6,
                 frequency: SwapFrequency::Quarterly,
@@ -97,10 +98,10 @@ fn piecewise_cap_floor_bootstrap_recovers_synthetic_segments() {
     let kappa = 0.05;
     let generated = HullWhiteParams::new(
         kappa,
-        PiecewiseConstantCurve::new(vec![0.0, 1.0], vec![0.01, 0.02]).expect("schedule"),
+        PiecewiseConstantCurve::new(vec![0.0, 0.75], vec![0.01, 0.02]).expect("schedule"),
     )
     .expect("model");
-    let maturities = [1.0, 2.0];
+    let maturities = [1.0, 1.25];
     let quotes: Vec<CapFloorQuote> = maturities
         .into_iter()
         .map(|maturity| {
@@ -135,10 +136,11 @@ fn piecewise_cap_floor_bootstrap_recovers_synthetic_segments() {
         })
         .collect();
 
-    let (bootstrapped, _report) = bootstrap_hull_white_sigma_schedule_to_cap_floors(
+    let (bootstrapped, report) = bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn(
         &discount,
         &forward,
         &quotes,
+        None,
         PiecewiseSigmaCalibrationConfig {
             fit_tolerance: 1e-6,
             fixed_kappa: kappa,
@@ -149,9 +151,31 @@ fn piecewise_cap_floor_bootstrap_recovers_synthetic_segments() {
     )
     .expect("bootstrap");
 
-    assert_eq!(bootstrapped.volatility.times(), &[0.0, 1.0]);
+    assert!(report.success);
+    assert_eq!(bootstrapped.volatility.times(), &[0.0, 0.75]);
     assert!((bootstrapped.volatility.values()[0] - 0.01).abs() < 1.0e-10);
     assert!((bootstrapped.volatility.values()[1] - 0.02).abs() < 1.0e-10);
+}
+
+#[test]
+fn piecewise_cap_floor_bootstrap_rejects_missing_live_fixing_horizon() {
+    let df = flat_df(0.03);
+    let quote = CapFloorQuote::try_new(0.25, 0.03, 0.01, true, true).expect("quote");
+    let error = bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn(
+        &df,
+        &df,
+        &[quote],
+        None,
+        PiecewiseSigmaCalibrationConfig {
+            fit_tolerance: 1e-6,
+            fixed_kappa: 0.05,
+            sigma_min: 1e-6,
+            sigma_max: 0.1,
+            frequency: SwapFrequency::Quarterly,
+        },
+    )
+    .expect_err("a spot-fixed cap has no volatility exposure");
+    assert!(error.to_string().contains("no live caplets"));
 }
 
 #[test]
@@ -276,7 +300,7 @@ fn calibrate_hw1f_round_trip() {
         })
         .collect();
 
-    let (params, report) = calibrate_hull_white_to_swaptions(
+    let (params, report) = calibrate_hull_white_to_swaptions_with_fn(
         &df_fn,
         &quotes,
         SwapFrequency::default(),
@@ -328,7 +352,7 @@ fn calibrate_hw1f_annual_vs_semiannual_produces_different_params() {
         },
     ];
 
-    let (params_semi, _) = calibrate_hull_white_to_swaptions(
+    let (params_semi, _) = calibrate_hull_white_to_swaptions_with_fn(
         &df_fn,
         &quotes,
         SwapFrequency::SemiAnnual,
@@ -337,9 +361,15 @@ fn calibrate_hw1f_annual_vs_semiannual_produces_different_params() {
         1e-6,
     )
     .expect("semi-annual");
-    let (params_ann, _) =
-        calibrate_hull_white_to_swaptions(&df_fn, &quotes, SwapFrequency::Annual, None, None, 1e-6)
-            .expect("annual");
+    let (params_ann, _) = calibrate_hull_white_to_swaptions_with_fn(
+        &df_fn,
+        &quotes,
+        SwapFrequency::Annual,
+        None,
+        None,
+        1e-6,
+    )
+    .expect("annual");
 
     assert!(
         (params_semi.kappa - params_ann.kappa).abs() > 1e-6
@@ -373,7 +403,7 @@ fn calibrate_hw1f_rejects_insufficient_quotes() {
         is_normal_vol: true,
     }];
     let df_fn = flat_df(0.03);
-    let result = calibrate_hull_white_to_swaptions(
+    let result = calibrate_hull_white_to_swaptions_with_fn(
         &df_fn,
         &quotes,
         SwapFrequency::default(),
@@ -439,7 +469,7 @@ fn hw1f_calibration_recovers_kappa_on_wide_round_trip_grid() {
         })
         .collect();
 
-    let (params, report) = calibrate_hull_white_to_swaptions(
+    let (params, report) = calibrate_hull_white_to_swaptions_with_fn(
         &df_fn,
         &quotes,
         SwapFrequency::SemiAnnual,
@@ -497,7 +527,7 @@ fn hw1f_calibration_errors_when_kappa_drives_out_of_bounds() {
         })
         .collect();
 
-    let result = calibrate_hull_white_to_swaptions(
+    let result = calibrate_hull_white_to_swaptions_with_fn(
         &df_fn,
         &quotes,
         SwapFrequency::SemiAnnual,
@@ -536,10 +566,11 @@ fn cap_floor_hw1f_calibration_rejects_one_quote_without_fixed_kappa() {
         is_normal_vol: true,
     }];
 
-    let result = calibrate_hull_white_to_cap_floors(
+    let result = calibrate_hull_white_to_cap_floors_with_fn(
         &df_fn,
         &df_fn,
         &quotes,
+        None,
         CapFloorCalibrationConfig {
             fit_tolerance: 1e-6,
             frequency: SwapFrequency::SemiAnnual,
@@ -595,9 +626,18 @@ fn item7_cap_floor_fixed_kappa_minimises_norm_not_signed_sum() {
         hw1f_cap_floor_price(kappa, 0.020, &df_fn, &df_fn, spec_long),
     ];
 
-    let sigma =
-        solve_cap_floor_sigma_for_fixed_kappa(kappa, &df_fn, &df_fn, &quotes, &market, frequency)
-            .expect("fixed-kappa sigma calibration should succeed");
+    let sigma = solve_cap_floor_sigma_for_fixed_kappa(
+        kappa,
+        &df_fn,
+        &df_fn,
+        &quotes,
+        &market,
+        &[
+            CapFloorSchedule::synthetic(q_short.maturity, frequency),
+            CapFloorSchedule::synthetic(q_long.maturity, frequency),
+        ],
+    )
+    .expect("fixed-kappa sigma calibration should succeed");
 
     // SSE objective replicated locally.
     let sse = |s: f64| -> f64 {
@@ -666,10 +706,11 @@ fn cap_floor_hw1f_calibration_solves_sigma_with_fixed_kappa() {
         is_normal_vol: true,
     }];
 
-    let (params, report) = calibrate_hull_white_to_cap_floors(
+    let (params, report) = calibrate_hull_white_to_cap_floors_with_fn(
         &df_fn,
         &df_fn,
         &quotes,
+        None,
         CapFloorCalibrationConfig {
             fit_tolerance: 1e-6,
             fixed_kappa: Some(true_kappa),
@@ -712,10 +753,11 @@ fn cap_floor_hw1f_calibration_recovers_two_parameters_on_synthetic_grid() {
         })
         .collect();
 
-    let (params, report) = calibrate_hull_white_to_cap_floors(
+    let (params, report) = calibrate_hull_white_to_cap_floors_with_fn(
         &df_fn,
         &df_fn,
         &quotes,
+        None,
         CapFloorCalibrationConfig {
             fit_tolerance: 1e-6,
             frequency: SwapFrequency::Quarterly,
@@ -773,15 +815,17 @@ fn hw1f_residuals_signal_err_on_non_finite_price_no_magic_literal() {
         .iter()
         .map(|_| PreparedSwaption {
             market_price: 0.01,
+            annuity: 1.0,
             fwd_swap_rate: 0.03,
             vega: 0.5,
+            swap_start_time: 1.0,
+            cashflows: vec![(1.5, 0.015), (2.0, 1.015)],
             schedule: None,
         })
         .collect();
 
     let target = HullWhiteSwaptionTarget {
         df: &nan_df,
-        ppy: SwapFrequency::SemiAnnual.periods_per_year(),
         initial_x0: [(-2.5_f64), (-4.0_f64)],
         prepared,
     };
@@ -812,7 +856,7 @@ fn hw1f_residuals_signal_err_on_non_finite_price_no_magic_literal() {
 
     // End-to-end: the full calibration with the same NaN curve must
     // fail cleanly rather than silently converge to a poisoned minimum.
-    let calib = calibrate_hull_white_to_swaptions(
+    let calib = calibrate_hull_white_to_swaptions_with_fn(
         &nan_df,
         &quotes,
         SwapFrequency::SemiAnnual,
@@ -898,24 +942,33 @@ fn infer_hw_initial_guess_lognormal_vol_seed_uses_forward_rate() {
     );
 }
 
-/// M2.17: the HW futures convexity adjustment must reduce to the Ho-Lee
-/// limit `½σ²T₁T₂` as κ → 0 — both via the explicit small-κ branch and
-/// continuously through it.
+/// M2.17: the HW futures convexity adjustment must equal the Ho-Lee
+/// low-rate limit `½σ²T₁(2T₂−T₁)` at κ = 0 and approach it continuously.
+/// Nonzero κ retains its analytical mean-reversion correction.
 #[test]
 fn convexity_adjustment_ho_lee_limit() {
     let sigma = 0.01;
     let t1 = 5.0;
     let t2 = 5.25;
-    let ho_lee = 0.5 * sigma * sigma * t1 * t2;
+    let ho_lee = 0.5 * sigma * sigma * t1 * (2.0 * t2 - t1);
 
-    // Explicit small-κ branch.
-    let ca_branch = hw1f_convexity_adjustment(1e-12, sigma, t1, t2);
+    let ca_zero = hw1f_convexity_adjustment(0.0, sigma, t1, t2);
     assert!(
-        (ca_branch - ho_lee).abs() < 1e-15,
-        "κ→0 branch must equal ½σ²T₁T₂: got {ca_branch}, want {ho_lee}"
+        (ca_zero - ho_lee).abs() < 1e-15,
+        "κ=0 must equal ½σ²T₁(2T₂−T₁): got {ca_zero}, want {ho_lee}"
     );
 
-    // Continuity across the branch threshold.
+    // B(κ,u) = u - κu²/2 + O(κ²). Expanding the full futures
+    // convexity expression gives this nonzero first derivative at κ=0;
+    // κ=1e-12 therefore differs from the limit by 7.0625e-15 here.
+    let tau = t2 - t1;
+    let derivative = -0.5 * sigma * sigma * t1 * (t1 * t1 + 2.5 * t1 * tau + 2.0 * tau * tau);
+    let kappa = 1e-12;
+    let ca_tiny = hw1f_convexity_adjustment(kappa, sigma, t1, t2);
+    let first_order = ho_lee + kappa * derivative;
+    assert!((ca_tiny - first_order).abs() < 1e-18);
+
+    // Continuity through small positive mean reversion.
     let ca_small = hw1f_convexity_adjustment(1e-6, sigma, t1, t2);
     assert!(
         (ca_small - ho_lee).abs() / ho_lee < 1e-4,
@@ -936,7 +989,7 @@ fn convexity_adjustment_magnitude_at_realistic_params() {
 
     let ca = hw1f_convexity_adjustment(kappa, sigma, t1, t2);
     // Below the Ho-Lee bound (mean reversion damps the adjustment)…
-    let ho_lee = 0.5 * sigma * sigma * t1 * t2;
+    let ho_lee = 0.5 * sigma * sigma * t1 * (2.0 * t2 - t1);
     assert!(
         ca < ho_lee,
         "κ>0 must damp the adjustment: {ca} vs {ho_lee}"
@@ -1045,7 +1098,7 @@ fn cap_floor_single_period_quote_rejected() {
         fixed_kappa: Some(0.05),
         initial_guess: None,
     };
-    let result = calibrate_hull_white_to_cap_floors(&df_fn, &df_fn, &[quote], config);
+    let result = calibrate_hull_white_to_cap_floors_with_fn(&df_fn, &df_fn, &[quote], None, config);
     assert!(
         result.is_err(),
         "single-period cap quote must be rejected, got {:?}",
@@ -1150,15 +1203,35 @@ fn swaption_malformed_schedule_is_rejected() {
             payment_times: (1..=10).map(|index| 1.0 + index as f64 * 0.5).collect(),
             accruals: vec![0.5; 10],
             maturity_time: 6.0,
+            floating_periods: (0..10)
+                .map(|index| SwaptionFloatingPeriod {
+                    fixing_time: 1.0 + index as f64 * 0.5,
+                    start_time: 1.0 + index as f64 * 0.5,
+                    end_time: 1.0 + (index + 1) as f64 * 0.5,
+                    payment_time: 1.0 + (index + 1) as f64 * 0.5,
+                    accrual: 0.5,
+                })
+                .collect(),
+            floating_is_compounded: false,
         },
         SwaptionSchedule {
             swap_start_time: 5.0,
             payment_times: vec![5.5, 6.0],
             accruals: vec![0.5],
             maturity_time: 10.0,
+            floating_periods: (0..10)
+                .map(|index| SwaptionFloatingPeriod {
+                    fixing_time: 5.0 + index as f64 * 0.5,
+                    start_time: 5.0 + index as f64 * 0.5,
+                    end_time: 5.0 + (index + 1) as f64 * 0.5,
+                    payment_time: 5.0 + (index + 1) as f64 * 0.5,
+                    accrual: 0.5,
+                })
+                .collect(),
+            floating_is_compounded: false,
         },
     ];
-    let err = calibrate_hull_white_to_swaptions(
+    let err = calibrate_hull_white_to_swaptions_with_fn(
         &df_fn,
         &quotes,
         SwapFrequency::Annual,
@@ -1193,7 +1266,8 @@ fn cap_floor_fixed_kappa_out_of_band_rejected() {
             fixed_kappa: Some(bad_kappa),
             initial_guess: None,
         };
-        let result = calibrate_hull_white_to_cap_floors(&df_fn, &df_fn, &[quote], config);
+        let result =
+            calibrate_hull_white_to_cap_floors_with_fn(&df_fn, &df_fn, &[quote], None, config);
         assert!(
             result.is_err(),
             "fixed_kappa={bad_kappa} outside [{KAPPA_MIN}, {KAPPA_MAX}] must be rejected"
@@ -1262,10 +1336,11 @@ fn m11_quote_fit_budget_controls_acceptance_without_changing_parameters() {
         })
         .collect();
     let fit = |fit_tolerance| {
-        calibrate_hull_white_to_cap_floors(
+        calibrate_hull_white_to_cap_floors_with_fn(
             &df,
             &df,
             &quotes,
+            None,
             CapFloorCalibrationConfig {
                 fit_tolerance,
                 frequency: SwapFrequency::Quarterly,

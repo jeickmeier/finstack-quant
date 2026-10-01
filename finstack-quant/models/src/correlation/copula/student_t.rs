@@ -64,9 +64,8 @@ use super::{get_cached_quadrature, Copula, DEFAULT_QUADRATURE_ORDER};
 use finstack_quant_core::math::distributions::chi_squared_quantile;
 #[cfg(test)]
 use finstack_quant_core::math::student_t_inv_cdf;
-use finstack_quant_core::math::{
-    ln_gamma, norm_cdf, student_t_cdf, GaussHermiteQuadrature, GaussLaguerreQuadrature,
-};
+use finstack_quant_core::math::{norm_cdf, student_t_cdf, GaussHermiteQuadrature};
+use nalgebra::{DMatrix, SymmetricEigen};
 use std::sync::Arc;
 
 /// Evaluate the Student-t CDF, returning a loudly-logged NaN when the
@@ -84,16 +83,6 @@ fn t_cdf_or_nan(x: f64, nu: f64) -> f64 {
         f64::NAN
     })
 }
-
-/// Minimum correlation for numerical stability.
-const MIN_CORRELATION: f64 = 0.01;
-/// Clip conditional-CDF arguments to avoid pathological tails when the
-/// smoothing clamp forces ρ ≈ MAX_CORRELATION (1 − ρ ≈ 1e-2). Mirrors the
-/// Gaussian copula behaviour; `student_t_cdf` saturates naturally, but we
-/// guard against catastrophic cancellation inside the scaling factor.
-const CDF_CLIP: f64 = 10.0;
-/// Maximum correlation for numerical stability.
-const MAX_CORRELATION: f64 = 0.99;
 
 /// Student-t copula with configurable degrees of freedom.
 ///
@@ -143,14 +132,14 @@ impl StudentTCopula {
     /// Create a Student-t copula with specified degrees of freedom.
     ///
     /// # Arguments
-    /// * `df` - Degrees of freedom (must be > 2 for finite variance)
+    /// * `df` - Finite degrees of freedom, strictly greater than 2 for finite variance.
     ///
     /// # Returns
     ///
     /// A Student-t copula using the default quadrature order.
     ///
     /// # Panics
-    /// Panics if df ≤ 2
+    /// Panics if `df` is not finite or is at most 2.
     ///
     /// # Examples
     ///
@@ -164,7 +153,10 @@ impl StudentTCopula {
     /// ```
     #[must_use]
     pub fn new(df: f64) -> Self {
-        assert!(df > 2.0, "Student-t df must be > 2 for finite variance");
+        assert!(
+            df.is_finite() && df > 2.0,
+            "Student-t df must be > 2 and finite for finite variance"
+        );
         let order = DEFAULT_QUADRATURE_ORDER;
         Self {
             degrees_of_freedom: df,
@@ -177,15 +169,23 @@ impl StudentTCopula {
     /// Create with custom quadrature order for higher precision.
     ///
     /// # Arguments
-    /// * `df` - Degrees of freedom (must be > 2)
-    /// * `order` - Requested quadrature order for the inner Gaussian integration
+    /// * `df` - Finite degrees of freedom, strictly greater than 2.
+    /// * `order` - Requested quadrature order for the inner Gaussian integration;
+    ///   the Gamma mixing rule uses this order bounded to 10 through 64 points.
     ///
     /// # Returns
     ///
     /// A Student-t copula using the requested quadrature order.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `df` is not finite or is at most 2.
     #[must_use]
     pub fn with_quadrature_order(df: f64, order: u8) -> Self {
-        assert!(df > 2.0, "Student-t df must be > 2");
+        assert!(
+            df.is_finite() && df > 2.0,
+            "Student-t df must be > 2 and finite"
+        );
         Self {
             degrees_of_freedom: df,
             quadrature_order: order,
@@ -204,11 +204,6 @@ impl StudentTCopula {
         self.degrees_of_freedom
     }
 
-    /// Smooth correlation to avoid numerical issues.
-    fn smooth_correlation(&self, correlation: f64) -> f64 {
-        correlation.clamp(MIN_CORRELATION, MAX_CORRELATION)
-    }
-
     /// Compute quadrature for W ~ Gamma(ν/2, ν/2) integration.
     ///
     /// W = χ²(ν)/ν has a Gamma(ν/2, 2/ν) distribution (shape=ν/2, scale=2/ν).
@@ -218,90 +213,40 @@ impl StudentTCopula {
     /// Using the substitution u = νw/2 (so w = 2u/ν, dw = 2/ν du):
     /// ∫ g(w) f(w) dw = ∫ g(2u/ν) · u^{ν/2-1} · exp(-u) / Γ(ν/2) du
     ///
-    /// Standard Gauss-Laguerre (α=0) integrates ∫ h(u) exp(-u) du, so each
-    /// weight must include the u^{ν/2-1} / Γ(ν/2) correction.
-    ///
-    /// Nodes and weights are computed at runtime via the Golub-Welsch
-    /// algorithm ([`GaussLaguerreQuadrature`]); a caller requesting
-    /// `with_quadrature_order(n)` receives an `n`-node rule up to
-    /// [`MAX_LAGUERRE_ORDER`]. The earlier hardcoded 10-node table
-    /// under-resolved tail integrals for heavy-tailed Student-t
-    /// copulas with ν ≤ 5.
+    /// Generalized Laguerre polynomials absorb the full Gamma weight. Their
+    /// Golub-Welsch Jacobi matrix is formed directly in `W = u / shape`
+    /// coordinates, keeping its entries finite even for very large ν. Squared
+    /// first components of its orthonormal eigenvectors are probability weights:
+    /// no Gamma function, density reweighting, or node filtering is required.
     fn compute_gamma_quadrature(nu: f64, n: usize) -> Vec<(f64, f64)> {
         let effective_n = n.clamp(MIN_LAGUERRE_ORDER, MAX_LAGUERRE_ORDER);
-        // `new` only fails for n == 0; effective_n is clamped to
-        // [MIN_LAGUERRE_ORDER, MAX_LAGUERRE_ORDER] with MIN >= 1, so the
-        // fallback is unreachable. The `unwrap_or_else` form is required
-        // because `#![deny(clippy::expect_used)]` prohibits `.expect()`.
-        let laguerre =
-            GaussLaguerreQuadrature::new(effective_n).unwrap_or_else(|_| GaussLaguerreQuadrature {
-                points: Vec::new(),
-                weights: Vec::new(),
-            });
-
-        let alpha = nu / 2.0;
-        let ln_gamma_alpha = ln_gamma(alpha);
-
-        let mut nodes_weights: Vec<(f64, f64)> = laguerre
-            .points
-            .iter()
-            .zip(laguerre.weights.iter())
-            .filter_map(|(&node, &laguerre_weight)| {
-                if node < 1e-15 {
-                    return None;
-                }
-                // w = 2·node/ν  (transform from Laguerre variable u to Gamma variate w)
-                let w = 2.0 * node / nu;
-
-                // Weight correction: u^{α-1} / Γ(α)
-                // = exp((α-1)·ln(u) - ln_gamma(α))
-                let gamma_correction = ((alpha - 1.0) * node.ln() - ln_gamma_alpha).exp();
-                let weight = laguerre_weight * gamma_correction;
-
-                if weight < 1e-30 || !weight.is_finite() {
-                    return None;
-                }
-
-                Some((w, weight))
-            })
-            .collect();
-
-        // Renormalize weights to sum to 1 after filtering.
-        //
-        // The Gamma(α, 2/ν) density integrates to 1 by construction; the
-        // filter above discards nodes where the Gauss-Laguerre node is below
-        // machine precision (effectively never for n ≥ 10) or where the
-        // combined weight underflows below 1e-30.  For the default 20-node
-        // rule at ν ≥ 4 (α ≥ 2) the gamma correction `node^(α−1)` is always
-        // `node` or larger, so all nodes survive and `total_weight` is ≈ 1
-        // before renormalization — the division is a near-identity.
-        //
-        // NOTE (W-50 audit): redistributing the tiny filtered mass onto the
-        // retained nodes (rather than discarding it) is conceptually wrong for
-        // strict Frobenius-nearest integration.  However, empirical testing
-        // shows the resulting bias between the 20-node default and the 64-node
-        // reference is < 5 bp at ν = 4 (see `gamma_quadrature_bias_within_5bp_at_nu_4`),
-        // so the renormalization is retained as a numerical guard against the
-        // pathological case where weights genuinely underflow.
-        let total_weight: f64 = nodes_weights.iter().map(|(_, w)| *w).sum();
-        if total_weight > 0.0 && total_weight.is_finite() {
-            for (_, w) in nodes_weights.iter_mut() {
-                *w /= total_weight;
+        let shape = nu / 2.0;
+        let mut jacobi = DMatrix::<f64>::zeros(effective_n, effective_n);
+        for k in 0..effective_n {
+            let k_float = k as f64;
+            jacobi[(k, k)] = 1.0 + 2.0 * k_float / shape;
+            if k > 0 {
+                let off_diagonal = ((k_float / shape) * (1.0 + (k_float - 1.0) / shape)).sqrt();
+                jacobi[(k, k - 1)] = off_diagonal;
+                jacobi[(k - 1, k)] = off_diagonal;
             }
         }
+        let eigen = SymmetricEigen::new(jacobi);
+        let mut nodes_weights: Vec<_> = (0..effective_n)
+            .map(|index| {
+                let first_component = eigen.eigenvectors[(0, index)];
+                (eigen.eigenvalues[index], first_component * first_component)
+            })
+            .collect();
+        nodes_weights.sort_unstable_by(|a, b| a.0.total_cmp(&b.0));
         nodes_weights
     }
 }
 
 /// Floor on the Student-t copula's Gauss-Laguerre outer-integration order.
 ///
-/// Matches the legacy hardcoded table width so existing callers that
-/// construct the copula at `DEFAULT_QUADRATURE_ORDER` continue to see at
-/// least 10 Laguerre nodes. Raising the floor would be a non-trivial
-/// numerical change — the tail integrand's effective polynomial degree
-/// grows with `ν`, so callers that want finer resolution should opt in via
-/// [`StudentTCopula::with_quadrature_order`] and benchmark their
-/// workload rather than raising the floor globally.
+/// At least ten nodes resolve the mixing distribution for low-degree rules;
+/// callers can increase the order to check nonlinear loss-integral convergence.
 const MIN_LAGUERRE_ORDER: usize = 10;
 
 /// Upper bound on the Gauss-Laguerre order accepted by the Student-t
@@ -360,27 +305,25 @@ impl Copula for StudentTCopula {
         };
         let m = *m;
         let nu = self.degrees_of_freedom;
-
-        if correlation <= MIN_CORRELATION {
-            return t_cdf_or_nan(default_threshold, nu);
+        if !correlation.is_finite() || !(0.0..=1.0).contains(&correlation) {
+            return f64::NAN;
+        }
+        if correlation >= 1.0 {
+            return f64::from(m <= default_threshold);
         }
 
-        // General formula with smoothing and argument clipping. We deliberately
-        // do NOT short-circuit ρ ≈ 1 with `t_{ν+1}((c − m) · √((ν+1)/(ν+m²)))`:
-        // that variant drops the essential 1/√(1−ρ) Cholesky factor and
-        // produces a smoothed CDF where the true ρ → 1 limit is an indicator
-        // 1{m ≤ c}. The smoothing clamp (0.99) combined with CDF_CLIP gives a
-        // stable, physically correct near-indicator limit.
-        let rho = self.smooth_correlation(correlation);
-
-        let sqrt_rho = rho.sqrt();
-        let sqrt_1mr = (1.0 - rho).sqrt();
+        let sqrt_rho = correlation.sqrt();
+        let sqrt_1mr = (1.0 - correlation).sqrt();
 
         // Standard multivariate t-copula conditional (Demarta & McNeil 2005):
         // P(default | M=m) = t_{ν+1}( (c - √ρ·m)/√(1-ρ) · √((ν+1)/(ν+m²)) )
-        let base_arg = (default_threshold - sqrt_rho * m) / sqrt_1mr;
-        let scaling = ((nu + 1.0) / (nu + m * m)).sqrt();
-        let conditional_threshold = (base_arg * scaling).clamp(-CDF_CLIP, CDF_CLIP);
+        // Even at rho = 0, observing M changes the shared scale-mixture
+        // distribution. Zero linear correlation does not imply independence.
+        // Scale before subtracting so large finite M cannot overflow M² or
+        // produce the indeterminate product infinity * zero.
+        let conditional_scale = nu.sqrt().hypot(m);
+        let conditional_threshold = ((nu + 1.0).sqrt() / sqrt_1mr)
+            * (default_threshold / conditional_scale - sqrt_rho * (m / conditional_scale));
 
         t_cdf_or_nan(conditional_threshold, nu + 1.0)
     }
@@ -405,22 +348,27 @@ impl Copula for StudentTCopula {
         // explicit shared W. Feeding Z into the M-slot is a distribution and
         // a sigma-algebra mismatch — it biases the pool default rate low.
         let z = systematic;
-        let w = mixing.max(1e-12);
+        if !mixing.is_finite()
+            || mixing <= 0.0
+            || !correlation.is_finite()
+            || !(0.0..=1.0).contains(&correlation)
+        {
+            return f64::NAN;
+        }
+        let w = mixing;
 
-        if correlation <= MIN_CORRELATION {
+        if correlation == 0.0 {
             // No systematic channel: Aᵢ = εᵢ/√W, so default ⟺ εᵢ ≤ c·√W.
-            return norm_cdf((default_threshold * w.sqrt()).clamp(-CDF_CLIP, CDF_CLIP));
+            return norm_cdf(default_threshold * w.sqrt());
+        }
+        if correlation >= 1.0 {
+            return f64::from(z / w.sqrt() <= default_threshold);
         }
 
-        // Smoothing clamp mirrors `conditional_default_prob`: at ρ → 1 the
-        // 1/√(1−ρ) factor plus CDF_CLIP yields the correct indicator limit
-        // 1{√ρ·Z ≤ c·√W}.
-        let rho = self.smooth_correlation(correlation);
-        let sqrt_rho = rho.sqrt();
-        let sqrt_1mr = (1.0 - rho).sqrt();
+        let sqrt_rho = correlation.sqrt();
+        let sqrt_1mr = (1.0 - correlation).sqrt();
 
-        let conditional_threshold =
-            ((default_threshold * w.sqrt() - sqrt_rho * z) / sqrt_1mr).clamp(-CDF_CLIP, CDF_CLIP);
+        let conditional_threshold = (default_threshold * w.sqrt() - sqrt_rho * z) / sqrt_1mr;
 
         norm_cdf(conditional_threshold)
     }
@@ -430,8 +378,8 @@ impl Copula for StudentTCopula {
         //
         // E[g(Z, W)] = E_W[ E_Z[ g(Z, W) | W ] ]
         //
-        // Outer: over W ~ Gamma(ν/2, ν/2) using Gauss-Laguerre with the
-        // Gamma density correction; inner: over Z ~ N(0,1) using
+        // Outer: over W ~ Gamma(ν/2, ν/2) using its normalized generalized
+        // Laguerre rule; inner: over Z ~ N(0,1) using
         // Gauss-Hermite. The integrand receives the raw pair `[z, w]` —
         // NOT the collapsed t-variate `m = z/√w` — so pool-loss engines
         // impose conditional independence in the correct (Z, W)
@@ -485,19 +433,20 @@ impl Copula for StudentTCopula {
         }
     }
 
-    fn sample_mixing(&self, u01: f64) -> f64 {
+    fn sample_mixing(&self, u01: f64) -> finstack_quant_core::Result<f64> {
         // Variance-mixture representation of the multivariate t-copula:
         // every name shares W = χ²(ν)/ν. Inverse-CDF sampling from a single
         // uniform keeps the draw deterministic and order-stable (no rejection
         // loop), which is required for bit-identical serial/parallel results.
-        let p = u01.clamp(1e-12, 1.0 - 1e-12);
+        super::validate_mixing_uniform(u01)?;
         let nu = self.degrees_of_freedom;
-        // chi_squared_quantile only fails for p ∉ [0,1) or df ≤ 0; both are
-        // excluded by the clamp and the ν > 2 invariant, so the fallback is
-        // unreachable. The `unwrap_or` form satisfies `clippy::expect_used`.
-        let chi2 = chi_squared_quantile(p, nu).unwrap_or(nu);
-        // Guard against a degenerate W ≈ 0 (would blow up M = Z/√W).
-        (chi2 / nu).max(1e-12)
+        let mixing = chi_squared_quantile(u01, nu)? / nu;
+        if !mixing.is_finite() || mixing <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Student-t mixing transform must produce a finite positive value, got {mixing}"
+            )));
+        }
+        Ok(mixing)
     }
 
     fn latent_variable(
@@ -513,9 +462,16 @@ impl Copula for StudentTCopula {
         // The shared mixing W (drawn once per period via `sample_mixing`)
         // induces tail dependence: a small W makes every name's |Aᵢ| large
         // simultaneously. Default occurs when Aᵢ ≤ t_ν⁻¹(PD).
-        let rho = correlation.clamp(0.0, 1.0);
-        let w = mixing.max(1e-12);
-        let gaussian_part = rho.sqrt() * systematic + (1.0 - rho).sqrt() * idiosyncratic;
+        if !mixing.is_finite()
+            || mixing <= 0.0
+            || !correlation.is_finite()
+            || !(0.0..=1.0).contains(&correlation)
+        {
+            return f64::NAN;
+        }
+        let w = mixing;
+        let gaussian_part =
+            correlation.sqrt() * systematic + (1.0 - correlation).sqrt() * idiosyncratic;
         gaussian_part / w.sqrt()
     }
 
@@ -530,7 +486,10 @@ impl Copula for StudentTCopula {
     }
 
     fn tail_dependence(&self, correlation: f64) -> f64 {
-        let rho = self.smooth_correlation(correlation);
+        if !correlation.is_finite() || !(0.0..=1.0).contains(&correlation) {
+            return f64::NAN;
+        }
+        let rho = correlation;
         let nu = self.degrees_of_freedom;
 
         // λ_L = 2 · t_{ν+1}(-√((ν+1)(1-ρ)/(1+ρ)))
@@ -543,6 +502,36 @@ impl Copula for StudentTCopula {
 mod tests {
     use super::*;
     use finstack_quant_core::math::standard_normal_inv_cdf;
+
+    #[test]
+    fn mixing_lower_tail_is_positive_and_inversion_failures_propagate() {
+        let mut copula = StudentTCopula::new(2.00001);
+        for u in [1e-15, 1e-12, 1e-6, 0.5, 1.0 - 1e-12] {
+            let mixing = copula.sample_mixing(u).expect("resolvable mixing tail");
+            assert!(mixing.is_finite() && mixing > 0.0);
+        }
+        assert!(copula.sample_mixing(1e-15).expect("lower tail") < 1e-12);
+
+        // Exercise the numerical-transform failure itself, separately from
+        // uniform validation: this must not substitute the mean W=1.
+        for unsupported in [f64::INFINITY, 1e8 + 1.0] {
+            copula.degrees_of_freedom = unsupported;
+            assert!(copula.sample_mixing(0.5).is_err());
+        }
+    }
+
+    #[test]
+    fn latent_and_conditional_mixing_preserve_small_values_and_reject_invalid_values() {
+        let copula = StudentTCopula::new(5.0);
+        let latent = copula.latent_variable(0.0, 1.0, 1e-20, 0.0);
+        assert!((latent / 1e10 - 1.0).abs() < 1e-12);
+        for mixing in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            assert!(copula.latent_variable(0.0, 1.0, mixing, 0.3).is_nan());
+            assert!(copula
+                .conditional_default_prob_given_systematic_and_mixing(0.0, 0.0, mixing, 0.3)
+                .is_nan());
+        }
+    }
 
     #[test]
     fn test_student_t_creation() {
@@ -630,8 +619,7 @@ mod tests {
     fn test_conditional_prob_uses_nu_plus_one_scaling() {
         // Verify the conditional formula from Demarta & McNeil (2005):
         //   P(default | M=m) = t_{ν+1}((c − √ρ·m)/√(1−ρ) · √((ν+1)/(ν+m²)))
-        // Use a moderate ρ so the smoothing clamp is not engaged and the
-        // closed-form expectation matches exactly.
+        // Every interior correlation uses the same exact conditional formula.
         let copula = StudentTCopula::new(5.0);
         let nu: f64 = 5.0;
         let rho: f64 = 0.30;
@@ -795,7 +783,7 @@ mod tests {
 
     #[test]
     fn test_gamma_quadrature_properties() {
-        for df in [4.0, 5.0, 10.0, 20.0] {
+        for df in [2.01, 4.0, 5.0, 10.0, 20.0, 200.0, 500.0, 1000.0, 1e8] {
             let copula = StudentTCopula::new(df);
             let points = &copula.gamma_quadrature;
 
@@ -810,7 +798,7 @@ mod tests {
 
             let weight_sum: f64 = points.iter().map(|&(_, w)| w).sum();
             assert!(
-                (weight_sum - 1.0).abs() < 0.05,
+                (weight_sum - 1.0).abs() < 1e-12,
                 "Gamma({}/2) weights sum to {}, expected ~1.0",
                 df,
                 weight_sum
@@ -821,7 +809,84 @@ mod tests {
                 "Expected at least 3 quadrature points, got {}",
                 points.len()
             );
+
+            let mean: f64 = points.iter().map(|&(w, weight)| w * weight).sum();
+            let second_moment: f64 = points.iter().map(|&(w, weight)| w * w * weight).sum();
+            assert!((mean - 1.0).abs() < 1e-12, "df={df}: E[W]={mean}");
+            assert!(
+                (second_moment - (1.0 + 2.0 / df)).abs() < 1e-12,
+                "df={df}: E[W²]={second_moment}"
+            );
         }
+    }
+
+    #[test]
+    fn high_df_quadrature_converges_to_gaussian_default_and_joint_probabilities() {
+        use crate::correlation::GaussianCopula;
+
+        let gaussian = GaussianCopula::new();
+        let rho = 0.30;
+        let pd = 0.05;
+        let threshold = standard_normal_inv_cdf(pd);
+        let gaussian_joint = gaussian.integrate_fn(&|factors| {
+            gaussian
+                .conditional_default_prob(threshold, factors, rho)
+                .powi(2)
+        });
+        for df in [200.0, 500.0, 1000.0, 10_000.0] {
+            let copula = StudentTCopula::new(df);
+            let threshold = student_t_inv_cdf(pd, df).expect("valid Student-t inputs");
+            let marginal = copula
+                .integrate_fn(&|factors| copula.conditional_default_prob(threshold, factors, rho));
+            let joint = copula.integrate_fn(&|factors| {
+                copula
+                    .conditional_default_prob(threshold, factors, rho)
+                    .powi(2)
+            });
+            assert!((marginal - pd).abs() < 1e-6, "df={df}: PD={marginal}");
+            assert!(
+                (joint - gaussian_joint).abs() < 5e-4,
+                "df={df}: joint={joint}, Gaussian={gaussian_joint}"
+            );
+            let pair = copula
+                .try_integrate_pair(&|factors| Ok((1.0, factors[1])))
+                .expect("finite Gamma moments");
+            assert!((pair.0 - 1.0).abs() < 1e-12);
+            assert!((pair.1 - 1.0).abs() < 1e-12);
+        }
+    }
+
+    #[test]
+    fn conditional_and_latent_kernels_preserve_every_correlation() {
+        let copula = StudentTCopula::new(5.0);
+        for rho in [0.0_f64, 0.001, 0.01, 0.010_001, 0.3, 0.99, 0.999_999, 1.0] {
+            for (threshold, z, mixing) in [(0.0_f64, 3.0_f64, 1.0_f64), (-0.7, -0.5, 0.4)] {
+                let expected = if rho == 1.0 {
+                    f64::from(z / mixing.sqrt() <= threshold)
+                } else {
+                    norm_cdf((threshold * mixing.sqrt() - rho.sqrt() * z) / (1.0 - rho).sqrt())
+                };
+                let actual = copula
+                    .conditional_default_prob_checked(threshold, &[z, mixing], rho)
+                    .expect("valid conditional inputs");
+                assert!((actual - expected).abs() < 1e-14, "rho={rho}");
+                if rho < 1.0 {
+                    let epsilon_at_barrier =
+                        (threshold * mixing.sqrt() - rho.sqrt() * z) / (1.0 - rho).sqrt();
+                    assert!(
+                        (copula.latent_variable(z, epsilon_at_barrier, mixing, rho) - threshold)
+                            .abs()
+                            < 1e-12
+                    );
+                }
+            }
+        }
+        assert_eq!(copula.tail_dependence(1.0), 1.0);
+        assert_eq!(copula.conditional_default_prob(0.0, &[0.05], 1.0), 0.0);
+        // At zero linear correlation, observing M still conditions shared W.
+        let expected =
+            student_t_cdf(-(6.0_f64 / 14.0).sqrt(), 6.0).expect("valid conditional t distribution");
+        assert!((copula.conditional_default_prob(-1.0, &[3.0], 0.0) - expected).abs() < 1e-14);
     }
 
     /// Requesting `with_quadrature_order(n)` with `n > 10` must
@@ -833,20 +898,15 @@ mod tests {
         let copula10 = StudentTCopula::with_quadrature_order(df, 10);
         let copula30 = StudentTCopula::with_quadrature_order(df, 30);
 
-        // The final vec is filtered for numerically-zero weights, so
-        // exact equality isn't safe — but 30-node must still yield more
-        // retained points than 10-node.
         let n10 = copula10.gamma_quadrature.len();
         let n30 = copula30.gamma_quadrature.len();
-        assert!(
-            n30 > n10,
-            "higher order must produce more gamma-quadrature points: got n30={n30}, n10={n10}"
-        );
+        assert_eq!(n10, 10);
+        assert_eq!(n30, 30);
         // Both must still integrate the constant 1 to approximately 1.
         for copula in [&copula10, &copula30] {
             let sum: f64 = copula.gamma_quadrature.iter().map(|(_, w)| w).sum();
             assert!(
-                (sum - 1.0).abs() < 0.05,
+                (sum - 1.0).abs() < 1e-12,
                 "n={}: Σ w_i = {sum}, expected ~1",
                 copula.gamma_quadrature.len()
             );
@@ -916,7 +976,9 @@ mod tests {
         let trials = 2_000_000usize;
         let mut joint = 0usize;
         for _ in 0..trials {
-            let w = copula.sample_mixing(rng.next_u01());
+            let w = copula
+                .sample_mixing(rng.next_u01())
+                .expect("valid mixing draw");
             let z = rng.next_std_normal();
             let a1 = copula.latent_variable(z, rng.next_std_normal(), w, rho);
             let a2 = copula.latent_variable(z, rng.next_std_normal(), w, rho);
@@ -956,7 +1018,9 @@ mod tests {
         let names = 64usize;
         let mut defaults = 0usize;
         for _ in 0..periods {
-            let w = copula.sample_mixing(rng.next_u01());
+            let w = copula
+                .sample_mixing(rng.next_u01())
+                .expect("valid mixing draw");
             let z = rng.next_std_normal();
             for _ in 0..names {
                 let eps = rng.next_std_normal();
@@ -1000,19 +1064,7 @@ mod tests {
         );
     }
 
-    /// W-50: Verify that the Gamma-quadrature renormalization after filtering
-    /// does not bias the senior-tranche conditional-PD integral by more than
-    /// 5 bp (0.0005) at ν = 4 (the heaviest-tail case where dropped nodes
-    /// matter most).
-    ///
-    /// The reference is a 64-node rule (MAX_LAGUERRE_ORDER); the test copula
-    /// uses the default 20-node rule.  If the renormalization were massively
-    /// redistributing mass from dropped nodes, the two results would differ by
-    /// more than the tolerance.
-    ///
-    /// This test is deliberately strict (5 bp instead of the existing 50 bp
-    /// self-consistency tolerance) to expose any regression if the filtering
-    /// threshold or MIN_LAGUERRE_ORDER are changed.
+    /// Compare default and high-order Gamma integration in a heavy-tail case.
     #[test]
     fn gamma_quadrature_bias_within_5bp_at_nu_4() {
         let nu = 4.0;
@@ -1020,7 +1072,7 @@ mod tests {
         let threshold = student_t_inv_cdf(pd, nu).expect("valid Student-t inputs");
         let correlation = 0.30;
 
-        // Default-order copula (20 Laguerre nodes, clamped to MIN_LAGUERRE_ORDER=10).
+        // Default-order copula (20 generalized Laguerre nodes).
         let copula_default = StudentTCopula::new(nu);
 
         // High-order reference: 64-node rule (MAX_LAGUERRE_ORDER).
@@ -1048,7 +1100,7 @@ mod tests {
         assert!(
             bias < 0.0005,
             "ν={nu}: gamma-quadrature bias between 20-node and 64-node rules = {bias:.6} ({:.2} bp); \
-             expected < 5 bp — renormalization may be redistributing filtered-node mass",
+             expected < 5 bp",
             bias * 10_000.0
         );
     }

@@ -116,6 +116,7 @@ fn clo(tests: Vec<CoverageTestSpec>) -> (StructuredCredit, Date) {
         maturity,
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse")
     .with_coverage_triggers(tests)
     .expect("coverage tests");

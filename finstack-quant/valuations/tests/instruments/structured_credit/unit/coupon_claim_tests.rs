@@ -91,6 +91,7 @@ fn starved_abs(tranches: TrancheStructure) -> StructuredCredit {
     ));
     let mut deal =
         StructuredCredit::new_abs("ABS-CLAIMS", pool, tranches, close(), maturity(), "USD-OIS")
+            .expect("valid structured-credit dates")
             .with_calendar_id("nyse");
     deal.fees = None;
     deal.principal_covers_senior_interest = Some(true);
@@ -172,7 +173,8 @@ fn new_clo_mezzanine_defers_while_the_senior_claim_is_non_deferrable() {
         close(),
         maturity(),
         "USD-OIS",
-    );
+    )
+    .expect("valid structured-credit dates");
     let pik: Vec<(&str, bool)> = clo
         .tranches
         .tranches

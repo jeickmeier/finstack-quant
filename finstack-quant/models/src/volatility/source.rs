@@ -6,7 +6,8 @@ use finstack_quant_core::{
     error::InputError,
     market_data::context::MarketContext,
     market_data::surfaces::{
-        FxDeltaVolSurface, VolCube, VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+        FxDeltaVolSurface, VolCube, VolCubeExpirySlice, VolInterpolationMode, VolQuoteType,
+        VolSurface, VolSurfaceAxis,
     },
     types::CurveId,
     Error, Result,
@@ -23,6 +24,8 @@ pub enum VolSource {
     Surface(Arc<VolSurface>),
     /// SABR parameter and forward nodes on an expiry-tenor grid.
     Cube(Arc<VolCube>),
+    /// Tenor-by-strike quotes at one fixed option expiry.
+    CubeExpirySlice(Arc<VolCubeExpirySlice>),
     /// FX ATM/risk-reversal/butterfly quotes in forward-delta space.
     FxDelta(Arc<FxDeltaVolSurface>),
 }
@@ -50,10 +53,18 @@ impl VolSource {
             ));
         }
         Ok(match self {
-            Self::Surface(surface) => match surface.quote_type() {
-                VolQuoteType::Normal => VolatilityConvention::Normal,
-                VolQuoteType::BlackLognormal => VolatilityConvention::Lognormal,
-            },
+            Self::Surface(surface) => grid_convention(
+                surface.quote_type(),
+                surface.get_displacements(),
+                surface.expiries(),
+                expiry,
+            )?,
+            Self::CubeExpirySlice(slice) => grid_convention(
+                slice.get_quote_type(),
+                slice.get_displacements(),
+                slice.get_tenors(),
+                tenor,
+            )?,
             Self::Cube(cube) => {
                 let (params, _, _) = cube_params(cube, expiry, tenor);
                 if SabrModel::new(params.clone()).vol_type() == SabrVolType::Normal {
@@ -73,6 +84,9 @@ impl VolSource {
     /// For an FX-delta source, `tenor` carries the positive FX forward because
     /// that artifact has no tenor axis. Surface sources select `tenor` or
     /// `strike` according to their stored secondary-axis metadata.
+    /// Shifted-Black sources retain their displaced quote; callers must use
+    /// [`Self::get_convention`] and apply its displacement to both forward and
+    /// strike when pricing. The returned number is not converted to unshifted Black.
     ///
     /// # Arguments
     ///
@@ -88,12 +102,17 @@ impl VolSource {
     pub fn get_vol(&self, expiry: f64, tenor: f64, strike: f64) -> Result<f64> {
         match self {
             Self::Surface(surface) => {
-                surface.require_quote_type(VolQuoteType::BlackLognormal)?;
+                require_black_quotes(surface.quote_type())?;
                 let secondary = match surface.secondary_axis() {
                     VolSurfaceAxis::Strike => strike,
                     VolSurfaceAxis::Tenor => tenor,
                 };
                 get_surface_vol(surface, expiry, secondary)
+            }
+            Self::CubeExpirySlice(slice) => {
+                segment(&[slice.get_expiry()], expiry)?;
+                require_black_quotes(slice.get_quote_type())?;
+                get_cube_expiry_slice_vol(slice, tenor, strike)
             }
             Self::Cube(cube) => {
                 if self.get_convention(expiry, tenor)? == VolatilityConvention::Normal {
@@ -147,6 +166,15 @@ impl VolSource {
                 get_surface_vol(surface, expiry, secondary)
             }
             Self::Cube(cube) => get_cube_normal_vol(cube, expiry, tenor, strike),
+            Self::CubeExpirySlice(slice) => {
+                segment(&[slice.get_expiry()], expiry)?;
+                if slice.get_quote_type() != VolQuoteType::Normal {
+                    return Err(Error::Validation(
+                        "slice does not contain normal volatility quotes".into(),
+                    ));
+                }
+                get_cube_expiry_slice_vol(slice, tenor, strike)
+            }
             Self::FxDelta(_) => Err(Error::Validation(
                 "FX delta volatility sources store Black/lognormal quotes".to_owned(),
             )),
@@ -190,6 +218,11 @@ impl VolSource {
                 clamp(cube.tenors(), tenor),
                 strike,
             ),
+            Self::CubeExpirySlice(slice) => (
+                slice.get_expiry(),
+                clamp(slice.get_tenors(), tenor),
+                clamp(slice.get_strikes(), strike),
+            ),
             Self::FxDelta(_) => (expiry, tenor, strike),
         })
     }
@@ -199,9 +232,41 @@ impl VolSource {
         match self {
             Self::Surface(surface) => surface.id(),
             Self::Cube(cube) => cube.id(),
+            Self::CubeExpirySlice(slice) => slice.get_id(),
             Self::FxDelta(surface) => surface.id(),
         }
     }
+}
+
+fn require_black_quotes(quote_type: VolQuoteType) -> Result<()> {
+    if quote_type == VolQuoteType::Normal {
+        Err(Error::Validation(
+            "normal volatility quotes cannot supply a Black volatility".into(),
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+fn grid_convention(
+    quote_type: VolQuoteType,
+    shifts: Option<&[f64]>,
+    axis: &[f64],
+    coordinate: f64,
+) -> Result<VolatilityConvention> {
+    Ok(match quote_type {
+        VolQuoteType::Normal => VolatilityConvention::Normal,
+        VolQuoteType::BlackLognormal => VolatilityConvention::Lognormal,
+        VolQuoteType::ShiftedBlackLognormal => {
+            let shifts = shifts.ok_or_else(|| {
+                Error::Validation("shifted Black quotes are missing displacement metadata".into())
+            })?;
+            let (lo, hi, weight) = segment(axis, coordinate.clamp(axis[0], axis[axis.len() - 1]))?;
+            VolatilityConvention::ShiftedLognormal {
+                shift: (1.0 - weight) * shifts[lo] + weight * shifts[hi],
+            }
+        }
+    })
 }
 
 fn segment(axis: &[f64], value: f64) -> Result<(usize, usize, f64)> {
@@ -282,8 +347,10 @@ pub fn get_surface_vol_clamped(surface: &VolSurface, expiry: f64, strike: f64) -
 
 /// Evaluate a surface with SVI wing extrapolation.
 ///
-/// Expiry is clamped to the nearest stored pillar. Out-of-grid Black strikes
-/// are evaluated from an SVI fit to the nearest expiry row. Normal-volatility
+/// Expiry is clamped to the stored axis. Out-of-grid Black strikes
+/// are evaluated from SVI fits to the bracketing expiry rows, using the same
+/// expiry interpolation as the observed grid. Each wing is joined to its
+/// observed boundary in total variance. Normal-volatility
 /// strikes use flat-wing extrapolation because SVI is a lognormal convention.
 /// SVI fitting failures are returned and never replaced by a flat Black wing.
 ///
@@ -292,7 +359,7 @@ pub fn get_surface_vol_clamped(surface: &VolSurface, expiry: f64, strike: f64) -
 /// * `surface` - Structurally validated observed volatility grid.
 /// * `expiry` - Option expiry in years.
 /// * `strike` - Strike in the same units as `forward`.
-/// * `forward` - Positive forward used to form log-moneyness.
+/// * `forward` - Finite forward used to form log-moneyness; it and the strike must be positive after each bracketing row's displacement for Black wing evaluation.
 ///
 /// # Errors
 ///
@@ -304,7 +371,7 @@ pub fn get_surface_vol_extrapolated(
     strike: f64,
     forward: f64,
 ) -> Result<f64> {
-    if !expiry.is_finite() || !strike.is_finite() || !forward.is_finite() || forward <= 0.0 {
+    if !expiry.is_finite() || !strike.is_finite() || !forward.is_finite() {
         return Err(InputError::Invalid.into());
     }
     if let Ok(vol) = get_surface_vol(surface, expiry, strike) {
@@ -326,18 +393,60 @@ pub fn get_surface_vol_extrapolated(
             surface.id()
         )));
     }
-    let row = surface
-        .expiries()
-        .iter()
-        .enumerate()
-        .min_by(|(_, left), (_, right)| (*left - expiry).abs().total_cmp(&(*right - expiry).abs()))
-        .map_or(0, |(index, _)| index);
-    let columns = surface.strikes().len();
-    let start = row * columns;
-    let vols = &surface.vols()[start..start + columns];
-    let model_expiry = surface.expiries()[row];
-    let params = super::svi::calibrate_svi(surface.strikes(), vols, forward, model_expiry)?;
-    params.implied_vol((strike / forward).ln(), model_expiry)
+    surface.require_secondary_axis(VolSurfaceAxis::Strike)?;
+    let (e0, e1, weight) = segment(surface.expiries(), expiry)?;
+    let wing_vol = |row: usize| -> Result<f64> {
+        let columns = surface.strikes().len();
+        let start = row * columns;
+        let vols = &surface.vols()[start..start + columns];
+        let model_expiry = surface.expiries()[row];
+        let shift = match grid_convention(
+            surface.quote_type(),
+            surface.get_displacements(),
+            surface.expiries(),
+            model_expiry,
+        )? {
+            VolatilityConvention::ShiftedLognormal { shift } => shift,
+            _ => 0.0,
+        };
+        let effective_forward = forward + shift;
+        let effective_strike = strike + shift;
+        if effective_forward <= 0.0 || effective_strike <= 0.0 {
+            return Err(InputError::NonPositiveValue.into());
+        }
+        let shifted_strikes: Vec<f64> = surface.strikes().iter().map(|k| k + shift).collect();
+        let params =
+            super::svi::calibrate_svi(&shifted_strikes, vols, effective_forward, model_expiry)?;
+        let edge = if strike < surface.strikes()[0] {
+            0
+        } else {
+            columns - 1
+        };
+        let edge_k = (shifted_strikes[edge] / effective_forward).ln();
+        let variance = params.total_variance((effective_strike / effective_forward).ln())
+            - params.total_variance(edge_k)
+            + model_expiry * vols[edge].powi(2);
+        if !variance.is_finite() || variance < 0.0 {
+            return Err(Error::Validation(
+                "SVI wing produced invalid anchored total variance".into(),
+            ));
+        }
+        Ok((variance / model_expiry).sqrt())
+    };
+    let v0 = wing_vol(e0)?;
+    if e0 == e1 {
+        return Ok(v0);
+    }
+    let v1 = wing_vol(e1)?;
+    match surface.interpolation_mode() {
+        VolInterpolationMode::Vol => Ok((1.0 - weight) * v0 + weight * v1),
+        VolInterpolationMode::TotalVariance => {
+            Ok((((1.0 - weight) * surface.expiries()[e0] * v0 * v0
+                + weight * surface.expiries()[e1] * v1 * v1)
+                / expiry)
+                .sqrt())
+        }
+    }
 }
 
 /// Measure an implied-volatility surface move in percentage points.
@@ -452,14 +561,21 @@ fn cube_params(cube: &VolCube, expiry: f64, tenor: f64) -> (SabrParameters, f64,
         if u <= 0.5 { n0 } else { n1 },
     );
     let nearest_params = &cube.params()[nearest];
-    let shift = match (p00.shift, p10.shift, p01.shift, p11.shift) {
-        (Some(q00), Some(q10), Some(q01), Some(q11)) => Some(bilinear(q00, q10, q01, q11, t, u)),
-        _ => nearest_params.shift,
-    };
+    let shifts = [p00.shift, p10.shift, p01.shift, p11.shift];
+    let shift = shifts.iter().any(Option::is_some).then(|| {
+        bilinear(
+            p00.shift.unwrap_or(0.0),
+            p10.shift.unwrap_or(0.0),
+            p01.shift.unwrap_or(0.0),
+            p11.shift.unwrap_or(0.0),
+            t,
+            u,
+        )
+    });
     let params = SabrParameters {
         alpha: bilinear(p00.alpha, p10.alpha, p01.alpha, p11.alpha, t, u).max(1e-8),
         beta: nearest_params.beta.clamp(0.0, 1.0),
-        nu: bilinear(p00.nu, p10.nu, p01.nu, p11.nu, t, u).max(1e-8),
+        nu: bilinear(p00.nu, p10.nu, p01.nu, p11.nu, t, u),
         rho: bilinear(p00.rho, p10.rho, p01.rho, p11.rho, t, u).clamp(-0.9999, 0.9999),
         shift,
     };
@@ -653,13 +769,27 @@ fn materialize_cube_tenor_slice_with_convention(
     let surface = VolSurface::from_grid(cube.id().as_str(), cube.expiries(), strikes, &values)?
         .with_interpolation_mode(cube.interpolation_mode());
     Ok(if normal {
-        surface.with_quote_type(VolQuoteType::Normal)
+        surface.with_quote_type(VolQuoteType::Normal)?
     } else {
-        surface
+        let shifts: Vec<Option<f64>> = cube
+            .expiries()
+            .iter()
+            .map(|&expiry| cube_params(cube, expiry, tenor).0.shift)
+            .collect();
+        if shifts.iter().any(Option::is_some) {
+            surface.with_displacements(
+                &shifts
+                    .into_iter()
+                    .map(|shift| shift.unwrap_or(0.0))
+                    .collect::<Vec<_>>(),
+            )?
+        } else {
+            surface
+        }
     })
 }
 
-/// Materialize a lognormal cube expiry slice as a tenor-axis core surface.
+/// Materialize lognormal quotes on tenor and strike axes at one fixed expiry.
 ///
 /// # Arguments
 ///
@@ -675,11 +805,11 @@ pub fn materialize_cube_expiry_slice(
     cube: &VolCube,
     expiry: f64,
     strikes: &[f64],
-) -> Result<VolSurface> {
+) -> Result<VolCubeExpirySlice> {
     materialize_cube_expiry_slice_with_convention(cube, expiry, strikes, false)
 }
 
-/// Materialize a normal cube expiry slice as a tenor-axis core surface.
+/// Materialize normal quotes on tenor and strike axes at one fixed expiry.
 ///
 /// # Arguments
 ///
@@ -695,7 +825,7 @@ pub fn materialize_cube_expiry_slice_normal(
     cube: &VolCube,
     expiry: f64,
     strikes: &[f64],
-) -> Result<VolSurface> {
+) -> Result<VolCubeExpirySlice> {
     materialize_cube_expiry_slice_with_convention(cube, expiry, strikes, true)
 }
 
@@ -704,10 +834,14 @@ fn materialize_cube_expiry_slice_with_convention(
     expiry: f64,
     strikes: &[f64],
     normal: bool,
-) -> Result<VolSurface> {
+) -> Result<VolCubeExpirySlice> {
     if strikes.is_empty() || !expiry.is_finite() || strikes.iter().any(|value| !value.is_finite()) {
         return Err(InputError::Invalid.into());
     }
+    let expiry = expiry.clamp(
+        cube.expiries()[0],
+        cube.expiries()[cube.expiries().len() - 1],
+    );
     let mut values = Vec::with_capacity(cube.tenors().len() * strikes.len());
     for &tenor in cube.tenors() {
         for &strike in strikes {
@@ -718,13 +852,94 @@ fn materialize_cube_expiry_slice_with_convention(
             });
         }
     }
-    let surface = VolSurface::from_grid(cube.id().as_str(), cube.tenors(), strikes, &values)?
-        .with_secondary_axis(VolSurfaceAxis::Tenor);
-    Ok(if normal {
-        surface.with_quote_type(VolQuoteType::Normal)
+    let shifts: Vec<Option<f64>> = cube
+        .tenors()
+        .iter()
+        .map(|&tenor| cube_params(cube, expiry, tenor).0.shift)
+        .collect();
+    let displacements = (!normal && shifts.iter().any(Option::is_some)).then(|| {
+        shifts
+            .into_iter()
+            .map(|shift| shift.unwrap_or(0.0))
+            .collect::<Vec<_>>()
+    });
+    let quote_type = if normal {
+        VolQuoteType::Normal
+    } else if displacements.is_some() {
+        VolQuoteType::ShiftedBlackLognormal
     } else {
-        surface
-    })
+        VolQuoteType::BlackLognormal
+    };
+    VolCubeExpirySlice::from_grid(
+        cube.id().as_str(),
+        expiry,
+        cube.tenors(),
+        strikes,
+        &values,
+        quote_type,
+        displacements.as_deref(),
+    )
+}
+
+/// Interpolate fixed-expiry volatility over the slice's tenor and strike axes.
+///
+/// # Arguments
+///
+/// * `slice` - Structurally validated fixed-expiry quotes with explicit tenor and strike coordinates.
+/// * `tenor` - Finite underlying tenor in years within the stored axis.
+/// * `strike` - Finite strike in forward-price or rate units within the stored axis.
+///
+/// # Errors
+///
+/// Returns a validation error for non-finite or out-of-grid coordinates.
+pub fn get_cube_expiry_slice_vol(
+    slice: &VolCubeExpirySlice,
+    tenor: f64,
+    strike: f64,
+) -> Result<f64> {
+    let (t0, t1, t) = segment(slice.get_tenors(), tenor)?;
+    let (s0, s1, u) = segment(slice.get_strikes(), strike)?;
+    let cols = slice.get_strikes().len();
+    let values = slice.get_vols();
+    Ok(bilinear(
+        values[t0 * cols + s0],
+        values[t1 * cols + s0],
+        values[t0 * cols + s1],
+        values[t1 * cols + s1],
+        t,
+        u,
+    ))
+}
+
+/// Interpolate fixed-expiry quotes with flat tenor and strike extrapolation.
+///
+/// # Arguments
+///
+/// * `slice` - Validated fixed-expiry tenor-by-strike quote grid.
+/// * `tenor` - Underlying tenor in years; finite values are clamped to the stored axis.
+/// * `strike` - Strike in forward-price or rate units; finite values are clamped to the stored axis.
+///
+/// Non-finite coordinates return NaN.
+pub fn get_cube_expiry_slice_vol_clamped(
+    slice: &VolCubeExpirySlice,
+    tenor: f64,
+    strike: f64,
+) -> f64 {
+    if !tenor.is_finite() || !strike.is_finite() {
+        return f64::NAN;
+    }
+    get_cube_expiry_slice_vol(
+        slice,
+        tenor.clamp(
+            slice.get_tenors()[0],
+            slice.get_tenors()[slice.get_tenors().len() - 1],
+        ),
+        strike.clamp(
+            slice.get_strikes()[0],
+            slice.get_strikes()[slice.get_strikes().len() - 1],
+        ),
+    )
+    .unwrap_or(f64::NAN)
 }
 
 /// Materialize the full lognormal cube in expiry-tenor-strike order.
@@ -776,4 +991,45 @@ fn cube_total_variance(
         )));
     }
     Ok((total / expiry).sqrt())
+}
+
+#[cfg(test)]
+mod source_regressions {
+    use super::*;
+
+    #[test]
+    fn svi_wings_join_the_boundary_and_preserve_expiry_interpolation() {
+        let base = VolSurface::from_grid(
+            "WINGS",
+            &[1.0, 2.0],
+            &[80.0, 90.0, 100.0, 110.0, 120.0],
+            &[0.1, 0.1, 0.1, 0.1, 0.1, 0.3, 0.3, 0.3, 0.3, 0.3],
+        )
+        .unwrap();
+        for mode in [
+            VolInterpolationMode::Vol,
+            VolInterpolationMode::TotalVariance,
+        ] {
+            let surface = base.clone().with_interpolation_mode(mode);
+            for expiry in [1.0, 1.49, 1.5, 1.51, 2.0] {
+                for (edge, outside) in [(80.0, 80.0 - 1e-7), (120.0, 120.0 + 1e-7)] {
+                    let observed = get_surface_vol(&surface, expiry, edge).unwrap();
+                    let wing =
+                        get_surface_vol_extrapolated(&surface, expiry, outside, 100.0).unwrap();
+                    assert!(
+                        (wing - observed).abs() < 1e-7,
+                        "boundary mismatch for {mode:?}, T={expiry}: {observed} versus {wing}"
+                    );
+                }
+            }
+            let v0 = get_surface_vol_extrapolated(&surface, 1.0, 130.0, 100.0).unwrap();
+            let v1 = get_surface_vol_extrapolated(&surface, 2.0, 130.0, 100.0).unwrap();
+            let actual = get_surface_vol_extrapolated(&surface, 1.5, 130.0, 100.0).unwrap();
+            let expected = match mode {
+                VolInterpolationMode::Vol => 0.5 * (v0 + v1),
+                VolInterpolationMode::TotalVariance => ((0.5 * v0 * v0 + v1 * v1) / 1.5).sqrt(),
+            };
+            assert!((actual - expected).abs() < 1e-12);
+        }
+    }
 }

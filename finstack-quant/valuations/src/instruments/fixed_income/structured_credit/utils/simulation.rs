@@ -90,7 +90,7 @@ impl RecoveryQueue {
                     "recovery lag exceeds supported calendar range".into(),
                 )
             })?;
-            if orig_date.add_months(months) <= current_date {
+            if orig_date.add_months(months)? <= current_date {
                 if let Some((_, amount, par)) = self.pending.pop_front() {
                     released = released.checked_add(amount)?;
                     released_par = released_par.checked_add(par)?;

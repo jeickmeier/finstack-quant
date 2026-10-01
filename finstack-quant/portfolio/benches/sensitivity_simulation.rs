@@ -347,7 +347,7 @@ fn factor_stress_model() -> finstack_quant_portfolio::factor_model::FactorModel 
             pricing_mode: PricingMode::DeltaBased,
             risk_measure: RiskMeasure::Variance,
             bump_config: Some(BumpSizeConfig::default()),
-            unmatched_policy: Some(UnmatchedPolicy::Residual),
+            unmatched_policy: Some(UnmatchedPolicy::Warn),
         })
         .build()
         .expect("bench: factor model should build")

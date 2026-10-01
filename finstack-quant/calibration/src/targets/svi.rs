@@ -35,7 +35,7 @@ use crate::CalibrationReport;
 use finstack_quant_core::dates::{DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{VolInterpolationMode, VolSurface};
 use finstack_quant_core::Result;
 use std::collections::BTreeMap;
 
@@ -249,7 +249,8 @@ impl SviSurfaceTarget {
             &params.target_expiries,
             &params.target_strikes,
             &grid,
-        )?;
+        )?
+        .with_interpolation_mode(VolInterpolationMode::TotalVariance);
 
         let residuals = surface_quote_residuals(
             &surface,
@@ -267,10 +268,6 @@ impl SviSurfaceTarget {
             .collect::<Result<Vec<_>>>()?;
         let calendar_cfg = ValidationConfig {
             lenient_arbitrage: false,
-            ..ValidationConfig::default()
-        };
-        let butterfly_cfg = ValidationConfig {
-            lenient_arbitrage: true,
             ..ValidationConfig::default()
         };
         let calendar_arbitrage =
@@ -297,7 +294,7 @@ impl SviSurfaceTarget {
         }
 
         let butterfly_warning =
-            validate_butterfly_call_convexity(&surface, &butterfly_cfg, &target_forwards)
+            validate_butterfly_call_convexity(&surface, &calendar_cfg, &target_forwards)
                 .err()
                 .map(|e| format!("SVI butterfly-spread arbitrage: {e}"));
 

@@ -18,6 +18,9 @@ use crate::errors::{core_to_py, serde_json_to_py, statements_to_py, value_error}
 use finstack_quant_core::dates::{Period, PeriodId};
 use finstack_quant_core::money::fx::FxConversionPolicy;
 use finstack_quant_statements::builder::{MixedNodeBuilder, ModelBuilder};
+use finstack_quant_statements::capital_structure::{
+    BondConventionParams, SwapConventions, SwapParams,
+};
 use finstack_quant_statements::types::{AmountOrScalar, FinancialStatementInstrument, NodeId};
 use pyo3::prelude::*;
 
@@ -522,8 +525,8 @@ impl PyModelBuilder {
     /// Use this for timelines the range grammar cannot express (a fiscal
     /// calendar from ``core.dates.build_fiscal_periods``, or a hand-built
     /// list). The periods are kept in the given order; ``build()`` rejects
-    /// timelines that are not strictly increasing or whose actuals do not
-    /// form a prefix.
+    /// timelines that are not strictly increasing, whose intervals are empty
+    /// or overlapping, or whose actuals do not form a prefix. Gaps are allowed.
     ///
     /// Parameters
     /// ----------
@@ -680,8 +683,11 @@ impl PyModelBuilder {
     /// Raises
     /// ------
     /// ValueError
-    ///     If the frame has no columns, a column label is not a period id,
-    ///     a cell is not numeric, or the builder was consumed.
+    ///     If the frame has no columns, a column label is invalid or outside
+    ///     the model timeline, a node id is reserved, a cell is not numeric,
+    ///     or the builder was consumed. Column labels are checked even when
+    ///     all their cells are missing. Rejected input leaves the builder
+    ///     unchanged.
     #[pyo3(signature = (df, actuals_until=None, node_id_column=None), text_signature = "($self, df, actuals_until=None, node_id_column=None)")]
     fn from_dataframe<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -693,25 +699,28 @@ impl PyModelBuilder {
             Some(column) => df.call_method1("set_index", (column,))?,
             None => df.clone(),
         };
-        let columns: Vec<String> = frame
+        let columns: Vec<PeriodId> = frame
             .getattr("columns")?
             .try_iter()?
-            .map(|column| Ok(column?.str()?.to_string()))
+            .map(|column| super::parse_period_id(&column?.str()?.to_string()))
             .collect::<PyResult<Vec<_>>>()?;
-        let (Some(first), Some(last)) = (columns.first(), columns.last()) else {
-            return Err(value_error(
-                "from_dataframe requires at least one period column",
-            ));
-        };
-        if matches!(slf.inner, Some(BuilderState::NeedPeriods(_))) {
-            let range = format!("{first}..{last}");
-            slf = Self::periods(slf, &range, actuals_until)?;
+        let periods = match slf.inner.as_ref() {
+            Some(BuilderState::NeedPeriods(builder)) => {
+                builder.resolve_period_columns(&columns, actuals_until)
+            }
+            Some(BuilderState::Ready(builder)) => {
+                builder.resolve_period_columns(&columns, actuals_until)
+            }
+            None => return Err(Self::consumed_error()),
         }
+        .map_err(statements_to_py)?;
 
         let mut rows: Vec<(String, Vec<(PeriodId, AmountOrScalar)>)> = Vec::new();
         for row in frame.call_method0("iterrows")?.try_iter()? {
             let (index, series): (Bound<'py, PyAny>, Bound<'py, PyAny>) = row?.extract()?;
             let node_id = index.str()?.to_string();
+            finstack_quant_statements::builder::validate_node_id(&node_id)
+                .map_err(statements_to_py)?;
             let mut pairs = Vec::new();
             for item in series.call_method0("items")?.try_iter()? {
                 let (column, cell): (Bound<'py, PyAny>, Bound<'py, PyAny>) = item?.extract()?;
@@ -732,11 +741,16 @@ impl PyModelBuilder {
             rows.push((node_id, pairs));
         }
 
+        let mut ready = match slf.take_any()? {
+            BuilderState::NeedPeriods(builder) => builder
+                .periods_explicit(periods)
+                .map_err(statements_to_py)?,
+            BuilderState::Ready(builder) => builder,
+        };
         for (node_id, pairs) in rows {
-            let state = slf.take_ready()?;
-            let ready = state.value(node_id, &pairs);
-            slf.inner = Some(BuilderState::Ready(ready));
+            ready = ready.value(node_id, &pairs);
         }
+        slf.inner = Some(BuilderState::Ready(ready));
         Ok(slf)
     }
 
@@ -980,6 +994,8 @@ impl PyModelBuilder {
 
     /// Add a fixed-rate bond to the capital structure (US conventions: 30/360, semi-annual).
     ///
+    /// Rejected input leaves this builder usable with its accumulated model intact.
+    ///
     /// Parameters
     /// ----------
     /// id : str
@@ -1007,36 +1023,32 @@ impl PyModelBuilder {
         let notional = notional.inner;
         let issue = extract_date(issue_date)?;
         let maturity = extract_date(maturity_date)?;
-        let state = slf.take_any()?;
-        let next = match state {
-            BuilderState::NeedPeriods(b) => BuilderState::NeedPeriods(
-                b.add_bond(
-                    id,
-                    notional,
-                    coupon_rate,
-                    issue,
-                    maturity,
-                    discount_curve_id,
-                )
-                .map_err(statements_to_py)?,
+        match slf.inner.as_mut() {
+            Some(BuilderState::NeedPeriods(b)) => b.try_add_bond(
+                id,
+                notional,
+                coupon_rate,
+                issue,
+                maturity,
+                discount_curve_id,
             ),
-            BuilderState::Ready(b) => BuilderState::Ready(
-                b.add_bond(
-                    id,
-                    notional,
-                    coupon_rate,
-                    issue,
-                    maturity,
-                    discount_curve_id,
-                )
-                .map_err(statements_to_py)?,
+            Some(BuilderState::Ready(b)) => b.try_add_bond(
+                id,
+                notional,
+                coupon_rate,
+                issue,
+                maturity,
+                discount_curve_id,
             ),
-        };
-        slf.inner = Some(next);
+            None => return Err(Self::consumed_error()),
+        }
+        .map_err(statements_to_py)?;
         Ok(slf)
     }
 
     /// Add an interest rate swap to the capital structure (US conventions).
+    ///
+    /// Rejected input leaves this builder usable with its accumulated model intact.
     ///
     /// Parameters
     /// ----------
@@ -1067,34 +1079,21 @@ impl PyModelBuilder {
         let notional = notional.inner;
         let start = extract_date(start_date)?;
         let maturity = extract_date(maturity_date)?;
-        let state = slf.take_any()?;
-        let next = match state {
-            BuilderState::NeedPeriods(b) => BuilderState::NeedPeriods(
-                b.add_swap(
-                    id,
-                    notional,
-                    fixed_rate,
-                    start,
-                    maturity,
-                    discount_curve_id,
-                    forward_curve_id,
-                )
-                .map_err(statements_to_py)?,
-            ),
-            BuilderState::Ready(b) => BuilderState::Ready(
-                b.add_swap(
-                    id,
-                    notional,
-                    fixed_rate,
-                    start,
-                    maturity,
-                    discount_curve_id,
-                    forward_curve_id,
-                )
-                .map_err(statements_to_py)?,
-            ),
+        let params = SwapParams {
+            id: id.to_string(),
+            notional,
+            fixed_rate,
+            start_date: start,
+            maturity_date: maturity,
+            discount_curve_id: discount_curve_id.to_string(),
+            forward_curve_id: forward_curve_id.to_string(),
         };
-        slf.inner = Some(next);
+        match slf.inner.as_mut() {
+            Some(BuilderState::NeedPeriods(b)) => b.try_add_swap(params),
+            Some(BuilderState::Ready(b)) => b.try_add_swap(params),
+            None => return Err(Self::consumed_error()),
+        }
+        .map_err(statements_to_py)?;
         Ok(slf)
     }
 
@@ -1102,6 +1101,8 @@ impl PyModelBuilder {
     ///
     /// Applies regional day-count, coupon-frequency, and calendar conventions
     /// automatically; ``add_bond`` uses US corporate conventions instead.
+    ///
+    /// Rejected input leaves this builder usable with its accumulated model intact.
     ///
     /// Parameters
     /// ----------
@@ -1147,34 +1148,21 @@ impl PyModelBuilder {
             })?;
         let rate = finstack_quant_core::types::Rate::from_decimal(coupon_rate)
             .map_err(crate::errors::core_to_py)?;
-        let state = slf.take_any()?;
-        let next = match state {
-            BuilderState::NeedPeriods(b) => BuilderState::NeedPeriods(
-                b.add_bond_with_convention(
-                    id,
-                    notional,
-                    rate,
-                    issue,
-                    maturity,
-                    convention,
-                    discount_curve_id,
-                )
-                .map_err(statements_to_py)?,
-            ),
-            BuilderState::Ready(b) => BuilderState::Ready(
-                b.add_bond_with_convention(
-                    id,
-                    notional,
-                    rate,
-                    issue,
-                    maturity,
-                    convention,
-                    discount_curve_id,
-                )
-                .map_err(statements_to_py)?,
-            ),
+        let params = BondConventionParams {
+            id: id.to_string(),
+            notional,
+            coupon_rate: rate,
+            issue_date: issue,
+            maturity_date: maturity,
+            convention,
+            discount_curve_id: discount_curve_id.to_string(),
         };
-        slf.inner = Some(next);
+        match slf.inner.as_mut() {
+            Some(BuilderState::NeedPeriods(b)) => b.try_add_bond_with_convention(params),
+            Some(BuilderState::Ready(b)) => b.try_add_bond_with_convention(params),
+            None => return Err(Self::consumed_error()),
+        }
+        .map_err(statements_to_py)?;
         Ok(slf)
     }
 
@@ -1183,6 +1171,8 @@ impl PyModelBuilder {
     /// Exposes day-count, frequency, and business-day-convention parameters
     /// for non-USD swaps (e.g. EUR annual ACT/360 fixed legs); ``add_swap``
     /// uses US conventions instead.
+    ///
+    /// Rejected input leaves this builder usable with its accumulated model intact.
     ///
     /// Parameters
     /// ----------
@@ -1239,44 +1229,30 @@ impl PyModelBuilder {
             }
             None => finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing,
         };
-        let state = slf.take_any()?;
-        let next = match state {
-            BuilderState::NeedPeriods(b) => BuilderState::NeedPeriods(
-                b.add_swap_with_conventions(
-                    id,
-                    notional,
-                    fixed_rate,
-                    start,
-                    maturity,
-                    discount_curve_id,
-                    forward_curve_id,
-                    fixed_frequency,
-                    fixed_day_count,
-                    float_frequency,
-                    float_day_count,
-                    resolved_business_day_convention,
-                )
-                .map_err(statements_to_py)?,
-            ),
-            BuilderState::Ready(b) => BuilderState::Ready(
-                b.add_swap_with_conventions(
-                    id,
-                    notional,
-                    fixed_rate,
-                    start,
-                    maturity,
-                    discount_curve_id,
-                    forward_curve_id,
-                    fixed_frequency,
-                    fixed_day_count,
-                    float_frequency,
-                    float_day_count,
-                    resolved_business_day_convention,
-                )
-                .map_err(statements_to_py)?,
-            ),
+        let params = SwapParams {
+            id: id.to_string(),
+            notional,
+            fixed_rate,
+            start_date: start,
+            maturity_date: maturity,
+            discount_curve_id: discount_curve_id.to_string(),
+            forward_curve_id: forward_curve_id.to_string(),
         };
-        slf.inner = Some(next);
+        let conventions = SwapConventions {
+            fixed_frequency,
+            fixed_day_count,
+            float_frequency,
+            float_day_count,
+            business_day_convention: resolved_business_day_convention,
+        };
+        match slf.inner.as_mut() {
+            Some(BuilderState::NeedPeriods(b)) => {
+                b.try_add_swap_with_conventions(params, conventions)
+            }
+            Some(BuilderState::Ready(b)) => b.try_add_swap_with_conventions(params, conventions),
+            None => return Err(Self::consumed_error()),
+        }
+        .map_err(statements_to_py)?;
         Ok(slf)
     }
 
@@ -1409,10 +1385,20 @@ impl PyModelBuilder {
 
     /// Build the model specification.
     ///
+    /// Validates node identities, explicit-value periods, forecasts, formula
+    /// dimensions, and positive, nonoverlapping timeline intervals. The node
+    /// identifier ``period_id`` is reserved for the result-export timeline.
+    ///
     /// Returns
     /// -------
     /// FinancialModelSpec
     ///     The completed model specification.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the builder is not ready, was consumed, or its model violates a
+    ///     semantic invariant. This terminal method consumes the ready builder.
     #[pyo3(text_signature = "($self)")]
     fn build(&mut self) -> PyResult<PyFinancialModelSpec> {
         let state = self.take_ready()?;

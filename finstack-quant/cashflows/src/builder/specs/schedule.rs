@@ -13,11 +13,19 @@ use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Teno
 ///
 /// - **`None`**: plain tenor stepping from the schedule boundaries (default).
 /// - **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates
-///   for rate, currency, and equity index futures).
+///   for rate, currency, and equity index futures). Cashflow schedules retain
+///   the contractual maturity as a short final stub when it is off-grid.
 /// - **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll
 ///   dates). When the start date is not itself a roll date, the first period
 ///   accrues from the roll date immediately **preceding** the start (standard
 ///   front accrual per the ISDA Big Bang Protocol, April 2009).
+///   Interior coupon or payment-program windows start at their declared
+///   boundary; front accrual is applied only once at the instrument start.
+///
+/// Explicit roll grids cannot be combined with `end_of_month`. ACT/ACT ICMA
+/// supports the CDS twentieth grid; third-Wednesday IMM with ACT/ACT ICMA is
+/// rejected because the available ICMA reference calculation requires nominal
+/// month-grid coupons.
 ///
 /// # Examples
 ///
@@ -92,6 +100,11 @@ pub struct ScheduleParams {
     pub stub: StubKind,
     /// Whether end-of-month rolling should be preserved when generating the
     /// schedule.
+    ///
+    /// Incompatible with explicit IMM roll rules. With ACT/ACT ICMA, the
+    /// regular grid anchor must be month-end: maturity for front stubs, or
+    /// start for back stubs and schedules without stubs. An irregular opposite
+    /// endpoint remains supported.
     #[serde(default)]
     pub end_of_month: bool,
     /// Payment lag in business days after the adjusted accrual end date.

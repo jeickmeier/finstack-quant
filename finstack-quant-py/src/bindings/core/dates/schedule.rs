@@ -533,6 +533,8 @@ impl PyScheduleBuilder {
     ///
     /// ``eom=True`` requires a month/year tenor and a regular schedule rule.
     /// ``build`` raises ``ValueError`` for day/week tenors or IMM/CDS modes.
+    /// With ``StubKind.NONE``, maturity must lie on the generated month-end
+    /// roll grid; otherwise an explicit stub rule is required.
     fn end_of_month(mut slf: PyRefMut<'_, Self>, eom: bool) -> PyRefMut<'_, Self> {
         slf.spec.end_of_month = eom;
         slf

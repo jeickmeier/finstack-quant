@@ -1,6 +1,7 @@
 //! Schedule anchor generation.
 
 use super::*;
+use time::Month;
 
 pub(super) type Buffer = SmallVec<[Date; 32]>;
 
@@ -44,24 +45,28 @@ fn push_if_new(buf: &mut Buffer, d: Date) {
 /// Unlike regular schedule generation which adds fixed intervals, this function
 /// computes the actual third Wednesday of each quarterly month to handle the
 /// variable day-of-month correctly.
-pub(super) fn generate_imm_dates(start: Date, end: Date) -> Vec<Date> {
+pub(super) fn generate_imm_dates(start: Date, end: Date) -> crate::Result<Vec<Date>> {
     let mut dates = Vec::new();
+    let last_imm = crate::dates::third_wednesday(Month::December, Date::MAX.year())?;
+    if start > last_imm {
+        return Ok(dates);
+    }
 
     let first_imm = if crate::dates::imm::is_imm_date(start) {
         start
     } else {
-        next_imm(start)
+        next_imm(start)?
     };
 
     if first_imm > end {
-        return dates;
+        return Ok(dates);
     }
 
     dates.push(first_imm);
 
     let mut current = first_imm;
-    loop {
-        let next = next_imm(current);
+    while current < end && current < last_imm {
+        let next = next_imm(current)?;
         if next > end {
             break;
         }
@@ -69,7 +74,7 @@ pub(super) fn generate_imm_dates(start: Date, end: Date) -> Vec<Date> {
         current = next;
     }
 
-    dates
+    Ok(dates)
 }
 
 /// Enforce strictly increasing, duplicate-free dates while preserving original order.
@@ -123,10 +128,13 @@ impl BuilderInternal {
     /// propagates: backward semi-annual from Aug 31 yields Feb 28/29 and then
     /// Aug **31** again, not Aug 28. Chaining `prev + tenor` (the previous
     /// implementation) drifted the roll day by 1–3 days per short month.
-    pub(super) fn nth_tenor(self, anchor: Date, n: i32) -> crate::Result<Date> {
+    /// Returns `None` when the roll lies beyond the finite date range; a stub
+    /// may terminate at its contractual endpoint without constructing that
+    /// comparison anchor. Invalid tenor arithmetic still returns an error.
+    pub(super) fn nth_tenor(self, anchor: Date, n: i32) -> crate::Result<Option<Date>> {
         let tenor = self.frequency;
         if n == 0 {
-            return Ok(anchor);
+            return Ok(Some(anchor));
         }
         let count_i32 =
             i32::try_from(tenor.count()).map_err(|_| crate::error::InputError::InvalidTenor {
@@ -149,19 +157,37 @@ impl BuilderInternal {
                 })
             })
         };
-        Ok(match tenor.unit() {
-            crate::dates::TenorUnit::Months => anchor.add_months(checked_mul_i32(n, count_i32)?),
+        let add_months = |months: i32| -> crate::Result<Option<Date>> {
+            let month_index = |date: Date| i64::from(date.year()) * 12 + date.month() as i64 - 1;
+            let target = month_index(anchor) + i64::from(months);
+            if !(month_index(Date::MIN)..=month_index(Date::MAX)).contains(&target) {
+                return Ok(None);
+            }
+            anchor.add_months(months).map(Some)
+        };
+        let add_days = |days: i64| -> crate::Result<Option<Date>> {
+            let origin = i64::from(anchor.to_julian_day());
+            let minimum = i64::from(Date::MIN.to_julian_day()) - origin;
+            let maximum = i64::from(Date::MAX.to_julian_day()) - origin;
+            if !(minimum..=maximum).contains(&days) {
+                return Ok(None);
+            }
+            anchor.add_days(days).map(Some)
+        };
+        match tenor.unit() {
+            crate::dates::TenorUnit::Months => add_months(checked_mul_i32(n, count_i32)?),
             crate::dates::TenorUnit::Years => {
                 let years = checked_mul_i32(n, count_i32)?;
-                anchor.add_months(checked_mul_i32(years, 12)?)
+                add_months(checked_mul_i32(years, 12)?)
             }
-            crate::dates::TenorUnit::Weeks => {
-                anchor + Duration::weeks(checked_mul_i64(i64::from(n), i64::from(tenor.count()))?)
-            }
+            crate::dates::TenorUnit::Weeks => add_days(checked_mul_i64(
+                checked_mul_i64(i64::from(n), i64::from(tenor.count()))?,
+                7,
+            )?),
             crate::dates::TenorUnit::Days => {
-                anchor + Duration::days(checked_mul_i64(i64::from(n), i64::from(tenor.count()))?)
+                add_days(checked_mul_i64(i64::from(n), i64::from(tenor.count()))?)
             }
-        })
+        }
     }
 
     // EOM convention: `maybe_eom` snaps only the COMPUTED intermediate roll
@@ -174,18 +200,18 @@ impl BuilderInternal {
         buf.push(self.start);
         let mut i = 1;
         loop {
-            // StubKind::None requires exact contractual alignment with the raw
-            // tenor roll. EOM only adjusts intermediate generated dates; it
-            // must not turn an arbitrary maturity before month-end into an
-            // undeclared final stub.
-            let raw = self.nth_tenor(self.start, i)?;
+            // Alignment is against the actual roll grid, including EOM.
+            // A contractual maturity between grid points needs an explicit stub.
+            let Some(raw) = self.nth_tenor(self.start, i)? else {
+                return Err(crate::error::InputError::NonIntegerScheduleTenor.into());
+            };
             let snapped = maybe_eom(self.eom, raw);
-            if raw == self.end {
+            if snapped == self.end {
                 push_if_new(&mut buf, self.end);
                 check_anchor_count(buf.len())?;
                 break;
             }
-            if raw > self.end {
+            if snapped > self.end {
                 return Err(crate::error::InputError::NonIntegerScheduleTenor.into());
             }
             if snapped < self.end {
@@ -202,12 +228,17 @@ impl BuilderInternal {
         buf.push(self.start);
         let mut i = 1;
         loop {
-            let dt = maybe_eom(self.eom, self.nth_tenor(self.start, i)?);
-            if dt >= self.end {
-                push_if_new(&mut buf, self.end);
-                check_anchor_count(buf.len())?;
-                break;
-            }
+            let dt = match self
+                .nth_tenor(self.start, i)?
+                .map(|raw| maybe_eom(self.eom, raw))
+            {
+                Some(dt) if dt < self.end => dt,
+                _ => {
+                    push_if_new(&mut buf, self.end);
+                    check_anchor_count(buf.len())?;
+                    break;
+                }
+            };
             push_if_new(&mut buf, dt);
             check_anchor_count(buf.len())?;
             i = next_roll_index(i)?;
@@ -221,12 +252,17 @@ impl BuilderInternal {
         push_if_new(&mut buf, anchor);
         let mut i = 1;
         loop {
-            let dt = self.nth_tenor(anchor, -i)?;
-            if dt <= self.start {
-                push_if_new(&mut buf, self.start);
-                check_anchor_count(buf.len())?;
-                break;
-            }
+            let dt = match self
+                .nth_tenor(anchor, -i)?
+                .map(|raw| maybe_eom(self.eom, raw))
+            {
+                Some(dt) if dt > self.start => dt,
+                _ => {
+                    push_if_new(&mut buf, self.start);
+                    check_anchor_count(buf.len())?;
+                    break;
+                }
+            };
             let snapped = maybe_eom(self.eom, dt);
             if snapped > self.start && snapped < self.end {
                 push_if_new(&mut buf, snapped);
@@ -244,7 +280,12 @@ impl BuilderInternal {
         let mut anchors: Vec<Date> = vec![self.end];
         let mut i = 1;
         let aligned = loop {
-            let dt = self.nth_tenor(self.end, -i)?;
+            let Some(dt) = self
+                .nth_tenor(self.end, -i)?
+                .map(|raw| maybe_eom(self.eom, raw))
+            else {
+                break false;
+            };
             if dt <= self.start {
                 break dt == self.start;
             }
@@ -276,9 +317,24 @@ impl BuilderInternal {
         buf.push(anchor);
         let mut i = 1;
         loop {
-            let next = self.nth_tenor(anchor, i)?;
-            let next_after = self.nth_tenor(anchor, next_roll_index(i)?)?;
-            if next_after > self.end {
+            let Some(next) = self
+                .nth_tenor(anchor, i)?
+                .map(|raw| maybe_eom(self.eom, raw))
+            else {
+                push_if_new(&mut buf, self.end);
+                check_anchor_count(buf.len())?;
+                break;
+            };
+            // An aligned contractual end needs no successor for comparison.
+            if next >= self.end {
+                push_if_new(&mut buf, self.end);
+                check_anchor_count(buf.len())?;
+                break;
+            }
+            let next_after = self
+                .nth_tenor(anchor, next_roll_index(i)?)?
+                .map(|raw| maybe_eom(self.eom, raw));
+            if next_after.is_none_or(|date| date > self.end) {
                 push_if_new(&mut buf, self.end);
                 check_anchor_count(buf.len())?;
                 break;

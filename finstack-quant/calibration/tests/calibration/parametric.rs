@@ -17,6 +17,31 @@ use time::Month;
 
 use crate::calibration::calibration_support as cal_utils;
 
+fn contractual_quote_dates(base: Date, index: &str, tenor: &str) -> (Date, Date) {
+    use finstack_quant_core::dates::{adjust, calendar_by_id, DateExt};
+    use finstack_quant_valuations::market::conventions::ConventionRegistry;
+
+    let registry = ConventionRegistry::try_global().expect("conventions");
+    let convention = registry
+        .require_rate_index(&IndexId::new(index))
+        .expect("index conventions");
+    let calendar = calendar_by_id(&convention.market_calendar_id).expect("calendar");
+    let spot = base
+        .add_business_days(convention.market_settlement_days, calendar)
+        .expect("spot date");
+    let spot = adjust(spot, convention.market_business_day_convention, calendar)
+        .expect("adjusted spot date");
+    let maturity = Tenor::parse(tenor)
+        .expect("tenor")
+        .add_to_date(
+            spot,
+            Some(calendar),
+            convention.market_business_day_convention,
+        )
+        .expect("contractual maturity");
+    (spot, maturity)
+}
+
 /// Builds a set of deposit quotes with rates drawn from a known Nelson-Siegel curve.
 ///
 /// The NS zero rate `r(T) = beta0 + (beta1+beta2)*(1-e^{-T/tau})/(T/tau) - beta2*e^{-T/tau}`
@@ -240,4 +265,350 @@ fn parametric_ns_calibration_fails_for_inconsistent_quotes() {
         max_residual > 1e-3,
         "Inconsistent-quote residual {max_residual:.4e} must exceed the 1e-3 per-notional threshold."
     );
+}
+
+#[test]
+fn parametric_ns_prices_ordinary_swap_quotes_on_its_candidate_curve() {
+    let mut envelope: CalibrationEnvelope = serde_json::from_str(include_str!(
+        "../../examples/market_bootstrap/01_usd_discount.json"
+    ))
+    .expect("reference envelope");
+    let base_date = Date::from_calendar_date(2026, Month::May, 8).expect("date");
+    envelope.plan.steps[0].params = StepParams::Parametric(ParametricCurveParams {
+        curve_id: "USD-NS".into(),
+        base_date,
+        model: NsVariant::Ns,
+        initial_params: None,
+    });
+    envelope.plan.settings.fail_on_bad_fit = false;
+
+    let result = engine::execute(&envelope).expect("swaps must have a projection curve role");
+    let report = &result.result.step_reports[&envelope.plan.steps[0].id];
+    assert_eq!(report.residuals.len(), 6);
+    for id in [
+        "USD-OIS-SWAP-1Y",
+        "USD-OIS-SWAP-2Y",
+        "USD-OIS-SWAP-5Y",
+        "USD-OIS-SWAP-10Y",
+    ] {
+        assert!(
+            report.residuals[id].is_finite(),
+            "swap {id} was not repriced"
+        );
+    }
+    assert!(
+        report.max_residual < 1e-2,
+        "candidate must fit the swap quotes"
+    );
+}
+
+#[test]
+fn parametric_delivered_models_reprice_short_end_deposits_analytically() {
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::{DayCount, DayCountContext};
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::{NelsonSiegelModel, ParametricCurve};
+    use finstack_quant_core::market_data::traits::Discounting;
+    use finstack_quant_core::money::Money;
+    use finstack_quant_valuations::instruments::rates::deposit::{
+        ConventionDepositParams, Deposit,
+    };
+
+    let base = Date::from_calendar_date(2025, Month::January, 2).expect("date");
+    let models = [
+        (
+            NsVariant::Ns,
+            NelsonSiegelModel::Ns {
+                beta0: 0.03,
+                beta1: 0.15,
+                beta2: -0.1,
+                tau: 0.05,
+            },
+        ),
+        (
+            NsVariant::Nss,
+            NelsonSiegelModel::Nss {
+                beta0: 0.03,
+                beta1: 0.15,
+                beta2: -0.1,
+                beta3: 0.02,
+                tau1: 0.05,
+                tau2: 0.5,
+            },
+        ),
+    ];
+    for (variant, model) in models {
+        let reference = ParametricCurve::builder("USD-NS")
+            .base_date(base)
+            .model(model.clone())
+            .build()
+            .expect("reference model");
+        let mut quotes = Vec::new();
+        let mut contracts = Vec::new();
+        for tenor in ["1W", "2W", "1M", "2M", "6M", "1Y"] {
+            let mut quote = RateQuote::Deposit {
+                id: QuoteId::new(tenor),
+                index: IndexId::new("USD-Deposit"),
+                pillar: Pillar::Tenor(Tenor::parse(tenor).expect("tenor")),
+                rate: 0.0,
+            };
+            let (_, maturity) = contractual_quote_dates(base, "USD-Deposit", tenor);
+            let deposit = Deposit::from_conventions(ConventionDepositParams {
+                id: tenor.into(),
+                notional: Money::from((1_000_000_i64, Currency::USD)),
+                trade_date: base,
+                maturity,
+                fixed_rate: 0.0,
+                index_id: "USD-Deposit",
+                discount_curve_id: "USD-NS",
+                attributes: Default::default(),
+            })
+            .expect("deposit");
+            let start_time = DayCount::Act365F
+                .year_fraction(base, deposit.start_date, DayCountContext::default())
+                .expect("start time");
+            let end_time = DayCount::Act365F
+                .year_fraction(base, deposit.maturity, DayCountContext::default())
+                .expect("end time");
+            let accrual = deposit
+                .day_count
+                .year_fraction(
+                    deposit.start_date,
+                    deposit.maturity,
+                    DayCountContext::default(),
+                )
+                .expect("index accrual");
+            let rate = (reference.df(start_time) / reference.df(end_time) - 1.0) / accrual;
+            if let RateQuote::Deposit {
+                rate: quote_rate, ..
+            } = &mut quote
+            {
+                *quote_rate = rate;
+            }
+            contracts.push((quote.id().to_string(), start_time, end_time, accrual, rate));
+            quotes.push(quote);
+        }
+        let mut settings = CalibrationConfig::default();
+        settings.fail_on_bad_fit = true;
+        settings.discount_curve.validation_tolerance = 1e-8;
+        let envelope = CalibrationEnvelope {
+            schema_url: None,
+            schema: finstack_quant_calibration::api::schema::CalibrationSchema::CURRENT,
+            plan: CalibrationPlan {
+                id: "analytical-fit".to_string(),
+                description: None,
+                quote_sets: [(
+                    "rates".to_string(),
+                    quotes.iter().map(|q| q.id().clone()).collect(),
+                )]
+                .into_iter()
+                .collect(),
+                settings,
+                steps: vec![CalibrationStep {
+                    id: "ns".to_string(),
+                    quote_set: "rates".to_string(),
+                    params: StepParams::Parametric(ParametricCurveParams {
+                        curve_id: "USD-NS".into(),
+                        base_date: base,
+                        model: variant,
+                        initial_params: Some(model),
+                    }),
+                }],
+            },
+            market_data: quotes.into_iter().map(MarketDatum::RateQuote).collect(),
+            prior_market: Vec::new(),
+        };
+        let result = engine::execute(&envelope).expect("exact analytical calibration");
+        let report = &result.result.step_reports["ns"];
+        assert!(report.success, "{}", report.convergence_reason);
+        let context = MarketContext::try_from(result.result.final_market).expect("market");
+        let delivered = context.get_parametric("USD-NS").expect("delivered model");
+        for (id, start, end, accrual, rate) in contracts {
+            // Independent deposit economics evaluated directly on the delivered
+            // analytical object, without the calibration's DiscountCurve adapter.
+            let residual = (1.0 + rate * accrual) * delivered.df(end) - delivered.df(start);
+            assert!(residual.abs() < 1e-8, "{variant:?} {id}: {residual}");
+            assert!(
+                (report.residuals[&id] - residual).abs() < 1e-12,
+                "reported residual must describe the delivered analytical curve"
+            );
+        }
+    }
+}
+
+#[test]
+fn parametric_delivered_curve_reprices_ois_with_payment_lag_analytically() {
+    use finstack_quant_cashflows::builder::periods::{build_periods, BuildPeriodsParams};
+    use finstack_quant_cashflows::builder::specs::RollRule;
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::{adjust, calendar_by_id, DayCount, DayCountContext};
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::{NelsonSiegelModel, ParametricCurve};
+    use finstack_quant_core::market_data::traits::Discounting;
+    use finstack_quant_core::money::Money;
+    use finstack_quant_valuations::instruments::rates::irs::{
+        ConventionSwapParams, FloatingLegCompounding, InterestRateSwap, PayReceive,
+    };
+
+    // Each term is (overnight accrual start, overnight accrual end, delayed
+    // payment time, fixed coupon fraction). This reprices directly on the
+    // delivered analytical object, without a sampled DiscountCurve adapter.
+    fn legs_pv(curve: &dyn Discounting, terms: &[(f64, f64, f64, f64)]) -> (f64, f64) {
+        terms.iter().fold(
+            (0.0, 0.0),
+            |(floating, annuity), &(start, end, pay, alpha)| {
+                let payment_df = curve.df(pay);
+                (
+                    floating + (curve.df(start) / curve.df(end) - 1.0) * payment_df,
+                    annuity + alpha * payment_df,
+                )
+            },
+        )
+    }
+
+    let base = Date::from_calendar_date(2025, Month::January, 2).expect("date");
+    let model = NelsonSiegelModel::Ns {
+        beta0: 0.03,
+        beta1: 0.15,
+        beta2: -0.1,
+        tau: 0.05,
+    };
+    let reference = ParametricCurve::builder("USD-NS-OIS")
+        .base_date(base)
+        .model(model.clone())
+        .build()
+        .expect("reference model");
+    let time = |date| {
+        DayCount::Act365F
+            .year_fraction(base, date, DayCountContext::default())
+            .expect("analytical curve time")
+    };
+    let mut quotes = Vec::new();
+    let mut contracts = Vec::new();
+    for tenor in ["1M", "6M", "2Y", "5Y"] {
+        let mut quote = RateQuote::Swap {
+            id: QuoteId::new(format!("OIS-{tenor}")),
+            index: IndexId::new("USD-SOFR-OIS"),
+            pillar: Pillar::Tenor(Tenor::parse(tenor).expect("tenor")),
+            rate: 0.0,
+            spread_decimal: None,
+        };
+        let (start_date, maturity) = contractual_quote_dates(base, "USD-SOFR-OIS", tenor);
+        let swap = InterestRateSwap::from_conventions(ConventionSwapParams {
+            id: format!("OIS-{tenor}").into(),
+            notional: Money::from((1_000_000_i64, Currency::USD)),
+            side: PayReceive::Pay,
+            fixed_rate: 0.0,
+            start_date,
+            maturity,
+            index_id: "USD-SOFR-OIS",
+            discount_curve_id: "USD-NS-OIS",
+            forward_curve_id: "USD-NS-OIS",
+        })
+        .expect("OIS contract");
+        let fixed = &swap.fixed_leg;
+        let float = &swap.float_leg;
+        assert_eq!(float.compounding, FloatingLegCompounding::sofr());
+        assert_eq!(
+            (fixed.start, fixed.end, fixed.frequency),
+            (float.start, float.end, float.frequency)
+        );
+        assert_eq!(fixed.payment_lag_days, float.payment_lag_days);
+        assert!(
+            fixed.payment_lag_days > 0,
+            "regression requires delayed payment"
+        );
+        let calendar_id = fixed.calendar_id.as_deref().expect("OIS calendar");
+        assert_eq!(float.calendar_id.as_deref(), Some(calendar_id));
+        let calendar = calendar_by_id(calendar_id).expect("calendar");
+        let periods = build_periods(BuildPeriodsParams {
+            start: fixed.start,
+            end: fixed.end,
+            frequency: fixed.frequency,
+            stub: fixed.stub,
+            business_day_convention: fixed.business_day_convention,
+            calendar_id,
+            end_of_month: fixed.end_of_month,
+            day_count: fixed.day_count,
+            payment_lag_days: fixed.payment_lag_days,
+            reset_lag_days: None,
+            adjust_accrual_dates: false,
+            roll_rule: RollRule::None,
+        })
+        .expect("actual contractual schedule");
+        let terms: Vec<_> = periods
+            .into_iter()
+            .map(|period| {
+                let start = adjust(
+                    period.accrual_start,
+                    float.business_day_convention,
+                    calendar,
+                )
+                .expect("overnight accrual start");
+                let end = adjust(period.accrual_end, float.business_day_convention, calendar)
+                    .expect("overnight accrual end");
+                assert!(period.payment_date > end, "payment delay must be retained");
+                (
+                    time(start),
+                    time(end),
+                    time(period.payment_date),
+                    period.accrual_year_fraction,
+                )
+            })
+            .collect();
+        let (floating, annuity) = legs_pv(&reference, &terms);
+        let par_rate = floating / annuity;
+        if let RateQuote::Swap { rate, .. } = &mut quote {
+            *rate = par_rate;
+        }
+        contracts.push((quote.id().to_string(), terms, par_rate));
+        quotes.push(quote);
+    }
+    let mut settings = CalibrationConfig::default();
+    settings.fail_on_bad_fit = true;
+    settings.discount_curve.validation_tolerance = 1e-8;
+    let envelope = CalibrationEnvelope {
+        schema_url: None,
+        schema: finstack_quant_calibration::api::schema::CalibrationSchema::CURRENT,
+        plan: CalibrationPlan {
+            id: "analytical-ois-fit".to_string(),
+            description: None,
+            quote_sets: [(
+                "rates".to_string(),
+                quotes.iter().map(|q| q.id().clone()).collect(),
+            )]
+            .into_iter()
+            .collect(),
+            settings,
+            steps: vec![CalibrationStep {
+                id: "ns".to_string(),
+                quote_set: "rates".to_string(),
+                params: StepParams::Parametric(ParametricCurveParams {
+                    curve_id: "USD-NS-OIS".into(),
+                    base_date: base,
+                    model: NsVariant::Ns,
+                    initial_params: Some(model),
+                }),
+            }],
+        },
+        market_data: quotes.into_iter().map(MarketDatum::RateQuote).collect(),
+        prior_market: Vec::new(),
+    };
+    let result = engine::execute(&envelope).expect("exact analytical OIS calibration");
+    let report = &result.result.step_reports["ns"];
+    assert!(report.success, "{}", report.convergence_reason);
+    assert!(report.max_residual < 1e-8);
+    let context = MarketContext::try_from(result.result.final_market).expect("market");
+    let delivered = context
+        .get_parametric("USD-NS-OIS")
+        .expect("delivered model");
+    for (id, terms, par_rate) in contracts {
+        let (floating, annuity) = legs_pv(delivered.as_ref(), &terms);
+        let residual = floating - par_rate * annuity;
+        assert!(residual.abs() < 1e-8, "{id}: {residual}");
+        assert!(
+            (report.residuals[&id] - residual).abs() < 1e-12,
+            "reported OIS residual must match delivered analytical PV for {id}"
+        );
+    }
 }

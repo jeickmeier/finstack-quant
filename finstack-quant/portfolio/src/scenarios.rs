@@ -50,7 +50,8 @@ struct AppliedScenarioState<'a> {
 fn selective_invalidation(
     portfolio: &Portfolio,
     changes: &ScenarioChangeManifest,
-) -> Option<PositionInvalidation> {
+    market: &MarketContext,
+) -> Result<Option<PositionInvalidation>> {
     if changes.as_of_changed
         || changes.portfolio_shape_changed
         || changes.all_dirty
@@ -60,7 +61,7 @@ fn selective_invalidation(
             .iter()
             .any(|index| *index >= portfolio.positions.len())
     {
-        return None;
+        return Ok(None);
     }
 
     let mut changed_factors = Vec::with_capacity(changes.market_targets.len());
@@ -84,13 +85,16 @@ fn selective_invalidation(
             ScenarioMarketTarget::EquityPrice { spot_id } => {
                 MarketFactorKey::spot(spot_id.as_str())
             }
+            ScenarioMarketTarget::BaseCorrelation { surface_id, .. } => {
+                MarketFactorKey::BaseCorrelation(surface_id.clone())
+            }
             // A direct FX quote can feed triangulated crosses used inside an
-            // instrument's native PV, while volatility-index and base-correlation
+            // instrument's native PV, while volatility-index
             // targets have no exact normalized dependency key. Selective reuse
             // cannot conservatively express those changes, so reprice the full book.
-            ScenarioMarketTarget::Fx { .. }
-            | ScenarioMarketTarget::VolatilityIndex { .. }
-            | ScenarioMarketTarget::BaseCorrelation { .. } => return None,
+            ScenarioMarketTarget::Fx { .. } | ScenarioMarketTarget::VolatilityIndex { .. } => {
+                return Ok(None)
+            }
         };
         changed_factors.push(key);
     }
@@ -100,16 +104,16 @@ fn selective_invalidation(
     } else {
         portfolio
             .dependency_index()
-            .affected_positions(&changed_factors)
+            .affected_positions(&changed_factors, market)?
     };
     reprice_indices.extend(changes.changed_instrument_indices.iter().copied());
 
     let invalidation = PositionInvalidation::new(reprice_indices, false);
-    Some(if changes.changed_instrument_indices.is_empty() {
+    Ok(Some(if changes.changed_instrument_indices.is_empty() {
         invalidation
     } else {
         invalidation.with_authoritative_portfolio_change()
-    })
+    }))
 }
 
 /// Apply a scenario to a portfolio.
@@ -604,7 +608,11 @@ pub fn scenario_pnl_batch(
             },
         ) in applied
         {
-            let invalidation = selective_invalidation(stressed_portfolio.as_ref(), &report.changes);
+            let invalidation = selective_invalidation(
+                stressed_portfolio.as_ref(),
+                &report.changes,
+                &stressed_market,
+            )?;
             let market_state = plan.register_owned_market(stressed_market, as_of);
             let portfolio_state = match stressed_portfolio {
                 Cow::Borrowed(_) => shared_portfolio,
@@ -829,8 +837,8 @@ mod tests {
         config
             .rounding
             .output_scale
-            .overrides
-            .insert(Currency::USD, 4);
+            .set_scale(Currency::USD, 4)
+            .expect("valid decimal scale");
         let result = apply_scenario(&portfolio, &scenario, &market, &config);
         assert!(result.is_ok());
 
@@ -842,7 +850,10 @@ mod tests {
                 .report
                 .meta
                 .as_ref()
-                .and_then(|meta| meta.rounding.output_scale_by_currency.get(&Currency::USD))
+                .and_then(|meta| meta
+                    .rounding
+                    .get_output_scale_by_currency()
+                    .get(&Currency::USD))
                 .copied(),
             Some(4),
             "scenario provenance must use the caller's active configuration"
@@ -1199,7 +1210,9 @@ mod tests {
         };
 
         assert!(
-            selective_invalidation(&portfolio, &changes).is_none(),
+            selective_invalidation(&portfolio, &changes, &MarketContext::new())
+                .expect("invalidation")
+                .is_none(),
             "an FX quote can feed triangulated native-PV crosses, so the full book must reprice"
         );
     }

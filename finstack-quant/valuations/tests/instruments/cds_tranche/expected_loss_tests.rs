@@ -190,7 +190,9 @@ fn test_hetero_spa_matches_homogeneous_when_issuers_identical() {
             .build()
             .unwrap();
 
-    let hetero_market = base_market.insert_credit_index("CDX.NA.IG.42", hetero_index);
+    let hetero_market = base_market
+        .insert_credit_index("CDX.NA.IG.42", hetero_index)
+        .expect("identical issuer curves reference the existing index hazard");
 
     let mut homo_config = CdsTranchePricerConfig::default();
     homo_config.use_issuer_curves = false;

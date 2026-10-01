@@ -40,6 +40,8 @@ pub(super) struct BuildState {
     /// (e.g., 600+ period amortizers). Converted to f64 only at API boundaries
     /// when passing to emission functions that operate in f64 space.
     pub(super) outstanding: Decimal,
+    /// Equal installment fixed from the live balance at a LinearBetween start.
+    pub(super) linear_between_installment: Option<Decimal>,
 }
 
 /// Principal event applied during schedule build (draws/repays).
@@ -76,14 +78,15 @@ pub struct PrincipalEvent {
 #[derive(Debug, Clone)]
 pub(super) struct AmortizationSetup {
     pub(super) amort_dates: finstack_quant_core::HashSet<Date>,
+    pub(super) final_amortization_date: Option<Date>,
     pub(super) payment_dates: finstack_quant_core::HashMap<Date, Date>,
     pub(super) step_remaining_map: Option<finstack_quant_core::HashMap<Date, Money>>, // for StepRemaining
     pub(super) custom_principal_map: Option<finstack_quant_core::HashMap<Date, Money>>,
     pub(super) linear_delta: Option<Decimal>, // for LinearTo
     pub(super) percent_per: Option<Decimal>,  // for PercentOfOriginalPerPeriod
     pub(super) percent_remaining: Option<Decimal>, // for PercentOfRemainingPerPeriod
-    /// `(start, last installment date, installment)` for LinearBetween.
-    pub(super) linear_between: Option<(Date, Date, Decimal)>,
+    /// `(start, final economic installment date, installment count)` for LinearBetween.
+    pub(super) linear_between: Option<(Date, Date, usize)>,
 }
 
 /// Grouped inputs for collecting all relevant schedule dates.
@@ -196,13 +199,16 @@ fn derive_amortization_setup(
     let custom_principal_map: Option<finstack_quant_core::HashMap<Date, Money>> =
         match &notional.amort {
             AmortizationSpec::CustomPrincipal { items } => {
-                let mut m = finstack_quant_core::HashMap::default();
+                let mut m: finstack_quant_core::HashMap<Date, Money> =
+                    finstack_quant_core::HashMap::default();
                 m.reserve(items.len());
                 for (d, mny) in items {
                     if mny.amount() > 0.0 {
-                        m.entry(*d)
-                            .and_modify(|existing| *existing += *mny)
-                            .or_insert(*mny);
+                        let total = match m.get(d).copied() {
+                            Some(existing) => existing.checked_add(*mny)?,
+                            None => *mny,
+                        };
+                        m.insert(*d, total);
                     }
                 }
                 Some(m)
@@ -236,27 +242,32 @@ fn derive_amortization_setup(
 
     let linear_between = match &notional.amort {
         AmortizationSpec::LinearBetween { start, end } => {
+            if !amort_base.contains(end) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "LinearBetween end {end} must be a coupon accrual boundary"
+                )));
+            }
             let window: Vec<Date> = amort_base
                 .iter()
                 .copied()
                 .filter(|date| *date > *start && *date <= *end)
                 .collect();
-            let Some(last) = window.last().copied() else {
+            if window.is_empty() {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "LinearBetween window ({start}, {end}] contains no payment date"
+                    "LinearBetween window ({start}, {end}] contains no coupon accrual boundary"
                 )));
-            };
-            let initial = f64_to_decimal(notional.initial.amount())?;
-            let installment = initial / Decimal::from(window.len() as u64);
-            Some((*start, last, installment.max(Decimal::ZERO)))
+            }
+            Some((*start, *end, window.len()))
         }
         _ => None,
     };
 
+    let final_amortization_date = amort_base.last().copied();
     let amort_dates: finstack_quant_core::HashSet<Date> = amort_base.into_iter().collect();
 
     Ok(AmortizationSetup {
         amort_dates,
+        final_amortization_date,
         payment_dates,
         step_remaining_map,
         custom_principal_map,
@@ -269,6 +280,7 @@ fn derive_amortization_setup(
 
 fn initialize_build_state(
     issue: Date,
+    accrual_start: Date,
     notional: &Notional,
     estimated_dates: usize,
     principal_events: &[PrincipalEvent],
@@ -290,6 +302,15 @@ fn initialize_build_state(
     }
 
     let mut outstanding = f64_to_decimal(notional.initial.amount())?;
+    // CDS IMM front periods can accrue before issue. Preserve the opening
+    // balance and every pre-issue movement over that actual accrual interval.
+    let history_start = principal_events
+        .first()
+        .map_or(accrual_start.min(issue), |event| {
+            event.date.min(accrual_start).min(issue)
+        });
+    let mut outstanding_history = Vec::with_capacity(estimated_dates);
+    outstanding_history.push((history_start, outstanding));
 
     for ev in principal_events.iter().filter(|ev| ev.date <= issue) {
         if ev.delta.amount() != 0.0 || ev.cash.amount() != 0.0 {
@@ -310,24 +331,39 @@ fn initialize_build_state(
                 .with_principal_delta(ev.delta)
                 .with_principal_date(ev.date),
             );
-            outstanding += f64_to_decimal(ev.delta.amount())?;
+            outstanding = outstanding
+                .checked_add(f64_to_decimal(ev.delta.amount())?)
+                .ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(
+                        "outstanding principal exceeds the supported decimal range".into(),
+                    )
+                })?;
             if outstanding < Decimal::ZERO {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "principal event on {} would make outstanding balance negative ({outstanding})",
                     ev.date
                 )));
             }
+            match outstanding_history.last_mut() {
+                Some((last_date, balance)) if *last_date == ev.date => *balance = outstanding,
+                _ => outstanding_history.push((ev.date, outstanding)),
+            }
         }
     }
 
-    let mut outstanding_history: Vec<(Date, Decimal)> = Vec::with_capacity(estimated_dates);
-    outstanding_history.push((issue, outstanding));
+    if outstanding_history
+        .last()
+        .is_none_or(|(date, _)| *date < issue)
+    {
+        outstanding_history.push((issue, outstanding));
+    }
 
     Ok(BuildState {
         projected_fixings: Vec::new(),
         flows,
         outstanding_history,
         outstanding,
+        linear_between_installment: None,
     })
 }
 
@@ -375,6 +411,9 @@ fn collect_all_dates(inputs: &DateCollectionInputs<'_>) -> finstack_quant_core::
     }
     for ev in inputs.principal_events {
         dates.push(ev.date);
+    }
+    if let AmortizationSpec::LinearBetween { start, .. } = &inputs.notional.amort {
+        dates.push(*start);
     }
     dates.push(inputs.redemption_date);
     dates.sort_unstable();
@@ -499,9 +538,15 @@ impl CashFlowBuilder {
     ///   principal events change interest from their economic effective date
     ///   (see [`PrincipalEvent`]'s interest-base convention).
     /// - **Redemption conventions:** business-day adjustment and payment lag
-    ///   follow the coupon window ending at maturity.
+    ///   follow the coupon window ending at maturity. Principal events must
+    ///   occur on or before its effective terminal accrual boundary; when
+    ///   accrual dates are adjusted with Preceding, this can precede raw maturity.
     /// - **Amortization cadence:** `LinearTo` / `PercentOfOriginalPerPeriod`
     ///   use all contractual coupon windows, including rate steps and fixed/float switches.
+    ///   `LinearBetween` uses economic coupon accrual boundaries in `(start, end]`;
+    ///   `end` must be an actual boundary. Its equal installment is fixed from the
+    ///   outstanding balance after all movements effective on `start`, including PIK.
+    ///   PIK and explicit principal events apply before scheduled amortization.
     /// - **Reporting day count:** the schedule's representative day count is
     ///   taken from the first fixed coupon leg, else the first floating leg;
     ///   schedules with no coupon leg default to Act/365F.
@@ -512,6 +557,11 @@ impl CashFlowBuilder {
     /// schedule/coupon/fee/principal-event error, or a floating-rate projection
     /// failure. In particular, a floating spec with the default error fallback
     /// fails when its required market data is unavailable.
+    /// Returns a validation error for a principal event after the effective
+    /// terminal accrual boundary, even if it falls before raw maturity.
+    /// Dated amortization is subject to the same effective terminal boundary;
+    /// a `LinearBetween` start before issue or an end without a coupon accrual
+    /// boundary is also rejected.
     ///
     /// # Arguments
     ///
@@ -568,6 +618,44 @@ impl CashFlowBuilder {
 
         let (redemption_date, redemption_effective_date) =
             compute_redemption_dates(maturity, &fixed_schedules, &float_schedules);
+        let late_amortization = match &notional.amort {
+            AmortizationSpec::StepRemaining { schedule } => schedule
+                .iter()
+                .find(|(date, _)| *date > redemption_effective_date)
+                .map(|(date, _)| *date),
+            AmortizationSpec::CustomPrincipal { items } => items
+                .iter()
+                .find(|(date, _)| *date > redemption_effective_date)
+                .map(|(date, _)| *date),
+            AmortizationSpec::LinearBetween { start, end } => {
+                if *start < issue {
+                    return Err(InputError::DateOutOfRange {
+                        date: *start,
+                        range: (issue, redemption_effective_date),
+                    }
+                    .into());
+                }
+                (*end > redemption_effective_date).then_some(*end)
+            }
+            _ => None,
+        };
+        if let Some(date) = late_amortization {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "amortization on {date} is after the effective terminal accrual date \
+                 {redemption_effective_date}; amortization must occur before or on the \
+                 final economic balance boundary"
+            )));
+        }
+        if let Some(event) = principal_events
+            .iter()
+            .find(|event| event.date > redemption_effective_date)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "principal event on {} is after the effective terminal accrual date {}; \
+                 principal events must occur before or on the final economic balance boundary",
+                event.date, redemption_effective_date
+            )));
+        }
         let date_inputs = DateCollectionInputs {
             issue,
             maturity,
@@ -613,8 +701,26 @@ impl CompiledCashFlowPlan {
         &self,
         curves: Option<&finstack_quant_core::market_data::context::MarketContext>,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
+        let accrual_start = self
+            .fixed_schedules
+            .iter()
+            .flat_map(|schedule| schedule.prev.values())
+            .chain(
+                self.float_schedules
+                    .iter()
+                    .flat_map(|schedule| schedule.prev.values()),
+            )
+            .chain(
+                self.periodic_fees
+                    .iter()
+                    .flat_map(|schedule| schedule.prev.values()),
+            )
+            .map(|period| period.accrual_start)
+            .min()
+            .unwrap_or(self.issue);
         let mut state = initialize_build_state(
             self.issue,
+            accrual_start,
             &self.notional,
             self.dates.len(),
             &self.principal_events,

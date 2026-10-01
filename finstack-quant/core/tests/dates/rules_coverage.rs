@@ -234,7 +234,7 @@ fn china_bridge_weekday_blocks() {
         &[(2024, 4, 4), (2024, 4, 5)],
         &[(2024, 4, 3), (2024, 4, 6)],
     );
-    // Qingming 2026 = Sat Apr 4 -> substitute Mon Apr 6 only (weekend not emitted).
+    // Qingming 2026 = Sun Apr 5 -> substitute Mon Apr 6 only (weekend not emitted).
     assert_applies(
         &qm,
         &[(2026, 4, 6)],

@@ -465,7 +465,8 @@ export type Date = string;
  */
 export type Date1 = string;
 /**
- * Date on which the fixed exercise payoff is paid.
+ * Date on which the fixed exercise payoff is paid, including after
+ * early exercise; this date is not relative to the exercise date.
  */
 export type Date2 = string;
 /**

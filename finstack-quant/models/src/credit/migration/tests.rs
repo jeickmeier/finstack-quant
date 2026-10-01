@@ -260,7 +260,7 @@ mod matrix_tests {
 #[cfg(test)]
 mod generator_tests {
     use crate::credit::migration::{
-        GeneratorMatrix, MigrationError, RatingScale, TransitionMatrix,
+        projection, GeneratorMatrix, MigrationError, RatingScale, TransitionMatrix,
     };
 
     fn two_state_scale() -> RatingScale {
@@ -321,6 +321,131 @@ mod generator_tests {
         let gen = GeneratorMatrix::new(scale, &[-lambda, lambda, 0.0, 0.0]).unwrap();
         assert!((gen.exit_rate("IG").unwrap() - lambda).abs() < 1e-12);
         assert!(gen.exit_rate("D").unwrap().abs() < 1e-12);
+    }
+
+    #[test]
+    fn erlang_chain_recovers_repeated_eigenvalues_without_spurious_migrations() {
+        for rate in [0.1_f64, 2.0, 8.0] {
+            let scale =
+                RatingScale::custom(["A", "B", "C", "D"].into_iter().map(String::from).collect())
+                    .unwrap();
+            let survival = (-rate).exp();
+            // Exact annual P for A -> B -> C -> D with identical exit rates.
+            let annual = TransitionMatrix::new(
+                scale,
+                &[
+                    survival,
+                    survival * rate,
+                    survival * rate * rate / 2.0,
+                    1.0 - survival * (1.0 + rate + rate * rate / 2.0),
+                    0.0,
+                    survival,
+                    survival * rate,
+                    1.0 - survival * (1.0 + rate),
+                    0.0,
+                    0.0,
+                    survival,
+                    1.0 - survival,
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0,
+                ],
+                1.0,
+            )
+            .unwrap();
+            let generator = GeneratorMatrix::from_transition_matrix_with_tol(&annual, 1e-11)
+                .expect("an exact embeddable chain needs no economic regularization");
+            for i in 0..4 {
+                for j in 0..4 {
+                    let expected = if i == 3 {
+                        0.0
+                    } else if i == j {
+                        -rate
+                    } else if j == i + 1 {
+                        rate
+                    } else {
+                        0.0
+                    };
+                    assert!(
+                        (generator.as_matrix()[(i, j)] - expected).abs() < 1e-10,
+                        "rate={rate}, entry=({i},{j})"
+                    );
+                }
+            }
+            assert!(generator.regularization_l1() < 1e-10);
+            let projected = projection::project(&generator, 5.0).unwrap();
+            let rt = rate * 5.0;
+            let exact_pd = 1.0 - (-rt).exp() * (1.0 + rt + rt * rt / 2.0);
+            assert!((projected.probability("A", "D").unwrap() - exact_pd).abs() < 1e-11);
+        }
+    }
+
+    #[test]
+    fn clustered_eigenvalues_preserve_the_source_generator() {
+        for gap in [1e-13_f64, 1e-11, 1e-8] {
+            for rate in [0.1_f64, 2.0] {
+                let scale = RatingScale::custom(
+                    ["A", "B", "C", "D"].into_iter().map(String::from).collect(),
+                )
+                .unwrap();
+                let second_rate = rate + gap;
+                let third_rate = rate + 2.0 * gap;
+                let source = GeneratorMatrix::new(
+                    scale,
+                    &[
+                        -rate,
+                        rate,
+                        0.0,
+                        0.0,
+                        0.0,
+                        -second_rate,
+                        second_rate,
+                        0.0,
+                        0.0,
+                        0.0,
+                        -third_rate,
+                        third_rate,
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                    ],
+                )
+                .unwrap();
+                let annual = projection::project(&source, 1.0).unwrap();
+                let recovered = GeneratorMatrix::from_transition_matrix_with_tol(&annual, 1e-11)
+                    .expect("clustered positive eigenvalues must remain accurate");
+                for i in 0..4 {
+                    for j in 0..4 {
+                        assert!(
+                            (recovered.as_matrix()[(i, j)] - source.as_matrix()[(i, j)]).abs()
+                                < 1e-10,
+                            "rate={rate}, gap={gap}, entry=({i},{j})"
+                        );
+                    }
+                }
+                let expected = projection::project(&source, 5.0).unwrap();
+                let actual = projection::project(&recovered, 5.0).unwrap();
+                assert!(
+                    (actual.probability("A", "D").unwrap()
+                        - expected.probability("A", "D").unwrap())
+                    .abs()
+                        < 1e-11
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn extraction_rejects_invalid_tolerances() {
+        let matrix = TransitionMatrix::new(two_state_scale(), &[0.9, 0.1, 0.0, 1.0], 1.0).unwrap();
+        for tolerance in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -0.1] {
+            assert!(matches!(
+                GeneratorMatrix::from_transition_matrix_with_tol(&matrix, tolerance),
+                Err(MigrationError::InvalidTolerance(_))
+            ));
+        }
     }
 
     #[test]
@@ -678,7 +803,7 @@ mod reference_matrix_tests {
 
 #[cfg(test)]
 mod serde_invariant_tests {
-    use crate::credit::migration::{GeneratorMatrix, RatingScale, TransitionMatrix};
+    use crate::credit::migration::{GeneratorMatrix, RatingPath, RatingScale, TransitionMatrix};
 
     fn scale() -> RatingScale {
         RatingScale::custom(vec!["A".to_string(), "D".to_string()]).expect("scale")
@@ -735,5 +860,46 @@ mod serde_invariant_tests {
             (restored.round_trip_error() - generator.round_trip_error()).abs() < 1e-15,
             "round-trip diagnostic changed during serde"
         );
+    }
+
+    #[test]
+    fn serialized_paths_reject_invalid_time_and_state_sequences() {
+        let valid = serde_json::json!({
+            "transitions": [[0.0, 0], [0.5, 1]],
+            "horizon": 1.0,
+            "scale": scale(),
+        });
+        let path: RatingPath = serde_json::from_value(valid.clone()).unwrap();
+        assert_eq!(path.state_at(0.25), 0);
+        assert_eq!(path.state_at(0.5), 1);
+        assert_eq!(path.default_time(), Some(0.5));
+        let restored: RatingPath =
+            serde_json::from_str(&serde_json::to_string(&path).unwrap()).unwrap();
+        assert_eq!(restored.transitions(), path.transitions());
+
+        for events in [
+            serde_json::json!([]),
+            serde_json::json!([[0.1, 0]]),
+            serde_json::json!([[0.0, 0], [2.0, 1]]),
+            serde_json::json!([[0.0, 0], [-0.1, 1]]),
+            serde_json::json!([[0.0, 0], [0.0, 1]]),
+            serde_json::json!([[0.0, 0], [0.5, 0], [0.25, 1]]),
+            serde_json::json!([[0.0, 2]]),
+            serde_json::json!([[0.0, 0], [0.5, 2]]),
+            serde_json::json!([[0.0, 1], [0.5, 0]]),
+            serde_json::json!([[0.0, 0], [0.25, 1], [0.5, 0]]),
+        ] {
+            let mut malformed = valid.clone();
+            malformed["transitions"] = events;
+            assert!(
+                serde_json::from_value::<RatingPath>(malformed.clone()).is_err(),
+                "accepted malformed path: {malformed}"
+            );
+        }
+        for horizon in [0.0, -1.0] {
+            let mut malformed = valid.clone();
+            malformed["horizon"] = serde_json::json!(horizon);
+            assert!(serde_json::from_value::<RatingPath>(malformed).is_err());
+        }
     }
 }

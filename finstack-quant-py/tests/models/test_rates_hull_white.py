@@ -40,9 +40,15 @@ def test_scalar_kernels_satisfy_known_identities() -> None:
     put = hw1f_zcb_option_price(0.98, 0.94, 0.96, 0.03, False)
     assert call - put == pytest.approx(0.94 - 0.96 * 0.98)
     ho_lee = hw1f_convexity_adjustment(1e-12, 0.01, 1.0, 1.25)
-    assert ho_lee == pytest.approx(0.5 * 0.01**2 * 1.0 * 1.25)
+    assert ho_lee == pytest.approx(0.5 * 0.01**2 * 1.0 * (2.0 * 1.25 - 1.0))
     assert hw1f_caplet_forward_rate_normal_vol(0.05, 0.01, 1.0, 0.25) > 0.0
     assert hw1f_caplet_forward_rate_normal_vol(0.05, 0.01, 0.0, 0.25) == 0.0
+
+
+@pytest.mark.parametrize("invalid", [math.nan, math.inf, -math.inf, -0.01])
+def test_convexity_invalid_parameters_remain_visible_at_zero_expiry(invalid: float) -> None:
+    assert math.isnan(hw1f_convexity_adjustment(invalid, 0.01, 0.0, 1.0))
+    assert math.isnan(hw1f_convexity_adjustment(0.05, invalid, 0.0, 1.0))
 
 
 def test_cap_floor_parity_with_discount_curve() -> None:

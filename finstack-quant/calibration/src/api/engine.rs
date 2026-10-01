@@ -14,6 +14,7 @@ use crate::api::errors::{EnvelopeError, StrictLoadDiagnostic};
 use crate::api::market_datum::MarketDatum;
 use crate::api::schema::CalibrationStep;
 use crate::api::schema::{CalibrationResult, CalibrationResultEnvelope};
+use crate::api::validate::DependencyNode;
 use crate::config::CalibrationConfig;
 use crate::quotes::market_quote::MarketQuote;
 use crate::step_runtime;
@@ -32,7 +33,7 @@ pub enum ExecutionStage {
     Ingestion,
     /// Runtime configuration validation.
     Configuration,
-    /// Market-context reconstruction.
+    /// Market-context reconstruction or capture of its final coherent snapshot.
     Context,
     /// Step quote resolution or preflight checks.
     Preflight,
@@ -332,12 +333,17 @@ impl<'a> ParallelBatchBuilder<'a> {
     }
 
     /// Try to add a step to the batch.
-    fn try_add(&mut self, step: &'a CalibrationStep, context: &MarketContext) -> BatchAddResult {
-        if !self.batch.is_empty() && self.depends_on_batch_outputs(step) {
+    fn try_add(
+        &mut self,
+        step: &'a CalibrationStep,
+        node: &DependencyNode,
+        context: &MarketContext,
+    ) -> BatchAddResult {
+        if !self.batch.is_empty() && self.depends_on_batch_outputs(node) {
             return BatchAddResult::Stop;
         }
 
-        if self.would_conflict(step) {
+        if self.would_conflict(node) {
             return BatchAddResult::Stop;
         }
 
@@ -358,30 +364,22 @@ impl<'a> ParallelBatchBuilder<'a> {
             };
         }
 
-        self.record_output(step);
+        self.record_output(node);
         self.batch.push(StepBatchItem { step, quotes });
         BatchAddResult::Added
     }
 
     /// Check if adding this step would create an output conflict.
-    fn would_conflict(&self, step: &CalibrationStep) -> bool {
-        step.params
-            .io()
-            .writes
-            .iter()
-            .any(|write| self.writes.contains(write))
+    fn would_conflict(&self, node: &DependencyNode) -> bool {
+        node.writes.iter().any(|write| self.writes.contains(write))
     }
 
-    fn record_output(&mut self, step: &CalibrationStep) {
-        self.writes.extend(step.params.io().writes);
+    fn record_output(&mut self, node: &DependencyNode) {
+        self.writes.extend(node.writes.iter().cloned());
     }
 
-    fn depends_on_batch_outputs(&self, step: &CalibrationStep) -> bool {
-        step.params
-            .io()
-            .reads
-            .iter()
-            .any(|read| self.writes.contains(read))
+    fn depends_on_batch_outputs(&self, node: &DependencyNode) -> bool {
+        node.reads.iter().any(|read| self.writes.contains(read))
     }
 
     /// Take the accumulated batch, resetting internal state for next batch.
@@ -608,7 +606,9 @@ fn apply_batch_results(
             report,
             credit_index_update,
         } = result;
-        step_runtime::apply_output(context, output, credit_index_update);
+        step_runtime::apply_output(context, output, credit_index_update).map_err(|error| {
+            ExecuteError::other(ExecutionStage::Context, Some(item.step.id.clone()), error)
+        })?;
         state.record_result(&item.step.id, report);
     }
     Ok(())
@@ -617,6 +617,7 @@ fn apply_batch_results(
 /// Execute steps in parallel mode.
 fn execute_parallel(
     plan: &CalibrationPlan,
+    nodes: &[DependencyNode],
     quote_index: &QuoteIndex<'_>,
     context: &mut MarketContext,
     state: &mut ExecutionState,
@@ -627,7 +628,7 @@ fn execute_parallel(
 
         // Build batch of independent steps
         while index < plan.steps.len() {
-            match builder.try_add(&plan.steps[index], context) {
+            match builder.try_add(&plan.steps[index], &nodes[index], context) {
                 BatchAddResult::Added => index += 1,
                 BatchAddResult::Stop => break,
                 BatchAddResult::Error(error) => return Err(error),
@@ -693,7 +694,9 @@ fn execute_sequential(
                 bad_fit_envelope_error(&step.id, &report),
             ));
         }
-        step_runtime::apply_output(context, output, credit_index_update);
+        step_runtime::apply_output(context, output, credit_index_update).map_err(|error| {
+            ExecuteError::other(ExecutionStage::Context, Some(step.id.clone()), error)
+        })?;
         state.record_result(&step.id, report);
     }
     Ok(())
@@ -770,11 +773,8 @@ pub fn execute(
     )
     .entered();
 
-    if let Some(error) = super::validate::validate(envelope)
-        .errors
-        .into_iter()
-        .next()
-    {
+    let validation = super::validate::validate(envelope);
+    if let Some(error) = validation.errors.into_iter().next() {
         return Err(ExecuteError::envelope(ExecutionStage::Ingestion, error));
     }
     let plan = &envelope.plan;
@@ -791,7 +791,13 @@ pub fn execute(
     let mut state = ExecutionState::new();
 
     if plan.settings.use_parallel {
-        execute_parallel(plan, &quote_index, &mut context, &mut state)?;
+        execute_parallel(
+            plan,
+            &validation.dependency_graph.nodes,
+            &quote_index,
+            &mut context,
+            &mut state,
+        )?;
     } else {
         execute_sequential(plan, &quote_index, &mut context, &mut state)?;
     }
@@ -815,7 +821,9 @@ pub fn execute(
     );
 
     let result = CalibrationResult {
-        final_market: (&context).into(),
+        final_market: (&context)
+            .try_into()
+            .map_err(|error| ExecuteError::other(ExecutionStage::Context, None, error))?,
         report: aggregated_report,
         step_reports,
         results_meta: finstack_quant_core::config::results_meta(
@@ -825,6 +833,10 @@ pub fn execute(
 
     Ok(CalibrationResultEnvelope::new(result))
 }
+
+#[cfg(test)]
+#[path = "dependency_review_tests.rs"]
+mod dependency_review_tests;
 
 #[cfg(test)]
 mod tests {
@@ -1048,16 +1060,31 @@ mod tests {
         let market_data = Vec::new();
         let quote_index = QuoteIndex::new(&market_data);
         let mut builder = ParallelBatchBuilder::new(&plan, &quote_index);
+        let nodes: Vec<_> = plan
+            .steps
+            .iter()
+            .enumerate()
+            .map(|(step_index, step)| {
+                let io = step.params.io();
+                DependencyNode {
+                    step_index,
+                    step_id: step.id.clone(),
+                    kind: io.kind.to_string(),
+                    reads: io.reads,
+                    writes: io.writes,
+                }
+            })
+            .collect();
 
-        builder.record_output(&plan.steps[0]);
+        builder.record_output(&nodes[0]);
         assert!(
-            builder.would_conflict(&plan.steps[1]),
+            builder.would_conflict(&nodes[1]),
             "secondary XCCY basis-curve write must conflict"
         );
         builder.take_batch();
-        builder.record_output(&plan.steps[2]);
+        builder.record_output(&nodes[2]);
         assert!(
-            builder.would_conflict(&plan.steps[3]),
+            builder.would_conflict(&nodes[3]),
             "duplicate Student-t scalar write must conflict"
         );
     }

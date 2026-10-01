@@ -10,7 +10,7 @@ use finstack_quant_calibration::api::schema::{
     CalibrationResultEnvelope, CalibrationSchema, CalibrationStep, CapFloorHullWhiteStepParams,
     DiscountCurveParams, ForwardCurveParams, HazardCurveParams, HullWhiteStepParams,
     HullWhiteVolatilityMode, InflationCurveParams, ParametricCurveParams, SabrInterpolationMethod,
-    SeasonalFactors, StepParams, StudentTParams, SurfaceExtrapolationPolicy, SviSurfaceParams,
+    StepParams, StudentTParams, SurfaceExtrapolationPolicy, SviSurfaceParams,
     SwaptionVolConvention, SwaptionVolParams, VolSurfaceModel, VolSurfaceParams, XccyBasisParams,
 };
 use finstack_quant_calibration::quotes::cds::CdsQuote;
@@ -131,7 +131,6 @@ fn export_calibration_envelope_types() {
     ForwardCurveParams::export(cfg).expect("export ForwardCurveParams");
     HazardCurveParams::export(cfg).expect("export HazardCurveParams");
     InflationCurveParams::export(cfg).expect("export InflationCurveParams");
-    SeasonalFactors::export(cfg).expect("export SeasonalFactors");
     VolSurfaceParams::export(cfg).expect("export VolSurfaceParams");
     SwaptionVolParams::export(cfg).expect("export SwaptionVolParams");
     BaseCorrelationParams::export(cfg).expect("export BaseCorrelationParams");

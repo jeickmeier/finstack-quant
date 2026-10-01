@@ -3,7 +3,8 @@
 //! Avoids repeated `serde_json::from_str` on the full MarketContext JSON
 //! in bulk-pricing and sensitivity-sweep workloads.
 
-use crate::utils::to_js_err;
+use crate::utils::{contract_to_js_error, to_js_err};
+use finstack_quant_core::contract::LoadLimits;
 use finstack_quant_core::market_data::context::MarketContext;
 use std::sync::Arc;
 use wasm_bindgen::prelude::*;
@@ -28,15 +29,20 @@ pub struct JsMarket {
 
 #[wasm_bindgen(js_class = Market)]
 impl JsMarket {
-    /// Parse a MarketContext from its JSON representation.
+    /// Strictly load a persisted MarketContext from its canonical state JSON.
     ///
     /// @param json - Canonical MarketContext JSON, the same payload accepted by
-    /// pricing `marketJson` arguments.
+    /// pricing `marketJson` arguments, with required `schema_version: 1`.
+    /// Inputs are bounded to 64 MiB and 96 nested JSON containers.
     /// @returns A `Market` handle that can be reused across pricing calls.
-    /// @throws If the JSON is malformed or does not match the MarketContext schema.
+    /// @throws If the JSON is malformed, exceeds canonical byte/depth limits,
+    /// has a missing or unsupported schema version, or has invalid market
+    /// objects, duplicate IDs, or unresolved curve references.
     #[wasm_bindgen(constructor)]
     pub fn new(json: &str) -> Result<JsMarket, JsValue> {
-        let inner: MarketContext = serde_json::from_str(json).map_err(to_js_err)?;
+        let (inner, _report) =
+            MarketContext::from_state_slice(json.as_bytes(), &LoadLimits::default())
+                .map_err(contract_to_js_error)?;
         Ok(JsMarket {
             inner: Arc::new(inner),
         })

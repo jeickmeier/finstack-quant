@@ -886,10 +886,5 @@ pub(crate) fn register(parent: &Bound<'_, PyModule>) -> PyResult<()> {
     parent.add_class::<PyOasResult>()?;
     parent.add_class::<PyTrancheMetrics>()?;
     parent.add_class::<PyScenarioTable>()?;
-    for &name in EXPORTS {
-        parent
-            .getattr(name)?
-            .setattr("__module__", "finstack_quant.valuations.instruments")?;
-    }
     Ok(())
 }

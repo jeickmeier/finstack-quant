@@ -96,7 +96,9 @@ impl RiskBudget {
     ///
     /// # Errors
     ///
-    /// Returns an error if the budget targets do not sum close to 1.0.
+    /// Returns an error if numeric inputs are non-finite, target fractions
+    /// are outside `[0, 1]` or do not sum close to 1.0, or the utilization
+    /// threshold is not strictly positive.
     pub(crate) fn evaluate_components<'a, I>(
         &self,
         components: I,
@@ -105,6 +107,23 @@ impl RiskBudget {
     where
         I: IntoIterator<Item = (&'a String, f64)>,
     {
+        if !portfolio_var.is_finite() {
+            return Err(finstack_quant_core::Error::Validation(
+                "portfolio_var must be finite".into(),
+            ));
+        }
+        if !self.utilization_threshold.is_finite() || self.utilization_threshold <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "utilization_threshold must be finite and strictly positive".into(),
+            ));
+        }
+        for (position_id, target) in &self.targets {
+            if !target.is_finite() || !(0.0..=1.0).contains(target) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "risk budget target for '{position_id}' must be finite and in [0, 1]"
+                )));
+            }
+        }
         let target_sum: f64 = self.targets.values().sum();
         if !self.targets.is_empty() && (target_sum - 1.0).abs() > 0.05 {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -113,6 +132,13 @@ impl RiskBudget {
         }
 
         let actual_by_id: IndexMap<&String, f64> = components.into_iter().collect();
+        for (position_id, component) in &actual_by_id {
+            if !component.is_finite() {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "component VaR for '{position_id}' must be finite"
+                )));
+            }
+        }
         let portfolio_var_magnitude = portfolio_var.abs();
         if portfolio_var_magnitude <= 1e-15
             && actual_by_id
@@ -215,8 +241,8 @@ impl RiskBudget {
 
 /// Evaluate a per-position risk budget from parallel binding-style arrays.
 ///
-/// Owns the input validation (array-length agreement and duplicate
-/// position-id rejection) so the Python `evaluate_risk_budget` function and the
+/// Owns numeric-domain, array-length and duplicate-position validation so
+/// the Python `evaluate_risk_budget` function and the
 /// WASM `evaluateRiskBudget` export share one behavior and one set of
 /// diagnostics.
 ///
@@ -224,21 +250,23 @@ impl RiskBudget {
 ///
 /// * `position_ids` - Position identifiers, one per entry of `actual_var` and
 ///   `target_var_pct`. Duplicates are rejected.
-/// * `actual_var` - Actual component VaR per position (loss convention;
+/// * `actual_var` - Finite actual component VaR per position (loss convention;
 ///   signs are kept — a component whose sign opposes `portfolio_var` is a
 ///   diversifier and reports negative utilization).
-/// * `target_var_pct` - Target fraction of portfolio VaR per position; a
-///   non-empty budget must sum to ~1.0.
-/// * `portfolio_var` - Total portfolio VaR used to convert target fractions
+/// * `target_var_pct` - Finite target fraction in `[0, 1]` per position; a
+///   non-empty budget must sum to ~1.0 (within 0.05).
+/// * `portfolio_var` - Finite total portfolio VaR used to convert target fractions
 ///   into levels.
-/// * `utilization_threshold` - Utilization ratio above which a breach is
+/// * `utilization_threshold` - Finite, strictly positive utilization ratio above which a breach is
 ///   flagged (see [`DEFAULT_UTILIZATION_THRESHOLD`]).
 ///
 /// # Errors
 ///
 /// Returns [`finstack_quant_core::Error::Validation`] when the array lengths
 /// disagree, a position id is duplicated, the non-empty targets do not sum to
-/// ~1.0, or non-zero component VaR is paired with zero portfolio VaR.
+/// ~1.0, numeric inputs are non-finite, a target fraction is outside `[0, 1]`,
+/// the threshold is non-positive, or non-zero component VaR is paired with
+/// zero portfolio VaR.
 pub fn evaluate_risk_budget_arrays(
     position_ids: Vec<String>,
     actual_var: &[f64],
@@ -289,6 +317,39 @@ mod tests {
     use super::*;
 
     type TestResult = finstack_quant_core::Result<()>;
+
+    #[test]
+    fn risk_budget_rejects_invalid_numeric_inputs_instead_of_reporting_no_breach() {
+        let ids = vec!["P".to_string()];
+        for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(
+                evaluate_risk_budget_arrays(ids.clone(), &[value], &[1.0], -100.0, 1.2).is_err()
+            );
+            assert!(
+                evaluate_risk_budget_arrays(ids.clone(), &[-100.0], &[1.0], value, 1.2).is_err()
+            );
+            assert!(
+                evaluate_risk_budget_arrays(ids.clone(), &[-100.0], &[value], -100.0, 1.2).is_err()
+            );
+            assert!(
+                evaluate_risk_budget_arrays(ids.clone(), &[-100.0], &[1.0], -100.0, value).is_err()
+            );
+        }
+        for threshold in [0.0, -1.0] {
+            assert!(
+                evaluate_risk_budget_arrays(ids.clone(), &[-100.0], &[1.0], -100.0, threshold)
+                    .is_err()
+            );
+        }
+        assert!(evaluate_risk_budget_arrays(
+            vec!["A".into(), "B".into()],
+            &[-120.0, 20.0],
+            &[-0.1, 1.1],
+            -100.0,
+            1.2,
+        )
+        .is_err());
+    }
 
     fn budget(targets: IndexMap<String, f64>, utilization_threshold: f64) -> RiskBudget {
         RiskBudget {

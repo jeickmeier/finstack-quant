@@ -88,11 +88,11 @@ is `pub(crate)`.
   `instruments::pricing::time` (`relative_df_discount_curve`, `curve_time`,
   `rate_period_on_dates`); do not call `disc.df(t)` with an
   instrument-derived `t`.
-- **Leg pricing is shared.** `instruments::pricing::swap_legs` owns
-  `pv_fixed_leg` and `pv_floating_leg`;
-  `common_impl::pricing::overnight` owns compounded-RFR projection (lookback,
-  observation shift, cutoff, fixings) for IRS, cap/floor and their risk paths.
-  A new swap-like leg reuses these rather than open-coding a period loop.
+- **Leg pricing is shared.** `instruments::pricing::swap_legs` owns fixed-leg
+  valuation and payment-delay handling. Floating coupons use the canonical
+  cashflow builder; `common_impl::pricing::overnight` supplies compounded-RFR
+  projection (lookback, observation shift, cutoff, fixings) for IRS, cap/floor
+  and their risk paths. New swap-like legs reuse these kernels.
 - **Rates are `f64`, notionals are `Money`.** Spreads are basis points on the
   wire (`Bps`, `spread_bp`) and decimals internally. `Decimal`-typed wire fields
   convert through `common_impl::numeric::decimal_to_f64` so a bad value is a

@@ -1013,7 +1013,7 @@ fn project(generator: &PyGeneratorMatrix, t: f64) -> PyResult<PyTransitionMatrix
 }
 
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "migration")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "migration")?;
     m.setattr(
         "__doc__",
         "Credit migration models: rating scales, transition matrices, CTMC generators, and seeded simulation.",
@@ -1040,13 +1040,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "migration",
-        "finstack_quant.models.credit",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
 
     Ok(())

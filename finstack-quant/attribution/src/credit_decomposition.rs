@@ -554,8 +554,12 @@ mod tests {
     fn spec(t0: Date, t1: Date, bond: Bond) -> AttributionSpec {
         AttributionSpec {
             instrument: InstrumentJson::Bond(bond),
-            market_t0: (&MarketContext::new()).into(),
-            market_t1: (&MarketContext::new()).into(),
+            market_t0: (&MarketContext::new())
+                .try_into()
+                .expect("coherent market snapshot"),
+            market_t1: (&MarketContext::new())
+                .try_into()
+                .expect("coherent market snapshot"),
             as_of_t0: t0,
             as_of_t1: t1,
             method: AttributionMethod::MetricsBased,

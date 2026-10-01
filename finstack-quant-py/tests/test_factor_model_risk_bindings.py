@@ -117,3 +117,55 @@ def test_sensitivity_reporting_currency_is_required_and_survives_round_trip() ->
     assert compute_pnl_profiles("[]", "[]", market, "2025-01-15", "EUR") == []
     with pytest.raises(ValueError, match="Matching variant not found"):
         compute_factor_sensitivities("[]", "[]", market, "2025-01-15", "INVALID")
+
+
+def test_canonical_nested_sensitivity_json_roundtrips_and_reconciles_risk() -> None:
+    payload = {
+        "base_currency": "EUR",
+        "position_ids": ["A", "B"],
+        "factor_ids": ["F"],
+        "data": [[2.0], [3.0]],
+    }
+    matrix = SensitivityMatrix.from_json(json.dumps(payload))
+    assert json.loads(matrix.to_json()) == payload
+    assert (matrix.n_positions, matrix.n_factors) == (2, 1)
+    assert matrix.delta(1, 0) == 3.0
+    assert matrix.position_deltas(0) == [2.0]
+    assert matrix.factor_deltas(0) == [2.0, 3.0]
+    assert json.loads(pickle.loads(pickle.dumps(matrix)).to_json()) == payload  # noqa: S301
+    decomposition = decompose_factor_risk(matrix, '{"factor_ids":["F"],"n":1,"data":[0.04]}')
+    assert decomposition.total_risk == pytest.approx(1.0)
+    contributions = decomposition.position_factor_contributions()
+    assert sum(row["risk_contribution"] for row in contributions) == pytest.approx(1.0)
+    assert decomposition.to_position_factor_dataframe()["position_id"].tolist() == ["A", "B"]
+    assert decomposition.to_factor_dataframe()["factor_id"].tolist() == ["F"]
+
+
+@pytest.mark.parametrize("data", [[], [[], []], [[]], [[2.0, 3.0]], [2.0], [[None]]])
+def test_malformed_sensitivity_storage_is_rejected_before_access_or_risk(data: object) -> None:
+    payload = {"base_currency": "USD", "position_ids": ["P"], "factor_ids": ["F"], "data": data}
+    with pytest.raises(ValueError, match=r"sensitivity data|invalid type"):
+        SensitivityMatrix.from_json(json.dumps(payload))
+
+
+@pytest.mark.parametrize("extra", [{"n_factors": 1}, {"unexpected": True}])
+def test_sensitivity_json_rejects_obsolete_and_unknown_fields(extra: dict[str, object]) -> None:
+    payload = {
+        "base_currency": "USD",
+        "position_ids": ["P"],
+        "factor_ids": ["F"],
+        "data": [[2.0]],
+        **extra,
+    }
+    with pytest.raises(ValueError, match="unknown field"):
+        SensitivityMatrix.from_json(json.dumps(payload))
+
+
+def test_sensitivity_json_requires_currency_and_preserves_zero_factor_rows() -> None:
+    payload = {"position_ids": ["P"], "factor_ids": [], "data": [[]]}
+    with pytest.raises(ValueError, match="base_currency"):
+        SensitivityMatrix.from_json(json.dumps(payload))
+    payload["base_currency"] = "USD"
+    matrix = SensitivityMatrix.from_json(json.dumps(payload))
+    assert matrix.position_deltas(0) == []
+    assert json.loads(matrix.to_json()) == payload

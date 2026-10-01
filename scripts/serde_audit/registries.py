@@ -90,7 +90,15 @@ ONE_WAY_EXCEPTIONS = (
     *_exception(
         "portfolio",
         "src/sensitivity/json.rs",
-        ("SensitivityMatrixJson", "FactorPnlProfileJson"),
+        ("SensitivityMatrixJson",),
+        "binding-view",
+        "Validated monetary sensitivity projection shared by host bindings.",
+        allowed_missing=frozenset({"JsonSchema"}),
+    ),
+    *_exception(
+        "portfolio",
+        "src/sensitivity/json.rs",
+        ("FactorPnlProfileJson",),
         "binding-view",
         "JSON projection for host bindings, not an inbound Rust contract.",
     ),
@@ -180,11 +188,6 @@ NON_MAINTAINED_SERDE_EXCEPTIONS = (
     *_computed_output("models", "src/credit/scoring/types.rs", ("ScoringResult",)),
     *_computed_output("core", "src/expr/ast.rs", ("EvaluationResult",)),
     *_in_process_spec("core", "src/market_data/bumps.rs", ("BumpSpec",)),
-    *_computed_output(
-        "core",
-        "src/market_data/term_structures/base_correlation.rs",
-        ("ArbitrageCheckResult",),
-    ),
     *_computed_output("core", "src/money/fx/types.rs", ("FxRateResult",)),
     *_classification(
         "core",

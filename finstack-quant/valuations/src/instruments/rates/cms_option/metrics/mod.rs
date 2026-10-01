@@ -185,7 +185,7 @@ impl MetricCalculator for VannaCalculator {
                 inst.cms_tenor,
                 "CmsOption cms_tenor",
             )?;
-            let swap_end = swap_start.add_months(swap_tenor_months);
+            let swap_end = swap_start.add_months(swap_tenor_months)?;
 
             let (forward_swap_rate, _) =
                 reference_swap.forward_rate_and_annuity(curves, as_of, swap_start, swap_end)?;
@@ -218,6 +218,10 @@ impl MetricCalculator for VannaCalculator {
                 inst.cms_tenor.to_years(),
                 forward_swap_rate,
                 reference_swap.payments_per_year()?,
+                crate::instruments::rates::cms_common::signed_act365f_year_fraction(
+                    swap_start,
+                    payment_date,
+                )?,
             );
             let d_conv_d_vol = if vol.abs() > 1e-10 {
                 2.0 * conv_adj / vol

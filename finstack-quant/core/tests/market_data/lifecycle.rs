@@ -107,6 +107,11 @@ fn derived_fx_shocks_preserve_dates_policies_and_reciprocals() {
     let bumped = matrix
         .with_bumped_rate(Currency::EUR, Currency::GBP, 0.1, base())
         .unwrap();
+    assert!(bumped
+        .get_serializable_state()
+        .expect("stable FX state")
+        .provider_quotes
+        .is_empty());
     for on in [base(), Date::from_ordinal_date(2025, 182).unwrap()] {
         for policy in [
             FxConversionPolicy::CashflowDate,
@@ -119,6 +124,80 @@ fn derived_fx_shocks_preserve_dates_policies_and_reciprocals() {
             assert!((bumped.rate(reverse).unwrap().rate - 1.0 / expected).abs() < 1e-12);
         }
     }
+}
+
+#[test]
+fn heterogeneous_context_rolls_backward_with_each_curves_time_basis() {
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::{
+        BasisSpreadCurve, DiscountCurve, ForwardCurve, HazardCurve,
+    };
+
+    let discount = DiscountCurve::builder("DISCOUNT")
+        .base_date(base())
+        .day_count(DayCount::Act360)
+        .knots([(0.0, 1.0), (1.0, 0.95), (2.0, 0.9)])
+        .build()
+        .expect("discount curve");
+    let forward = ForwardCurve::builder("FORWARD", 0.25)
+        .base_date(base())
+        .day_count(DayCount::Act365F)
+        .knots([(0.0, 0.03), (1.0, 0.04), (2.0, 0.05)])
+        .build()
+        .expect("forward curve");
+    let hazard = HazardCurve::builder("HAZARD")
+        .base_date(base())
+        .day_count(DayCount::Act360)
+        .recovery_rate(0.4)
+        .knots([(1.0, 0.01), (2.0, 0.02)])
+        .build()
+        .expect("hazard curve");
+    let inflation = InflationCurve::builder("INFLATION")
+        .base_date(base())
+        .base_cpi(300.0)
+        .knots([(0.0, 300.0), (1.0, 306.0), (2.0, 312.0)])
+        .build()
+        .expect("inflation curve");
+    let price = PriceCurve::builder("PRICE")
+        .base_date(base())
+        .knots([(0.0, 100.0), (1.0, 110.0), (2.0, 120.0)])
+        .build()
+        .expect("price curve");
+    let basis = BasisSpreadCurve::builder("BASIS")
+        .base_date(base())
+        .knots([(0.0, 0.001), (1.0, 0.002), (2.0, 0.003)])
+        .build()
+        .expect("basis curve");
+    let expected_discount = discount.df(1.0) / discount.df(-30.0 / 360.0);
+    let context = MarketContext::new()
+        .insert(discount)
+        .insert(forward)
+        .insert(hazard)
+        .insert(inflation)
+        .insert(price)
+        .insert(basis);
+    let rolled = context.roll_forward(-30).expect("backward context roll");
+    let expected_base = base() - time::Duration::days(30);
+    let discount = rolled.get_discount("DISCOUNT").expect("discount");
+    assert_eq!(discount.base_date(), expected_base);
+    assert!((discount.df(1.0 + 30.0 / 360.0) - expected_discount).abs() < 1e-12);
+    let forward = rolled.get_forward("FORWARD").expect("forward");
+    assert_eq!(forward.base_date(), expected_base);
+    assert!((forward.rate(1.0 + 30.0 / 365.0) - 0.04).abs() < 1e-12);
+    let hazard = rolled.get_hazard("HAZARD").expect("hazard");
+    assert_eq!(hazard.base_date(), expected_base);
+    assert!((hazard.hazard_rate(1.0 + 30.0 / 360.0) - 0.01).abs() < 1e-12);
+    let inflation = rolled.get_inflation_curve("INFLATION").expect("inflation");
+    assert_eq!(inflation.base_date(), expected_base);
+    assert!((inflation.cpi(1.0 + 30.0 / 365.0) - 306.0).abs() < 1e-12);
+    assert_eq!(
+        rolled.get_price_curve("PRICE").expect("price").base_date(),
+        expected_base
+    );
+    assert_eq!(
+        rolled.get_basis_spread("BASIS").expect("basis").base_date(),
+        expected_base
+    );
 }
 
 #[test]

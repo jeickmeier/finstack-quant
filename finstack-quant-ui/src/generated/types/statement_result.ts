@@ -825,8 +825,8 @@ export interface D_677810Bf9653Cfb0A467 {
   /**
    * Net cash interest **received** during the period.
    *
-   * Non-zero only for two-leg instruments whose legs net to a receipt (e.g.
-   * an in-the-money pay-fixed swap). Stored as a positive amount, like the
+   * Includes net hedge receipts and receipts from negative-rate debt coupons.
+   * Stored as a positive amount, like the
    * outflow-oriented fields, and reported through the `cs.interest_income`
    * namespace.
    *
@@ -838,7 +838,8 @@ export interface D_677810Bf9653Cfb0A467 {
   principal_payment: D_1B5716Dde9957A614F3C6;
 }
 /**
- * Accrued interest not yet paid (liability)
+ * Debt coupon interest accrued but not yet paid (liability).
+ * Hedge-leg accrual valuation is outside the debt-service contract and is zero.
  */
 export interface D_1B5716Dde9957A614F3C {
   /**

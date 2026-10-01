@@ -15,6 +15,16 @@ fn norm_cdf(x: f64) -> f64 {
     special_functions::norm_cdf(x)
 }
 
+/// Natural logarithm of the standard normal cumulative distribution function.
+///
+/// # Arguments
+/// - `x`: Standard-normal threshold in standard-deviation units; accepts infinities and propagates NaN.
+#[pyfunction]
+#[pyo3(text_signature = "(x)")]
+fn log_norm_cdf(x: f64) -> f64 {
+    special_functions::log_norm_cdf(x)
+}
+
 /// Standard normal probability density function φ(x).
 ///
 /// Returns (1/√(2π)) · exp(-x²/2).
@@ -87,13 +97,14 @@ fn student_t_inv_cdf(p: f64, df: f64) -> PyResult<f64> {
 
 /// Build the `finstack_quant.core.math.special_functions` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "special_functions")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "special_functions")?;
     m.setattr(
         "__doc__",
         "Special mathematical functions: normal distribution, error function, gamma.",
     )?;
 
     m.add_function(wrap_pyfunction!(norm_cdf, &m)?)?;
+    m.add_function(wrap_pyfunction!(log_norm_cdf, &m)?)?;
     m.add_function(wrap_pyfunction!(norm_pdf, &m)?)?;
     m.add_function(wrap_pyfunction!(norm_cdf_with_params, &m)?)?;
     m.add_function(wrap_pyfunction!(norm_pdf_with_params, &m)?)?;
@@ -108,6 +119,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         [
             "erf",
             "ln_gamma",
+            "log_norm_cdf",
             "norm_cdf",
             "norm_cdf_with_params",
             "norm_pdf",
@@ -118,13 +130,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "special_functions",
-        "finstack_quant.core.math",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
 
     Ok(())

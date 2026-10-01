@@ -11,6 +11,7 @@
 mod approximations;
 mod bachelier;
 mod black;
+mod checked;
 
 pub use approximations::{
     brenner_subrahmanyam_approx, implied_vol_initial_guess, manaster_koehler_approx,
@@ -21,7 +22,11 @@ pub use bachelier::{
 };
 pub use black::{
     black_call, black_delta_call, black_delta_put, black_gamma, black_put, black_scholes_spot_call,
-    black_scholes_spot_put, black_shifted_call, black_shifted_put, black_shifted_vega, black_vega,
+    black_scholes_spot_put, black_shifted_call, black_shifted_put, black_vega,
+};
+pub use checked::{
+    bachelier_greeks, bachelier_price, black76_greeks, black76_price, black_shifted_price,
+    black_shifted_vega, ForwardGreeks,
 };
 
 #[cfg(test)]
@@ -29,6 +34,58 @@ mod tests {
     use super::*;
 
     const EPSILON: f64 = 1e-10;
+
+    #[test]
+    fn spot_helpers_price_zero_volatility_from_discounted_forward() {
+        let call = black_scholes_spot_call(100.0, 102.0, 0.05, 0.0, 0.0, 1.0);
+        let put = black_scholes_spot_put(100.0, 102.0, 0.05, 0.0, 0.0, 1.0);
+        let discounted_intrinsic = 100.0 - 102.0 * (-0.05_f64).exp();
+        assert!((call - 2.974_598_700_927_174_4).abs() < 1e-12);
+        assert_eq!(put, 0.0);
+        assert!((call - put - discounted_intrinsic).abs() < 1e-12);
+        let negative_carry_call = black_scholes_spot_call(100.0, 100.0, 0.0, 0.05, 0.0, 1.0);
+        let negative_carry_put = black_scholes_spot_put(100.0, 100.0, 0.0, 0.05, 0.0, 1.0);
+        assert_eq!(negative_carry_call, 0.0);
+        assert!((negative_carry_put - 100.0 * (1.0 - (-0.05_f64).exp())).abs() < 1e-12);
+        assert_eq!(
+            black_scholes_spot_call(110.0, 100.0, 0.05, 0.02, 0.0, 0.0),
+            10.0
+        );
+    }
+
+    #[test]
+    fn raw_forward_formulas_do_not_mask_invalid_inputs_at_boundaries() {
+        type ForwardFormula = fn(f64, f64, f64, f64) -> f64;
+        let formulas: [ForwardFormula; 12] = [
+            black_call,
+            black_put,
+            black_delta_call,
+            black_delta_put,
+            black_gamma,
+            black_vega,
+            bachelier_call,
+            bachelier_put,
+            bachelier_delta_call,
+            bachelier_delta_put,
+            bachelier_gamma,
+            bachelier_vega,
+        ];
+        for formula in formulas {
+            for base in [[100.0, 100.0, 0.2, 0.0], [100.0, 100.0, 0.0, 1.0]] {
+                for index in 0..4 {
+                    for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+                        let mut args = base;
+                        args[index] = invalid;
+                        assert!(formula(args[0], args[1], args[2], args[3]).is_nan());
+                    }
+                }
+            }
+            assert!(formula(100.0, 100.0, -0.2, 1.0).is_nan());
+            assert!(formula(100.0, 100.0, 0.2, -1.0).is_nan());
+        }
+        assert!(black_scholes_spot_call(100.0, 100.0, 0.05, 0.0, -0.2, 1.0).is_nan());
+        assert!(black_scholes_spot_put(f64::NAN, 100.0, 0.05, 0.0, 0.0, 0.0).is_nan());
+    }
 
     #[test]
     fn test_bachelier_put_call_parity() {

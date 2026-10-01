@@ -19,31 +19,6 @@ pub(crate) fn is_truthy(value: f64) -> bool {
     value.is_finite() && value != 0.0
 }
 
-/// Decode an internal `__cs__<component>__<instrument>` reference.
-pub(crate) fn decode_cs_reference(name: &str) -> Option<(&str, &str)> {
-    let rest = name.strip_prefix("__cs__")?;
-    let (component, instrument) = rest.split_once("__")?;
-    if component.is_empty() || instrument.is_empty() || instrument.contains("__") {
-        return None;
-    }
-    Some((component, instrument))
-}
-
-/// Get a single historical value for a node or cs-reference at a target period.
-pub(crate) fn get_historical_column_value(
-    context: &EvaluationContext,
-    node_name: &str,
-    target_period: &PeriodId,
-) -> Option<f64> {
-    if let Some((component, instrument_or_total)) = decode_cs_reference(node_name) {
-        context
-            .get_historical_cs_value(component, instrument_or_total, target_period)
-            .ok()
-    } else {
-        context.get_historical_value(node_name, target_period)
-    }
-}
-
 /// Collect historical values sorted chronologically.
 ///
 /// Returns an `Rc<BTreeMap<PeriodId, f64>>` containing all historical periods
@@ -70,40 +45,20 @@ pub(crate) fn collect_historical_values_sorted(
     // historical map, so without this filter nested aggregates (e.g.
     // `lag(rolling_mean(x, 4), 2)`) would window data after the lagged
     // evaluation point — a silent look-ahead bias.
-    let sorted_periods =
-        if let Some((component, instrument_or_total)) = decode_cs_reference(node_name) {
-            let mut sorted_periods = BTreeMap::new();
-            for period in context.historical_capital_structure_cashflows.keys() {
-                if *period > context.period_id {
-                    continue;
-                }
-                if let Ok(value) =
-                    context.get_historical_cs_value(component, instrument_or_total, period)
-                {
-                    sorted_periods.insert(*period, value);
-                }
+    let mut sorted_periods = BTreeMap::new();
+    if let Some(&column) = context.node_to_column.get(node_name) {
+        for (period, row) in context.history.iter() {
+            if period > context.period_id {
+                continue;
             }
-            if let Ok(current) = context.get_cs_value(component, instrument_or_total) {
-                sorted_periods.insert(context.period_id, current);
+            if let Some(value) = row.get(column).copied().flatten() {
+                sorted_periods.insert(period, value);
             }
-            sorted_periods
-        } else {
-            let mut sorted_periods = BTreeMap::new();
-            if let Some(&column) = context.node_to_column.get(node_name) {
-                for (period, row) in context.history.iter() {
-                    if period > context.period_id {
-                        continue;
-                    }
-                    if let Some(value) = row.get(column).copied().flatten() {
-                        sorted_periods.insert(period, value);
-                    }
-                }
-            }
-            if let Ok(current) = context.get_value(node_name) {
-                sorted_periods.insert(context.period_id, current);
-            }
-            sorted_periods
-        };
+        }
+    }
+    if let Ok(current) = context.get_value(node_name) {
+        sorted_periods.insert(context.period_id, current);
+    }
 
     let result = Rc::new(sorted_periods);
     context
@@ -111,6 +66,33 @@ pub(crate) fn collect_historical_values_sorted(
         .borrow_mut()
         .insert(node_name.to_string(), Rc::clone(&result));
     Ok(result)
+}
+
+/// Collect the dedicated capital-structure reference's visible snapshots.
+///
+/// Capital-structure references are AST nodes, not specially encoded statement
+/// columns. Keep their lookup on the typed cashflow path so missing instruments
+/// and incompatible aggregate currencies retain their diagnostic errors.
+pub(crate) fn collect_cs_values_sorted(
+    component: &str,
+    instrument_or_total: &str,
+    context: &EvaluationContext,
+) -> Result<Rc<BTreeMap<PeriodId, f64>>> {
+    let mut values = BTreeMap::new();
+    for period in context.historical_capital_structure_cashflows.keys() {
+        if *period >= context.period_id {
+            continue;
+        }
+        values.insert(
+            *period,
+            context.get_historical_cs_value(component, instrument_or_total, period)?,
+        );
+    }
+    values.insert(
+        context.period_id,
+        context.get_cs_value(component, instrument_or_total)?,
+    );
+    Ok(Rc::new(values))
 }
 
 /// Collect values for a rolling window in chronological order.
@@ -139,24 +121,6 @@ pub(crate) fn collect_all_historical_values(
 ) -> Result<Vec<f64>> {
     let sorted = collect_historical_values_sorted(node_name, context)?;
     Ok(sorted.values().copied().collect())
-}
-
-/// Collect values for a node over a closed period range [start, end].
-///
-/// Periods are compared using their natural ordering. Values are returned in
-/// chronological order (oldest -> newest).
-pub(crate) fn collect_period_range_values(
-    node_name: &str,
-    context: &EvaluationContext,
-    start: PeriodId,
-    end: PeriodId,
-) -> Result<Vec<f64>> {
-    let sorted = collect_historical_values_sorted(node_name, context)?;
-    Ok(sorted
-        .iter()
-        .filter(|(period, _)| **period >= start && **period <= end)
-        .map(|(_, value)| *value)
-        .collect())
 }
 
 #[cfg(test)]

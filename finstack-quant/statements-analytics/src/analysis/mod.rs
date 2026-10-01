@@ -37,6 +37,8 @@ pub(crate) mod credit;
 
 pub(crate) mod scenarios;
 
+mod units;
+
 /// Domain-level validation checks (reconciliation, consistency, credit).
 pub mod checks;
 

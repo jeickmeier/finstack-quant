@@ -264,7 +264,7 @@ impl VmCalculator {
         loop {
             let contractual = match self.csa.vm_params.frequency {
                 MarginTenor::Weekly => start + time::Duration::weeks(i64::from(period)),
-                MarginTenor::Monthly => start.add_months(period),
+                MarginTenor::Monthly => start.add_months(period)?,
                 MarginTenor::Daily | MarginTenor::OnDemand => return Ok(dates),
             };
             if contractual > end {

@@ -22,10 +22,14 @@ pub struct EclStageRequest {
     /// Remaining contractual or behavioural maturity in years, used as the
     /// lifetime-PD comparison horizon subject to the canonical SICR cap.
     pub remaining_maturity_years: f64,
-    /// Current lifetime probability of default as a decimal probability.
+    /// Current remaining-lifetime probability of default as a decimal in
+    /// `[0, 1]`, measured from the reporting date.
     pub current_pd: f64,
-    /// Lifetime probability of default at initial recognition as a decimal
-    /// probability.
+    /// Initial-recognition expected PD for the same remaining window as
+    /// `current_pd`, conditional on survival to the reporting date, as a
+    /// decimal in `[0, 1]`. The caller aligns the original risk estimate to
+    /// this window; the full original contractual-lifetime PD is not suitable
+    /// for an aged exposure.
     pub origination_pd: f64,
     /// Current days past due; `None` applies the performing-exposure default
     /// of zero days.
@@ -70,7 +74,7 @@ impl EclStageRequest {
         let defaults = StagingConfig::default();
         let config = StagingConfig {
             pd_delta_absolute: self.pd_delta_absolute.unwrap_or(defaults.pd_delta_absolute),
-            pd_delta_relative: f64::INFINITY,
+            pd_delta_relative: None,
             rating_downgrade_notches: 0,
             rating_scale_labels: None,
             dpd_stage2_threshold: if self.dpd_stage2_trigger.unwrap_or(true) {
@@ -124,10 +128,12 @@ impl EclStageRequest {
 /// * `exposure` - Credit exposure whose DPD, qualitative flags, rating labels
 ///   and cure state drive the staging waterfall. Its `ead`, `lgd` and `eir`
 ///   are not read by staging.
-/// * `current_pd` - Current lifetime probability of default as a decimal in
-///   `[0, 1]`, compared against `origination_pd` for the SICR test.
-/// * `origination_pd` - Lifetime probability of default at initial recognition
-///   as a decimal in `[0, 1]`.
+/// * `current_pd` - Current remaining-lifetime probability of default as a
+///   decimal in `[0, 1]`, measured from the reporting date.
+/// * `origination_pd` - Initial-recognition expected PD for that same remaining
+///   window, conditional on survival to the reporting date, as a decimal in
+///   `[0, 1]`. For original cumulative curve `F`, age `a`, and remaining horizon
+///   `h`, supply `(F(a + h) - F(a)) / (1 - F(a))`.
 /// * `config` - Staging policy thresholds, backstops and curing rules.
 ///
 /// # Returns
@@ -136,7 +142,11 @@ impl EclStageRequest {
 ///
 /// # Errors
 ///
-/// Rejects non-finite or out-of-range PDs, maturity and policy thresholds.
+/// Rejects non-finite or out-of-range PDs, maturity and policy thresholds,
+/// or an unrepresentable relative PD ratio when that trigger is enabled,
+/// including positive `current_pd` against zero `origination_pd`. Both PDs
+/// zero mean no increase; disabling the relative trigger allows an
+/// absolute-only comparison from a zero origination baseline.
 /// Current and origination PDs remain separate even when rating labels match.
 pub fn classify_exposure(
     exposure: &Exposure,
@@ -205,7 +215,7 @@ pub fn compute_ecl_for_exposure(
             lgd_override: None,
         })
         .collect::<Vec<_>>();
-    let mut config = EclConfigBuilder::new().scenarios(macro_scenarios.clone());
+    let mut config = EclConfigBuilder::new();
     if let Some(years) = bucket_width_years {
         config = config.bucket_width(years);
     }
@@ -443,7 +453,7 @@ mod tests {
         .unwrap_err();
         assert_eq!(
             invalid_weights.to_string(),
-            "Validation error: Scenario weights must sum to 1.0, got 0.400000"
+            "Validation error: scenario weights must sum to 1.0, got 0.400000"
         );
 
         let missing_curve = EclRequest {

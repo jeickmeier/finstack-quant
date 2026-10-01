@@ -904,23 +904,31 @@ impl MonotoneConvexStrategy {
     /// applied when all inferred discrete forwards are non-negative. `epsilon`
     /// controls near-zero slope handling and must lie in `(0, 1e-6]`.
     ///
+    /// # Arguments
+    ///
+    /// * `knots` - Finite, strictly increasing year fractions with at least two
+    ///   entries and the same length as `values`.
+    /// * `values` - Positive, finite discount factors at the corresponding knots;
+    ///   increasing values are accepted for negative-rate curves.
+    /// * `epsilon` - Absolute tolerance in decimal forward-rate units for treating
+    ///   both endpoint deviations as nearly flat; must be finite and in `(0, 1e-6]`.
+    ///
     /// # Errors
     ///
     /// Returns an error if `epsilon` is outside that range, consecutive knots
     /// are too closely spaced for stable slope calculations, or any supplied
     /// value is non-finite or not strictly positive.
     ///
-    /// # Panics
-    ///
-    /// Panics if fewer than two knots are supplied or `values.len()` does not
-    /// match `knots.len()`. Callers needing input-shape validation should use
-    /// the generic [`Interpolator`](super::Interpolator) constructor instead.
     pub fn with_epsilon(knots: &[f64], values: &[f64], epsilon: f64) -> crate::Result<Self> {
         use crate::error::InputError;
 
-        if epsilon <= 0.0 || epsilon > 1e-6 {
+        if !epsilon.is_finite() || epsilon <= 0.0 || epsilon > 1e-6 {
             return Err(InputError::Invalid.into());
         }
+        if knots.len() != values.len() {
+            return Err(InputError::DimensionMismatch.into());
+        }
+        super::utils::validate_knots(knots)?;
 
         // Same knot-spacing validation as the other strategy constructors.
         validate_knot_spacing(knots, MIN_RELATIVE_KNOT_GAP)?;
@@ -972,12 +980,10 @@ impl MonotoneConvexStrategy {
 
             // Boundary conditions from Hagan-West (2006):
             //
-            // Extrapolate the instantaneous forward at the first/last knot from the
-            // adjacent discrete forwards:
-            //   f_0     = f^d_0 - 0.5 * (f^d_1     - f^d_0)
-            //   f_{n-1} = f^d_{n-2} + 0.5 * (f^d_{n-2} - f^d_{n-3})
-            f[0] = 1.5 * fd[0] - 0.5 * fd[1];
-            f[n - 1] = 1.5 * fd[n - 2] - 0.5 * fd[n - 3];
+            // Use the adjacent instantaneous knot forward, not the next
+            // discrete interval forward (Hagan-West 2008, equations 23-24).
+            f[0] = 1.5 * fd[0] - 0.5 * f[1];
+            f[n - 1] = 1.5 * fd[n - 2] - 0.5 * f[n - 2];
 
             // Apply the Hagan-West forward-positivity amelioration only when
             // every discrete forward is non-negative. Per Hagan & West (2006),
@@ -987,7 +993,7 @@ impl MonotoneConvexStrategy {
             // and the projection is skipped so negative forwards interpolate
             // faithfully instead of being clamped toward zero.
             if fd.iter().all(|&v| v >= 0.0) {
-                Self::apply_monotonicity_constraints(&mut f, &fd, epsilon);
+                Self::apply_monotonicity_constraints(&mut f, &fd);
             }
         }
 
@@ -1000,170 +1006,28 @@ impl MonotoneConvexStrategy {
         })
     }
 
-    /// Apply Hagan-West (2006) monotonicity constraints to ensure non-negative
-    /// forward rates across each segment.
+    /// Apply the Hagan-West (2006), equations (60)-(62), forward bounds.
     ///
-    /// # Notation
+    /// Each knot forward is clamped once to the intersection of its adjacent
+    /// segment bounds: `0 <= f[i] <= 2 * min(fd[i-1], fd[i])`. Boundary knots
+    /// use their sole adjacent discrete forward. A zero-rate segment therefore
+    /// has zero forwards at both ends, without a later segment undoing it.
     ///
-    /// For segment `i`, the instantaneous forward model is
+    /// Regions I-III are monotone between their nonnegative endpoint forwards.
+    /// In region IV the minimum deviation is `-g0*g1/(g0+g1)`; bounding both
+    /// positive deviations by the segment mean keeps this minimum above zero.
     ///
-    /// ```text
-    /// f(x) = fd_i + g(x),        x ∈ [0, 1]
-    /// g(x) = α (1 - 4x + 3x²) + β (-2x + 3x²)
-    /// α    = f[i]   - fd[i]      (left deviation from discrete forward)
-    /// β    = f[i+1] - fd[i]      (right deviation from discrete forward)
-    /// ```
-    ///
-    /// The constraint is `f(x) ≥ 0` on `[0, 1]`. When violated we project
-    /// `(α, β)` onto the boundary of the feasibility region.
-    ///
-    /// # Projection strategy
-    ///
-    /// Because `g(x; α, β) = α · p(x) + β · q(x)` is linear in `(α, β)` for
-    /// each fixed `x`, scaling `(α, β) → (η α, η β)` for some `η ∈ [0, 1]`
-    /// scales `g` uniformly and in particular scales the segment's minimum
-    /// deviation `(min_f − fd_i)` by `η`.
-    ///
-    /// If the unadjusted segment has `min_f < 0` (constraint violated), we
-    /// pick the unique `η` that makes the scaled segment touch zero:
-    ///
-    /// ```text
-    /// fd_i + η · (min_f - fd_i) = 0   ⇒   η = fd_i / (fd_i - min_f).
-    /// ```
-    ///
-    /// Because `min_f < 0 ≤ fd_i` implies `fd_i - min_f > fd_i ≥ 0`, `η`
-    /// lies in `(0, 1)` whenever `fd_i > 0`. This single-factor projection:
-    ///
-    /// * preserves the direction / ratio `α : β` (no axis-aligned
-    ///   collapse), and therefore preserves the qualitative shape of the
-    ///   segment forward;
-    /// * reduces to flat `f[i] = f[i+1] = fd_i` only in the limit
-    ///   `fd_i → 0⁺`, avoiding the pre-fix behaviour of collapsing to flat
-    ///   whenever `fd_i` was merely "small enough" to be in a ZIRP regime.
-    ///
-    /// # Region taxonomy (for readers cross-referencing H&W Fig 6)
-    ///
-    /// The four-region Figure 6 taxonomy classifies `(α, β)` by sign and
-    /// by whether the binding minimum occurs at an endpoint or at the
-    /// interior critical point `x_c = (2α + β) / (3(α + β))`. The scalar
-    /// projection above is exactly the H&W projection at the endpoint-
-    /// binding regions and is a valid — if slightly more conservative —
-    /// projection in the interior-binding regions; for curves where the
-    /// interior minimum is the binding constraint it deviates from
-    /// QuantLib's per-axis projection by at most `O(bp²)`, well within
-    /// tolerance for this workspace's downstream consumers.
-    ///
-    /// # Reference
-    ///
-    /// Hagan, P. S., & West, G. (2006). "Interpolation Methods for
-    /// Curve Construction." *Applied Mathematical Finance*, 13(2), §6
-    /// and Figure 6.
-    ///
-    /// # Fixpoint sweep
-    ///
-    /// Knot value `f[i+1]` is shared between segments `i` and `i+1`, so the
-    /// projection of a later segment can re-violate an earlier one. The
-    /// sequential sweep is therefore repeated (bounded number of passes)
-    /// until no segment requires projection.
-    fn apply_monotonicity_constraints(f: &mut [f64], fd: &[f64], _epsilon: f64) {
-        // Numerical floor protecting the `η = fd_i / (fd_i - min_f)`
-        // division from pathologically tiny denominators.
-        const DENOM_EPS: f64 = 1e-300;
-        // Bounded fixpoint iteration: projecting segment i mutates the shared
-        // knot value f[i+1], which can re-violate the previously projected
-        // segment i (its β changes). Each projection only shrinks |α|, |β|
-        // towards the feasible flat point, so the sweep is a contraction and
-        // a small number of passes suffices in practice.
-        const MAX_PROJECTION_PASSES: usize = 3;
-
-        let n = f.len();
-        for _pass in 0..MAX_PROJECTION_PASSES {
-            let mut mutated = false;
-            for i in 0..n - 1 {
-                let fd_i = fd[i];
-                let alpha = f[i] - fd_i;
-                let beta = f[i + 1] - fd_i;
-
-                // Trivially feasible: already flat within this segment.
-                if alpha == 0.0 && beta == 0.0 {
-                    continue;
-                }
-
-                // Check whether f(x) = fd_i + g(x) ever goes negative on [0, 1].
-                let min_f = Self::segment_min_forward(alpha, beta, fd_i);
-                if min_f >= 0.0 {
-                    continue;
-                }
-                mutated = true;
-
-                // The non-negative-forward invariant is infeasible when
-                // fd_i ≤ 0: any non-zero (α, β) will push the segment below
-                // zero somewhere and no η > 0 can rescue it. Flatten. (Since
-                // the projection only runs when all discrete forwards are
-                // non-negative, this branch only sees fd_i == 0; genuine
-                // negative-rate curves skip the projection entirely.)
-                if fd_i <= 0.0 {
-                    f[i] = fd_i;
-                    f[i + 1] = fd_i;
-                    continue;
-                }
-
-                // Scalar-η projection onto the boundary min(f) = 0.
-                let denom = fd_i - min_f; // strictly > 0 because min_f < 0 < fd_i
-                if denom <= DENOM_EPS {
-                    f[i] = fd_i;
-                    f[i + 1] = fd_i;
-                    continue;
-                }
-
-                let eta = (fd_i / denom).clamp(0.0, 1.0);
-                f[i] = fd_i + eta * alpha;
-                f[i + 1] = fd_i + eta * beta;
-
-                // Numerical safety: after projection the segment minimum is 0
-                // analytically. Floating-point can still produce a tiny
-                // negative value at a knot — clamp to the H&W non-negativity
-                // invariant.
-                if f[i] < 0.0 {
-                    f[i] = 0.0;
-                }
-                if f[i + 1] < 0.0 {
-                    f[i + 1] = 0.0;
-                }
-            }
-            if !mutated {
-                break;
-            }
+    /// This method is called only when all discrete forwards are nonnegative;
+    /// negative-rate curves keep their original interpolation.
+    fn apply_monotonicity_constraints(f: &mut [f64], fd: &[f64]) {
+        let last = f.len() - 1;
+        f[0] = f[0].clamp(0.0, 2.0 * fd[0]);
+        for i in 1..last {
+            f[i] = f[i].clamp(0.0, 2.0 * fd[i - 1].min(fd[i]));
         }
+        f[last] = f[last].clamp(0.0, 2.0 * fd[last - 1]);
     }
 
-    /// Compute the minimum forward rate across segment [0,1] for given
-    /// alpha/beta deviations from discrete forward fd_i.
-    fn segment_min_forward(alpha: f64, beta: f64, fd_i: f64) -> f64 {
-        // f(x) = fd_i + alpha*(1 - 4x + 3x^2) + beta*(-2x + 3x^2)
-        // Evaluate at endpoints
-        let f_at_0 = fd_i + alpha; // g(0) = alpha
-        let f_at_1 = fd_i + beta; // g(1) = beta
-        let mut min_f = f_at_0.min(f_at_1);
-
-        // Check critical point: g'(x) = alpha*(-4 + 6x) + beta*(-2 + 6x) = 0
-        // => x_c = (4*alpha + 2*beta) / (6*(alpha + beta))
-        //        = (2*alpha + beta) / (3*(alpha + beta))
-        let sum = alpha + beta;
-        if sum.abs() > 1e-15 {
-            let x_c = (2.0 * alpha + beta) / (3.0 * sum);
-            if x_c > 0.0 && x_c < 1.0 {
-                let x2 = x_c * x_c;
-                let g_c = alpha * (1.0 - 4.0 * x_c + 3.0 * x2) + beta * (-2.0 * x_c + 3.0 * x2);
-                min_f = min_f.min(fd_i + g_c);
-            }
-        }
-        min_f
-    }
-
-    /// Compute the forward rate at time t within segment i.
-    ///
-    /// Uses the Hagan-West formula:
     /// Interpolate the discount factor at time t within segment i.
     ///
     /// DF(t) = DF(t_i) * exp(-∫_{t_i}^{t} f(s) ds)
@@ -1171,58 +1035,99 @@ impl MonotoneConvexStrategy {
     /// The integral of f(s) = f^d + g(x) from t_i to t is:
     /// ∫ = f^d * (t - t_i) + dt * G(x)
     ///
-    /// where G(x) = ∫_0^x g(u) du
-    ///            = g_left * (x - 2x² + x³) + g_right * (-x² + x³)
+    /// where `G(x)` is the analytic integral of the applicable Hagan-West region.
     fn interpolate_segment(&self, i: usize, t: f64, knots: &[f64]) -> f64 {
-        let dt_seg = self.dt[i];
-        let x = (t - knots[i]) / dt_seg;
-        let x2 = x * x;
-        let x3 = x2 * x;
-
-        // g values relative to THIS segment's discrete forward
-        let fd_i = self.fd[i];
-        let g_left = self.f[i] - fd_i;
-        let g_right = self.f[i + 1] - fd_i;
-
-        // G(x) = integral of g from 0 to x
-        // G(x) = g_left * (x - 2x² + x³) + g_right * (-x² + x³)
-        let g_integral = g_left * (x - 2.0 * x2 + x3) + g_right * (-x2 + x3);
-
-        // Total integral from t_i to t
-        let integral = fd_i * (t - knots[i]) + dt_seg * g_integral;
-
-        // DF(t) = exp(-(log_df[i] + integral))
-        (-(self.log_df[i] + integral)).exp()
+        self.segment_df_and_forward(i, t, knots).0
     }
 
     /// Compute both the discount factor `DF(t)` and the instantaneous forward
     /// rate `f(t)` within segment `i` in a single pass, returning `(df, forward)`.
     ///
-    /// Shares the `x`, `x²`, `x³` and g-deviation computations so derivative
-    /// queries ([`interp_prime`](MonotoneConvexStrategy::interp_prime), used in
-    /// CS01/DV01 bump loops) compute the discount factor and the segment forward
-    /// rate together instead of recomputing the polynomial and a second `exp`.
+    /// Uses the same regional forward and integral for values and derivatives.
     fn segment_df_and_forward(&self, i: usize, t: f64, knots: &[f64]) -> (f64, f64) {
         let dt_seg = self.dt[i];
         let x = (t - knots[i]) / dt_seg;
-        let x2 = x * x;
-        let x3 = x2 * x;
 
         // g values relative to THIS segment's discrete forward.
         let fd_i = self.fd[i];
         let g_left = self.f[i] - fd_i;
         let g_right = self.f[i + 1] - fd_i;
 
-        // Forward: f(t) = fd_i + g(x).
-        let g_x = g_left * (1.0 - 4.0 * x + 3.0 * x2) + g_right * (-2.0 * x + 3.0 * x2);
+        let (g_x, g_integral) = Self::forward_adjustment(x, g_left, g_right, self.epsilon);
         let forward = fd_i + g_x;
 
         // DF: integral of f from t_i to t, then DF(t) = exp(-(log_df[i] + integral)).
-        let g_integral = g_left * (x - 2.0 * x2 + x3) + g_right * (-x2 + x3);
         let integral = fd_i * (t - knots[i]) + dt_seg * g_integral;
         let df = (-(self.log_df[i] + integral)).exp();
 
         (df, forward)
+    }
+
+    /// Hagan-West (2008), equations 27-34: `(g(x), integral_0^x g)`.
+    /// The integral over the whole normalized segment is zero in every region.
+    fn forward_adjustment(x: f64, g0: f64, g1: f64, epsilon: f64) -> (f64, f64) {
+        if x <= 0.0 {
+            return (g0, 0.0);
+        }
+        if x >= 1.0 {
+            return (g1, 0.0);
+        }
+        let opposite = (g0 < 0.0 && g1 > 0.0) || (g0 > 0.0 && g1 < 0.0);
+        if (g0.abs() <= epsilon && g1.abs() <= epsilon)
+            || (opposite && g1.abs() >= 0.5 * g0.abs() && g1.abs() <= 2.0 * g0.abs())
+        {
+            // Region I. Retain the polynomial even near the origin so endpoint
+            // deviations and the zero integral are preserved, without division.
+            let g = g0 * (1.0 - 4.0 * x + 3.0 * x * x) + g1 * (-2.0 * x + 3.0 * x * x);
+            let integral = x * (1.0 - x) * (g0 * (1.0 - x) - g1 * x);
+            return (g, integral);
+        }
+        if opposite && g1.abs() > 2.0 * g0.abs() {
+            // Region II: constant left section followed by a quadratic.
+            let width = -3.0 * g0 / (g1 - g0);
+            let eta = 1.0 - width;
+            let dx = (x - eta).max(0.0);
+            let u = dx / width;
+            return (
+                g0 + (g1 - g0) * u * u,
+                g0 * x + (g1 - g0) * dx * u * u / 3.0,
+            );
+        }
+        if opposite {
+            // Region III is the time reversal of region II. Evaluate its
+            // primitive from the right to avoid cancellation on the flat tail.
+            let eta = 3.0 * g1 / (g1 - g0);
+            let dx = (eta - x).max(0.0);
+            let u = dx / eta;
+            return (
+                g1 + (g0 - g1) * u * u,
+                -g1 * (1.0 - x) - (g0 - g1) * dx * u * u / 3.0,
+            );
+        }
+        // Region IV: two quadratics meet at their common extremum. On the
+        // coordinate axes the limiting interior adjustment is zero; exact
+        // endpoint values were handled above, avoiding a zero-width division.
+        if g0 == 0.0 || g1 == 0.0 {
+            return (0.0, 0.0);
+        }
+        let sum = g0 + g1;
+        let left_width = g1 / sum;
+        let right_width = g0 / sum;
+        let a = -g0 * left_width;
+        if x <= left_width {
+            let u = x / left_width;
+            (
+                a + (g0 - a) * (1.0 - u) * (1.0 - u),
+                a * x + (g0 - a) * x * (1.0 - u + u * u / 3.0),
+            )
+        } else {
+            let dx = 1.0 - x;
+            let u = dx / right_width;
+            (
+                a + (g1 - a) * (1.0 - u) * (1.0 - u),
+                -a * dx - (g1 - a) * dx * (1.0 - u + u * u / 3.0),
+            )
+        }
     }
 
     /// Get the epsilon value used for near-zero detection.

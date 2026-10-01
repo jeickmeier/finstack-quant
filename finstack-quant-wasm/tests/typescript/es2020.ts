@@ -4,6 +4,9 @@ import {
   features,
   models,
   portfolio,
+  scenarios,
+  type AttributionFactor,
+  type HorizonResult,
   type MaterializationPhases,
   type MaterializationReport,
   type WasmOwned,
@@ -18,8 +21,16 @@ const materializationParseNanos: number = materializationPhases.parse;
 const materializationTimingAvailable: boolean = materializationReport.timing_available;
 const materializationDependencies: number = materializationReport.dependencies;
 
-const discountFromArray = new core.DiscountCurve('USD-OIS', '2025-01-01', numberValues);
-const discountFromTyped = new core.DiscountCurve('USD-OIS-TYPED', '2025-01-01', typedValues);
+const discountFromArray = new core.DiscountCurve({
+  id: 'USD-OIS',
+  baseDate: '2025-01-01',
+  knots: numberValues,
+});
+const discountFromTyped = new core.DiscountCurve({
+  id: 'USD-OIS-TYPED',
+  baseDate: '2025-01-01',
+  knots: typedValues,
+});
 
 const forwardFromArray = new core.ForwardCurve({
   id: 'USD-SOFR-3M',
@@ -122,3 +133,30 @@ valuation.covenants = undefined;
 // @ts-expect-error Metadata is a complete canonical structure.
 valuation.meta = {};
 void [roundingMode, covenantReports, explanation];
+
+const scenarioSpec = scenarios.buildScenarioSpec('metadata', []);
+const scenarioName: string | null | undefined = scenarioSpec.name;
+scenarioSpec.name = null;
+scenarioSpec.description = null;
+const horizon: HorizonResult = scenarios.computeHorizonReturn('{}', '{}', '2025-01-15', '{}');
+const horizonReturn: number | null = horizon.total_return;
+const horizonAnnualized: number | null = horizon.annualized_return;
+const horizonInitialAmount: string = horizon.initial_value.amount;
+const horizonDays: number | null = horizon.horizon_days;
+const horizonFactor: AttributionFactor = 'carry';
+const carryContribution: number | null = horizon.factor_contributions[horizonFactor];
+const horizonOperations: number = horizon.scenario_report.operations_applied;
+// @ts-expect-error Undefined compounded returns must be handled by the caller.
+const requiredAnnualized: number = horizon.annualized_return;
+// @ts-expect-error Factor keys use canonical Rust attribution names.
+void horizon.factor_contributions.rates;
+void [
+  scenarioName,
+  horizonReturn,
+  horizonAnnualized,
+  horizonInitialAmount,
+  horizonDays,
+  carryContribution,
+  horizonOperations,
+  requiredAnnualized,
+];

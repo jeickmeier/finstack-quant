@@ -120,7 +120,9 @@ fn create_market() -> MarketContext {
 
     source_market
         .insert(index_curve)
+        .insert(Arc::clone(&index_data.base_correlation_curve))
         .insert_credit_index("CDX.NA.IG.42", index_data)
+        .expect("Credit index dependencies should be registered")
 }
 
 fn create_market_with_issuers(num_issuers: usize) -> MarketContext {
@@ -197,9 +199,20 @@ fn create_market_with_issuers(num_issuers: usize) -> MarketContext {
         .build()
         .unwrap();
 
-    source_market
+    let mut market = source_market
         .insert(index_curve)
+        .insert(Arc::clone(&index_data.base_correlation_curve));
+    for curve in index_data
+        .issuer_credit_curves
+        .as_ref()
+        .expect("Issuer curves should exist")
+        .values()
+    {
+        market.insert_mut(Arc::clone(curve));
+    }
+    market
         .insert_credit_index("CDX.NA.IG.42", index_data)
+        .expect("Credit index dependencies should be registered")
 }
 
 fn bench_cds_tranche_npv(c: &mut Criterion) {

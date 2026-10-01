@@ -8,8 +8,9 @@ import { checkGraph } from "../../scripts/check-registry.mjs";
 import {
   itemMetadata,
   metadataInputs,
+  pinWasm,
 } from "../../scripts/registry-metadata.mjs";
-it("derives canonical IDs and published registry versions", async () => {
+it("derives canonical IDs and registry versions", async () => {
   const cwd = fileURLToPath(new URL("../../", import.meta.url));
   const { items } = await loadRegistry({ cwd });
   const graph = checkGraph(items),
@@ -45,34 +46,23 @@ it("derives canonical IDs and published registry versions", async () => {
     schemaIds: ["https://example.test/canonical-bond"],
   });
 });
-it("keeps the published registry pin independent of the local WASM package", async () => {
+it("pins registry items to the sibling workspace WASM package", async () => {
   const directory = await mkdtemp(
     path.join(tmpdir(), "finstack-registry-metadata-"),
   );
   try {
     const cwd = path.join(directory, "ui");
-    const packageDirectory = path.join(
-      directory,
-      "node_modules/finstack-quant-wasm",
-    );
+    const packageDirectory = path.join(directory, "finstack-quant-wasm");
     await mkdir(path.join(cwd, "src/generated"), { recursive: true });
     await mkdir(packageDirectory, { recursive: true });
     const files = [
       [
         path.join(cwd, "package.json"),
-        {
-          name: "registry-test",
-          version: "1.2.3",
-          registryWasmVersion: "0.8.0",
-        },
+        { name: "registry-test", version: "1.2.3" },
       ],
       [
         path.join(packageDirectory, "package.json"),
-        {
-          name: "finstack-quant-wasm",
-          version: "4.5.6",
-          exports: { "./package.json": "./package.json" },
-        },
+        { name: "finstack-quant-wasm", version: "4.5.6" },
       ],
       [path.join(cwd, "src/generated/roots.json"), []],
       [path.join(cwd, "src/contract-provenance.json"), { entries: [] }],
@@ -82,11 +72,17 @@ it("keeps the published registry pin independent of the local WASM package", asy
     );
     await expect(metadataInputs(cwd)).resolves.toEqual({
       version: "1.2.3",
-      wasmVersion: "0.8.0",
+      wasmVersion: "4.5.6",
       roots: [],
       provenance: { entries: [] },
     });
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+it("repins WASM dependencies and leaves others untouched", () => {
+  expect(
+    pinWasm(["react@19.2.8", "finstack-quant-wasm@0.0.1"], "4.5.6"),
+  ).toEqual(["react@19.2.8", "finstack-quant-wasm@4.5.6"]);
+  expect(pinWasm(undefined, "4.5.6")).toBeUndefined();
 });

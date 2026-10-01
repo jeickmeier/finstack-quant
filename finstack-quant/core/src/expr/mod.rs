@@ -37,6 +37,15 @@
 //! back across the output vector unless the function name explicitly says
 //! `rolling_*`.
 //!
+//! `std` and `var` use population estimators (denominator `n`, `ddof=0`),
+//! excluding NaNs. They broadcast NaN when fewer than two observations remain.
+//! Rolling variance and standard deviation also use `ddof=0`, but require a
+//! complete window with no NaNs. EWM variance/std use normalized population
+//! moments without sample-bias correction and start at zero for one observation.
+//! Rolling sum/mean propagate NaNs within the window and recover after they
+//! expire; a single sign of infinity yields that infinity, while both signs
+//! yield NaN until one sign leaves the window.
+//!
 //! # Quick example
 //!
 //! ```rust
@@ -55,6 +64,10 @@
 //! let cols = [data.as_slice()];
 //! let result = compiled.eval(&context, &cols, EvalOpts::default())?;
 //! assert_eq!(result.values.len(), 5);
+//!
+//! // Population variance of [1, 2, 3, 4, 5] is 2, broadcast to every row.
+//! let variance = CompiledExpr::new(Expr::call(Function::Var, vec![Expr::column("x")]));
+//! assert_eq!(variance.eval(&context, &cols, EvalOpts::default())?.values, vec![2.0; 5]);
 //! # Ok::<(), finstack_quant_core::Error>(())
 //! ```
 //!
@@ -66,8 +79,9 @@
 //! 3. Results are deterministic for the same inputs and evaluation options.
 //! 4. The module does not depend on external DataFrame libraries.
 //!
-//! Exponential-weighted semantics follow common pandas-style usage when
-//! parameters match.
+//! Exponential weights are normalized over the observed history when `adjust`
+//! is enabled; the recursive form seeds from the first non-NaN observation.
+//! Missing observations emit NaN without advancing either weighting mode.
 
 mod ast;
 mod ast_walk;

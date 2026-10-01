@@ -35,6 +35,32 @@ fn surface_node(surface: &VolSurface, expiry: f64, strike: f64) -> f64 {
     surface.vols()[row * surface.strikes().len() + column]
 }
 
+#[test]
+fn vol_cube_accessors_reject_each_out_of_bounds_axis_before_flattening() {
+    let params = SabrParameterData::new(0.03, 0.5, -0.2, 0.3).expect("SABR node");
+    let cube = VolCube::from_grid(
+        "CUBE",
+        &[1.0, 2.0],
+        &[1.0, 2.0],
+        &[params; 4],
+        &[0.01, 0.02, 0.03, 0.04],
+    )
+    .expect("cube");
+    assert!((cube.forward_at(1, 0) - 0.03).abs() < 1e-12);
+    for (expiry, tenor) in [(0, 2), (2, 0), (usize::MAX, usize::MAX)] {
+        assert!(std::panic::catch_unwind(|| cube.forward_at(expiry, tenor)).is_err());
+        assert!(std::panic::catch_unwind(|| cube.params_at(expiry, tenor)).is_err());
+    }
+}
+
+#[test]
+fn roll_forward_rejects_extreme_date_offsets() {
+    let context = MarketContext::new().insert(sample_discount_curve("USD-OIS"));
+    for days in [i64::MIN, i64::MAX] {
+        assert!(context.roll_forward(days).is_err());
+    }
+}
+
 // Simple static FX provider for testing
 struct StaticFxProvider;
 impl FxProvider for StaticFxProvider {
@@ -210,7 +236,10 @@ fn market_context_manages_fx_and_scalars() {
         .insert_series(series)
         .insert_inflation_index("US-CPI", index)
         .insert_dividends(dividends)
+        .insert(Arc::clone(&credit_index.index_credit_curve))
+        .insert(Arc::clone(&credit_index.base_correlation_curve))
         .insert_credit_index("CDX", credit_index)
+        .expect("canonical credit index")
         .insert_surface(vol_surface.clone())
         .insert_price("USD-PRIME", MarketScalar::Unitless(0.05));
 
@@ -363,6 +392,7 @@ fn market_context_roll_forward_keeps_credit_index_curves_consistent() {
         .insert(hazard)
         .insert(base_corr)
         .insert_credit_index("CDX-IG", credit_index)
+        .expect("canonical credit index")
         .roll_forward(30)
         .unwrap();
 
@@ -399,6 +429,7 @@ fn generic_curve_replace_rebinds_credit_index_dependencies() {
         .insert(original_hazard)
         .insert(base_corr)
         .insert_credit_index("CDX-IG", credit_index)
+        .expect("canonical credit index")
         .insert(replacement_hazard);
 
     let direct_hazard = ctx.get_hazard("CDX").unwrap();
@@ -407,6 +438,225 @@ fn generic_curve_replace_rebinds_credit_index_dependencies() {
         bundled_credit_index.index_credit_curve.base_date(),
         direct_hazard.base_date()
     );
+}
+
+#[test]
+fn credit_index_insert_uses_canonical_dependencies_before_roundtrip_or_other_inserts() {
+    use finstack_quant_core::market_data::term_structures::{BaseCorrelationCurve, HazardCurve};
+    use std::collections::BTreeMap;
+
+    let hazard = |id: &str, rate| {
+        Arc::new(
+            HazardCurve::builder(id)
+                .base_date(sample_base_date())
+                .recovery_rate(0.4)
+                .knots([(0.0, rate), (5.0, rate)])
+                .build()
+                .expect("hazard"),
+        )
+    };
+    let canonical_hazard = hazard("INDEX-HAZ", 0.02);
+    let canonical_issuer = hazard("ISSUER-HAZ", 0.03);
+    let canonical_correlation = Arc::new(sample_base_correlation_curve("CORR"));
+    let stale_correlation = Arc::new(
+        BaseCorrelationCurve::builder("CORR")
+            .knots([(3.0, 0.1), (100.0, 0.15)])
+            .build()
+            .expect("stale correlation"),
+    );
+    let index = CreditIndexData::builder()
+        .num_constituents(1)
+        .recovery_rate(0.4)
+        .index_credit_curve(hazard("INDEX-HAZ", 0.1))
+        .base_correlation_curve(stale_correlation)
+        .issuer_curves(BTreeMap::from([(
+            "ISSUER".to_owned(),
+            hazard("ISSUER-HAZ", 0.2),
+        )]))
+        .build()
+        .expect("index");
+    let context = MarketContext::new()
+        .insert(Arc::clone(&canonical_hazard))
+        .insert(Arc::clone(&canonical_issuer))
+        .insert(Arc::clone(&canonical_correlation))
+        .insert_credit_index("INDEX", index)
+        .expect("all dependencies present");
+    let index = context.get_credit_index("INDEX").expect("index");
+    assert!(Arc::ptr_eq(&index.index_credit_curve, &canonical_hazard));
+    assert!(Arc::ptr_eq(
+        &index.base_correlation_curve,
+        &canonical_correlation
+    ));
+    assert!(Arc::ptr_eq(
+        &index.issuer_credit_curves.as_ref().expect("issuer curves")["ISSUER"],
+        &canonical_issuer,
+    ));
+
+    let restored: MarketContext =
+        serde_json::from_str(&serde_json::to_string(&context).expect("serialize canonical market"))
+            .expect("restore canonical market");
+    let unrelated = context.clone().insert(sample_discount_curve("UNRELATED"));
+    for market in [&context, &restored, &unrelated] {
+        let index = market.get_credit_index("INDEX").expect("index");
+        assert!((index.index_credit_curve.sp(5.0) - (-0.1_f64).exp()).abs() < 1e-14);
+        assert!(Arc::ptr_eq(
+            &index.index_credit_curve,
+            &market.get_hazard("INDEX-HAZ").expect("canonical hazard"),
+        ));
+        assert!(Arc::ptr_eq(
+            &index.base_correlation_curve,
+            &market
+                .get_base_correlation("CORR")
+                .expect("canonical correlation"),
+        ));
+    }
+}
+
+#[test]
+fn credit_index_insert_rejects_missing_or_wrong_type_dependencies_atomically() {
+    use std::collections::BTreeMap;
+
+    let hazard = Arc::new(sample_hazard_curve("CDX"));
+    let correlation = Arc::new(sample_base_correlation_curve("CDX-BC"));
+    let index = CreditIndexData::builder()
+        .num_constituents(1)
+        .recovery_rate(0.4)
+        .index_credit_curve(Arc::clone(&hazard))
+        .base_correlation_curve(Arc::clone(&correlation))
+        .build()
+        .expect("index");
+    for mut context in [
+        MarketContext::new(),
+        MarketContext::new().insert(Arc::clone(&hazard)),
+        MarketContext::new()
+            .insert(sample_discount_curve("CDX"))
+            .insert(Arc::clone(&correlation)),
+    ] {
+        let before = serde_json::to_string(&context).expect("before");
+        assert!(context
+            .insert_credit_index_mut("INDEX", index.clone())
+            .is_err());
+        assert_eq!(serde_json::to_string(&context).expect("after"), before);
+    }
+
+    let mut context = MarketContext::new()
+        .insert(hazard)
+        .insert(correlation)
+        .insert_credit_index("INDEX", index.clone())
+        .expect("index dependencies");
+    let original = context.get_credit_index("INDEX").expect("original index");
+    let mut missing_issuer = index;
+    missing_issuer.issuer_credit_curves = Some(BTreeMap::from([(
+        "ISSUER".to_owned(),
+        Arc::new(sample_hazard_curve("MISSING-ISSUER")),
+    )]));
+    assert!(context
+        .insert_credit_index_mut("INDEX", missing_issuer)
+        .is_err());
+    assert!(Arc::ptr_eq(
+        &context.get_credit_index("INDEX").expect("unchanged index"),
+        &original
+    ));
+}
+
+#[test]
+fn credit_index_insert_revalidates_publicly_mutable_fields() {
+    use std::collections::BTreeMap;
+
+    let hazard = Arc::new(sample_hazard_curve("HAZ"));
+    let correlation = Arc::new(sample_base_correlation_curve("CORR"));
+    let index = CreditIndexData::builder()
+        .num_constituents(2)
+        .recovery_rate(0.4)
+        .index_credit_curve(Arc::clone(&hazard))
+        .base_correlation_curve(Arc::clone(&correlation))
+        .issuer_curves(BTreeMap::from([
+            ("A".to_owned(), Arc::clone(&hazard)),
+            ("B".to_owned(), Arc::clone(&hazard)),
+        ]))
+        .issuer_weights(BTreeMap::from([
+            ("A".to_owned(), 0.5),
+            ("B".to_owned(), 0.5),
+        ]))
+        .build()
+        .expect("valid aggregate");
+    let mut context = MarketContext::new()
+        .insert(hazard)
+        .insert(correlation)
+        .insert_credit_index("INDEX", index.clone())
+        .expect("canonical aggregate");
+    let mutations: [fn(&mut CreditIndexData); 7] = [
+        |data| data.num_constituents = 0,
+        |data| data.num_constituents = 3,
+        |data| data.recovery_rate = f64::NAN,
+        |data| data.recovery_rate = -0.1,
+        |data| {
+            data.issuer_credit_curves
+                .as_mut()
+                .expect("curves")
+                .remove("B");
+        },
+        |data| {
+            data.issuer_weights = Some(BTreeMap::from([("A".to_owned(), 1.0)]));
+        },
+        |data| {
+            data.issuer_recovery_rates = Some(BTreeMap::from([("UNKNOWN".to_owned(), 0.4)]));
+        },
+    ];
+    let before = serde_json::to_string(&context).expect("valid snapshot");
+    for mutate in mutations {
+        let mut invalid = index.clone();
+        mutate(&mut invalid);
+        assert!(context.insert_credit_index_mut("INDEX", invalid).is_err());
+        assert_eq!(
+            serde_json::to_string(&context).expect("unchanged snapshot"),
+            before
+        );
+    }
+    let _: MarketContext = serde_json::from_str(&before).expect("accepted state restores");
+}
+
+#[test]
+fn retaining_curves_removes_dangling_indices_and_collateral_mappings() {
+    use std::collections::BTreeMap;
+
+    let hazard = Arc::new(sample_hazard_curve("INDEX-HAZ"));
+    let issuer = Arc::new(sample_hazard_curve("ISSUER-HAZ"));
+    let correlation = Arc::new(sample_base_correlation_curve("CORR"));
+    let index = CreditIndexData::builder()
+        .num_constituents(1)
+        .recovery_rate(0.4)
+        .index_credit_curve(Arc::clone(&hazard))
+        .base_correlation_curve(Arc::clone(&correlation))
+        .issuer_curves(BTreeMap::from([("ISSUER".to_owned(), Arc::clone(&issuer))]))
+        .build()
+        .expect("index");
+    let context = MarketContext::new()
+        .insert(hazard)
+        .insert(issuer)
+        .insert(correlation)
+        .insert(sample_discount_curve("USD-OIS"))
+        .map_collateral("CSA", CurveId::new("USD-OIS"))
+        .insert_credit_index("INDEX", index)
+        .expect("index dependencies");
+
+    for removed in ["INDEX-HAZ", "ISSUER-HAZ", "CORR"] {
+        let mut retained = context.clone();
+        let info = retained.retain_curves_mut(|id, _| id.as_str() != removed);
+        assert_eq!(info.invalidated_credit_indices, vec![CurveId::new("INDEX")]);
+        assert!(retained.get_credit_index("INDEX").is_err());
+        assert!(retained.get_collateral("CSA").is_ok());
+        let json = serde_json::to_string(&retained).expect("snapshot after retention");
+        let _: MarketContext = serde_json::from_str(&json).expect("no dangling references");
+    }
+
+    let mut retained = context;
+    let info = retained.retain_curves_mut(|id, _| id.as_str() != "USD-OIS");
+    assert!(info.invalidated_credit_indices.is_empty());
+    assert!(retained.get_credit_index("INDEX").is_ok());
+    assert!(retained.get_collateral("CSA").is_err());
+    let json = serde_json::to_string(&retained).expect("snapshot without discount curve");
+    let _: MarketContext = serde_json::from_str(&json).expect("no dangling collateral mapping");
 }
 
 #[test]
@@ -426,6 +676,7 @@ fn cross_type_curve_replacement_invalidates_credit_index_dependency() {
         .insert(original_hazard)
         .insert(base_corr)
         .insert_credit_index("CDX-IG", credit_index)
+        .expect("canonical credit index")
         .insert(replacement_discount);
 
     assert!(ctx.get_discount("CDX").is_ok());
@@ -529,7 +780,8 @@ fn market_context_update_and_bump_failures() {
     let ctx = MarketContext::new()
         .insert(hazard.as_ref().clone())
         .insert(base_corr.as_ref().clone())
-        .insert_credit_index("CDX", credit_index);
+        .insert_credit_index("CDX", credit_index)
+        .expect("canonical credit index");
     assert!(ctx
         .bump([MarketBump::Curve {
             id: CurveId::new("MISSING"),
@@ -553,7 +805,8 @@ fn market_context_observed_mutations_report_credit_index_rebind_status() {
     let ctx = MarketContext::new()
         .insert(hazard)
         .insert(base_corr)
-        .insert_credit_index("CDX-IG", credit_index);
+        .insert_credit_index("CDX-IG", credit_index)
+        .expect("canonical credit index");
 
     let (bumped, info) = ctx
         .bump_observed([MarketBump::BaseCorrBucketPts {
@@ -570,9 +823,11 @@ fn market_context_observed_mutations_report_credit_index_rebind_status() {
     assert!(bumped.get_credit_index("CDX-IG").is_ok());
 
     let mut cross_type = bumped;
-    cross_type.retain_curves_mut(|id, _| id.as_str() != "CDX");
-    let invalidated = cross_type.rebind_credit_indices_mut();
-    assert_eq!(invalidated, vec![CurveId::from("CDX-IG")]);
+    let info = cross_type.retain_curves_mut(|id, _| id.as_str() != "CDX");
+    assert_eq!(
+        info.invalidated_credit_indices,
+        vec![CurveId::from("CDX-IG")]
+    );
     assert!(cross_type.get_credit_index("CDX-IG").is_err());
 }
 
@@ -664,8 +919,8 @@ fn market_context_snapshot_restore_mutators_drop_and_replace_owned_families() {
         .insert_inflation_index("US-CPI", index)
         .insert_dividends(divs);
 
-    ctx.retain_curves_mut(|id, _| id.as_str() == "USD-OIS")
-        .retain_series_mut(|id, _| id.as_str() == "KEEP")
+    ctx.retain_curves_mut(|id, _| id.as_str() == "USD-OIS");
+    ctx.retain_series_mut(|id, _| id.as_str() == "KEEP")
         .replace_surfaces_mut([(
             CurveId::from("NEW-VOL"),
             Arc::new(
@@ -1061,7 +1316,10 @@ fn market_context_insert_and_stats_setters_cover_remaining_paths() {
 
     // insert_credit_index + insert_fx
     ctx = ctx
+        .insert(Arc::clone(&credit_index.index_credit_curve))
+        .insert(Arc::clone(&credit_index.base_correlation_curve))
         .insert_credit_index("CDX", credit_index)
+        .expect("canonical credit index")
         .insert_fx(sample_fx_matrix());
 
     // map_collateral

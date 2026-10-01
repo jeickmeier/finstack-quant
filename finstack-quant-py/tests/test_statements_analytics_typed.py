@@ -101,7 +101,7 @@ def test_analysis_functions_accept_typed_configs_and_return_typed_results() -> N
     assert sensitivity.get_value(0, "profit", "2025Q2") == pytest.approx(35.0)
     entries = generate_tornado_entries(sensitivity, "profit", "2025Q2")
     assert isinstance(entries[0], TornadoEntry)
-    assert entries[0].parameter_id == "revenue"
+    assert entries[0].parameter_id == "revenue@2025Q2"
     assert TornadoEntry.from_json(entries[0].to_json()).swing == pytest.approx(entries[0].swing)
     assert SensitivityResult.from_json(sensitivity.to_json()).get_value(2, "profit", "2025Q2") == pytest.approx(55.0)
 

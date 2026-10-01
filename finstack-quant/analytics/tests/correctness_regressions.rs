@@ -1,5 +1,5 @@
 //! Regression tests pinning analytics metric values.
-use finstack_quant_analytics::{CagrDayCount, Performance};
+use finstack_quant_analytics::{CagrDayCount, Performance, ReturnKind};
 use finstack_quant_core::dates::{Date, Month, PeriodKind};
 
 fn d(year: i32, month: Month, day: u8) -> Date {
@@ -11,6 +11,96 @@ fn assert_close(actual: f64, expected: f64) {
         (actual - expected).abs() < 1e-12,
         "expected {expected}, got {actual}"
     );
+}
+
+#[test]
+fn treynor_propagates_invalid_cash_before_zero_beta_sentinels() {
+    let dates = (1..=3).map(|day| d(2024, Month::January, day)).collect();
+    let perf = Performance::from_returns(
+        dates,
+        vec![
+            vec![-0.01, 0.0, 0.01],
+            vec![0.01; 3],
+            vec![0.0; 3],
+            vec![-0.01; 3],
+        ],
+        vec!["BENCH".into(), "POS".into(), "ZERO".into(), "NEG".into()],
+        Some("BENCH"),
+        PeriodKind::Daily,
+    )
+    .expect("constant portfolios have estimable zero beta against a varying benchmark");
+
+    for risk_free_rate in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        assert!(perf
+            .treynor(risk_free_rate)
+            .iter()
+            .all(|ratio| ratio.is_nan()));
+    }
+    assert_eq!(
+        perf.treynor(0.0),
+        vec![0.0, f64::INFINITY, 0.0, f64::NEG_INFINITY]
+    );
+}
+
+#[test]
+fn multi_factor_regression_rejects_non_finite_rescaled_coefficients() {
+    let dates = (1..=5).map(|day| d(2024, Month::January, day)).collect();
+    let perf = Performance::from_returns(
+        dates,
+        vec![vec![2e199, 4e199, 6e199, 8e199, 1e200]],
+        vec!["PORT".into()],
+        None,
+        PeriodKind::Daily,
+    )
+    .expect("the supplied return observations are finite");
+    let factor = [2e-151, 4e-151, 6e-151, 8e-151, 1e-150];
+    let error = perf
+        .multi_factor_greeks(0, &[&factor], ReturnKind::Excess)
+        .expect_err("the fitted coefficient is not representable as a finite f64");
+    assert!(error.to_string().contains("finite"));
+}
+
+#[test]
+fn multi_factor_regression_computes_finite_large_residual_volatility() {
+    let scale = 1e200;
+    let dates = (1..=5).map(|day| d(2024, Month::January, day)).collect();
+    let perf = Performance::from_returns(
+        dates,
+        vec![vec![3.0 * scale, scale, 3.0 * scale, scale, 3.0 * scale]],
+        vec!["PORT".into()],
+        None,
+        PeriodKind::Daily,
+    )
+    .expect("the supplied return observations are finite");
+    let factor = [-0.2, -0.1, 0.0, 0.1, 0.2];
+    let fit = perf
+        .multi_factor_greeks(0, &[&factor], ReturnKind::Excess)
+        .expect("squared residual overflow must not reject representable statistics");
+    // The factor is orthogonal to centered returns. The fitted intercept is
+    // 2.2 * scale and SSR is 4.8 * scale^2, with three residual degrees of freedom.
+    assert_close(fit.alpha / scale, 2.2 * 252.0);
+    assert!(fit.betas[0].abs() / scale < 1e-12);
+    assert_close(fit.r_squared, 0.0);
+    assert_close(fit.adjusted_r_squared, -1.0 / 3.0);
+    assert_close(fit.residual_vol / scale, (4.8_f64 / 3.0 * 252.0).sqrt());
+}
+
+#[test]
+fn multi_factor_regression_rejects_annualized_output_overflow() {
+    let dates = (1..=5).map(|day| d(2024, Month::January, day)).collect();
+    let perf = Performance::from_returns(
+        dates,
+        vec![vec![1e307; 5]],
+        vec!["PORT".into()],
+        None,
+        PeriodKind::Daily,
+    )
+    .expect("the supplied constant return observations are finite");
+    let factor = [-0.2, -0.1, 0.0, 0.1, 0.2];
+    let error = perf
+        .multi_factor_greeks(0, &[&factor], ReturnKind::Excess)
+        .expect_err("the annualized intercept overflows despite finite period coefficients");
+    assert!(error.to_string().contains("finite"));
 }
 
 #[test]

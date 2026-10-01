@@ -321,7 +321,8 @@ fn test_convertible_pricing_at_maturity_uses_payoff() {
     .expect("should price");
 
     let conversion_value = 150.0 * 10.0;
-    assert!((price.amount() - conversion_value).abs() < 1e-6);
+    let entitled_coupon = 50.0 * 184.0 / 365.0;
+    assert!((price.amount() - conversion_value - entitled_coupon).abs() < 1e-6);
 }
 
 #[test]
@@ -471,9 +472,10 @@ fn test_mandatory_conversion_forced_at_loss() {
     )
     .expect("should price");
 
-    // conversion_value = 50 * 10 = 500 (must convert, can't choose 1000 redemption)
+    // Forced equity delivery plus the separately entitled final coupon.
+    let entitled_coupon = 50.0 * 184.0 / 365.0;
     assert!(
-        (price_at_mat.amount() - 500.0).abs() < 1.0,
+        (price_at_mat.amount() - 500.0 - entitled_coupon).abs() < 1e-8,
         "Mandatory at maturity should force conversion: got {}",
         price_at_mat.amount()
     );
@@ -1022,4 +1024,245 @@ fn pv_is_continuous_and_delta_bounded_at_conversion_price() {
         (at - odd).abs() / at < 5e-4,
         "200 vs 201 steps diverge: {at} vs {odd}"
     );
+}
+
+/// A live conversion window must be mapped after removing its historical part.
+#[test]
+fn convertible_seasoned_window_preserves_exercise_dates() {
+    use time::macros::date;
+    let mut bond = create_test_bond();
+    bond.maturity = date!(2026 - 01 - 01);
+    let opening = date!(2025 - 02 - 01);
+    let closing = date!(2025 - 04 - 01);
+    bond.conversion.policy = ConversionPolicy::Window {
+        start: opening,
+        end: closing,
+    };
+    let market = create_test_market_context();
+    for as_of in [
+        date!(2025 - 01 - 15),
+        opening,
+        date!(2025 - 03 - 01),
+        closing,
+        date!(2025 - 04 - 02),
+    ] {
+        let steps = (bond.maturity - as_of).whole_days() as usize;
+        let inputs = prepare_for_pricing(&bond, &market, as_of).expect("window inputs");
+        let valuator = ConvertibleBondValuator::new(
+            &bond,
+            &inputs.cashflow_schedule,
+            inputs.time_to_maturity,
+            steps,
+            as_of,
+            &market,
+            inputs.volatility,
+        )
+        .expect("seasoned window");
+        for step in 0..=steps {
+            let date = as_of + time::Duration::days(step as i64);
+            assert_eq!(
+                valuator.conversion_allowed(step, 150.0),
+                opening <= date && date <= closing,
+                "as_of={as_of}, date={date}"
+            );
+        }
+        for tree in [
+            ConvertibleTreeType::Binomial,
+            ConvertibleTreeType::Trinomial,
+        ] {
+            assert!(
+                price_convertible_bond(&with_tree_steps(&bond, steps), &market, tree, as_of)
+                    .expect("window price")
+                    .amount()
+                    .is_finite()
+            );
+        }
+    }
+    // Unlike a voluntary interval, a past mandatory event must not become a
+    // new present-day choice: the untransformed contract remains unsupported.
+    bond.conversion.policy = ConversionPolicy::MandatoryOn(opening);
+    assert!(
+        price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial, closing).is_err()
+    );
+}
+
+fn lifecycle_bond() -> ConvertibleBond {
+    use time::macros::date;
+    let mut bond = create_test_bond();
+    bond.maturity = date!(2026 - 01 - 01);
+    if let crate::instruments::fixed_income::bond::CashflowSpec::Fixed(coupon) =
+        &mut bond.cashflow_spec
+    {
+        coupon.schedule.day_count = DayCount::Thirty360;
+        coupon.schedule.business_day_convention = BusinessDayConvention::Unadjusted;
+    }
+    bond
+}
+
+fn lifecycle_market(as_of: Date, spot: f64) -> MarketContext {
+    MarketContext::new()
+        .insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (1.0, 1.0), (10.0, 1.0)])
+                .build()
+                .expect("flat curve"),
+        )
+        .insert_price("AAPL", MarketScalar::Unitless(spot))
+        .insert_price("AAPL-VOL", MarketScalar::Unitless(0.01))
+        .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.0))
+}
+
+#[test]
+fn convertible_forced_delivery_overrides_put_and_retains_risky_coupon() {
+    use super::tsiveriotis_zhang::{TsiveriotisZhangEngine, TzMarketInputs};
+    use crate::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
+    use finstack_quant_core::market_data::term_structures::HazardCurve;
+    use time::macros::date;
+    let as_of = date!(2025 - 01 - 01);
+    let event = date!(2025 - 07 - 01);
+    for hazard in [0.0, 0.1] {
+        let market = lifecycle_market(as_of, 50.0)
+            .insert(HazardCurve::flat("CREDIT", as_of, hazard, 0.0).expect("hazard curve"));
+        for policy in [
+            ConversionPolicy::MandatoryOn(event),
+            ConversionPolicy::MandatoryVariable {
+                conversion_date: event,
+                lower_conversion_price: 100.0,
+                upper_conversion_price: 120.0,
+            },
+        ] {
+            // Exercise the same forced event both inside a longer tree and at
+            // its terminal node. Only the entitled event-date coupon survives.
+            for maturity in [event, date!(2026 - 01 - 01)] {
+                let mut bond = lifecycle_bond();
+                bond.maturity = maturity;
+                bond.conversion.policy = policy.clone();
+                bond.credit_curve_id = Some("CREDIT".into());
+                bond.recovery_rate = Some(0.0);
+                bond.call_put = Some(CallPutSchedule {
+                    calls: vec![],
+                    puts: vec![CallPut {
+                        start: event,
+                        end: event,
+                        price_pct_of_par: 100.0,
+                        make_whole: None,
+                    }],
+                });
+                let steps = (maturity - as_of).whole_days() as usize;
+                let inputs = prepare_for_pricing(&bond, &market, as_of).expect("inputs");
+                let valuator = ConvertibleBondValuator::new(
+                    &bond,
+                    &inputs.cashflow_schedule,
+                    inputs.time_to_maturity,
+                    steps,
+                    as_of,
+                    &market,
+                    inputs.volatility,
+                )
+                .expect("valuator");
+                let engine = TsiveriotisZhangEngine {
+                    valuator: &valuator,
+                    steps,
+                    time_to_maturity: inputs.time_to_maturity,
+                };
+                let expected_cash = 25.0 * (-hazard * 181.0 / 365.0).exp();
+                for tree in [
+                    ConvertibleTreeType::Binomial,
+                    ConvertibleTreeType::Trinomial,
+                ] {
+                    let (total, cash) = engine
+                        .price(
+                            TzMarketInputs {
+                                spot: 50.0,
+                                volatility: 0.01,
+                                risk_free_rate: 0.0,
+                                dividend_yield: 0.0,
+                            },
+                            tree,
+                        )
+                        .expect("forced price");
+                    assert!((cash - expected_cash).abs() < 1e-8, "{tree:?}: cash={cash}");
+                    assert!(
+                        (total - 500.0 - expected_cash).abs() < 1e-7,
+                        "{tree:?}: total={total}"
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn convertible_exact_maturity_matches_terminal_coupon_and_exercise_policy() {
+    use crate::instruments::fixed_income::bond::{CallPut, CallPutSchedule, CashflowSpec};
+    use time::macros::date;
+    let maturity = date!(2026 - 01 - 01);
+    let cases = [
+        (ConversionPolicy::Voluntary, 150.0, None, 1500.0),
+        (ConversionPolicy::Voluntary, 50.0, Some(110.0), 1100.0),
+        (
+            ConversionPolicy::MandatoryOn(maturity),
+            50.0,
+            Some(110.0),
+            500.0,
+        ),
+        (
+            ConversionPolicy::MandatoryVariable {
+                conversion_date: maturity,
+                lower_conversion_price: 100.0,
+                upper_conversion_price: 120.0,
+            },
+            50.0,
+            Some(110.0),
+            500.0,
+        ),
+        (
+            ConversionPolicy::Window {
+                start: date!(2025 - 02 - 01),
+                end: date!(2025 - 03 - 01),
+            },
+            150.0,
+            None,
+            1000.0,
+        ),
+    ];
+    for (policy, spot, put_pct, ex_coupon) in cases {
+        for pays_coupon in [false, true] {
+            let mut bond = lifecycle_bond();
+            bond.conversion.policy = policy.clone();
+            if !pays_coupon {
+                bond.cashflow_spec = CashflowSpec::default();
+            }
+            bond.call_put = put_pct.map(|price_pct_of_par| CallPutSchedule {
+                calls: vec![],
+                puts: vec![CallPut {
+                    start: maturity,
+                    end: maturity,
+                    price_pct_of_par,
+                    make_whole: None,
+                }],
+            });
+            let expected = ex_coupon + if pays_coupon { 25.0 } else { 0.0 };
+            for tree in [
+                ConvertibleTreeType::Binomial,
+                ConvertibleTreeType::Trinomial,
+            ] {
+                for as_of in [maturity - time::Duration::days(1), maturity] {
+                    let price = price_convertible_bond(
+                        &with_tree_steps(&bond, 20),
+                        &lifecycle_market(as_of, spot),
+                        tree,
+                        as_of,
+                    )
+                    .expect("terminal payoff")
+                    .amount();
+                    assert!(
+                        (price - expected).abs() < 1e-7,
+                        "{tree:?}, as_of={as_of}, policy={policy:?}: {price} vs {expected}"
+                    );
+                }
+            }
+        }
+    }
 }

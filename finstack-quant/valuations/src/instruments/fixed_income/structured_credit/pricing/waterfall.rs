@@ -1071,13 +1071,19 @@ fn is_principal_payment(calculation: &PaymentCalculation, payment_type: PaymentT
 fn shifted_tranche_rate(
     tranche: &Tranche,
     period_start: Date,
+    period_end: Date,
+    accrual_year_fraction: f64,
     valuation_date: Date,
     market: &MarketContext,
     floating_rate_shift: f64,
 ) -> Result<f64> {
-    let raw = tranche
-        .coupon
-        .try_rate_for_period(period_start, valuation_date, market)?;
+    let raw = tranche.coupon.try_rate_for_period(
+        period_start,
+        period_end,
+        accrual_year_fraction,
+        valuation_date,
+        market,
+    )?;
     Ok(match tranche.coupon {
         RateSpec::Floating(_) => (raw + floating_rate_shift).max(0.0),
         RateSpec::Fixed { .. } => raw,
@@ -1379,17 +1385,19 @@ fn calculate_payment_amount(
                 .unwrap_or(tranche.current_balance)
                 .amount()
                 .max(0.0);
-            let rate = shifted_tranche_rate(
-                tranche,
-                period_start,
-                valuation_date,
-                market,
-                floating_rate_shift,
-            )?;
             let accrual_fraction = tranche.day_count.year_fraction(
                 period_start,
                 payment_date,
                 DayCountContext::default(),
+            )?;
+            let rate = shifted_tranche_rate(
+                tranche,
+                period_start,
+                payment_date,
+                accrual_fraction,
+                valuation_date,
+                market,
+                floating_rate_shift,
             )?;
             let carried = deferred_interest
                 .and_then(|d| d.get(tranche_id.as_str()))
@@ -1419,19 +1427,21 @@ fn calculate_payment_amount(
             // Available-funds cap: the effective coupon cannot exceed `cap_rate`.
             // The cap applies AFTER the rate-path shift, matching the engine's
             // interest-due kernel (the cap tracks the shifted net WAC).
-            let rate = shifted_tranche_rate(
-                tranche,
-                period_start,
-                valuation_date,
-                market,
-                floating_rate_shift,
-            )?
-            .min(*cap_rate);
             let accrual_fraction = tranche.day_count.year_fraction(
                 period_start,
                 payment_date,
                 DayCountContext::default(),
             )?;
+            let rate = shifted_tranche_rate(
+                tranche,
+                period_start,
+                payment_date,
+                accrual_fraction,
+                valuation_date,
+                market,
+                floating_rate_shift,
+            )?
+            .min(*cap_rate);
             let carried = deferred_interest
                 .and_then(|d| d.get(tranche_id.as_str()))
                 .map(|m| m.amount())

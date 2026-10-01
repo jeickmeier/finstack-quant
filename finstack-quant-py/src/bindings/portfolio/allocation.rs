@@ -90,10 +90,17 @@ impl PyWeightAllocationResult {
 
 /// Allocate strategy weights from a JSON specification.
 ///
+/// ``total_capital`` is finite and signed; nonnegative strategy weights allocate
+/// amounts with the same sign. Capital sums to the total rounded at
+/// ``money_decimal_places`` (default 10, maximum 12). Minor units are assigned
+/// by largest fractional remainder, with ties awarded in strategy input order.
+/// Zero-weight strategies receive zero capital.
+///
 /// Parameters
 /// ----------
 /// spec_json : str | dict | list | pandas.DataFrame
-///     JSON-serialized ``WeightAllocationSpec``.
+///     JSON-serialized ``WeightAllocationSpec`` with a scheme, finite signed
+///     total capital, strategy rows, and any required covariance data.
 ///
 /// Returns
 /// -------
@@ -101,6 +108,12 @@ impl PyWeightAllocationResult {
 ///     Typed result with ``scheme``, ``allocations`` and ``diagnostics``
 ///     getters plus ``to_dataframe()``. Use :func:`allocate_weights_json`
 ///     for the raw wire string.
+///
+/// Raises
+/// ------
+/// PortfolioError
+///     If the specification is malformed, violates scheme invariants, or its
+///     capital is not representable at the requested rounding precision.
 #[pyfunction]
 #[pyo3(text_signature = "(spec_json)")]
 fn allocate_weights(
@@ -128,12 +141,25 @@ fn allocate_weights(
 
 /// Allocate strategy weights from a JSON specification and return wire JSON.
 ///
-/// Wire twin of :func:`allocate_weights`; same input, JSON-string output.
+/// Wire twin of :func:`allocate_weights`; same signed-capital, largest-remainder
+/// rounding and validation, with JSON-string output.
+///
+/// Parameters
+/// ----------
+/// spec_json : str | dict | list | pandas.DataFrame
+///     JSON-serialized ``WeightAllocationSpec`` selecting the scheme, finite
+///     signed total capital, strategy inputs, and any required covariance data.
 ///
 /// Returns
 /// -------
 /// str
 ///     JSON-serialized ``WeightAllocationResult``.
+///
+/// Raises
+/// ------
+/// PortfolioError
+///     If the specification is malformed, violates scheme invariants, or its
+///     capital is not representable at the requested rounding precision.
 #[pyfunction]
 #[pyo3(text_signature = "(spec_json)")]
 fn allocate_weights_json(py: Python<'_>, spec_json: &Bound<'_, PyAny>) -> PyResult<String> {
@@ -146,6 +172,9 @@ fn allocate_weights_json(py: Python<'_>, spec_json: &Bound<'_, PyAny>) -> PyResu
 
 /// Validate a strategy allocation JSON specification.
 ///
+/// Executes the same allocation and capital rounding as :func:`allocate_weights`
+/// to validate the request, then discards the result.
+///
 /// Parameters
 /// ----------
 /// spec_json : str | dict | list | pandas.DataFrame
@@ -155,6 +184,12 @@ fn allocate_weights_json(py: Python<'_>, spec_json: &Bound<'_, PyAny>) -> PyResu
 /// -------
 /// str
 ///     Canonical compact JSON.
+///
+/// Raises
+/// ------
+/// PortfolioError
+///     If the specification is malformed, violates scheme invariants, or its
+///     capital is not representable at the requested rounding precision.
 #[pyfunction]
 #[pyo3(text_signature = "(spec_json)")]
 fn validate_allocation_json(py: Python<'_>, spec_json: &Bound<'_, PyAny>) -> PyResult<String> {

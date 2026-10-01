@@ -5,9 +5,7 @@ use super::helpers::sp_cond_to;
 use crate::cashflow::builder::specs::RollRule;
 use crate::constants::{credit, numerical, BASIS_POINTS_PER_UNIT, ONE_BASIS_POINT};
 use crate::instruments::common_impl::helpers::year_fraction;
-use crate::instruments::credit_derivatives::cds::{
-    CdsValuationConvention, CreditDefaultSwap, PayReceive,
-};
+use crate::instruments::credit_derivatives::cds::{CreditDefaultSwap, PayReceive};
 use finstack_quant_core::dates::{
     Date, DayCountContext, Schedule, ScheduleBuilder, StubKind, Tenor,
 };
@@ -103,7 +101,17 @@ impl CdsPricer {
                     } else {
                         dates[0]
                     },
-                    accrual_end: if adjusted { payment_date } else { dates[1] },
+                    // Contractual final accrual is unadjusted; Following
+                    // determines payment only. Preserve the explicit QuantLib
+                    // parity schedule separately.
+                    accrual_end: if adjusted
+                        && (idx + 1 < schedule.payment_dates.len()
+                            || cds.valuation_convention.act360_includes_last_day())
+                    {
+                        payment_date
+                    } else {
+                        dates[1]
+                    },
                     payment_date,
                     is_final: idx + 1 == schedule.payment_dates.len(),
                 }
@@ -130,26 +138,11 @@ impl CdsPricer {
             ) + 1;
             return Ok((days.max(0) as f64) / 360.0);
         }
-        // CDSW final-coupon convention: the final Act/360 premium period is
-        // inclusive of the maturity date (one extra calendar day). The rule
-        // is the canonical Bloomberg CDSW behaviour and is shared by every
-        // pricer/convention that uses business-day-adjusted accrual periods
-        // (`uses_adjusted_premium_accrual_dates()` — currently
-        // `BloombergCdswClean` plus the explicit override flag). The CDS
-        // option synthetic underlying and CDS tranche index legs both type
-        // their underlying CDS as Bloomberg-clean so they pick up this rule
-        // automatically.
-        //
-        // The `payment_date == cds.premium_leg.end` guard avoids double-counting
-        // when business-day adjustment has already pushed the final accrual
-        // boundary past the unadjusted maturity (e.g. a Sunday IMM rolling
-        // forward to Monday). In that case the BDA shift already accounts
-        // for the extra calendar day(s) and the +1-day rule must not apply
-        // on top of it.
+        // The contractual final Act/360 coupon includes the unadjusted
+        // maturity date. Rolling payment by multiple days never extends it.
         if cds.uses_adjusted_premium_accrual_dates()
             && cds.premium_leg.day_count == finstack_quant_core::dates::DayCount::Act360
             && period.is_final
-            && period.payment_date == cds.premium_leg.end
             && period.accrual_end > period.accrual_start
         {
             let days = finstack_quant_core::dates::DayCount::calendar_days(
@@ -295,25 +288,22 @@ impl CdsPricer {
                 let start_date = period.accrual_start;
                 let end_date = period.accrual_end;
                 let payment_date = period.payment_date;
-                if end_date <= as_of {
+                if payment_date <= as_of {
                     continue;
                 }
                 let accrual = self.coupon_accrual(cds, &period)?;
                 let df = disc.df_between_dates(as_of, payment_date)?;
-                let sp = sp_cond_to(surv, as_of, end_date)?;
+                let sp = if end_date <= as_of {
+                    1.0
+                } else {
+                    sp_cond_to(surv, as_of, end_date)?
+                };
                 let unit_spread = 1.0;
                 ann += unit_spread * accrual * sp * df;
                 ann += self.accrual_on_default_isda_standard_model_cond(AodInputs {
                     cds,
                     spread: unit_spread,
-                    accrual_start_date: if matches!(
-                        cds.valuation_convention,
-                        CdsValuationConvention::BloombergCdswClean
-                    ) {
-                        start_date.max(as_of)
-                    } else {
-                        start_date
-                    },
+                    accrual_start_date: start_date,
                     start_date: start_date.max(as_of),
                     end_date,
                     settlement_delay: cds.protection_leg.settlement_delay,
@@ -390,11 +380,7 @@ impl CdsPricer {
         let df_asof = disc.df(t_asof_disc);
         let sp_asof = surv.sp(t_asof_haz);
         let sp_floor = credit::SURVIVAL_PROBABILITY_FLOOR;
-        let sp_cond_denom = if sp_asof > sp_floor {
-            sp_asof
-        } else {
-            return Ok(0.0);
-        };
+        let sp_cond_denom = (sp_asof > sp_floor).then_some(sp_asof);
 
         let mut per_bp_pv = 0.0;
         for period in periods {
@@ -402,8 +388,8 @@ impl CdsPricer {
             let end_date = period.accrual_end;
             let payment_date = period.payment_date;
 
-            // Skip periods that have already ended before as_of
-            if end_date <= as_of {
+            // Payments on as_of are treated as settled.
+            if payment_date <= as_of {
                 continue;
             }
 
@@ -418,10 +404,17 @@ impl CdsPricer {
             )?;
             let df = disc.df(t_pay) / df_asof;
 
-            // Conditional survival: sp(end) / sp(as_of)
-            let t_end =
-                haz_day_count.year_fraction(haz_base, end_date, DayCountContext::default())?;
-            let sp = surv.sp(t_end) / sp_cond_denom;
+            // Completed coupons are fixed receivables even if historical
+            // absolute survival lies below the conditional-ratio floor.
+            let sp = if end_date <= as_of {
+                1.0
+            } else if let Some(denom) = sp_cond_denom {
+                let t_end =
+                    haz_day_count.year_fraction(haz_base, end_date, DayCountContext::default())?;
+                surv.sp(t_end) / denom
+            } else {
+                0.0
+            };
 
             per_bp_pv += ONE_BASIS_POINT * accrual * sp * df;
 
@@ -429,14 +422,7 @@ impl CdsPricer {
                 per_bp_pv += self.accrual_on_default_isda_standard_model_cond(AodInputs {
                     cds,
                     spread: ONE_BASIS_POINT,
-                    accrual_start_date: if matches!(
-                        cds.valuation_convention,
-                        CdsValuationConvention::BloombergCdswClean
-                    ) {
-                        start_date.max(as_of)
-                    } else {
-                        start_date
-                    },
+                    accrual_start_date: start_date,
                     start_date: start_date.max(as_of),
                     end_date,
                     settlement_delay: cds.protection_leg.settlement_delay,
@@ -478,19 +464,15 @@ impl CdsPricer {
         let df_asof = disc.df(t_asof_disc);
         let sp_asof = surv.sp(t_asof_haz);
         let sp_floor = credit::SURVIVAL_PROBABILITY_FLOOR;
-        let sp_cond_denom = if sp_asof > sp_floor {
-            sp_asof
-        } else {
-            return Ok(0.0);
-        };
+        let sp_cond_denom = (sp_asof > sp_floor).then_some(sp_asof);
 
         let mut annuity = 0.0;
         for period in periods {
             let end_date = period.accrual_end;
             let payment_date = period.payment_date;
 
-            // Skip periods that have already ended before as_of
-            if end_date <= as_of {
+            // Payments on as_of are treated as settled.
+            if payment_date <= as_of {
                 continue;
             }
 
@@ -505,10 +487,17 @@ impl CdsPricer {
             )?;
             let df = disc.df(t_pay) / df_asof;
 
-            // Conditional survival: sp(end) / sp(as_of)
-            let t_end =
-                haz_day_count.year_fraction(haz_base, end_date, DayCountContext::default())?;
-            let sp = surv.sp(t_end) / sp_cond_denom;
+            // Completed coupons are fixed receivables even if historical
+            // absolute survival lies below the conditional-ratio floor.
+            let sp = if end_date <= as_of {
+                1.0
+            } else if let Some(denom) = sp_cond_denom {
+                let t_end =
+                    haz_day_count.year_fraction(haz_base, end_date, DayCountContext::default())?;
+                surv.sp(t_end) / denom
+            } else {
+                0.0
+            };
 
             annuity += accrual * sp * df;
         }

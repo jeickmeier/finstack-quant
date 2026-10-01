@@ -294,10 +294,22 @@ fn test_pik_cashflows() {
         schedule
             .get_flows()
             .iter()
-            .all(|cf| cf.kind != finstack_quant_cashflows::primitives::CFKind::Pik),
-        "holder-view cashflow_schedule should exclude PIK accretion"
+            .any(|cf| cf.kind == finstack_quant_cashflows::primitives::CFKind::Pik),
+        "canonical schedules must retain PIK for accrued interest and balance replay"
     );
-    assert!(!schedule.get_flows().is_empty());
+    let settlements = bond.dated_cashflows(&curves, issue).unwrap();
+    assert_eq!(settlements.len(), 2, "PIK is not settlement cash");
+    assert_eq!(settlements[0].1.amount(), -1000.0);
+    assert!(settlements[1].1.amount() > 1000.0);
+    assert!(
+        finstack_quant_cashflows::accrued_interest_amount(
+            &schedule,
+            date!(2025 - 04 - 01),
+            &finstack_quant_cashflows::AccrualConfig::default(),
+        )
+        .unwrap()
+            > 0.0
+    );
 }
 
 #[test]

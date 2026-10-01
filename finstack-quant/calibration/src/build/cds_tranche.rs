@@ -1,5 +1,6 @@
 //! Builders for CDS Tranche instruments from market quotes.
 
+use crate::build::cds::cds_accrual_start;
 use crate::build::helpers::{resolve_calendar, resolve_spot_date};
 use crate::build::BuildCtx;
 use crate::quotes::cds_tranche::CdsTrancheQuote;
@@ -103,6 +104,11 @@ impl Default for CdsTrancheBuildOverrides {
 /// ```
 ///
 /// Note: `upfront_pct` is a decimal fraction (e.g., -0.025 for -2.5%).
+///
+/// With the default `CdsImm` roll rule, premium accrual starts on the
+/// unadjusted quarterly CDS roll on or before the trade date. Upfront cash
+/// settles separately at the convention's settlement date. A `None` roll rule
+/// retains a custom schedule starting on that settlement date.
 ///
 /// # Examples
 ///
@@ -214,12 +220,12 @@ pub fn build_cds_tranche_instrument(
 
     let (effective_date, maturity_date) = match overrides.roll_rule {
         RollRule::CdsImm => {
-            // CDS-style effective date (prior IMM) and IMM-aligned maturity.
-            let roll_anchor = spot.add_months(-3);
-            let effective_date = next_cds_date(roll_anchor);
+            // Premium accrual follows the trade-date coupon period, even when
+            // upfront cash settlement crosses the next quarterly roll.
+            let effective_date = cds_accrual_start(ctx.as_of())?;
             // Use unadjusted maturity date for IMM roll selection to prevent BDC
             // from pushing the date past the 20th into the next quarter.
-            let maturity_imm = next_cds_date(maturity - time::Duration::days(1));
+            let maturity_imm = next_cds_date(maturity.add_days(-1)?)?;
             (effective_date, maturity_imm)
         }
         RollRule::None => {

@@ -42,7 +42,8 @@ fn usd_discount_curve(base_date: Date) -> DiscountCurve {
 
 #[test]
 fn market_context_split_rejects_malformed_collateral_currency() {
-    let mut state = MarketContextState::from(&MarketContext::new());
+    let mut state =
+        MarketContextState::try_from(&MarketContext::new()).expect("coherent market snapshot");
     state
         .collateral
         .insert("NOT_A_CURRENCY".to_string(), "USD".to_string());
@@ -155,7 +156,6 @@ fn inflation_preflight_rejects_invalid_observation_lag() {
             notional: 1.0,
             method: Default::default(),
             interpolation: Default::default(),
-            seasonal_factors: None,
         }),
     };
 
@@ -261,7 +261,8 @@ fn base_correlation_preflight_rejects_invalid_attachment_detachment() {
     let source_market = MarketContext::new()
         .insert(hazard.as_ref().clone())
         .insert(base_corr.as_ref().clone())
-        .insert_credit_index("CDX.NA.IG", index_data);
+        .insert_credit_index("CDX.NA.IG", index_data)
+        .expect("credit index dependencies");
 
     let tranche_quote = MarketQuote::CdsTranche(CdsTrancheQuote {
         id: QuoteId::new("CDX-IG-7-3"),
@@ -350,12 +351,15 @@ fn base_correlation_preflight_requires_credit_index_data() {
 
     let envelope = envelope_for_step(step, vec![tranche_quote], source_market);
     let err = engine::execute(&envelope).expect_err("missing credit index should fail");
-    let msg = err.to_string();
-    assert!(
-        msg.to_ascii_lowercase().contains("credit index")
-            || msg.to_ascii_lowercase().contains("not found"),
-        "unexpected error: {msg}"
-    );
+    let details = err.details();
+    assert_eq!(details.stage, engine::ExecutionStage::Ingestion);
+    assert!(matches!(
+        details.envelope_error,
+        Some(finstack_quant_calibration::api::errors::EnvelopeError::MissingDependency {
+            missing_id,
+            ..
+        }) if missing_id == "CDX.NA.IG"
+    ));
 }
 
 #[test]
@@ -388,7 +392,8 @@ fn base_correlation_preflight_rejects_non_monotone_tranche_points() {
     let source_market = MarketContext::new()
         .insert(hazard_clone)
         .insert(base_corr_clone)
-        .insert_credit_index("CDX.NA.IG", index_data);
+        .insert_credit_index("CDX.NA.IG", index_data)
+        .expect("credit index dependencies");
 
     let tranche_quote = MarketQuote::CdsTranche(CdsTrancheQuote {
         id: QuoteId::new("CDX-IG-7-3"),
@@ -482,7 +487,6 @@ fn inflation_preflight_rejects_lag_mismatch_with_index() {
             notional: 1.0,
             method: Default::default(),
             interpolation: Default::default(),
-            seasonal_factors: None,
         }),
     };
 
@@ -541,7 +545,7 @@ fn vol_surface_requires_quotes_even_when_params_valid() {
             target_expiries: vec![1.0], // year fraction (validated by VolSurfaceTarget)
             target_strikes: vec![0.9, 1.0, 1.1],
             spot_override: Some(100.0),
-            dividend_yield_override: None,
+            dividend_yield_override: Some(0.0),
             expiry_extrapolation: SurfaceExtrapolationPolicy::Error,
         }),
     };

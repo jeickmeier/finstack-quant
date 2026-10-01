@@ -380,36 +380,46 @@ fn test_bond_frn_ex_coupon_accrual_negative_in_window() {
         .min()
         .expect("FRN should have at least one coupon date in test");
 
-    let ex_date = first_coupon_date - Duration::days(5);
-    let day_before_ex = ex_date - Duration::days(1);
+    let record_date = first_coupon_date - Duration::days(5);
+    let day_before_record = record_date - Duration::days(1);
 
-    // Before ex-date, accrued interest should be positive
+    // Settlement before the record date retains the coupon.
     let schedule_before = bond
         .full_cashflow_schedule(&ctx)
         .expect("Full schedule should build");
     let ai_before = crate::cashflow::accrual::accrued_interest_amount(
         &schedule_before,
-        day_before_ex,
+        day_before_record,
         &bond.accrual_config(),
     )
-    .expect("Accrued interest calculation should succeed before ex-date");
+    .expect("Accrued interest calculation should succeed before the record date");
     assert!(
         ai_before > 0.0,
-        "Accrued interest should be positive before ex-date"
+        "Accrued interest should be positive before the record date"
     );
 
-    // On or inside the ex-coupon window, accrued interest is negative: the
-    // buyer forgoes the upcoming coupon but compensates the seller for the
-    // stub from settlement to period end.
+    let ai_record = crate::cashflow::accrual::accrued_interest_amount(
+        &full_schedule,
+        record_date,
+        &bond.accrual_config(),
+    )
+    .expect("Accrued interest calculation should succeed on the record date");
+    assert!(
+        ai_record > 0.0,
+        "Settlement on the record date retains the coupon"
+    );
+
+    // Strictly after the record date, the buyer forgoes the upcoming coupon
+    // and accrued interest is the negative rebate of the remaining stub.
     let schedule_ex = bond
         .full_cashflow_schedule(&ctx)
         .expect("Full schedule should build");
     let ai_ex = crate::cashflow::accrual::accrued_interest_amount(
         &schedule_ex,
-        ex_date,
+        record_date + Duration::days(1),
         &bond.accrual_config(),
     )
-    .expect("Accrued interest calculation should succeed on ex-date");
+    .expect("Accrued interest calculation should succeed inside the ex-coupon window");
     assert!(
         ai_ex < 0.0,
         "Accrued interest in ex-coupon window should be negative, got {}",
@@ -489,36 +499,46 @@ fn test_amortizing_bond_ex_coupon_accrual_negative_in_window() {
         .min()
         .expect("Amortizing bond should have at least one coupon date in test");
 
-    let ex_date = first_coupon_date - Duration::days(7);
-    let day_before_ex = ex_date - Duration::days(1);
+    let record_date = first_coupon_date - Duration::days(7);
+    let day_before_record = record_date - Duration::days(1);
 
-    // Before ex-date, accrued interest should be positive
+    // Settlement before the record date retains the coupon.
     let schedule_before = bond
         .full_cashflow_schedule(&ctx)
         .expect("Full schedule should build");
     let ai_before = crate::cashflow::accrual::accrued_interest_amount(
         &schedule_before,
-        day_before_ex,
+        day_before_record,
         &bond.accrual_config(),
     )
-    .expect("Accrued interest calculation should succeed before ex-date");
+    .expect("Accrued interest calculation should succeed before the record date");
     assert!(
         ai_before > 0.0,
-        "Accrued interest should be positive before ex-date for amortizing bond"
+        "Accrued interest should be positive before the record date for amortizing bond"
     );
 
-    // On or inside the ex-coupon window, accrued interest is negative: the
-    // buyer forgoes the upcoming coupon but compensates the seller for the
-    // stub from settlement to period end.
+    let ai_record = crate::cashflow::accrual::accrued_interest_amount(
+        &full_schedule,
+        record_date,
+        &bond.accrual_config(),
+    )
+    .expect("Accrued interest calculation should succeed on the record date");
+    assert!(
+        ai_record > 0.0,
+        "Settlement on the record date retains the coupon"
+    );
+
+    // Strictly after the record date, the buyer forgoes the upcoming coupon
+    // and accrued interest is the negative rebate of the remaining stub.
     let schedule_ex = bond
         .full_cashflow_schedule(&ctx)
         .expect("Full schedule should build");
     let ai_ex = crate::cashflow::accrual::accrued_interest_amount(
         &schedule_ex,
-        ex_date,
+        record_date + Duration::days(1),
         &bond.accrual_config(),
     )
-    .expect("Accrued interest calculation should succeed on ex-date");
+    .expect("Accrued interest calculation should succeed inside the ex-coupon window");
     assert!(
         ai_ex < 0.0,
         "Accrued interest in ex-coupon window should be negative for amortizing bond, got {}",

@@ -28,8 +28,9 @@ pub use yield_price::{
 pub(crate) use annuity::floating_leg_pv_and_annuity;
 pub(crate) use compute::{clear_price_driving_overrides, settlement_dirty_from_quote_overrides};
 pub(crate) use yield_price::{
-    clean_price_from_japanese_simple_yield, enumerate_exit_paths, exercise_redemption_amount,
-    icma_reference_period, japanese_simple_yield, solve_ytw_from_flows, RedemptionBasis,
+    act365l_flow_times, bond_flow_times, clean_price_from_japanese_simple_yield,
+    enumerate_exit_paths, exercise_redemption_amount, flow_times, icma_reference_period,
+    japanese_simple_yield, price_from_ytm_timed, solve_ytw_from_flows, RedemptionBasis,
 };
 
 /// One candidate early-exit for yield-to-worst enumeration.

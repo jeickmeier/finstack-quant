@@ -225,6 +225,7 @@ fn replay_portfolio_returns_a_structured_object() {
 #[wasm_bindgen_test]
 fn mo25_26_decompose_factor_risk_accepts_zero_factors_with_canonical_measure() {
     let sensitivities = serde_json::json!({
+        "base_currency": "USD",
         "position_ids": [],
         "factor_ids": [],
         "data": []

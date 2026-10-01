@@ -478,8 +478,10 @@ impl PyAssetBackedFacility {
     /// Final repayment date (maturity, or the revolving end plus the term-out
     /// window) as ``datetime.date``.
     #[getter]
+    ///
+    /// Raises ``ValueError`` if the term-out window exceeds the supported calendar range.
     fn repayment_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        date_to_py(py, self.inner.repayment_date())
+        date_to_py(py, self.inner.repayment_date().map_err(core_to_py)?)
     }
 
     /// Legal final maturity as ``datetime.date``.

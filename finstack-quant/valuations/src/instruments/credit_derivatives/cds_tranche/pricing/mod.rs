@@ -53,8 +53,9 @@
 //!   curves, recovery rates, and weights via `CreditIndexData::issuer_credit_curves`
 //! * Automatically detects uniform portfolios and uses the exact conditional
 //!   binomial path at every pool size
-//! * Falls back to heterogeneous exact convolution (pools ≤ 64 names) or the
-//!   moment-matched normal approximation for large diversified portfolios
+//! * Uses bounded conditional convolution by default for heterogeneous pools;
+//!   a moment-matched normal approximation is available by explicit opt-in,
+//!   with no general concentration error guarantee
 //!
 //! ## Limitations
 //!

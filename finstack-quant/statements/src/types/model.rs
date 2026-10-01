@@ -12,7 +12,7 @@ use finstack_quant_valuations::instruments::{
     Bond, CapFloor, ConvertibleBond, InstrumentJson, InterestRateSwap, RevolvingCredit, Swaption,
     TermLoan,
 };
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use serde::{Deserialize, Serialize};
 
 /// Persistence contract for [`FinancialModelSpec`].
@@ -56,11 +56,59 @@ pub struct FinancialModelSpec {
 }
 
 impl FinancialModelSpec {
+    /// Validate changed explicit inputs and infer their types without rebuilding
+    /// formulas or the DAG. Only nonempty series contribute inferred types.
+    pub(crate) fn validate_explicit_values(
+        &self,
+    ) -> Result<IndexMap<NodeId, crate::types::NodeValueType>> {
+        let periods: IndexSet<_> = self.periods.iter().map(|period| period.id).collect();
+        let mut inferred_types = IndexMap::new();
+        for (node_id, node) in &self.nodes {
+            if node.node_type == NodeType::Calculated && node.values.is_some() {
+                return Err(Error::build(format!(
+                    "Calculated node '{}' cannot have explicit values — use Mixed or Value type",
+                    node_id
+                )));
+            }
+            if let Some(values) = &node.values {
+                for period_id in values.keys() {
+                    if !periods.contains(period_id) {
+                        return Err(Error::build(format!(
+                            "Node '{node_id}' has an explicit value for period {period_id}, \
+                             which is not present in the model timeline"
+                        )));
+                    }
+                }
+            }
+            for period_id in node.availability_dates.keys() {
+                if !periods.contains(period_id) {
+                    return Err(Error::build(format!(
+                        "Node '{node_id}' has an availability date for period {period_id}, \
+                         which is not present in the model timeline"
+                    )));
+                }
+                if !node
+                    .values
+                    .as_ref()
+                    .is_some_and(|values| values.contains_key(period_id))
+                {
+                    return Err(Error::build(format!(
+                        "Node '{node_id}' has an availability date for period {period_id}, \
+                         but no explicit value for that period"
+                    )));
+                }
+            }
+            if let Some(inferred) = validated_explicit_value_type(node)? {
+                inferred_types.insert(node_id.clone(), inferred);
+            }
+        }
+        Ok(inferred_types)
+    }
+
     /// Resolve explicit reporting currency, or infer one unambiguous monetary currency.
     pub(crate) fn capital_structure_currency(
         &self,
     ) -> Result<Option<finstack_quant_core::currency::Currency>> {
-        use finstack_quant_cashflows::CashflowScheduleSource;
         if let Some(currency) = self
             .capital_structure
             .as_ref()
@@ -83,27 +131,41 @@ impl FinancialModelSpec {
                 currencies.insert(currency);
             }
         }
-        if let Some(cs) = &self.capital_structure {
-            for debt in &cs.debt_instruments {
-                let source: &dyn CashflowScheduleSource = match &debt.spec {
-                    FinancialStatementInstrument::Bond(v) => v,
-                    FinancialStatementInstrument::ConvertibleBond(v) => v,
-                    FinancialStatementInstrument::RevolvingCredit(v) => v,
-                    FinancialStatementInstrument::TermLoan(v) => v,
-                    FinancialStatementInstrument::InterestRateSwap(v) => v,
-                    FinancialStatementInstrument::CapFloor(v) => v,
-                    FinancialStatementInstrument::Swaption(v) => v,
-                };
-                if let Some(notional) = source.notional()? {
-                    currencies.insert(notional.currency());
-                }
-            }
-        }
+        currencies.extend(
+            self.capital_structure_instrument_currencies()?
+                .into_values(),
+        );
         Ok(if currencies.len() == 1 {
             currencies.into_iter().next()
         } else {
             None
         })
+    }
+
+    /// Native currencies of named instruments, independent of reporting FX.
+    pub(crate) fn capital_structure_instrument_currencies(
+        &self,
+    ) -> Result<IndexMap<String, finstack_quant_core::currency::Currency>> {
+        use finstack_quant_cashflows::CashflowScheduleSource;
+
+        let mut currencies = IndexMap::new();
+        if let Some(cs) = &self.capital_structure {
+            for debt in &cs.debt_instruments {
+                let source: &dyn CashflowScheduleSource = match &debt.spec {
+                    FinancialStatementInstrument::Bond(value) => value,
+                    FinancialStatementInstrument::ConvertibleBond(value) => value,
+                    FinancialStatementInstrument::RevolvingCredit(value) => value,
+                    FinancialStatementInstrument::TermLoan(value) => value,
+                    FinancialStatementInstrument::InterestRateSwap(value) => value,
+                    FinancialStatementInstrument::CapFloor(value) => value,
+                    FinancialStatementInstrument::Swaption(value) => value,
+                };
+                if let Some(notional) = source.notional()? {
+                    currencies.insert(debt.id.clone(), notional.currency());
+                }
+            }
+        }
+        Ok(currencies)
     }
 
     /// Create a [`crate::builder::ModelBuilder`] for constructing a model specification.
@@ -236,9 +298,18 @@ impl FinancialModelSpec {
     ///
     /// # Errors
     ///
-    /// Returns an error if periods are not strictly increasing, or if an actual
-    /// period appears after any forecast period.
+    /// Returns an error if period identifiers are not strictly increasing,
+    /// intervals are empty, reversed or overlapping, or an actual period
+    /// appears after any forecast period. Gaps between intervals are allowed.
     fn validate_period_timeline(periods: &[finstack_quant_core::dates::Period]) -> Result<()> {
+        for period in periods {
+            if period.end <= period.start {
+                return Err(Error::build(format!(
+                    "Model period {} must have start before end, got [{}, {})",
+                    period.id, period.start, period.end
+                )));
+            }
+        }
         for window in periods.windows(2) {
             let [prev, next] = window else { continue };
             if next.id <= prev.id {
@@ -247,6 +318,13 @@ impl FinancialModelSpec {
                      {} appears after {}. Forecasts anchor on the last actual period, so an \
                      out-of-order timeline can silently anchor a forecast on a later value.",
                     next.id, prev.id
+                )));
+            }
+            if next.start < prev.end {
+                return Err(Error::build(format!(
+                    "Model period {} starts at {} before the preceding period {} ends at {}; \
+                     period intervals must not overlap",
+                    next.id, next.start, prev.id, prev.end
                 )));
             }
         }
@@ -286,10 +364,11 @@ impl FinancialModelSpec {
     ///
     /// # Errors
     ///
-    /// Returns a build error for an empty period set, reserved node IDs,
+    /// Returns a build error for an empty or invalid period set, reserved node IDs,
+    /// a node ID that differs from its map key, values outside the timeline,
     /// incompatible node-type fields (such as a calculated node with values),
     /// mixed scalar/monetary values or currencies within a node, invalid
-    /// formulas or known dimensions, or an invalid waterfall. Unknown formula
+    /// forecasts, formulas or known dimensions, or an invalid waterfall. Unknown formula
     /// references are warned about and deferred to evaluation to allow optional
     /// registry metrics; callers should treat that warning as a likely model
     /// authoring error and resolve it before production use.
@@ -299,12 +378,22 @@ impl FinancialModelSpec {
         }
 
         Self::validate_period_timeline(&self.periods)?;
+        let inferred_explicit_types = self.validate_explicit_values()?;
 
         for node_id in self.nodes.keys() {
             crate::builder::validate_node_id(node_id.as_str())?;
         }
 
         for (node_id, node) in &self.nodes {
+            if node.node_id != *node_id {
+                return Err(Error::build(format!(
+                    "Node map key '{node_id}' does not match its embedded node_id '{}'",
+                    node.node_id
+                )));
+            }
+            if let Some(forecast) = &node.forecast {
+                forecast.validate()?;
+            }
             match node.node_type {
                 NodeType::Value => {
                     if node.formula_text.is_some() {
@@ -315,12 +404,6 @@ impl FinancialModelSpec {
                     }
                 }
                 NodeType::Calculated => {
-                    if node.values.is_some() {
-                        return Err(Error::build(format!(
-                            "Calculated node '{}' cannot have explicit values — use Mixed or Value type",
-                            node_id
-                        )));
-                    }
                     if node.forecast.is_some() {
                         return Err(Error::build(format!(
                             "Calculated node '{}' cannot have a forecast — use Mixed type (a \
@@ -332,44 +415,16 @@ impl FinancialModelSpec {
                 }
                 NodeType::Mixed => {}
             }
-
-            for period_id in node.availability_dates.keys() {
-                if !self.periods.iter().any(|period| period.id == *period_id) {
-                    return Err(Error::build(format!(
-                        "Node '{node_id}' has an availability date for period {period_id}, \
-                         which is not present in the model timeline"
-                    )));
-                }
-                if !node
-                    .values
-                    .as_ref()
-                    .is_some_and(|values| values.contains_key(period_id))
-                {
-                    return Err(Error::build(format!(
-                        "Node '{node_id}' has an availability date for period {period_id}, \
-                         but no explicit value for that period"
-                    )));
-                }
-            }
         }
 
-        for node in self.nodes.values_mut() {
-            if let Some(values) = &node.values {
-                let inferred = crate::types::infer_series_value_type(values.values())?;
-                match (node.value_type, inferred) {
-                    (Some(declared), Some(actual)) if declared != actual => {
-                        return Err(Error::build(format!(
-                            "Node '{}' declares {declared:?} but its explicit values have type {actual:?}",
-                            node.node_id
-                        )));
-                    }
-                    (None, inferred) => node.value_type = inferred,
-                    _ => {}
-                }
+        for (node_id, node) in &mut self.nodes {
+            if node.value_type.is_none() {
+                node.value_type = inferred_explicit_types.get(node_id).copied();
             }
         }
 
         let capital_structure_currency = self.capital_structure_currency()?;
+        let instrument_currencies = self.capital_structure_instrument_currencies()?;
         let mut node_value_types: IndexMap<NodeId, crate::types::NodeValueType> = self
             .nodes
             .iter()
@@ -402,6 +457,7 @@ impl FinancialModelSpec {
                         &ast,
                         &node_value_types,
                         capital_structure_currency,
+                        &instrument_currencies,
                     )?
                 };
                 if let Some(value_type) = inferred {
@@ -440,6 +496,7 @@ impl FinancialModelSpec {
                     &ast,
                     &node_value_types,
                     capital_structure_currency,
+                    &instrument_currencies,
                 )
                 .map_err(|error| {
                     Error::build(format!("Invalid formula on node '{node_id}': {error}"))
@@ -465,6 +522,7 @@ impl FinancialModelSpec {
                     &ast,
                     &node_value_types,
                     capital_structure_currency,
+                    &instrument_currencies,
                 )
                 .map_err(|error| {
                     Error::build(format!("Invalid where clause on node '{node_id}': {error}"))
@@ -483,6 +541,27 @@ impl FinancialModelSpec {
         if let Some(cs) = &self.capital_structure {
             if let Some(waterfall) = &cs.waterfall {
                 waterfall.validate()?;
+                if let Some(pik) = &waterfall.pik_toggle {
+                    for debt in &cs.debt_instruments {
+                        let selected = pik
+                            .target_instrument_ids
+                            .as_ref()
+                            .is_some_and(|targets| targets.iter().any(|target| target == &debt.id));
+                        if selected
+                            && matches!(
+                                debt.spec,
+                                FinancialStatementInstrument::InterestRateSwap(_)
+                                    | FinancialStatementInstrument::CapFloor(_)
+                                    | FinancialStatementInstrument::Swaption(_)
+                            )
+                        {
+                            return Err(Error::build(format!(
+                                "WaterfallSpec: PIK target '{}' is a hedge or option; only borrowing debt coupons can capitalize into principal",
+                                debt.id
+                            )));
+                        }
+                    }
+                }
                 let has_prepay = waterfall.priority_of_payments.iter().any(|p| {
                     matches!(
                         p,
@@ -521,25 +600,6 @@ impl FinancialModelSpec {
                     }
                 }
             }
-            // Period-flow classification infers expense vs income for two-leg
-            // instruments from the sign of the net flow, which assumes the
-            // issuer pays fixed (`PayReceive::Pay`). A `Receive` swap would
-            // silently invert that classification, so reject it loudly until
-            // the sign convention is threaded through (INVARIANTS.md §3).
-            for debt in &cs.debt_instruments {
-                if let FinancialStatementInstrument::InterestRateSwap(swap) = &debt.spec {
-                    if swap.side == finstack_quant_valuations::instruments::PayReceive::Receive {
-                        return Err(Error::build(format!(
-                            "Interest rate swap '{}' has side `Receive`, which the \
-                             capital-structure flow classification does not support: \
-                             two-leg expense/income signs assume the issuer pays fixed \
-                             (`Pay`). Model the position as a `Pay` swap with inverted \
-                             legs instead.",
-                            debt.id
-                        )));
-                    }
-                }
-            }
         }
 
         match crate::evaluator::DependencyGraph::from_model(self) {
@@ -564,6 +624,36 @@ impl FinancialModelSpec {
 
         Ok(())
     }
+}
+
+/// Validate explicit series units against their optional node declaration.
+///
+/// # Arguments
+///
+/// * `node` - Node whose explicit scalar or monetary series must use one type
+///   and currency and agree with any declared units. Empty series infer no type.
+///
+/// # Errors
+///
+/// Returns a validation error for mixed series units or a declaration mismatch.
+pub(crate) fn validated_explicit_value_type(
+    node: &NodeSpec,
+) -> Result<Option<crate::types::NodeValueType>> {
+    let inferred = node
+        .values
+        .as_ref()
+        .map(|values| crate::types::infer_series_value_type(values.values()))
+        .transpose()?
+        .flatten();
+    if let (Some(declared), Some(actual)) = (node.value_type, inferred) {
+        if declared != actual {
+            return Err(Error::build(format!(
+                "Node '{}' declares {declared:?} but its explicit values have type {actual:?}",
+                node.node_id
+            )));
+        }
+    }
+    Ok(inferred)
 }
 
 fn validation_report_error(error: Error, limits: &LoadLimits) -> ContractError {
@@ -797,10 +887,10 @@ mod period_timeline_tests {
         );
     }
 
-    /// A `Receive` swap inverts the expense/income classification the flow
-    /// engine infers from net-flow signs, so it must be rejected at build.
+    /// Both swap sides are supported; signed cashflows and the declared IRS
+    /// kind determine receipts and payments independently of coupon signs.
     #[test]
-    fn receive_swap_in_capital_structure_is_rejected() {
+    fn receive_swap_in_capital_structure_is_accepted() {
         use finstack_quant_valuations::instruments::PayReceive;
 
         let mut swap = InterestRateSwap::example().expect("example swap");
@@ -819,13 +909,9 @@ mod period_timeline_tests {
             fx_policy: None,
             waterfall: None,
         });
-        let err = model
+        model
             .validate_semantics()
-            .expect_err("a Receive swap must be rejected");
-        assert!(
-            err.to_string().contains("Receive"),
-            "expected the Receive-side diagnostic: {err}"
-        );
+            .expect("Receive swaps are supported");
     }
 
     /// A bond plus a prepayment rung is rejected: this engine rebuilds loan

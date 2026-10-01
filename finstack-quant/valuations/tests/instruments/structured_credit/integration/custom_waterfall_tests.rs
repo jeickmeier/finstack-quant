@@ -138,6 +138,7 @@ fn create_test_deal() -> StructuredCredit {
         maturity_date(),
         "USD_OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse")
 }
 

@@ -113,7 +113,7 @@ impl AssetBackedFacility {
     pub fn synthesized_deal(&self) -> finstack_quant_core::Result<StructuredCredit> {
         self.validate()?;
         let residual = self.collateral.total_balance()?.checked_sub(self.drawn)?;
-        let repayment_date = self.repayment_date();
+        let repayment_date = self.repayment_date()?;
 
         let coupon = self.rate.clone();
         let mut note = Tranche::from_balance(
@@ -185,7 +185,7 @@ impl AssetBackedFacility {
             .pool(pool)
             .tranches(tranches)
             .closing_date(self.closing_date)
-            .first_payment_date(self.closing_date.add_months(months))
+            .first_payment_date(self.closing_date.add_months(months)?)
             .maturity(self.maturity)
             .frequency(self.frequency)
             .discount_curve_id(self.discount_curve_id.clone())
@@ -322,7 +322,7 @@ impl AssetBackedFacility {
             }
             let accrual = self.day_count.year_fraction(
                 period.start,
-                period.end,
+                period.end.min(commitment_end),
                 DayCountContext::default(),
             )?;
             let fee = undrawn * fee_bp / 10_000.0 * accrual;

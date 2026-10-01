@@ -10,7 +10,10 @@ use finstack_quant_models::closed_form::vanilla::bs_price_unchecked;
 type OhlcVecs = (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>);
 use finstack_quant_core::{
     dates::{Date, DayCountContext},
-    market_data::context::MarketContext,
+    market_data::{
+        context::MarketContext,
+        surfaces::{VolQuoteType, VolSurfaceAxis},
+    },
     math::stats::realized_variance,
     money::Money,
     Result,
@@ -33,54 +36,9 @@ pub(crate) fn compute_pv(
     // Compute observation dates once per pricing call. Each branch below would
     // otherwise rebuild this 1-3 times via the helper functions.
     let obs_dates = observation_dates(inst)?;
-    let final_observation_date = inst.final_observation_date()?;
-    if as_of >= final_observation_date {
-        let realized_var = if inst.realized_var_method.requires_ohlc() {
-            let (open, high, low, close) =
-                get_historical_ohlc_with_dates(inst, context, as_of, &obs_dates)?;
-            if close.is_empty() {
-                return Ok(Money::from((0_i64, inst.notional.currency())));
-            }
-            finstack_quant_core::math::stats::realized_variance_ohlc(
-                &open,
-                &high,
-                &low,
-                &close,
-                inst.realized_var_method,
-                annualization_factor(inst),
-            )?
-        } else {
-            let prices = get_historical_prices_with_dates(inst, context, as_of, &obs_dates)?;
-            if prices.is_empty() {
-                return Ok(Money::from((0_i64, inst.notional.currency())));
-            }
-            realized_variance(
-                &prices,
-                inst.realized_var_method,
-                annualization_factor(inst),
-            )?
-        };
-        let df = dom.df_between_dates(as_of, settlement_date)?;
-        return Ok(inst.payoff(realized_var)? * df);
-    }
-
-    if as_of < inst.start_date {
-        let forward_var = remaining_forward_variance(inst, context, as_of)?;
-        let undiscounted = inst.payoff(forward_var)?;
-        // Date-based discounting: `df_between_dates` resolves the year fraction
-        // on the curve's own time axis. Feeding `df()` an instrument-day-count
-        // year fraction mis-discounts whenever the instrument and curve
-        // day-counts differ or `as_of != base_date`.
-        let df = dom.df_between_dates(as_of, settlement_date)?;
-        return Ok(undiscounted * df);
-    }
-
-    let expected_var = seasoned_expected_variance_with_dates(inst, context, as_of, &obs_dates)?;
-    let undiscounted = inst.payoff(expected_var)?;
-    // Date-based discounting (see the pre-start branch above): `df_between_dates`
-    // resolves the year fraction on the curve's own time axis.
+    let expected_var = expected_variance_with_dates(inst, context, as_of, &obs_dates)?;
     let df = dom.df_between_dates(as_of, settlement_date)?;
-    Ok(undiscounted * df)
+    Ok(inst.payoff(expected_var)? * df)
 }
 
 pub(crate) fn observation_dates(inst: &FxVarianceSwap) -> Result<Vec<Date>> {
@@ -122,11 +80,9 @@ pub(crate) fn realized_fraction_by_observations(inst: &FxVarianceSwap, as_of: Da
 /// Fraction of the observation period elapsed at `as_of`, measured by the
 /// instrument's day-count convention.
 ///
-/// This is the correct weight for blending already-annualized realized and
-/// forward variance in a seasoned MTM (the accrued-variance identity weights
-/// the un-annualized total variance by `t_elapsed/T` and `τ_remaining/T`).
-/// Observation-count fractions only coincide for perfectly uniform schedules
-/// and drift first-order near maturity for weekend-skipping daily schedules.
+/// This descriptive calendar-time fraction is not the contractual variance
+/// weight. Pricing normalizes expected squared returns by the full number of
+/// scheduled return samples, including weekends and irregular observation gaps.
 pub(crate) fn time_elapsed_fraction(inst: &FxVarianceSwap, as_of: Date) -> Result<f64> {
     let final_observation_date = observation_dates(inst)?
         .last()
@@ -161,15 +117,26 @@ fn realized_fraction_by_observations_with_dates(
     if all.is_empty() {
         return 0.0;
     }
-    if as_of <= inst.start_date {
-        return 0.0;
-    }
     if as_of >= all.last().copied().unwrap_or(inst.maturity) {
         return 1.0;
     }
-    let total = all.len() as f64;
-    let realized = all.iter().filter(|&&d| d <= as_of).count() as f64;
-    (realized / total).clamp(0.0, 1.0)
+    let accrued = all.iter().filter(|&&d| d <= as_of).count();
+    use finstack_quant_core::math::stats::RealizedVarMethod;
+    let (realized, total) = match inst.realized_var_method {
+        RealizedVarMethod::CloseToClose | RealizedVarMethod::YangZhang => {
+            // Yang-Zhang's first close anchors the overnight return of the
+            // next bar; it is not itself an estimator sample.
+            (accrued.saturating_sub(1), all.len().saturating_sub(1))
+        }
+        RealizedVarMethod::Parkinson
+        | RealizedVarMethod::GarmanKlass
+        | RealizedVarMethod::RogersSatchell => (accrued, all.len()),
+    };
+    if total == 0 {
+        0.0
+    } else {
+        realized as f64 / total as f64
+    }
 }
 
 pub(crate) fn get_historical_prices(
@@ -192,7 +159,7 @@ fn get_historical_prices_with_dates(
         .unwrap_or_else(|| inst.series_id());
     if let Ok(series) = context.get_series(&close_id_owned) {
         let dates: Vec<Date> = obs_dates.iter().copied().filter(|&d| d <= as_of).collect();
-        if dates.len() >= 2 {
+        if !dates.is_empty() {
             return dates
                 .iter()
                 .map(|&date| series.value_on_exact(date))
@@ -201,7 +168,7 @@ fn get_historical_prices_with_dates(
     }
 
     let accrued = obs_dates.iter().filter(|&&date| date <= as_of).count();
-    if accrued >= 2 {
+    if accrued >= 2 || obs_dates.iter().any(|&date| date < as_of) {
         return Err(finstack_quant_core::Error::Validation(format!(
             "FxVarianceSwap '{}' has {} past observation dates but no historical price data is available in series '{}'. Provide the time series before pricing a seasoned swap.",
             inst.id.as_str(),
@@ -252,7 +219,7 @@ fn get_historical_ohlc_with_dates(
 
     let dates: Vec<Date> = obs_dates.iter().copied().filter(|&d| d <= as_of).collect();
 
-    if dates.len() < 2 {
+    if dates.is_empty() {
         return Ok((vec![], vec![], vec![], vec![]));
     }
 
@@ -298,7 +265,7 @@ fn realized_variance_with_factor(
     if inst.realized_var_method.requires_ohlc() {
         let (open, high, low, close) =
             get_historical_ohlc_with_dates(inst, context, as_of, obs_dates)?;
-        if close.len() < 2 {
+        if close.is_empty() {
             return Ok(0.0);
         }
         return finstack_quant_core::math::stats::realized_variance_ohlc(
@@ -317,80 +284,130 @@ fn realized_variance_with_factor(
     realized_variance(&prices, inst.realized_var_method, annualization_factor)
 }
 
-/// Number of per-period samples (return periods or OHLC bars) accrued by
-/// `as_of`.
-fn realized_sample_count(
+/// Expected contractual annualized variance, shared by PV and its metric.
+///
+/// Known close-to-close squared log returns and the model's future squared
+/// log returns receive the same `annualization / total_return_count` factor.
+/// OHLC estimators retain their exact settlement definitions but have no
+/// pre-settlement forecast model in this pricer.
+pub(crate) fn expected_variance(
+    inst: &FxVarianceSwap,
+    context: &MarketContext,
+    as_of: Date,
+) -> Result<f64> {
+    expected_variance_with_dates(inst, context, as_of, &observation_dates(inst)?)
+}
+
+fn expected_variance_with_dates(
     inst: &FxVarianceSwap,
     context: &MarketContext,
     as_of: Date,
     obs_dates: &[Date],
 ) -> Result<f64> {
+    if obs_dates.last().is_some_and(|&last| as_of >= last) {
+        return partial_realized_variance_with_dates(inst, context, as_of, obs_dates);
+    }
+    require_close_to_close_forecast(inst)?;
+    let total_returns = obs_dates.len().saturating_sub(1);
+    if total_returns == 0 {
+        return Err(finstack_quant_core::Error::Validation(
+            "FX variance requires at least two distinct adjusted observations".into(),
+        ));
+    }
+    let prices = get_historical_prices_with_dates(inst, context, as_of, obs_dates)?;
+    // Calling the canonical estimator also validates historical prices.
+    let realized = realized_variance(&prices, inst.realized_var_method, 1.0)?;
+    let known_sum = realized * prices.len().saturating_sub(1) as f64;
+    let (future_sum, _) = remaining_squared_returns(inst, context, as_of, obs_dates, &prices)?;
+    Ok(annualization_factor(inst) * (known_sum + future_sum) / total_returns as f64)
+}
+
+fn require_close_to_close_forecast(inst: &FxVarianceSwap) -> Result<()> {
     if inst.realized_var_method.requires_ohlc() {
-        let (_, _, _, close) = get_historical_ohlc_with_dates(inst, context, as_of, obs_dates)?;
-        Ok((close.len() as f64).max(0.0))
-    } else {
-        let prices = get_historical_prices_with_dates(inst, context, as_of, obs_dates)?;
-        Ok((prices.len() as f64 - 1.0).max(0.0))
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "FX variance swap '{}': pre-settlement forecasting is supported only for close_to_close; {} requires an estimator-specific OHLC forecast model. Fully observed settlement remains supported.",
+            inst.id, inst.realized_var_method.label(),
+        )));
     }
+    Ok(())
 }
 
-/// Realized variance for the seasoned mark-to-market blend, annualized on the
-/// **day-count time basis** (`V_accrued / t_elapsed`) so it is consistent with
-/// the day-count blend weight `w` (mirrors the equity W-33 fix).
+/// Gaussian independent-increment projection calibrated to the smile-replicated
+/// cumulative expected quadratic variation. Rates are deterministic domestic
+/// and foreign discount curves. For each unsettled return, E[R²] = q + m²,
+/// where m includes log FX carry, -q/2, and the observed partial return.
 ///
-/// [`partial_realized_variance`] annualizes on an observation-count basis
-/// (`Σr²/N · AF`), which disagrees with the day-count basis for non-uniform
-/// schedules. Re-basing with `AF = M / t_elapsed` (M = accrued sample count)
-/// yields exactly `V_accrued / t_elapsed` for both close-to-close and OHLC
-/// estimators. Degenerate windows (no time or samples accrued) fall back to
-/// the observation-count annualization.
-pub(crate) fn seasoned_realized_variance(
-    inst: &FxVarianceSwap,
-    context: &MarketContext,
-    as_of: Date,
-    t_elapsed: f64,
-    obs_dates: &[Date],
-) -> Result<f64> {
-    let m = realized_sample_count(inst, context, as_of, obs_dates)?;
-    if t_elapsed > 0.0 && m > 0.0 {
-        realized_variance_with_factor(inst, context, as_of, obs_dates, m / t_elapsed)
-    } else {
-        partial_realized_variance_with_dates(inst, context, as_of, obs_dates)
-    }
-}
-
-/// Seasoned mark-to-market expected variance: the day-count time-weighted
-/// blend of realized-to-date and remaining forward variance (W-32), with the
-/// realized term annualized on the same day-count basis (W-33, mirroring the
-/// equity sibling).
-///
-/// `compute_pv` and the `ExpectedVariance` metric both call this, so the
-/// reported expected variance always equals the variance implied by the
-/// swap's PV.
-pub(crate) fn seasoned_expected_variance(
-    inst: &FxVarianceSwap,
-    context: &MarketContext,
-    as_of: Date,
-) -> Result<f64> {
-    seasoned_expected_variance_with_dates(inst, context, as_of, &observation_dates(inst)?)
-}
-
-fn seasoned_expected_variance_with_dates(
+/// This is exact for deterministic instantaneous variance and deterministic
+/// rates. A vanilla smile alone does not identify forward log-return second
+/// moments under general stochastic volatility or stochastic rates; there is
+/// no claim that this projection supplies that missing joint distribution.
+fn remaining_squared_returns(
     inst: &FxVarianceSwap,
     context: &MarketContext,
     as_of: Date,
     obs_dates: &[Date],
+    historical_prices: &[f64],
+) -> Result<(f64, usize)> {
+    require_close_to_close_forecast(inst)?;
+    let dom = context.get_discount(inst.domestic_discount_curve_id.as_str())?;
+    let foreign = context.get_discount(inst.foreign_discount_curve_id.as_str())?;
+    let spot = inst.spot_rate(context, as_of)?;
+    if !spot.is_finite() || spot <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(
+            "FX variance forecast requires finite positive spot".into(),
+        ));
+    }
+    let mut total = finstack_quant_core::math::NeumaierAccumulator::new();
+    let mut count = 0;
+    let mut prior_boundary = None;
+    for window in obs_dates.windows(2).filter(|window| window[1] > as_of) {
+        let start = window[0].max(as_of);
+        let end = window[1];
+        let start_variation = match prior_boundary {
+            Some((date, variation)) if date == start => variation,
+            _ => cumulative_variation(inst, context, as_of, start)?,
+        };
+        let end_variation = cumulative_variation(inst, context, as_of, end)?;
+        prior_boundary = Some((end, end_variation));
+        let raw_variation = end_variation - start_variation;
+        let tolerance = 1e-12 * end_variation.abs().max(start_variation.abs()).max(1.0);
+        if raw_variation < -tolerance {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "FX variance swap '{}': negative forward variation {raw_variation} over {start} to {end}; check smile calendar consistency and replication grid",
+                inst.id,
+            )));
+        }
+        let variation = raw_variation.max(0.0);
+        let carry =
+            (foreign.df_between_dates(start, end)? / dom.df_between_dates(start, end)?).ln();
+        let partial_return = if window[0] <= as_of {
+            let last_fixing = historical_prices.last().copied().ok_or_else(|| {
+                finstack_quant_core::Error::Validation("FX variance missing latest fixing".into())
+            })?;
+            (spot / last_fixing).ln()
+        } else {
+            0.0
+        };
+        let mean = partial_return + carry - 0.5 * variation;
+        total.add(variation + mean * mean);
+        count += 1;
+    }
+    Ok((total.total(), count))
+}
+
+fn cumulative_variation(
+    inst: &FxVarianceSwap,
+    context: &MarketContext,
+    as_of: Date,
+    end: Date,
 ) -> Result<f64> {
-    let w = time_elapsed_fraction(inst, as_of)?;
-    let total_t = inst.day_count.year_fraction(
-        inst.start_date,
-        inst.final_observation_date()?,
-        DayCountContext::default(),
-    )?;
-    let t_elapsed = w * total_t;
-    let realized = seasoned_realized_variance(inst, context, as_of, t_elapsed, obs_dates)?;
-    let forward = remaining_forward_variance(inst, context, as_of)?;
-    Ok(realized * w + forward * (1.0 - w))
+    if end <= as_of {
+        return Ok(0.0);
+    }
+    let t = inst
+        .day_count
+        .year_fraction(as_of, end, DayCountContext::default())?;
+    Ok(replicated_variance_to(inst, context, as_of, end)? * t)
 }
 
 pub(crate) fn remaining_forward_variance(
@@ -398,7 +415,25 @@ pub(crate) fn remaining_forward_variance(
     context: &MarketContext,
     as_of: Date,
 ) -> Result<f64> {
-    let final_observation_date = inst.final_observation_date()?;
+    let dates = observation_dates(inst)?;
+    if dates.last().is_some_and(|&date| as_of >= date) {
+        return Ok(0.0);
+    }
+    let prices = get_historical_prices_with_dates(inst, context, as_of, &dates)?;
+    let (sum, count) = remaining_squared_returns(inst, context, as_of, &dates, &prices)?;
+    if count == 0 {
+        return Ok(0.0);
+    }
+    Ok(annualization_factor(inst) * sum / count as f64)
+}
+
+/// Smile-replicated annualized quadratic variation from as-of to one boundary.
+fn replicated_variance_to(
+    inst: &FxVarianceSwap,
+    context: &MarketContext,
+    as_of: Date,
+    final_observation_date: Date,
+) -> Result<f64> {
     let t =
         inst.day_count
             .year_fraction(as_of, final_observation_date, DayCountContext::default())?;
@@ -408,6 +443,8 @@ pub(crate) fn remaining_forward_variance(
 
     let spot = inst.spot_rate(context, as_of)?;
     let surface = context.get_surface(inst.vol_surface_id.as_str())?;
+    surface.require_quote_type(VolQuoteType::BlackLognormal)?;
+    surface.require_secondary_axis(VolSurfaceAxis::Strike)?;
     let dom = context.get_discount(inst.domestic_discount_curve_id.as_str())?;
     let for_curve = context.get_discount(inst.foreign_discount_curve_id.as_str())?;
     // Date-based discount factors: `df_between_dates(as_of, maturity)` resolves the
@@ -482,6 +519,375 @@ mod tests {
             .insert_fx(fx)
     }
 
+    fn zero_rate_market(as_of: Date, volatility: f64) -> MarketContext {
+        use finstack_quant_core::market_data::surfaces::VolSurface;
+        let mut market = build_market(as_of);
+        for id in ["USD-OIS", "EUR-OIS"] {
+            market = market.insert(
+                DiscountCurve::builder(id)
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (5.0, 1.0)])
+                    .build()
+                    .expect("curve"),
+            );
+        }
+        let provider = SimpleFxProvider::new();
+        provider
+            .set_quote(Currency::EUR, Currency::USD, 1.0)
+            .expect("spot");
+        let strikes: Vec<_> = (1..=400).map(|i| f64::from(i) * 0.01).collect();
+        let vols = vec![volatility; strikes.len()];
+        market
+            .insert_fx(FxMatrix::new(Arc::new(provider)))
+            .insert_surface(
+                VolSurface::builder("EURUSD-VOL")
+                    .expiries(&[1.0, 3.0])
+                    .strikes(&strikes)
+                    .row(&vols)
+                    .row(&vols)
+                    .build()
+                    .expect("surface"),
+            )
+    }
+
+    #[test]
+    fn replication_rejects_non_black_and_non_strike_surfaces() {
+        let swap = FxVarianceSwap::example().expect("swap");
+        let market = zero_rate_market(swap.start_date, 0.2);
+        let base = market
+            .get_surface(swap.vol_surface_id.as_str())
+            .expect("surface");
+        for surface in [
+            base.as_ref().clone().with_displacements(&[0.1; 2]).unwrap(),
+            base.as_ref()
+                .clone()
+                .with_quote_type(VolQuoteType::Normal)
+                .unwrap(),
+            base.as_ref()
+                .clone()
+                .with_secondary_axis(VolSurfaceAxis::Tenor),
+        ] {
+            let context = market.clone().insert_surface(surface);
+            let error = replicated_variance_to(&swap, &context, swap.start_date, swap.maturity)
+                .expect_err("Carr-Madan Black replication must enforce surface metadata");
+            let text = error.to_string();
+            assert!(
+                text.contains("quotes") || text.contains("secondary axis"),
+                "{text}"
+            );
+        }
+    }
+
+    #[test]
+    fn fixed_returns_keep_the_same_denominator_before_final_fixing() {
+        use finstack_quant_core::dates::Tenor;
+        use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+        for frequency in [Tenor::daily(), Tenor::weekly(), Tenor::monthly()] {
+            for annualization in [252.0, 365.0] {
+                let mut swap = FxVarianceSwap::example().expect("example");
+                swap.start_date = date!(2025 - 01 - 08);
+                swap.maturity = if frequency == Tenor::daily() {
+                    date!(2025 - 01 - 13)
+                } else {
+                    date!(2025 - 05 - 08)
+                };
+                swap.observation_frequency = frequency;
+                swap.trading_days_per_year = annualization;
+                swap.strike_variance = 0.0;
+                let dates = observation_dates(&swap).expect("dates");
+                let final_date = *dates.last().expect("last");
+                let as_of = final_date - finstack_quant_core::dates::Duration::days(1);
+                let market = zero_rate_market(as_of, 0.00001);
+                // Exactly two known returns, +1% then -1%; all remaining
+                // historical closes and the final close are 1.0.
+                let observations: Vec<_> = dates
+                    .iter()
+                    .enumerate()
+                    .map(|(i, &date)| (date, if i == 1 { 0.01_f64.exp() } else { 1.0 }))
+                    .collect();
+                let control_observations = dates.iter().map(|&date| (date, 1.0)).collect();
+                let known = market.clone().insert_series(
+                    ScalarTimeSeries::new("EURUSD", observations, None).expect("series"),
+                );
+                let control = market.insert_series(
+                    ScalarTimeSeries::new("EURUSD", control_observations, None).expect("series"),
+                );
+                let before_difference = expected_variance(&swap, &known, as_of).expect("known")
+                    - expected_variance(&swap, &control, as_of).expect("control");
+                let exact = annualization_factor(&swap) * 0.0002 / (dates.len() - 1) as f64;
+                assert!((before_difference - exact).abs() < 1e-12);
+                let settled = expected_variance(&swap, &known, final_date).expect("settled");
+                assert!((settled - exact).abs() < 1e-12);
+            }
+        }
+    }
+
+    #[test]
+    fn forward_start_uses_only_the_observed_window_and_discrete_mean_correction() {
+        use finstack_quant_core::dates::Tenor;
+        use finstack_quant_core::market_data::surfaces::VolSurface;
+        let as_of = date!(2025 - 01 - 06);
+        let mut swap = FxVarianceSwap::example().expect("example");
+        swap.start_date = date!(2026 - 01 - 06);
+        swap.maturity = date!(2027 - 01 - 06);
+        swap.observation_frequency = Tenor::monthly();
+        let dates = observation_dates(&swap).expect("dates");
+        let times: Vec<_> = dates
+            .iter()
+            .map(|&date| {
+                swap.day_count
+                    .year_fraction(as_of, date, DayCountContext::default())
+                    .expect("time")
+            })
+            .collect();
+        // Deterministic instantaneous variance: 1% until year 1, then 17%.
+        // Both intervals together imply 30% annual vol at year 2.
+        let integrated = |time: f64| 0.01 * time.min(1.0) + 0.17 * (time - 1.0).max(0.0);
+        let strikes: Vec<_> = (1..=800).map(|i| f64::from(i) * 0.005).collect();
+        let mut surface = VolSurface::builder("EURUSD-VOL")
+            .expiries(&times)
+            .strikes(&strikes);
+        for &time in &times {
+            surface = surface.row(&vec![(integrated(time) / time).sqrt(); strikes.len()]);
+        }
+        let market = zero_rate_market(as_of, 0.1).insert_surface(surface.build().expect("surface"));
+        let expected = times
+            .windows(2)
+            .map(|window| {
+                let q = integrated(window[1]) - integrated(window[0]);
+                q + 0.25 * q * q
+            })
+            .sum::<f64>()
+            * annualization_factor(&swap)
+            / (dates.len() - 1) as f64;
+        let actual = expected_variance(&swap, &market, as_of).expect("forward variance");
+        assert!(
+            (actual - expected).abs() < 0.00005,
+            "{actual} vs {expected}"
+        );
+        let mut earlier = swap;
+        earlier.start_date = as_of;
+        let earlier_value = expected_variance(&earlier, &market, as_of).expect("earlier start");
+        assert!(actual > earlier_value + 0.04);
+    }
+
+    #[test]
+    fn fx_variance_vega_reprices_the_same_sample_normalized_model() {
+        use crate::instruments::fx::fx_variance_swap::metrics::VegaCalculator;
+        use crate::metrics::bump_surface_vol_absolute;
+        use crate::metrics::{MetricCalculator, MetricContext};
+        use finstack_quant_core::dates::Tenor;
+        let as_of = date!(2025 - 01 - 06);
+        let mut swap = FxVarianceSwap::example().expect("example");
+        swap.start_date = date!(2026 - 01 - 06);
+        swap.maturity = date!(2027 - 01 - 06);
+        swap.observation_frequency = Tenor::monthly();
+        let market = zero_rate_market(as_of, 0.2);
+        let up = bump_surface_vol_absolute(&market, "EURUSD-VOL", 0.01).expect("up");
+        let down = bump_surface_vol_absolute(&market, "EURUSD-VOL", -0.01).expect("down");
+        let expected = (swap.value(&up, as_of).expect("up PV").amount()
+            - swap.value(&down, as_of).expect("down PV").amount())
+            / 2.0;
+        let base = swap.value(&market, as_of).expect("base");
+        let mut context = MetricContext::new(
+            Arc::new(swap),
+            Arc::new(market),
+            as_of,
+            base,
+            MetricContext::default_config(),
+        );
+        let actual = VegaCalculator.calculate(&mut context).expect("vega");
+        assert!((actual - expected).abs() < 1e-6);
+    }
+
+    #[test]
+    fn negative_forward_variation_is_rejected() {
+        use finstack_quant_core::dates::Tenor;
+        use finstack_quant_core::market_data::surfaces::VolSurface;
+        let as_of = date!(2025 - 01 - 06);
+        let mut swap = FxVarianceSwap::example().expect("example");
+        swap.start_date = date!(2026 - 01 - 06);
+        swap.maturity = date!(2027 - 01 - 06);
+        swap.observation_frequency = Tenor::annual();
+        let strikes: Vec<_> = (1..=400).map(|i| f64::from(i) * 0.01).collect();
+        let high = vec![0.4; strikes.len()];
+        let low = vec![0.1; strikes.len()];
+        let surface = VolSurface::builder("EURUSD-VOL")
+            .expiries(&[1.0, 2.0])
+            .strikes(&strikes)
+            .row(&high)
+            .row(&low)
+            .build()
+            .expect("surface");
+        let market = zero_rate_market(as_of, 0.1).insert_surface(surface);
+        assert!(expected_variance(&swap, &market, as_of)
+            .expect_err("calendar arbitrage")
+            .to_string()
+            .contains("negative forward variation"));
+    }
+
+    #[test]
+    fn ohlc_forecast_is_explicitly_unsupported_but_single_bar_realization_works() {
+        use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+        use finstack_quant_core::math::stats::RealizedVarMethod;
+        let as_of = date!(2025 - 01 - 06);
+        let mut swap = FxVarianceSwap::example().expect("example");
+        swap.start_date = as_of;
+        swap.maturity = date!(2025 - 01 - 08);
+        swap.realized_var_method = RealizedVarMethod::Parkinson;
+        swap.open_series_id = Some("OPEN".into());
+        swap.high_series_id = Some("HIGH".into());
+        swap.low_series_id = Some("LOW".into());
+        let mut market = zero_rate_market(as_of, 0.2);
+        for (name, value) in [
+            ("OPEN", 1.0),
+            ("HIGH", 1.01),
+            ("LOW", 0.99),
+            ("EURUSD", 1.0),
+        ] {
+            market = market.insert_series(
+                ScalarTimeSeries::new(name, vec![(as_of, value)], None).expect("series"),
+            );
+        }
+        let realized = partial_realized_variance(&swap, &market, as_of).expect("single bar");
+        let exact =
+            (1.01_f64 / 0.99).ln().powi(2) * annualization_factor(&swap) / (4.0 * 2.0_f64.ln());
+        assert!((realized - exact).abs() < 1e-12);
+        assert!(expected_variance(&swap, &market, as_of)
+            .expect_err("no OHLC model")
+            .to_string()
+            .contains("estimator-specific"));
+    }
+
+    #[test]
+    fn realized_fraction_uses_each_estimators_sample_count() {
+        use finstack_quant_core::math::stats::RealizedVarMethod;
+        let mut swap = FxVarianceSwap::example().expect("example");
+        swap.start_date = date!(2025 - 01 - 06);
+        swap.maturity = date!(2025 - 01 - 13);
+        let dates = observation_dates(&swap).expect("six business dates");
+        assert_eq!(dates.len(), 6);
+        for method in [
+            RealizedVarMethod::CloseToClose,
+            RealizedVarMethod::YangZhang,
+            RealizedVarMethod::Parkinson,
+            RealizedVarMethod::GarmanKlass,
+            RealizedVarMethod::RogersSatchell,
+        ] {
+            swap.realized_var_method = method;
+            let anchored = matches!(
+                method,
+                RealizedVarMethod::CloseToClose | RealizedVarMethod::YangZhang
+            );
+            for (index, &date) in dates.iter().enumerate() {
+                let expected = if anchored {
+                    index as f64 / 5.0
+                } else {
+                    (index + 1) as f64 / 6.0
+                };
+                let actual = realized_fraction_by_observations(&swap, date).expect("fraction");
+                assert!(
+                    (actual - expected).abs() < 1e-12,
+                    "{method:?}: {actual} vs {expected}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn unfinished_return_includes_the_move_since_the_last_fixing() {
+        use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+        let as_of = date!(2025 - 01 - 12);
+        let mut swap = FxVarianceSwap::example().expect("example");
+        swap.start_date = date!(2025 - 01 - 08);
+        swap.maturity = date!(2025 - 01 - 13);
+        let dates = observation_dates(&swap).expect("dates");
+        let observations = dates
+            .iter()
+            .copied()
+            .filter(|&date| date <= as_of)
+            .map(|date| (date, 1.0))
+            .collect();
+        let provider = SimpleFxProvider::new();
+        provider
+            .set_quote(Currency::EUR, Currency::USD, 1.02)
+            .expect("spot");
+        let market = zero_rate_market(as_of, 0.2)
+            .insert_fx(FxMatrix::new(Arc::new(provider)))
+            .insert_series(ScalarTimeSeries::new("EURUSD", observations, None).expect("series"));
+        let q =
+            cumulative_variation(&swap, &market, as_of, swap.maturity).expect("future variation");
+        let mean = 1.02_f64.ln() - 0.5 * q;
+        let expected = annualization_factor(&swap) * (q + mean * mean) / 3.0;
+        let actual = expected_variance(&swap, &market, as_of).expect("variance");
+        assert!((actual - expected).abs() < 1e-12);
+        let without_partial_move = annualization_factor(&swap) * (q + 0.25 * q * q) / 3.0;
+        assert!((actual - without_partial_move).abs() > 0.01);
+    }
+
+    #[test]
+    fn fully_observed_ohlc_settlement_preserves_estimator_definitions() {
+        use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+        use finstack_quant_core::math::stats::RealizedVarMethod;
+        let mut swap = FxVarianceSwap::example().expect("example");
+        swap.start_date = date!(2025 - 01 - 06);
+        swap.maturity = date!(2025 - 01 - 09);
+        swap.open_series_id = Some("OPEN".into());
+        swap.high_series_id = Some("HIGH".into());
+        swap.low_series_id = Some("LOW".into());
+        let dates = observation_dates(&swap).expect("four bars");
+        assert_eq!(dates.len(), 4);
+        let mut market = zero_rate_market(swap.start_date, 0.2);
+        for (id, first, later) in [
+            ("OPEN", 1.0, 1.0),
+            ("EURUSD", 1.0, 1.0),
+            ("HIGH", 1.2, 1.01),
+            ("LOW", 0.8, 0.99),
+        ] {
+            let observations = dates
+                .iter()
+                .enumerate()
+                .map(|(i, &date)| (date, if i == 0 { first } else { later }))
+                .collect();
+            market = market
+                .insert_series(ScalarTimeSeries::new(id, observations, None).expect("series"));
+        }
+        let range_mean =
+            ((1.2_f64 / 0.8).ln().powi(2) + 3.0 * (1.01_f64 / 0.99).ln().powi(2)) / 4.0;
+        let rs_first = 1.2_f64.ln().powi(2) + 0.8_f64.ln().powi(2);
+        let rs_later = 1.01_f64.ln().powi(2) + 0.99_f64.ln().powi(2);
+        for (method, per_period) in [
+            (
+                RealizedVarMethod::Parkinson,
+                range_mean / (4.0 * 2.0_f64.ln()),
+            ),
+            (RealizedVarMethod::GarmanKlass, 0.5 * range_mean),
+            (
+                RealizedVarMethod::RogersSatchell,
+                (rs_first + 3.0 * rs_later) / 4.0,
+            ),
+            // Three return periods; Yang-Zhang excludes the first anchor bar.
+            (
+                RealizedVarMethod::YangZhang,
+                (1.0 - 0.34 / (1.34 + 4.0 / 2.0)) * rs_later,
+            ),
+        ] {
+            swap.realized_var_method = method;
+            let expected = annualization_factor(&swap) * per_period;
+            let actual =
+                expected_variance(&swap, &market, swap.maturity).expect("settlement variance");
+            assert!(
+                (actual - expected).abs() < 1e-12,
+                "{method:?}: {actual} vs {expected}"
+            );
+            let pv = swap
+                .value(&market, swap.maturity)
+                .expect("settlement PV")
+                .amount();
+            assert!((pv - swap.payoff(expected).expect("payoff").amount()).abs() < 1e-7);
+        }
+    }
+
     #[test]
     fn fx_variance_swap_pricer_compute_pv_matches_instrument_value() {
         use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
@@ -522,11 +928,10 @@ mod tests {
         assert_eq!(annualization_factor(&swap), 26.0);
     }
 
-    /// W-32: the FX seasoned MTM must blend realized and forward variance by
-    /// the day-count `time_elapsed_fraction`, not by observation count, which
-    /// drifts for weekend-skipping daily schedules near maturity.
+    /// The full sample denominator is identical before and at settlement;
+    /// calendar-time weights do not change already fixed return contributions.
     #[test]
-    fn fx_seasoned_mtm_uses_time_weighting_not_observation_count() {
+    fn fx_seasoned_mtm_uses_contractual_sample_normalization() {
         use crate::instruments::common_impl::traits::Attributes;
         use crate::instruments::fx::fx_variance_swap::types::PayReceive;
         use finstack_quant_core::dates::{DayCount, Tenor};
@@ -594,24 +999,9 @@ mod tests {
 
         let pv = compute_pv(&swap, &market, as_of).expect("seasoned fx pv");
 
-        // Recompute the identity from the same building blocks. The realized
-        // term must be on the day-count time basis (`seasoned_realized_variance`,
-        // W-33) so it is consistent with the day-count blend weight.
-        let total_t = swap
-            .day_count
-            .year_fraction(swap.start_date, swap.maturity, DayCountContext::default())
-            .expect("total yf");
-        let t_elapsed = time_w * total_t;
-        let realized = seasoned_realized_variance(
-            &swap,
-            &market,
-            as_of,
-            t_elapsed,
-            &observation_dates(&swap).expect("observation schedule"),
-        )
-        .expect("realized");
+        let realized = partial_realized_variance(&swap, &market, as_of).expect("realized");
         let forward = remaining_forward_variance(&swap, &market, as_of).expect("forward");
-        let expected_var = realized * time_w + forward * (1.0 - time_w);
+        let expected_var = realized * count_w + forward * (1.0 - count_w);
         let dom = market.get_discount("USD-OIS").expect("curve");
         // Date-based discounting, matching the pricer (item 4).
         let df = dom
@@ -621,16 +1011,16 @@ mod tests {
 
         assert!(
             (pv.amount() - expected_pv.amount()).abs() < 1e-6,
-            "FX seasoned MTM must use time-weighted identity: pv={} expected={}",
+            "FX seasoned MTM must preserve the sample denominator: pv={} expected={}",
             pv.amount(),
             expected_pv.amount()
         );
 
-        let count_var = realized * count_w + forward * (1.0 - count_w);
+        let count_var = realized * time_w + forward * (1.0 - time_w);
         let count_pv = swap.payoff(count_var).expect("valid payoff") * df;
         assert!(
             (pv.amount() - count_pv.amount()).abs() > 1e-6,
-            "FX seasoned MTM must differ from observation-count weighting"
+            "FX seasoned MTM must differ from calendar-time weighting"
         );
     }
 
@@ -821,7 +1211,7 @@ mod tests {
             })
             .expect("axis-bug replication");
 
-        let actual = remaining_forward_variance(&swap, &market, as_of)
+        let actual = replicated_variance_to(&swap, &market, as_of, maturity)
             .expect("forward variance must succeed");
 
         if (expected_variance - bug_variance).abs() > 1e-8 {

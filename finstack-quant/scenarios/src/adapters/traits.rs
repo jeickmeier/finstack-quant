@@ -6,7 +6,8 @@
 
 use crate::spec::RateBindingSpec;
 use crate::warning::Warning;
-use finstack_quant_core::market_data::bumps::MarketBump;
+use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+use finstack_quant_core::types::CurveId;
 use finstack_quant_statements::types::NodeId;
 
 /// Outcome of a scenario operation, collected before mutation.
@@ -14,6 +15,20 @@ use finstack_quant_statements::types::NodeId;
 pub(crate) enum ScenarioEffect {
     /// Market-data bump applied to the context.
     MarketBump(MarketBump),
+    /// Price-scalar percentage bump, qualified by its market collection.
+    PriceBump {
+        /// Price-scalar identifier.
+        id: CurveId,
+        /// Percentage change; `10.0` increases the price by ten percent.
+        pct: f64,
+    },
+    /// Volatility-surface bump, qualified by its market collection.
+    SurfaceBump {
+        /// Volatility-surface identifier.
+        id: CurveId,
+        /// Canonical surface bump specification.
+        spec: BumpSpec,
+    },
     /// Structured warning recorded on the application report.
     Warning(Warning),
     /// Replace a curve in the market (discount, forward, hazard, inflation, or vol-index).

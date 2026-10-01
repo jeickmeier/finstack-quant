@@ -7,7 +7,6 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::money::Money;
-use finstack_quant_core::Error;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
@@ -291,15 +290,12 @@ fn test_maturity_equals_valuation_date() {
     )
     .expect("CDS construction should succeed");
 
-    let error = cds
+    // Exhausted protection contributes zero. With no pending premium or
+    // upfront cashflows, the fully settled contract has zero value.
+    let value = cds
         .value(&market, as_of)
-        .expect_err("a CDS ending on the valuation date is expired");
-    assert_eq!(
-        error,
-        Error::Validation(format!(
-            "CDS 'EXPIRED' is expired: protection end {end} is on or before valuation date {as_of}"
-        ))
-    );
+        .expect("settled CDS can be valued");
+    assert_eq!(value.amount(), 0.0);
 }
 
 #[test]
@@ -322,15 +318,12 @@ fn test_valuation_after_maturity() {
     )
     .expect("CDS construction should succeed");
 
-    let error = cds
+    // Exhausted protection contributes zero. With no pending premium or
+    // upfront cashflows, the fully settled contract has zero value.
+    let value = cds
         .value(&market, as_of)
-        .expect_err("a CDS valued after protection ends is expired");
-    assert_eq!(
-        error,
-        Error::Validation(format!(
-            "CDS 'PAST_MATURITY' is expired: protection end {end} is on or before valuation date {as_of}"
-        ))
-    );
+        .expect("settled CDS can be valued");
+    assert_eq!(value.amount(), 0.0);
 }
 
 #[test]

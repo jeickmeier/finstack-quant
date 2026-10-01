@@ -5,9 +5,33 @@ use wasm_bindgen::prelude::*;
 
 /// Build a cashflow schedule from a JSON spec and return canonical schedule JSON.
 ///
+/// IMM/CDS IMM roll rules use quarterly accrual and short-back stubs, regardless
+/// of the supplied frequency/stub. IMM retains contractual maturity through a
+/// terminal stub. Both modes reject end-of-month rolling; ACT/ACT ICMA rejects
+/// third-Wednesday IMM but supports CDS IMM. Plain ACT/ACT ICMA end-of-month
+/// schedules require a month-end regular anchor (maturity for front stubs,
+/// start otherwise); the opposite endpoint may be irregular. Negative payment
+/// and reset lags are rejected.
+///
+/// Complete supplied fixing observations can build a floating coupon without
+/// a forward curve. Explicit fallback applies to missing curves or absent
+/// fixing series. Supplied historical gaps before a resolved curve's base date
+/// always fail, as do curve, date, day-count and arithmetic errors.
+///
 /// @param spec_json - JSON-encoded `CashflowScheduleBuildSpec`. Optional
 ///   `principal_exchange` is `"none"` or `"initial_and_final"` (default).
 ///   `principal_events` entries require both economic `date` and cash `payment_date`.
+///   `linear_between` amortization uses coupon accrual boundaries in `(start, end]`;
+///   `end` must be an actual boundary no later than the terminal accrual date.
+///   Installments use outstanding after start-date PIK and principal movements,
+///   and the final installment clears the live balance. Cash settles on the
+///   corresponding adjusted, lagged payment dates.
+///   Term legs observe one fixing per coupon period at its lagged accrual start;
+///   `rate_spec.reset_frequency` and `index_tenor` do not add intraperiod resets
+///   or override the named forward curve's index tenor. Overnight legs use daily
+///   observations; `overnight_index_constraints` selects daily or final-period
+///   index bounds. Final-period index and all-in rate adjustments are allocated
+///   uniformly over contractual accrual time when principal changes.
 /// @param market_json - Optional JSON-encoded market context for floating-rate lookups.
 /// @returns JSON-encoded `CashFlowSchedule`.
 /// @throws If the spec or market JSON is malformed, or schedule construction fails.
@@ -34,9 +58,13 @@ pub fn validate_cashflow_schedule_json(schedule_json: &str) -> Result<String, Js
 ///
 /// @param schedule_json - JSON-encoded `CashFlowSchedule`.
 /// @returns JSON array of settlement cash entries. PIK and
-///   `DefaultedNotional` state rows are omitted; parse the full schedule JSON
-///   when flow classification is required.
-/// @throws If the schedule JSON is malformed.
+///   `DefaultedNotional` state rows and zero-cash principal markers are omitted.
+///   Native currencies are retained without conversion or netting; parse the
+///   full schedule JSON when flow classification is required.
+/// @throws If the schedule JSON, flow amounts, accrual metadata, row currencies,
+///   or dates are invalid, or a single-currency principal path fails balance
+///   reconciliation. Composite principal paths in multiple currencies receive
+///   structural validation without scalar balance reconciliation.
 #[wasm_bindgen(js_name = datedFlowsJson)]
 pub fn dated_flows_json(schedule_json: &str) -> Result<String, JsValue> {
     finstack_quant_cashflows::dated_flows_json(schedule_json).map_err(to_js_err)
@@ -52,7 +80,9 @@ pub fn dated_flows_json(schedule_json: &str) -> Result<String, JsValue> {
 ///   crosses the WASM boundary as `f64`; for large notionals, compare with an
 ///   absolute tolerance scaled to the schedule notional rather than expecting
 ///   decimal-string equality.
-/// @throws If any JSON input is malformed or the accrual computation fails.
+/// @throws If any JSON input is malformed, a compounded period rate is
+///   non-finite or at or below -1, or the accrual computation fails or produces
+///   a non-finite result.
 #[wasm_bindgen(js_name = accruedInterest)]
 pub fn accrued_interest(
     schedule_json: &str,

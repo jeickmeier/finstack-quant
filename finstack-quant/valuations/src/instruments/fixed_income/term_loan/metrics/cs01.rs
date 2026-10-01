@@ -17,6 +17,12 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 
 impl ZSpreadCs01 for TermLoan {
+    fn z_spread_cs01_quoted_spread(&self) -> Option<f64> {
+        self.instrument_pricing_overrides
+            .market_quotes
+            .quoted_z_spread
+    }
+
     fn z_spread_cs01_inputs(
         &self,
         curves: &MarketContext,

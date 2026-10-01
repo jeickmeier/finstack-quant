@@ -308,7 +308,10 @@ fn term_out_amortizes_the_facility_sequentially() {
         date: d(2025, 1, 1),
     }];
     assert_eq!(facility.effective_revolving_end(), d(2025, 1, 1));
-    assert_eq!(facility.repayment_date(), d(2027, 1, 1));
+    assert_eq!(
+        facility.repayment_date().expect("valid repayment date"),
+        d(2027, 1, 1)
+    );
     let deal = facility.synthesized_deal().expect("deal");
     assert_eq!(deal.maturity, d(2032, 1, 1));
     assert_eq!(
@@ -435,7 +438,13 @@ fn facility_prices_and_reports_metrics_through_the_registry() {
     }
     let example = AssetBackedFacility::example().expect("example facility builds");
     example.validate_invariants().expect("example validates");
-    assert_eq!(example.closing_date.add_months(24), example.revolving_end);
+    assert_eq!(
+        example
+            .closing_date
+            .add_months(24)
+            .expect("valid date shift"),
+        example.revolving_end
+    );
 }
 
 /// A dated amortization event ends the commitment with the revolving
@@ -524,7 +533,8 @@ fn an_amortization_event_starts_the_term_out_clock() {
         .max()
         .expect("repayment dates");
     assert!(
-        repaid_on >= event.add_months(24) && repaid_on < event.add_months(25),
+        repaid_on >= event.add_months(24).expect("valid date shift")
+            && repaid_on < event.add_months(25).expect("valid date shift"),
         "the term-out ends 24 months after the event: {repaid_on}"
     );
     assert!(
@@ -750,4 +760,49 @@ fn floating_facility_interest_is_tagged_float_reset() {
     assert!(!floating_kinds.is_empty());
     assert!(floating_kinds.iter().all(|k| *k == CFKind::FloatReset));
     assert!(kinds(&fixed).iter().all(|k| *k == CFKind::Fixed));
+}
+
+#[test]
+fn commitment_fee_clips_mid_period_end_and_preserves_payment_date() {
+    let end = d(2024, 2, 15);
+    for early_event in [false, true] {
+        for frequency in [Tenor::quarterly(), Tenor::semi_annual()] {
+            let mut f = facility(60_000_000.0, 100_000_000.0);
+            f.frequency = frequency;
+            if early_event {
+                f.amortization_events = vec![AmortizationEvent::Date { date: end }];
+            } else {
+                f.revolving_end = end;
+            }
+            let projection = f.project(&market(), close()).expect("projection");
+            let period = &projection.facility.accrual_periods[0];
+            assert!(period.start < end && end < period.end);
+            let accrual = f
+                .day_count
+                .year_fraction(period.start, end, DayCountContext::default())
+                .expect("clipped accrual");
+            let expected =
+                (f.commitment.amount() - period.opening_balance.amount()) * 0.005 * accrual;
+            assert_eq!(projection.commitment_fees.len(), 1);
+            let (payment_date, fee) = projection.commitment_fees[0];
+            assert_eq!(payment_date, period.payment_date);
+            assert!(
+                (fee.amount() - expected).abs() < 1e-6,
+                "event={early_event}, frequency={frequency:?}: {} != {expected}",
+                fee.amount()
+            );
+        }
+    }
+}
+
+#[test]
+fn commitment_fee_exact_period_end_charges_one_full_period() {
+    let mut f = facility(60_000_000.0, 100_000_000.0);
+    let projection = f.project(&market(), close()).expect("projection");
+    let end = projection.facility.accrual_periods[0].end;
+    let first_fee = projection.commitment_fees[0];
+    f.revolving_end = end;
+    let clipped = f.project(&market(), close()).expect("boundary projection");
+    assert_eq!(clipped.commitment_fees.len(), 1);
+    assert_eq!(clipped.commitment_fees[0], first_fee);
 }

@@ -650,7 +650,8 @@ impl PyPercentage {
 /// Immutable, hashable, ordered enum-style type: ``AAA < AA+ < ... < C < NR < D``
 /// (a "smaller" rating is stronger credit; ``NR`` sits between ``C`` and ``D``).
 /// Notched ratings (``"BBB+"``, ``"Baa1"``) keep notch-level precision.
-/// Compares equal to a rating string: ``CreditRating.BBB == "BBB"``.
+/// Equality and ordering compare ``CreditRating`` instances; parse strings
+/// explicitly, for example ``CreditRating.BBB == CreditRating("baa2")``.
 ///
 /// Parameters
 /// ----------
@@ -881,19 +882,16 @@ impl PyCreditRating {
     }
 
     /// Hash consistent with equality between ``CreditRating`` instances.
-    ///
-    /// Note that ``hash(CreditRating.BBB) != hash("BBB")`` even though the two
-    /// compare equal; use ``CreditRating`` keys consistently in dicts/sets.
     fn __hash__(&self) -> u64 {
         let mut hasher = DefaultHasher::new();
         self.inner.hash(&mut hasher);
         hasher.finish()
     }
 
-    /// Rich comparison against another ``CreditRating`` or a rating string.
+    /// Rich comparison against another ``CreditRating``.
     ///
-    /// Ordering follows credit quality: ``AAA < BBB < D``. An unparsable
-    /// string compares unequal (``==`` is ``False``) and unordered.
+    /// Ordering follows credit quality: ``AAA < BBB < D``. Other host types
+    /// compare unequal and do not support ordering.
     fn __richcmp__(
         &self,
         other: &Bound<'_, PyAny>,
@@ -902,16 +900,6 @@ impl PyCreditRating {
     ) -> PyResult<Py<PyAny>> {
         if let Ok(rhs) = other.extract::<PyRef<'_, PyCreditRating>>() {
             return op.matches(self.inner.cmp(&rhs.inner)).into_py_any(py);
-        }
-        if let Ok(text) = other.cast::<PyString>() {
-            return match text.to_str()?.parse::<CreditRating>() {
-                Ok(rhs) => op.matches(self.inner.cmp(&rhs)).into_py_any(py),
-                Err(_) => match op {
-                    CompareOp::Eq => false.into_py_any(py),
-                    CompareOp::Ne => true.into_py_any(py),
-                    _ => Ok(py.NotImplemented()),
-                },
-            };
         }
         Ok(py.NotImplemented())
     }
@@ -1288,7 +1276,7 @@ impl PyAttributes {
 
 /// Register the `finstack_quant.core.types` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "types")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "types")?;
     m.setattr(
         "__doc__",
         "Core finstack-quant types: rates, identifiers, credit ratings, attributes.",
@@ -1315,13 +1303,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
     m.setattr("__all__", all)?;
 
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "types",
-        "finstack_quant.core",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
 
     Ok(())

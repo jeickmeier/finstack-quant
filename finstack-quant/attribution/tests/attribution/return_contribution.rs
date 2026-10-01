@@ -1,7 +1,63 @@
 //! Tests for the surrounding crate component and its documented behavior.
 //!
-use finstack_quant_attribution::attribute_return_contribution_json;
+use finstack_quant_attribution::{
+    attribute_return_contribution_json, validate_return_contribution_json, ReturnContributionResult,
+};
 use serde_json::{json, Value};
+
+#[test]
+fn return_contribution_rejects_derived_numeric_overflow() {
+    let cases = [
+        json!({"positions": [{"id": "A", "weight": 1e308, "return": 2.0}]}),
+        json!({"positions": [{"id": "A", "weight": 1.0, "return": 0.02}],
+            "factors": [{"factor": "F", "exposure": 1e308, "factor_return": 2.0}]}),
+        json!({"positions": [{"id": "A", "market_value": 1e308, "return": 0.02},
+            {"id": "B", "market_value": 1e308, "return": 0.02}]}),
+        json!({"positions": [{"id": "A", "weight": 1e308, "return": 0.0},
+            {"id": "B", "weight": 1e308, "return": 0.0}]}),
+        json!({"positions": [{"id": "A", "weight": 1.0, "return": 1e308},
+            {"id": "B", "weight": 1.0, "return": 1e308}]}),
+        json!({"positions": [{"id": "A", "weight": 1.0, "return": 1e308,
+            "benchmark_weight": 1.0, "benchmark_return": -1e308}]}),
+        json!({"positions": [{"id": "A", "weight": 1.0, "return": 0.02}],
+            "factors": [{"factor": "F", "exposure": 1e308, "factor_return": 1.0},
+                {"factor": "G", "exposure": 1e308, "factor_return": 1.0}]}),
+        json!({"positions": [
+            {"id": "A", "weight": 1.0, "return": 1e308, "groups": {"sector": "positive"}},
+            {"id": "B", "weight": 1.0, "return": -1e308, "groups": {"sector": "negative"}},
+            {"id": "C", "weight": 1.0, "return": 1e308, "groups": {"sector": "positive"}},
+            {"id": "D", "weight": 1.0, "return": -1e308, "groups": {"sector": "negative"}}
+        ]}),
+    ];
+    for mut spec in cases {
+        spec["as_of"] = json!("2026-09-29");
+        let spec_json = spec.to_string();
+        for result in [
+            attribute_return_contribution_json(&spec_json),
+            validate_return_contribution_json(&spec_json),
+        ] {
+            let error = result.expect_err("derived non-finite quantities must be rejected");
+            assert!(matches!(error, finstack_quant_core::Error::Validation(_)));
+            assert!(error.to_string().contains("finite"), "{error}");
+        }
+    }
+}
+
+#[test]
+fn return_contribution_large_finite_results_roundtrip() {
+    let spec = json!({
+        "as_of": "2026-09-29",
+        "positions": [{"id": "A", "weight": 1e100, "return": 1e-100}],
+        "factors": [{"factor": "F", "exposure": 1e100, "factor_return": 1e-100}],
+    });
+    let output = attribute_return_contribution_json(&spec.to_string()).expect("finite results");
+    let result: ReturnContributionResult = serde_json::from_str(&output).expect("result roundtrip");
+    assert!((result.portfolio_return - 1.0).abs() < 1e-12);
+    assert!(result
+        .specific_return
+        .is_some_and(|value| value.abs() < 1e-12));
+    assert_eq!(result.instrument_contribution[0].weight, 1e100);
+}
 
 #[test]
 fn return_contribution_groups_factors_and_brinson_reconcile() {

@@ -246,38 +246,67 @@ impl TryFrom<HullWhiteCalibrationParams> for HullWhiteParams {
 #[must_use]
 pub fn hw_b(kappa: f64, t1: f64, t2: f64) -> f64 {
     let tau = t2 - t1;
-    if kappa.abs() < 1e-10 {
+    if kappa * tau == 0.0 {
         tau
     } else {
-        (1.0 - (-kappa * tau).exp()) / kappa
+        -(-kappa * tau).exp_m1() / kappa
     }
 }
 
-/// Compute the Hull-White futures-to-forward convexity adjustment.
+/// Approximate the Hull-White simple-rate futures-to-forward convexity adjustment.
 ///
-/// The returned decimal-rate adjustment satisfies
-/// `forward = futures_rate - adjustment` and uses the Ho-Lee limit for small κ.
+/// The returned decimal-rate adjustment is subtracted from a futures-implied
+/// simple deposit rate: `forward_rate ≈ futures_rate - adjustment`. This is
+/// the low-rate, small-variance expansion of the Kirikos-Novak formula used by
+/// [QuantLib's HullWhite::convexityBias](https://github.com/lballabio/QuantLib/blob/master/ql/models/shortrate/onefactormodels/hullwhite.cpp).
+/// It assumes constant κ and σ and that the fixing and accrual start coincide
+/// at `t_settle`, with payment at `t_end`.
+///
+/// With `τ = t_end - t_settle`, `B(u) = (1-exp(-κu))/κ`, and
+/// `z = σ²/2 · [B(2t_settle) B(τ) + B(t_settle)²]`, the full simple-rate bias
+/// is `(1-exp(-z B(τ))) · (futures_rate + 1/τ)`. This helper returns
+/// `z B(τ)/τ`: it drops the rate-dependent factor and linearizes the
+/// exponential, requiring both `|futures_rate · τ| ≪ 1` and `|z B(τ)| ≪ 1`.
+/// A futures quote is not an input, so this helper does not evaluate the full
+/// simple-rate bias. It is not a compounded-in-arrears overnight-rate adjustment.
+///
+/// The continuous Ho-Lee limit is `σ²/2 · t_settle · (2t_end - t_settle)`.
 ///
 /// # Arguments
 ///
-/// * `kappa` - Mean-reversion speed κ in inverse years.
-/// * `sigma` - Short-rate volatility σ in absolute rate units per square-root year.
-/// * `t_settle` - Futures settlement time in years from valuation.
-/// * `t_end` - Futures underlying end time in years from valuation.
+/// * `kappa` - Finite non-negative mean-reversion speed κ in inverse years;
+///   zero selects the continuous Ho-Lee limit.
+/// * `sigma` - Finite non-negative short-rate volatility σ in absolute decimal
+///   rate units per square-root year, not Black percentage volatility.
+/// * `t_settle` - Finite fixing and accrual-start time measured from valuation
+///   with the underlying deposit's day-count convention.
+/// * `t_end` - Finite accrual-end/payment time on the same year-fraction scale
+///   as `t_settle`; their difference is the underlying simple-rate accrual fraction.
+///
+/// # Returns
+///
+/// An additive decimal-rate approximation. Returns zero for non-positive
+/// fixing time or accrual length, and `NaN` for non-finite inputs or negative
+/// κ or σ. No date-to-year-fraction or futures-price-to-rate conversion is performed.
 #[must_use]
 pub fn hw1f_convexity_adjustment(kappa: f64, sigma: f64, t_settle: f64, t_end: f64) -> f64 {
+    if !kappa.is_finite()
+        || kappa < 0.0
+        || !sigma.is_finite()
+        || sigma < 0.0
+        || !t_settle.is_finite()
+        || !t_end.is_finite()
+    {
+        return f64::NAN;
+    }
     let tau = t_end - t_settle;
     if t_settle <= 0.0 || tau <= 0.0 {
         return 0.0;
     }
-    const SMALL_KAPPA: f64 = 1e-8;
-    if kappa.abs() < SMALL_KAPPA {
-        return 0.5 * sigma * sigma * t_settle * t_end;
-    }
     let b_0s = hw_b(kappa, 0.0, t_settle);
     let b_se = hw_b(kappa, t_settle, t_end);
-    let bracket = b_se * (1.0 - (-2.0 * kappa * t_settle).exp()) + 2.0 * kappa * b_0s * b_0s;
-    sigma * sigma / (4.0 * kappa) * (b_se / tau) * bracket
+    let b_02s = hw_b(kappa, 0.0, 2.0 * t_settle);
+    0.5 * sigma * sigma * (b_se / tau) * (b_02s * b_se + b_0s * b_0s)
 }
 
 /// Compute zero-coupon bond-option volatility under constant σ.
@@ -362,6 +391,53 @@ pub fn hw_ln_a(kappa: f64, sigma: f64, t: f64, maturity: f64, df: &dyn Fn(f64) -
         sigma * sigma / (4.0 * kappa) * (1.0 - (-2.0 * kappa * t).exp()) * b * b
     };
     (p0_maturity / p0t).ln() + b * f0t - var_term
+}
+
+/// Payment-measure adjustment to a simple or compounded floating coupon's bond ratio.
+///
+/// Multiplying `P(t,start) / P(t,end)` by this factor gives the expected
+/// accumulation factor under the payment-date measure. The coupon value is
+/// `(adjusted_ratio - 1) * P(t,payment)` per unit notional. A payment at accrual
+/// end has adjustment one. Compounded coupons cover an unshifted overnight
+/// accrual window; observation shifts, lookbacks and rate cutoffs require their
+/// own observation schedule and must not use this kernel.
+///
+/// # Arguments
+///
+/// * `params` - Constant Hull-White mean reversion and absolute short-rate volatility.
+/// * `valuation_time` - Conditional valuation time in ACT/365F model years,
+///   at or before fixing and accrual start.
+/// * `start` - Coupon accrual-start time on the same model clock.
+/// * `end` - Coupon accrual-end time, strictly after `start`.
+/// * `payment` - Coupon payment time, at or after `start` for a simple term
+///   coupon and at or after `end` for a compounded overnight coupon.
+///   Business-day adjustments may move simple payments before accrual end.
+/// * `fixing` - Simple-rate fixing time, at or before `start`; ignored for
+///   compounded overnight coupons, whose rate remains stochastic through `end`.
+/// * `is_compounded` - `true` for an unshifted compounded overnight coupon;
+///   `false` for a simple term rate fixed at `fixing`.
+#[must_use]
+pub fn hw1f_delayed_coupon_adjustment(
+    params: HullWhiteCalibrationParams,
+    valuation_time: f64,
+    start: f64,
+    end: f64,
+    payment: f64,
+    fixing: f64,
+    is_compounded: bool,
+) -> f64 {
+    let HullWhiteCalibrationParams { kappa, sigma } = params;
+    if is_compounded {
+        let b = hw_b(kappa, start, end);
+        let state_variance = sigma * sigma * hw_b(2.0 * kappa, valuation_time, start);
+        let covariance =
+            b * (-kappa * (end - start)).exp() * state_variance + 0.5 * sigma * sigma * b * b;
+        (-hw_b(kappa, end, payment) * covariance).exp()
+    } else {
+        let variance = sigma * sigma * hw_b(2.0 * kappa, valuation_time, fixing);
+        let loading = hw_b(kappa, fixing, end) - hw_b(kappa, fixing, start);
+        (variance * loading * (hw_b(kappa, fixing, end) - hw_b(kappa, fixing, payment))).exp()
+    }
 }
 
 /// Price a zero-coupon bond option from discount factors and bond volatility.
@@ -463,7 +539,10 @@ pub fn hw1f_caplet_price_from_dfs(
 /// * `pd_pay` - Discount-curve discount factor to payment.
 /// * `t_fix` - Contractual fixing time in years.
 /// * `t_start` - Coupon-period start time in years.
-/// * `t_end` - Coupon-period end time in years.
+/// * `t_end` - Coupon-period end time in ACT/365F model years.
+/// * `t_pay` - Contractual payment time on the same model clock, at or after
+///   `t_start`. Business-day adjustment may place it before `t_end`; either
+///   payment timing changes the projected ratio under the payment measure.
 /// * `accrual` - Positive coupon accrual fraction in years.
 /// * `strike` - Caplet or floorlet strike as a decimal rate.
 /// * `is_cap` - `true` for a caplet and `false` for a floorlet.
@@ -481,6 +560,7 @@ pub fn hw1f_term_caplet_price_from_dfs_with_model(
     t_fix: f64,
     t_start: f64,
     t_end: f64,
+    t_pay: f64,
     accrual: f64,
     strike: f64,
     is_cap: bool,
@@ -489,6 +569,13 @@ pub fn hw1f_term_caplet_price_from_dfs_with_model(
     if !valid_df(pf_start)
         || !valid_df(pf_end)
         || !valid_df(pd_pay)
+        || !accrual.is_finite()
+        || !strike.is_finite()
+        || ![t_fix, t_start, t_end, t_pay]
+            .iter()
+            .all(|time| time.is_finite())
+        || t_fix < 0.0
+        || t_pay < t_start
         || accrual <= 0.0
         || t_end <= t_start
         || t_start < t_fix
@@ -497,7 +584,14 @@ pub fn hw1f_term_caplet_price_from_dfs_with_model(
             "invalid term caplet discount factors or times".into(),
         ));
     }
-    let ratio_forward = pf_start / pf_end;
+    // The term rate is a martingale under its accrual-end measure. A delayed
+    // payment requires the lognormal change of measure through fixing; its
+    // covariance is exact for constant mean reversion and scheduled sigma.
+    let state_variance = params.state_variance(t_fix)?;
+    let ratio_loading = hw_b(params.kappa, t_fix, t_end) - hw_b(params.kappa, t_fix, t_start);
+    let payment_loading = hw_b(params.kappa, t_fix, t_pay) - hw_b(params.kappa, t_fix, t_end);
+    let ratio_forward =
+        (pf_start / pf_end) * (-state_variance * ratio_loading * payment_loading).exp();
     let ratio_strike = 1.0 + accrual * strike;
     if ratio_strike <= 0.0 {
         return if is_cap {
@@ -600,6 +694,7 @@ pub fn hw1f_cap_floor_price_with_model(
                 t_fix,
                 t_start,
                 t_end,
+                t_end,
                 accrual,
                 strike,
                 is_cap,
@@ -699,9 +794,48 @@ mod tests {
         let sigma = 0.01;
         let t1 = 1.0;
         let t2 = 1.25;
-        let expected = 0.5 * sigma * sigma * t1 * t2;
-        let actual = hw1f_convexity_adjustment(1.0e-12, sigma, t1, t2);
-        assert!((actual - expected).abs() < 1.0e-14);
+        let expected = 0.5 * sigma * sigma * t1 * (2.0 * t2 - t1);
+        for kappa in [0.0, 1.0e-14, 1.0e-12, 0.999e-8, 1.001e-8, 1.0e-7] {
+            let actual = hw1f_convexity_adjustment(kappa, sigma, t1, t2);
+            assert!(
+                (actual - expected).abs() < 2.0e-7 * expected,
+                "κ={kappa}: got {actual}, expected continuous limit {expected}"
+            );
+        }
+    }
+
+    #[test]
+    fn convexity_matches_quantlib_low_rate_small_variance_expansion() {
+        // Kirikos-Novak benchmark parameters from QuantLib's short-rate-model
+        // test suite. This four-input helper evaluates the leading expansion,
+        // not the full quote-dependent simple-rate bias.
+        let approximation = hw1f_convexity_adjustment(0.03, 0.015, 5.0, 5.25);
+        assert!((approximation - 0.002657379853909778).abs() < 1.0e-15);
+
+        let futures_rate = 0.06;
+        let tau = 0.25;
+        // The bias uses 1-exp(-exponent), with exponent=approximation*tau.
+        let full_bias = -(-approximation * tau).exp_m1() * (futures_rate + 1.0 / tau);
+        assert!((futures_rate - full_bias - 0.0573037).abs() < 1.0e-7);
+
+        // At vanishing volatility and zero futures rate, the independently
+        // evaluated full expression converges to the approximation.
+        for sigma in [1.0e-3, 1.0e-4, 1.0e-5] {
+            let leading = hw1f_convexity_adjustment(0.03, sigma, 5.0, 5.25);
+            let full = -(-leading * tau).exp_m1() / tau;
+            assert!((full / leading - 1.0).abs() < 1.0e-5);
+        }
+    }
+
+    #[test]
+    fn convexity_rejects_invalid_model_inputs_before_zero_time_shortcut() {
+        for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -0.01] {
+            assert!(hw1f_convexity_adjustment(invalid, 0.01, 0.0, 0.25).is_nan());
+            assert!(hw1f_convexity_adjustment(0.03, invalid, 0.0, 0.25).is_nan());
+        }
+        assert!(hw1f_convexity_adjustment(0.03, 0.01, f64::NAN, 1.0).is_nan());
+        assert!(hw1f_convexity_adjustment(0.03, 0.01, 0.0, f64::INFINITY).is_nan());
+        assert_eq!(hw1f_convexity_adjustment(0.03, 0.0, 5.0, 5.25), 0.0);
     }
 
     #[test]
@@ -732,5 +866,125 @@ mod tests {
         );
         let forward = (pf_fix / pf_pay - 1.0) / accrual;
         assert!((caplet - floorlet - pd_pay * accrual * (forward - strike)).abs() < 1.0e-14);
+    }
+
+    #[test]
+    fn delayed_term_caplet_matches_independent_payment_measure_integral() {
+        let (kappa, sigma) = (0.07, 0.025);
+        let model = HullWhiteParams::constant(kappa, sigma).expect("valid model");
+        let (fixing, start, end) = (2.0, 2.02, 2.52);
+        for payment in [2.72, 2.50] {
+            let accrual = 0.5 * 365.0 / 360.0;
+            let strike = 0.03;
+            let df = |time: f64| (-0.03 * time).exp();
+            // Integrate the term-ratio and end-to-payment discount loadings
+            // directly, independently of the analytical state-variance kernel.
+            let n = 20_000;
+            let du = fixing / f64::from(n);
+            let covariance: f64 = (0..n)
+                .map(|i| {
+                    let u = (f64::from(i) + 0.5) * du;
+                    let ratio_loading =
+                        sigma * ((-kappa * (start - u)).exp() - (-kappa * (end - u)).exp()) / kappa;
+                    let delay_loading = sigma
+                        * ((-kappa * (end - u)).exp() - (-kappa * (payment - u)).exp())
+                        / kappa;
+                    ratio_loading * delay_loading * du
+                })
+                .sum();
+            let ratio = df(start) / df(end) * (-covariance).exp();
+            let variance: f64 = (0..n)
+                .map(|i| {
+                    let u = (f64::from(i) + 0.5) * du;
+                    let loading =
+                        sigma * ((-kappa * (start - u)).exp() - (-kappa * (end - u)).exp()) / kappa;
+                    loading * loading * du
+                })
+                .sum();
+            let vol = variance.sqrt();
+            let gearing = 1.0 + strike * accrual;
+            let d1 = (ratio / gearing).ln() / vol + 0.5 * vol;
+            let expected = df(payment) * (ratio * norm_cdf(d1) - gearing * norm_cdf(d1 - vol));
+            let actual = hw1f_term_caplet_price_from_dfs_with_model(
+                &model,
+                df(start),
+                df(end),
+                df(payment),
+                fixing,
+                start,
+                end,
+                payment,
+                accrual,
+                strike,
+                true,
+            )
+            .expect("delayed caplet");
+            assert!((actual - expected).abs() < 1e-12, "{actual} vs {expected}");
+            let no_measure_adjustment = hw1f_term_caplet_price_from_dfs_with_model(
+                &model,
+                df(start),
+                df(end),
+                df(payment),
+                fixing,
+                start,
+                end,
+                end,
+                accrual,
+                strike,
+                true,
+            )
+            .expect("unadjusted caplet");
+            assert!((actual - no_measure_adjustment).abs() > 1e-6);
+        }
+    }
+
+    #[test]
+    fn term_caplet_without_payment_delay_matches_bond_option_and_parity() {
+        let (kappa, sigma) = (0.05, 0.01);
+        let model = HullWhiteParams::constant(kappa, sigma).expect("valid model");
+        let df = |time: f64| (-0.03 * time).exp();
+        let strike = 0.025;
+        let cap = hw1f_term_caplet_price_from_dfs_with_model(
+            &model,
+            df(1.0),
+            df(2.0),
+            df(2.0),
+            1.0,
+            1.0,
+            2.0,
+            2.0,
+            1.0,
+            strike,
+            true,
+        )
+        .expect("caplet");
+        let floor = hw1f_term_caplet_price_from_dfs_with_model(
+            &model,
+            df(1.0),
+            df(2.0),
+            df(2.0),
+            1.0,
+            1.0,
+            2.0,
+            2.0,
+            1.0,
+            strike,
+            false,
+        )
+        .expect("floorlet");
+        let bond_option = hw1f_caplet_price_from_dfs(
+            kappa,
+            sigma,
+            df(1.0),
+            df(2.0),
+            df(2.0),
+            1.0,
+            2.0,
+            1.0,
+            strike,
+            true,
+        );
+        assert!((cap - bond_option).abs() < 1e-14);
+        assert!((cap - floor - (df(1.0) - (1.0 + strike) * df(2.0))).abs() < 1e-14);
     }
 }

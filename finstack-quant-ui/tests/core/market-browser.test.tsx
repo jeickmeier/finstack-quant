@@ -226,6 +226,11 @@ it("preserves FX source, direction, date, policy and unavailable diagonals witho
   ]);
   expect(rows("provider_quotes")[0]![2]).toBe("1.12 · Undated");
   expect(rows("provider_quotes")[2]![2]).toBe("0.007 · Undated");
+  expect(rows("provider_pinned_quotes")[0]![2]).toBe(
+    market
+      .fx!.provider_pinned_quotes.map((q) => `${q[4]} · ${q[2]} · ${q[3]}`)
+      .join("; "),
+  );
   expect(rows("pinned_quotes")[0]![2]).toBe(
     market
       .fx!.pinned_quotes.map((q) => `${q[4]} · ${q[2]} · ${q[3]}`)

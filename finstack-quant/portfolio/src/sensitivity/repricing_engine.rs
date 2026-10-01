@@ -1,6 +1,8 @@
 //! Finite-difference and repricing utilities for portfolio sensitivities.
 //!
-use super::delta_engine::mapping_to_market_bumps;
+use super::delta_engine::{
+    compute_delta_sensitivities, mapping_to_market_bumps, validate_position_weights,
+};
 use super::traits::{
     mapping_bumps_fx, raw_pv_in_base, FactorRepricingPlan, FactorSensitivityEngine,
 };
@@ -75,7 +77,10 @@ impl ScenarioGrid {
     }
 }
 
-/// Scenario-grid sensitivity engine that reprices across multiple factor shocks.
+/// Scenario-grid P&L engine with two-endpoint central sensitivity extraction.
+///
+/// Full grids are computed only by [`Self::compute_pnl_profiles`]. Sensitivity
+/// matrices use the same central up/down pricing kernel as [`super::DeltaBasedEngine`].
 #[derive(Debug, Clone)]
 pub struct FullRepricingEngine {
     bump_config: BumpSizeConfig,
@@ -149,7 +154,8 @@ impl FullRepricingEngine {
     ///
     /// # Arguments
     ///
-    /// * `positions` - `(id, instrument, weight)` rows in profile order.
+    /// * `positions` - `(id, instrument, weight)` rows in profile order. Weights
+    ///   are finite signed unit multipliers applied after each PV difference.
     /// * `factors` - Factor definitions that select the market bumps.
     /// * `market` - Unbumped market snapshot; each grid point bumps it.
     /// * `as_of` - Valuation date for pricing and spot FX lookup.
@@ -157,9 +163,9 @@ impl FullRepricingEngine {
     ///
     /// # Errors
     ///
-    /// Returns validation errors for non-finite base or bumped PVs, or a
-    /// non-finite/zero bump. Propagates market-bump, instrument-pricing, and
-    /// FX-conversion failures.
+    /// Returns validation errors for non-finite weights, base or bumped PVs,
+    /// weighted P&L, or a non-finite/zero bump. Propagates market-bump,
+    /// instrument-pricing, and FX-conversion failures.
     pub fn compute_pnl_profiles(
         &self,
         positions: &[(String, &dyn Instrument, f64)],
@@ -168,6 +174,7 @@ impl FullRepricingEngine {
         as_of: Date,
         base_currency: Currency,
     ) -> Result<Vec<FactorPnlProfile>> {
+        validate_position_weights(positions)?;
         let base_pvs = Self::collect_base_pvs(positions, market, as_of, base_currency)?;
         let repricing_plan = FactorRepricingPlan::build(positions, factors, market);
 
@@ -209,7 +216,15 @@ impl FullRepricingEngine {
                                     factor.id.as_str()
                                 )));
                             }
-                            Ok((pv - base_pvs[position_idx]) * *weight)
+                            let pnl = (pv - base_pvs[position_idx]) * *weight;
+                            if !pnl.is_finite() {
+                                let position_id = &positions[position_idx].0;
+                                return Err(Error::Validation(format!(
+                                    "non-finite weighted P&L for position '{position_id}' on factor '{}' at shift {shift} ({pnl}); check the position weight and bumped PV difference",
+                                    factor.id.as_str()
+                                )));
+                            }
+                            Ok(pnl)
                             },
                         )
                         .collect::<Result<_>>()?;
@@ -251,36 +266,14 @@ impl FactorSensitivityEngine for FullRepricingEngine {
         as_of: Date,
         base_currency: Currency,
     ) -> Result<SensitivityMatrix> {
-        let profiles =
-            self.compute_pnl_profiles(positions, factors, market, as_of, base_currency)?;
-        let position_ids = positions.iter().map(|(id, _, _)| id.clone()).collect();
-        let factor_ids = factors.iter().map(|factor| factor.id.clone()).collect();
-        let mut matrix = SensitivityMatrix::zeros(position_ids, factor_ids);
-
-        for (factor_idx, (profile, factor)) in profiles.iter().zip(factors).enumerate() {
-            let down_idx = profile
-                .shifts
-                .iter()
-                .position(|shift| (*shift - (-1.0)).abs() < 1e-12);
-            let up_idx = profile
-                .shifts
-                .iter()
-                .position(|shift| (*shift - 1.0).abs() < 1e-12);
-
-            if let (Some(down_idx), Some(up_idx)) = (down_idx, up_idx) {
-                let bump_size = self
-                    .bump_config
-                    .bump_size_for_factor(&factor.id, &factor.factor_type);
-                for position_idx in 0..positions.len() {
-                    let delta = (profile.position_pnls[up_idx][position_idx]
-                        - profile.position_pnls[down_idx][position_idx])
-                        / (2.0 * bump_size);
-                    matrix.set_delta(position_idx, factor_idx, delta);
-                }
-            }
-        }
-
-        Ok(matrix)
+        compute_delta_sensitivities(
+            &self.bump_config,
+            positions,
+            factors,
+            market,
+            as_of,
+            base_currency,
+        )
     }
 }
 
@@ -865,13 +858,13 @@ mod tests {
         assert_eq!(matrix.delta(1, 0), 0.0);
         assert_eq!(
             affected_calls.load(Ordering::Relaxed),
-            5,
-            "one base endpoint plus four non-zero grid shifts must be priced"
+            2,
+            "matrix extraction needs only the two central endpoints"
         );
         assert_eq!(
             unaffected_calls.load(Ordering::Relaxed),
-            1,
-            "a resolved position on another curve needs only base currency validation"
+            0,
+            "a proven-unaffected sensitivity row needs no endpoint pricing"
         );
         Ok(())
     }
@@ -905,8 +898,8 @@ mod tests {
         assert_eq!(matrix.delta(0, 0), 0.0);
         assert_eq!(
             calls.load(Ordering::Relaxed),
-            5,
-            "failed dependency introspection must fall back to every grid endpoint"
+            2,
+            "failed dependency introspection must price both central endpoints"
         );
         Ok(())
     }
@@ -939,9 +932,115 @@ mod tests {
 
         assert_eq!(
             calls.load(Ordering::Relaxed),
-            1,
+            0,
             "declared factor type must not override the exact stored curve role"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn sensitivity_extraction_prices_two_endpoints_independent_of_profile_grid() -> Result<()> {
+        let as_of = date!(2025 - 01 - 01);
+        let market = test_market(as_of)?;
+        let calls = Arc::new(AtomicUsize::new(0));
+        let mut instrument = MockInstrument::new("counted", "USD-OIS", 5.0, 10_000.0);
+        instrument.raw_value_calls = Some(Arc::clone(&calls));
+        let positions = vec![("counted".to_string(), &instrument as &dyn Instrument, 1.0)];
+        let factors = vec![FactorDefinition {
+            id: FactorId::new("rates"),
+            factor_type: FactorType::Rates,
+            market_mapping: MarketMapping::CurveParallel {
+                curve_ids: vec![CurveId::new("USD-OIS")],
+                units: BumpUnits::RateBp,
+            },
+            description: None,
+        }];
+        let reference = super::super::DeltaBasedEngine::new(BumpSizeConfig::default())
+            .compute_sensitivities(&positions, &factors, &market, as_of, Currency::USD)?;
+        assert_eq!(calls.swap(0, Ordering::Relaxed), 2);
+        for points in [3, 5, 7] {
+            let engine = FullRepricingEngine::new(BumpSizeConfig::default(), points)?;
+            let matrix = engine.compute_sensitivities(
+                &positions,
+                &factors,
+                &market,
+                as_of,
+                Currency::USD,
+            )?;
+            assert_eq!(matrix, reference);
+            assert_eq!(calls.swap(0, Ordering::Relaxed), 2);
+            let profiles =
+                engine.compute_pnl_profiles(&positions, &factors, &market, as_of, Currency::USD)?;
+            assert_eq!(profiles[0].position_pnls.len(), points);
+            assert_eq!(calls.swap(0, Ordering::Relaxed), points);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn weighted_sensitivity_and_profile_overflow_fail_with_finite_endpoint_pvs() -> Result<()> {
+        let as_of = date!(2025 - 01 - 01);
+        let market = test_market(as_of)?;
+        let instrument = MockInstrument::new("large-weight", "USD-OIS", 5.0, 100_000.0);
+        let positions = [(
+            "large-weight".to_string(),
+            &instrument as &dyn Instrument,
+            1e308,
+        )];
+        let factors = [FactorDefinition {
+            id: FactorId::new("rates"),
+            factor_type: FactorType::Rates,
+            market_mapping: MarketMapping::CurveParallel {
+                curve_ids: vec![CurveId::new("USD-OIS")],
+                units: BumpUnits::RateBp,
+            },
+            description: None,
+        }];
+        let delta = super::super::DeltaBasedEngine::new(BumpSizeConfig::default());
+        let error = delta
+            .compute_sensitivities(&positions, &factors, &market, as_of, Currency::USD)
+            .expect_err("finite endpoints must not produce an infinite weighted sensitivity");
+        assert!(error
+            .to_string()
+            .contains("non-finite weighted sensitivity"));
+        let full = FullRepricingEngine::new(BumpSizeConfig::default(), 5)?;
+        let error = full
+            .compute_sensitivities(&positions, &factors, &market, as_of, Currency::USD)
+            .expect_err("both matrix engines share the weighted result guard");
+        assert!(error
+            .to_string()
+            .contains("non-finite weighted sensitivity"));
+        let error = full
+            .compute_pnl_profiles(&positions, &factors, &market, as_of, Currency::USD)
+            .expect_err("weighted profile overflow must fail before JSON serialization");
+        assert!(error.to_string().contains("non-finite weighted P&L"));
+        Ok(())
+    }
+
+    #[test]
+    fn non_finite_position_weights_fail_even_with_no_factors() -> Result<()> {
+        let as_of = date!(2025 - 01 - 01);
+        let market = test_market(as_of)?;
+        let instrument = MockInstrument::new("invalid-weight", "USD-OIS", 5.0, 1.0);
+        let delta = super::super::DeltaBasedEngine::new(BumpSizeConfig::default());
+        let full = FullRepricingEngine::new(BumpSizeConfig::default(), 5)?;
+        for weight in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let positions = [(
+                "invalid-weight".to_string(),
+                &instrument as &dyn Instrument,
+                weight,
+            )];
+            let error = delta
+                .compute_sensitivities(&positions, &[], &market, as_of, Currency::USD)
+                .expect_err("invalid weight must fail before the empty factor pass");
+            assert!(error.to_string().contains("weight must be finite"));
+            assert!(full
+                .compute_sensitivities(&positions, &[], &market, as_of, Currency::USD)
+                .is_err());
+            assert!(full
+                .compute_pnl_profiles(&positions, &[], &market, as_of, Currency::USD)
+                .is_err());
+        }
         Ok(())
     }
 }

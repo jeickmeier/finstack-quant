@@ -222,9 +222,9 @@ impl ScenarioEngine {
     ///
     /// Operations are applied in this order:
     /// 0. Time roll-forward, if present
-    /// 1. Market data (FX, equities, vol surfaces, curves, base correlation) — all
-    ///    [`MarketBump`] effects accumulated during this phase are applied to the
-    ///    context in a single batched market bump call.
+    /// 1. Market data (FX, equities, vol surfaces, curves, base correlation) —
+    ///    adjacent [`MarketBump`] effects are batched. Collection-specific and
+    ///    quote-replay effects flush preceding bumps before application.
     /// 2. Rate bindings update (if configured)
     /// 3. Statement forecast adjustments
     /// 4. Statement re-evaluation
@@ -232,6 +232,9 @@ impl ScenarioEngine {
     /// If a [`crate::spec::OperationSpec::TimeRollForward`] sets
     /// `apply_shocks = false`, the engine returns immediately after phase 0 and
     /// does not apply the remaining operations in `spec`.
+    /// Advancing calibrated hazard curves requires a recalibration provider;
+    /// a missing provider fails before changing the market or valuation date.
+    /// A business-day adjustment to the opening date leaves the market unchanged.
     ///
     /// # Atomicity
     ///
@@ -287,12 +290,13 @@ impl ScenarioEngine {
                 _ => None,
             }) {
             let _span = tracing::info_span!("phase_0_time_roll", period = %period).entered();
-            let hazard_rolls =
+            let credit_ops =
                 if apply_shocks && spec.hazard_bump_mode == crate::HazardBumpMode::SolveToPar {
-                    par_cds_hazard_rolls(&expanded_ops, ctx.market)?
+                    expanded_ops.as_ref()
                 } else {
-                    Vec::new()
+                    &[]
                 };
+            let hazard_rolls = par_cds_hazard_rolls(credit_ops, ctx.market)?;
             let roll_report = crate::adapters::time_roll::apply_time_roll_forward_with_credit(
                 ctx,
                 period,

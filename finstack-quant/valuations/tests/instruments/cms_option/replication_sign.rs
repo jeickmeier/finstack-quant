@@ -79,7 +79,7 @@ fn single_curve_cms(
         option_type,
         notional: Money::new(1.0, Currency::USD).expect("valid money fixture"),
         day_count: DayCount::Act365F,
-        index_id: None,
+        index_id: Some(finstack_quant_core::types::IndexId::new("USD-LIBOR-3M")),
         swap_fixed_frequency: Some(Tenor::semi_annual()),
         swap_float_frequency: Some(Tenor::quarterly()),
         // Same day count for both legs so forward rate equals OIS rate exactly.
@@ -114,7 +114,9 @@ fn density_price(inst: &CmsOption, market: &MarketContext, as_of: Date, vol: f64
     let start = reference
         .reference_swap_start(inst.fixing_dates[0])
         .unwrap();
-    let end = start.add_months(inst.cms_tenor.months().expect("month tenor") as i32);
+    let end = start
+        .add_months(inst.cms_tenor.months().expect("month tenor") as i32)
+        .expect("valid date shift");
     let (forward, _) = reference
         .forward_rate_and_annuity(market, as_of, start, end)
         .unwrap();

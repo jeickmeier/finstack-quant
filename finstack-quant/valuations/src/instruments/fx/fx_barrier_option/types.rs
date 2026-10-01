@@ -67,9 +67,15 @@ pub struct FxBarrierOption {
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
     )]
     pub monitoring_start_date: Option<Date>,
-    /// Observed barrier state for expired options.
+    /// Processed barrier-monitoring state through the valuation date.
     ///
-    /// Historical monitoring must be supplied explicitly for expired contracts.
+    /// `Some(true)` records a breach whose at-hit rebate has already settled,
+    /// including a hit processed on the valuation date. That rebate is not a
+    /// remaining claim at expiry. An at-expiry rebate remains due on expiry.
+    /// `Some(false)` records no breach in the processed monitoring history.
+    /// Historical monitoring must be supplied explicitly for seasoned and
+    /// expired contracts. Same-day unpaid at-hit claims require a separate
+    /// cash receivable; this boolean does not represent pending settlement.
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub observed_barrier_breached: Option<bool>,
@@ -557,6 +563,10 @@ impl crate::instruments::common_impl::traits::Instrument for FxBarrierOption {
 
     fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
         None
+    }
+
+    fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
+        Some(self.expiry)
     }
 
     crate::impl_focused_pricing_overrides!();

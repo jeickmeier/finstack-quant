@@ -12,34 +12,45 @@ use crate::error::InputError;
 /// The denominator rule depends on the coupon frequency supplied via
 /// [`DayCountContext`]:
 ///
-/// - **Annual** (or no frequency supplied): 366 if February 29 falls in the
-///   interval `(start, end]` (exclusive of start, inclusive of end), else 365.
-/// - **Non-annual**: 366 if the period END date falls in a leap year, else 365.
-pub(super) fn year_fraction_act_365l(start: Date, end: Date, ctx: DayCountContext<'_>) -> f64 {
-    if start == end {
-        return 0.0;
+/// - **Annual**: 366 if February 29 falls in the full coupon period
+///   `(coupon_start, coupon_end]`, else 365.
+/// - **Non-annual**: 366 if the next coupon date falls in a leap year, else 365.
+///
+/// The requested accrual slice must lie within `ctx.coupon_period`; its end
+/// date does not change the coupon's denominator.
+pub(super) fn year_fraction_act_365l(
+    start: Date,
+    end: Date,
+    ctx: DayCountContext<'_>,
+) -> crate::Result<f64> {
+    let frequency = ctx.frequency.ok_or_else(|| {
+        crate::Error::Validation("ACT/365L requires coupon frequency in DayCountContext".into())
+    })?;
+    let (coupon_start, coupon_end) = ctx.coupon_period.ok_or_else(|| {
+        crate::Error::Validation(
+            "ACT/365L requires the enclosing coupon_period in DayCountContext".into(),
+        )
+    })?;
+    if coupon_start >= coupon_end || start < coupon_start || end > coupon_end {
+        return Err(crate::Error::Validation(
+            "ACT/365L accrual dates must lie within a strictly increasing coupon_period".into(),
+        ));
     }
 
     let actual_days = (end - start).whole_days() as f64;
 
-    // ICMA Rule 251: the Feb-29 rule applies to annual-pay instruments; for
-    // any other frequency the leap-year status of the period end date decides.
-    // With no frequency in context, default to the annual rule.
-    let annual = match ctx.frequency {
-        Some(frequency) => matches!(
-            (frequency.unit(), frequency.count()),
-            (TenorUnit::Years, 1) | (TenorUnit::Months, 12)
-        ),
-        None => true,
-    };
+    let annual = matches!(
+        (frequency.unit(), frequency.count()),
+        (TenorUnit::Years, 1) | (TenorUnit::Months, 12)
+    );
 
     let leap = if annual {
-        interval_contains_feb_29(start, end)
+        interval_contains_feb_29(coupon_start, coupon_end)
     } else {
-        time::util::is_leap_year(end.year())
+        time::util::is_leap_year(coupon_end.year())
     };
 
-    actual_days / if leap { 366.0 } else { 365.0 }
+    Ok(actual_days / if leap { 366.0 } else { 365.0 })
 }
 
 /// Check if February 29 falls in the interval `(start, end]` (exclusive of
@@ -63,7 +74,7 @@ fn interval_contains_feb_29(start: Date, end: Date) -> bool {
 // NL/365 helper
 /// Calculate year fraction for NL/365 (Actual/365 No Leap).
 ///
-/// Counts actual days in `[start, end)` excluding any February 29, divided by
+/// Counts actual days in `(start, end]` excluding any February 29, divided by
 /// a fixed 365-day year.
 pub(super) fn year_fraction_nl_365(start: Date, end: Date) -> f64 {
     if start == end {
@@ -75,9 +86,7 @@ pub(super) fn year_fraction_nl_365(start: Date, end: Date) -> f64 {
     for year in start.year()..=end.year() {
         if time::util::is_leap_year(year) {
             if let Ok(feb_29) = Date::from_calendar_date(year, Month::February, 29) {
-                // Day-count intervals are [start, end): exclude Feb 29 when it
-                // is an accrued day of the period.
-                if feb_29 >= start && feb_29 < end {
+                if feb_29 > start && feb_29 <= end {
                     leap_days += 1;
                 }
             }

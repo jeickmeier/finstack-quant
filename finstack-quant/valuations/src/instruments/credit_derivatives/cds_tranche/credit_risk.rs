@@ -74,7 +74,7 @@ pub(super) fn parallel_cs01(
             replace_hazard(&mut bumped_index, Arc::clone(&bumped));
             bumped_market.insert_mut(bumped);
         }
-        revalue(&bumped_market.insert_credit_index(index_id, bumped_index))
+        revalue(&bumped_market.insert_credit_index(index_id, bumped_index)?)
     };
     Ok(sensitivity_central_diff(
         reprice(bump_bp)?,

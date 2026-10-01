@@ -302,15 +302,15 @@ fn local_range(span: TickerSpan, global: TickerSpan) -> core::ops::Range<usize> 
     start..end
 }
 
-fn build_synthetic_price_dates(dates: &[Date], frequency: PeriodKind) -> Vec<Date> {
+fn build_synthetic_price_dates(dates: &[Date], frequency: PeriodKind) -> crate::Result<Vec<Date>> {
     let Some(&first) = dates.first() else {
-        return Vec::new();
+        return Ok(Vec::new());
     };
-    let prior_date = frequency.prior_observation_date(first);
+    let prior_date = frequency.prior_observation_date(first)?;
     let mut price_dates = Vec::with_capacity(dates.len() + 1);
     price_dates.push(prior_date);
     price_dates.extend_from_slice(dates);
-    price_dates
+    Ok(price_dates)
 }
 
 impl Performance {
@@ -551,6 +551,7 @@ impl Performance {
     /// the column count does not match `ticker_names`, any return column has
     /// the wrong length, the benchmark name is unknown, any ticker lacks a
     /// contiguous finite return span, ticker names are duplicated, or any active return value is `<= -1.0`.
+    /// Propagates a date-range validation error if the synthetic prior price date underflows the calendar.
     pub fn from_returns(
         dates: Vec<Date>,
         returns: Vec<Vec<f64>>,
@@ -584,7 +585,7 @@ impl Performance {
         }
 
         Self::assemble(
-            build_synthetic_price_dates(&dates, frequency),
+            build_synthetic_price_dates(&dates, frequency)?,
             dates,
             all_returns,
             return_spans,

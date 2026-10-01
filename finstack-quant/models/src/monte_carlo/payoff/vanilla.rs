@@ -59,6 +59,10 @@ impl EuropeanCall {
 }
 
 impl Payoff for EuropeanCall {
+    fn supports_lrm_greeks(&self) -> bool {
+        self.maturity_step > 0
+    }
+
     /// Process a path event at maturity.
     ///
     /// Captures the terminal spot price at maturity.
@@ -122,6 +126,10 @@ impl EuropeanPut {
 }
 
 impl Payoff for EuropeanPut {
+    fn supports_lrm_greeks(&self) -> bool {
+        self.maturity_step > 0
+    }
+
     /// Process a path event at maturity.
     ///
     /// Captures the terminal spot price at maturity.
@@ -200,6 +208,10 @@ impl Digital {
 }
 
 impl Payoff for Digital {
+    fn supports_lrm_greeks(&self) -> bool {
+        self.maturity_step > 0
+    }
+
     /// Process a path event at maturity.
     ///
     /// Captures the terminal spot price at maturity.
@@ -281,6 +293,10 @@ impl Forward {
 }
 
 impl Payoff for Forward {
+    fn supports_lrm_greeks(&self) -> bool {
+        self.maturity_step > 0
+    }
+
     /// Process a path event at maturity.
     ///
     /// Captures the terminal spot price at maturity.

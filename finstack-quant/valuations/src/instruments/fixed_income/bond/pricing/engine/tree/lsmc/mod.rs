@@ -4,6 +4,12 @@
 //! policy is fitted on standardized rate, hazard, balance, locked-coupon,
 //! accrued-interest, and cumulative-distribution state, then frozen before
 //! the pricing paths are sampled.
+//!
+//! Floating PIK changes principal at the economic accrual boundary while cash
+//! settles independently on the adjusted payment date. Stochastic floating PIK
+//! combined with amortization is rejected: the replay template does not carry
+//! canonical runtime amortization targets, so projected repayment amounts would
+//! violate remaining-balance targets on sampled paths.
 
 use super::bond_valuator::BondValuator;
 use crate::cashflow::builder::calendar::resolve_calendar_strict;
@@ -63,8 +69,9 @@ const FEATURE_COUNT: usize = 8;
 /// Runtime controls for bond LSMC.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct BondLsmcConfig {
-    /// Independent estimators sampled exactly in each stage. Each estimator
-    /// uses two physical factor paths when `antithetic` is true.
+    /// Independent estimators sampled exactly in each stage; at least two are
+    /// required to estimate sampling uncertainty. Each estimator uses two
+    /// physical factor paths when `antithetic` is true.
     pub(crate) paths: usize,
     /// Whether consecutive factor paths form one antithetic estimator.
     pub(crate) antithetic: bool,
@@ -112,9 +119,9 @@ impl BondLsmcConfig {
     }
 
     fn validate(self) -> Result<()> {
-        if self.paths == 0 {
+        if self.paths < 2 {
             return Err(Error::Validation(
-                "bond hazard LSMC requires at least one simulated factor path".to_string(),
+                "bond hazard LSMC requires at least two independent pricing estimators".to_string(),
             ));
         }
         if !self.oas_bp.is_finite() {

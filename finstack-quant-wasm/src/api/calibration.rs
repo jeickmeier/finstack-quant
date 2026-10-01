@@ -10,10 +10,9 @@
 //! `JSON.parse` reads them as IEEE-754 doubles; values above
 //! `Number.MAX_SAFE_INTEGER` (2^53 − 1) would round silently. In practice
 //! iteration counts stay under ~10⁴ for any non-pathological calibration, so
-//! the [`crate::utils::check_js_safe_count`] guard is not threaded through
-//! the JSON path. If a future getter exposes a raw `usize` across the
-//! boundary (e.g. a `report.iterations() -> usize` accessor), route it
-//! through that guard first.
+//! JSON counts remain exactly representable. A future JavaScript numeric input
+//! count must be validated as `f64` before conversion to the wasm32 `usize`
+//! range, since integer ABI conversion truncates fractions and wraps overflow.
 //!
 //! On error, the host functions throw a JS `Error` with `name =
 //! "CalibrationEnvelopeError"`. The error exposes `kind`, `stage`, `step_id`,
@@ -66,6 +65,9 @@ fn validate_calibration_json_inner(json: &str) -> Result<String, ExecuteError> {
 ///
 /// # Errors
 ///
+/// The JavaScript facade rejects object inputs containing non-finite numbers
+/// with `TypeError` before serialization. Explicit JSON strings are parsed in Rust.
+///
 /// Throws a JavaScript exception if `json` is malformed, its calibration
 /// schema marker is missing, malformed, or unsupported, static envelope
 /// validation fails (fail-fast: first error; `dryRun` lists every static
@@ -95,11 +97,14 @@ fn calibrate_inner(envelope_json: &str) -> Result<CalibrationResultEnvelope, Exe
 ///
 /// # Errors
 ///
+/// The JavaScript facade rejects object inputs containing non-finite numbers
+/// with `TypeError` before serialization. Explicit JSON strings are parsed in Rust.
+///
 /// Throws a JavaScript exception if `envelopeJson` is malformed or violates
 /// the calibration schema or static plan contract (fail-fast: first static
-/// error; `dryRun` lists every static error), market context construction
-/// or a calibration step fails, a solver does not converge, or the result
-/// envelope cannot be converted to a JavaScript value.
+/// error; `dryRun` lists every static error), solver configuration is invalid,
+/// market context construction or a calibration step fails, a solver does
+/// not converge, or the result envelope cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = calibrate)]
 pub fn calibrate(envelope_json: &str) -> Result<JsValue, JsValue> {
     let result = calibrate_inner(envelope_json).map_err(execute_error_to_js)?;
@@ -113,6 +118,9 @@ pub fn calibrate(envelope_json: &str) -> Result<JsValue, JsValue> {
 /// @param envelope_json - CalibrationEnvelope JSON containing targets, parameters, bounds, and dependencies.
 ///
 /// # Errors
+///
+/// The JavaScript facade rejects object inputs containing non-finite numbers
+/// with `TypeError` before serialization. Explicit JSON strings are parsed in Rust.
 ///
 /// Throws a JavaScript exception if `envelopeJson` is malformed, its schema
 /// marker is missing, malformed, or unsupported, the envelope structure is
@@ -133,6 +141,9 @@ pub fn dry_run(envelope_json: &str) -> Result<String, JsValue> {
 /// @returns Positive finite LMM base volatility.
 ///
 /// # Errors
+///
+/// The JavaScript facade rejects object inputs containing non-finite numbers
+/// with `TypeError` before serialization. Explicit JSON strings are parsed in Rust.
 ///
 /// Throws if the envelope is not a Bermudan swaption, the date or market
 /// inputs are invalid, or the Rebonato calibration cannot be completed.

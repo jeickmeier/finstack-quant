@@ -96,8 +96,9 @@ fn normalization_config_schema() -> PyResult<String> {
 
 /// Return the JSON Schema for a serialized ``StatementResult``.
 ///
-/// This is the shape of an evaluated model: per-period node values plus the
-/// numeric mode and rounding context stamped into the result envelope.
+/// This describes per-period node values and execution statistics: numeric
+/// mode, node and period counts, optional elapsed time, parallel execution,
+/// and evaluation warnings. Monetary node maps retain amounts and currencies.
 ///
 /// Returns
 /// -------
@@ -122,14 +123,11 @@ fn statement_result_schema() -> PyResult<String> {
     schema_json(canonical::statement_result_schema().map_err(statements_to_py)?)
 }
 
-schema_registry_functions!(
-    finstack_quant_statements::schema::ARTIFACTS,
-    "finstack_quant.statements.schema"
-);
+schema_registry_functions!(finstack_quant_statements::schema::ARTIFACTS);
 
 /// Register the `finstack_quant.statements.schema` Python namespace.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "schema")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "schema")?;
     m.setattr("__doc__", MODULE_DOC)?;
     add_registry_functions(&m)?;
 
@@ -145,20 +143,13 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "statement_result_schema",
         "validate",
     ];
-    for name in exports {
-        m.getattr(name)?
-            .setattr("__module__", "finstack_quant.statements.schema")?;
-    }
 
     let all = PyList::new(py, exports)?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "schema",
-        "finstack_quant.statements",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
 
     Ok(())

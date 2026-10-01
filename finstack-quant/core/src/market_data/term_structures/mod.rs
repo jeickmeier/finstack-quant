@@ -139,8 +139,8 @@ mod price_curve;
 mod rate_calibration;
 
 pub use base_correlation::{
-    ArbitrageCheckResult, ArbitrageViolation, BaseCorrelationCurve, BaseCorrelationCurveBuilder,
-    BASE_CORR_DETACHMENT_MATCH_TOLERANCE,
+    BaseCorrelationCurve, BaseCorrelationCurveBuilder, CorrelationShapeReport,
+    CorrelationShapeViolation, BASE_CORR_DETACHMENT_MATCH_TOLERANCE,
 };
 pub use basis_spread_curve::{BasisSpreadCurve, BasisSpreadCurveBuilder};
 pub use credit_index::{CreditIndexData, CreditIndexDataBuilder};

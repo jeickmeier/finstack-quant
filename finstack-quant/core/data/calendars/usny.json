@@ -2,7 +2,7 @@
   "id": "usny",
   "name": "United States (New York Federal) Holidays",
   "ignore_weekends": false,
-  "notes": "Federal Reserve observance convention (basis for SOFR/Fedwire business days): a holiday falling on Sunday is observed the following Monday; a holiday falling on Saturday has NO substitute (Federal Reserve Banks are open the preceding Friday). Source: Federal Reserve Board, 'K.8 Holidays Observed by the Federal Reserve System'. This differs from the OPM/NYSE rule (fri_if_sat_mon_if_sun) used by nyse.json and sifma.json.",
+  "notes": "Federal Reserve observance convention (basis for Fedwire business days): a holiday falling on Sunday is observed the following Monday; a holiday falling on Saturday has NO substitute (Federal Reserve Banks are open the preceding Friday). Source: Federal Reserve Board, 'K.8 Holidays Observed by the Federal Reserve System'. This differs from the OPM/NYSE rule (fri_if_sat_mon_if_sun) used by nyse.json and sifma.json.",
   "rules": [
     { "type": "fixed", "name": "New Year's Day", "month": "january", "day": 1, "observed": "mon_if_sun" },
     { "type": "nth_weekday", "name": "Martin Luther King Jr. Day", "n": 3, "weekday": "monday", "month": "january", "from_year": 1986 },

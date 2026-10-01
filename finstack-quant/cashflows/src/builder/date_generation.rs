@@ -13,9 +13,82 @@ use super::calendar::resolve_calendar_strict;
 use super::periods::SchedulePeriod;
 use super::specs::RollRule;
 use finstack_quant_core::dates::{
-    adjust, BusinessDayConvention, Date, DateExt, HolidayCalendar, ScheduleBuilder, StubKind,
+    adjust, is_cds_date, is_imm_date, next_cds_date, next_imm, prev_cds_date,
+    BusinessDayConvention, Date, DateExt, DayCount, HolidayCalendar, ScheduleBuilder, StubKind,
     Tenor, TenorUnit,
 };
+
+/// Resolve conventions overridden by an explicit quarterly roll grid.
+///
+/// # Arguments
+///
+/// * `frequency` - Requested coupon tenor for a plain schedule.
+/// * `roll_rule` - Explicit IMM rules replace the requested tenor with quarterly.
+pub(crate) fn effective_frequency(frequency: Tenor, roll_rule: RollRule) -> Tenor {
+    if matches!(roll_rule, RollRule::None) {
+        frequency
+    } else {
+        Tenor::quarterly()
+    }
+}
+
+/// Resolve the stub convention used by an explicit quarterly roll grid.
+///
+/// # Arguments
+///
+/// * `stub` - Requested treatment of off-grid boundaries for a plain schedule.
+/// * `roll_rule` - Explicit IMM rules use a short terminal stub.
+pub(crate) fn effective_stub(stub: StubKind, roll_rule: RollRule) -> StubKind {
+    if matches!(roll_rule, RollRule::None) {
+        stub
+    } else {
+        StubKind::ShortBack
+    }
+}
+
+/// Reject convention combinations that cannot supply an unambiguous ICMA grid.
+///
+/// # Arguments
+///
+/// * `start` - Unadjusted contractual start, also the anchor for back stubs.
+/// * `end` - Unadjusted contractual end, also the anchor for front stubs.
+/// * `stub` - Effective stub convention after resolving an explicit roll grid.
+/// * `end_of_month` - Whether intermediate nominal dates roll to month-end.
+/// * `day_count` - Coupon accrual convention whose reference-grid requirements are checked.
+/// * `roll_rule` - Plain month grid, CDS twentieth grid, or third-Wednesday IMM grid.
+pub(crate) fn validate_accrual_grid(
+    start: Date,
+    end: Date,
+    stub: StubKind,
+    end_of_month: bool,
+    day_count: DayCount,
+    roll_rule: RollRule,
+) -> finstack_quant_core::Result<()> {
+    if end_of_month && !matches!(roll_rule, RollRule::None) {
+        return Err(finstack_quant_core::Error::Validation(
+            "end_of_month cannot be combined with an IMM or CDS IMM roll grid".into(),
+        ));
+    }
+    if day_count == DayCount::ActActIsma {
+        if matches!(roll_rule, RollRule::Imm) {
+            return Err(finstack_quant_core::Error::Validation(
+                "ACT/ACT ICMA requires a nominal month grid; third-Wednesday IMM accrual is not supported".into(),
+            ));
+        }
+        let anchor = match stub {
+            StubKind::ShortFront | StubKind::LongFront => end,
+            _ => start,
+        };
+        if end_of_month && anchor != anchor.end_of_month() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "ACT/ACT ICMA end-of-month schedules require the regular grid anchor {anchor} \
+                 to be month-end; use a front stub for a month-end maturity or a back stub \
+                 for a month-end start"
+            )));
+        }
+    }
+    Ok(())
+}
 
 /// Step `date` by `sign * tenor` using calendar-clamped month arithmetic.
 ///
@@ -26,24 +99,24 @@ fn step_tenor(date: Date, tenor: Tenor, sign: i32) -> Option<Date> {
     match tenor.unit() {
         TenorUnit::Days => {
             let days = i64::from(tenor.count()).checked_mul(i64::from(sign))?;
-            Some(date + time::Duration::days(days))
+            date.add_days(days).ok()
         }
         TenorUnit::Weeks => {
             let days = i64::from(tenor.count())
                 .checked_mul(7)?
                 .checked_mul(i64::from(sign))?;
-            Some(date + time::Duration::days(days))
+            date.add_days(days).ok()
         }
         TenorUnit::Months => {
             let months = i32::try_from(tenor.count()).ok()?.checked_mul(sign)?;
-            Some(date.add_months(months))
+            date.add_months(months).ok()
         }
         TenorUnit::Years => {
             let months = i32::try_from(tenor.count())
                 .ok()?
                 .checked_mul(12)?
                 .checked_mul(sign)?;
-            Some(date.add_months(months))
+            date.add_months(months).ok()
         }
     }
 }
@@ -66,13 +139,31 @@ pub(crate) fn is_regular_period(accrual_start: Date, accrual_end: Date, frequenc
 }
 
 /// ACT/ACT ICMA quasi-coupon reference anchored on the contractual stub side.
+///
+/// # Arguments
+///
+/// * `accrual_start` - Unadjusted coupon start, including any interior program cut.
+/// * `accrual_end` - Unadjusted coupon end before payment-date adjustment.
+/// * `frequency` - Effective nominal coupon tenor, quarterly for CDS IMM.
+/// * `stub` - Selects the adjacent reference coupon for a plain-grid stub.
+/// * `end_of_month` - Whether a plain-grid reference date must retain month-end rolling.
+/// * `roll_rule` - CDS IMM uses the twentieth grid even for a clipped front coupon.
 pub(crate) fn icma_coupon_period(
     accrual_start: Date,
     accrual_end: Date,
     frequency: Tenor,
     stub: StubKind,
     end_of_month: bool,
+    roll_rule: RollRule,
 ) -> Option<(Date, Date)> {
+    if matches!(roll_rule, RollRule::CdsImm) {
+        let reference_start = if is_cds_date(accrual_start) {
+            accrual_start
+        } else {
+            prev_cds_date(accrual_start).ok()?
+        };
+        return Some((reference_start, next_cds_date(reference_start).ok()?));
+    }
     if is_regular_period(accrual_start, accrual_end, frequency) {
         return Some((accrual_start, accrual_end));
     }
@@ -106,6 +197,16 @@ pub(crate) fn build_schedule_period(
     cal: &dyn HolidayCalendar,
     adjust_accrual_dates: bool,
 ) -> finstack_quant_core::Result<SchedulePeriod> {
+    if accrual_start >= accrual_end {
+        return Err(finstack_quant_core::Error::Validation(
+            "a schedule period requires start strictly before end".into(),
+        ));
+    }
+    if payment_lag_days < 0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "payment_lag_days must be non-negative; got {payment_lag_days}"
+        )));
+    }
     let adjusted_end = adjust(accrual_end, business_day_convention, cal)?;
     let payment_date = if payment_lag_days == 0 {
         adjusted_end
@@ -144,6 +245,12 @@ pub(crate) type IndexedPeriods = (
 
 /// Convert a generated schedule into the compiler's payment-date index form.
 ///
+/// # Arguments
+///
+/// * `periods` - Generated contractual accrual periods and their adjusted payment dates.
+/// * `frequency` - Effective coupon tenor for classifying plain-grid regular coupons.
+/// * `roll_rule` - Explicit quarterly grid used to distinguish its regular coupons from stubs.
+///
 /// # Errors
 ///
 /// Returns `Error::Validation` when two distinct accrual periods adjust to the
@@ -153,13 +260,20 @@ pub(crate) type IndexedPeriods = (
 pub(crate) fn index_period_schedule(
     periods: Vec<SchedulePeriod>,
     frequency: Tenor,
+    roll_rule: RollRule,
 ) -> finstack_quant_core::Result<IndexedPeriods> {
     let dates = periods.iter().map(|period| period.payment_date).collect();
     // Regularity uses unadjusted dates (ISDA 2006 §4.16(c)).
     let first_or_last = periods
         .iter()
         .filter(|period| {
-            !is_regular_period(period.unadjusted_start, period.unadjusted_end, frequency)
+            let start = period.unadjusted_start;
+            let end = period.unadjusted_end;
+            match roll_rule {
+                RollRule::Imm => !is_imm_date(start) || next_imm(start).ok() != Some(end),
+                RollRule::CdsImm => !is_cds_date(start) || next_cds_date(start).ok() != Some(end),
+                RollRule::None => !is_regular_period(start, end, frequency),
+            }
         })
         .map(|period| period.payment_date)
         .collect();
@@ -278,8 +392,17 @@ pub(crate) fn generate_periods_with_adjustment(
     };
     let cal = resolve_calendar_strict(calendar_id)?;
 
-    let schedule = builder.build()?;
-    let dates = schedule.dates;
+    // Core's IMM generator lists futures roll dates only. A coupon schedule
+    // must retain its contractual end, including when no roll falls inside it.
+    let mut dates =
+        if matches!(roll_rule, RollRule::Imm) && !next_imm(start).is_ok_and(|next| next <= end) {
+            vec![start, end]
+        } else {
+            builder.build()?.dates
+        };
+    if dates.last().is_some_and(|last| *last < end) {
+        dates.push(end);
+    }
 
     if dates.len() < 2 {
         return Ok(Vec::new());
@@ -472,8 +595,8 @@ mod tests {
         .expect("schedule should build");
 
         assert_eq!(periods.len(), 2);
-        let (_, _, stubs) =
-            index_period_schedule(periods, Tenor::semi_annual()).expect("period index");
+        let (_, _, stubs) = index_period_schedule(periods, Tenor::semi_annual(), RollRule::None)
+            .expect("period index");
         assert!(
             stubs.is_empty(),
             "regular periods must not be tagged as stubs"
@@ -498,8 +621,8 @@ mod tests {
         .expect("schedule builds");
 
         assert_eq!(periods.len(), 2);
-        let (_, _, stubs) =
-            index_period_schedule(periods, Tenor::semi_annual()).expect("period index");
+        let (_, _, stubs) = index_period_schedule(periods, Tenor::semi_annual(), RollRule::None)
+            .expect("period index");
         assert!(
             stubs.is_empty(),
             "adjusted regular periods must not be tagged as stubs: {stubs:?}"
@@ -521,8 +644,8 @@ mod tests {
         .expect("schedule should build");
 
         let first = periods[0];
-        let (_, _, stubs) =
-            index_period_schedule(periods, Tenor::semi_annual()).expect("period index");
+        let (_, _, stubs) = index_period_schedule(periods, Tenor::semi_annual(), RollRule::None)
+            .expect("period index");
         assert!(
             stubs.contains(&first.payment_date),
             "short-front stub must be tagged"
@@ -561,7 +684,7 @@ mod tests {
         )
         .expect("raw schedule should build");
 
-        let res = super::index_period_schedule(periods, Tenor::daily());
+        let res = super::index_period_schedule(periods, Tenor::daily(), RollRule::None);
         let err = res.expect_err("duplicate adjusted payment dates must error");
         assert!(
             err.to_string().contains("same payment date"),

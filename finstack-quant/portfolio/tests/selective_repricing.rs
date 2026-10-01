@@ -222,7 +222,8 @@ fn affected_positions_deduplicates() {
     let key = usd_discount_key();
     let indices = portfolio
         .dependency_index()
-        .affected_positions(&[key.clone(), key]);
+        .affected_positions(&[key.clone(), key], &MarketContext::new())
+        .expect("dependency routing");
     assert_eq!(indices.len(), 1);
 }
 
@@ -569,7 +570,9 @@ fn unresolved_positions_always_included_in_affected() {
     );
 
     let unrelated_key = MarketFactorKey::curve("JPY".into(), RatesCurveKind::Discount);
-    let affected = index.affected_positions(&[unrelated_key]);
+    let affected = index
+        .affected_positions(&[unrelated_key], &MarketContext::new())
+        .expect("dependency routing");
     assert!(
         affected.contains(&1),
         "unresolved position index should appear in affected set even for unrelated keys"
@@ -605,10 +608,14 @@ fn empty_dependencies_are_resolved_and_never_affected() {
     );
     assert!(
         index
-            .affected_positions(&[MarketFactorKey::curve(
-                "USD-OIS".into(),
-                RatesCurveKind::Discount,
-            )])
+            .affected_positions(
+                &[MarketFactorKey::curve(
+                    "USD-OIS".into(),
+                    RatesCurveKind::Discount,
+                )],
+                &MarketContext::new()
+            )
+            .expect("dependency routing")
             .is_empty(),
         "a market-independent position must not be repriced for any factor"
     );

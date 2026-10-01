@@ -543,7 +543,7 @@ def black76_price(
     Raises
     ------
     ValueError
-        If the inputs produce a non-finite price.
+        If an input is non-finite, forward, strike, or discount factor is not positive, volatility or expiry is negative, or the price is non-finite.
 
     Examples
     --------
@@ -592,7 +592,7 @@ def black76_greeks(
     Raises
     ------
     ValueError
-        If any Greek is non-finite for the supplied inputs.
+        If an input is non-finite, forward or strike is not positive, volatility or expiry is negative, or the result is non-finite.
 
     Examples
     --------
@@ -638,7 +638,7 @@ def bachelier_price(
     Raises
     ------
     ValueError
-        If the inputs produce a non-finite price.
+        If an input is non-finite, normal volatility or expiry is negative, or the result is non-finite.
 
     Examples
     --------
@@ -685,7 +685,7 @@ def bachelier_greeks(
     Raises
     ------
     ValueError
-        If any Greek is non-finite for the supplied inputs.
+        If an input is non-finite, normal volatility or expiry is negative, or the result is non-finite.
 
     Examples
     --------
@@ -736,7 +736,7 @@ def black_shifted_price(
     Raises
     ------
     ValueError
-        If the inputs produce a non-finite price.
+        If an input is non-finite, shifted forward or strike is not positive, volatility or expiry is negative, or the result is non-finite.
 
     Examples
     --------
@@ -777,7 +777,7 @@ def black_shifted_vega(
     Raises
     ------
     ValueError
-        If the inputs produce a non-finite vega.
+        If an input is non-finite, shifted forward or strike is not positive, volatility or expiry is negative, or the result is non-finite.
 
     Examples
     --------
@@ -1206,9 +1206,9 @@ def bs_cos_price(
     Raises
     ------
     ValueError
-        If ``vol`` is not strictly positive, the inputs produce an invalid COS
-        truncation range, a non-finite characteristic-function value, or a
-        non-finite option price.
+        If spot, strike, expiry or volatility is not finite and positive,
+        rates or dividend yield are non-finite, the term count is zero, or
+        numerical pricing cannot produce a finite result.
 
     Examples
     --------
@@ -1250,11 +1250,13 @@ def vg_cos_price(
     div_yield : float
         Continuous dividend yield (decimal).
     sigma : float
-        VG diffusion parameter (volatility).
+        Positive finite volatility of the subordinated Brownian motion.
     theta : float
-        VG drift parameter.
+        Finite annual log-return drift of the subordinated Brownian motion;
+        its sign controls skew.
     nu : float
-        VG variance rate parameter.
+        Positive finite variance rate of the Gamma time change, in years;
+        larger values increase log-return tail thickness.
     expiry : float
         Time to expiry in years.
     is_call : bool
@@ -1270,9 +1272,10 @@ def vg_cos_price(
     Raises
     ------
     ValueError
-        If the Variance Gamma parameters produce an invalid COS truncation
-        range, a non-finite characteristic-function value, or a non-finite
-        option price.
+        If spot, strike or expiry is not finite and positive, a model input
+        is non-finite, sigma or nu is not positive, the martingale condition
+        ``1 - theta*nu - 0.5*sigma**2*nu > 0`` fails, the term count is zero,
+        or numerical pricing cannot produce a finite result.
 
     Examples
     --------
@@ -1337,9 +1340,10 @@ def merton_jump_cos_price(
     Raises
     ------
     ValueError
-        If the jump-diffusion parameters produce an invalid COS truncation
-        range, a non-finite characteristic-function value, or a non-finite
-        option price.
+        If spot, strike or expiry is not finite and positive, a model input
+        is non-finite, sigma, sigma_jump or lambda_ is negative, the jump
+        compensator is non-finite, the term count is zero, or numerical
+        pricing cannot produce a finite result.
 
     Examples
     --------

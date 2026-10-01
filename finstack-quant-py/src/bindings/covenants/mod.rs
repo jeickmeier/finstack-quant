@@ -194,7 +194,7 @@ fn project_finance_json(
 
 /// Register the `finstack_quant.covenants` Python namespace.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "covenants")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "covenants")?;
     m.setattr(
         "__doc__",
         "Typed covenant definitions, the CovenantEngine evaluator, template packages, \
@@ -266,13 +266,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "covenants",
-        crate::bindings::module_utils::ROOT_PACKAGE,
-        crate::bindings::module_utils::ParentNameSource::Name,
+        crate::bindings::module_utils::Exposure::Python,
     )?;
 
     Ok(())

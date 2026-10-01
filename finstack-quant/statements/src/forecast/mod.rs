@@ -285,6 +285,7 @@ pub(crate) fn allowed_params(method: crate::types::ForecastMethod) -> &'static [
 enum ParamShape {
     Number,
     UnsignedInt,
+    Seed,
     NumberArray,
     Text,
     Object,
@@ -300,7 +301,8 @@ fn param_shape(key: &str) -> Option<ParamShape> {
         | "alpha" | "beta" | "phi" | "growth" | "target" | "half_life" | "min" | "max" => {
             ParamShape::Number
         }
-        "seed" | "season_length" | "window" => ParamShape::UnsignedInt,
+        "seed" => ParamShape::Seed,
+        "season_length" | "window" => ParamShape::UnsignedInt,
         "curve" | "historical" => ParamShape::NumberArray,
         "correlation_with" | "mode" | "method" | "shape" => ParamShape::Text,
         "overrides" => ParamShape::Object,
@@ -322,9 +324,7 @@ fn param_shape(key: &str) -> Option<ParamShape> {
 ///
 /// Returns a forecast error naming the first key whose value has the wrong
 /// JSON type (for example a string where a number is expected).
-pub(crate) fn validate_param_types(
-    params: &indexmap::IndexMap<String, serde_json::Value>,
-) -> Result<()> {
+fn validate_param_types(params: &indexmap::IndexMap<String, serde_json::Value>) -> Result<()> {
     for (key, value) in params {
         let Some(shape) = param_shape(key) else {
             continue;
@@ -332,6 +332,7 @@ pub(crate) fn validate_param_types(
         let ok = match shape {
             ParamShape::Number => value.as_f64().is_some(),
             ParamShape::UnsignedInt => value.as_u64().is_some(),
+            ParamShape::Seed => statistical::parse_seed_json(value).is_some(),
             ParamShape::NumberArray => value
                 .as_array()
                 .is_some_and(|items| items.iter().all(|v| v.as_f64().is_some())),
@@ -342,6 +343,7 @@ pub(crate) fn validate_param_types(
             let expected = match shape {
                 ParamShape::Number => "a number",
                 ParamShape::UnsignedInt => "a non-negative integer",
+                ParamShape::Seed => "a non-negative integer representable as u64",
                 ParamShape::NumberArray => "an array of numbers",
                 ParamShape::Text => "a string",
                 ParamShape::Object => "an object keyed by period id",
@@ -362,6 +364,8 @@ pub(crate) fn validate_param_types(
 /// not explode over long horizons. The clamp is applied to **output values
 /// only** — stochastic recurrences evolve unclamped, so a persistent walk can
 /// pin at a bound while its underlying path drifts beyond it.
+/// Non-finite observations are preserved so bounds cannot hide missing data
+/// or suppress the evaluator's non-finite-value diagnostics.
 ///
 /// In Monte Carlo mode the evaluator applies this **after** Z-score
 /// recording, so correlation shocks are always inverted from the unclamped
@@ -413,6 +417,11 @@ pub(crate) fn apply_bounds(
     }
 
     for value in results.values_mut() {
+        // Missing/non-finite observations retain their evaluator diagnostics;
+        // f64::min/max would silently turn NaN into the finite bound.
+        if !value.is_finite() {
+            continue;
+        }
         if let Some(lo) = min {
             *value = value.max(lo);
         }
@@ -423,11 +432,11 @@ pub(crate) fn apply_bounds(
     Ok(())
 }
 
-/// Reject parameter keys the method does not understand.
+/// Reject unknown parameter keys and values of the wrong JSON type.
 ///
 /// # Errors
 ///
-/// Returns an error naming the offending key and listing the allowed set.
+/// Returns an error naming the offending key and its allowed keys or type.
 pub(crate) fn validate_params(
     method: crate::types::ForecastMethod,
     params: &indexmap::IndexMap<String, serde_json::Value>,
@@ -446,7 +455,7 @@ pub(crate) fn validate_params(
             )));
         }
     }
-    Ok(())
+    validate_param_types(params)
 }
 
 fn mix_node_seed(
@@ -524,14 +533,14 @@ mod tests {
     }
 
     #[test]
-    fn bounds_reject_non_finite_values() {
+    fn bounds_reject_non_numeric_values() {
         let periods = quarters(1);
         for bad in [serde_json::json!("high"), serde_json::Value::Null] {
             let mut spec = ForecastSpec::forward_fill();
             spec.params.insert("max".into(), bad);
             let err =
                 apply_forecast_for_node(&spec, 100.0, &periods, "node").expect_err("bad bound");
-            assert!(err.to_string().contains("finite"), "{err}");
+            assert!(err.to_string().contains("'max' must be a number"), "{err}");
         }
     }
 

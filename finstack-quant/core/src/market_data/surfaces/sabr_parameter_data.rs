@@ -15,7 +15,7 @@ pub struct SabrParameterData {
     pub beta: f64,
     /// Forward-volatility correlation in the open interval `(-1, 1)`.
     pub rho: f64,
-    /// Volatility of volatility, strictly positive.
+    /// Volatility of volatility, nonnegative; zero is the deterministic-volatility limit.
     pub nu: f64,
     /// Optional finite displacement applied to forward and strike.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -50,7 +50,7 @@ impl SabrParameterData {
     /// * `alpha` - Strictly positive initial SABR volatility level.
     /// * `beta` - CEV exponent in the closed interval `[0, 1]`.
     /// * `rho` - Forward-volatility correlation in the open interval `(-1, 1)`.
-    /// * `nu` - Strictly positive volatility-of-volatility parameter.
+    /// * `nu` - Nonnegative volatility-of-volatility parameter; zero gives deterministic volatility.
     ///
     /// # Errors
     ///
@@ -67,7 +67,7 @@ impl SabrParameterData {
     /// * `alpha` - Strictly positive initial SABR volatility level.
     /// * `beta` - CEV exponent in the closed interval `[0, 1]`.
     /// * `rho` - Forward-volatility correlation in the open interval `(-1, 1)`.
-    /// * `nu` - Strictly positive volatility-of-volatility parameter.
+    /// * `nu` - Nonnegative volatility-of-volatility parameter; zero gives deterministic volatility.
     /// * `shift` - Optional finite displacement in the same units as the
     ///   associated forwards and strikes.
     ///
@@ -97,9 +97,9 @@ impl SabrParameterData {
                 "SABR rho must be in (-1, 1), got {rho}"
             )));
         }
-        if nu <= 0.0 || !nu.is_finite() {
+        if nu < 0.0 || !nu.is_finite() {
             return Err(crate::Error::Validation(format!(
-                "SABR nu (vol-of-vol) must be positive, got {nu}"
+                "SABR nu (vol-of-vol) must be nonnegative, got {nu}"
             )));
         }
         if shift.is_some_and(|value| !value.is_finite()) {

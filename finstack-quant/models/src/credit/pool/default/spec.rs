@@ -151,7 +151,7 @@ impl serde::Serialize for StochasticDefaultSpec {
                     "StochasticDefaultSpec::HazardCurveBased is a derived calibrated-curve \
                      artifact and cannot be persisted; reconstruct it with \
                      build_from_hazard_curve and persist calibration prior_market instead",
-                ))
+                ));
             }
         };
         serde::Serialize::serialize(&persisted, serializer)

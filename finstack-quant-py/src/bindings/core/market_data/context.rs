@@ -177,7 +177,8 @@ impl PyMarketContext {
     ///     Identifier for the scalar.
     /// value : float | int | decimal.Decimal
     ///     Price or unitless value. Monetary ``Decimal`` values keep full
-    ///     precision; unitless ``Decimal`` values must round-trip through ``float``.
+    ///     precision; unitless ``Decimal`` values must be exactly representable
+    ///     as binary ``float``.
     /// currency : Currency | str, optional
     ///     When given, the scalar is a monetary price in this currency;
     ///     otherwise it is unitless.
@@ -216,21 +217,33 @@ impl PyMarketContext {
     ///     Identifier for the index bundle (e.g. ``"CDX-IG"``); the bundle
     ///     carries no id of its own, so it must be supplied.
     /// data : CreditIndexData
-    ///     Bundle to store.
+    ///     Bundle whose hazard, base-correlation, and issuer curve IDs resolve
+    ///     to curves already inserted in this context. Canonical context curves
+    ///     replace the bundle's embedded references.
     ///
     /// Returns
     /// -------
     /// MarketContext
     ///     ``self``.
+    ///
+    /// Raises
+    /// ------
+    /// KeyError
+    ///     If a referenced curve is absent; the context is unchanged.
+    /// ValueError
+    ///     If constituent count, recovery, or issuer data is invalid, or a
+    ///     referenced ID resolves to the wrong curve type.
     #[pyo3(text_signature = "(self, id, data)")]
     fn insert_credit_index<'py>(
         mut slf: PyRefMut<'py, Self>,
         id: &str,
         data: &PyCreditIndexData,
-    ) -> PyRefMut<'py, Self> {
+    ) -> PyResult<PyRefMut<'py, Self>> {
         // Cold path: one deep clone per insert; lookups now share the `Arc`.
-        slf.inner.insert_credit_index_mut(id, (*data.inner).clone());
-        slf
+        slf.inner
+            .insert_credit_index_mut(id, (*data.inner).clone())
+            .map_err(core_to_py)?;
+        Ok(slf)
     }
 
     /// Insert a scalar time series under its own id (fluent, returns ``self``).
@@ -594,7 +607,7 @@ impl PyMarketContext {
     /// Parameters
     /// ----------
     /// days : int
-    ///     Calendar days to roll (may be negative).
+    ///     Signed 64-bit calendar days to roll (may be negative).
     ///
     /// Returns
     /// -------
@@ -604,7 +617,9 @@ impl PyMarketContext {
     /// Raises
     /// ------
     /// ValueError
-    ///     If a curve cannot be rebuilt after rolling.
+    ///     If a rolled base date exceeds the supported date range or a curve cannot be rebuilt after rolling.
+    /// OverflowError
+    ///     If ``days`` is outside the signed 64-bit integer range.
     #[pyo3(text_signature = "(self, days)")]
     fn roll_forward(&self, days: i64) -> PyResult<Self> {
         self.inner
@@ -643,7 +658,8 @@ impl PyMarketContext {
 
     /// Serialize this market context to compact JSON (round-trips with pricers).
     ///
-    /// Raises ``ValueError`` if serialization fails.
+    /// Raises ``ValueError`` if the FX provider cannot supply a coherent
+    /// snapshot or serialization fails.
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(|e| {
@@ -723,7 +739,7 @@ pub(super) const EXPORTS: &[&str] = &["MarketContext"];
 
 /// Register the `finstack_quant.core.market_data.context` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "context")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "context")?;
     m.setattr(
         "__doc__",
         "Market data context container bindings (finstack-quant-core).",
@@ -734,13 +750,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let all = PyList::new(py, EXPORTS)?;
     m.setattr("__all__", all)?;
 
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "context",
-        "finstack_quant.core.market_data",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
 
     Ok(())

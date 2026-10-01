@@ -7,7 +7,7 @@ use finstack_quant_statements::checks::{
     Check, CheckCategory, CheckContext, CheckFinding, CheckResult, Materiality, Severity,
 };
 use finstack_quant_statements::types::NodeId;
-use finstack_quant_statements::Result;
+use finstack_quant_statements::{Error, Result};
 
 /// Verifies that the change in working capital on the cash flow statement
 /// equals the negative delta of net working capital on the balance sheet.
@@ -50,6 +50,29 @@ impl Check for WorkingCapitalConsistency {
         for i in 1..periods.len() {
             let prev_pid = &periods[i - 1].id;
             let curr_pid = &periods[i].id;
+            for node in self
+                .current_assets_nodes
+                .iter()
+                .chain(&self.current_liabilities_nodes)
+            {
+                crate::analysis::units::validate_matching_units(
+                    context.results,
+                    self.wc_change_cf_node.as_str(),
+                    node.as_str(),
+                    curr_pid,
+                )?;
+                if crate::analysis::units::node_unit_at(context.results, node.as_str(), prev_pid)?
+                    != crate::analysis::units::node_unit_at(
+                        context.results,
+                        node.as_str(),
+                        curr_pid,
+                    )?
+                {
+                    return Err(Error::invalid_input(format!(
+                        "Working-capital node '{node}' must retain its type and currency between {prev_pid} and {curr_pid}"
+                    )));
+                }
+            }
 
             let Some(wc_cf) =
                 get_finite_node_value(context.results, &self.wc_change_cf_node, curr_pid)
@@ -68,9 +91,20 @@ impl Check for WorkingCapitalConsistency {
             let expected_wc_change = -(nwc_curr - nwc_prev);
             let diff = wc_cf - expected_wc_change;
 
+            if !diff.is_finite() {
+                return Err(Error::eval(format!(
+                    "Working-capital check requires finite balances and differences in {curr_pid}"
+                )));
+            }
+
             if diff.abs() > tolerance {
                 let reference = expected_wc_change.abs().max(1.0);
                 let relative = (diff / reference).abs() * 100.0;
+                if !relative.is_finite() {
+                    return Err(Error::eval(format!(
+                        "Working-capital relative difference is not finite in {curr_pid}"
+                    )));
+                }
 
                 let mut nodes = vec![self.wc_change_cf_node.clone()];
                 nodes.extend(self.current_assets_nodes.iter().cloned());

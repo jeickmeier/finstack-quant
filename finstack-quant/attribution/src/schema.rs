@@ -126,7 +126,7 @@ fn attribution_examples() -> finstack_quant_core::Result<Vec<serde_json::Value>>
             finstack_quant_core::Error::Internal(format!("build example deposit: {error}"))
         })?;
 
-    let market = MarketContextState::from(&MarketContext::new());
+    let market = MarketContextState::try_from(&MarketContext::new())?;
     let spec = crate::spec::AttributionSpec {
         instrument: InstrumentJson::Deposit(deposit),
         market_t0: market.clone(),

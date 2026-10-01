@@ -178,6 +178,20 @@ mod shift_operations {
     }
 
     #[test]
+    fn shift_extreme_signed_offsets_return_missing_values() {
+        let (ctx, data) = small_test_data();
+        let cols = to_slice_refs(&data);
+        for offset in [f64::from(i32::MIN), f64::from(i32::MAX)] {
+            let shift = CompiledExpr::new(Expr::call(
+                Function::Shift,
+                vec![Expr::column("x"), Expr::literal(offset)],
+            ));
+            let output = shift.eval(&ctx, &cols, EvalOpts::default()).unwrap().values;
+            assert!(output.iter().all(|value| value.is_nan()));
+        }
+    }
+
+    #[test]
     fn diff_basic() {
         let (ctx, data) = small_test_data();
         let cols = to_slice_refs(&data);
@@ -516,6 +530,104 @@ mod rolling_operations {
     }
 
     #[test]
+    fn rolling_sum_and_mean_retain_small_values_after_large_value_expires() {
+        let ctx = SimpleContext::new(["x"]).unwrap();
+        for function in [Function::RollingSum, Function::RollingMean] {
+            let expr = CompiledExpr::new(Expr::call(
+                function,
+                vec![Expr::column("x"), Expr::literal(2.0)],
+            ));
+            // Adding a later NaN must not change the earlier finite windows.
+            for values in [
+                vec![1e16, 1.0, 1.0, 1.0],
+                vec![1e16, 1.0, 1.0, 1.0, f64::NAN],
+            ] {
+                let result = expr
+                    .eval(&ctx, &[&values], EvalOpts::default())
+                    .unwrap()
+                    .values;
+                let expected = if function == Function::RollingSum {
+                    2.0
+                } else {
+                    1.0
+                };
+                assert!(result[0].is_nan());
+                assert_eq!(result[2], expected, "{function:?}");
+                assert_eq!(result[3], expected, "{function:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn rolling_sum_and_mean_compensate_cancellation_with_and_without_nan() {
+        let ctx = SimpleContext::new(["x"]).unwrap();
+        for function in [Function::RollingSum, Function::RollingMean] {
+            let expr = CompiledExpr::new(Expr::call(
+                function,
+                vec![Expr::column("x"), Expr::literal(3.0)],
+            ));
+            for values in [
+                vec![1e16, 1.0, -1e16],
+                vec![1e16, 1.0, -1e16, f64::NAN, 1.0, 2.0, 3.0],
+            ] {
+                let result = expr
+                    .eval(&ctx, &[&values], EvalOpts::default())
+                    .unwrap()
+                    .values;
+                let divisor = if function == Function::RollingSum {
+                    1.0
+                } else {
+                    3.0
+                };
+                assert_eq!(result[2], 1.0 / divisor, "{function:?}");
+                if result.len() > 3 {
+                    assert!(result[3..6].iter().all(|value| value.is_nan()));
+                    assert_eq!(result[6], 6.0 / divisor, "{function:?}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn rolling_sum_and_mean_recover_when_nonfinite_observations_expire() {
+        let ctx = SimpleContext::new(["x"]).unwrap();
+        for function in [Function::RollingSum, Function::RollingMean] {
+            let expr = CompiledExpr::new(Expr::call(
+                function,
+                vec![Expr::column("x"), Expr::literal(2.0)],
+            ));
+            let divisor = if function == Function::RollingSum {
+                1.0
+            } else {
+                2.0
+            };
+            for nonfinite in [f64::INFINITY, f64::NEG_INFINITY, f64::NAN] {
+                let values = [nonfinite, 1.0, 2.0, 3.0];
+                let result = expr
+                    .eval(&ctx, &[&values], EvalOpts::default())
+                    .unwrap()
+                    .values;
+                assert!(result[0].is_nan());
+                if nonfinite.is_nan() {
+                    assert!(result[1].is_nan());
+                } else {
+                    assert_eq!(result[1], nonfinite);
+                }
+                assert_eq!(result[2], 3.0 / divisor);
+                assert_eq!(result[3], 5.0 / divisor);
+            }
+            let values = [f64::INFINITY, f64::NEG_INFINITY, 1.0, 2.0];
+            let result = expr
+                .eval(&ctx, &[&values], EvalOpts::default())
+                .unwrap()
+                .values;
+            assert!(result[1].is_nan());
+            assert_eq!(result[2], f64::NEG_INFINITY);
+            assert_eq!(result[3], 3.0 / divisor);
+        }
+    }
+
+    #[test]
     fn rolling_std_basic() {
         let ctx = SimpleContext::new(["x"]).expect("unique columns");
         let x = vec![1.0, 2.0, 3.0, 4.0];
@@ -797,6 +909,91 @@ mod ewm_operations {
         assert_eq!(result.len(), 5);
         assert_eq!(result[0], 0.0);
         assert!(result[1] >= 0.0); // Variance should be non-negative
+    }
+
+    #[test]
+    fn ewm_variance_and_std_are_translation_invariant_for_both_weighting_modes() {
+        let ctx = SimpleContext::new(["x"]).unwrap();
+        for (adjust, expected_variances) in [
+            (0.0, [0.0, 0.25, 0.6875]),
+            (1.0, [0.0, 2.0 / 9.0, 26.0 / 49.0]),
+        ] {
+            for function in [Function::EwmVar, Function::EwmStd] {
+                let expr = CompiledExpr::new(Expr::call(
+                    function,
+                    vec![Expr::column("x"), Expr::literal(0.5), Expr::literal(adjust)],
+                ));
+                for offset in [0.0, 1e8, 1e10, -1e12] {
+                    let values = [offset, offset + 1.0, offset + 2.0];
+                    let result = expr
+                        .eval(&ctx, &[&values], EvalOpts::default())
+                        .unwrap()
+                        .values;
+                    for (actual, variance) in result.iter().zip(expected_variances) {
+                        let expected: f64 = if function == Function::EwmStd {
+                            f64::sqrt(variance)
+                        } else {
+                            variance
+                        };
+                        assert!(
+                            (actual - expected).abs() < 1e-12,
+                            "{function:?} adjust={adjust} offset={offset}: {actual} != {expected}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn ewm_variance_matches_explicit_normalized_weights() {
+        let ctx = SimpleContext::new(["x"]).unwrap();
+        let values = [0.0, 1.0, 2.0, 4.0, -2.0, 3.0];
+        for adjust in [false, true] {
+            for alpha in [1e-12_f64, 0.1, 0.5, 1.0] {
+                let expr = CompiledExpr::new(Expr::call(
+                    Function::EwmVar,
+                    vec![
+                        Expr::column("x"),
+                        Expr::literal(alpha),
+                        Expr::literal(if adjust { 1.0 } else { 0.0 }),
+                    ],
+                ));
+                let result = expr
+                    .eval(&ctx, &[&values], EvalOpts::default())
+                    .unwrap()
+                    .values;
+                for (end, actual) in result.iter().enumerate() {
+                    let weights: Vec<f64> = (0..=end)
+                        .map(|index| {
+                            let decay = (1.0 - alpha).powi((end - index) as i32);
+                            if adjust || index == 0 {
+                                decay
+                            } else {
+                                alpha * decay
+                            }
+                        })
+                        .collect();
+                    let total_weight: f64 = weights.iter().sum();
+                    let mean = values[..=end]
+                        .iter()
+                        .zip(&weights)
+                        .map(|(value, weight)| value * weight)
+                        .sum::<f64>()
+                        / total_weight;
+                    let expected = values[..=end]
+                        .iter()
+                        .zip(&weights)
+                        .map(|(value, weight)| weight * (value - mean).powi(2))
+                        .sum::<f64>()
+                        / total_weight;
+                    assert!(
+                        (actual - expected).abs() < 1e-12,
+                        "adjust={adjust} alpha={alpha} row={end}: {actual} != {expected}"
+                    );
+                }
+            }
+        }
     }
 
     #[test]

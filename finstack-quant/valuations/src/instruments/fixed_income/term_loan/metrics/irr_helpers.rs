@@ -268,7 +268,7 @@ pub(super) fn solve_irr_to_date(
     )
 }
 
-/// Exercisable call candidates as `(exercise_date, price_pct_of_par)` pairs.
+/// Exercisable call candidates as `(exercise_date, dirty_redemption)` pairs.
 ///
 /// A loan call entry is an effective-dated **standing** provision: it stays
 /// exercisable until the next entry replaces it. Two families of candidates
@@ -283,8 +283,8 @@ pub(super) fn solve_irr_to_date(
 ///   for evaluating an immediately exercisable prepayment), matching the tree
 ///   engine's treatment of past-dated provisions as active from step 0.
 ///
-/// `MakeWhole` provisions are skipped in both families: the borrower pays at
-/// least the continuation value, so the option is non-economic.
+/// Make-whole provisions use the same dated reference-curve redemption as
+/// deterministic tree pricing, with the clean floor and accrued cash once.
 ///
 /// # Arguments
 ///
@@ -293,35 +293,30 @@ pub(super) fn solve_irr_to_date(
 /// * `schedule` - Full internal cashflow schedule used to locate the first
 ///   coupon date after settlement for the standing-call candidate.
 /// * `as_of` - Valuation date separating standing from future provisions.
+/// * `market` - Reference discount curves for make-whole redemptions.
 ///
 /// Returns an empty vector when the loan has no exercisable calls.
 pub(super) fn exercisable_call_candidates(
     loan: &TermLoan,
     schedule: &CashFlowSchedule,
     as_of: Date,
-) -> finstack_quant_core::Result<Vec<(Date, f64)>> {
-    use crate::instruments::fixed_income::term_loan::LoanCallType;
-
+    market: &finstack_quant_core::market_data::context::MarketContext,
+) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
     let Some(cs) = &loan.call_schedule else {
         return Ok(Vec::new());
     };
 
-    let mut candidates: Vec<(Date, f64)> = cs
+    let mut candidates = cs
         .calls
         .iter()
-        .filter(|c| {
-            c.date > as_of
-                && c.date <= loan.maturity
-                && !matches!(c.call_type, LoanCallType::MakeWhole { .. })
-        })
-        .map(|c| (c.date, c.price_pct_of_par))
-        .collect();
+        .filter(|c| c.date > as_of && c.date <= loan.maturity)
+        .map(|c| (c.date, c))
+        .collect::<Vec<_>>();
 
     // Active standing provision: only relevant when some entry is already
     // effective (`date <= as_of`). The candidate exercise date is the first
     // coupon date after settlement; the price is the provision active AT that
     // exercise date (a later entry may have replaced the one active today).
-    // If the active entry is MakeWhole the loan is not economically callable.
     if cs.calls.iter().any(|c| c.date <= as_of) {
         let settlement = loan.settlement_date(as_of)?;
         let first_coupon_after_settlement = schedule
@@ -339,21 +334,37 @@ pub(super) fn exercisable_call_candidates(
             .filter(|date| *date > settlement)
             .min();
         if let Some(exercise) = first_coupon_after_settlement {
-            let active = cs
-                .calls
-                .iter()
-                .rfind(|c| c.date <= exercise)
-                .filter(|c| !matches!(c.call_type, LoanCallType::MakeWhole { .. }));
+            let active = cs.calls.iter().rfind(|c| c.date <= exercise);
             if let Some(call) = active {
                 if exercise < loan.maturity && !candidates.iter().any(|(d, _)| *d == exercise) {
-                    candidates.push((exercise, call.price_pct_of_par));
+                    candidates.push((exercise, call));
                 }
             }
         }
     }
 
     candidates.sort_by_key(|a| a.0);
-    Ok(candidates)
+    let out_path = schedule.outstanding_by_date()?;
+    candidates
+        .into_iter()
+        .map(|(exercise, call)| {
+            let outstanding = outstanding_before(&out_path, exercise, loan.currency);
+            let accrued = crate::cashflow::accrual::accrued_interest_amount(
+                schedule,
+                exercise,
+                &loan.accrual_config(),
+            )?;
+            let clean = super::super::pricing::call::clean_call_price(
+                call,
+                schedule,
+                market,
+                exercise,
+                outstanding.amount(),
+                accrued,
+            )?;
+            Ok((exercise, Money::new(clean + accrued, loan.currency)?))
+        })
+        .collect()
 }
 
 /// Look up outstanding BEFORE a target date from the outstanding path.

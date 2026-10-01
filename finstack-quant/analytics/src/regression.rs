@@ -171,7 +171,15 @@ pub fn constrained_least_squares(
 
     let x_matrix = DMatrix::from_row_slice(n_assets, n_factors, exposures);
     let r_vector = DVector::from_row_slice(returns);
-    let w_vector = DVector::from_row_slice(weights);
+    // Uniform weight scaling leaves the equality constraint unchanged. Keep
+    // weights bounded throughout the solve and correction, so products cannot
+    // overflow or underflow merely because holdings use different units.
+    let weight_scale = weights.iter().map(|value| value.abs()).fold(0.0, f64::max);
+    let w_vector = if weight_scale > 0.0 {
+        DVector::from_iterator(n_assets, weights.iter().map(|value| value / weight_scale))
+    } else {
+        DVector::zeros(n_assets)
+    };
 
     // Solve both right-hand sides from one factorization of the scaled
     // exposure matrix:
@@ -179,7 +187,6 @@ pub fn constrained_least_squares(
     // g = argmin ‖w − Xg‖² = (X'X)⁻¹X'w
     let targets = DMatrix::from_columns(&[r_vector.clone(), w_vector.clone()]);
     let solutions = normalized_svd_least_squares(x_matrix.clone(), &targets)?;
-    ensure_finite(solutions.as_slice())?;
     let f_hat = solutions.column(0).into_owned();
     let g = solutions.column(1).into_owned();
 
@@ -192,7 +199,6 @@ pub fn constrained_least_squares(
     // equality constraint. Normalize weights and returns separately before
     // comparing the Cauchy-Schwarz-scaled ratio: the common scale factors
     // cancel, avoiding overflow in ‖w‖ * (‖r‖ + ‖Xf̂‖).
-    let weight_scale = w_vector.iter().map(|value| value.abs()).fold(0.0, f64::max);
     let return_scale = r_vector
         .iter()
         .chain(fitted.iter())
@@ -203,14 +209,13 @@ pub fn constrained_least_squares(
     } else if !return_scale.is_finite() {
         false
     } else {
-        let scaled_weights = &w_vector / weight_scale;
-        let scaled_returns = &r_vector / return_scale;
-        let scaled_fitted = &fitted / return_scale;
+        let scaled_returns = r_vector.map(|value| value / return_scale);
+        let scaled_fitted = fitted.map(|value| value / return_scale);
         let scaled_residual = &scaled_returns - &scaled_fitted;
         let scaled_bound = CONSTRAINT_SATISFACTION_RELATIVE_TOLERANCE
-            * scaled_weights.norm()
+            * w_vector.norm()
             * (scaled_returns.norm() + scaled_fitted.norm());
-        let scaled_weighted_residual = scaled_weights.dot(&scaled_residual);
+        let scaled_weighted_residual = w_vector.dot(&scaled_residual);
         scaled_weighted_residual.is_finite() && scaled_weighted_residual.abs() <= scaled_bound
     };
     if ols_satisfies_constraint {
@@ -258,16 +263,31 @@ pub(crate) fn normalized_svd_least_squares(
 
     let mut scales = Vec::with_capacity(p);
     for column in design.column_iter() {
-        let norm = neumaier_sum(column.iter().map(|value| value * value)).sqrt();
-        if !norm.is_finite() || norm <= 0.0 {
+        let max_value = column.iter().map(|value| value.abs()).fold(0.0, f64::max);
+        if !max_value.is_finite() || max_value <= 0.0 {
             return Err(InputError::Invalid.into());
         }
-        scales.push(norm);
+        // Exact binary scaling avoids squared overflow/underflow without
+        // changing the rounding of ordinary column norms. Preserve a single
+        // rounded divisor whenever the full norm is representable.
+        let binary_scale = f64::from_bits(max_value.to_bits() & (0x7ff_u64 << 52));
+        let scale = if binary_scale > 0.0 {
+            binary_scale
+        } else {
+            max_value
+        };
+        let norm = neumaier_sum(column.iter().map(|value| (value / scale).powi(2))).sqrt();
+        let full_norm = scale * norm;
+        scales.push(if full_norm.is_finite() {
+            (full_norm, 1.0)
+        } else {
+            (scale, norm)
+        });
     }
 
-    for (col_idx, scale) in scales.iter().enumerate() {
+    for (col_idx, &(scale, norm)) in scales.iter().enumerate() {
         for row_idx in 0..n {
-            design[(row_idx, col_idx)] /= *scale;
+            design[(row_idx, col_idx)] = design[(row_idx, col_idx)] / scale / norm;
         }
     }
 
@@ -290,16 +310,21 @@ pub(crate) fn normalized_svd_least_squares(
         .map_err(|_| InputError::Invalid)?;
 
     let mut beta = beta_scaled;
-    for (row_idx, scale) in scales.iter().enumerate() {
+    for (row_idx, &(scale, norm)) in scales.iter().enumerate() {
         for col_idx in 0..beta.ncols() {
-            beta[(row_idx, col_idx)] /= *scale;
+            beta[(row_idx, col_idx)] = beta[(row_idx, col_idx)] / norm / scale;
         }
     }
+    ensure_finite(beta.as_slice())?;
     Ok(beta)
 }
 
 /// Returns an error if any value in `values` is `NaN` or infinite.
-fn ensure_finite(values: &[f64]) -> crate::Result<()> {
+///
+/// # Arguments
+///
+/// * `values` - Input or computed floating-point values that must all be finite.
+pub(crate) fn ensure_finite(values: &[f64]) -> crate::Result<()> {
     for &value in values {
         if value.is_nan() {
             return Err(InputError::NonFiniteValue {
@@ -392,10 +417,33 @@ mod tests {
     }
 
     #[test]
-    fn lambda_overflow_fails_closed() {
-        let err = constrained_least_squares(&[1.0, 0.0], 1, &[0.0, 1.0e200], &[1.0e-150, 1.0e-150])
-            .expect_err("finite inputs must not produce an infinite Lagrange multiplier");
-        assert!(err.to_string().to_lowercase().contains("finite"), "{err}");
+    fn normalized_weights_avoid_spurious_lagrange_multiplier_overflow() {
+        let coefficients =
+            constrained_least_squares(&[1.0, 0.0], 1, &[0.0, 1.0e200], &[1.0e-150, 1.0e-150])
+                .expect("the constrained coefficient is finite despite tiny holdings");
+        assert!((coefficients[0] / 1.0e200 - 1.0).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn uniform_weight_scaling_preserves_reachable_and_unreachable_constraints() {
+        for scale in [1.0e-320, 1.0e-200, 1.0, 100.0, 1.0e200, 1.0e308] {
+            let weights = [scale, scale];
+            let coefficients = constrained_least_squares(&[1.0, 0.0], 1, &[0.0, 1.0], &weights)
+                .expect("uniform weight scaling leaves the solution unchanged");
+            assert!((coefficients[0] - 1.0).abs() < 1.0e-12);
+            assert!(constrained_least_squares(&[1.0, -1.0], 1, &[0.02, 0.01], &weights).is_err());
+        }
+    }
+
+    #[test]
+    fn exposure_normalization_supports_extreme_finite_column_scales() {
+        for scale in [1.0e-200, 1.0e200] {
+            let coefficients =
+                constrained_least_squares(&[scale, 0.0], 1, &[0.0, 1.0], &[1.0, 1.0]).expect(
+                    "a representable coefficient must not fail because its column norm overflows",
+                );
+            assert!((coefficients[0] * scale - 1.0).abs() < 1.0e-12);
+        }
     }
 
     #[test]

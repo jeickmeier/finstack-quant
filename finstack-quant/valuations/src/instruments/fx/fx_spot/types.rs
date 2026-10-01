@@ -353,7 +353,7 @@ impl FxSpot {
                         "FxSpot settlement_days {settlement_days} exceeds the supported range"
                     ))
                 })?;
-                Ok(as_of.add_weekdays(lag_days))
+                as_of.add_weekdays(lag_days)
             }
         }
     }

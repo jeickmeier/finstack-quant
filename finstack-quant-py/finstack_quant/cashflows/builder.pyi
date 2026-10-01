@@ -127,7 +127,10 @@ class AmortizationSpec:
         ----------
         schedule : list[tuple[datetime.date, Money]]
             Ordered ``(date, remaining_principal_after_date)`` pairs; dates
-            must be strictly increasing and amounts non-increasing.
+            must be strictly increasing and targets finite, nonnegative, and
+            in the notional currency. A target may exceed an earlier target
+            or the initial notional when prior draws or PIK fund it. Building
+            the schedule rejects targets above the live balance on that date.
 
         Returns
         -------
@@ -214,20 +217,25 @@ class AmortizationSpec:
     @staticmethod
     def linear_between(start: datetime.date | str, end: datetime.date | str) -> AmortizationSpec:
         """
-        Equal principal installments on every payment date in ``(start, end]``.
+        Equal principal installments on coupon accrual boundaries in ``(start, end]``.
+
+        The installment uses outstanding after start-date PIK and principal
+        movements. The final installment clears the live remaining balance.
+        Cash settles on each boundary's adjusted, lagged payment date.
 
         Parameters
         ----------
         start : datetime.date | str
-            Amortization start; installments fall on payment dates strictly
-            after it.
+            Economic amortization start, on or after issue; installments apply
+            strictly after it.
         end : datetime.date | str
-            Amortization end, by which the principal is fully repaid.
+            Final economic repayment date, which must be a coupon accrual
+            boundary no later than the terminal accrual date; validated at build.
 
         Returns
         -------
         AmortizationSpec
-            A dated linear amortization rule.
+            Dated amortization rule; cash payment can follow the economic end.
 
         Raises
         ------
@@ -253,8 +261,11 @@ class AmortizationSpec:
         Parameters
         ----------
         items : list[tuple[datetime.date, Money]]
-            ``(date, principal_amount)`` exchanges; positive amounts reduce
-            outstanding principal.
+            ``(date, principal_amount)`` exchanges with finite, nonnegative
+            amounts in the notional currency; positive amounts reduce
+            outstanding principal. Cumulative repayments may exceed the
+            initial notional when prior draws or PIK fund them. Building the
+            schedule rejects repayments above the live balance on each date.
 
         Returns
         -------
@@ -599,8 +610,9 @@ class CashFlowBuilder:
             Classification for the emitted cashflow. Required; matches the
             Rust API, which has no default.
         cash : Money, optional
-            Cash leg paid or received, when it differs from *delta*
-            (default: equal to *delta*).
+            Cash amount before the cashflow kind's sign handling. When omitted,
+            defaults to ``-delta`` for amortization and ``delta`` for draws;
+            emitted settlement cash then follows the kind's sign convention.
 
         Returns
         -------
@@ -899,9 +911,10 @@ class CashFlowBuilder:
         Parameters
         ----------
         market : MarketContext, optional
-            Market context supplying forward curves for floating-rate
-            projection. Fixed coupons and deterministic fees do not
-            require one.
+            Market context supplying observed fixings and forward curves for
+            floating coupons. Complete observed history can supply a coupon
+            without a forward curve. Fixed coupons and deterministic fees do
+            not require a market context.
 
         Returns
         -------
@@ -911,11 +924,21 @@ class CashFlowBuilder:
         Raises
         ------
         KeyError
-            If required inputs are missing, such as an unset principal.
+            If required inputs are missing, such as an unset principal or a
+            forward curve needed for an unobserved fixing with fallback ERROR.
         ValueError
             If a spec or date validation fails, including any deferred
-            error recorded by an earlier fluent call, or a floating-rate
-            projection fails and its fallback policy does not resolve it.
+            error recorded by an earlier fluent call or a negative reset lag.
+            Invalid accrual grids include end-of-month rolling with either
+            IMM rule, ACT/ACT ICMA with third-Wednesday IMM, and a plain
+            ACT/ACT ICMA end-of-month grid whose regular anchor is not month-end.
+            Supplied fixing history must contain exact-date observations
+            before the forward curve's base date, under every fallback policy.
+            An explicit fallback can handle an absent fixing series or missing
+            curve; curve, date, day-count and arithmetic errors still propagate.
+        RuntimeError
+            If an operational or numerical computation failure occurs during
+            construction; a fallback policy does not suppress it.
         """
         ...
 
@@ -1317,7 +1340,8 @@ class CashFlowSchedule:
         Raises
         ------
         ValueError
-            If *scale* is NaN or infinite.
+            If *scale* is non-finite or a scaled cash amount or principal
+            movement exceeds the Decimal range.
         """
         ...
 
@@ -1337,12 +1361,15 @@ class CashFlowSchedule:
         -------
         float
             The weighted average life in years; ``0.0`` if there are no
-            future principal flows.
+            future principal repayments. Funding draws and non-cash PIK or
+            default write-downs do not contribute; scheduled amortization,
+            prepayments, final redemption, and revolving repayments do.
 
         Raises
         ------
         ValueError
-            If the day-count year-fraction calculation fails.
+            If future principal repayments mix currencies or the day-count
+            year-fraction calculation fails.
         """
         ...
 
@@ -1353,8 +1380,8 @@ class CashFlowSchedule:
         Returns
         -------
         list[tuple[datetime.date, Money]]
-            ``(date, outstanding_balance)`` pairs in schedule order, one
-            per distinct flow date.
+            ``(date, outstanding_balance)`` pairs in economic principal-date
+            order, one per distinct balance-effective date.
 
         Raises
         ------
@@ -1396,10 +1423,10 @@ class CashFlowSchedule:
 
         Returns
         -------
-        dict[str, dict[str, Money]]
-            Mapping from period id label (e.g. ``"2025Q1"``) to a mapping
-            of currency code to the present-value total for that period
-            and currency; periods with no flows are omitted.
+        PeriodAggregation
+            Read-only mapping from period id label (e.g. ``"2025Q1"``) to
+            per-currency present-value totals, with ``to_dataframe()``;
+            periods with no flows are omitted.
 
         Raises
         ------
@@ -1412,8 +1439,7 @@ class CashFlowSchedule:
         Notes
         -----
         Binds Rust ``CashFlowSchedule::pv_by_period`` (market-resolved). The
-        borrowed-handle variant ``pv_by_period_with_discounting`` that takes
-        ``PvDiscountSource`` is Rust-only.
+        borrowed-handle variant ``pv_by_period_with_discounting`` is Rust-only.
         """
         ...
 
@@ -1432,7 +1458,9 @@ class CashFlowSchedule:
         Raises
         ------
         ValueError
-            If the value cannot be serialized to JSON.
+            If the value cannot be serialized to JSON, including a non-finite
+            coupon rate or projected index rate on any cashflow. Invalid rates
+            are rejected rather than serialized as absent metadata.
         """
         ...
 
@@ -1484,8 +1512,8 @@ class CashFlowSchedule:
         ----------
         outstanding : bool, default False
             Append an ``outstanding`` column with the principal balance (float,
-            flow currency) after the last principal event on or before each
-            flow date.
+            notional currency) after all economic principal events on or before
+            each payment date. Before the first event, use the initial notional.
 
         Returns
         -------
@@ -1501,7 +1529,8 @@ class CashFlowSchedule:
         Raises
         ------
         ValueError
-            If ``outstanding=True`` and principal flows mix currencies.
+            If ``outstanding=True`` and ``meta.issue_date`` is missing or
+            principal flows mix currencies with the notional.
         """
         ...
 
@@ -1536,7 +1565,7 @@ class CashFlowSchedule:
         ------
         ValueError
             If ``pvs`` does not have one entry per flow or contains a
-            non-finite value.
+            non-finite value, or flow amounts mix currencies.
         """
         ...
 
@@ -2927,10 +2956,16 @@ class FloatingCouponSpec:
 
 class FloatingRateFallback:
     """
-    Policy for handling floating rate projection failures.
+    Policy for missing floating-rate market data.
 
     ``ERROR`` and ``SPREAD_ONLY`` are class-attribute singletons;
     :meth:`fixed_rate` constructs the data-carrying ``FixedRate`` variant.
+    An explicit fallback can handle an absent fixing series or missing curve.
+    Supplied observations take precedence, so complete observed history can
+    supply a coupon without a curve even with ``ERROR``. When a curve supplies
+    the historical cutoff, gaps in a supplied series before its base date
+    remain exact-date errors under every policy. Curve, date, day-count and
+    arithmetic failures also propagate.
 
     Examples
     --------
@@ -2940,20 +2975,23 @@ class FloatingRateFallback:
     """
 
     ERROR: FloatingRateFallback
-    """Fail the build when the forward curve lookup fails (default, safest)."""
+    """Reject missing market data needed to observe or project the index (default)."""
     SPREAD_ONLY: FloatingRateFallback
-    """Project spread-only when no forward curve is available (explicit opt-in)."""
+    """Use a zero index when an absent fixing series or missing curve permits fallback."""
 
     @staticmethod
     def fixed_rate(rate: Decimal | float) -> FloatingRateFallback:
         """
-        Use a fixed rate as the index component when projection fails.
+        Supply a fixed index rate when missing market data permits fallback.
 
         Parameters
         ----------
         rate : decimal.Decimal | float
-            Decimal annual rate substituted for the projected index rate
-            (e.g. ``0.045`` for 4.5%), not basis points.
+            Decimal annual index rate (e.g. ``0.045`` for 4.5%), not basis
+            points. Used for an absent fixing series or missing curve;
+            existing observations remain authoritative. It cannot replace
+            gaps in supplied history before an available curve's base date,
+            or suppress curve, date, day-count or arithmetic failures.
 
         Returns
         -------
@@ -3037,7 +3075,12 @@ class FloatingRateSpec:
         spread_bp : decimal.Decimal | float
             Spread/margin over the index in basis points.
         reset_frequency : Tenor | str
-            Reset frequency for rate fixings; also the default index tenor.
+            Fallback compiled term tenor when ``index_tenor`` is omitted and
+            no forward curve resolves; the term tenor must be positive. The
+            bare builder observes one term fixing per coupon accrual start,
+            with ``reset_lag_days``; this field does not add resets inside
+            a payment period. A resolved curve owns the quoted index tenor,
+            while overnight coupons use their daily observation schedule.
         gearing : decimal.Decimal | float, optional
             Leverage multiplier applied to the all-in rate (default ``1``);
             must be strictly positive.
@@ -3054,12 +3097,21 @@ class FloatingRateSpec:
             Cap applied to the index component, in basis points.
         overnight_index_constraints : OvernightIndexConstraintApplication, optional
             Where index floors/caps are applied for overnight-compounded
-            coupons (default daily).
+            coupons (default daily): daily bounds apply per observation;
+            period index bounds and all-in bounds apply once to the completed
+            coupon. With changing principal, any final annual-rate adjustment
+            is allocated uniformly over contractual accrual time, preserving
+            raw daily compound increments.
         index_tenor : Tenor | str, optional
-            Underlying index tenor for the forward projection, when it
-            differs from *reset_frequency*.
+            Explicit compiled term tenor when no forward curve resolves;
+            when omitted, ``reset_frequency`` supplies it. The compiled
+            term tenor must be positive. A resolved forward
+            curve's quoted tenor remains authoritative. Ignored for overnight
+            coupons; a disagreement with the curve exceeding 10% warns at build.
         reset_lag_days : int
-            Reset lag in business days (default ``2``, T-2 convention).
+            Nonnegative reset lag in business days (default ``2``, T-2
+            convention). Negative values are rejected by :meth:`validate`
+            or schedule construction, rather than by this constructor.
         fixing_calendar_id : str, optional
             Calendar for the reset lag; defaults to the coupon schedule
             calendar when omitted.
@@ -3071,8 +3123,11 @@ class FloatingRateSpec:
             Day-count basis for the overnight compounding denominator
             (default Act/360).
         fallback : FloatingRateFallback, optional
-            Policy applied when forward curve lookup fails (default
-            ``Error``).
+            Policy for an absent fixing series or missing forward curve
+            (default ``ERROR``). Complete supplied observations require no
+            curve. Gaps in supplied history before an available curve's base
+            date remain exact-date errors; curve, date, day-count and arithmetic
+            failures propagate under every policy.
 
         Raises
         ------
@@ -3235,7 +3290,11 @@ class FloatingRateSpec:
         Returns
         -------
         OvernightIndexConstraintApplication
-            Where index floors/caps apply on overnight legs.
+            Daily applies index bounds per observation; period applies them
+            once to the completed coupon. All-in bounds also apply once at
+            completion. With changing principal, final rate adjustments are
+            allocated uniformly over contractual accrual time while preserving
+            raw daily compound increments.
 
         Notes
         -----
@@ -3246,12 +3305,17 @@ class FloatingRateSpec:
     @property
     def reset_frequency(self) -> Tenor:
         """
-        Reset frequency.
+        Return the fallback tenor for compiled term-observation metadata.
 
         Returns
         -------
         Tenor
-            Reset frequency.
+            Compiled term tenor used and validated when ``index_tenor`` is
+            absent and no forward curve resolves. Term coupons observe one
+            fixing at each accrual start,
+            subject to reset lag; this value does not create extra resets.
+            Forward curves own their quoted tenor and overnight coupons use
+            their daily fixing schedule.
 
         Notes
         -----
@@ -3262,12 +3326,15 @@ class FloatingRateSpec:
     @property
     def index_tenor(self) -> Tenor | None:
         """
-        Explicit index tenor, if set.
+        Return the explicit fallback tenor for term-observation metadata, if set.
 
         Returns
         -------
         Tenor | None
-            Explicit index tenor, if set.
+            Compiled term tenor used and validated when no forward curve
+            resolves, or None to use ``reset_frequency``. A resolved curve's
+            quoted tenor remains authoritative; a disagreement exceeding
+            10% warns at build. Overnight coupons ignore this value.
 
         Notes
         -----
@@ -3358,7 +3425,11 @@ class FloatingRateSpec:
     @staticmethod
     def sofr(spread_bp: Decimal | float | str) -> FloatingRateSpec:
         """
-        USD SOFR compounded in arrears (ARRC / ISDA 2021): quarterly resets, Act/360 daily compounding, no reset lag, USNY fixings.
+        USD SOFR compounded in arrears (ARRC / ISDA 2021).
+
+        Uses Act/360 daily compounding, no reset lag, and the dedicated
+        ``sofr`` fixing/value-date calendar, which excludes Good Friday.
+        The coupon schedule independently determines the payment calendar.
 
         Parameters
         ----------
@@ -3387,7 +3458,7 @@ class FloatingRateSpec:
     @staticmethod
     def sonia(spread_bp: Decimal | float | str) -> FloatingRateSpec:
         """
-        GBP SONIA compounded in arrears: annual resets, Act/365F daily compounding, no reset lag, GBLO fixings.
+        GBP SONIA compounded in arrears: Act/365F daily compounding, no reset lag, GBLO fixings.
 
         Parameters
         ----------
@@ -3416,7 +3487,7 @@ class FloatingRateSpec:
     @staticmethod
     def euribor_3m(spread_bp: Decimal | float | str) -> FloatingRateSpec:
         """
-        EUR 3M EURIBOR term rate: quarterly resets fixed in advance with a 2-business-day TARGET2 lag and an explicit 3M index tenor.
+        EUR 3M EURIBOR term rate: one fixing per coupon period at its lagged accrual start, with a 2-business-day TARGET2 lag and an explicit 3M index tenor.
 
         Parameters
         ----------
@@ -3613,12 +3684,18 @@ class Notional:
         """
         Validate the notional and its amortization rule.
 
+        Step targets and custom repayments are checked for finite,
+        nonnegative amounts in the notional currency. Step dates must be
+        strictly increasing. The builder checks each event against the live
+        balance after prior draws and PIK; these rules have no initial-notional
+        cap or requirement for successive step targets to decrease.
+
         Raises
         ------
         ValueError
-            If the amortization schedule is inconsistent with the initial
-            notional, such as a currency mismatch or a target above the
-            initial amount.
+            If the notional or amortization parameters are invalid, including
+            a currency mismatch, a negative amount, unordered step dates, or
+            a linear-to target above the initial notional.
         """
         ...
 
@@ -4519,7 +4596,10 @@ class RollRule:
     Roll-date rule applied when generating schedule anchors.
 
     Immutable, hashable enum-style type with one class attribute per
-    Rust variant (``NONE``, ``IMM``, ``CDS_IMM``).
+    Rust variant (``NONE``, ``IMM``, ``CDS_IMM``). Both IMM modes override
+    the requested frequency and stub rule with quarterly and short-back
+    conventions for date generation and accrual. Neither supports end-of-month
+    rolling. Schedule construction checks these convention combinations.
 
     Examples
     --------
@@ -4531,9 +4611,19 @@ class RollRule:
     NONE: RollRule
     """Plain tenor stepping from the schedule boundaries (default)."""
     IMM: RollRule
-    """Standard IMM dates: third Wednesday of Mar/Jun/Sep/Dec."""
+    """Third Wednesdays of Mar/Jun/Sep/Dec, retaining contractual maturity.
+
+    An off-grid maturity produces a terminal stub. A horizon with no interior
+    IMM date produces one stub over the full horizon. ACT/ACT ICMA is rejected
+    because this third-Wednesday grid has no supported nominal reference grid.
+    """
     CDS_IMM: RollRule
-    """CDS IMM dates: 20th of Mar/Jun/Sep/Dec with Big-Bang front accrual."""
+    """Twentieths of Mar/Jun/Sep/Dec, supporting ACT/ACT ICMA accrual.
+
+    The first coupon at the initial instrument horizon accrues from the
+    preceding CDS roll date. Interior coupon-program windows start at their
+    declared boundary and do not extend accrual backward before that window.
+    """
 
 class ScheduleParams:
     """
@@ -4569,25 +4659,37 @@ class ScheduleParams:
         Parameters
         ----------
         frequency : Tenor | str
-            Accrual and payment frequency (e.g. ``"3M"``).
+            Accrual and payment frequency (e.g. ``"3M"``). IMM and CDS_IMM
+            replace it with quarterly frequency for date generation and accrual.
         day_count : DayCount
-            Day-count convention for accrual year fractions.
+            Day-count convention for accrual year fractions. ACT_ACT_ISMA
+            (ACT/ACT ICMA) supports the CDS_IMM twentieth grid but rejects
+            the IMM third-Wednesday grid at schedule construction.
         calendar_id : str
             Holiday calendar id (``"weekends_only"`` for weekend-only
             rolling).
         business_day_convention : BusinessDayConvention | str, optional
             Payment-date rolling convention (default Modified Following).
         stub : StubKind, optional
-            Stub rule (default short-front).
+            Stub rule (default short-front). IMM and CDS_IMM use short-back
+            regardless of this input. For a plain ACT/ACT ICMA grid, short-front
+            and long-front anchor regular periods on maturity; other rules
+            anchor them on the start date.
         end_of_month : bool
-            Preserve end-of-month rolling (default ``False``).
+            Preserve end-of-month rolling (default ``False``). Both IMM modes
+            reject True at schedule construction. A plain ACT/ACT ICMA grid
+            requires its regular anchor, selected by *stub*, to be month-end;
+            the opposite endpoint may be irregular.
         payment_lag_days : int
-            Payment lag in business days (default ``0``).
+            Nonnegative payment lag in business days (default ``0``).
         adjust_accrual_dates : bool
             Roll accrual boundaries with *business_day_convention*, i.e. swap/ISDA convention
             (default ``False``, bond convention).
         roll_rule : RollRule, optional
-            IMM/CDS-IMM anchor grid (default none).
+            IMM/CDS-IMM anchor grid (default none). These modes use quarterly,
+            short-back conventions; see :class:`RollRule` for horizon and
+            front-accrual behavior. Grid compatibility is checked when building
+            the schedule, after its start and maturity dates are known.
 
         Raises
         ------
@@ -4595,7 +4697,8 @@ class ScheduleParams:
             If *frequency* or *business_day_convention* is neither the
             documented wrapper type nor a string.
         ValueError
-            If a tenor or business-day convention string is invalid.
+            If a tenor or business-day convention string is invalid,
+            *calendar_id* is unknown, or *payment_lag_days* is negative.
         OverflowError
             If *payment_lag_days* is outside the signed 32-bit integer range.
         """
@@ -4971,6 +5074,10 @@ class ScheduleParams:
     def validate(self) -> None:
         """
         Fail-fast validation: known calendar id and non-negative payment lag.
+
+        This check does not validate the accrual grid. Schedule construction
+        checks IMM, end-of-month and ACT/ACT ICMA compatibility using the
+        actual start and maturity dates.
 
         Raises
         ------

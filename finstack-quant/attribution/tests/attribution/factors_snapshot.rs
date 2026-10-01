@@ -35,6 +35,88 @@ fn sample_fx_matrix() -> FxMatrix {
     FxMatrix::new(Arc::new(StaticFxProvider))
 }
 
+#[test]
+fn restoring_credit_curves_preserves_complete_canonical_index_dependencies() {
+    use finstack_quant_core::market_data::term_structures::CreditIndexData;
+    use std::collections::BTreeMap;
+
+    let as_of = date!(2025 - 01 - 01);
+    let hazard = |id: &str, rate| {
+        Arc::new(
+            HazardCurve::builder(id)
+                .base_date(as_of)
+                .recovery_rate(0.4)
+                .knots([(0.0, rate), (5.0, rate)])
+                .build()
+                .expect("hazard"),
+        )
+    };
+    let index_hazard = hazard("INDEX-HAZ", 0.1);
+    let issuer_hazard = hazard("ISSUER-HAZ", 0.2);
+    let correlation = Arc::new(
+        BaseCorrelationCurve::builder("CORR")
+            .knots([(3.0, 0.2), (100.0, 0.3)])
+            .build()
+            .expect("correlation"),
+    );
+    let index = CreditIndexData::builder()
+        .num_constituents(1)
+        .recovery_rate(0.4)
+        .index_credit_curve(Arc::clone(&index_hazard))
+        .base_correlation_curve(Arc::clone(&correlation))
+        .issuer_curves(BTreeMap::from([(
+            "ISSUER".to_owned(),
+            Arc::clone(&issuer_hazard),
+        )]))
+        .build()
+        .expect("index");
+    let current = MarketContext::new()
+        .insert(index_hazard)
+        .insert(issuer_hazard)
+        .insert(correlation)
+        .insert_credit_index("INDEX", index)
+        .expect("canonical index");
+    let source = MarketContext::new()
+        .insert(hazard("INDEX-HAZ", 0.02))
+        .insert(hazard("ISSUER-HAZ", 0.03))
+        .insert(
+            BaseCorrelationCurve::builder("CORR")
+                .knots([(3.0, 0.25), (100.0, 0.35)])
+                .build()
+                .expect("replacement correlation"),
+        );
+    let flags = MarketRestoreFlags::HAZARD | MarketRestoreFlags::CORRELATION;
+    let snapshot = MarketSnapshot::extract(&source, flags);
+    let restored = MarketSnapshot::restore_market(&current, &snapshot, flags);
+    let index = restored
+        .get_credit_index("INDEX")
+        .expect("index survives curve replacement");
+    assert!(Arc::ptr_eq(
+        &index.index_credit_curve,
+        &restored.get_hazard("INDEX-HAZ").expect("restored hazard"),
+    ));
+    assert!(Arc::ptr_eq(
+        &index.base_correlation_curve,
+        &restored
+            .get_base_correlation("CORR")
+            .expect("restored correlation"),
+    ));
+    assert!(Arc::ptr_eq(
+        &index.issuer_credit_curves.as_ref().expect("issuer curves")["ISSUER"],
+        &restored.get_hazard("ISSUER-HAZ").expect("restored issuer"),
+    ));
+    assert!((index.index_credit_curve.sp(5.0) - (-0.1_f64).exp()).abs() < 1e-14);
+    let json = serde_json::to_string(&restored).expect("consistent restored snapshot");
+    let _: MarketContext = serde_json::from_str(&json).expect("restored market roundtrip");
+
+    let missing = MarketSnapshot::extract(&MarketContext::new(), MarketRestoreFlags::HAZARD);
+    let without_hazards =
+        MarketSnapshot::restore_market(&current, &missing, MarketRestoreFlags::HAZARD);
+    assert!(without_hazards.get_credit_index("INDEX").is_err());
+    let json = serde_json::to_string(&without_hazards).expect("snapshot after removal");
+    let _: MarketContext = serde_json::from_str(&json).expect("no dangling index references");
+}
+
 fn create_test_discount_curve(id: &str, base_date: Date) -> DiscountCurve {
     DiscountCurve::builder(id)
         .base_date(base_date)

@@ -33,7 +33,7 @@ pub fn build_flat_forward_curve(rate: f64, base_date: Date, curve_id: &str) -> F
             DayCount::Act360
                 .year_fraction(
                     base_date,
-                    base_date.add_months(quarter * 3),
+                    base_date.add_months(quarter * 3).expect("valid date shift"),
                     DayCountContext::default(),
                 )
                 .expect("valid quarterly projection boundary")

@@ -27,7 +27,6 @@ True
 """
 
 import json as _json
-import sys as _sys
 from typing import TYPE_CHECKING as _TYPE_CHECKING, Any as _Any
 
 from finstack_quant.finstack_quant import valuations as _valuations
@@ -47,10 +46,9 @@ snowball_coupon_profile = _valuations.snowball_coupon_profile
 inverse_floater_coupon_profile = _valuations.inverse_floater_coupon_profile
 cms_spread_option_intrinsic = _valuations.cms_spread_option_intrinsic
 callable_range_accrual_accrued = _valuations.callable_range_accrual_accrued
-# `schema` is a compiled submodule with no pure-Python shim package, so alias it
-# onto the public dotted path that `import finstack_quant.valuations.schema` uses.
+# `schema` is a compiled submodule with no pure-Python shim package; the extension
+# registers it as `finstack_quant.valuations.schema`.
 schema = _valuations.schema
-_sys.modules.setdefault("finstack_quant.valuations.schema", schema)
 
 
 def instrument_cashflows(

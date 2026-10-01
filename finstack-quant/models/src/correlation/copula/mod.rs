@@ -36,6 +36,15 @@ use crate::correlation::{Error, Result};
 /// Fallible two-valued integrand over a copula factor realization.
 pub type FactorPairIntegrand<'a> = dyn Fn(&[f64]) -> finstack_quant_core::Result<(f64, f64)> + 'a;
 
+fn validate_mixing_uniform(u01: f64) -> finstack_quant_core::Result<()> {
+    if !u01.is_finite() || u01 <= 0.0 || u01 >= 1.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "copula mixing requires a finite uniform draw strictly inside (0, 1), got {u01}"
+        )));
+    }
+    Ok(())
+}
+
 /// Copula model for portfolio default correlation.
 ///
 /// Implementations provide the conditional default probability P(τᵢ ≤ t | M)
@@ -93,7 +102,8 @@ pub trait Copula: Send + Sync {
     ///   period, shared by every name.
     /// * `mixing` — the shared mixing variable `W` drawn via
     ///   [`Self::sample_mixing`] (`1.0` for copulas without a mixing
-    ///   variable). The default implementation ignores it.
+    ///   variable). Student-t requires a finite, strictly positive value;
+    ///   invalid Student-t mixing inputs produce `NaN`.
     /// * `correlation` — the asset correlation `ρ`.
     ///
     /// # Implementation requirement
@@ -216,7 +226,8 @@ pub trait Copula: Send + Sync {
     /// * `mixing` — the shared positive mixing variable `W` for copulas with
     ///   a variance-mixture representation (Student-t: `W ~ Gamma(ν/2, ν/2)`).
     ///   Pass `1.0` for copulas without a mixing variable (Gaussian); the
-    ///   default implementation ignores it.
+    ///   default implementation ignores it. Invalid Student-t mixing inputs
+    ///   (non-finite or not strictly positive) produce `NaN`.
     /// * `correlation` — the asset correlation `ρ`.
     ///
     /// # Default implementation
@@ -240,16 +251,32 @@ pub trait Copula: Send + Sync {
 
     /// Draw the shared mixing variable `W` for variance-mixture copulas.
     ///
-    /// `u01` is a uniform `[0,1)` draw. The default implementation returns
+    /// The default implementation returns
     /// `1.0` (no mixing — Gaussian). The Student-t copula overrides this to
     /// sample `W ~ Gamma(ν/2, ν/2)` so that `M = Z/√W` is `t(ν)`-distributed
     /// and the shared `W` induces tail dependence across every name. The RFL
     /// copula overrides it to sample the loading shock `η = Φ⁻¹(u01)`, drawn
     /// once per period and shared so the realized loading `β(η)` is common
     /// across the pool.
-    fn sample_mixing(&self, u01: f64) -> f64 {
-        let _ = u01;
-        1.0
+    ///
+    /// # Arguments
+    ///
+    /// * `u01` - Finite uniform draw strictly inside `(0, 1)`. Endpoints are
+    ///   rejected because inverse transforms can produce zero or infinite
+    ///   mixing values there. The draw is consumed once per shared period.
+    ///
+    /// # Returns
+    ///
+    /// A finite shared factor: positive variance multiplier for Student-t,
+    /// normal loading shock for RFL, or `1.0` for Gaussian copulas.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] for an invalid
+    /// uniform draw or a failed numerical distribution transform.
+    fn sample_mixing(&self, u01: f64) -> finstack_quant_core::Result<f64> {
+        validate_mixing_uniform(u01)?;
+        Ok(1.0)
     }
 
     /// Number of systematic factors in the model.
@@ -340,10 +367,8 @@ pub trait Copula: Send + Sync {
     ///
     /// - Gaussian copula: λ_L = 0 (no tail dependence)
     /// - Student-t copula: λ_L > 0 (positive tail dependence)
-    /// - Random Factor Loading copula: returns `f64::NAN`
-    ///   (no closed-form λ_L; see
-    ///   `RandomFactorLoadingCopula::stress_correlation_proxy`
-    ///   for the heuristic stress gauge).
+    /// - Random Factor Loading copula: the probability of the perfect-loading
+    ///   atom, `P(β = 1)`, in its calibrated clipped-normal loading distribution.
     ///
     /// Implementations that cannot supply a closed-form `λ_L` MUST return
     /// `f64::NAN` rather than a heuristic proxy. Callers should check
@@ -352,6 +377,10 @@ pub trait Copula: Send + Sync {
     /// # Returns
     ///
     /// The strict `λ_L`, or `f64::NAN` if the model has no closed form.
+    ///
+    /// # Arguments
+    ///
+    /// * `correlation` - Pairwise latent asset correlation in `[0, 1]`.
     fn tail_dependence(&self, correlation: f64) -> f64;
 }
 
@@ -468,8 +497,8 @@ impl CopulaSpec {
     /// A boxed [`Copula`] implementation matching the spec variant.
     ///
     /// # Errors
-    /// Returns [`crate::correlation::Error`] if a Student-t spec has invalid
-    /// degrees of freedom.
+    /// Returns [`crate::correlation::Error`] for invalid Student-t degrees
+    /// of freedom or non-finite/out-of-range RFL loading volatility.
     pub fn build(&self) -> Result<Box<dyn Copula>> {
         Ok(match self {
             CopulaSpec::Gaussian => Box::new(GaussianCopula::new()),
@@ -478,6 +507,11 @@ impl CopulaSpec {
                 Box::new(StudentTCopula::new(*degrees_of_freedom))
             }
             CopulaSpec::RandomFactorLoading { loading_volatility } => {
+                if !loading_volatility.is_finite() || !(0.0..=0.5).contains(loading_volatility) {
+                    return Err(Error::InvalidLoadingVolatility {
+                        value: *loading_volatility,
+                    });
+                }
                 Box::new(RandomFactorLoadingCopula::new(*loading_volatility))
             }
             CopulaSpec::MultiFactor => Box::new(MultiFactorCopula::new()),
@@ -607,6 +641,25 @@ mod tests {
     use super::*;
 
     #[test]
+    fn mixing_draws_reject_invalid_uniforms_for_every_sampling_family() {
+        let copulas: [Box<dyn Copula>; 3] = [
+            Box::new(GaussianCopula::new()),
+            Box::new(StudentTCopula::new(5.0)),
+            Box::new(RandomFactorLoadingCopula::new(0.1)),
+        ];
+        for copula in copulas {
+            for u in [0.0, 1.0, -0.1, 1.1, f64::NAN, f64::INFINITY] {
+                assert!(
+                    copula.sample_mixing(u).is_err(),
+                    "{}: u={u}",
+                    copula.model_name()
+                );
+            }
+            assert!(copula.sample_mixing(0.5).expect("valid draw").is_finite());
+        }
+    }
+
+    #[test]
     fn test_copula_spec_default() {
         let spec = CopulaSpec::default();
         assert_eq!(spec, CopulaSpec::Gaussian);
@@ -676,5 +729,22 @@ mod tests {
             spec.build(),
             Err(Error::InvalidStudentTDegreesOfFreedom { .. })
         ));
+    }
+
+    #[test]
+    fn invalid_rfl_loading_volatility_is_rejected_before_construction() {
+        for value in [f64::NAN, f64::INFINITY, -0.1, 0.500_001] {
+            let spec = CopulaSpec::RandomFactorLoading {
+                loading_volatility: value,
+            };
+            assert!(matches!(
+                spec.build(),
+                Err(Error::InvalidLoadingVolatility { .. })
+            ));
+        }
+        let spec: CopulaSpec =
+            serde_json::from_str(r#"{"type":"random_factor_loading","loading_volatility":0.7}"#)
+                .expect("syntactically valid persisted spec");
+        assert!(spec.build().is_err());
     }
 }

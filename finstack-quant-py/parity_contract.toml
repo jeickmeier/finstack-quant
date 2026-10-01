@@ -78,6 +78,7 @@ public = [
     "SabrParameterData",
     "ScalarTimeSeries",
     "VolCube",
+    "VolCubeExpirySlice",
     "VolSurface",
     "context",
     "curves",
@@ -99,7 +100,7 @@ note = "Subset scope: the Rust config module also exposes ConfigExtensions, Curr
 [crates.core.module_symbols.types]
 python_package = "finstack_quant.core.types"
 public = ["Rate", "Bps", "Percentage", "CreditRating", "CurveId", "InstrumentId", "Attributes"]
-note = "Subset scope: Rust-only extras are BarrierType, RatingLabel, and the remaining id newtypes (CalendarId, DealId, Id, IndexId, IssuerId, PoolId, PriceId, UnderlyingId) — hosts pass those ids as plain strings on JSON/typed surfaces. Rating-factor behavior is owned by models.credit. Python binds the full Rate/Bps/Percentage value API (abs, is_zero/is_positive/is_negative, checked arithmetic dunders, as_rate/as_basis_points/as_percentage cross conversions, Rate FromStr via Rate('5%'|'25bp'|'0.05')), CreditRating predicates/to_moodys_string/notches_to with ord + str equality, CurveId/InstrumentId ord/len/is_empty, and Attributes tags/add_tag/has_tag/matches_selector + mapping dunders; all seven carry to_json/from_json/pickle. WASM exposes Rate, Bps, and Percentage; CreditRating and identifier wrappers remain outside its core types subset."
+note = "Subset scope: Rust-only extras are BarrierType, RatingLabel, and the remaining id newtypes (CalendarId, DealId, Id, IndexId, IssuerId, PoolId, PriceId, UnderlyingId) — hosts pass those ids as plain strings on JSON/typed surfaces. Rating-factor behavior is owned by models.credit. Python binds the full Rate/Bps/Percentage value API (abs, is_zero/is_positive/is_negative, checked arithmetic dunders, as_rate/as_basis_points/as_percentage cross conversions, Rate FromStr via Rate('5%'|'25bp'|'0.05')), CreditRating predicates/to_moodys_string/notches_to with typed equality and ordering, CurveId/InstrumentId ord/len/is_empty, and Attributes tags/add_tag/has_tag/matches_selector + mapping dunders; all seven carry to_json/from_json/pickle. WASM exposes Rate, Bps, and Percentage; CreditRating and identifier wrappers remain outside its core types subset."
 
 [crates.core.module_symbols.currency]
 python_package = "finstack_quant.core.currency"
@@ -114,7 +115,7 @@ note = "Subset scope: the Rust money module's FormatOpts struct is not bound as 
 [crates.core.module_symbols.math]
 python_package = "finstack_quant.core.math"
 public = ["linalg", "longest_positive_run", "special_functions", "stats", "summation"]
-note = "Subset scope: 11 Rust-only math submodules are deliberately unbound (compounding, distributions, fractional, integration, interp, piecewise, probability, random, solver, solver_multi, time_grid) — they are engine internals consumed by the domain crates, not host-facing numerics. Per-submodule subsets of the bound modules: `consecutive` is partial (only longest_positive_run, bound flat on core.math); `stats` binds mean, variance, population_variance, mean_var, the *_or_nan family (mean, sample_variance, sample_std, median, quantile_linear, finite_min, finite_max), finite_count, correlation, covariance, quantile, log_returns, realized_variance and realized_variance_ohlc (RealizedVarMethod passed as its snake_case name) — OnlineStats/OnlineCovariance and required_samples stay Rust-only; `linalg` binds cholesky_decomposition, cholesky_solve, apply_lower_triangular, symmetric_eigen and ledoit_wolf_shrinkage (LedoitWolfResult returned as a (covariance, shrinkage) tuple) — cholesky_correlation, CorrelationFactor, transpose_row_major and the correlation validators (bound under analytics) stay Rust-only; `special_functions` binds erf, ln_gamma, norm_cdf, norm_pdf, norm_cdf_with_params, norm_pdf_with_params, standard_normal_inv_cdf, student_t_cdf, student_t_inv_cdf; `summation` binds kahan_sum and neumaier_sum."
+note = "Subset scope: 11 Rust-only math submodules are deliberately unbound (compounding, distributions, fractional, integration, interp, piecewise, probability, random, solver, solver_multi, time_grid) — they are engine internals consumed by the domain crates, not host-facing numerics. Per-submodule subsets of the bound modules: `consecutive` is partial (only longest_positive_run, bound flat on core.math); `stats` binds mean, variance, population_variance, mean_var, the *_or_nan family (mean, sample_variance, sample_std, median, quantile_linear, finite_min, finite_max), finite_count, correlation, covariance, quantile, log_returns, realized_variance and realized_variance_ohlc (RealizedVarMethod passed as its snake_case name) — OnlineStats/OnlineCovariance and required_samples stay Rust-only; `linalg` binds cholesky_decomposition, cholesky_solve, apply_lower_triangular, symmetric_eigen and ledoit_wolf_shrinkage (LedoitWolfResult returned as a (covariance, shrinkage) tuple) — cholesky_correlation, CorrelationFactor, transpose_row_major and the correlation validators (bound under analytics) stay Rust-only; `special_functions` binds erf, ln_gamma, log_norm_cdf, norm_cdf, norm_pdf, norm_cdf_with_params, norm_pdf_with_params, standard_normal_inv_cdf, student_t_cdf, student_t_inv_cdf; `summation` binds kahan_sum and neumaier_sum."
 
 [crates.core.module_symbols.dates]
 python_package = "finstack_quant.core.dates"
@@ -133,10 +134,10 @@ public = [
     "third_wednesday", "third_friday", "next_imm", "is_imm_date", "is_cds_date",
     "next_cds_date", "prev_cds_date", "prev_cds_semiannual_roll",
     "next_semiannual_cds_maturity", "imm_option_expiry", "next_imm_option_expiry",
-    "next_equity_option_expiry",
+    "next_third_friday",
     "create_date", "days_since_epoch", "date_from_epoch_days",
 ]
-note = "DayCountContext is the sole owned host context; it stores Rust DayCountContextState and resolves the borrowed Rust context during calculation. Rust DayCountContextState is not a separate host class. Subset scope: the Rust dates::fx (FX spot-lag/settlement date logic) and dates::calendar (calendar registry internals beyond adjust/available_calendars/CalendarMetadata/HolidayCalendar.count_business_days) submodules remain Rust-only; hosts reach calendars by string id (or `a+b` joint ids, resolved in Rust calendar_by_id_strict) through adjust, HolidayCalendar and the schedule builder. The Rust DateExt trait methods are bound as free functions taking the date first (add_business_days, add_weekdays, add_months, end_of_month, is_weekend, quarter, fiscal_year, months_until); ScheduleBuilder.to_spec / Schedule.from_spec wrap the serde ScheduleSpec; ScheduleSpec.new supplies canonical Rust builder defaults. Rust-only: PeriodId::from_date (calendar bucket construction from an already validated Rust Date), ScheduleWarning as a type (Python exposes Schedule.warnings as list[dict] with kind/message), act_act_isma_year_fraction_with_reference_period, CompositeCalendar/Calendar/Rule/WeekendRule construction."
+note = "DayCountContext is the sole owned host context; it stores Rust DayCountContextState and resolves the borrowed Rust context during calculation. Rust DayCountContextState is not a separate host class. Subset scope: the Rust dates::fx (FX spot-lag/settlement date logic) and dates::calendar (calendar registry internals beyond adjust/available_calendars/CalendarMetadata/HolidayCalendar.count_business_days) submodules remain Rust-only; hosts reach calendars by string id (or `a+b` joint ids, resolved in Rust calendar_by_id_strict) through adjust, HolidayCalendar and the schedule builder. The Rust DateExt trait methods are bound as free functions taking the date first (add_business_days, add_weekdays, add_months, end_of_month, is_weekend, quarter, fiscal_year, months_until); ScheduleBuilder.to_spec / Schedule.from_spec wrap the serde ScheduleSpec; ScheduleSpec.new supplies canonical Rust builder defaults. Rust-only: DateExt::add_days (checked calendar-day arithmetic shared by Rust curve rolls and tenor/schedule generation; hosts use named financial date shifts or MarketContext.roll_forward), PeriodId::from_date (calendar bucket construction from an already validated Rust Date), ScheduleWarning as a type (Python exposes Schedule.warnings as list[dict] with kind/message), act_act_isma_year_fraction_with_reference_period, CompositeCalendar/Calendar/Rule/WeekendRule construction."
 
 [crates.core.module_symbols.market_data]
 python_package = "finstack_quant.core.market_data"
@@ -144,7 +145,7 @@ public = [
     "curves", "fx", "context", "scalars",
     "BaseCorrelationCurve", "CreditIndexData", "DiscountCurve", "ForwardCurve",
     "FxDeltaVolSurface", "HazardCurve", "InflationCurve", "PriceCurve", "VolSurface",
-    "VolCube", "SabrParameterData", "FxConversionPolicy", "FxRateResult", "FxMatrix",
+    "VolCube", "VolCubeExpirySlice", "SabrParameterData", "FxConversionPolicy", "FxRateResult", "FxMatrix",
     "FxQuoteConvention", "FxPairConvention", "fx_market_pair", "fx_pair_convention",
     "fx_pip_size", "invert_fx_rate",
     "ScalarTimeSeries", "InflationIndex", "MarketContext",
@@ -366,19 +367,19 @@ note = "Typed submodules (primitives/builder/accrual/aggregation) plus the JSON 
 fixings = { python = "finstack_quant.cashflows.fixings", status = "exists", note = "Typed raw rate/FX observations and atomic crossed-fixing materialization. Scenario rolls invoke the same Rust helper; WASM exposes metadata through its existing JSON schedule/scenario facade." }
 json        = { python = "finstack_quant.cashflows",             status = "exists", note = "JSON bridge exposes the canonical coupon_program and payment_program builder surface. Naming note: the free function validate_cashflow_schedule_json wraps Rust json::validate_cashflow_schedule (schedule-typed free function); the typed twin is CashFlowSchedule.validate() on the builder surface — same validation, JSON vs typed entry." }
 accrual     = { python = "finstack_quant.cashflows.accrual",     status = "exists", note = "Typed accrual engine; accrued_interest remains on the JSON bridge" }
-aggregation = { python = "finstack_quant.cashflows.aggregation", status = "exists", note = "Typed period rollups and currency-checked totals. Rust-only (deliberately unbound): credit_adjusted_cashflow_pv, RecoveryTiming, and DateContext — a borrow-parameterized PV kernel consumed by valuations pricers, not a host-facing API." }
+aggregation = { python = "finstack_quant.cashflows.aggregation", status = "exists", note = "Typed period rollups and currency-checked totals. Rust-only (deliberately unbound): credit_adjusted_cashflow_pvs, RecoveryTiming, and DateContext — a borrow-parameterized PV kernel consumed by valuations pricers, not a host-facing API." }
 builder     = { python = "finstack_quant.cashflows.builder",     status = "exists", note = "Typed spec + builder + schedule surface; the JSON program bridge remains available on finstack_quant.cashflows" }
 primitives  = { python = "finstack_quant.cashflows.primitives",  status = "exists", note = "Typed CashFlow/CFKind primitives; CashFlow rows also travel inside schedule JSON" }
 schema      = { python = "finstack_quant.cashflows.schema",      status = "exists", note = "Compiled-in JSON Schema resources; package_cashflow_schema is doc(hidden) generator plumbing and stays Rust-only" }
-traits      = { python = "finstack_quant.cashflows.traits",      status = "missing", note = "Rust-side trait surface; not meaningful as a Python module. Its free functions schedule_from_dated_flows / schedule_from_classified_flows and ScheduleBuildOpts are re-exported at the Rust crate root and bound flat on finstack_quant.cashflows" }
+traits      = { python = "finstack_quant.cashflows.traits",      status = "missing", note = "Rust-side trait surface; not meaningful as a Python module. Its free functions dated_flows / schedule_from_dated_flows / schedule_from_classified_flows and ScheduleBuildOpts are re-exported at the Rust crate root and bound flat on finstack_quant.cashflows. Both typed and JSON dated-flow views delegate to the same validated Rust extraction." }
 # Rust `builder::` public submodules with no Python module twin. Their
 # host-relevant types are re-exported at the Rust builder root and bound
 # through finstack_quant.cashflows.builder; the submodules themselves stay
 # Rust-only organization.
 "builder.calendar"     = { python = "finstack_quant.cashflows.builder.calendar",     status = "missing", note = "Calendar resolution helpers for schedule generation; consumed internally by the builder pipeline" }
 "builder.periods"      = { python = "finstack_quant.cashflows.builder.periods",      status = "missing", note = "SchedulePeriod is re-exported at the Rust builder root; period iteration stays Rust-only" }
-"builder.rate_helpers" = { python = "finstack_quant.cashflows.builder.rate_helpers", status = "missing", note = "project_floating_rate / FloatingRateParams are Rust-only projection plumbing used by pricers" }
-"builder.schedule"     = { python = "finstack_quant.cashflows.builder.schedule",     status = "missing", note = "CashFlowSchedule/CashFlowMeta are bound flat on finstack_quant.cashflows.builder; the Rust submodule path is not mirrored. CashFlowSchedule.pv_by_period binds the market-resolved Rust pv_by_period; the borrowed-handle pv_by_period_with_discounting (PvDiscountSource / PvCreditAdjustment) is Rust-only" }
+"builder.rate_helpers" = { python = "finstack_quant.cashflows.builder.rate_helpers", status = "missing", note = "project_index_rate / project_floating_rate / FloatingRateParams are Rust-only projection plumbing used by pricers. The dated projection helpers accept contractual accrual start/end dates and index accrual fractions; host cashflow and instrument APIs supply these through canonical Rust schedules rather than exposing an alternate host calculation." }
+"builder.schedule"     = { python = "finstack_quant.cashflows.builder.schedule",     status = "missing", note = "CashFlowSchedule/CashFlowMeta are bound flat on finstack_quant.cashflows.builder; the Rust submodule path is not mirrored. CashFlowSchedule.pv_by_period binds the market-resolved Rust pv_by_period; the borrowed-handle pv_by_period_with_discounting (discount handle / PvCreditAdjustment) and bulk outstanding_at_dates helper used by DataFrame export are Rust-only" }
 "builder.specs"        = { python = "finstack_quant.cashflows.builder.specs",        status = "missing", note = "Spec types are bound flat on finstack_quant.cashflows.builder; the Rust submodule path is not mirrored" }
 
 [crates.cashflows.module_symbols.primitives]
@@ -392,7 +393,7 @@ python_package = "finstack_quant.cashflows.builder"
 # (Rust-side tabular envelope; Python builds DataFrames via
 # CashFlowSchedule.to_dataframe), SchedulePeriod, project_floating_rate /
 # FloatingRateParams (pricer plumbing), CashflowRepresentation /
-# PvCreditAdjustment / PvDiscountSource (enum metadata carried inside schedule
+# PvCreditAdjustment (credit metadata carried inside schedule
 # JSON), evaluate_fee_tiers / FeeTier / DefaultCurve /
 # PrepaymentCurve (spec internals reachable through the spec types).
 note = "cdr_to_mdr/cpr_to_smm/mdr_to_cdr/smm_to_cpr are also re-exported at the Rust crate root and bound flat on finstack_quant.cashflows (see wasm_cashflows_subset). Typed CashFlowBuilder matches the Rust coupon-program methods (including fixed_to_float and float_margin_steps); WASM remains JSON-only via CouponLegSpec."
@@ -803,6 +804,7 @@ public = ["dtsm", "hull_white"]
 # `capfloor_hw1f_sigma_schedule_key`), `hw_b`, `hw_ln_a`,
 # `fd_instantaneous_forward`, `hw1f_caplet_price_from_dfs`,
 # `hw1f_term_caplet_price_from_dfs_with_model`,
+# `hw1f_delayed_coupon_adjustment` (shared delayed-payment pricing kernel),
 # `hw1f_cap_floor_price_with_model` and `hw_bond_vol_with_model` (bound as
 # `HullWhiteParams.bond_vol`). WASM does not expose `rates.hullWhite`.
 [crates.models.rates.hull_white]
@@ -850,6 +852,8 @@ public = [
     "check_surface_grid",
     "convert_atm_volatility",
     "delta_to_strike",
+    "get_cube_expiry_slice_vol",
+    "get_cube_expiry_slice_vol_clamped",
     "get_cube_normal_vol",
     "get_cube_normal_vol_clamped",
     "get_cube_vol",
@@ -934,6 +938,13 @@ symbols = [
     "api::engine::execute_prepared",
     "api::host_error::HostExecuteError",
     "api::validate::validate_prepared",
+    "hull_white::CapFloorSchedule",
+    "hull_white::CapletSchedule",
+    "hull_white::SwaptionFloatingPeriod",
+    "hull_white::SwaptionSchedule",
+    "hull_white::bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn",
+    "hull_white::calibrate_hull_white_to_cap_floors_with_fn",
+    "hull_white::calibrate_hull_white_to_swaptions_with_fn",
     "prepared::PreparedCalibration",
     "recalibration::CachedRecalibrationProvider",
     "recalibration::RecalibrationProvider",
@@ -943,7 +954,7 @@ symbols = [
     "solver::traits::CalibrationTarget",
     "targets::TargetBuilder",
 ]
-note = "Solver/target/prepared-plan internals and the recalibration provider are driven from Rust (and from the scenarios crate); Python drives them through the calibration envelope entry points."
+note = "Solver/target/prepared-plan internals and the recalibration provider are driven from Rust (and from the scenarios crate); Python drives them through the calibration envelope entry points. Canonical curve-based Hull-White entry points own model-time and projection defaults behind the existing Python functions; specialized callback variants with contractual schedules stay Rust-only."
 
 [crates.valuations]
 rust_crate = "finstack-quant-valuations"
@@ -956,7 +967,7 @@ status = "exists"
 [crates.valuations.modules]
 # Top-level public modules. Symbol-level pinning for non-submodule public names
 # lives in [crates.valuations.symbols] below.
-instruments  = { python = "finstack_quant.valuations.instruments",  status = "exists", note = "Instrument JSON validation and pricing helpers live under finstack_quant.valuations.instruments" }
+instruments  = { python = "finstack_quant.valuations.instruments",  status = "exists", note = "Instrument JSON validation and pricing helpers live under finstack_quant.valuations.instruments. The public Rust instruments::pricing facade remains Rust-only cross-crate infrastructure: time::rate_between_on_dates requires contractual accrual_year_fraction independently of the curve clock, alongside time discounting helpers, overnight_conventions, fixed swap-leg helpers, and GenericInstrumentPricer. Hosts consume these through canonical Rust instrument and calibration entry points." }
 composite    = { python = "finstack_quant.valuations.composite",    status = "exists", note = "Resolved generic composite instruments, primitive exposure reports, explicit rebalancing, and dated history." }
 credit_derivatives = { python = "finstack_quant.valuations.credit_derivatives", status = "exists", note = "CDS-family example-payload factories; mirrors WASM valuations.creditDerivatives" }
 schema       = { python = "finstack_quant.valuations.schema",       status = "exists", note = "Compiled-in JSON Schema accessors and envelope/type validators; no WASM twin" }
@@ -1470,8 +1481,8 @@ status = "exists"
 
 [crates.statements.modules]
 adjustments      = { python = "finstack_quant.statements.adjustments",       status = "missing", note = "Bindings are currently exported from finstack_quant.statements root" }
-builder          = { python = "finstack_quant.statements.builder",           status = "missing", note = "Bindings are currently exported from finstack_quant.statements root" }
-capital_structure = { python = "finstack_quant.statements.capital_structure", status = "missing", note = "Bindings are currently exported from finstack_quant.statements root" }
+builder          = { python = "finstack_quant.statements.builder",           status = "missing", note = "Bindings are exported from finstack_quant.statements root. Rust-only try_* mutation seams preserve builder state on failure; Python add_bond/add_swap and their convention variants delegate to canonical try_add_* methods. ModelBuilder::resolve_period_columns is a Rust-only import-validation seam used by Python from_dataframe to validate all input columns before mutating the builder. BondConventionParams, SwapParams, and SwapConventions are Rust-only grouped inputs for these mutation seams; hosts retain the canonical add_* authoring signatures." }
+capital_structure = { python = "finstack_quant.statements.capital_structure", status = "missing", note = "Bindings are currently exported from finstack_quant.statements root. build_instrument_from_spec and calculate_period_flows are Rust-only runtime seams carrying canonical instrument semantics. CapitalStructureState, PrincipalClaim, and CapitalStructureState::set_period_principal_flows are Rust-only allocation internals: principal_shortfall and principal_advance_payments retain dated claims so cash settlement and economic principal movements remain distinct. Hosts evaluate capital structures through Evaluator.evaluate_with_market; neither runtime state nor PrincipalClaim is a host wire type." }
 checks           = { python = "finstack_quant.statements.checks",            status = "missing", note = "Bindings are currently exported from finstack_quant.statements root. CheckSuite/CheckSuiteBuilder and the builtin-check constructors stay Rust-only; hosts attach suites via CheckSuiteSpec + Evaluator.with_checks" }
 dsl              = { python = "finstack_quant.statements.dsl",               status = "missing", note = "Bindings are currently exported from finstack_quant.statements root" }
 error            = { python = "finstack_quant.statements.error",             status = "missing" }
@@ -1486,7 +1497,7 @@ utils            = { python = "finstack_quant.statements.utils",             sta
 
 # Rust-only type inventories (categories, not every name): the
 # capital-structure runtime surface (execute_waterfall, CapitalStructureState,
-# instrument cashflow plumbing), evaluator internals (DependencyGraph,
+# PrincipalClaim, dated principal-input setters and instrument cashflow plumbing), evaluator internals (DependencyGraph,
 # EvalWarning, forecast engine types), dsl AST types, registry metric-spec
 # types are deliberately unbound in both hosts. NormalizationResult is typed
 # in Python and carries value_type/currency; normalization remains Python-only.
@@ -1774,6 +1785,8 @@ symbols = [
 # WASM accepts JSON analysis inputs through `exports/statements_analytics.js`
 # with camelCase facade names and returns structured result objects, including
 # CheckReport. Python exposes typed analysis and check-report wrappers.
+# ForecastMetrics.mape/smape are canonical Option<f64>: unavailable percentages
+# return None in Python and null in WASM/JSON, preserving JSON/pickle round trips.
 # ---------------------------------------------------------------------------
 [wasm_statements_analytics_subset]
 rust_module_root = "../finstack-quant-wasm/src/api/statements_analytics/"
@@ -2019,7 +2032,7 @@ portfolio    = { python = "finstack_quant.portfolio.portfolio",    status = "mis
 position     = { python = "finstack_quant.portfolio.position",     status = "missing", note = "Position/PositionUnit are Rust-only as types; Python adds positions through PortfolioBuilder.position(position_id, instrument, quantity, entity_id, unit, attributes) and reads them via Portfolio.positions_to_dataframe(); PositionValue (valuation module) is bound" }
 replay       = { python = "finstack_quant.portfolio",              status = "flattened", note = "replay_portfolio is exported flat on finstack_quant.portfolio; the replay type surface (ReplayTimeline, ReplayConfig, ReplayResult, snapshot/step types) remains Rust-only" }
 results      = { python = "finstack_quant.portfolio.results",      status = "missing", note = "Bindings are currently exported from finstack_quant.portfolio root" }
-sensitivity  = { python = "finstack_quant.portfolio",              status = "flattened", note = "Factor sensitivity entry points (compute_factor_sensitivities, compute_pnl_profiles, decompose_factor_risk) require explicit base_currency; SensitivityMatrix/FactorPnlProfile/FactorRiskDecomposition are exported flat on finstack_quant.portfolio; the engine types (delta/repricing engines, traits) remain Rust-only" }
+sensitivity  = { python = "finstack_quant.portfolio",              status = "flattened", note = "compute_factor_sensitivities and compute_pnl_profiles require explicit base_currency; Python/WASM share a validated monetary matrix wire with required base_currency and nested data[position][factor]; decompose_factor_risk inherits the matrix currency rather than taking a currency argument; SensitivityMatrix/FactorPnlProfile/FactorRiskDecomposition are exported flat on finstack_quant.portfolio; the engine types (delta/repricing engines, traits) remain Rust-only" }
 types        = { python = "finstack_quant.portfolio.types",        status = "missing", note = "Entity/EntityId/PositionId/AttributeValue and friends are Rust-only; the Python root does NOT re-export them (identifiers cross the boundary as plain strings)" }
 valuation    = { python = "finstack_quant.portfolio.valuation",    status = "missing", note = "Bindings are currently exported from finstack_quant.portfolio root" }
 scenarios    = { python = "finstack_quant.portfolio.scenarios",    status = "missing", note = "Scenario support is exposed via root helpers rather than a dedicated submodule" }
@@ -2436,7 +2449,7 @@ status = "exists"
 engine    = { python = "finstack_quant.scenarios",           status = "flattened", note = "ApplicationReport (typed) plus apply_scenario / apply_scenario_to_market are exported flat on finstack_quant.scenarios; ScenarioEngine, ExecutionContext, ApplicationEnvelope, and RollForwardReport remain Rust-only (reports cross the boundary as ApplicationResult / structured objects). All three Python entry points (apply_scenario, apply_scenario_to_market, compute_horizon_return) build the engine through one bindings::scenarios::extract::scenario_engine(config) helper that threads the caller's FinstackConfig and attaches a CachedRecalibrationProvider; HorizonAnalysis::with_recalibration_provider carries the same provider into metrics_based pricing" }
 envelope  = { python = "finstack_quant.scenarios.envelope",  status = "missing", note = "Versioned persistence envelope (ScenarioEnvelope, ScenarioSchema, SCENARIO_CONTRACT) is bound in no host; Rust-only" }
 error     = { python = "finstack_quant.scenarios.error",     status = "missing", note = "No typed exception classes are bound; errors map through errors::scenarios_to_py (lookup misses MarketDataNotFound/NodeNotFound/TenorNotFound/InstrumentNotFound -> KeyError, Internal -> RuntimeError, everything else -> ValueError). From<scenarios::Error> for core::Error keeps the NotFound kind for the same four variants" }
-horizon   = { python = "finstack_quant.scenarios",           status = "flattened", note = "compute_horizon_return and the typed HorizonResult are exported flat on finstack_quant.scenarios; HorizonAnalysis (builder-style analyzer) remains Rust-only. Both hosts parse the attribution method through the canonical scenarios::horizon::attribution_method_from_str" }
+horizon   = { python = "finstack_quant.scenarios",           status = "flattened", note = "compute_horizon_return and the typed HorizonResult are exported flat on finstack_quant.scenarios; HorizonAnalysis (builder-style analyzer) and HorizonResultJson (borrowed serialization view) remain Rust-only. Python HorizonResult.to_json and WASM computeHorizonReturn serialize the same Rust HorizonResult::to_json view, including total_return, annualized_return, and factor_contributions under canonical AttributionFactor names. Undefined or nonfinite derived returns are JSON null; Python accessors retain nan for undefined total/factor returns and None for undefined annualization. Python from_json recomputes derived values from the underlying result fields. Both hosts parse the attribution method through the canonical scenarios::horizon::attribution_method_from_str" }
 spec      = { python = "finstack_quant.scenarios",           status = "flattened", note = "ScenarioSpec, OperationSpec (typed classmethod constructors), RateBindingSpec, HierarchyTarget (core::market_data::hierarchy::HierarchyTarget, bound here because only hierarchy-targeted operations consume it), and the enums CurveKind/TenorMatchMode/TimeRollMode/Compounding are exported flat; every enum also constructs from its wire label (CurveKind('par_cds')) and OperationSpec constructors accept the wrapper or the label. ScenarioSpec.hazard_bump_mode is a shared string-literal field in both hosts (solve_to_par / first_order_shift), not a typed host enum. Construction is ScenarioSpec(...) / ScenarioSpec.from_json (the former build_scenario_spec / parse_scenario_spec free functions were removed as duplicates); compose_scenarios returns a typed ScenarioSpec and validate_scenario_spec accepts ScenarioSpec | str. OperationSpec.curve_parallel_bp(curve_id=list[str]) expands via Rust ScenarioSpec::parallel_bp_many." }
 templates = { python = "finstack_quant.scenarios",           status = "flattened", note = "TemplateMetadata plus registry access (list_builtin_templates, list_builtin_template_metadata, build_from_template, list_template_components, build_template_component) are exported flat; TemplateRegistry/RegisteredTemplate types remain Rust-only. WASM returns equivalent plain objects." }
 warning   = { python = "finstack_quant.scenarios.warning",   status = "missing", note = "The structured Warning enum has no typed host class; ApplicationReport.warnings / HorizonResult.warnings surface it as list[dict] via serde (each dict carries the `kind` tag plus variant fields), matching the WASM plain-object shape, with warnings_json as the JSON twin" }
@@ -2649,7 +2662,7 @@ modules = [
 # ForwardCurve is part of the agreed market_data subset. Member names are
 # explicit so Rust/Python snake_case additions are mirrored in WASM camelCase.
 discount_curve_members = ["id", "baseDate", "flat", "df", "zero", "forward"]
-discount_curve_optional_constructor_args = [
+discount_curve_optional_options = [
     "interp", "extrapolation", "dayCount", "validationMode", "forwardFloor",
 ]
 hazard_curve_members = ["id", "baseDate", "sp", "hazardRate", "recoveryRate"]
@@ -2709,6 +2722,7 @@ root_exports = [
     "covariance",
     "quantile",
     "normCdf",
+    "logNormCdf",
     "normPdf",
     "standardNormalInvCdf",
     "erf",
@@ -2731,6 +2745,7 @@ python_only_market_data = [
     "InflationCurve",
     "PriceCurve",
     "VolSurface",
+    "VolCubeExpirySlice",
     "SabrParameterData",
     "ScalarTimeSeries",
     "InflationIndex",
@@ -2776,7 +2791,7 @@ python_only_dates = [
     "next_semiannual_cds_maturity",
     "imm_option_expiry",
     "next_imm_option_expiry",
-    "next_equity_option_expiry",
+    "next_third_friday",
     "days_since_epoch",
 ]
 
@@ -2860,6 +2875,7 @@ wasm_only = []
 "math.stats.covariance" = "covariance"
 "math.stats.quantile" = "quantile"
 "math.special_functions.norm_cdf" = "normCdf"
+"math.special_functions.log_norm_cdf" = "logNormCdf"
 "math.special_functions.norm_pdf" = "normPdf"
 "math.special_functions.standard_normal_inv_cdf" = "standardNormalInvCdf"
 "math.special_functions.erf" = "erf"
@@ -2881,9 +2897,11 @@ wasm_only = []
 "FxDeltaVolSurface.to_vol_surface" = "VolSurface is not on the WASM core facade; use impliedVol or calibrate JSON."
 "volatility.materialize_cube_tenor_slice" = "Python-only because VolSurface is outside the WASM core subset."
 "volatility.materialize_cube_tenor_slice_normal" = "Python-only because VolSurface is outside the WASM core subset."
-"volatility.materialize_cube_expiry_slice" = "Python-only because VolSurface is outside the WASM core subset."
-"volatility.materialize_cube_expiry_slice_normal" = "Python-only because VolSurface is outside the WASM core subset."
+"volatility.materialize_cube_expiry_slice" = "Python-only because VolCubeExpirySlice is outside the WASM core subset."
+"volatility.materialize_cube_expiry_slice_normal" = "Python-only because VolCubeExpirySlice is outside the WASM core subset."
 "volatility.materialize_fx_delta_surface" = "Python-only because VolSurface is outside the WASM core subset."
+"volatility.get_cube_expiry_slice_vol" = "Python-only because VolCubeExpirySlice is outside the WASM core subset."
+"volatility.get_cube_expiry_slice_vol_clamped" = "Python-only because VolCubeExpirySlice is outside the WASM core subset."
 "volatility.get_surface_vol" = "Python-only because VolSurface is outside the WASM core subset."
 "volatility.get_surface_vol_clamped" = "Python-only because VolSurface is outside the WASM core subset."
 "volatility.check_butterfly_grid" = "Python-only retained host coverage."

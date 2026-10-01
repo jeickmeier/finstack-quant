@@ -314,34 +314,41 @@ class HullWhiteParams:
     def __repr__(self) -> str: ...
 
 def hw1f_convexity_adjustment(kappa: float, sigma: float, t_settle: float, t_end: float) -> float:
-    """Return the Hull-White futures/FRA convexity adjustment for one forward period.
+    """Approximate the simple-deposit futures-minus-forward bias under Hull-White.
 
     Parameters
     ----------
     kappa : float
-        Mean-reversion speed in inverse years (Ho-Lee limit near zero).
+        Finite non-negative mean-reversion speed in inverse years; zero uses
+        the Ho-Lee limit.
     sigma : float
-        Short-rate volatility in absolute rate units per square-root year.
+        Finite non-negative short-rate volatility in absolute decimal rate
+        units per square-root year.
     t_settle : float
-        Settlement/fixing time in years.
+        Settlement/fixing time in years using the deposit day-count convention.
     t_end : float
-        End of the accrual period in years (``> t_settle``).
+        End of the accrual period on the same day-count basis; ``t_end -
+        t_settle`` is the deposit accrual fraction.
 
     Returns
     -------
     float
-        Additive adjustment in decimal rate units; ``0.0`` when
-        ``t_settle <= 0`` or the period is empty.
+        Approximate futures-minus-forward bias in decimal rate units; ``0.0``
+        for non-positive fixing time or accrual. Non-finite inputs or negative
+        ``kappa``/``sigma`` return ``NaN`` before degenerate-period handling.
 
     Notes
     -----
+    This low-rate, small-variance approximation does not perform the exact
+    conversion from a simple forward rate to a futures quote. The Ho-Lee
+    limit is ``0.5 * sigma**2 * t_settle * (2*t_end - t_settle)``.
     This helper does not raise.
 
     Examples
     --------
     >>> from finstack_quant.models.rates.hull_white import hw1f_convexity_adjustment
-    >>> round(hw1f_convexity_adjustment(0.05, 0.01, 1.0, 2.0), 8)
-    9.167e-05
+    >>> round(hw1f_convexity_adjustment(0.0, 0.01, 1.0, 2.0), 8)
+    0.00015
     """
     ...
 

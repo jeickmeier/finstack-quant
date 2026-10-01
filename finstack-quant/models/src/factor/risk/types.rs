@@ -70,8 +70,9 @@ pub enum ResidualContributionSource {
 pub struct PositionResidualContribution {
     /// Portfolio position identifier.
     pub position_id: String,
-    /// Annualized variance contributed by this position's idiosyncratic risk.
-    /// Always non-negative.
+    /// Annualized variance allocated to this position's idiosyncratic risk.
+    /// A hedge sharing another position's issuer shock may receive a negative
+    /// allocation; the total residual variance must remain non-negative.
     pub residual_variance: f64,
     /// Where the residual variance came from.
     pub source: ResidualContributionSource,

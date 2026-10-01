@@ -529,6 +529,11 @@ export interface DDb1Fcc5C6A61E550E867 {
  * - **American options**: Binomial tree (Leisen-Reimer) with cost-of-carry derived from
  *   the forward/spot relationship
  *
+ * Analytical delta measures currency per unit change in the resolved forward,
+ * holding discount factors and volatility fixed. At zero volatility or expiry,
+ * the intrinsic-payoff derivative is used; delta is defined as zero exactly at
+ * the strike, where the mathematical derivative does not exist.
+ *
  * # American Option Assumptions
  *
  * For American exercise, the model requires a spot price to build the binomial tree.

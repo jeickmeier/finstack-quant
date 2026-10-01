@@ -32,6 +32,22 @@ pub struct PyEuropeanPricer {
 
 #[pymethods]
 impl PyEuropeanPricer {
+    /// Create a European pricer with at least two independent path estimators.
+    ///
+    /// Parameters
+    /// ----------
+    /// num_paths : int, optional
+    ///     Independent path estimators in ``[2, 10_000_000]``. ``None`` uses
+    ///     the registry default; the upper limit is checked when pricing.
+    /// seed : int, optional
+    ///     Deterministic Philox seed; ``None`` uses the registry default.
+    /// use_parallel : bool, optional
+    ///     Whether to use the rayon pool; ``None`` uses the registry default.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the path count is less than two or embedded defaults cannot be loaded.
     #[new]
     #[pyo3(signature = (num_paths=None, seed=None, use_parallel=None))]
     fn new(
@@ -146,7 +162,9 @@ impl PyPathDependentPricer {
     /// Parameters
     /// ----------
     /// num_paths : int, optional
-    ///     Independent path estimators. Defaults to the registry value.
+    ///     Path budget of at least two. Without Sobol, counts independent
+    ///     estimators, with each antithetic pair counted once; with Sobol,
+    ///     counts points across independent scrambles. Defaults to the registry value.
     /// seed : int, optional
     ///     Root Philox seed. Defaults to the registry value.
     /// use_parallel : bool, optional
@@ -168,7 +186,7 @@ impl PyPathDependentPricer {
     /// Raises
     /// ------
     /// ValueError
-    ///     If the embedded defaults registry cannot be loaded or the
+    ///     If the path budget is less than two, embedded defaults cannot be loaded, or the
     ///     configuration is inconsistent (``use_sobol`` with ``use_parallel``).
     #[new]
     #[pyo3(signature = (
@@ -302,6 +320,13 @@ impl PyPathDependentPricer {
 }
 
 /// Longstaff-Schwartz Monte Carlo pricer for American options.
+///
+/// Independent paths must be in ``[1, 10_000_000]`` and time steps in
+/// ``[1, 100_000]``. Each pricing pass retains at most ``64_000_000`` spot
+/// values: ``num_paths * (2 if antithetic else 1) * (num_steps + 1)``,
+/// including time zero and both rows of each antithetic pair. Construction
+/// checks storage without partners; pricing checks the selected pairing
+/// before allocating paths.
 #[pyclass(
     name = "LsmcPricer",
     module = "finstack_quant.models.monte_carlo",
@@ -316,6 +341,37 @@ pub struct PyLsmcPricer {
 
 #[pymethods]
 impl PyLsmcPricer {
+    /// Configure the path generation and regression basis for early exercise.
+    ///
+    /// Parameters
+    /// ----------
+    /// num_paths : int, optional
+    ///     Independent path count in ``[2, 10_000_000]``. ``None`` uses the
+    ///     registry default; subject to the retained-storage limit above.
+    /// seed : int, optional
+    ///     Deterministic Philox seed; ``None`` uses the registry default.
+    /// use_parallel : bool, optional
+    ///     Whether path generation uses the rayon pool; ``None`` uses the
+    ///     registry default.
+    /// num_steps : int, optional
+    ///     Time-grid steps and exercise dates in ``[1, 100_000]``. ``None``
+    ///     uses the registry default; subject to the retained-storage limit.
+    /// basis : str, optional
+    ///     ``"laguerre"``, ``"polynomial"``, or ``"normalized_polynomial"``;
+    ///     ``None`` selects the registry default.
+    /// basis_degree : int, optional
+    ///     Positive regression degree, validated when pricing; Laguerre
+    ///     supports degrees one through four. ``None`` uses the registry default.
+    /// antithetic : bool, optional
+    ///     Pair each path with its sign-flipped shocks. ``None`` uses the
+    ///     registry default; both rows count toward retained storage at pricing.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the basis family is unknown, the path or step count is outside
+    ///     the documented range, or paths without antithetic partners exceed
+    ///     ``64_000_000`` retained spot values including time zero.
     #[new]
     #[pyo3(signature = (
         num_paths=None,
@@ -397,14 +453,22 @@ impl PyLsmcPricer {
     /// currency : Currency or str, optional
     ///     Currency stamped on the estimate; defaults to the registry value.
     /// num_steps : int, optional
-    ///     Per-call override of the exercise grid; defaults to the instance
-    ///     ``num_steps``.
+    ///     Per-call exercise-grid override in ``[1, 100_000]``; defaults to
+    ///     the instance ``num_steps``. Subject to the retained-storage limit.
     /// basis : str, optional
     ///     Per-call override of the regression basis family; defaults to the
     ///     instance ``basis``.
     /// basis_degree : int, optional
     ///     Per-call override of the basis degree; defaults to the instance
     ///     ``basis_degree``.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the requested grid or path count exceeds the documented range,
+    ///     or retained spots exceed ``64_000_000`` values including time zero
+    ///     and both rows of each antithetic pair; also raised for invalid market
+    ///     inputs, currency, basis family, or basis degree.
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, currency=None, num_steps=None, basis=None, basis_degree=None))]
     fn price_american_put(
@@ -447,6 +511,10 @@ impl PyLsmcPricer {
     /// Releases the GIL during the Monte Carlo run. Accepts the same per-call
     /// ``num_steps`` / ``basis`` / ``basis_degree`` overrides as
     /// ``price_american_put``.
+    ///
+    /// Raises ``ValueError`` for the same workload limits: at most ``100_000``
+    /// steps, ``10_000_000`` independent paths, and ``64_000_000`` retained spot
+    /// values including time zero and both rows of each antithetic pair.
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, currency=None, num_steps=None, basis=None, basis_degree=None))]
     fn price_american_call(
@@ -495,6 +563,11 @@ impl PyLsmcPricer {
     /// Releases the GIL during both Monte Carlo passes. Accepts the same
     /// per-call ``num_steps`` / ``basis`` / ``basis_degree`` overrides as
     /// ``price_american_put``.
+    ///
+    /// Each pass applies the same workload limits and raises ``ValueError``
+    /// above ``100_000`` steps, ``10_000_000`` independent paths, or
+    /// ``64_000_000`` retained spot values including time zero and both rows
+    /// of each antithetic pair.
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (
         spot, strike, rate, div_yield, vol, expiry, pricing_seed, currency=None,
@@ -541,6 +614,8 @@ impl PyLsmcPricer {
     ///
     /// See ``price_american_put_unbiased`` for the bias-mitigation rationale
     /// and the meaning of ``pricing_seed``; the same per-call overrides apply.
+    /// Each pass raises ``ValueError`` for the same workload limits, including
+    /// ``64_000_000`` retained spot values with time zero and antithetic rows.
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (
         spot, strike, rate, div_yield, vol, expiry, pricing_seed, currency=None,

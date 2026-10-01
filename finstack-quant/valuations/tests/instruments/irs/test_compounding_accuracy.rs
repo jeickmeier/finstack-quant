@@ -50,7 +50,7 @@ fn test_compounding_lookback_sensitivity() {
     // remains focused on the lookback sensitivity (not fixing-data availability).
     let earliest_obs = start
         .add_business_days(-2, cal)
-        .unwrap_or(start.add_weekdays(-2));
+        .unwrap_or(start.add_weekdays(-2).expect("valid date shift"));
     let ctx = if earliest_obs < base {
         let mut obs: Vec<(Date, f64)> = Vec::new();
         let mut d = earliest_obs;
@@ -75,7 +75,7 @@ fn test_compounding_lookback_sensitivity() {
             business_day_convention: BusinessDayConvention::Following,
             calendar_id: Some("USNY".into()),
             start,
-            end: start.add_months(12),
+            end: start.add_months(12).expect("valid date shift"),
             payment_lag_days: 0,
             end_of_month: false,
             stub: finstack_quant_core::dates::StubKind::ShortFront,
@@ -89,7 +89,7 @@ fn test_compounding_lookback_sensitivity() {
             business_day_convention: BusinessDayConvention::Following,
             calendar_id: Some("USNY".into()),
             start,
-            end: start.add_months(12),
+            end: start.add_months(12).expect("valid date shift"),
             compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
             payment_lag_days: 0,
             end_of_month: false,
@@ -309,7 +309,7 @@ fn test_seasoned_compounded_swap_requires_fixings() {
             business_day_convention: BusinessDayConvention::Following,
             calendar_id: Some("USNY".into()),
             start,
-            end: start.add_months(1),
+            end: start.add_months(1).expect("valid date shift"),
             payment_lag_days: 0,
             end_of_month: false,
             stub: finstack_quant_core::dates::StubKind::ShortFront,
@@ -323,7 +323,7 @@ fn test_seasoned_compounded_swap_requires_fixings() {
             business_day_convention: BusinessDayConvention::Following,
             calendar_id: Some("USNY".into()),
             start,
-            end: start.add_months(1),
+            end: start.add_months(1).expect("valid date shift"),
             compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
             payment_lag_days: 0,
             end_of_month: false,
@@ -392,7 +392,7 @@ fn test_seasoned_compounded_swap_with_fixings_prices() {
             business_day_convention: BusinessDayConvention::Following,
             calendar_id: Some("USNY".into()),
             start,
-            end: start.add_months(1),
+            end: start.add_months(1).expect("valid date shift"),
             payment_lag_days: 0,
             end_of_month: false,
             stub: finstack_quant_core::dates::StubKind::ShortFront,
@@ -406,7 +406,7 @@ fn test_seasoned_compounded_swap_with_fixings_prices() {
             business_day_convention: BusinessDayConvention::Following,
             calendar_id: Some("USNY".into()),
             start,
-            end: start.add_months(1),
+            end: start.add_months(1).expect("valid date shift"),
             compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
             payment_lag_days: 0,
             end_of_month: false,
@@ -470,7 +470,7 @@ fn test_compounded_swap_with_spread_near_zero_rates() {
             business_day_convention: BusinessDayConvention::Following,
             calendar_id: Some("USNY".into()),
             start,
-            end: start.add_months(12),
+            end: start.add_months(12).expect("valid date shift"),
             payment_lag_days: 0,
             end_of_month: false,
             stub: finstack_quant_core::dates::StubKind::ShortFront,
@@ -484,7 +484,7 @@ fn test_compounded_swap_with_spread_near_zero_rates() {
             business_day_convention: BusinessDayConvention::Following,
             calendar_id: Some("USNY".into()),
             start,
-            end: start.add_months(12),
+            end: start.add_months(12).expect("valid date shift"),
             compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
             payment_lag_days: 0,
             end_of_month: false,
@@ -562,7 +562,7 @@ fn test_compounded_swap_with_spread_negative_rates() {
             business_day_convention: BusinessDayConvention::Following,
             calendar_id: Some("USNY".into()),
             start,
-            end: start.add_months(12),
+            end: start.add_months(12).expect("valid date shift"),
             payment_lag_days: 0,
             end_of_month: false,
             stub: finstack_quant_core::dates::StubKind::ShortFront,
@@ -576,7 +576,7 @@ fn test_compounded_swap_with_spread_negative_rates() {
             business_day_convention: BusinessDayConvention::Following,
             calendar_id: Some("USNY".into()),
             start,
-            end: start.add_months(12),
+            end: start.add_months(12).expect("valid date shift"),
             compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
             payment_lag_days: 0,
             end_of_month: false,
@@ -662,7 +662,7 @@ fn test_observation_shift_before_curve_base_date() {
             business_day_convention: BusinessDayConvention::Following,
             calendar_id: Some("USNY".into()),
             start,
-            end: start.add_months(1),
+            end: start.add_months(1).expect("valid date shift"),
             payment_lag_days: 0,
             end_of_month: false,
             stub: finstack_quant_core::dates::StubKind::ShortFront,
@@ -676,7 +676,7 @@ fn test_observation_shift_before_curve_base_date() {
             business_day_convention: BusinessDayConvention::Following,
             calendar_id: Some("USNY".into()),
             start,
-            end: start.add_months(1),
+            end: start.add_months(1).expect("valid date shift"),
             compounding: FloatingLegCompounding::CompoundedInArrears {
                 lookback_days: 0, // No shift needed, as_of is after start
             },

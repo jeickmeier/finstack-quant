@@ -42,9 +42,8 @@ use pyo3::types::{PyDict, PyList};
 /// ``result["dv01"]`` / ``result.get_metric("dv01")`` return a scalar measure;
 /// ``result.metrics`` is the whole ``{key: value}`` dict in computation order.
 /// Composite keys are fully qualified and literal: ``pv01::USD-OIS``,
-/// ``bucketed_dv01::USD-OIS::10y``, ``cs01::ACME-HZD``. Legacy escaped keys
-/// persisted by earlier releases (``pv01::USD_x2dOIS``) still resolve through
-/// ``get_metric``/``__getitem__``. Units differ by metric (``ytm`` is a decimal
+/// ``bucketed_dv01::USD-OIS::10y``, ``cs01::ACME-HZD``. Lookup matches the
+/// stored canonical key exactly. Units differ by metric (``ytm`` is a decimal
 /// rate, ``par_spread`` is basis points, ``dv01`` is currency per bp) —
 /// ``metric_units()`` labels every key.
 ///
@@ -479,6 +478,8 @@ impl PyValuationResult {
 ///     Metric-time overrides merged into
 ///     ``instrument.spec.metric_pricing_overrides`` before instrument
 ///     validation; ``None`` (the default) retains the envelope configuration.
+///     Dict and JSON patches replace only supplied fields, including individual
+///     ``bump_config`` fields; explicit ``None``/``null`` clears optional fields.
 ///
 /// Returns
 /// -------
@@ -589,14 +590,7 @@ fn bond_from_cashflows_json(
 }
 
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "valuations")?;
-    let qual = crate::bindings::module_utils::set_submodule_package(
-        parent,
-        &m,
-        "valuations",
-        crate::bindings::module_utils::ROOT_PACKAGE,
-        crate::bindings::module_utils::ParentNameSource::Name,
-    )?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "valuations")?;
     m.setattr(
         "__doc__",
         concat!(
@@ -638,19 +632,17 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule_at(py, parent, &m, &qual)?;
+    crate::bindings::module_utils::attach_submodule(
+        parent,
+        &m,
+        crate::bindings::module_utils::Exposure::Python,
+    )?;
 
     Ok(())
 }
 
 fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "instruments")?;
-    let qual = crate::bindings::module_utils::set_submodule_package_by_package(
-        parent,
-        &m,
-        "instruments",
-        "finstack_quant.valuations",
-    )?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "instruments")?;
     m.setattr(
         "__doc__",
         "JSON validation, pricing, metric, and cashflow helpers for valuation workflows.",
@@ -660,14 +652,6 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     m.add_function(wrap_pyfunction!(validate_typed_instrument_json, &m)?)?;
     m.add_function(wrap_pyfunction!(pretty_instrument_json, &m)?)?;
     m.add_function(wrap_pyfunction!(bond_from_cashflows_json, &m)?)?;
-    for name in [
-        "bond_from_cashflows_json",
-        "pretty_instrument_json",
-        "validate_typed_instrument_json",
-    ] {
-        m.getattr(name)?
-            .setattr("__module__", "finstack_quant.valuations.instruments")?;
-    }
     instruments::register(py, &m)?;
     merton_mc::register(py, &m)?;
     typed_legs::register(py, &m)?;
@@ -743,18 +727,16 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     exports.dedup();
     let all = PyList::new(py, exports)?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule_at(py, parent, &m, &qual)?;
+    crate::bindings::module_utils::attach_submodule(
+        parent,
+        &m,
+        crate::bindings::module_utils::Exposure::Python,
+    )?;
     Ok(())
 }
 
 fn register_market(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "market")?;
-    let qual = crate::bindings::module_utils::set_submodule_package_by_package(
-        parent,
-        &m,
-        "market",
-        "finstack_quant.valuations",
-    )?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "market")?;
     m.setattr(
         "__doc__",
         "Listed-market product coverage and exchange routing metadata.",
@@ -768,6 +750,10 @@ fn register_market(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()>
     exports.dedup();
     let all = PyList::new(py, exports)?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule_at(py, parent, &m, &qual)?;
+    crate::bindings::module_utils::attach_submodule(
+        parent,
+        &m,
+        crate::bindings::module_utils::Exposure::Python,
+    )?;
     Ok(())
 }

@@ -1,21 +1,24 @@
 //! Forward variance curve for rough volatility models.
 //!
-//! The forward variance curve ξ₀(t) represents the market-implied forward
-//! variance strip, typically extracted from the implied volatility surface via:
+//! The initial forward variance curve ξ₀(t) represents expected instantaneous
+//! variance at time `t`, conditional on today's information, under the model's
+//! pricing measure:
 //!
 //! ```text
-//! ξ₀(t) = d/dt [σ_imp²(t) · t]
+//! ξ₀(t) = E^Q[V_t | F₀]
 //! ```
 //!
-//! This curve is used as input to the rBergomi and related rough volatility
-//! models where the initial forward variance curve governs the term structure of
-//! variance.
+//! Callers supply or calibrate this curve for rBergomi and related rough
+//! volatility models. Differencing ATM implied total variances `σ_ATM²(t) · t`
+//! is an optional approximation to its interval averages; it is not an exact
+//! variance-swap bootstrap or, under stochastic volatility, generally equal to
+//! the expected integrated variance.
 //!
 //! # Interpolation
 //!
-//! Piecewise linear interpolation between knots with flat extrapolation at the
-//! boundaries. This matches the typical step-like structure of forward variance
-//! strips extracted from discrete-expiry implied vol data.
+//! Point samples use piecewise linear interpolation. Interval forward variances
+//! use piecewise constant interpolation so their integrated areas are preserved.
+//! Both representations extrapolate flat at their boundaries.
 //!
 //! # References
 //!
@@ -26,28 +29,40 @@
 
 /// Forward variance curve ξ₀(t) for rough volatility models.
 ///
-/// Represents the market-implied forward variance strip, typically extracted
-/// from the vol surface via: ξ₀(t) = d/dt [σ_imp²(t) · t]
+/// Represents `ξ₀(t) = E^Q[V_t | F₀]`, expected instantaneous variance under
+/// the consuming model's pricing measure. Values are supplied or calibrated by
+/// the caller. The integral sets the model's expected accumulated variance.
 ///
-/// Used as input to rBergomi and related rough vol models where the initial
-/// forward variance curve determines the term structure of variance.
+/// Differencing ATM implied total variance is an optional proxy, not an exact
+/// variance-swap bootstrap. This type interpolates the supplied curve; it does
+/// not perform market calibration.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(try_from = "RawForwardVarianceCurve")]
 pub struct ForwardVarianceCurve {
-    /// Knot times (year fractions, strictly increasing, >= 0).
+    /// Interpolation contract used by the constructor.
+    interpolation: Interpolation,
+    /// Point times or interval ends (strictly increasing year fractions).
     times: Vec<f64>,
-    /// Forward variance values at knot times (all > 0).
+    /// Point samples or constant interval variances (all > 0).
     values: Vec<f64>,
+}
+
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum Interpolation {
+    Linear,
+    ConstantIntervals,
 }
 
 /// Raw deserialization state of [`ForwardVarianceCurve`].
 ///
 /// Mirrors the serialized field layout exactly; conversion routes through
-/// [`ForwardVarianceCurve::from_points`] so deserialized curves satisfy the
-/// same invariants as constructed ones, and unknown fields are rejected.
+/// the matching constructor so deserialized curves satisfy the same invariants
+/// as constructed ones, and unknown fields are rejected.
 #[derive(Debug, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawForwardVarianceCurve {
+    interpolation: Interpolation,
     /// Knot times (year fractions).
     times: Vec<f64>,
     /// Forward variance values at knot times.
@@ -66,7 +81,10 @@ impl TryFrom<RawForwardVarianceCurve> for ForwardVarianceCurve {
             )));
         }
         let points: Vec<(f64, f64)> = raw.times.into_iter().zip(raw.values).collect();
-        ForwardVarianceCurve::from_points(&points)
+        match raw.interpolation {
+            Interpolation::Linear => ForwardVarianceCurve::from_points(&points),
+            Interpolation::ConstantIntervals => ForwardVarianceCurve::from_intervals(&points),
+        }
     }
 }
 
@@ -78,6 +96,7 @@ impl Default for ForwardVarianceCurve {
     /// substitute for market-data-derived curves.
     fn default() -> Self {
         Self {
+            interpolation: Interpolation::Linear,
             times: vec![0.0],
             values: vec![0.04],
         }
@@ -86,6 +105,11 @@ impl Default for ForwardVarianceCurve {
 
 impl ForwardVarianceCurve {
     /// Creates a flat forward variance curve (constant ξ₀(t) = v0).
+    ///
+    /// # Arguments
+    ///
+    /// * `v0` - Finite, strictly positive annualized variance in decimal units
+    ///   (for example, 0.04 corresponds to 20% annualized volatility).
     ///
     /// # Errors
     ///
@@ -97,6 +121,7 @@ impl ForwardVarianceCurve {
             )));
         }
         Ok(Self {
+            interpolation: Interpolation::Linear,
             times: vec![0.0],
             values: vec![v0],
         })
@@ -105,6 +130,13 @@ impl ForwardVarianceCurve {
     /// Creates a forward variance curve from (time, forward_variance) pairs.
     ///
     /// Points are sorted by time internally before validation.
+    ///
+    /// # Arguments
+    ///
+    /// * `points` - Nonempty `(time, variance)` samples. Times are finite,
+    ///   nonnegative year fractions; variances are finite, strictly positive,
+    ///   annualized decimal variances. Duplicate times are rejected. Values
+    ///   interpolate linearly between samples and extrapolate flat.
     ///
     /// # Errors
     ///
@@ -149,13 +181,54 @@ impl ForwardVarianceCurve {
             values.push(v);
         }
 
-        Ok(Self { times, values })
+        Ok(Self {
+            interpolation: Interpolation::Linear,
+            times,
+            values,
+        })
+    }
+
+    /// Creates a piecewise constant curve from interval forward variances.
+    ///
+    /// Interval averages are preserved exactly: integrating to each interval
+    /// end gives the sum of its predecessors' `variance * duration`. At a shared
+    /// boundary, evaluation uses the following interval's variance.
+    ///
+    /// # Arguments
+    ///
+    /// * `intervals` - Nonempty `(end_time, variance)` pairs in strictly increasing
+    ///   end-time order. The first interval starts at zero; every end is a finite,
+    ///   positive year fraction. Variances are finite, strictly positive,
+    ///   annualized decimal variances. The last variance extrapolates flat beyond
+    ///   the final end, and the first variance extrapolates to negative times.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for empty input, invalid times or variances, or unordered
+    /// interval ends. Inputs are not sorted because order defines interval areas.
+    pub fn from_intervals(intervals: &[(f64, f64)]) -> crate::Result<Self> {
+        let mut previous = 0.0;
+        for &(end, _) in intervals {
+            if !end.is_finite() || end <= previous {
+                return Err(crate::Error::Validation(format!(
+                    "ForwardVarianceCurve: interval ends must increase strictly from zero, got {end} after {previous}"
+                )));
+            }
+            previous = end;
+        }
+        let mut curve = Self::from_points(intervals)?;
+        curve.interpolation = Interpolation::ConstantIntervals;
+        Ok(curve)
     }
 
     /// Evaluates the forward variance ξ₀(t) at time `t`.
     ///
-    /// Uses linear interpolation between knots and flat extrapolation at the
-    /// boundaries.
+    /// Uses the interpolation contract selected by the constructor, with flat
+    /// extrapolation at the boundaries.
+    ///
+    /// # Arguments
+    ///
+    /// * `t` - Evaluation time in year fractions. Nonfinite times return NaN.
     pub fn value(&self, t: f64) -> f64 {
         debug_assert!(!self.times.is_empty());
         if !t.is_finite() {
@@ -163,6 +236,11 @@ impl ForwardVarianceCurve {
         }
 
         let n = self.times.len();
+
+        if matches!(self.interpolation, Interpolation::ConstantIntervals) {
+            let i = self.times.partition_point(|&end| end <= t).min(n - 1);
+            return self.values[i];
+        }
 
         // Flat extrapolation at boundaries
         if t <= self.times[0] {
@@ -193,9 +271,13 @@ impl ForwardVarianceCurve {
 
     /// Computes the integrated variance ∫₀ᵗ ξ₀(s) ds.
     ///
-    /// Uses piecewise linear integration (trapezoidal rule between knots) for
-    /// the region covered by the curve, with flat extrapolation beyond the
-    /// boundaries.
+    /// Integrates the constructor's interpolation contract exactly and
+    /// extrapolates flat beyond the curve boundaries.
+    ///
+    /// # Arguments
+    ///
+    /// * `t` - Integration end in year fractions. Returns zero for nonpositive
+    ///   times and NaN for nonfinite times.
     pub fn integrated_variance(&self, t: f64) -> f64 {
         debug_assert!(!self.times.is_empty());
         if !t.is_finite() {
@@ -207,6 +289,19 @@ impl ForwardVarianceCurve {
         }
 
         let n = self.times.len();
+
+        if matches!(self.interpolation, Interpolation::ConstantIntervals) {
+            let mut start = 0.0;
+            let mut integral = 0.0;
+            for (&end, &variance) in self.times.iter().zip(&self.values) {
+                integral += variance * (t.min(end) - start);
+                if t <= end {
+                    return integral;
+                }
+                start = end;
+            }
+            return integral + self.values[n - 1] * (t - start);
+        }
 
         // If t is at or before the first knot, flat extrapolation from v[0]
         if t <= self.times[0] {
@@ -278,6 +373,64 @@ mod tests {
                 c.integrated_variance(t)
             );
         }
+    }
+
+    #[test]
+    fn interval_variances_preserve_areas_and_boundary_values() {
+        let curve = ForwardVarianceCurve::from_intervals(&[(0.25, 0.04), (1.0, 0.12), (1.5, 0.02)])
+            .unwrap();
+        for (time, expected) in [(0.25, 0.01), (1.0, 0.1), (1.5, 0.11), (2.0, 0.12)] {
+            assert!((curve.integrated_variance(time) - expected).abs() < TOL);
+        }
+        assert_eq!(curve.value(0.0), 0.04);
+        assert_eq!(curve.value(0.25), 0.12);
+        assert_eq!(curve.value(1.0), 0.02);
+        assert_eq!(curve.value(3.0), 0.02);
+        assert!((curve.integrated_variance(0.5) - 0.04).abs() < TOL);
+    }
+
+    #[test]
+    fn intervals_require_ordered_positive_ends_and_positive_variance() {
+        for intervals in [
+            vec![],
+            vec![(0.0, 0.04)],
+            vec![(1.0, 0.04), (0.5, 0.12)],
+            vec![(0.5, 0.04), (0.5, 0.12)],
+            vec![(f64::NAN, 0.04)],
+            vec![(1.0, 0.0)],
+            vec![(1.0, f64::INFINITY)],
+        ] {
+            assert!(ForwardVarianceCurve::from_intervals(&intervals).is_err());
+        }
+    }
+
+    #[test]
+    fn serde_preserves_interpolation_contract() {
+        let points = [(0.25, 0.04), (1.0, 0.12)];
+        for curve in [
+            ForwardVarianceCurve::from_points(&points).unwrap(),
+            ForwardVarianceCurve::from_intervals(&points).unwrap(),
+        ] {
+            let serialized = serde_json::to_value(&curve).unwrap();
+            let restored: ForwardVarianceCurve =
+                serde_json::from_value(serialized.clone()).unwrap();
+            for time in [0.0, 0.25, 0.5, 1.0, 2.0] {
+                assert_eq!(restored.value(time), curve.value(time));
+                assert_eq!(
+                    restored.integrated_variance(time),
+                    curve.integrated_variance(time)
+                );
+            }
+            let mut unknown = serialized;
+            unknown["unknown_field"] = serde_json::json!(true);
+            assert!(serde_json::from_value::<ForwardVarianceCurve>(unknown).is_err());
+        }
+        let invalid = serde_json::json!({
+            "interpolation": "constant_intervals",
+            "times": [1.0, 0.5],
+            "values": [0.04, 0.12]
+        });
+        assert!(serde_json::from_value::<ForwardVarianceCurve>(invalid).is_err());
     }
 
     #[test]

@@ -127,3 +127,63 @@ fn early_autocall_is_discounted_to_contractual_payment_date() {
 
     assert!((delayed_pv - expected).abs() / expected < 1e-4);
 }
+
+#[test]
+fn terminal_principal_and_last_coupon_use_their_own_payment_dates() {
+    use finstack_quant_valuations::instruments::equity::autocallable::FinalPayoffType;
+
+    let as_of = date!(2025 - 01 - 01);
+    let observations = vec![date!(2025 - 07 - 01), date!(2026 - 01 - 01)];
+    let market = build_market_with_day_count(as_of, 100.0, 0.0, 0.08, 0.0, DayCount::Act365F);
+    let curve = market.get_discount(DISC_ID).unwrap();
+
+    for coupon in [0.0, 0.02] {
+        for final_coupon_payment in [date!(2026 - 01 - 01), date!(2026 - 02 - 01)] {
+            let mut note = create_quarterly_autocallable(
+                observations.clone(),
+                DayCount::Act365F,
+                Some("separate-settlement"),
+            );
+            note.expiry = date!(2026 - 07 - 01);
+            note.payment_dates[1] = final_coupon_payment;
+            note.autocall_barriers = vec![10.0; 2];
+            note.coupon_barriers = vec![0.1; 2];
+            note.coupons = vec![coupon; 2];
+            note.final_payoff_type = FinalPayoffType::CapitalProtection {
+                floor: 1.0,
+                participation_rate: 0.0,
+            };
+
+            let principal = curve.df_between_dates(as_of, note.expiry).unwrap();
+            let coupons: f64 = note
+                .payment_dates
+                .iter()
+                .map(|&date| coupon * curve.df_between_dates(as_of, date).unwrap())
+                .sum();
+            let expected = note.notional.amount() * (principal + coupons);
+            let actual = note.value(&market, as_of).unwrap().amount();
+            assert!(
+                (actual - expected).abs() < 1e-7,
+                "coupon={coupon}, last_coupon={final_coupon_payment}: {actual} vs {expected}"
+            );
+
+            // Roll across the final observation with its known fixing. Remove
+            // coupons already paid, then compare the same remaining cashflows
+            // at a common valuation date on each side of the live/fixed branch.
+            let roll_date = observations[1];
+            note.initial_level = Some(100.0);
+            note.past_fixings = observations.iter().map(|&date| (date, 100.0)).collect();
+            let rolled_pv = note.value(&market, roll_date).unwrap().amount();
+            let paid_coupons: f64 = note
+                .payment_dates
+                .iter()
+                .filter(|&&date| date <= roll_date)
+                .map(|&date| {
+                    coupon * note.notional.amount() * curve.df_between_dates(as_of, date).unwrap()
+                })
+                .sum();
+            let rolled_discounted = rolled_pv * curve.df_between_dates(as_of, roll_date).unwrap();
+            assert!((actual - paid_coupons - rolled_discounted).abs() < 1e-7);
+        }
+    }
+}

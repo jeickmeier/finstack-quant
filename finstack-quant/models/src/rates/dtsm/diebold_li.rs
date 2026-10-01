@@ -33,7 +33,7 @@
 use nalgebra::{DMatrix, DVector};
 use serde::{Deserialize, Serialize};
 
-use super::types::{FactorTimeSeries, YieldForecast, YieldPanel};
+use super::types::{validate_tenors, FactorTimeSeries, YieldForecast, YieldPanel};
 
 /// Default Diebold-Li decay parameter, expressed for tenors **in years** (the
 /// workspace-wide tenor convention; see the `dtsm` module examples).
@@ -96,6 +96,49 @@ impl TryFrom<RawDieboldLi> for DieboldLi {
                 "Lambda must be positive and finite, got {}",
                 raw.lambda
             )));
+        }
+        if let Some(factors) = &raw.factors {
+            factors.validate()?;
+            validate_tenors(&raw.tenors)?;
+            if raw.tenors.len() < 3 || factors.residuals.ncols() != raw.tenors.len() {
+                return Err(finstack_quant_core::Error::Validation(
+                    "DieboldLi tenors must match the extracted factor residual columns".into(),
+                ));
+            }
+        } else if !raw.tenors.is_empty() {
+            return Err(finstack_quant_core::Error::Validation(
+                "DieboldLi cannot carry tenors without extracted factors".into(),
+            ));
+        }
+        match (&raw.mu, &raw.phi, &raw.q_cov) {
+            (None, None, None) => {}
+            (Some(mu), Some(phi), Some(q_cov)) => {
+                if raw.factors.is_none()
+                    || mu.len() != 3
+                    || phi.shape() != (3, 3)
+                    || q_cov.shape() != (3, 3)
+                {
+                    return Err(finstack_quant_core::Error::Validation(
+                        "DieboldLi fitted state requires extracted factors, a three-element mean, and 3x3 VAR/covariance matrices".into(),
+                    ));
+                }
+                if mu
+                    .iter()
+                    .chain(phi.iter())
+                    .chain(q_cov.iter())
+                    .any(|v| !v.is_finite())
+                {
+                    return Err(finstack_quant_core::Error::Validation(
+                        "DieboldLi fitted state must be finite".into(),
+                    ));
+                }
+            }
+            _ => {
+                return Err(finstack_quant_core::Error::Validation(
+                    "DieboldLi mean, VAR coefficients, and covariance must all be fitted together"
+                        .into(),
+                ))
+            }
         }
         Ok(Self {
             lambda: raw.lambda,
@@ -162,7 +205,7 @@ impl DieboldLi {
     ///
     /// # Arguments
     ///
-    /// * `panel` - Validated yield observations by date and tenor, with decimal yields and tenors in years; at least three tenors are required. The extracted factors replace this model's stored factor history.
+    /// * `panel` - Validated yield observations by date and tenor, with decimal yields and tenors in years; at least three tenors are required. The extracted factors replace this model's stored factor history and invalidate previously fitted VAR dynamics; call `fit_var` before forecasting again.
     ///
     /// # Errors
     /// - Panel has fewer than 3 tenors (underdetermined system)
@@ -249,6 +292,9 @@ impl DieboldLi {
             r_squared,
             r_squared_avg,
         });
+        self.mu = None;
+        self.phi = None;
+        self.q_cov = None;
 
         Ok(self)
     }
@@ -267,7 +313,8 @@ impl DieboldLi {
     ///
     /// Propagates the validation errors of [`Self::extract_factors`] (fewer
     /// than three tenors, singular loading matrix) and [`Self::fit_var`]
-    /// (fewer than five observations).
+    /// (fewer than five observations, a singular regression, or an undefined
+    /// centered-VAR mean).
     pub fn fit(self, panel: &YieldPanel) -> finstack_quant_core::Result<Self> {
         self.extract_factors(panel)?.fit_var()
     }
@@ -283,6 +330,7 @@ impl DieboldLi {
     /// # Errors
     /// - Factors not yet extracted
     /// - Fewer than 5 observations (insufficient for VAR estimation)
+    /// - Singular VAR design matrix or no unique finite centered-VAR mean
     pub fn fit_var(mut self) -> finstack_quant_core::Result<Self> {
         let fts = self.factors.as_ref().ok_or_else(|| {
             finstack_quant_core::Error::Validation(
@@ -332,9 +380,7 @@ impl DieboldLi {
         let phi = DMatrix::from_fn(3, 3, |row, col| b_hat[(col + 1, row)]);
 
         // Unconditional mean: mu = (I - Phi)^{-1} c
-        let eye3 = DMatrix::identity(3, 3);
-        let i_minus_phi = &eye3 - &phi;
-        let mu = i_minus_phi.try_inverse().map(|inv| &inv * &c).unwrap_or(c); // fallback to c if non-invertible (unit root)
+        let mu = var_mean(&phi, &c)?;
 
         let mut residuals = DMatrix::zeros(n_obs, 3);
         for i in 0..n_obs {
@@ -529,6 +575,26 @@ impl DieboldLi {
     pub fn loading_matrix(&self) -> DMatrix<f64> {
         ns_loading_matrix(self.lambda, &self.tenors)
     }
+}
+
+/// Recover the centered VAR mean without substituting an unrelated intercept
+/// when a unit root makes the mean undefined.
+fn var_mean(
+    phi: &DMatrix<f64>,
+    intercept: &DVector<f64>,
+) -> finstack_quant_core::Result<DVector<f64>> {
+    let system = DMatrix::identity(3, 3) - phi;
+    let mean = system.lu().solve(intercept).ok_or_else(|| {
+        finstack_quant_core::Error::Validation(
+            "VAR(1) has no unique centered mean: I - Phi is singular".into(),
+        )
+    })?;
+    if mean.iter().any(|value| !value.is_finite()) {
+        return Err(finstack_quant_core::Error::Validation(
+            "VAR(1) centered mean must be finite".into(),
+        ));
+    }
+    Ok(mean)
 }
 
 /// Build the N x 3 Nelson-Siegel loading matrix for a given lambda and tenor grid.
@@ -806,6 +872,32 @@ mod tests {
         assert_eq!(factors.dates.as_deref(), panel.dates.as_deref());
         assert_eq!(factors.num_dates(), 12);
         assert_eq!(factors.residual_rows().len(), 12);
+    }
+
+    #[test]
+    fn extracting_new_factors_invalidates_previous_var_fit() {
+        let panel = dated_panel();
+        let fitted = DieboldLi::with_default_lambda().fit(&panel).unwrap();
+        assert!(fitted.forecast(1).is_ok());
+        let extracted = fitted.extract_factors(&panel).unwrap();
+        assert!(extracted.factors().is_some());
+        assert!(extracted.mu().is_none());
+        assert!(extracted.phi().is_none());
+        assert!(extracted.q_cov().is_none());
+        assert!(extracted.forecast(1).is_err());
+        assert!(extracted.fit_var().unwrap().forecast(1).is_ok());
+    }
+
+    #[test]
+    fn var_mean_rejects_unit_root_instead_of_using_drift_as_mean() {
+        let phi = DMatrix::from_diagonal(&DVector::from_vec(vec![1.0, 0.5, 0.25]));
+        let drift = DVector::from_vec(vec![0.001, 0.002, 0.003]);
+        // beta_1(t+1) = beta_1(t) + 10bp has no fixed mean; replacing its
+        // mean by 10bp would silently erase every future drift increment.
+        assert!(var_mean(&phi, &drift).is_err());
+        let stationary = DMatrix::from_diagonal(&DVector::from_vec(vec![0.75, 0.5, 0.25]));
+        let mean = var_mean(&stationary, &drift).unwrap();
+        assert!((mean - DVector::from_vec(vec![0.004, 0.004, 0.004])).norm() < 1e-14);
     }
 
     #[test]

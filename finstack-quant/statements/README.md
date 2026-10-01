@@ -55,7 +55,7 @@ exclusive end date.
 | `dsl` | `parse_formula`, `compile`, `parse_and_compile`, `StmtExpr`, `BinOp`, `UnaryOp` |
 | `forecast` | Deterministic and statistical projection methods driven by `ForecastSpec` |
 | `registry` | `Registry`, `MetricRegistry`, `MetricDefinition`, `UnitType` — the `fin.*` built-in catalog and user namespaces |
-| `capital_structure` | `WaterfallSpec`, `EcfSweepSpec`, `PikToggleSpec`, `CapitalStructureCashflows`, `CashflowBreakdown`, `execute_waterfall`, `calculate_period_flows` |
+| `capital_structure` | `WaterfallSpec`, `EcfSweepSpec`, `PikToggleSpec`, `CapitalStructureCashflows`, `CashflowBreakdown`, `CapitalStructureState`, `PrincipalClaim`, `execute_waterfall`, `calculate_period_flows` |
 | `checks` | `CheckSuite`, `CheckSuiteSpec`, `Check`, `CheckReport`, `FormulaCheckSpec`, and the `builtins` implementations |
 | `adjustments` | `engine::NormalizationEngine`; `types::NormalizationConfig`/`Adjustment`/`AdjustmentValue`/`AdjustmentCap`. This module has no root re-exports — name the submodule |
 | `formula` | `extract_all_identifiers` — the curated helper boundary shared with the analytics crate |
@@ -165,9 +165,10 @@ A model may carry typed debt instruments (`add_bond`, `add_bond_with_convention`
 FX policy, and an optional `WaterfallSpec`. Formulas then reference aggregated
 instrument flows through the `cs.*` namespace.
 
-When `fx_policy` is omitted, `cs.*` cash items and balances convert on the
-inclusive period-end date (`PeriodEnd`): the already-aggregated period bucket
-is converted once, not each contractual cashflow date.
+Named instrument references retain the instrument's native currency. `.total`
+references use the reporting currency. When `fx_policy` is omitted, totals
+convert each already-aggregated period bucket on the inclusive period-end date
+(`PeriodEnd`), rather than each contractual cashflow date.
 
 ```text
 cs.<component>.<instrument_id>
@@ -178,9 +179,31 @@ Valid components: `interest_expense` (cash + PIK), `interest_expense_cash`,
 `interest_expense_pik`, `interest_income`, `principal_payment`, `debt_balance`,
 `fees`, `accrued_interest`. Unknown components are rejected at compile time.
 
+Cash interest follows the declared instrument kind: positive bond and loan
+coupons are issuer expenses, while negative debt coupons are income. Swaps use
+the holder's signed cashflows, with receipts reported as `interest_income` and
+payments as `interest_expense_cash`; both pay-fixed and receive-fixed positions
+are supported, including negative rates and zero fixed coupons. Hedge trade
+notionals size cashflows and do not count as borrowing principal. `accrued_interest`
+reports debt coupon accrual; derivative accrual valuation is outside this contract.
+Placeholder option schedules are rejected because their contingent payouts are
+not modeled.
+
 `cs.*` requires market data, so these models must be evaluated with
 `Evaluator::evaluate_with_market(&model, &market_ctx, as_of)`; plain `evaluate`
 cannot resolve them.
+
+Rust callers using `execute_waterfall` directly can supply dated principal
+claims through `CapitalStructureState::set_period_principal_flows`. Each
+`PrincipalClaim` carries its cash payment date, economic principal-reduction
+date and native-currency amount. Unpaid claims retain those dates in
+`principal_shortfall`; paid advances remain in `principal_advance_payments`
+until their economic dates and reserve the principal already settled in cash.
+Market-aware evaluation supplies these runtime inputs using the actual model
+period, including fiscal dates. Aggregate-only callers that omit dated claims
+must ensure cash and economic principal movements fall in the same allocation
+period. These state types are intentionally absent from Python and WASM; both
+hosts use the canonical evaluator.
 
 Known limits (also stated in the module rustdoc): waterfall allocation is
 pro-rata inside each payment class, walking class rank (empty
@@ -188,7 +211,7 @@ pro-rata inside each payment class, walking class rank (empty
 interest after outstanding changes, and Bond / ConvertibleBond plus a sweep
 is rejected; `available_cash_node` is the pre-waterfall cash pool and must
 not deduct `cs` debt-service tokens; omitted `fx_policy` converts
-period-aggregated `cs.*` items on the inclusive period-end date
+period-aggregated reporting totals on the inclusive period-end date
 (`PeriodEnd`); prepayment penalties, call premiums, and OID accretion are
 not modeled.
 

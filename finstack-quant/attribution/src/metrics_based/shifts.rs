@@ -4,143 +4,226 @@ use finstack_quant_core::market_data::diff::{
 };
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::HashMap;
-use finstack_quant_valuations::metrics::MetricId;
+use finstack_quant_core::{Error, Result};
+use finstack_quant_valuations::metrics::{parse_key_rate_label, MetricId};
+use finstack_quant_valuations::recalibration::RecalibrationProvider;
 
-/// Extract per-curve bucketed DV01 sensitivities from ValuationResult measures.
-///
-/// Bucketed DV01 metrics are stored with composite keys like:
-/// - `"bucketed_dv01::USD-OIS::5y"` per-tenor keys — the shape the
-///   `BucketedDv01` producer actually emits (the per-curve total goes only to
-///   `computed_series`, never to `measures`)
-/// - `"bucketed_dv01::USD-OIS"` for a per-curve total DV01 (accepted for
-///   backward compatibility and preferred when present)
-/// - `"bucketed_dv01"` for the primary curve (if single curve instrument)
-///
-/// When the direct per-curve key is absent, the per-curve total is derived by
-/// summing the instrument's per-tenor keys over the standard bucket grid.
+/// Extract every supplied key-rate coordinate for the declared curves.
 ///
 /// # Arguments
 ///
-/// * `measures` - Measures from ValuationResult containing flattened bucketed metrics
-/// * `curve_ids` - List of discount curves required by the instrument
+/// * `measures` - Flattened sensitivity metrics from the opening valuation.
+/// * `curve_ids` - Complete declared curve set for this factor family.
+/// * `metric_prefix` - Canonical per-tenor sensitivity metric identifier.
 ///
-/// # Returns
-///
-/// HashMap mapping each curve ID to its total DV01 sensitivity.
-pub(super) fn extract_bucketed_dv01_per_curve(
-    measures: &indexmap::IndexMap<MetricId, f64>,
-    curve_ids: &[CurveId],
-) -> HashMap<CurveId, f64> {
-    use finstack_quant_valuations::metrics::STANDARD_BUCKET_LABELS;
-
-    let mut result = HashMap::default();
-
-    // Pattern 1: Explicit per-curve keys "bucketed_dv01::{curve_id}".
-    // Reuse a single key buffer instead of a per-curve `format!` allocation.
-    let mut key = String::new();
-    for curve_id in curve_ids {
-        key.clear();
-        key.push_str("bucketed_dv01::");
-        key.push_str(curve_id.as_str());
-        if let Some(&dv01) = measures.get(key.as_str()) {
-            result.insert(curve_id.clone(), dv01);
-            continue;
-        }
-        // Pattern 1b: the producer never emits the direct per-curve key — it
-        // flattens per-tenor keys "bucketed_dv01::{curve}::{label}". Derive
-        // the per-curve total by summing those.
-        key.push_str("::");
-        let prefix_len = key.len();
-        let mut total = 0.0;
-        let mut found = false;
-        for label in STANDARD_BUCKET_LABELS {
-            key.truncate(prefix_len);
-            key.push_str(label);
-            if let Some(&dv01) = measures.get(key.as_str()) {
-                total += dv01;
-                found = true;
-            }
-        }
-        if found {
-            result.insert(curve_id.clone(), total);
-        }
-    }
-
-    // Pattern 2: For single-curve instruments, check the base key
-    if result.is_empty() && curve_ids.len() == 1 {
-        if let Some(&dv01) = measures.get("bucketed_dv01") {
-            result.insert(curve_ids[0].clone(), dv01);
-        }
-    }
-
-    // Diagnostic: warn when bucketed DV01 is unavailable for curves the caller
-    // requested. Downstream attribution then falls back to coarser parallel
-    // DV01 — silent without this warning.
-    for curve_id in curve_ids {
-        if !result.contains_key(curve_id) {
-            tracing::warn!(
-                curve_id = %curve_id.as_str(),
-                "bucketed_dv01 unavailable for curve; attribution will fall back to aggregate \
-                 parallel DV01 — results will be coarser",
-            );
-        }
-    }
-
-    result
-}
-
-/// Extract per-curve **key-rate** (per-tenor) sensitivities flattened under
-/// composite keys `{metric_prefix}::{curve}::{tenor_label}` (for example
-/// `bucketed_dv01::USD-OIS::5y` or `bucketed_cs01::ACME-HAZ::5y`).
-///
-/// Walks the standard bucket grid and collects, per curve, the
-/// `(tenor_years, sensitivity)` pairs that are present.
-///
-/// # Arguments
-///
-/// * `measures` - Metric map from a priced valuation result.
-/// * `curve_ids` - Curves to look up.
-/// * `metric_prefix` - Key prefix of the bucketed metric family
-///   (`"bucketed_dv01"` or `"bucketed_cs01"`).
-///
-/// Returns a map `curve → Vec<(tenor_years, sensitivity)>`; a curve is absent
-/// when none of its per-tenor keys were found (caller then falls back to the
-/// coarser per-curve-total or aggregate path).
+/// A nonempty bucketed family must cover every declared curve. Invalid labels,
+/// duplicate coordinates and missing curves are errors, never partial success.
 pub(crate) fn extract_keyrate_per_curve(
     measures: &indexmap::IndexMap<MetricId, f64>,
     curve_ids: &[CurveId],
     metric_prefix: &str,
-) -> HashMap<CurveId, Vec<(f64, f64)>> {
-    use finstack_quant_valuations::metrics::{STANDARD_BUCKETS_YEARS, STANDARD_BUCKET_LABELS};
-
-    let mut result: HashMap<CurveId, Vec<(f64, f64)>> = HashMap::default();
-    // Reuse one key buffer across all curves/tenors: build the
-    // `{prefix}::{curve}::` prefix once per curve, then swap only the
-    // trailing tenor label — no per-tenor `format!` allocation.
-    let mut key = String::new();
+) -> Result<HashMap<CurveId, Vec<(f64, f64)>>> {
+    let mut result = HashMap::default();
     for curve_id in curve_ids {
-        let mut buckets: Vec<(f64, f64)> = Vec::new();
-        key.clear();
-        key.push_str(metric_prefix);
-        key.push_str("::");
-        key.push_str(curve_id.as_str());
-        key.push_str("::");
-        let prefix_len = key.len();
-        for (&tenor_years, label) in STANDARD_BUCKETS_YEARS
+        let prefix = format!("{metric_prefix}::{curve_id}::");
+        let mut buckets = measures
             .iter()
-            .zip(STANDARD_BUCKET_LABELS.iter())
-        {
-            key.truncate(prefix_len);
-            key.push_str(label);
-            if let Some(&value) = measures.get(key.as_str()) {
-                buckets.push((tenor_years, value));
-            }
+            .filter_map(|(key, sensitivity)| {
+                key.as_str()
+                    .strip_prefix(&prefix)
+                    .map(|label| parse_key_rate_label(label).map(|tenor| (tenor, *sensitivity)))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        buckets.sort_by(|left, right| left.0.total_cmp(&right.0));
+        if buckets.windows(2).any(|pair| pair[0].0 >= pair[1].0) {
+            return Err(Error::Validation(format!(
+                "{metric_prefix} for '{curve_id}' contains duplicate year coordinates"
+            )));
         }
         if !buckets.is_empty() {
             result.insert(curve_id.clone(), buckets);
         }
     }
-    result
+    validate_curve_coverage(&result, curve_ids, metric_prefix)?;
+    Ok(result)
+}
+
+fn validate_curve_coverage<T>(
+    buckets: &HashMap<CurveId, T>,
+    curve_ids: &[CurveId],
+    metric_prefix: &str,
+) -> Result<()> {
+    if !buckets.is_empty() {
+        for curve_id in curve_ids {
+            if !buckets.contains_key(curve_id) {
+                return Err(Error::Validation(format!(
+                    "{metric_prefix} is incomplete: declared curve '{curve_id}' has no buckets"
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// One credit sensitivity paired with its observed, unit-consistent move.
+pub(crate) struct CreditKeyRateBucket {
+    pub(crate) tenor_years: f64,
+    pub(crate) sensitivity: f64,
+    pub(crate) move_bp: f64,
+    /// Exact opening replay index; absent for caller-supplied curve-coordinate risk.
+    pub(crate) quote_index: Option<usize>,
+}
+
+/// Pair all credit buckets with their original replay quote identities.
+///
+/// # Arguments
+///
+/// * `measures` - Opening quote-space CS01 metrics, in currency per basis point.
+/// * `curve_ids` - Complete declared credit curve set.
+/// * `market_t0` - Opening curves and exact replay quote bindings.
+/// * `market_t1` - Closing curves and matching quote bindings.
+/// * `provider` - Canonical calibration provider resolving exact opening pillars.
+pub(crate) fn extract_credit_keyrates(
+    measures: &indexmap::IndexMap<MetricId, f64>,
+    curve_ids: &[CurveId],
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+    provider: &dyn RecalibrationProvider,
+) -> Result<HashMap<CurveId, Vec<CreditKeyRateBucket>>> {
+    use finstack_quant_calibration::quotes::cds::CdsQuote;
+    let mut result = HashMap::default();
+    for curve_id in curve_ids {
+        let prefix = format!("bucketed_cs01::{curve_id}::");
+        let supplied: indexmap::IndexMap<_, _> = measures
+            .iter()
+            .filter_map(|(key, value)| {
+                key.as_str()
+                    .strip_prefix(&prefix)
+                    .map(|label| (label, *value))
+            })
+            .collect();
+        if supplied.is_empty() {
+            continue;
+        }
+        let hazard = market_t0.get_hazard(curve_id.as_str()).ok();
+        let buckets = if let Some(recipe_t0) =
+            hazard.as_ref().and_then(|curve| curve.hazard_calibration())
+        {
+            let hazard = hazard
+                .as_ref()
+                .ok_or_else(|| Error::Internal("missing hazard curve".into()))?;
+            let closing_hazard = market_t1.get_hazard(curve_id.as_str())?;
+            let recipe_t1 = closing_hazard.hazard_calibration().ok_or_else(|| {
+                Error::Validation(format!(
+                    "bucketed_cs01 for '{curve_id}' requires closing replay quote bindings"
+                ))
+            })?;
+            let closing_buckets = provider.hazard_spread_risk_buckets(&closing_hazard)?;
+            let replay_buckets = provider.hazard_spread_risk_buckets(hazard)?;
+            if supplied.len() != replay_buckets.len() {
+                return Err(Error::Validation(format!(
+                    "bucketed_cs01 for '{curve_id}' has {} buckets but the replay contract requires {}",
+                    supplied.len(), replay_buckets.len()
+                )));
+            }
+            let closing_quotes = closing_buckets
+                .iter()
+                .map(|bucket| {
+                    let input = recipe_t1
+                        .spread_risk_inputs
+                        .get(bucket.quote_index)
+                        .ok_or_else(|| {
+                            Error::Validation(format!(
+                                "invalid closing replay quote index {} for '{curve_id}'",
+                                bucket.quote_index
+                            ))
+                        })?;
+                    let quote: CdsQuote =
+                        serde_json::from_value(input.quote.clone()).map_err(|error| {
+                            Error::Validation(format!("invalid closing CDS replay quote: {error}"))
+                        })?;
+                    Ok((bucket.pillar_date, quote))
+                })
+                .collect::<Result<Vec<_>>>()?;
+            replay_buckets
+                .iter()
+                .map(|bucket| {
+                    let label = bucket.get_metric_label(&replay_buckets);
+                    let sensitivity = supplied.get(label.as_str()).copied().ok_or_else(|| {
+                        Error::Validation(format!(
+                    "bucketed_cs01 for '{curve_id}' is missing exact replay bucket '{label}'"
+                ))
+                    })?;
+                    let input = recipe_t0
+                        .spread_risk_inputs
+                        .get(bucket.quote_index)
+                        .ok_or_else(|| {
+                            Error::Validation(format!(
+                                "invalid replay quote index {} for '{curve_id}'",
+                                bucket.quote_index
+                            ))
+                        })?;
+                    let opening_quote: CdsQuote = serde_json::from_value(input.quote.clone())
+                        .map_err(|error| {
+                            Error::Validation(format!("invalid opening CDS replay quote: {error}"))
+                        })?;
+                    let mut matching = closing_quotes.iter().filter(|(date, quote)| {
+                        *date == bucket.pillar_date && quote.id().as_str() == bucket.quote_id
+                    });
+                    let (_, closing_quote) = matching.next().ok_or_else(|| {
+                        Error::Validation(format!(
+                            "bucketed_cs01 for '{curve_id}' has no closing quote '{}' at {}",
+                            bucket.quote_id, bucket.pillar_date
+                        ))
+                    })?;
+                    if matching.next().is_some() {
+                        return Err(Error::Validation(format!(
+                            "ambiguous closing CDS replay quote '{}'",
+                            bucket.quote_id
+                        )));
+                    }
+                    Ok(CreditKeyRateBucket {
+                        tenor_years: bucket.pillar_time,
+                        sensitivity,
+                        move_bp: closing_quote.coupon_bp() - opening_quote.coupon_bp(),
+                        quote_index: Some(bucket.quote_index),
+                    })
+                })
+                .collect::<Result<Vec<_>>>()?
+        } else {
+            // Caller-supplied curve-coordinate CS01 uses the same per-tenor
+            // par-spread/zero-rate measurement as its declared curve family.
+            let numeric = extract_keyrate_per_curve(
+                measures,
+                std::slice::from_ref(curve_id),
+                "bucketed_cs01",
+            )?;
+            let coordinates = numeric
+                .get(curve_id)
+                .ok_or_else(|| Error::Internal("missing credit coordinates".into()))?;
+            let tenors: Vec<_> = coordinates.iter().map(|(tenor, _)| *tenor).collect();
+            let moves =
+                finstack_quant_core::market_data::diff::measure_per_tenor_credit_curve_shift(
+                    curve_id.as_str(),
+                    market_t0,
+                    market_t1,
+                    &tenors,
+                )?;
+            coordinates
+                .iter()
+                .zip(moves)
+                .map(|((tenor, sensitivity), move_bp)| CreditKeyRateBucket {
+                    tenor_years: *tenor,
+                    sensitivity: *sensitivity,
+                    move_bp,
+                    quote_index: None,
+                })
+                .collect()
+        };
+        result.insert(curve_id.clone(), buckets);
+    }
+    validate_curve_coverage(&result, curve_ids, "bucketed_cs01")?;
+    Ok(result)
 }
 
 /// Measure the per-tenor discount-curve zero-rate shift (in basis points) at

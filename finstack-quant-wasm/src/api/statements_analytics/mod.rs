@@ -24,8 +24,10 @@ use wasm_bindgen::prelude::*;
 /// # Errors
 ///
 /// Rejects malformed model or configuration JSON, invalid sensitivity modes or
-/// parameter perturbations, missing model nodes or periods, model-evaluation
-/// failures, or failure to serialize the sensitivity result to JavaScript.
+/// parameter perturbations, duplicate parameters, non-finite values, requests
+/// over 128 parameters, 10,000 scenarios or 10 million model node-period
+/// evaluation cells, missing model nodes or periods, model-evaluation failures,
+/// or failure to serialize the sensitivity result to JavaScript.
 /// @param model_json - Financial-model specification JSON.
 /// @param config_json - Configuration JSON for this call.
 #[wasm_bindgen(js_name = runSensitivity)]
@@ -109,15 +111,16 @@ pub fn evaluate_scenario_set(
 ///
 /// Takes two float arrays (actual, forecast) and returns the serde form of
 /// the Rust `ForecastMetrics` (`mae`, `mape`, `mape_effective_n`, `smape`,
-/// `rmse`, `n`).
+/// `rmse`, `n`). Unavailable MAPE/sMAPE values are `null`, including both
+/// percentage metrics for a perfect forecast of an all-zero series.
 ///
 /// # Errors
 ///
 /// Rejects inputs that cannot be decoded as numeric JavaScript arrays, arrays
-/// with unequal lengths, empty arrays, or metrics that cannot be serialized to
-/// JavaScript.
-/// @param actual - Actual realized values aligned one-for-one with the forecast series.
-/// @param forecast - Forecast values aligned one-for-one with the actual realized series.
+/// with unequal lengths, empty arrays, non-finite observations, arithmetic
+/// overflow, or metrics that cannot be serialized to JavaScript.
+/// @param actual - Finite actual realized values in consistent units aligned one-for-one with the forecast series; negative values are accepted.
+/// @param forecast - Finite forecast values in the same units aligned one-for-one with the actual realized series.
 #[wasm_bindgen(js_name = backtestForecast)]
 pub fn backtest_forecast(actual: JsValue, forecast: JsValue) -> Result<JsValue, JsValue> {
     let actual_vec: Vec<f64> = serde_wasm_bindgen::from_value(actual).map_err(to_js_err)?;
@@ -136,9 +139,11 @@ pub fn backtest_forecast(actual: JsValue, forecast: JsValue) -> Result<JsValue, 
 /// # Errors
 ///
 /// Rejects malformed `result_json`, an invalid optional `period` identifier, or
-/// failure to convert the entries to JavaScript. A missing metric produces no
-/// entry rather than rejecting.
-/// @returns Structured tornado entries sorted by descending absolute swing.
+/// a full-grid run, a scenario that does not identify exactly one perturbed
+/// parameter, an absent unperturbed baseline, a missing target metric or period,
+/// non-finite metric values or impacts, or failure to convert the entries to
+/// JavaScript.
+/// @returns Structured tornado entries sorted by descending absolute swing, with parameter IDs preserving the perturbed `node@period` key.
 /// @param result_json - Result JSON produced by a prior call.
 /// @param metric_node - Statement metric node identifier selected for the requested analysis.
 /// @param period - Model period label for the requested statement value or calculation.
@@ -156,7 +161,8 @@ pub fn generate_tornado_entries(
         &result,
         metric_node,
         period_id,
-    );
+    )
+    .map_err(to_js_err)?;
     to_js_value(&entries)
 }
 
@@ -177,7 +183,7 @@ pub fn generate_tornado_entries(
 /// @param model_json - Financial-model specification JSON.
 /// @param wacc - Baseline weighted average cost of capital in decimal form (0.10 = 10%).
 /// @param terminal_value_json - Terminal-value spec JSON selecting whether growth or the exit multiple is shocked.
-/// @param ufcf_node - Node identifier holding unlevered free cash flow for the forecast periods.
+/// @param ufcf_node - Node identifier holding monetary unlevered free cash flow in model currency for the forecast periods; Gordon Growth / H-Model terminal cash flow requires a complete contiguous calendar year at the forecast end.
 /// @param net_debt_override - Optional net debt in model currency; otherwise requires debt and cash in that currency from a period ending on or before valuation.
 /// @param wacc_sensitivity_bump - Absolute shock applied to WACC and to the terminal growth rate, in decimal (0.01 = +/-100 bp).
 /// @param wacc_denominator_epsilon - Minimum spread preserved between WACC and the terminal growth rate so 1/(wacc - g) stays defined, in decimal.
@@ -523,6 +529,10 @@ pub fn pl_summary_report_text(
 
 /// Generate a credit assessment report as formatted text.
 ///
+/// Trailing-year ratios require a complete annual, semiannual, quarterly,
+/// monthly or Gregorian daily year. Weekly and fiscal-daily ratios are
+/// unavailable because the result does not contain their date calendar.
+///
 /// # Errors
 ///
 /// Rejects malformed `results_json` or an `period` value that is not a valid
@@ -543,6 +553,12 @@ pub fn credit_assessment_report_text(results_json: &str, period: &str) -> Result
 /// Compute a structured credit assessment (leverage, coverage, FCF).
 ///
 /// Returns a structured JavaScript object.
+/// Ratios are `null` when their inputs have mixed scalar/money representations,
+/// different currencies, or non-finite arithmetic.
+/// Trailing-year ratios require all annual, semiannual, quarterly or monthly
+/// periods, including fiscal periods, or the complete Gregorian daily year
+/// ending after the assessment date. Weekly and fiscal-daily ratios are `null`
+/// because the result does not contain their date calendar.
 ///
 /// # Errors
 ///
@@ -836,7 +852,8 @@ mod tests {
             &result,
             "gross_profit",
             None,
-        );
+        )
+        .expect("tornado entries");
         assert!(!entries.is_empty());
     }
 

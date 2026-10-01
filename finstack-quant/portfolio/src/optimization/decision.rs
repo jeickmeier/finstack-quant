@@ -1,7 +1,7 @@
 //! Problem, decision-space, constraint, and solver types for portfolio optimization.
 //!
 use super::problem::PortfolioOptimizationProblem;
-use super::types::{MissingMetricPolicy, WeightingScheme};
+use super::types::{MetricExpr, MissingMetricPolicy, Objective, WeightingScheme};
 use super::types::{GROSS_BASE_TOL, MIN_WEIGHT_TOL, PV_PER_UNIT_TOL};
 use crate::error::{Error, Result};
 use crate::position::PositionUnit;
@@ -37,9 +37,8 @@ pub(crate) struct DecisionItem {
     pub is_held: bool,
     /// Current quantity held (if any).
     ///
-    /// This is only used when reconstructing `WeightingScheme::UnitScaling`
-    /// solutions, where the optimized weight is a dimensionless multiplier on
-    /// the live quantity rather than a PV share.
+    /// Held positions retain this quantity under every weighting scheme;
+    /// `UnitScaling` also uses it as the live multiplier baseline.
     pub current_quantity: f64,
     /// Quantity unit, used to convert scale-factor units back to
     /// [`crate::position::Position::quantity`] after ValueWeight /
@@ -83,12 +82,35 @@ fn metrics_to_strings(
 }
 
 fn is_missing_required_metrics(
+    problem: &PortfolioOptimizationProblem,
+    entity_id: &EntityId,
+    position_id: &PositionId,
     measures: &IndexMap<String, f64>,
-    required_metrics: &[MetricId],
+    attributes: &IndexMap<String, AttributeValue>,
 ) -> bool {
-    required_metrics
-        .iter()
-        .any(|metric| !measures.contains_key(metric.as_str()))
+    let objective = match &problem.objective {
+        Objective::Maximize(expr) | Objective::Minimize(expr) => expr,
+    };
+    std::iter::once(objective)
+        .chain(
+            problem
+                .constraints
+                .iter()
+                .filter_map(|constraint| match constraint {
+                    super::constraints::Constraint::MetricBound { metric, .. } => Some(metric),
+                    _ => None,
+                }),
+        )
+        .any(|expression| {
+            let (metric, filter) = match expression {
+                MetricExpr::WeightedSum { metric, filter }
+                | MetricExpr::ValueWeightedAverage { metric, filter } => (metric, filter),
+            };
+            filter
+                .as_ref()
+                .is_none_or(|filter| filter.matches(entity_id, position_id, attributes))
+                && metric.resolve(measures, attributes, 0.0, 0.0).is_none()
+        })
 }
 
 /// Convert a scale-factor holding back to [`crate::position::Position::quantity`] units.
@@ -143,6 +165,18 @@ pub(crate) fn build_decision_space(
     market: &MarketContext,
     config: &FinstackConfig,
 ) -> Result<DecisionSpaceResult> {
+    for candidate in &problem.trade_universe.candidates {
+        if problem
+            .portfolio
+            .get_position(candidate.id.as_str())
+            .is_some()
+        {
+            return Err(Error::invalid_input(format!(
+                "candidate position ID '{}' already exists in the portfolio",
+                candidate.id
+            )));
+        }
+    }
     let mut items = Vec::new();
     let mut features = Vec::new();
     let mut current_weights = IndexMap::new();
@@ -192,8 +226,13 @@ pub(crate) fn build_decision_space(
             ));
         }
 
-        let missing_required_metrics = !required_metrics.is_empty()
-            && is_missing_required_metrics(&measures, required_metrics);
+        let missing_required_metrics = is_missing_required_metrics(
+            problem,
+            &position.entity_id,
+            &position.position_id,
+            &measures,
+            &position.attributes,
+        );
 
         let explicit_hold = if let Some(ref held) = problem.trade_universe.held_filter {
             held.matches(
@@ -347,8 +386,13 @@ pub(crate) fn build_decision_space(
             .as_ref()
             .map(|r| metrics_to_strings(&r.measures))
             .unwrap_or_default();
-        let missing_required_metrics = !required_metrics.is_empty()
-            && is_missing_required_metrics(&measures, required_metrics);
+        let missing_required_metrics = is_missing_required_metrics(
+            problem,
+            &candidate.entity_id,
+            &candidate.id,
+            &measures,
+            &candidate.attributes,
+        );
 
         items.push(DecisionItem {
             position_id: candidate.id.clone(),

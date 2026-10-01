@@ -1,14 +1,15 @@
 //! Formula-evaluation helpers for statement expressions.
 //!
 use super::formula::{
-    collect_all_historical_values, collect_expression_values_sorted,
-    collect_expression_window_values, collect_period_range_values, collect_rolling_window_values,
-    eval_error, evaluate_non_negative_integer_arg, require_args, require_min_args,
+    collect_all_historical_values, collect_expression_range_values,
+    collect_expression_values_sorted, collect_expression_window_values,
+    collect_rolling_window_values, eval_error, evaluate_non_negative_integer_arg, require_args,
+    require_min_args,
 };
 use super::results::EvalWarning;
 use super::EvaluationContext;
 use crate::error::Result;
-use finstack_quant_core::dates::PeriodKind;
+use finstack_quant_core::dates::{PeriodId, PeriodKind};
 use finstack_quant_core::expr::{Expr, ExprNode, Function};
 use finstack_quant_core::math::{finite_count, finite_max_or_nan, finite_min_or_nan, neumaier_sum};
 use finstack_quant_core::math::{
@@ -72,6 +73,17 @@ fn sum_finite_or_nan(values: &[f64]) -> f64 {
     } else {
         neumaier_sum(filtered.iter().copied())
     }
+}
+
+fn sum_expression_range(
+    expr: &Expr,
+    context: &EvaluationContext,
+    start: PeriodId,
+    end: PeriodId,
+    node_id: Option<&str>,
+) -> Result<f64> {
+    let values = collect_expression_range_values(expr, context, start, end, node_id)?;
+    Ok(sum_finite_or_nan(&values))
 }
 
 pub(crate) fn evaluate_historical_function(
@@ -263,16 +275,7 @@ fn evaluate_period_aggregate_function(
                 PeriodKind::Annual => finstack_quant_core::dates::PeriodId::annual(current.year),
             };
 
-            if let ExprNode::Column(node_name) = &args[0].node {
-                let values =
-                    collect_period_range_values(node_name, context, start_of_year, current)?;
-                Ok(sum_finite_or_nan(&values))
-            } else {
-                Err(eval_error(
-                    node_id,
-                    "ytd() currently supports only simple column references; use an intermediate node for complex expressions",
-                ))
-            }
+            sum_expression_range(&args[0], context, start_of_year, current, node_id)
         }
         Function::Qtd => {
             require_args("qtd", args, 1, node_id)?;
@@ -291,15 +294,7 @@ fn evaluate_period_aggregate_function(
                 quarter_start_month as u8,
             )?;
 
-            if let ExprNode::Column(node_name) = &args[0].node {
-                let values = collect_period_range_values(node_name, context, start, current)?;
-                Ok(sum_finite_or_nan(&values))
-            } else {
-                Err(eval_error(
-                    node_id,
-                    "qtd() currently supports only simple column references; use an intermediate node for complex expressions",
-                ))
-            }
+            sum_expression_range(&args[0], context, start, current, node_id)
         }
         Function::FiscalYtd => {
             require_args("fiscal_ytd", args, 2, node_id)?;
@@ -331,15 +326,7 @@ fn evaluate_period_aggregate_function(
             let start =
                 finstack_quant_core::dates::PeriodId::month(fiscal_start_year, start_month)?;
 
-            if let ExprNode::Column(node_name) = &args[0].node {
-                let values = collect_period_range_values(node_name, context, start, current)?;
-                Ok(sum_finite_or_nan(&values))
-            } else {
-                Err(eval_error(
-                    node_id,
-                    "fiscal_ytd() currently supports only simple column references; use an intermediate node for complex expressions",
-                ))
-            }
+            sum_expression_range(&args[0], context, start, current, node_id)
         }
         Function::Ttm => {
             require_args("ttm", args, 1, node_id)?;
@@ -349,14 +336,18 @@ fn evaluate_period_aggregate_function(
             let mut values = Vec::with_capacity(window);
             for offset in (0..window).rev() {
                 let Some(period) =
-                    super::formula_timeseries::offset_period(context.period_id, -(offset as i32))
+                    super::formula_timeseries::offset_period(context, -(offset as i32))
                 else {
                     return Ok(f64::NAN);
                 };
                 let value = if offset == 0 {
                     super::formula::evaluate_formula(&args[0], context, node_id)?
                 } else {
-                    if !context.history.contains_key(&period) {
+                    if !context.history.contains_key(&period)
+                        && !context
+                            .historical_capital_structure_cashflows
+                            .contains_key(&period)
+                    {
                         return Ok(f64::NAN);
                     }
                     let mut historical = super::formula::build_context_for_period(period, context)?;

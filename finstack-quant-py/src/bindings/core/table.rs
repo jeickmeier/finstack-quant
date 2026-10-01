@@ -205,7 +205,7 @@ impl PyArrowTable {
 
 /// Build the `finstack_quant.core.table` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "table")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "table")?;
     m.setattr(
         "__doc__",
         "Arrow interchange surface for finstack-quant tabular results.\n\n\
@@ -217,13 +217,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyArrowTable>()?;
     let all = PyList::new(py, ["ArrowTable"])?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "table",
-        "finstack_quant.core",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
     Ok(())
 }

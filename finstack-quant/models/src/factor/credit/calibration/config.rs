@@ -98,19 +98,26 @@ impl PanelFrequency {
                 }
                 Ok(date)
             }
-            Self::Monthly => Ok(step_months_from_origin(origin, steps)),
-            Self::Quarterly => Ok(step_months_from_origin(origin, steps.saturating_mul(3))),
+            Self::Monthly => step_months_from_origin(origin, steps),
+            Self::Quarterly => step_months_from_origin(
+                origin,
+                steps.checked_mul(3).ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(
+                        "quarterly date step exceeds supported range".into(),
+                    )
+                })?,
+            ),
         }
     }
 }
 
-fn step_months_from_origin(origin: Date, months: i32) -> Date {
-    let stepped = origin.add_months(months);
-    if origin == origin.end_of_month() {
+fn step_months_from_origin(origin: Date, months: i32) -> finstack_quant_core::Result<Date> {
+    let stepped = origin.add_months(months)?;
+    Ok(if origin == origin.end_of_month() {
         stepped.end_of_month()
     } else {
         stepped
-    }
+    })
 }
 
 /// Whether the calibrator works in price-difference (return) or raw-level space.

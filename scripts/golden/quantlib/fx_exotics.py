@@ -57,6 +57,7 @@ def _fx_market(
             "quotes": [["EUR", "USD", spot]],
             "pinned_quotes": [],
             "provider_quotes": [],
+            "provider_pinned_quotes": [],
         },
         surfaces=[constant_vol_surface(vol_surface_id, volatility, strikes=strikes)],
     )
@@ -372,6 +373,7 @@ def build_quanto_option() -> dict[str, Any]:
                 "quotes": [["JPY", "USD", fx_spot]],
                 "pinned_quotes": [],
                 "provider_quotes": [],
+                "provider_pinned_quotes": [],
             },
             prices={
                 "NKY-DIVYIELD": {"unitless": dividend_yield},

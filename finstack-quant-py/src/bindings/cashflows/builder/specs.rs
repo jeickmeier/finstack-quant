@@ -189,6 +189,12 @@ macro_rules! wire_methods {
 /// Roll-date rule for schedule anchors: ``RollRule.NONE`` (plain tenor
 /// stepping), ``RollRule.IMM`` (third Wednesdays of Mar/Jun/Sep/Dec) or
 /// ``RollRule.CDS_IMM`` (20th of Mar/Jun/Sep/Dec, Big-Bang front accrual).
+/// Both IMM modes use quarterly accrual and short-back stubs regardless of
+/// the supplied frequency/stub. IMM retains contractual maturity through a
+/// terminal stub. CDS front accrual applies only at the instrument's initial
+/// horizon; interior coupon/payment windows start at their declared boundary.
+/// IMM modes cannot combine with end-of-month rolling. ACT/ACT ICMA supports
+/// CDS IMM but rejects the third-Wednesday IMM reference grid at build.
 ///
 /// Examples
 /// --------
@@ -472,9 +478,13 @@ impl PyOvernightIndexConstraintApplication {
     }
 }
 
-/// Policy when a floating leg's forward curve is missing: ``ERROR``
-/// (default, fail the build), ``SPREAD_ONLY`` (project the spread alone) or
-/// ``fixed_rate(rate)`` (use a fixed decimal index rate).
+/// Policy for missing floating-rate market data: ``ERROR`` (default),
+/// ``SPREAD_ONLY`` (zero index rate) or ``fixed_rate(rate)`` (fixed index rate).
+/// Explicit fallbacks cover a missing forward curve or absent historical
+/// fixing series. A supplied series missing a required observation before
+/// the resolved curve's base date always fails. Complete supplied observations
+/// can build without a curve, including with ``ERROR``. Curve, date, day-count
+/// and arithmetic errors propagate rather than selecting a fallback.
 ///
 /// Examples
 /// --------
@@ -497,7 +507,7 @@ pub struct PyFloatingRateFallback {
 
 #[pymethods]
 impl PyFloatingRateFallback {
-    /// Fail the build when the forward curve lookup fails (default, safest).
+    /// Fail when required observations need missing market data (default).
     #[allow(non_snake_case)]
     #[classattr]
     fn ERROR() -> Self {
@@ -505,7 +515,7 @@ impl PyFloatingRateFallback {
             inner: FloatingRateFallback::Error,
         }
     }
-    /// Project spread-only when no forward curve is available (explicit opt-in).
+    /// Use a zero index rate for eligible missing market data (explicit opt-in).
     #[allow(non_snake_case)]
     #[classattr]
     fn SPREAD_ONLY() -> Self {
@@ -514,7 +524,9 @@ impl PyFloatingRateFallback {
         }
     }
 
-    /// Use ``rate`` (decimal annual rate, e.g. ``0.045``) as the index component.
+    /// Use ``rate`` (decimal annual rate, e.g. ``0.045``) as the index component
+    /// for eligible missing market data. Supplied historical gaps and genuine
+    /// projection errors still fail.
     #[staticmethod]
     #[pyo3(text_signature = "(rate)")]
     fn fixed_rate(rate: &Bound<'_, PyAny>) -> PyResult<Self> {
@@ -584,7 +596,8 @@ impl PyFeeAccrualBasis {
 /// Parameters
 /// ----------
 /// frequency : Tenor or str
-///     Accrual and payment frequency (e.g. ``"3M"``).
+///     Accrual and payment frequency (e.g. ``"3M"``). IMM/CDS IMM roll rules
+///     use an effective quarterly frequency for dates and accrual.
 /// day_count : DayCount
 ///     Day-count convention for accrual year fractions.
 /// calendar_id : str
@@ -594,15 +607,19 @@ impl PyFeeAccrualBasis {
 ///     Payment-date rolling convention (default Modified Following, the
 ///     Rust wire default).
 /// stub : StubKind, optional
-///     Stub rule (default short-front, the Rust wire default).
+///     Stub rule (default short-front, the Rust wire default). IMM/CDS IMM
+///     roll rules use short-back stubs.
 /// end_of_month : bool, default False
-///     Preserve end-of-month rolling.
+///     Preserve end-of-month rolling; incompatible with IMM/CDS IMM rules.
+///     For ACT/ACT ICMA, the regular anchor must be month-end: maturity for
+///     front stubs, start otherwise. The opposite endpoint may be irregular.
 /// payment_lag_days : int, default 0
 ///     Payment lag in business days (non-negative).
 /// adjust_accrual_dates : bool, default False
 ///     Roll accrual boundaries with ``business_day_convention`` (swap/ISDA convention).
 /// roll_rule : RollRule, optional
-///     IMM/CDS-IMM anchor grid (default none).
+///     IMM/CDS-IMM anchor grid (default none). Third-Wednesday IMM with
+///     ACT/ACT ICMA is rejected when the schedule is built; CDS IMM is supported.
 ///
 /// Raises
 /// ------
@@ -715,6 +732,7 @@ impl PyScheduleParams {
     }
 
     /// Fail-fast validation: known calendar id and non-negative payment lag.
+    /// Horizon-dependent roll-grid and ICMA anchor checks occur at build.
     ///
     /// Raises
     /// ------
@@ -879,7 +897,11 @@ impl PyFixedCouponSpec {
 /// spread_bp : Decimal, float or str
 ///     Spread over the index in basis points.
 /// reset_frequency : Tenor or str
-///     Reset frequency (e.g. ``"3M"``).
+///     Fallback compiled term tenor when ``index_tenor`` is omitted and no
+///     forward curve resolves; the term tenor must be positive. The bare builder
+///     observes one lagged term fixing per coupon accrual start, without extra
+///     resets inside a payment period. Resolved curves own their quoted tenor;
+///     overnight coupons use their daily observation schedule.
 /// gearing : Decimal, float or str, default 1
 ///     Multiplier applied to the index (and spread when
 ///     ``gearing_includes_spread``).
@@ -890,7 +912,10 @@ impl PyFixedCouponSpec {
 /// overnight_index_constraints : OvernightIndexConstraintApplication, optional
 ///     Where floors/caps apply on overnight legs (default DAILY).
 /// index_tenor : Tenor or str, optional
-///     Explicit index tenor when it differs from ``reset_frequency``.
+///     Explicit compiled term tenor when no forward curve resolves; when
+///     omitted, ``reset_frequency`` supplies it. Resolved curves own their
+///     quoted tenor; a disagreement exceeding 10% warns at build. Ignored
+///     for overnight coupons.
 /// reset_lag_days : int, default 2
 ///     Fixing lag in business days (non-negative).
 /// fixing_calendar_id : str, optional
@@ -902,7 +927,11 @@ impl PyFixedCouponSpec {
 /// overnight_basis : DayCount, optional
 ///     Day count for overnight compounding.
 /// fallback : FloatingRateFallback, optional
-///     Behaviour when the forward curve is missing (default ERROR).
+///     Missing-market-data policy (default ERROR). A missing curve or absent
+///     fixing series may use an explicit fallback. Supplied historical gaps
+///     before the curve base date always fail; complete supplied observations
+///     need no forward curve. Curve, date, day-count and arithmetic errors
+///     are never replaced with fallback rates.
 ///
 /// Examples
 /// --------
@@ -974,7 +1003,9 @@ impl PyFloatingRateSpec {
     }
 
     /// USD SOFR compounded in arrears (ARRC / ISDA 2021): index ``USD-SOFR``,
-    /// quarterly resets, Act/360 daily compounding, no reset lag, USNY fixings.
+    /// Act/360 daily compounding, no reset lag, and the ``sofr`` repo
+    /// fixing/value-date calendar, which excludes Good Friday. The coupon
+    /// schedule selects its payment calendar separately.
     ///
     /// Parameters
     /// ----------
@@ -988,7 +1019,7 @@ impl PyFloatingRateSpec {
         })
     }
 
-    /// GBP SONIA compounded in arrears: index ``GBP-SONIA``, annual resets,
+    /// GBP SONIA compounded in arrears: index ``GBP-SONIA``,
     /// Act/365F daily compounding, no reset lag, GBLO fixings.
     ///
     /// Parameters
@@ -1003,8 +1034,9 @@ impl PyFloatingRateSpec {
         })
     }
 
-    /// EUR 3M EURIBOR term rate: index ``EUR-EURIBOR-3M``, quarterly resets
-    /// fixed in advance with a 2-business-day lag on TARGET2, 3M index tenor.
+    /// EUR 3M EURIBOR term rate: index ``EUR-EURIBOR-3M``, one fixing per coupon
+    /// period at its lagged accrual start, with a 2-business-day TARGET2 lag
+    /// and an explicit 3M index tenor.
     ///
     /// Parameters
     /// ----------
@@ -1074,13 +1106,15 @@ impl PyFloatingRateSpec {
         }
     }
 
-    /// Reset frequency.
+    /// Fallback compiled term tenor when no forward curve resolves and
+    /// ``index_tenor`` is absent; does not add resets within a coupon period.
     #[getter]
     fn reset_frequency(&self) -> PyTenor {
         PyTenor::from_inner(self.inner.reset_frequency)
     }
 
-    /// Explicit index tenor, if set.
+    /// Explicit compiled term tenor when no forward curve resolves, or None
+    /// to use ``reset_frequency``; resolved curves remain authoritative.
     #[getter]
     fn index_tenor(&self) -> Option<PyTenor> {
         self.inner.index_tenor.map(PyTenor::from_inner)
@@ -1115,7 +1149,7 @@ impl PyFloatingRateSpec {
         self.inner.overnight_basis.map(PyDayCount::from_inner)
     }
 
-    /// Missing-curve fallback policy.
+    /// Missing-market-data fallback policy; supplied historical gaps remain errors.
     #[getter]
     fn fallback(&self) -> PyFloatingRateFallback {
         PyFloatingRateFallback {
@@ -1400,8 +1434,30 @@ impl PyAmortizationSpec {
         }
     }
 
-    /// Equal principal installments on every payment date in ``(start, end]``,
-    /// fully repaid by ``end``.
+    /// Equal principal installments on coupon accrual boundaries in ``(start, end]``.
+    ///
+    /// The installment uses outstanding after start-date PIK and principal
+    /// movements. The final installment clears the live remaining balance.
+    /// Cash settles on each boundary's adjusted, lagged payment date.
+    ///
+    /// Parameters
+    /// ----------
+    /// start : datetime.date or str
+    ///     Economic amortization start, on or after issue; installments apply
+    ///     strictly after it.
+    /// end : datetime.date or str
+    ///     Final economic repayment date, which must be a coupon accrual
+    ///     boundary no later than the terminal accrual date; validated at build.
+    ///
+    /// Returns
+    /// -------
+    /// AmortizationSpec
+    ///     Dated amortization rule; cash payment can follow the economic end.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If either date cannot be parsed.
     #[staticmethod]
     #[pyo3(text_signature = "(start, end)")]
     fn linear_between(start: &Bound<'_, PyAny>, end: &Bound<'_, PyAny>) -> PyResult<Self> {
@@ -1623,9 +1679,11 @@ impl PyNotional {
     /// Raises
     /// ------
     /// ValueError
-    ///     If the amortization schedule is inconsistent with the initial
-    ///     notional (e.g. a currency mismatch or a target above the initial
-    ///     amount).
+    ///     If the notional is invalid, amortization amounts are negative,
+    ///     currencies differ, step dates are not strictly increasing, or a
+    ///     ``linear_to`` target exceeds the initial notional. The builder
+    ///     checks dated repayments against the live balance after PIK and
+    ///     draws, so future funded balances may exceed the initial notional.
     #[pyo3(text_signature = "(self)")]
     fn validate(&self) -> PyResult<()> {
         self.inner.validate().map_err(core_to_py)

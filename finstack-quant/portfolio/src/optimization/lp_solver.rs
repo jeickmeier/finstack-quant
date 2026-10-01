@@ -109,23 +109,12 @@ impl DefaultLpOptimizer {
     /// Returns `None` when the metric/attribute is missing for the position;
     /// callers apply the [`MissingMetricPolicy`] on top of this.
     fn per_position_metric_raw(ppm: &PerPositionMetric, feat: &DecisionFeatures) -> Option<f64> {
-        match ppm {
-            PerPositionMetric::Metric(id) => feat.measures.get(id.as_str()).copied(),
-            PerPositionMetric::CustomKey(key) => feat.measures.get(key).copied(),
-            PerPositionMetric::PvBase => Some(feat.pv_base),
-            PerPositionMetric::PvNative => Some(feat.pv_native),
-            PerPositionMetric::Attribute(key) => {
-                feat.attributes.get(key).and_then(|v| v.as_number())
-            }
-            PerPositionMetric::AttributeIndicator(test) => {
-                Some(if test.evaluate(&feat.attributes) {
-                    1.0
-                } else {
-                    0.0
-                })
-            }
-            PerPositionMetric::Constant(c) => Some(*c),
-        }
+        ppm.resolve(
+            &feat.measures,
+            &feat.attributes,
+            feat.pv_base,
+            feat.pv_native,
+        )
     }
 
     /// Lower a `PerPositionMetric` to a per‑decision value `m_i`.
@@ -654,32 +643,36 @@ impl DefaultLpOptimizer {
                 .get(&item.position_id)
                 .copied()
                 .unwrap_or(0.0);
-            let qty = match problem.weighting {
-                WeightingScheme::NotionalWeight => {
-                    if feat.deal_notional_abs > PV_PER_UNIT_TOL {
-                        quantity_from_scale(
-                            item.unit,
-                            (w_star * reconstruction_denominator) / feat.deal_notional_abs,
-                        )
-                    } else {
-                        0.0
+            let qty = if item.is_existing && item.is_held {
+                item.current_quantity
+            } else {
+                match problem.weighting {
+                    WeightingScheme::NotionalWeight => {
+                        if feat.deal_notional_abs > PV_PER_UNIT_TOL {
+                            quantity_from_scale(
+                                item.unit,
+                                (w_star * reconstruction_denominator) / feat.deal_notional_abs,
+                            )
+                        } else {
+                            0.0
+                        }
                     }
-                }
-                WeightingScheme::ValueWeight => {
-                    if feat.pv_per_unit.abs() > PV_PER_UNIT_TOL {
-                        quantity_from_scale(
-                            item.unit,
-                            (w_star * reconstruction_denominator) / feat.pv_per_unit,
-                        )
-                    } else {
-                        0.0
+                    WeightingScheme::ValueWeight => {
+                        if feat.pv_per_unit.abs() > PV_PER_UNIT_TOL {
+                            quantity_from_scale(
+                                item.unit,
+                                (w_star * reconstruction_denominator) / feat.pv_per_unit,
+                            )
+                        } else {
+                            0.0
+                        }
                     }
-                }
-                WeightingScheme::UnitScaling => {
-                    if item.is_existing {
-                        item.current_quantity * w_star
-                    } else {
-                        w_star
+                    WeightingScheme::UnitScaling => {
+                        if item.is_existing {
+                            item.current_quantity * w_star
+                        } else {
+                            w_star
+                        }
                     }
                 }
             };

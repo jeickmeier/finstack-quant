@@ -875,3 +875,47 @@ fn typed_artifact_field_roundtrips_without_materializing_as_null() {
         "finstack_quant.instrument/1"
     );
 }
+
+#[test]
+fn book_depth_is_bounded_before_runtime_materialization() {
+    use finstack_quant_portfolio::book::Book;
+    let cache = InstrumentArtifactCache::default();
+    let mut input = envelope(0, 0);
+    for index in 0..513 {
+        let id = format!("book-{index}");
+        let mut book = Book::new(id.clone(), None);
+        if index > 0 {
+            book.parent_id = Some(format!("book-{}", index - 1).into());
+        }
+        if index < 512 {
+            book.child_book_ids
+                .push(format!("book-{}", index + 1).into());
+        }
+        input.portfolio.books.insert(id.into(), book);
+    }
+    let bytes = serde_json::to_vec(&input).expect("serialize books");
+    let report = report_from_error(
+        Portfolio::validate_materialization(&bytes, &cache, &LoadLimits::default())
+            .expect_err("excessive book depth"),
+    );
+    assert!(report
+        .diagnostics
+        .iter()
+        .any(|issue| issue.code == "portfolio/book-depth-limit"));
+    assert!(Portfolio::from_materialization(&bytes, &cache, &LoadLimits::default()).is_err());
+}
+
+#[test]
+fn book_count_is_bounded_before_typed_allocation_or_decode() {
+    let books = (0..100_001)
+        .map(|index| format!("\"B{index}\":null"))
+        .collect::<Vec<_>>()
+        .join(",");
+    let bytes =
+        format!("{{\"instruments\":[],\"positions\":[],\"portfolio\":{{\"books\":{{{books}}}}}}}");
+    let cache = InstrumentArtifactCache::new();
+    let error = Portfolio::from_materialization(bytes.as_bytes(), &cache, &LoadLimits::default())
+        .expect_err("book count preflight must run before typed deserialization");
+    assert!(matches!(error, Error::ContractLimitExceeded { .. }));
+    assert_eq!(cache.decode_count(), 0);
+}

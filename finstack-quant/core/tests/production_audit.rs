@@ -68,7 +68,7 @@ fn m9_snapshot_preserves_provider_below_pinned_source() {
         )
         .expect("pinned");
     let market = MarketContext::new().insert_fx(matrix);
-    let state = MarketContextState::from(&market);
+    let state = MarketContextState::try_from(&market).expect("coherent market snapshot");
     let restored = MarketContext::try_from(state).expect("restore");
     for (from, to, expected) in [
         (Currency::EUR, Currency::USD, 1.3),

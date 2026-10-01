@@ -627,13 +627,11 @@ fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
     // hazard-curve adjustment.
     let err_result = schedule.pv_by_period_with_discounting(
         &periods,
-        finstack_quant_cashflows::builder::PvDiscountSource::Discount {
-            disc: &disc,
-            credit: Some(finstack_quant_cashflows::builder::PvCreditAdjustment {
-                hazard: Some(&hazard),
-                recovery_rate: Some(0.40),
-            }),
-        },
+        &disc,
+        Some(finstack_quant_cashflows::builder::PvCreditAdjustment {
+            hazard: Some(&hazard),
+            recovery_rate: Some(0.40),
+        }),
         finstack_quant_cashflows::aggregation::DateContext::new(
             base,
             DayCount::Act365F,
@@ -650,13 +648,11 @@ fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
     let pv_map = schedule
         .pv_by_period_with_discounting(
             &periods,
-            finstack_quant_cashflows::builder::PvDiscountSource::Discount {
-                disc: &disc,
-                credit: Some(finstack_quant_cashflows::builder::PvCreditAdjustment {
-                    hazard: Some(&hazard),
-                    recovery_rate: None,
-                }),
-            },
+            &disc,
+            Some(finstack_quant_cashflows::builder::PvCreditAdjustment {
+                hazard: Some(&hazard),
+                recovery_rate: None,
+            }),
             finstack_quant_cashflows::aggregation::DateContext::new(
                 base,
                 DayCount::Act365F,

@@ -468,12 +468,15 @@ class FinstackConfig:
         currency : Currency | str
             Currency object or ISO-4217 alphabetic code.
         scale : int
-            Number of decimal places (non-negative).
+            Number of decimal places in the inclusive range ``0..28``.
 
         Raises
         ------
         ValueError
-            If *currency* is not recognised.
+            If *currency* is not recognised or *scale* exceeds 28. The
+            configuration is unchanged when validation fails.
+        OverflowError
+            If *scale* is negative or exceeds the unsigned 32-bit integer range.
         """
         ...
 
@@ -486,12 +489,15 @@ class FinstackConfig:
         currency : Currency | str
             Currency object or ISO-4217 alphabetic code.
         scale : int
-            Number of decimal places (non-negative).
+            Number of decimal places in the inclusive range ``0..28``.
 
         Raises
         ------
         ValueError
-            If *currency* is not recognised.
+            If *currency* is not recognised or *scale* exceeds 28. The
+            configuration is unchanged when validation fails.
+        OverflowError
+            If *scale* is negative or exceeds the unsigned 32-bit integer range.
         """
         ...
 

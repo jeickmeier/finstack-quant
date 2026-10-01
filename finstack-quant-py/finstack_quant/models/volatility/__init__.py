@@ -7,7 +7,9 @@ Examples:
 0.5
 """
 
-from finstack_quant.finstack_quant.models import volatility as _volatility
+from finstack_quant.finstack_quant import models as _models
+
+_volatility = _models.volatility
 
 ArbitrageReport = _volatility.ArbitrageReport
 SabrCalibrator = _volatility.SabrCalibrator
@@ -22,6 +24,8 @@ check_local_vol_density_grid = _volatility.check_local_vol_density_grid
 check_surface_grid = _volatility.check_surface_grid
 convert_atm_volatility = _volatility.convert_atm_volatility
 delta_to_strike = _volatility.delta_to_strike
+get_cube_expiry_slice_vol = _volatility.get_cube_expiry_slice_vol
+get_cube_expiry_slice_vol_clamped = _volatility.get_cube_expiry_slice_vol_clamped
 get_cube_normal_vol = _volatility.get_cube_normal_vol
 get_cube_normal_vol_clamped = _volatility.get_cube_normal_vol_clamped
 get_cube_vol = _volatility.get_cube_vol
@@ -52,6 +56,8 @@ __all__ = [
     "check_surface_grid",
     "convert_atm_volatility",
     "delta_to_strike",
+    "get_cube_expiry_slice_vol",
+    "get_cube_expiry_slice_vol_clamped",
     "get_cube_normal_vol",
     "get_cube_normal_vol_clamped",
     "get_cube_vol",

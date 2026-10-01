@@ -310,7 +310,9 @@ fn conversion_change_spec(
         .clone();
     let opening_conversion = closing.conversion.clone();
     closing.conversion.ratio = Some(30.0);
-    let state = finstack_quant_core::market_data::context::MarketContextState::from(&market(150.0));
+    let state =
+        finstack_quant_core::market_data::context::MarketContextState::try_from(&market(150.0))
+            .expect("coherent market snapshot");
     finstack_quant_attribution::AttributionSpec {
         instrument: finstack_quant_valuations::instruments::InstrumentJson::ConvertibleBond(
             closing,
@@ -358,7 +360,7 @@ fn metrics_spec_restores_opening_conversion_and_rounding() {
         result
             .meta
             .rounding
-            .output_scale_by_currency
+            .get_output_scale_by_currency()
             .get(&Currency::USD),
         Some(&4)
     );
@@ -374,9 +376,10 @@ fn taylor_market_gamma_uses_opening_conversion_state() {
     // A rates move: the issuer hazard curve is entered directly (no
     // calibration recipe), so quote-space credit gamma is unavailable and the
     // gamma path is exercised on the risk-free curve.
-    changed.market_t1 = finstack_quant_core::market_data::context::MarketContextState::from(
+    changed.market_t1 = finstack_quant_core::market_data::context::MarketContextState::try_from(
         &market_with_rate(150.0, 0.035),
-    );
+    )
+    .expect("coherent market snapshot");
     let mut fixed = changed.clone();
     fixed.instrument = finstack_quant_valuations::instruments::InstrumentJson::ConvertibleBond(
         convertible_with_credit()

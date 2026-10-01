@@ -284,7 +284,7 @@ impl CorporateAnalysisBuilder {
     ///
     /// # Arguments
     ///
-    /// * `node` - Statement node id whose per-period values are LTV
+    /// * `node` - Monetary statement node id whose per-period values are LTV
     ///   denominators, in the same currency as instrument debt balances
     ///   (typically an enterprise-value or collateral-value series).
     ///
@@ -431,13 +431,6 @@ impl CorporateAnalysisBuilder {
             );
         }
 
-        let ltv_refs = ltv_reference_path(
-            &self.model.periods,
-            &statement,
-            self.ltv_value_node.as_deref(),
-            ev_for_ltv,
-        );
-
         let mut credit = IndexMap::new();
         if let Some(ref cs) = statement.cs_cashflows {
             let cfads_node = self.cfads_node.as_deref().ok_or_else(|| {
@@ -449,6 +442,13 @@ impl CorporateAnalysisBuilder {
             })?;
             let reporting_currency =
                 crate::analysis::valuation::corporate::extract_currency_from_model(&self.model)?;
+            let ltv_refs = ltv_reference_path(
+                &self.model.periods,
+                &statement,
+                self.ltv_value_node.as_deref(),
+                ev_for_ltv,
+                reporting_currency,
+            )?;
             for instrument_id in cs.by_instrument.keys() {
                 let metrics = compute_credit_context(
                     &statement,
@@ -486,20 +486,27 @@ fn ltv_reference_path(
     statement: &StatementResult,
     ltv_value_node: Option<&str>,
     ev_for_ltv: Option<f64>,
-) -> Option<Vec<(PeriodId, f64)>> {
+    reporting_currency: finstack_quant_core::currency::Currency,
+) -> Result<Option<Vec<(PeriodId, f64)>>> {
     if let Some(node) = ltv_value_node {
-        let path: Vec<(PeriodId, f64)> = periods
-            .iter()
-            .filter_map(|period| {
-                statement
-                    .get(node, &period.id)
-                    .filter(|value| value.is_finite() && *value > 0.0)
-                    .map(|value| (period.id, value))
-            })
-            .collect();
-        Some(path)
+        let mut path = Vec::with_capacity(periods.len());
+        for period in periods {
+            if statement.get(node, &period.id).is_none() {
+                continue;
+            }
+            let value = super::corporate::monetary_node_value(
+                statement,
+                node,
+                &period.id,
+                reporting_currency,
+            )?;
+            if value > 0.0 {
+                path.push((period.id, value));
+            }
+        }
+        Ok(Some(path))
     } else {
-        ev_for_ltv.map(|ev| periods.iter().map(|period| (period.id, ev)).collect())
+        Ok(ev_for_ltv.map(|ev| periods.iter().map(|period| (period.id, ev)).collect()))
     }
 }
 
@@ -692,14 +699,11 @@ mod tests {
     #[test]
     fn test_non_positive_enterprise_value_status_is_top_level() {
         let model = ModelBuilder::new("non-positive-ev")
-            .periods("2025Q1..Q1", None)
+            .periods("2025..2025", None)
             .expect("periods")
             .value_money(
                 "ufcf",
-                &[(
-                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                    Money::from((0_i64, Currency::USD)),
-                )],
+                &[(PeriodId::annual(2025), Money::from((0_i64, Currency::USD)))],
             )
             .with_meta("currency", serde_json::json!("USD"))
             .build()
@@ -725,7 +729,7 @@ mod tests {
         let as_of = date!(2025 - 01 - 01);
         let market = MarketContext::new().insert(flat_discount_curve(0.05, as_of, "USD-OIS"));
         let model = ModelBuilder::new("dcf-cs-test")
-            .periods("2025Q1..Q2", Some("2025Q1"))
+            .periods("2025Q1..Q4", Some("2025Q1"))
             .expect("periods")
             .value_money(
                 "revenue",
@@ -737,6 +741,14 @@ mod tests {
                     (
                         PeriodId::quarter(2025, 2).expect("valid period fixture"),
                         Money::from((1_100_000_i64, Currency::USD)),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 3).expect("valid period fixture"),
+                        Money::from((1_200_000_i64, Currency::USD)),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 4).expect("valid period fixture"),
+                        Money::from((1_300_000_i64, Currency::USD)),
                     ),
                 ],
             )
@@ -780,7 +792,7 @@ mod tests {
 
         assert!(
             result.is_ok(),
-            "DCF analysis should reuse the as-of aware statement evaluation"
+            "DCF analysis should reuse the as-of aware statement evaluation: {result:?}"
         );
     }
 
@@ -802,11 +814,49 @@ mod tests {
     }
 
     #[test]
+    fn ltv_reference_rejects_foreign_and_scalar_nodes() {
+        let periods = sample_periods();
+        let mut statement = StatementResult::new();
+        statement.nodes.insert(
+            "collateral".into(),
+            IndexMap::from([(periods[0].id, 1_000.0)]),
+        );
+        statement.monetary_nodes.insert(
+            "collateral".into(),
+            IndexMap::from([(periods[0].id, Money::from((1_000_i64, Currency::EUR)))]),
+        );
+        assert!(ltv_reference_path(
+            &periods,
+            &statement,
+            Some("collateral"),
+            None,
+            Currency::USD
+        )
+        .is_err());
+        statement.monetary_nodes.clear();
+        assert!(ltv_reference_path(
+            &periods,
+            &statement,
+            Some("collateral"),
+            None,
+            Currency::USD
+        )
+        .is_err());
+    }
+
+    #[test]
     fn test_ltv_reference_path_broadcasts_scalar_ev() {
         let periods = sample_periods();
         let statement = StatementResult::new();
-        let path = ltv_reference_path(&periods, &statement, None, Some(10_000_000.0))
-            .expect("broadcast path");
+        let path = ltv_reference_path(
+            &periods,
+            &statement,
+            None,
+            Some(10_000_000.0),
+            Currency::USD,
+        )
+        .expect("valid path")
+        .expect("broadcast path");
         assert_eq!(
             path,
             vec![
@@ -837,10 +887,29 @@ mod tests {
         );
         statement
             .nodes
-            .insert("enterprise_value".to_string(), values);
+            .insert("enterprise_value".to_string(), values.clone());
+        statement.monetary_nodes.insert(
+            "enterprise_value".into(),
+            values
+                .iter()
+                .map(|(period, value)| {
+                    (
+                        *period,
+                        Money::new(*value, Currency::USD).expect("valid money"),
+                    )
+                })
+                .collect(),
+        );
 
-        let path = ltv_reference_path(&periods, &statement, Some("enterprise_value"), Some(1.0))
-            .expect("node path");
+        let path = ltv_reference_path(
+            &periods,
+            &statement,
+            Some("enterprise_value"),
+            Some(1.0),
+            Currency::USD,
+        )
+        .expect("valid path")
+        .expect("node path");
         assert_eq!(
             path,
             vec![
@@ -860,8 +929,15 @@ mod tests {
             .get_mut("enterprise_value")
             .expect("node")
             .shift_remove(&PeriodId::quarter(2025, 2).expect("valid period fixture"));
-        let path = ltv_reference_path(&periods, &statement, Some("enterprise_value"), None)
-            .expect("partial node path");
+        let path = ltv_reference_path(
+            &periods,
+            &statement,
+            Some("enterprise_value"),
+            None,
+            Currency::USD,
+        )
+        .expect("valid path")
+        .expect("partial node path");
         assert_eq!(
             path,
             vec![(
@@ -883,8 +959,14 @@ mod tests {
             .value(
                 "enterprise_value",
                 &[
-                    (q1, AmountOrScalar::scalar(10_000_000.0)),
-                    (q2, AmountOrScalar::scalar(8_000_000.0)),
+                    (
+                        q1,
+                        AmountOrScalar::amount(10_000_000.0, Currency::USD).unwrap(),
+                    ),
+                    (
+                        q2,
+                        AmountOrScalar::amount(8_000_000.0, Currency::USD).unwrap(),
+                    ),
                 ],
             )
             .value(

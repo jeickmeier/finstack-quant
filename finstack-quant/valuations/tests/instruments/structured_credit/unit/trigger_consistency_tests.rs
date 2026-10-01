@@ -90,6 +90,7 @@ fn clo(tests: Vec<CoverageTestSpec>) -> StructuredCredit {
     .expect("structure");
     let mut deal =
         StructuredCredit::new_clo("CLO-TRIGGERS", pool, tranches, CLOSE, MATURITY, "USD-OIS")
+            .expect("valid structured-credit dates")
             .with_calendar_id("nyse")
             .with_coverage_triggers(tests)
             .expect("tests");

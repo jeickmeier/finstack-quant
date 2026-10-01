@@ -279,7 +279,7 @@ proptest! {
         let as_of = date!(2024 - 01 - 01);
         let expiry = date!(2025 - 01 - 01);
         let swap_start = expiry;
-        let swap_end = swap_start.add_months(tenor_years * 12);
+        let swap_end = swap_start.add_months(tenor_years * 12).expect("valid date shift");
 
         let payer = create_standard_payer_swaption(expiry, swap_start, swap_end, strike);
         let receiver = create_standard_receiver_swaption(expiry, swap_start, swap_end, strike);

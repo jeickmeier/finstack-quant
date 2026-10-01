@@ -21950,7 +21950,7 @@ class StructuredCredit:
         Raises
         ------
         ValueError
-            If the deal fails pricing validation.
+            If the deal fails pricing validation or its first registry payment period exceeds the supported calendar range.
 
         Examples
         --------
@@ -22055,7 +22055,7 @@ class StructuredCredit:
         Raises
         ------
         ValueError
-            If the deal fails pricing validation.
+            If the deal fails pricing validation or its first registry payment period exceeds the supported calendar range.
 
         Examples
         --------
@@ -22128,7 +22128,7 @@ class StructuredCredit:
         Raises
         ------
         ValueError
-            If the deal fails pricing validation.
+            If the deal fails pricing validation or its first registry payment period exceeds the supported calendar range.
 
         Examples
         --------
@@ -22201,7 +22201,7 @@ class StructuredCredit:
         Raises
         ------
         ValueError
-            If the deal fails pricing validation.
+            If the deal fails pricing validation or its first registry payment period exceeds the supported calendar range.
 
         Examples
         --------
@@ -24137,6 +24137,8 @@ def validate_instrument_json(
         Metric-time overrides merged into
         ``instrument.spec.metric_pricing_overrides`` before instrument
         validation; ``None`` (the default) retains the envelope configuration.
+        Dict and JSON patches replace only supplied fields, including individual
+        ``bump_config`` fields; explicit ``None``/``null`` clears optional fields.
 
     Returns
     -------
@@ -24295,6 +24297,8 @@ def price_instrument(
         (``{"target": "z_spread", "mode": "linear"}``), ``bump_config``,
         ``bond_risk_basis``, ``theta_day_basis``, ``var_config``. A dict or
         JSON string is accepted in place of the typed object.
+        Dict and JSON patches retain omitted fields, including individual
+        ``bump_config`` fields; explicit ``None``/``null`` clears optional fields.
     market_history : MarketHistory or dict or str, optional
         Historical scenarios required by the ``"hvar"`` and
         ``"expected_shortfall"`` metrics; a dict or JSON string is accepted in
@@ -25490,9 +25494,10 @@ class AssetBackedFacility:
         datetime.date
             The repayment date.
 
-        Notes
-        -----
-        This accessor does not raise; it is derived from stored terms.
+        Raises
+        ------
+        ValueError
+            If the term-out window exceeds the supported calendar range.
         """
         ...
     @property

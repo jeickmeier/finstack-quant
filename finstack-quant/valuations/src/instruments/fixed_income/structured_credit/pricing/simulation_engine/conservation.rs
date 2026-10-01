@@ -169,10 +169,13 @@ pub(super) fn recycle_reinvestment_principal(
                     .as_ref(),
                 market,
                 payment_date,
-                state.pool_state.rates[i],
-                state.pool_state.spread_bp[i],
+                period_helpers::CollateralCoupon {
+                    fallback_all_in_rate: state.pool_state.rates[i],
+                    spread_bp: state.pool_state.spread_bp[i],
+                    day_count: state.pool_state.day_counts[i],
+                    index_floor_rate: state.pool_state.index_floors[i],
+                },
                 state.floating_rate_shift,
-                state.pool_state.index_floors[i],
             )?
         } else {
             state.pool_state.rates[i]
@@ -243,7 +246,7 @@ fn purchase_replacement_collateral(
             assumptions.maturity_months
         ))
     })?;
-    let maturity = payment_date.add_months(months).min(legal_final);
+    let maturity = payment_date.add_months(months)?.min(legal_final);
     if maturity <= payment_date {
         return Ok(Money::from((0_i64, state.currency)));
     }
@@ -253,10 +256,13 @@ fn purchase_replacement_collateral(
             market.get_forward(index)?.as_ref(),
             market,
             payment_date,
-            spread,
-            Some(assumptions.spread_bp),
+            period_helpers::CollateralCoupon {
+                fallback_all_in_rate: spread,
+                spread_bp: Some(assumptions.spread_bp),
+                day_count: DayCount::Act360,
+                index_floor_rate: None,
+            },
             state.floating_rate_shift,
-            None,
         )?,
         None => spread,
     };

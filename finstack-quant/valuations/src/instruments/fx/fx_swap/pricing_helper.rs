@@ -32,7 +32,7 @@ pub(crate) struct FxSwapPricingContext {
     pub(crate) model_spot: f64,
     /// Model forward rate via CIP (quote per base)
     pub(crate) model_forward: f64,
-    /// Contract near rate (explicit or model spot)
+    /// Contract near rate (explicit or as-of-to-near CIP forward)
     pub(crate) contract_near_rate: f64,
     /// Contract far rate (explicit or model forward)
     pub(crate) contract_far_rate: f64,
@@ -48,35 +48,16 @@ impl FxSwapPricingContext {
     /// Build pricing context from market data and instrument.
     ///
     /// # Arguments
-    /// * `swap` - The FX swap instrument
-    /// * `curves` - Market context with discount curves and FX matrix
-    /// * `as_of` - Valuation date
+    /// * `swap` - Validated FX swap with base-currency notional and quote-per-base contract rates.
+    /// * `curves` - Market snapshot containing quote/base discount curves and current FX spot.
+    /// * `as_of` - Valuation date from which settlement discount factors and omitted outright forwards are resolved.
     ///
     /// # Errors
     /// Returns error if:
     /// - Required discount curves are missing
     /// - FX matrix is missing
     /// - Discount factors are near-zero (degenerate market data)
-    /// - Contract rates are non-positive when explicitly provided
     pub(crate) fn build(swap: &FxSwap, curves: &MarketContext, as_of: Date) -> Result<Self> {
-        // Validate explicit contract rates if provided
-        if let Some(rate) = swap.near_rate {
-            if rate <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "near_rate must be positive, got: {}",
-                    rate
-                )));
-            }
-        }
-        if let Some(rate) = swap.far_rate {
-            if rate <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "far_rate must be positive, got: {}",
-                    rate
-                )));
-            }
-        }
-
         let domestic_disc = curves.get_discount(swap.domestic_discount_curve_id.as_str())?;
         let foreign_disc = curves.get_discount(swap.foreign_discount_curve_id.as_str())?;
 
@@ -109,17 +90,10 @@ impl FxSwapPricingContext {
             )));
         };
 
-        // Calculate model forward via covered interest rate parity
-        let model_forward = Self::calculate_cip_forward(
-            model_spot,
-            df_dom_near,
-            df_dom_far,
-            df_for_near,
-            df_for_far,
-        )?;
+        let model_near = Self::calculate_cip_forward(model_spot, df_dom_near, df_for_near)?;
+        let model_forward = Self::calculate_cip_forward(model_spot, df_dom_far, df_for_far)?;
 
-        // Contract rates default to model when not explicitly provided
-        let contract_near_rate = swap.near_rate.unwrap_or(model_spot);
+        let contract_near_rate = swap.near_rate.unwrap_or(model_near);
         let contract_far_rate = swap.far_rate.unwrap_or(model_forward);
 
         let notional = swap.notional.amount();
@@ -139,46 +113,32 @@ impl FxSwapPricingContext {
         })
     }
 
-    /// Calculate forward rate via Covered Interest Rate Parity.
-    ///
-    /// Formula: F = S × (DF_for_far / DF_for_near) / (DF_dom_far / DF_dom_near)
-    ///
-    /// When r_dom > r_for, forward is at premium (F > S) as required by no-arbitrage.
+    /// Calculate an outright forward from today's spot and date-based discount factors.
     ///
     /// # Arguments
-    /// * `spot` - Current spot rate (quote per base)
-    /// * `df_dom_near` - Domestic DF to near date
-    /// * `df_dom_far` - Domestic DF to far date
-    /// * `df_for_near` - Foreign DF to near date
-    /// * `df_for_far` - Foreign DF to far date
+    /// * `spot` - Current FX rate in quote currency per unit of base currency.
+    /// * `df_domestic` - Quote-currency discount factor from valuation to settlement.
+    /// * `df_foreign` - Base-currency discount factor over the same date interval.
     ///
     /// # Errors
-    /// Returns error if near-date discount factors are near-zero.
+    /// Returns a validation error for non-positive, non-finite, or near-zero domestic
+    /// discount factors, or a non-positive or non-finite resulting forward.
     pub(crate) fn calculate_cip_forward(
         spot: f64,
-        df_dom_near: f64,
-        df_dom_far: f64,
-        df_for_near: f64,
-        df_for_far: f64,
+        df_domestic: f64,
+        df_foreign: f64,
     ) -> Result<f64> {
-        // Validate denominators to avoid silent incorrect results
-        if df_dom_near.abs() < DF_NEAR_ZERO_THRESHOLD {
+        if !df_domestic.is_finite() || df_domestic < DF_NEAR_ZERO_THRESHOLD {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "Domestic discount factor at near date is near-zero ({}), cannot compute forward",
-                df_dom_near
+                "Domestic discount factor ({df_domestic}) cannot produce a finite FX forward"
             )));
         }
-        if df_for_near.abs() < DF_NEAR_ZERO_THRESHOLD {
+        let forward = spot * df_foreign / df_domestic;
+        if !forward.is_finite() || forward <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "Foreign discount factor at near date is near-zero ({}), cannot compute forward",
-                df_for_near
+                "FX forward must be positive and finite, got {forward}"
             )));
         }
-
-        let dom_ratio = df_dom_far / df_dom_near;
-        let for_ratio = df_for_far / df_for_near;
-        let forward = spot * for_ratio / dom_ratio;
-
         Ok(forward)
     }
 
@@ -260,24 +220,110 @@ mod tests {
     use super::*;
 
     #[test]
+    fn future_near_defaults_use_date_based_outright_forwards() {
+        use crate::instruments::{Attributes, Instrument, PricingOptions};
+        use crate::metrics::MetricId;
+        use finstack_quant_core::{
+            currency::Currency,
+            market_data::term_structures::DiscountCurve,
+            money::{
+                fx::{FxMatrix, SimpleFxProvider},
+                Money,
+            },
+            types::InstrumentId,
+        };
+        use std::sync::Arc;
+        use time::macros::date;
+
+        let as_of = date!(2025 - 01 - 01);
+        let near = date!(2026 - 01 - 01);
+        let far = date!(2027 - 01 - 01);
+        let usd = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([
+                (0.0, 1.0),
+                (1.0, (-0.05_f64).exp()),
+                (2.0, (-0.10_f64).exp()),
+            ])
+            .build()
+            .expect("USD curve");
+        let eur = DiscountCurve::builder("EUR-OIS")
+            .base_date(as_of)
+            .knots([
+                (0.0, 1.0),
+                (1.0, (-0.02_f64).exp()),
+                (2.0, (-0.04_f64).exp()),
+            ])
+            .build()
+            .expect("EUR curve");
+        let near_forward = 1.1 * eur.df_between_dates(as_of, near).expect("near EUR DF")
+            / usd.df_between_dates(as_of, near).expect("near USD DF");
+        let far_forward = 1.1 * eur.df_between_dates(as_of, far).expect("far EUR DF")
+            / usd.df_between_dates(as_of, far).expect("far USD DF");
+        let provider = SimpleFxProvider::new();
+        provider
+            .set_quote(Currency::EUR, Currency::USD, 1.1)
+            .expect("FX quote");
+        let market = MarketContext::new()
+            .insert(usd)
+            .insert(eur)
+            .insert_fx(FxMatrix::new(Arc::new(provider)));
+        let mut swap = FxSwap::builder()
+            .id(InstrumentId::new("FUTURE-NEAR"))
+            .base_currency(Currency::EUR)
+            .quote_currency(Currency::USD)
+            .near_date(near)
+            .far_date(far)
+            .notional(Money::from((1_000_000_i64, Currency::EUR)))
+            .domestic_discount_curve_id("USD-OIS".into())
+            .foreign_discount_curve_id("EUR-OIS".into())
+            .attributes(Attributes::new())
+            .build()
+            .expect("swap");
+        let ctx = FxSwapPricingContext::build(&swap, &market, as_of).expect("pricing context");
+        assert!((ctx.contract_near_rate - near_forward).abs() < 1e-12);
+        assert!((ctx.contract_far_rate - far_forward).abs() < 1e-12);
+        assert!(swap.value_raw(&market, as_of).expect("default PV").abs() < 1e-8);
+        let result = swap
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[
+                    MetricId::Dv01Domestic,
+                    MetricId::Dv01Foreign,
+                    MetricId::Fx01,
+                ],
+                PricingOptions::default(),
+            )
+            .expect("risk");
+        for value in result.measures.values() {
+            assert!(
+                value.abs() < 1e-8,
+                "market-default repricing remains par: {value}"
+            );
+        }
+        swap.near_rate = Some(near_forward);
+        assert!(swap.value_raw(&market, as_of).expect("fixed near PV").abs() < 1e-8);
+        swap.far_rate = Some(far_forward);
+        assert!(
+            swap.value_raw(&market, as_of)
+                .expect("explicit fair PV")
+                .abs()
+                < 1e-8
+        );
+    }
+
+    #[test]
     fn test_cip_forward_calculation() {
         // Test: r_dom = 5%, r_for = 0.5%, T = 1 year
         // DF_dom = exp(-0.05) ≈ 0.9512, DF_for = exp(-0.005) ≈ 0.995
         // F = S × DF_for / DF_dom = 1.0 × 0.995 / 0.9512 ≈ 1.046
         let spot = 1.0;
-        let df_dom_near = 1.0;
-        let df_for_near = 1.0;
         let df_dom_far = 0.9512;
         let df_for_far = 0.995;
 
-        let forward = FxSwapPricingContext::calculate_cip_forward(
-            spot,
-            df_dom_near,
-            df_dom_far,
-            df_for_near,
-            df_for_far,
-        )
-        .unwrap();
+        let forward =
+            FxSwapPricingContext::calculate_cip_forward(spot, df_dom_far, df_for_far).unwrap();
 
         // Forward should be at premium when r_dom > r_for
         assert!(forward > spot, "Forward should be > spot");
@@ -290,11 +336,11 @@ mod tests {
 
     #[test]
     fn test_cip_forward_rejects_zero_df() {
-        let result = FxSwapPricingContext::calculate_cip_forward(1.0, 0.0, 0.95, 1.0, 0.99);
-        assert!(result.is_err(), "Should reject near-zero domestic DF");
+        let result = FxSwapPricingContext::calculate_cip_forward(1.0, 0.0, 0.99);
+        assert!(result.is_err(), "Should reject zero domestic DF");
 
-        let result = FxSwapPricingContext::calculate_cip_forward(1.0, 1.0, 0.95, 0.0, 0.99);
-        assert!(result.is_err(), "Should reject near-zero foreign DF");
+        let result = FxSwapPricingContext::calculate_cip_forward(1.0, 0.95, 0.0);
+        assert!(result.is_err(), "Should reject zero foreign DF");
     }
 
     /// Item 5 verification: `total_pv` must equal a full four-cashflow,

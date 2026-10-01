@@ -122,8 +122,8 @@ pub struct CashflowBreakdown {
 
     /// Net cash interest **received** during the period.
     ///
-    /// Non-zero only for two-leg instruments whose legs net to a receipt (e.g.
-    /// an in-the-money pay-fixed swap). Stored as a positive amount, like the
+    /// Includes net hedge receipts and receipts from negative-rate debt coupons.
+    /// Stored as a positive amount, like the
     /// outflow-oriented fields, and reported through the `cs.interest_income`
     /// namespace.
     ///
@@ -145,7 +145,8 @@ pub struct CashflowBreakdown {
     /// Outstanding debt balance at period end
     pub debt_balance: Money,
 
-    /// Accrued interest not yet paid (liability)
+    /// Debt coupon interest accrued but not yet paid (liability).
+    /// Hedge-leg accrual valuation is outside the debt-service contract and is zero.
     pub accrued_interest: Money,
 }
 
@@ -426,8 +427,7 @@ impl CapitalStructureCashflows {
 
     /// Get cash interest **received** for a specific instrument and period.
     ///
-    /// Non-zero only for two-leg instruments whose legs net to a receipt (e.g.
-    /// an in-the-money pay-fixed swap).
+    /// Includes net hedge receipts and receipts from negative-rate debt coupons.
     ///
     /// # Arguments
     /// * `instrument_id` - Instrument identifier
@@ -590,8 +590,7 @@ impl CapitalStructureCashflows {
 
     /// Get total cash interest **received** across all instruments for a period.
     ///
-    /// Non-zero only when the structure holds two-leg instruments whose legs
-    /// net to a receipt (e.g. an in-the-money pay-fixed swap).
+    /// Includes net hedge receipts and receipts from negative-rate debt coupons.
     ///
     /// # Arguments
     /// * `period_id` - Period to inspect

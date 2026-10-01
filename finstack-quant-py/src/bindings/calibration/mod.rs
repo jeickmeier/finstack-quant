@@ -319,7 +319,7 @@ fn calibrate_bermudan_lmm_base_vol(
 
 /// Register the root-level calibration submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "calibration")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "calibration")?;
     m.add_class::<PyCalibrationConfig>()?;
     m.add_class::<PyCalibrationDiagnostics>()?;
     m.add_class::<PyCalibrationEnvelope>()?;
@@ -379,13 +379,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             ],
         )?,
     )?;
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "calibration",
-        crate::bindings::module_utils::ROOT_PACKAGE,
-        crate::bindings::module_utils::ParentNameSource::Name,
+        crate::bindings::module_utils::Exposure::Python,
     )?;
     Ok(())
 }

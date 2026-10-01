@@ -436,8 +436,20 @@ pub fn build_snapshot_fx_matrix(
     Ok(Arc::new(matrix))
 }
 
-impl From<&MarketContext> for MarketContextState {
-    fn from(ctx: &MarketContext) -> Self {
+impl TryFrom<&MarketContext> for MarketContextState {
+    type Error = crate::Error;
+
+    /// Capture a market snapshot whose FX quotes belong to one provider revision.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - Market context whose curves, scalars, metadata, and coherent FX
+    ///   quotes are copied into a deterministic persisted snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the FX provider cannot supply a coherent snapshot.
+    fn try_from(ctx: &MarketContext) -> crate::Result<Self> {
         let mut curves: Vec<CurveState> = ctx
             .curves
             .values()
@@ -445,7 +457,11 @@ impl From<&MarketContext> for MarketContextState {
             .collect();
         curves.sort_by(|a, b| a.id().cmp(b.id()));
 
-        let fx = ctx.fx.as_ref().map(|fx| fx.get_serializable_state());
+        let fx = ctx
+            .fx
+            .as_ref()
+            .map(|fx| fx.get_serializable_state())
+            .transpose()?;
 
         let mut surfaces_pairs: Vec<(CurveId, VolSurface)> = ctx
             .surfaces
@@ -546,7 +562,7 @@ impl From<&MarketContext> for MarketContextState {
             .map(|(csa, curve_id)| (csa.clone(), curve_id.to_string()))
             .collect();
 
-        MarketContextState {
+        Ok(MarketContextState {
             schema_version: SchemaVersion::CURRENT,
             curves,
             fx,
@@ -560,7 +576,7 @@ impl From<&MarketContext> for MarketContextState {
             vol_cubes,
             collateral,
             hierarchy: ctx.hierarchy.clone(),
-        }
+        })
     }
 }
 
@@ -592,6 +608,7 @@ fn restore_market_context(
         );
         let provider = SimpleFxProvider::new();
         provider.set_quotes(&fx_state.provider_quotes)?;
+        provider.set_snapshot_pinned_quotes(&fx_state.provider_pinned_quotes)?;
         let matrix = FxMatrix::try_with_config(Arc::new(provider), fx_state.config)?;
         matrix.load_from_state(&fx_state)?;
         ctx.fx = Some(Arc::new(matrix));
@@ -762,7 +779,7 @@ impl serde::Serialize for MarketContext {
     where
         S: serde::Serializer,
     {
-        let state: MarketContextState = self.into();
+        let state = MarketContextState::try_from(self).map_err(serde::ser::Error::custom)?;
         state.serialize(serializer)
     }
 }

@@ -183,7 +183,8 @@ class CopulaSpec:
         Raises
         ------
         ValueError
-            If a deserialized Student-t spec has invalid degrees of freedom.
+            If a deserialized Student-t spec has invalid degrees of freedom,
+            or random-loading volatility is non-finite or outside ``[0, 0.5]``.
         """
         ...
 
@@ -405,11 +406,10 @@ class Copula:
         """
         Strict lower-tail dependence coefficient ``λ_L`` at the given correlation.
 
-        Returns ``nan`` when the model has no closed-form ``λ_L`` (Random
-        Factor Loading); check ``math.isnan()`` before using the result.
-        Gaussian and multi-factor Gaussian copulas return ``0.0``; Student-t
-        returns the closed-form positive ``λ_L``. For the RFL heuristic
-        stress gauge use :meth:`stress_correlation_proxy` instead.
+        Random Factor Loading returns the probability mass at unit loading
+        under the calibrated clipped-normal loading distribution. Gaussian
+        models have zero tail dependence except at perfect correlation;
+        Student-t returns its closed-form positive coefficient.
 
         Parameters
         ----------
@@ -419,7 +419,7 @@ class Copula:
         Returns
         -------
         float
-            The strict ``λ_L``, or ``nan`` if the model has no closed form.
+            The strict lower-tail coefficient in ``[0, 1]`` for valid inputs.
 
         Notes
         -----
@@ -432,8 +432,7 @@ class Copula:
         Heuristic stress-correlation proxy for the Random Factor Loading copula.
 
         This is **not** the strict copula lower-tail-dependence coefficient
-        ``λ_L`` (which has no closed form for RFL — :meth:`tail_dependence`
-        returns ``nan``). It gauges the extra correlation mass in the
+        ``λ_L`` returned by :meth:`tail_dependence`. It gauges the extra correlation mass in the
         high-loading tail and vanishes in the Gaussian (``loading_vol = 0``)
         limit.
 
@@ -2723,14 +2722,21 @@ def validate_correlation_matrix(matrix: Sequence[float] | Sequence[Sequence[floa
         Flat row-major correlation matrix (length ``n * n``) or a 2-D
         ``n x n`` list/array of rows.
     n : int
-        Dimension of the square matrix.
+        Non-negative square-matrix dimension representable as the platform's
+        unsigned pointer-sized integer; ``n * n`` must also fit that range.
 
     Raises
     ------
     ValueError
-        If the shape does not match ``n`` (the message states the rows and
-        widths found), or the matrix is invalid (diagonal not one, entry out
-        of ``[-1, 1]``, not symmetric, not PSD).
+        If ``n * n`` overflows the platform's unsigned pointer-sized integer
+        range, the shape does not match ``n`` (the message states the rows
+        and widths found), or the matrix is invalid (diagonal not one,
+        entry out of ``[-1, 1]``, not symmetric, not PSD).
+    OverflowError
+        If ``n`` is negative or exceeds the platform's unsigned
+        pointer-sized integer range.
+    TypeError
+        If ``n`` is not an integer.
 
     Examples
     --------
@@ -2760,10 +2766,13 @@ def nearest_correlation(
     matrix : Sequence[float] or Sequence[Sequence[float]]
         Flat row-major ``n x n`` input matrix, or a 2-D ``n x n`` list/array.
     n : int
-        Matrix dimension.
+        Non-negative matrix dimension representable as the platform's
+        unsigned pointer-sized integer; ``n * n`` must also fit that range.
     max_iter : int or None
-        Maximum alternating-projection iterations. Defaults to the Rust
-        ``NearestCorrelationOpts::default()`` value (currently ``200``).
+        Non-negative maximum alternating-projection iterations,
+        representable as the platform's unsigned pointer-sized integer.
+        Defaults to the Rust ``NearestCorrelationOpts::default()`` value
+        (currently ``200``).
     tol : float or None
         Frobenius-norm tolerance between successive iterates. Defaults to
         the Rust ``NearestCorrelationOpts::default()`` value (currently
@@ -2777,8 +2786,14 @@ def nearest_correlation(
     Raises
     ------
     ValueError
-        If the input shape does not match ``n``, is grossly asymmetric, or
-        the diagonal is far from 1.
+        If ``n * n`` overflows the platform's unsigned pointer-sized integer
+        range, the input shape does not match ``n``, is grossly asymmetric,
+        or the diagonal is far from 1.
+    OverflowError
+        If ``n`` or ``max_iter`` is negative or exceeds the platform's
+        unsigned pointer-sized integer range.
+    TypeError
+        If ``n`` or a supplied ``max_iter`` is not an integer.
     RuntimeError
         If the projection does not converge within ``max_iter`` iterations.
 
@@ -2805,7 +2820,8 @@ def cholesky_decompose(matrix: Sequence[float] | Sequence[Sequence[float]], n: i
         Flat row-major correlation matrix (length ``n * n``) or a 2-D
         ``n x n`` list/array of rows.
     n : int
-        Dimension of the square matrix.
+        Non-negative square-matrix dimension representable as the platform's
+        unsigned pointer-sized integer; ``n * n`` must also fit that range.
 
     Returns
     -------
@@ -2819,9 +2835,15 @@ def cholesky_decompose(matrix: Sequence[float] | Sequence[Sequence[float]], n: i
     Raises
     ------
     ValueError
-        If the matrix shape is wrong, an entry is non-finite, or the matrix is
-        indefinite. The message includes the mismatched dimensions or the
-        offending position and value.
+        If ``n * n`` overflows the platform's unsigned pointer-sized integer
+        range, the matrix shape is wrong, an entry is non-finite, or the
+        matrix is indefinite. The message includes the mismatched dimensions
+        or the offending position and value.
+    OverflowError
+        If ``n`` is negative or exceeds the platform's unsigned
+        pointer-sized integer range.
+    TypeError
+        If ``n`` is not an integer.
 
     Examples
     --------

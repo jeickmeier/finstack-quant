@@ -12,6 +12,7 @@ use crate::pricer::{
 use crate::results::ValuationResult;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurfaceAxis};
 use finstack_quant_core::money::Money;
 
 use finstack_quant_models::closed_form::quanto::{quanto_call, quanto_put};
@@ -63,6 +64,8 @@ fn collect_quanto_inputs(
     // surfaces must be queried at the CIRP forward rather than moneyness 1.0.
     let sigma_fx = if let Some(fx_vol_surface_id) = &inst.fx_vol_surface_id {
         let fx_vol_surface = curves.get_surface(fx_vol_surface_id.as_str())?;
+        fx_vol_surface.require_quote_type(VolQuoteType::BlackLognormal)?;
+        fx_vol_surface.require_secondary_axis(VolSurfaceAxis::Strike)?;
         let fx_spot = resolve_quanto_fx_spot(inst, curves, as_of);
         match fx_spot {
             Some(s_fx) if s_fx.is_finite() && s_fx > 0.0 => {

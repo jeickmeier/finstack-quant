@@ -3,6 +3,11 @@
 //! Exposes canonical European, Asian, LSMC, Heston, and Greek workflows;
 //! closed-form Black-Scholes references live at `finstack_quant.models`. Advanced Rust process, discretization, RNG, and payoff types
 //! remain Rust-only.
+//!
+//! Compact GBM paths retain at most 100,000 paths and 64 million scalar values
+//! across paths and shared time grids. LSMC accepts at most 10 million independent
+//! paths and 100,000 steps; each pricing pass limits retained spots to 64 million
+//! values, including time zero and antithetic partners.
 
 mod engine;
 mod greeks;
@@ -14,7 +19,7 @@ use pyo3::types::PyList;
 
 /// Register the `finstack_quant.models.monte_carlo` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "monte_carlo")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "monte_carlo")?;
     m.setattr(
         "__doc__",
         "Monte Carlo convenience bindings (finstack-quant-models).",
@@ -45,13 +50,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "monte_carlo",
-        "finstack_quant.models",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Python,
     )?;
 
     Ok(())

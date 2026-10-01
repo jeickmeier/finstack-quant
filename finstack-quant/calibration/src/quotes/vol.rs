@@ -117,7 +117,10 @@ pub enum VolQuote {
         /// Implied volatility in canonical decimal units: absolute rate
         /// volatility for normal quotes and Black volatility for lognormal quotes.
         vol: f64,
-        /// Volatility quoting convention.
+        /// Volatility quoting convention. Shifted Black quotes require a
+        /// `ShiftedLognormal` calibration plan supplying their displacement;
+        /// Hull-White calibration rejects them because its quote contract
+        /// carries no displacement.
         #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         quote_type: VolQuoteType,
         /// Option exercise conventions
@@ -142,7 +145,9 @@ pub enum VolQuote {
         /// Implied volatility in canonical decimal units: absolute rate
         /// volatility for normal quotes and Black volatility for lognormal quotes.
         vol: f64,
-        /// Volatility quoting convention.
+        /// Volatility quoting convention. Hull-White calibration accepts
+        /// normal and unshifted Black quotes; it rejects shifted Black
+        /// because this quote does not carry a displacement.
         #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         quote_type: VolQuoteType,
         /// `true` for cap, `false` for floor.

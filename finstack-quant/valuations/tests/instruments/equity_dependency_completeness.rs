@@ -58,7 +58,7 @@ fn build_vol_surface(id: &str) -> VolSurface {
 #[test]
 fn test_commodity_option_equity_dependencies_complete() {
     let as_of = date!(2025 - 01 - 01);
-    let expiry = as_of.add_months(6);
+    let expiry = as_of.add_months(6).expect("valid date shift");
 
     let option = CommodityOption::builder()
         .id(InstrumentId::new("WTI-OPT-DEPS"))
@@ -115,7 +115,7 @@ fn test_commodity_option_equity_dependencies_complete() {
 #[test]
 fn test_missing_equity_spot_fails() {
     let as_of = date!(2025 - 01 - 01);
-    let expiry = as_of.add_months(6);
+    let expiry = as_of.add_months(6).expect("valid date shift");
 
     let option = CommodityOption::builder()
         .id(InstrumentId::new("WTI-OPT-SPOT-MISSING"))

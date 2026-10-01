@@ -156,6 +156,10 @@ impl NormalizationEngine {
 
     /// Merge normalized values and their units atomically into a result node.
     ///
+    /// A successful nonempty merge clears the attached check report because
+    /// its findings describe the values before this modification. Rerun the
+    /// desired check suite to validate the updated results.
+    ///
     /// # Arguments
     ///
     /// * `results` - Result whose numeric, monetary, and type maps are updated together.
@@ -203,6 +207,7 @@ impl NormalizationEngine {
                 .monetary_nodes
                 .insert(output_node_id.to_string(), money_map);
         }
+        results.check_report = None;
         Ok(())
     }
 

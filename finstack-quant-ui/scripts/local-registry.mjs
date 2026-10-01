@@ -18,9 +18,14 @@ export async function serveLocalRegistry(root) {
         await readFile(path.join(root, "public/r", name), "utf8"),
       );
       if (item.dependencies)
-        item.dependencies = item.dependencies.map((value) =>
-          value === `${pkg.name}@${pkg.version}` ? `file:${wasm}` : value,
-        );
+        item.dependencies = item.dependencies.map((value) => {
+          if (!value.startsWith(`${pkg.name}@`)) return value;
+          if (value !== `${pkg.name}@${pkg.version}`)
+            throw Error(
+              `${name} pins ${value}, but the local package is ${pkg.version}; run mise run ui-gen and mise run ui-build`,
+            );
+          return `file:${wasm}`;
+        });
       await writeFile(path.join(staged, name), JSON.stringify(item));
     }
     server = await serveExport(staged);

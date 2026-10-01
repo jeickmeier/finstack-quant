@@ -5,26 +5,43 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::{FormatOpts, Money};
 
 #[test]
+fn money_preserves_nonzero_amount_at_maximum_configured_scale() {
+    let mut cfg = FinstackConfig::default();
+    cfg.rounding
+        .ingest_scale
+        .set_scale(Currency::USD, 28)
+        .unwrap();
+    cfg.rounding
+        .output_scale
+        .set_scale(Currency::USD, 28)
+        .unwrap();
+    let exact_amount = rust_decimal::Decimal::new(1, 28);
+    let money = Money::from_decimal_with_config(exact_amount, Currency::USD, &cfg)
+        .expect("smallest positive Decimal amount");
+    assert_eq!(money.amount_decimal(), exact_amount);
+    assert_eq!(
+        money.format_with_config(&cfg),
+        "USD 0.0000000000000000000000000001"
+    );
+    assert!(!finstack_quant_core::config::rounding_context_from(&cfg)
+        .is_effectively_zero_money(money.amount(), Currency::USD));
+}
+
+#[test]
 fn money_display_respects_output_scale() {
     let mut cfg = FinstackConfig::default();
     cfg.rounding.mode = RoundingMode::AwayFromZero;
     // Keep ingest high so display rounding is the observable effect
-    cfg.rounding.ingest_scale = CurrencyScalePolicy {
-        overrides: Default::default(),
-    };
-    cfg.rounding.output_scale = CurrencyScalePolicy {
-        overrides: Default::default(),
-    };
+    cfg.rounding.ingest_scale = CurrencyScalePolicy::default();
+    cfg.rounding.output_scale = CurrencyScalePolicy::default();
     let m = Money::new_with_config(1.23456, Currency::USD, &cfg).expect("valid money fixture");
     // default USD decimals is 2 by ISO; override output to 3 for the test
     let mut cfg = FinstackConfig::default();
     cfg.rounding.mode = RoundingMode::AwayFromZero;
-    cfg.rounding.ingest_scale = CurrencyScalePolicy {
-        overrides: Default::default(),
-    };
-    cfg.rounding.output_scale = CurrencyScalePolicy {
-        overrides: std::collections::BTreeMap::from([(Currency::USD, 3)]),
-    };
+    cfg.rounding.ingest_scale = CurrencyScalePolicy::default();
+    cfg.rounding.output_scale =
+        CurrencyScalePolicy::new(std::collections::BTreeMap::from([(Currency::USD, 3)]))
+            .expect("supported decimal scale");
     let s = m.format_with_config(&cfg);
     assert_eq!(s, "USD 1.235");
 }
@@ -126,7 +143,10 @@ fn configured_decimal_ingestion_preserves_precision() {
     let amount = "9007199254740993.125".parse().unwrap();
     let mut cfg = FinstackConfig::default();
     cfg.rounding.mode = RoundingMode::Floor;
-    cfg.rounding.ingest_scale.overrides.insert(Currency::USD, 2);
+    cfg.rounding
+        .ingest_scale
+        .set_scale(Currency::USD, 2)
+        .expect("valid decimal scale");
     let money = Money::from_decimal_with_config(amount, Currency::USD, &cfg).unwrap();
     assert_eq!(
         money,

@@ -41,6 +41,39 @@ fn parse_extrapolation(s: &str) -> Result<ExtrapolationPolicy, JsValue> {
     s.parse::<ExtrapolationPolicy>().map_err(to_js_err)
 }
 
+fn check_option_fields(options: &JsValue, fields: &[&str]) -> Result<(), JsValue> {
+    if !options.is_object() {
+        return Err(to_js_err("options must be an object"));
+    }
+    // serde-wasm-bindgen looks up declared struct fields without visiting unknown keys.
+    for key in js_sys::Object::keys(&js_sys::Object::from(options.clone())).iter() {
+        if let Some(key) = key.as_string() {
+            if !fields.contains(&key.as_str()) {
+                return Err(to_js_err(format!("unknown field `{key}` in curve options")));
+            }
+        }
+    }
+    Ok(())
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct DiscountCurveOptions {
+    id: String,
+    base_date: String,
+    knots: Vec<f64>,
+    #[serde(default)]
+    interp: Option<String>,
+    #[serde(default)]
+    extrapolation: Option<String>,
+    #[serde(default)]
+    day_count: Option<String>,
+    #[serde(default)]
+    validation_mode: Option<String>,
+    #[serde(default)]
+    forward_floor: Option<f64>,
+}
+
 /// Discount factor curve for present-value calculations.
 ///
 /// Built from `(time, discount_factor)` pillars where `time` is a year
@@ -54,14 +87,14 @@ fn parse_extrapolation(s: &str) -> Result<ExtrapolationPolicy, JsValue> {
 /// import init, { core } from "finstack-quant-wasm";
 /// await init();
 /// // OIS-style USD curve, base-date 2025-01-02, three pillars.
-/// const curve = new core.DiscountCurve(
-///   "USD-OIS",
-///   "2025-01-02",
-///   [0.0, 1.0, 1.0, 0.95, 5.0, 0.78],
-///   "monotone_convex",
-///   "flat_forward",
-///   "act_365f",
-/// );
+/// const curve = new core.DiscountCurve({
+///   id: "USD-OIS",
+///   baseDate: "2025-01-02",
+///   knots: [0.0, 1.0, 1.0, 0.95, 5.0, 0.78],
+///   interp: "monotone_convex",
+///   extrapolation: "flat_forward",
+///   dayCount: "act_365f",
+/// });
 /// curve.df(2.5);          // discount factor at 2.5y
 /// curve.zero(2.5);        // continuously-compounded zero rate at 2.5y
 /// ```
@@ -72,65 +105,72 @@ pub struct JsDiscountCurve {
 
 #[wasm_bindgen(js_class = DiscountCurve)]
 impl JsDiscountCurve {
-    /// Construct from an array of `[time, df]` pairs.
+    /// Construct a discount curve using named inputs and canonical Rust defaults.
     ///
-    /// @param id - Curve identifier (e.g. `"USD-OIS"`). Used as the lookup
-    /// key inside a `MarketContext`.
-    /// @param baseDate - ISO-8601 date string (`"YYYY-MM-DD"`). All `time`
-    /// values are interpreted as year fractions from this date under
-    /// `dayCount`.
-    /// @param knots - Flat `[t0, df0, t1, df1, …]` array. `t` in years,
-    /// `df` strictly positive. Length must be even.
-    /// @param interp - Interpolation style. When omitted, the Rust builder
-    /// default (`"monotone_convex"`) applies. One of `"linear"`,
-    /// `"log_linear"`, `"monotone_convex"`, `"cubic_hermite"`,
-    /// `"piecewise_quadratic_forward"`.
-    /// @param extrapolation - Extrapolation policy. When omitted, the Rust
-    /// builder default (`"flat_forward"`) applies. One of `"flat_zero"`,
-    /// `"flat_forward"`, `"nan"`.
-    /// @param dayCount - Day-count convention (defaults to curve-ID inference).
-    /// @param validationMode - Rust validation preset: `"market_standard"`
-    /// (default) or `"negative_rate_friendly"`.
-    /// @param forwardFloor - Required minimum implied forward when using
-    /// `"negative_rate_friendly"`.
-    /// @returns The constructed `DiscountCurve`.
-    /// @throws If `knots` length is odd, the date is malformed, the
-    /// interpolation style is unknown, or any `df` is non-positive.
+    /// # Arguments
+    ///
+    /// * `options` - DiscountCurveOptions object: lookup id, ISO baseDate, flat
+    ///   time/positive-discount-factor knots, and optional interp, extrapolation,
+    ///   dayCount, validationMode and forwardFloor. Times are year fractions
+    ///   from baseDate. Arrays and typed arrays are accepted. Omitted policies
+    ///   use Rust defaults: monotone_convex interpolation, flat_forward
+    ///   extrapolation, curve-ID day-count inference and market_standard
+    ///   validation. negative_rate_friendly requires a finite forwardFloor
+    ///   expressed as a decimal continuously compounded forward rate.
+    ///
+    /// # Returns
+    ///
+    /// The validated `DiscountCurve`.
+    ///
+    /// # Errors
+    ///
+    /// Throws Error if options cannot be decoded, contain unknown fields,
+    /// or canonical validation rejects the date, conventions, knots, or validation policy.
     #[wasm_bindgen(constructor)]
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "preserves existing positional constructor arguments and appends validation options compatibly"
-    )]
-    pub fn new(
-        id: &str,
-        base_date: &str,
-        knots: &[f64],
-        interp: Option<String>,
-        extrapolation: Option<String>,
-        day_count: Option<String>,
-        validation_mode: Option<String>,
-        forward_floor: Option<f64>,
-    ) -> Result<JsDiscountCurve, JsValue> {
-        let base = parse_iso_date(base_date)?;
-        if !knots.len().is_multiple_of(2) {
+    pub fn new(options: JsValue) -> Result<JsDiscountCurve, JsValue> {
+        check_option_fields(
+            &options,
+            &[
+                "id",
+                "baseDate",
+                "knots",
+                "interp",
+                "extrapolation",
+                "dayCount",
+                "validationMode",
+                "forwardFloor",
+            ],
+        )?;
+        let options = serde_wasm_bindgen::from_value(options).map_err(to_js_err)?;
+        Self::build(options)
+    }
+
+    fn build(options: DiscountCurveOptions) -> Result<JsDiscountCurve, JsValue> {
+        let base = parse_iso_date(&options.base_date)?;
+        if !options.knots.len().is_multiple_of(2) {
             return Err(to_js_err("knots array must have even length (t, df pairs)"));
         }
-        let pairs: Vec<(f64, f64)> = knots.chunks_exact(2).map(|c| (c[0], c[1])).collect();
+        let pairs = options.knots.chunks_exact(2).map(|c| (c[0], c[1]));
 
-        let mut builder = RustDiscountCurve::builder(id).base_date(base).knots(pairs);
-        if let Some(ref s) = interp {
+        let mut builder = RustDiscountCurve::builder(options.id)
+            .base_date(base)
+            .knots(pairs);
+        if let Some(ref s) = options.interp {
             builder = builder.interp(parse_interp_style(s)?);
         }
-        if let Some(ref s) = extrapolation {
+        if let Some(ref s) = options.extrapolation {
             builder = builder.extrapolation(parse_extrapolation(s)?);
         }
-        if let Some(ref s) = day_count {
+        if let Some(ref s) = options.day_count {
             builder = builder.day_count(parse_day_count(s)?);
         }
         builder = builder.validation(
             ValidationMode::from_preset(
-                validation_mode.as_deref().unwrap_or("market_standard"),
-                forward_floor,
+                options
+                    .validation_mode
+                    .as_deref()
+                    .unwrap_or("market_standard"),
+                options.forward_floor,
             )
             .map_err(to_js_err)?,
         );
@@ -388,23 +428,48 @@ impl JsForwardCurve {
     ///
     /// # Errors
     ///
-    /// Throws Error when options cannot be decoded or canonical curve validation rejects dates, conventions, knots, tenor, reset lag, or projection grid.
+    /// Throws Error when options contain unknown fields, cannot be decoded, or canonical curve validation rejects dates, conventions, knots, tenor, reset lag, or projection grid.
     #[wasm_bindgen(constructor)]
     pub fn new(options: JsValue) -> Result<JsForwardCurve, JsValue> {
+        check_option_fields(
+            &options,
+            &[
+                "id",
+                "tenor",
+                "baseDate",
+                "knots",
+                "dayCount",
+                "interp",
+                "extrapolation",
+                "projectionGrid",
+                "resetLag",
+            ],
+        )?;
         let options = serde_wasm_bindgen::from_value(options).map_err(to_js_err)?;
         Self::build(options)
     }
 
     /// Forward rate at year fraction `t`.
-    /// @param t - Time from the curve base date in years.
+    ///
+    /// The stored rate is annualized on the curve's day-count basis. Convert
+    /// its accrual growth to the contractual index basis before calculating a
+    /// coupon with a different accrual convention; Rust instrument pricing
+    /// performs this conversion from the contractual schedule.
+    /// @param t - Time from the curve base date in years using the curve day count.
+    /// @returns Simple forward rate as a decimal, annualized on the curve day count.
     #[wasm_bindgen(js_name = rate)]
     pub fn rate(&self, t: f64) -> f64 {
         self.inner.rate(t)
     }
 
     /// Discount-factor-implied simple forward over `(t1, t2)`.
+    ///
+    /// The denominator is the curve-time span `t2 - t1`. To express the
+    /// implied growth on another contractual index basis, multiply by that
+    /// span and divide by the index accrual fraction for the same dated period.
     /// @param t1 - Earlier curve time in years used as the start of the forward interval.
     /// @param t2 - Later curve time in years used as the end of the forward interval.
+    /// @returns Simple forward rate as a decimal, annualized on the curve day count.
     ///
     /// # Errors
     ///
@@ -872,14 +937,15 @@ impl JsVolCube {
     ///   `[alpha0, beta0, rho0, nu0, shift0, alpha1, …]`.
     ///   Length must equal `expiries.len() * tenors.len() * 5`.
     ///   Pass `NaN` for the shift element of a node to omit the shift.
+    ///   The `nu` component is nonnegative; zero gives deterministic volatility.
     /// * `forwards` - Row-major forward rates, one per grid node.
-    /// @param interpolation_mode - Volatility-surface interpolation mode used between quoted points.
+    /// * `interpolation_mode` - Volatility interpolation contract, `vol` or `total_variance`; omitted selects `vol`.
     ///
     /// # Errors
     ///
     /// Throws a JavaScript exception if an axis is empty, non-finite,
     /// non-positive, or not strictly increasing; the parameter or forward array
-    /// has the wrong length; a forward is non-finite; any SABR node has invalid
+    /// has the wrong length or its grid-size product overflows; a forward is non-finite; any SABR node has invalid
     /// alpha, beta, rho, nu, or shift; or `interpolationMode` is neither `vol`
     /// nor `total_variance`.
     #[wasm_bindgen(constructor)]
@@ -891,8 +957,14 @@ impl JsVolCube {
         forwards: &[f64],
         interpolation_mode: Option<String>,
     ) -> Result<JsVolCube, JsValue> {
-        let n_nodes = expiries.len() * tenors.len();
-        if params_flat.len() != n_nodes * 5 {
+        let n_nodes = expiries
+            .len()
+            .checked_mul(tenors.len())
+            .ok_or_else(|| to_js_err("VolCube grid dimensions are too large"))?;
+        let n_params = n_nodes
+            .checked_mul(5)
+            .ok_or_else(|| to_js_err("VolCube parameter dimensions are too large"))?;
+        if params_flat.len() != n_params {
             return Err(to_js_err(format!(
                 "params_flat length {} != {} nodes * 5 params",
                 params_flat.len(),
@@ -972,8 +1044,9 @@ impl JsFxDeltaVolSurface {
     /// Construct an FX delta-quoted vol surface with 25-delta wings.
     ///
     /// Optional `rr10d` / `bf10d` add 10-delta wings for richer wing
-    /// interpolation. Pass an empty array for both to omit; if one is
-    /// provided, the other must be too.
+    /// interpolation. Omit both arguments (or pass `undefined`) for a
+    /// three-point smile. Supplied wings must both match the expiry count;
+    /// empty arrays are invalid.
     ///
     /// # Arguments
     /// * `id`        - Stable surface identifier.
@@ -1116,16 +1189,16 @@ mod tests {
 
     #[test]
     fn discount_curve_new_and_accessors() {
-        let curve = JsDiscountCurve::new(
-            "USD-OIS",
-            "2024-01-15",
-            &[0.5, 0.99, 1.0, 0.98, 2.0, 0.96],
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
+        let curve = JsDiscountCurve::build(DiscountCurveOptions {
+            id: "USD-OIS".into(),
+            base_date: "2024-01-15".into(),
+            knots: vec![0.5, 0.99, 1.0, 0.98, 2.0, 0.96],
+            interp: None,
+            extrapolation: None,
+            day_count: None,
+            validation_mode: None,
+            forward_floor: None,
+        })
         .expect("discount curve");
         assert_eq!(curve.id(), "USD-OIS");
         assert_eq!(curve.base_date(), "2024-01-15");

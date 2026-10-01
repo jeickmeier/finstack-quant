@@ -20,7 +20,7 @@
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.8.0",
+        "wasmVersion": "0.9.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]

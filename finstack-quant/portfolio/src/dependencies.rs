@@ -8,6 +8,7 @@
 //! when a subset of market data changes.
 
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::HashMap;
 use finstack_quant_core::HashSet;
@@ -30,6 +31,10 @@ pub enum MarketFactorKey {
         /// Curve kind (discount, forward, credit, or inflation).
         kind: RatesCurveKind,
     },
+    /// Base-correlation curve used by credit-index loss pricing.
+    BaseCorrelation(CurveId),
+    /// Composite credit-index data resolved against the request market.
+    CreditIndex(CurveId),
     /// Equity, commodity, or other spot price identifier.
     Spot(String),
     /// Volatility surface identifier.
@@ -48,6 +53,11 @@ pub enum MarketFactorKey {
 impl MarketFactorKey {
     /// Create a curve key from a `CurveId` and [`RatesCurveKind`].
     ///
+    /// # Arguments
+    ///
+    /// * `id` - Exact curve identifier used by the instrument and market snapshot.
+    /// * `kind` - Curve role distinguishing discount, forward, credit, and inflation inputs.
+    ///
     /// # Returns
     ///
     /// Curve market-factor key.
@@ -56,6 +66,10 @@ impl MarketFactorKey {
     }
 
     /// Create a spot key.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Exact scalar identifier for the equity, commodity, or other spot input.
     ///
     /// # Returns
     ///
@@ -66,6 +80,10 @@ impl MarketFactorKey {
 
     /// Create a vol-surface key.
     ///
+    /// # Arguments
+    ///
+    /// * `id` - Exact volatility-surface identifier in market data.
+    ///
     /// # Returns
     ///
     /// Volatility-surface market-factor key.
@@ -75,6 +93,11 @@ impl MarketFactorKey {
 
     /// Create an FX-pair key.
     ///
+    /// # Arguments
+    ///
+    /// * `base` - Currency whose unit is quoted by the FX rate.
+    /// * `quote` - Currency in which one unit of `base` is expressed.
+    ///
     /// # Returns
     ///
     /// FX market-factor key.
@@ -83,6 +106,10 @@ impl MarketFactorKey {
     }
 
     /// Create a time-series key.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Exact scalar time-series identifier in market data.
     ///
     /// # Returns
     ///
@@ -107,6 +134,9 @@ pub fn flatten_dependencies(deps: &MarketDependencies) -> HashSet<MarketFactorKe
     for (curve_id, kind) in deps.curves.all_with_kind() {
         keys.insert(MarketFactorKey::curve(curve_id, kind));
     }
+    for index_id in &deps.credit_index_ids {
+        keys.insert(MarketFactorKey::CreditIndex(index_id.clone()));
+    }
     for spot_id in &deps.market_scalar_ids {
         keys.insert(MarketFactorKey::Spot(spot_id.clone()));
     }
@@ -124,6 +154,62 @@ pub fn flatten_dependencies(deps: &MarketDependencies) -> HashSet<MarketFactorKe
     }
 
     keys
+}
+
+/// Resolve a credit-index aggregate to every curve its pricing data references.
+///
+/// Index and issuer hazards are included together because instrument dependency
+/// declarations do not encode which loss model reads each curve. Issuer curves
+/// are sorted and deduplicated so assignment reports remain deterministic.
+///
+/// # Arguments
+///
+/// * `market` - Request market snapshot containing the referenced credit-index data.
+/// * `index_id` - Exact credit-index identifier used to look up its hazard and correlation curves.
+///
+/// # Errors
+///
+/// Propagates a missing credit-index lookup error.
+pub(crate) fn credit_index_keys(
+    market: &MarketContext,
+    index_id: &CurveId,
+) -> finstack_quant_core::Result<Vec<MarketFactorKey>> {
+    let index = market.get_credit_index(index_id.as_str())?;
+    let mut hazards = std::collections::BTreeSet::from([index.index_credit_curve.id().clone()]);
+    if let Some(issuers) = &index.issuer_credit_curves {
+        hazards.extend(issuers.values().map(|curve| curve.id().clone()));
+    }
+    let mut keys: Vec<_> = hazards
+        .into_iter()
+        .map(|id| MarketFactorKey::curve(id, RatesCurveKind::Credit))
+        .collect();
+    keys.push(MarketFactorKey::BaseCorrelation(
+        index.base_correlation_curve.id().clone(),
+    ));
+    Ok(keys)
+}
+
+/// Normalize instrument dependencies and resolve composite credit-index inputs.
+///
+/// # Arguments
+///
+/// * `deps` - Instrument dependency description; credit-index inputs expand to all
+///   aggregate and issuer hazards plus the base-correlation curve.
+/// * `market` - Request market snapshot supplying the current credit-index constituents.
+///
+/// # Errors
+///
+/// Propagates a missing credit-index lookup error.
+pub(crate) fn resolved_dependencies(
+    deps: &MarketDependencies,
+    market: &MarketContext,
+) -> finstack_quant_core::Result<HashSet<MarketFactorKey>> {
+    let mut keys = flatten_dependencies(deps);
+    for index_id in &deps.credit_index_ids {
+        keys.remove(&MarketFactorKey::CreditIndex(index_id.clone()));
+        keys.extend(credit_index_keys(market, index_id)?);
+    }
+    Ok(keys)
 }
 
 fn finalize_dependency_map(
@@ -170,6 +256,11 @@ impl DependencyIndex {
     /// flattens each into normalized keys, and records the position index.
     /// Instruments that return an error from `market_dependencies()` are
     /// tracked as unresolved and conservatively included in every query.
+    ///
+    /// # Arguments
+    ///
+    /// * `positions` - Ordered portfolio positions whose instrument dependencies
+    ///   determine the resulting zero-based position indices.
     ///
     /// # Returns
     ///
@@ -251,6 +342,12 @@ impl DependencyIndex {
 
     /// Look up position indices affected by a single market factor key.
     ///
+    /// # Arguments
+    ///
+    /// * `key` - Exact normalized market input to look up. Composite credit-index
+    ///   keys remain indexed by identity; use `affected_positions` to resolve
+    ///   their underlying curves against a request market.
+    ///
     /// # Returns
     ///
     /// Slice of matching position indices, or an empty slice when the key is absent.
@@ -261,10 +358,29 @@ impl DependencyIndex {
     /// Collect the deduplicated, sorted union of position indices affected by
     /// any of the supplied keys, plus all unresolved positions.
     ///
+    /// Composite credit-index dependencies are resolved against `market`, so
+    /// changing an index hazard, issuer hazard, or base correlation reprices
+    /// every position that consumes the index.
+    ///
+    /// # Arguments
+    ///
+    /// * `keys` - Changed market inputs, including composite index replacements.
+    /// * `market` - Request market snapshot supplying the current credit-index
+    ///   curve references; missing referenced indices return an error.
+    ///
     /// # Returns
     ///
     /// Sorted affected-position indices.
-    pub fn affected_positions(&self, keys: &[MarketFactorKey]) -> Vec<usize> {
+    ///
+    /// # Errors
+    ///
+    /// Returns the market-data lookup error if a tracked credit-index aggregate
+    /// is absent from the request market.
+    pub fn affected_positions(
+        &self,
+        keys: &[MarketFactorKey],
+        market: &MarketContext,
+    ) -> finstack_quant_core::Result<Vec<usize>> {
         let mut seen = HashSet::default();
         let mut result = Vec::new();
 
@@ -279,6 +395,23 @@ impl DependencyIndex {
             .any(|key| matches!(key, MarketFactorKey::Fx { .. }));
         for key in keys {
             for &idx in self.positions_for_key(key) {
+                if seen.insert(idx) {
+                    result.push(idx);
+                }
+            }
+        }
+        for (indexed_key, indices) in &self.inner {
+            let MarketFactorKey::CreditIndex(index_id) = indexed_key else {
+                continue;
+            };
+            if !keys.contains(indexed_key)
+                && !credit_index_keys(market, index_id)?
+                    .iter()
+                    .any(|key| keys.contains(key))
+            {
+                continue;
+            }
+            for &idx in indices {
                 if seen.insert(idx) {
                     result.push(idx);
                 }
@@ -303,11 +436,10 @@ impl DependencyIndex {
         }
 
         result.sort_unstable();
-        result
+        Ok(result)
     }
 
-    /// Position indices whose instruments failed to report dependencies or
-    /// returned an empty compatibility-default dependency set.
+    /// Position indices whose instruments failed to report dependencies.
     ///
     /// # Returns
     ///
@@ -345,8 +477,118 @@ impl DependencyIndex {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
+
+    pub(crate) fn credit_index_fixture() -> (
+        finstack_quant_valuations::instruments::CdsTranche,
+        MarketContext,
+        finstack_quant_core::dates::Date,
+    ) {
+        use finstack_quant_core::market_data::term_structures::{
+            BaseCorrelationCurve, CreditIndexData, DiscountCurve, HazardCurve,
+        };
+        use std::sync::Arc;
+        let as_of = time::macros::date!(2025 - 01 - 01);
+        let discount = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.8), (10.0, 0.6)])
+            .build()
+            .expect("discount");
+        let hazard = HazardCurve::builder("INDEX-HZ")
+            .base_date(as_of)
+            .recovery_rate(0.4)
+            .knots([(1.0, 0.01), (3.0, 0.015), (5.0, 0.02), (10.0, 0.025)])
+            .build()
+            .expect("hazard");
+        let correlation = BaseCorrelationCurve::builder("INDEX-BC")
+            .knots([
+                (3.0, 0.25),
+                (7.0, 0.30),
+                (10.0, 0.34),
+                (15.0, 0.40),
+                (30.0, 0.50),
+            ])
+            .build()
+            .expect("base correlation");
+        let index = CreditIndexData::builder()
+            .num_constituents(125)
+            .recovery_rate(0.4)
+            .index_credit_curve(Arc::new(hazard.clone()))
+            .base_correlation_curve(Arc::new(correlation.clone()))
+            .build()
+            .expect("index");
+        let market = MarketContext::new()
+            .insert(discount)
+            .insert(hazard)
+            .insert(correlation)
+            .insert_credit_index("INDEX", index)
+            .expect("credit index dependencies");
+        let mut tranche =
+            finstack_quant_valuations::instruments::CdsTranche::example().expect("tranche");
+        tranche.credit_index_id = "INDEX".into();
+        (tranche, market, as_of)
+    }
+
+    #[test]
+    fn credit_index_routing_resolves_hazard_issuer_and_correlation_on_request_market() {
+        use crate::position::{Position, PositionUnit};
+        use finstack_quant_core::market_data::term_structures::HazardCurve;
+        use std::sync::Arc;
+        let (tranche, market, as_of) = credit_index_fixture();
+        let position = Position::new(
+            "tranche",
+            crate::types::DUMMY_ENTITY_ID,
+            "tranche",
+            Arc::new(tranche),
+            1.0,
+            PositionUnit::Units,
+        )
+        .expect("position");
+        let dependency_index = DependencyIndex::build(&[position]);
+        let issuer = HazardCurve::builder("ISSUER-HZ")
+            .base_date(as_of)
+            .recovery_rate(0.4)
+            .knots([(1.0, 0.01), (5.0, 0.02)])
+            .build()
+            .expect("issuer");
+        let mut index = market
+            .get_credit_index("INDEX")
+            .expect("index")
+            .as_ref()
+            .clone();
+        index.num_constituents = 1;
+        index.issuer_credit_curves = Some(std::collections::BTreeMap::from_iter([(
+            "issuer".to_string(),
+            Arc::new(issuer.clone()),
+        )]));
+        let market = market
+            .insert(issuer)
+            .insert_credit_index("INDEX", index)
+            .expect("credit index dependencies");
+        for key in [
+            MarketFactorKey::curve("INDEX-HZ".into(), RatesCurveKind::Credit),
+            MarketFactorKey::curve("ISSUER-HZ".into(), RatesCurveKind::Credit),
+            MarketFactorKey::BaseCorrelation("INDEX-BC".into()),
+            MarketFactorKey::CreditIndex("INDEX".into()),
+        ] {
+            assert_eq!(
+                dependency_index
+                    .affected_positions(&[key], &market)
+                    .expect("routing"),
+                vec![0]
+            );
+        }
+        assert!(dependency_index
+            .affected_positions(
+                &[MarketFactorKey::curve(
+                    "INDEX-HZ".into(),
+                    RatesCurveKind::Credit
+                )],
+                &MarketContext::new(),
+            )
+            .is_err());
+    }
 
     #[test]
     fn flatten_empty_deps() {
@@ -431,7 +673,12 @@ mod tests {
         };
 
         assert_eq!(
-            index.affected_positions(&[MarketFactorKey::fx(Currency::USD, Currency::EUR)]),
+            index
+                .affected_positions(
+                    &[MarketFactorKey::fx(Currency::USD, Currency::EUR)],
+                    &MarketContext::new()
+                )
+                .expect("dependency routing"),
             vec![7, 11],
         );
     }

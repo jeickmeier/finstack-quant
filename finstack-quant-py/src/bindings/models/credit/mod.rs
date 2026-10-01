@@ -1742,16 +1742,10 @@ fn parse_direction(value: &str) -> PyResult<ThresholdDirection> {
 }
 
 pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let module = PyModule::new(py, "credit")?;
+    let module = crate::bindings::module_utils::new_submodule(parent, "credit")?;
     module.setattr(
         "__doc__",
         "Product-independent credit models, scoring, migration, PD, LGD, recovery, and liability-management analytics.",
-    )?;
-    let qualified_name = crate::bindings::module_utils::set_submodule_package_by_package(
-        parent,
-        &module,
-        "credit",
-        "finstack_quant.models",
     )?;
     module.add_class::<PyAssetDynamics>()?;
     module.add_class::<PyBarrierType>()?;
@@ -1791,6 +1785,10 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
         ],
     )?;
     module.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule_at(py, parent, &module, &qualified_name)?;
+    crate::bindings::module_utils::attach_submodule(
+        parent,
+        &module,
+        crate::bindings::module_utils::Exposure::Python,
+    )?;
     Ok(())
 }

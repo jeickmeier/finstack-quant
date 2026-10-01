@@ -93,6 +93,7 @@ pub fn standard_market_context() -> MarketContext {
         .insert(standard_hazard_curve())
         .insert(standard_correlation_curve())
         .insert_credit_index("CDX.NA.IG.42", standard_credit_index())
+        .expect("standard credit index dependencies should exist")
 }
 
 /// Create a market whose index hazard curve carries a lossless replay recipe.
@@ -120,6 +121,7 @@ pub fn replayable_market_context() -> MarketContext {
     source
         .insert(hazard)
         .insert_credit_index("CDX.NA.IG.42", index)
+        .expect("replayable credit index dependencies should exist")
 }
 
 /// Create a market context with heterogeneous issuer curves
@@ -146,6 +148,10 @@ pub fn market_context_with_issuers(n: usize) -> MarketContext {
     );
 
     let base_corr_curve = standard_correlation_curve();
+    let mut market = MarketContext::new()
+        .insert(discount_curve)
+        .insert(Arc::clone(&index_curve))
+        .insert(base_corr_curve.clone());
 
     let mut issuer_curves = finstack_quant_core::HashMap::default();
     for i in 0..n {
@@ -162,6 +168,7 @@ pub fn market_context_with_issuers(n: usize) -> MarketContext {
             ])
             .build()
             .unwrap();
+        market = market.insert(hz.clone());
         issuer_curves.insert(id, Arc::new(hz));
     }
 
@@ -174,10 +181,9 @@ pub fn market_context_with_issuers(n: usize) -> MarketContext {
         .build()
         .unwrap();
 
-    MarketContext::new()
-        .insert(discount_curve)
-        .insert(index_curve.as_ref().clone())
+    market
         .insert_credit_index("CDX.NA.IG.42", index)
+        .expect("heterogeneous credit index dependencies should exist")
 }
 
 /// Create standard mezzanine tranche (3-7%)

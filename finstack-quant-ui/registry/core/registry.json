@@ -23,7 +23,7 @@
       "categories": ["Primitive Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.8.0",
+        "wasmVersion": "0.9.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
@@ -49,7 +49,7 @@
       "categories": ["Primitive Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.8.0",
+        "wasmVersion": "0.9.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
@@ -76,7 +76,7 @@
       "categories": ["Primitive Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.8.0",
+        "wasmVersion": "0.9.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
@@ -105,7 +105,7 @@
       "categories": ["Primitive Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.8.0",
+        "wasmVersion": "0.9.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
@@ -129,7 +129,7 @@
         "@finstack/primitive-contracts"
       ],
       "categories": ["Primitive Components"],
-      "meta": { "version": "0.2.0", "wasmVersion": "0.8.0", "schemaIds": [] }
+      "meta": { "version": "0.2.0", "wasmVersion": "0.9.0", "schemaIds": [] }
     },
     {
       "name": "bdc-select",
@@ -149,7 +149,7 @@
         "@finstack/primitive-contracts"
       ],
       "categories": ["Primitive Components"],
-      "meta": { "version": "0.2.0", "wasmVersion": "0.8.0", "schemaIds": [] }
+      "meta": { "version": "0.2.0", "wasmVersion": "0.9.0", "schemaIds": [] }
     },
     {
       "name": "knot-table",
@@ -172,7 +172,7 @@
       "categories": ["Primitive Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.8.0",
+        "wasmVersion": "0.9.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
@@ -197,7 +197,7 @@
       "categories": ["Primitive Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.8.0",
+        "wasmVersion": "0.9.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
@@ -223,7 +223,7 @@
         "input-group"
       ],
       "categories": ["Primitive Components"],
-      "meta": { "version": "0.2.0", "wasmVersion": "0.8.0", "schemaIds": [] }
+      "meta": { "version": "0.2.0", "wasmVersion": "0.9.0", "schemaIds": [] }
     },
     {
       "name": "domain-field",
@@ -247,7 +247,7 @@
       "categories": ["Primitive Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.8.0",
+        "wasmVersion": "0.9.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
@@ -279,7 +279,7 @@
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.8.0",
+        "wasmVersion": "0.9.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
@@ -316,7 +316,7 @@
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.8.0",
+        "wasmVersion": "0.9.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
@@ -358,7 +358,7 @@
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.8.0",
+        "wasmVersion": "0.9.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
@@ -386,7 +386,7 @@
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.8.0",
+        "wasmVersion": "0.9.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
@@ -414,7 +414,7 @@
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.8.0",
+        "wasmVersion": "0.9.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
@@ -455,7 +455,7 @@
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.8.0",
+        "wasmVersion": "0.9.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
@@ -478,7 +478,7 @@
       "categories": [],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.8.0",
+        "wasmVersion": "0.9.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
@@ -553,7 +553,7 @@
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.8.0",
+        "wasmVersion": "0.9.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"
         ]
@@ -592,7 +592,7 @@
       "categories": ["Individual Components"],
       "meta": {
         "version": "0.2.0",
-        "wasmVersion": "0.8.0",
+        "wasmVersion": "0.9.0",
         "schemaIds": [
           "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json"

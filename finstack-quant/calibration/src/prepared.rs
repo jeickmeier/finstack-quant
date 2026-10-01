@@ -10,7 +10,6 @@ use crate::quotes::rates::RateQuote;
 use crate::quotes::xccy::XccyQuote;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
 use finstack_quant_valuations::instruments::Instrument;
 
@@ -19,8 +18,6 @@ use finstack_quant_valuations::instruments::Instrument;
 pub(crate) struct CdsTrancheCalibrationQuote {
     /// Prepared quote with constructed instrument and pillar timing.
     pub(crate) prepared: PreparedQuote<CdsTrancheQuote>,
-    /// Optional upfront cashflow from the market quote.
-    pub(crate) upfront: Option<Money>,
     /// Detachment point in percentage terms (e.g. 3.0 for 3%).
     pub(crate) detachment_pct: f64,
 }

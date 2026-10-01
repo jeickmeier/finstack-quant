@@ -223,7 +223,7 @@ export default [
   {
     "path": "#/$defs/d_677810bf9653cfb0a467/properties/accrued_interest",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/accrued_interest",
-    "description": "Accrued interest not yet paid (liability)",
+    "description": "Debt coupon interest accrued but not yet paid (liability).\nHedge-leg accrual valuation is outside the debt-service contract and is zero.",
     "ref": "#/$defs/Money",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
   },
@@ -258,7 +258,7 @@ export default [
   {
     "path": "#/$defs/d_677810bf9653cfb0a467/properties/interest_income_cash",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/interest_income_cash",
-    "description": "Net cash interest **received** during the period.\n\nNon-zero only for two-leg instruments whose legs net to a receipt (e.g.\nan in-the-money pay-fixed swap). Stored as a positive amount, like the\noutflow-oriented fields, and reported through the `cs.interest_income`\nnamespace.\n\n`None` means that no income leg applies. Read it via\n[`Self::interest_income_cash_or_zero`] when a currency-preserving zero\nis more convenient than an optional value."
+    "description": "Net cash interest **received** during the period.\n\nIncludes net hedge receipts and receipts from negative-rate debt coupons.\nStored as a positive amount, like the\noutflow-oriented fields, and reported through the `cs.interest_income`\nnamespace.\n\n`None` means that no income leg applies. Read it via\n[`Self::interest_income_cash_or_zero`] when a currency-preserving zero\nis more convenient than an optional value."
   },
   {
     "path": "#/$defs/d_677810bf9653cfb0a467/properties/interest_income_cash/anyOf/0",

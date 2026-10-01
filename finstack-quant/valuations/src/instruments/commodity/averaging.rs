@@ -2,13 +2,51 @@
 //!
 //! Both the `commodity_swap` floating leg and the
 //! `commodity_swaption` forward swap rate
-//! average daily business-day prices over each settlement period. The
-//! averaging windows are **half-open** `[start, end)` so a payment date is
+//! average daily business-day prices over each contractual observation period.
+//! Payment adjustments leave these observation dates unchanged. The
+//! averaging windows are **half-open** `[start, end)` so a shared boundary is
 //! never observed by two adjacent periods; the final period sets
 //! `include_end = true` so the swap maturity date is observed exactly once.
 
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::Result;
+
+/// Build contractual commodity observation periods and separately adjusted payments.
+///
+/// # Arguments
+/// * `start` - Inclusive contractual observation start before payment adjustments.
+/// * `maturity` - Final contractual observation date; must follow `start`.
+/// * `frequency` - Positive interval between commodity settlement periods.
+/// * `calendar_id` - Registered payment and observation calendar; absent calendars leave payments unadjusted.
+/// * `business_day_convention` - Payment adjustment applied only when a calendar is supplied.
+pub(crate) fn commodity_periods(
+    start: Date,
+    maturity: Date,
+    frequency: finstack_quant_core::dates::Tenor,
+    calendar_id: Option<&str>,
+    business_day_convention: finstack_quant_core::dates::BusinessDayConvention,
+) -> Result<Vec<crate::cashflow::builder::periods::SchedulePeriod>> {
+    use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
+    use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind};
+    build_periods(BuildPeriodsParams {
+        start,
+        end: maturity,
+        frequency,
+        stub: StubKind::ShortBack,
+        business_day_convention: if calendar_id.is_some() {
+            business_day_convention
+        } else {
+            BusinessDayConvention::Unadjusted
+        },
+        calendar_id: calendar_id.unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+        end_of_month: false,
+        day_count: DayCount::Act365F,
+        payment_lag_days: 0,
+        reset_lag_days: None,
+        adjust_accrual_dates: false,
+        roll_rule: crate::cashflow::builder::specs::RollRule::None,
+    })
+}
 
 /// Average `get_price` over the business days of the half-open window
 /// `[obs_start, obs_end)`, optionally including `obs_end` itself (used by

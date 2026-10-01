@@ -62,6 +62,7 @@ const supplemental = {
       ["EUR", "USD", 1.12],
       ["JPY", "USD", 0.007],
     ],
+    provider_pinned_quotes: [["EUR", "USD", "2026-05-08", "period_end", 1.14]],
     pinned_quotes: [
       ["EUR", "USD", "2026-05-08", "period_end", 1.13],
       ["EUR", "USD", "2026-05-08", "cashflow_date", 1.11],

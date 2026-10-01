@@ -143,10 +143,11 @@ pub(crate) fn calculate_theta_date(
 ///   snapshot's FX provider. Missing FX rates propagate as errors.
 /// * `start_date` - Opening valuation date; receipt inclusion follows the instrument PV boundary.
 /// * `end_date` - Closing valuation date; receipt inclusion follows the instrument PV boundary.
-/// * `base_currency` - Reporting currency of the returned economic-income sum.
+/// * `base_currency` - Reporting currency of the returned economic cash sum, including principal.
 ///
 /// # Returns
-/// Sum of cashflow amounts in the period (converted to base currency)
+/// Signed sum of eligible economic cash in the period, including principal,
+/// converted to `base_currency`; capitalized and collateral transfers are excluded.
 pub fn collect_cashflows_in_period(
     instrument: &dyn crate::instruments::Instrument,
     curves: &finstack_quant_core::market_data::context::MarketContext,
@@ -154,6 +155,50 @@ pub fn collect_cashflows_in_period(
     end_date: Date,
     base_currency: Currency,
 ) -> Result<f64> {
+    collect_period_cash(instrument, curves, start_date, end_date, base_currency)
+        .map(|cash| cash.total.amount())
+}
+
+/// Signed cash receipts used by total-return and income attribution.
+#[derive(Debug, Clone, Copy)]
+pub struct PeriodCash {
+    /// All eligible economic cash in the requested reporting currency,
+    /// including principal repayments and signed notional exchanges.
+    pub total: finstack_quant_core::money::Money,
+    /// Coupon, interest and fee cash in the same reporting currency as
+    /// `total`; principal, recovery and notional exchanges are excluded.
+    pub income: finstack_quant_core::money::Money,
+}
+
+/// Collect period cash while separating income from principal receipts.
+///
+/// Uses the payment-date interval and economic-cash exclusions documented by
+/// [`collect_cashflows_in_period`]. Each eligible payment is converted once
+/// at its payment-date FX rate. Principal enters `total` without being labeled
+/// coupon or interest income.
+///
+/// # Arguments
+///
+/// * `instrument` - Instrument supplying classified cashflows and its
+///   same-day settlement convention.
+/// * `curves` - Market snapshot used to construct the schedule and convert
+///   each signed receipt at its payment date; missing FX rates fail the call.
+/// * `start_date` - Opening valuation date; the instrument's PV boundary
+///   determines whether same-day payments are included.
+/// * `end_date` - Closing valuation date; the complementary PV boundary
+///   determines whether same-day payments are included.
+/// * `base_currency` - Reporting currency shared by the returned total and income.
+///
+/// # Errors
+///
+/// Propagates cashflow construction, FX conversion and monetary addition errors.
+pub fn collect_period_cash(
+    instrument: &dyn crate::instruments::Instrument,
+    curves: &finstack_quant_core::market_data::context::MarketContext,
+    start_date: Date,
+    end_date: Date,
+    base_currency: Currency,
+) -> Result<PeriodCash> {
     let schedule = instrument.cashflow_schedule(curves, start_date)?;
     collect_cashflows_from_flows(
         schedule.get_flows(),
@@ -172,6 +217,16 @@ pub(crate) fn collect_cashflows_in_period_cached(
     end_date: Date,
     base_currency: Currency,
 ) -> Result<f64> {
+    collect_period_cash_cached(context, start_date, end_date, base_currency)
+        .map(|cash| cash.total.amount())
+}
+
+pub(crate) fn collect_period_cash_cached(
+    context: &mut crate::metrics::MetricContext,
+    start_date: Date,
+    end_date: Date,
+    base_currency: Currency,
+) -> Result<PeriodCash> {
     let curves = std::sync::Arc::clone(&context.curves);
     let skip_issue_draw_on = opening_notional_draw_date(context.instrument.as_ref());
     let include_same_day = context.instrument.includes_valuation_date_cashflows();
@@ -197,13 +252,8 @@ fn opening_notional_draw_date(instrument: &dyn crate::instruments::Instrument) -
     None
 }
 
-/// Whether `kind` is period economic cash for total-return / theta add-back.
-///
-/// See [`collect_cashflows_in_period`] for the full policy. Coupons are
-/// collected on payment date; signed principal is included when it is
-/// period cash (XCCY exchanges, amortizing redemptions, revolving
-/// draws/repayments).
-fn is_period_economic_cash(kind: CFKind) -> bool {
+/// Interest and fee cash; principal settlement is economic cash but not income.
+fn is_period_income(kind: CFKind) -> bool {
     match kind {
         CFKind::Fixed
         | CFKind::FloatReset
@@ -215,18 +265,25 @@ fn is_period_economic_cash(kind: CFKind) -> bool {
         | CFKind::FacilityFee
         | CFKind::LcFee
         | CFKind::FrontingFee
-        | CFKind::Notional
-        | CFKind::Amortization
-        | CFKind::PrePayment
-        | CFKind::RevolvingDraw
-        | CFKind::RevolvingRepayment
-        | CFKind::Recovery
         | CFKind::AccruedOnDefault
         | CFKind::MarginInterest => true,
         // Excluded: PIK (not cash), defaulted-notional write-downs,
         // IM/VM/collateral substitution, and any future `CFKind` variant.
         _ => false,
     }
+}
+
+fn is_period_economic_cash(kind: CFKind) -> bool {
+    is_period_income(kind)
+        || matches!(
+            kind,
+            CFKind::Notional
+                | CFKind::Amortization
+                | CFKind::PrePayment
+                | CFKind::RevolvingDraw
+                | CFKind::RevolvingRepayment
+                | CFKind::Recovery
+        )
 }
 
 fn collect_cashflows_from_flows(
@@ -237,8 +294,12 @@ fn collect_cashflows_from_flows(
     base_currency: Currency,
     skip_issue_draw_on: Option<Date>,
     include_same_day: bool,
-) -> Result<f64> {
-    let mut sum = finstack_quant_core::money::Money::from((0_i64, base_currency));
+) -> Result<PeriodCash> {
+    let zero = finstack_quant_core::money::Money::from((0_i64, base_currency));
+    let mut cash = PeriodCash {
+        total: zero,
+        income: zero,
+    };
     for cf in flows {
         let received = if include_same_day {
             cf.date >= start_date && cf.date < end_date
@@ -252,10 +313,14 @@ fn collect_cashflows_from_flows(
             {
                 continue;
             }
-            sum = sum.checked_add(curves.convert_money(cf.amount, base_currency, cf.date)?)?;
+            let payment = curves.convert_money(cf.amount, base_currency, cf.date)?;
+            cash.total = cash.total.checked_add(payment)?;
+            if is_period_income(cf.kind) {
+                cash.income = cash.income.checked_add(payment)?;
+            }
         }
     }
-    Ok(sum.amount())
+    Ok(cash)
 }
 
 /// Last economic payment or contractual expiry, whichever is later.
@@ -305,7 +370,16 @@ fn compute_theta_breakdown(context: &mut crate::metrics::MetricContext) -> Resul
     let base_currency = context.base_value.currency();
 
     let horizon_days = (rolled_date - context.as_of).whole_days();
-    let rolled_market = context.curves.roll_forward(horizon_days)?;
+    let schedule = context
+        .instrument
+        .cashflow_schedule(&context.curves, context.as_of)?;
+    let projected_market = finstack_quant_cashflows::fixings::materialize_fixings(
+        &context.curves,
+        [&schedule],
+        context.as_of,
+        rolled_date,
+    )?;
+    let rolled_market = projected_market.roll_forward(horizon_days)?;
     let rolled_pv = context.reprice_money(&rolled_market, rolled_date)?.amount();
 
     let start_date = context.as_of;
@@ -517,7 +591,7 @@ mod tests {
             true,
         )
         .unwrap();
-        assert!((sum - 60.0).abs() < 1e-9);
+        assert!((sum.total.amount() - 60.0).abs() < 1e-9);
         let missing_fx = finstack_quant_core::market_data::context::MarketContext::new();
         assert!(collect_cashflows_from_flows(
             &flows,
@@ -554,10 +628,11 @@ mod tests {
             true,
         )
         .expect("collect");
+        assert_eq!(sum.income.amount(), 25_000.0);
         // coupon 25k + signed notional -1mm + amort 50k; PIK/default/end-date excluded
         assert!(
-            (sum - (25_000.0 - 1_000_000.0 + 50_000.0)).abs() < 1e-9,
-            "signed principal must enter period cash, got {sum}"
+            (sum.total.amount() - (25_000.0 - 1_000_000.0 + 50_000.0)).abs() < 1e-9,
+            "signed principal must enter period cash, got {sum:?}"
         );
     }
 
@@ -581,8 +656,8 @@ mod tests {
         )
         .expect("collect");
         assert!(
-            (sum + 50.0).abs() < 1e-12,
-            "issue-date draw is excluded; later signed notional remains, got {sum}"
+            (sum.total.amount() + 50.0).abs() < 1e-12,
+            "issue-date draw is excluded; later signed notional remains, got {sum:?}"
         );
     }
 
@@ -595,6 +670,64 @@ mod tests {
         let expected = deposit.effective_start_date().expect("effective start");
         assert_eq!(expected, date!(2024 - 01 - 08));
         assert_eq!(opening_notional_draw_date(&deposit), Some(expected));
+    }
+
+    #[test]
+    fn money_market_maturity_separates_principal_from_interest_income() {
+        use crate::instruments::rates::repo::{CollateralSpec, Repo};
+        use crate::instruments::Instrument;
+        use finstack_quant_core::dates::DayCount;
+        use finstack_quant_core::market_data::context::MarketContext;
+        use finstack_quant_core::money::Money;
+
+        let principal = Money::from((1_000_000_i64, Currency::USD));
+        let start = date!(2025 - 01 - 06);
+        let maturity = date!(2025 - 04 - 07);
+        let market = MarketContext::new();
+        for rate in [0.0, 0.05] {
+            let deposit = Deposit::builder()
+                .id("DEPOSIT-INCOME".into())
+                .notional(principal)
+                .start_date(start)
+                .maturity(maturity)
+                .fixed_rate_opt(Some(rust_decimal::Decimal::try_from(rate).expect("rate")))
+                .day_count(DayCount::Act360)
+                .discount_curve_id("USD-OIS".into())
+                .build()
+                .expect("deposit");
+            let repo = Repo::term(
+                "REPO-INCOME",
+                principal,
+                CollateralSpec::new("BOND", 100.0, "BOND-PX"),
+                rate,
+                start,
+                maturity,
+                "USD-OIS",
+            )
+            .expect("repo");
+            let expected_interest = principal.amount() * rate * (91.0 / 360.0);
+            for instrument in [&deposit as &dyn Instrument, &repo as &dyn Instrument] {
+                let cash = collect_period_cash(
+                    instrument,
+                    &market,
+                    date!(2025 - 04 - 06),
+                    date!(2025 - 04 - 08),
+                    Currency::USD,
+                )
+                .expect("maturity cash");
+                assert!((cash.income.amount() - expected_interest).abs() < 1e-8);
+                assert_eq!(
+                    cash.total.checked_sub(cash.income).expect("principal"),
+                    principal
+                );
+                assert!(
+                    (cash.total.amount() - principal.amount() - expected_interest).abs() < 1e-8
+                );
+                if rate == 0.0 {
+                    assert_eq!(cash.income.amount(), 0.0);
+                }
+            }
+        }
     }
 
     #[test]
@@ -616,8 +749,8 @@ mod tests {
         )
         .expect("collect");
         assert!(
-            (sum - 10.0).abs() < 1e-12,
-            "only the payment-date flow in [start, end) is income, got {sum}"
+            (sum.total.amount() - 10.0).abs() < 1e-12,
+            "only the payment-date flow in [start, end) is income, got {sum:?}"
         );
     }
 }

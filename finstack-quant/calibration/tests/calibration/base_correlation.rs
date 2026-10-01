@@ -1,45 +1,38 @@
-//! Integration test for base correlation calibration (canonical).
+//! Base-correlation calibration must reprice the complete settlement-quoted trade.
 
 use finstack_quant_calibration::api::engine;
 use finstack_quant_calibration::api::schema::{
-    BaseCorrelationParams, CalibrationEnvelope, CalibrationPlan, CalibrationStep, StepParams,
+    BaseCorrelationParams, CalibrationEnvelope, CalibrationPlan, CalibrationSchema,
+    CalibrationStep, StepParams,
 };
-use finstack_quant_calibration::CalibrationConfig;
-use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, Tenor};
-use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::term_structures::DiscountCurve;
-use finstack_quant_core::market_data::term_structures::{
-    BaseCorrelationCurve, CreditIndexData, HazardCurve,
-};
-use finstack_quant_core::money::Money;
-use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche;
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranchePricer;
-use finstack_quant_valuations::instruments::Attributes;
-use finstack_quant_valuations::instruments::PayReceive;
-use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
-
-use crate::calibration::calibration_support as cal_utils;
 use finstack_quant_calibration::quotes::cds_tranche::CdsTrancheQuote;
 use finstack_quant_calibration::quotes::ids::QuoteId;
 use finstack_quant_calibration::quotes::market_quote::MarketQuote;
-use finstack_quant_core::HashMap;
-use std::env;
+use finstack_quant_calibration::CalibrationConfig;
+use finstack_quant_cashflows::builder::specs::RollRule;
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::{
+    adjust, calendar_by_id_strict, prev_cds_date, Date, DateExt, DayCount,
+};
+use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::term_structures::{
+    BaseCorrelationCurve, CreditIndexData, DiscountCurve, HazardCurve,
+};
+use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
+    CdsTranche, CdsTranchePricer,
+};
+use finstack_quant_valuations::instruments::{Attributes, PayReceive};
+use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
+use finstack_quant_valuations::market::conventions::ConventionRegistry;
 use std::sync::Arc;
 use time::Month;
 
 use super::tolerances;
+use crate::calibration::calibration_support as cal_utils;
 
-// Fixture upfronts (decimal fraction of tranche notional, matching the
-// `CdsTrancheQuote::upfront_pct` schema: -0.025 means -2.5%) generated from a
-// frozen market snapshot. To regenerate after a pricing model change:
-// FINSTACK_REGEN_BASE_CORR_FIXTURES=1 cargo test -p finstack-quant-valuations base_correlation_step_builds_curve_and_updates_credit_index_data -- --nocapture
-const UPFRONT_0_3_FRAC: f64 = 0.039_857_737_7;
-const UPFRONT_3_7_FRAC: f64 = -0.043_038_584_6;
-
-fn create_discount_curve(base_date: Date) -> DiscountCurve {
-    DiscountCurve::builder("USD-OIS")
+fn create_market(base_date: Date, correlations: [f64; 2]) -> MarketContext {
+    let discount = DiscountCurve::builder("USD-OIS")
         .base_date(base_date)
         .day_count(DayCount::Act365F)
         .knots(vec![
@@ -50,11 +43,8 @@ fn create_discount_curve(base_date: Date) -> DiscountCurve {
             (10.0, 0.68),
         ])
         .build()
-        .expect("discount curve")
-}
-
-fn create_hazard_curve(base_date: Date) -> Arc<HazardCurve> {
-    Arc::new(
+        .expect("discount curve");
+    let hazard = Arc::new(
         HazardCurve::builder("CDX_HAZARD")
             .base_date(base_date)
             .day_count(DayCount::Act365F)
@@ -62,242 +52,260 @@ fn create_hazard_curve(base_date: Date) -> Arc<HazardCurve> {
             .knots([(0.0, 0.0010), (5.0, 0.0012), (10.0, 0.0015)])
             .build()
             .expect("hazard curve"),
-    )
-}
-
-fn create_credit_index(
-    hazard: Arc<HazardCurve>,
-    base_corr: Arc<BaseCorrelationCurve>,
-) -> CreditIndexData {
-    CreditIndexData::builder()
+    );
+    let correlation = Arc::new(
+        BaseCorrelationCurve::builder("CDX_CORR")
+            .knots([(3.0, correlations[0]), (7.0, correlations[1])])
+            .build()
+            .expect("base correlation"),
+    );
+    let index = CreditIndexData::builder()
         .num_constituents(125)
         .recovery_rate(0.40)
-        .index_credit_curve(hazard)
-        .base_correlation_curve(base_corr)
+        .index_credit_curve(Arc::clone(&hazard))
+        .base_correlation_curve(Arc::clone(&correlation))
         .build()
-        .expect("credit index")
+        .expect("credit index");
+    MarketContext::new()
+        .insert(discount)
+        .insert(hazard.as_ref().clone())
+        .insert(correlation.as_ref().clone())
+        .insert_credit_index("CDX", index)
+        .expect("credit index dependencies")
 }
 
-fn tranche_upfront_frac(
-    base_date: Date,
-    maturity: Date,
-    attach_pct: f64,
-    detach_pct: f64,
-    coupon_bp: f64,
-    notional: f64,
-    market: &MarketContext,
-) -> f64 {
-    let tranche = CdsTranche::builder()
-        .id("QUOTE_TRANCHE".into())
-        .index_name("CDX".to_string())
-        .series(40)
-        .attach_pct(attach_pct)
-        .detach_pct(detach_pct)
-        .notional(Money::new(notional, Currency::USD).expect("valid money fixture"))
-        .maturity(maturity)
-        .coupon_bp(coupon_bp)
-        .frequency(Tenor::quarterly())
-        .day_count(DayCount::Act360)
-        .business_day_convention(BusinessDayConvention::Following)
-        .calendar_id_opt(None)
-        .discount_curve_id(CurveId::from("USD-OIS"))
-        .credit_index_id(CurveId::from("CDX"))
+fn build_tranche(quote: &CdsTrancheQuote, base_date: Date, notional: f64) -> CdsTranche {
+    let registry = ConventionRegistry::try_global().expect("conventions");
+    let convention = registry
+        .resolve_cds(&quote.convention)
+        .expect("CDS convention");
+    let calendar = calendar_by_id_strict(&convention.calendar_id).expect("calendar");
+    let settlement = adjust(
+        base_date
+            .add_business_days(i32::from(convention.settlement_days), calendar)
+            .expect("cash settlement lag"),
+        convention.business_day_convention,
+        calendar,
+    )
+    .expect("cash settlement date");
+    let tranche_notional = notional * (quote.detachment - quote.attachment);
+    // Construct through the public instrument API, independently of the
+    // calibration quote builder, to check its economic contract end to end.
+    let mut tranche = CdsTranche::builder()
+        .id(quote.id.as_str().into())
+        .index_name(quote.index.clone())
+        .series(quote.series)
+        .attach_pct(quote.attachment * 100.0)
+        .detach_pct(quote.detachment * 100.0)
+        .notional(Money::new(tranche_notional, quote.convention.currency).expect("notional"))
+        .maturity(quote.maturity)
+        .coupon_bp(quote.coupon_bp)
+        .frequency(convention.frequency)
+        .day_count(convention.day_count)
+        .business_day_convention(convention.business_day_convention)
+        .calendar_id_opt(Some(convention.calendar_id.clone().into()))
+        .discount_curve_id("USD-OIS".into())
+        .credit_index_id("CDX".into())
         .side(PayReceive::Pay)
-        .start_date_opt(None)
+        .start_date_opt(Some(
+            prev_cds_date(base_date).expect("prior quarterly roll"),
+        ))
         .realized_loss(0.0)
-        .roll_rule(finstack_quant_cashflows::builder::specs::RollRule::CdsImm)
+        .roll_rule(RollRule::CdsImm)
+        .stub(convention.stub)
         .attributes(Attributes::new())
         .build()
         .expect("tranche");
-
-    let pv = CdsTranchePricer::new()
-        .price_tranche(&tranche, market, base_date)
-        .expect("price")
-        .amount();
-
-    pv / notional
+    tranche.upfront = Some((
+        settlement,
+        Money::new(
+            tranche_notional * quote.upfront_pct,
+            quote.convention.currency,
+        )
+        .expect("upfront cash"),
+    ));
+    tranche
 }
 
-fn fixture_upfronts(
-    base_date: Date,
-    maturity: Date,
-    coupon_bp: f64,
-    notional: f64,
-    quote_market: &MarketContext,
-) -> (f64, f64) {
-    if env::var("FINSTACK_REGEN_BASE_CORR_FIXTURES").is_ok() {
-        let upfront_0_3 = tranche_upfront_frac(
-            base_date,
-            maturity,
-            0.0,
-            3.0,
-            coupon_bp,
-            notional,
-            quote_market,
-        );
-        let upfront_3_7 = tranche_upfront_frac(
-            base_date,
-            maturity,
-            3.0,
-            7.0,
-            coupon_bp,
-            notional,
-            quote_market,
-        );
-        println!("UPFRONT_0_3_FRAC={upfront_0_3:.10}");
-        println!("UPFRONT_3_7_FRAC={upfront_3_7:.10}");
-        return (upfront_0_3, upfront_3_7);
+fn quote(attachment: f64, detachment: f64, maturity: Date) -> CdsTrancheQuote {
+    CdsTrancheQuote {
+        id: QuoteId::new(format!("TRANCHE-{attachment}-{detachment}")),
+        index: "CDX".to_string(),
+        series: 40,
+        attachment,
+        detachment,
+        maturity,
+        upfront_pct: 0.0,
+        coupon_bp: 100.0,
+        convention: CdsConventionKey {
+            currency: Currency::USD,
+            doc_clause: CdsDocClause::IsdaNa,
+        },
     }
+}
 
-    (UPFRONT_0_3_FRAC, UPFRONT_3_7_FRAC)
+/// Construct a par quote in settlement cash units from the independent tranche pricer.
+fn par_quote(
+    mut quote: CdsTrancheQuote,
+    base_date: Date,
+    notional: f64,
+    market: &MarketContext,
+) -> CdsTrancheQuote {
+    // A nonzero upfront supplies the convention settlement date. Remove only
+    // that cashflow before computing the price of the premium/protection legs.
+    quote.upfront_pct = 1.0;
+    let mut tranche = build_tranche(&quote, base_date, notional);
+    let (settlement, _) = tranche.upfront.take().expect("settlement cashflow");
+    let df = market
+        .get_discount("USD-OIS")
+        .expect("discount curve")
+        .df_between_dates(base_date, settlement)
+        .expect("settlement discount factor");
+    let pv = CdsTranchePricer::new()
+        .price_tranche(&tranche, market, base_date)
+        .expect("price tranche legs")
+        .amount();
+    quote.upfront_pct = pv / (tranche.notional.amount() * df);
+    quote
+}
+
+fn envelope(
+    base_date: Date,
+    notional: f64,
+    quotes: &[CdsTrancheQuote],
+    market: &MarketContext,
+) -> CalibrationEnvelope {
+    let market_quotes: Vec<MarketQuote> = quotes
+        .iter()
+        .cloned()
+        .map(MarketQuote::CdsTranche)
+        .collect();
+    let (prior_market, mut market_data) = cal_utils::split_market_context(market);
+    cal_utils::extend_market_data(&mut market_data, &market_quotes);
+    CalibrationEnvelope {
+        schema_url: None,
+        schema: CalibrationSchema::CURRENT,
+        plan: CalibrationPlan {
+            id: "base-correlation-regression".to_string(),
+            description: None,
+            quote_sets: [(
+                "tranches".to_string(),
+                cal_utils::quote_set_ids(&market_quotes),
+            )]
+            .into_iter()
+            .collect(),
+            settings: CalibrationConfig {
+                solver: finstack_quant_calibration::SolverConfig::default()
+                    .with_tolerance(tolerances::BASE_CORR_SOLVER_TOL)
+                    .with_max_iterations(500),
+                ..Default::default()
+            },
+            steps: vec![CalibrationStep {
+                id: "corr".to_string(),
+                quote_set: "tranches".to_string(),
+                params: StepParams::BaseCorrelation(BaseCorrelationParams {
+                    index_id: "CDX".to_string(),
+                    series: 40,
+                    maturity_years: 5.0,
+                    base_date,
+                    discount_curve_id: "USD-OIS".into(),
+                    currency: Currency::USD,
+                    notional,
+                    frequency: None,
+                    day_count: None,
+                    business_day_convention: None,
+                    calendar_id: None,
+                    detachment_points: quotes.iter().map(|q| q.detachment).collect(),
+                    roll_rule: RollRule::CdsImm,
+                }),
+            }],
+        },
+        market_data,
+        prior_market,
+    }
 }
 
 #[test]
-fn base_correlation_step_builds_curve_and_updates_credit_index_data() {
-    let base_date = Date::from_calendar_date(2025, Month::March, 20).expect("base_date");
-    let maturity = Date::from_calendar_date(2030, Month::March, 20).expect("maturity");
-
-    // Generate tranche quotes from a known "target" base correlation curve.
-    let hazard = create_hazard_curve(base_date);
-    let target_corr = Arc::new(
-        BaseCorrelationCurve::builder("TARGET")
-            .knots([(3.0, 0.25), (7.0, 0.35)])
-            .build()
-            .expect("target base correlation"),
-    );
-
-    let quote_market = MarketContext::new()
-        .insert(create_discount_curve(base_date))
-        .insert(hazard.as_ref().clone())
-        .insert(target_corr.as_ref().clone())
-        .insert_credit_index(
-            "CDX",
-            create_credit_index(Arc::clone(&hazard), Arc::clone(&target_corr)),
-        );
-
-    let notional = 1.0;
-    let coupon_bp = 100.0;
-    let (upfront_0_3, upfront_3_7) =
-        fixture_upfronts(base_date, maturity, coupon_bp, notional, &quote_market);
-
-    // Start calibration from a different seed curve to ensure the step updates the context.
-    let seed_corr = Arc::new(
-        BaseCorrelationCurve::builder("SEED")
-            .knots([(3.0, 0.10), (7.0, 0.15)])
-            .build()
-            .expect("seed base correlation"),
-    );
-    let source_market = MarketContext::new()
-        .insert(create_discount_curve(base_date))
-        .insert(hazard.as_ref().clone())
-        .insert(seed_corr.as_ref().clone())
-        .insert_credit_index(
-            "CDX",
-            create_credit_index(Arc::clone(&hazard), Arc::clone(&seed_corr)),
-        );
-
-    // Use fraction attachment/detachment in the quote to validate unit normalization.
-    let quotes = vec![
-        MarketQuote::CdsTranche(CdsTrancheQuote {
-            id: QuoteId::new("TRANCHE-1"),
-            index: "CDX".to_string(),
-            series: 40,
-            attachment: 0.0,
-            detachment: 0.03,
-            maturity,
-            upfront_pct: upfront_0_3,
-            coupon_bp,
-            convention: CdsConventionKey {
-                currency: Currency::USD,
-                doc_clause: CdsDocClause::IsdaNa,
-            },
-        }),
-        MarketQuote::CdsTranche(CdsTrancheQuote {
-            id: QuoteId::new("TRANCHE-2"),
-            index: "CDX".to_string(),
-            series: 40,
-            attachment: 0.03,
-            detachment: 0.07,
-            maturity,
-            upfront_pct: upfront_3_7,
-            coupon_bp,
-            convention: CdsConventionKey {
-                currency: Currency::USD,
-                doc_clause: CdsDocClause::IsdaNa,
-            },
-        }),
-    ];
-
-    let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
-    cal_utils::extend_market_data(&mut market_data, &quotes);
-    let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();
-    quote_sets.insert("tranches".to_string(), cal_utils::quote_set_ids(&quotes));
-
-    let plan = CalibrationPlan {
-        id: "plan".to_string(),
-        description: None,
-        quote_sets: quote_sets.into_iter().collect(),
-        settings: CalibrationConfig {
-            solver: finstack_quant_calibration::SolverConfig::default()
-                .with_tolerance(tolerances::BASE_CORR_SOLVER_TOL)
-                .with_max_iterations(500),
-            ..Default::default()
-        },
-        steps: vec![CalibrationStep {
-            id: "corr".to_string(),
-            quote_set: "tranches".to_string(),
-            params: StepParams::BaseCorrelation(BaseCorrelationParams {
-                index_id: "CDX".to_string(),
-                series: 40,
-                maturity_years: 5.0,
+fn base_correlation_step_builds_curve_and_reprices_settlement_quoted_trades() {
+    // March 21 is just after the semiannual roll. The standard 5Y quote
+    // matures June 20, 2030, 91 days beyond the old anniversary-based check.
+    // Prior frozen inputs used a legacy March maturity and omitted the
+    // settlement discount factor; use a consistent synthetic trade instead.
+    let base_date = Date::from_calendar_date(2025, Month::March, 21).expect("base date");
+    let maturity = Date::from_calendar_date(2030, Month::June, 20).expect("maturity");
+    let notional = 1_000_000.0;
+    let target_market = create_market(base_date, [0.25, 0.35]);
+    let quotes: Vec<CdsTrancheQuote> = [(0.0, 0.03), (0.03, 0.07)]
+        .into_iter()
+        .map(|(attachment, detachment)| {
+            par_quote(
+                quote(attachment, detachment, maturity),
                 base_date,
-                discount_curve_id: CurveId::from("USD-OIS"),
-                currency: Currency::USD,
                 notional,
-                frequency: Some(Tenor::quarterly()),
-                day_count: Some(DayCount::Act360),
-                business_day_convention: Some(BusinessDayConvention::Following),
-                calendar_id: None,
-                detachment_points: vec![0.03, 0.07],
-                roll_rule: finstack_quant_cashflows::builder::specs::RollRule::CdsImm,
-            }),
-        }],
-    };
-
-    let envelope = CalibrationEnvelope {
-        schema_url: None,
-
-        schema: finstack_quant_calibration::api::schema::CalibrationSchema::CURRENT,
-        plan,
-        market_data,
-        prior_market: prior,
-    };
-
-    let result = engine::execute(&envelope).expect("execute");
+                &target_market,
+            )
+        })
+        .collect();
+    let source_market = create_market(base_date, [0.10, 0.15]);
+    let result = engine::execute(&envelope(base_date, notional, &quotes, &source_market))
+        .expect("calibrate standard 5Y tranches");
     assert!(result.result.report.success);
     let step = result.result.step_reports.get("corr").expect("step report");
     assert!(step.success);
-    assert!(
-        step.max_residual <= tolerances::BASE_CORR_UPFRONT_FRAC_TOL,
-        "base correlation fit must be vendor-grade: max_residual={:.3e} > tol={:.3e}",
-        step.max_residual,
-        tolerances::BASE_CORR_UPFRONT_FRAC_TOL
-    );
+    assert!(step.max_residual < 1e-8, "residual: {}", step.max_residual);
 
-    let ctx = MarketContext::try_from(result.result.final_market).expect("restore context");
-
-    // Calibrated curve is inserted as "{index_id}_CORR".
-    let curve = ctx
+    let market = MarketContext::try_from(result.result.final_market).expect("restore context");
+    let curve = market
         .get_base_correlation("CDX_CORR")
-        .expect("base correlation curve");
-    let arb = curve.validate_arbitrage_free();
-    assert!(
-        arb.is_arbitrage_free,
-        "calibrated base correlation curve must be arbitrage-free; violations={:?}",
-        arb.violations
-    );
-
-    // Credit index aggregate is updated to reference the calibrated curve.
-    let index = ctx.get_credit_index("CDX").expect("credit index");
+        .expect("calibrated curve");
+    assert!(curve.validate_shape().is_monotonic);
+    for (actual, expected) in curve.correlations().iter().zip([0.25, 0.35]) {
+        assert!(
+            (actual - expected).abs() < 1e-6,
+            "rho={actual}, expected={expected}"
+        );
+    }
+    let index = market.get_credit_index("CDX").expect("credit index");
     assert_eq!(index.base_correlation_curve.id().as_str(), "CDX_CORR");
+
+    for quote in &quotes {
+        let tranche = build_tranche(quote, base_date, notional);
+        let (settlement, upfront) = tranche.upfront.expect("quoted upfront");
+        assert!(settlement > base_date);
+        let df = market
+            .get_discount("USD-OIS")
+            .expect("discount curve")
+            .df_between_dates(base_date, settlement)
+            .expect("discount factor");
+        let omitted_discounting_error =
+            upfront.amount().abs() * (1.0 - df) / tranche.notional.amount();
+        assert!(
+            omitted_discounting_error > 1e-6,
+            "fixture must detect undiscounted upfront"
+        );
+        let npv = CdsTranchePricer::new()
+            .price_tranche(&tranche, &market, base_date)
+            .expect("reprice complete quoted trade")
+            .amount();
+        assert!(
+            (npv / tranche.notional.amount()).abs() < 1e-8,
+            "complete quoted trade did not reprice: NPV={npv}"
+        );
+    }
+}
+
+#[test]
+fn base_correlation_rejects_thin_tranche_mispricing_above_ten_basis_points() {
+    let base_date = Date::from_calendar_date(2025, Month::March, 21).expect("base date");
+    let maturity = Date::from_calendar_date(2030, Month::June, 20).expect("maturity");
+    let notional = 1_000_000.0;
+    // Equity-tranche upfront is maximal at zero correlation. Add 170 bp of
+    // tranche-notional upfront beyond that bound: portfolio scaling reduced
+    // this to 5.1 bp, incorrectly accepting it under the 10 bp fit tolerance.
+    let market = create_market(base_date, [0.0, 0.0]);
+    let mut unreachable = par_quote(quote(0.0, 0.03, maturity), base_date, notional, &market);
+    unreachable.upfront_pct += 0.017;
+    let err = engine::execute(&envelope(base_date, notional, &[unreachable], &market))
+        .expect_err("170 bp error on a 3% tranche must fail calibration");
+    assert!(err.to_string().contains("exceeds tolerance"), "{err}");
 }

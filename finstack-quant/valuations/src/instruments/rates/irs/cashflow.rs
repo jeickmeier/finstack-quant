@@ -14,7 +14,9 @@
 //! Compounded floating-leg schedules in this module emit accrual-end dates;
 //! the pricer applies floating-leg payment lag when discounting those flows.
 
-use finstack_quant_core::dates::{BusinessDayConvention, Date, DateExt, DayCountContext};
+#[cfg(test)]
+use finstack_quant_core::dates::BusinessDayConvention;
+use finstack_quant_core::dates::{Date, DateExt, StubKind, TenorUnit};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
@@ -64,42 +66,43 @@ fn uses_observation_shift_dcf(compounding: FloatingLegCompounding) -> bool {
 fn is_irregular_fixed_period(
     period: &SchedulePeriod,
     fixed: &crate::instruments::common_impl::parameters::legs::FixedLegSpec,
-    cal: &dyn finstack_quant_core::dates::HolidayCalendar,
-    adjust_accrual_dates: bool,
+    index: usize,
+    period_count: usize,
 ) -> Result<bool> {
-    let mut expected_regular_end = fixed.frequency.add_to_date(
-        period.accrual_start,
-        None,
-        BusinessDayConvention::Unadjusted,
-    )?;
-    if fixed.end_of_month {
-        expected_regular_end = expected_regular_end.end_of_month();
-    }
-    if adjust_accrual_dates {
-        expected_regular_end = finstack_quant_core::dates::adjust(
-            expected_regular_end,
-            fixed.business_day_convention,
-            cal,
-        )?;
-    }
-
-    let dc_ctx = DayCountContext {
-        calendar: Some(cal),
-        frequency: Some(fixed.frequency),
-        bus_basis: None,
-        coupon_period: None,
-        end_is_termination_date: false,
+    let front = match fixed.stub {
+        StubKind::ShortFront | StubKind::LongFront if index == 0 => true,
+        StubKind::ShortBack | StubKind::LongBack if index + 1 == period_count => false,
+        _ => return Ok(false),
     };
-    let expected_regular_accrual =
-        fixed
-            .day_count
-            .year_fraction(period.accrual_start, expected_regular_end, dc_ctx)?;
-
-    let date_matches = period.accrual_end == expected_regular_end;
-    let accrual_matches =
-        (period.accrual_year_fraction - expected_regular_accrual).abs() <= 1.0e-10;
-
-    Ok(!(date_matches || accrual_matches))
+    // Only the declared stub-side edge can be irregular. Compare it with the
+    // original schedule anchor, rather than stepping from a clamped February
+    // date or accepting the opposite roll direction's grid.
+    let periods = i64::try_from(period_count).map_err(|_| {
+        finstack_quant_core::Error::Validation("fixed-leg period count exceeds i64".into())
+    })?;
+    let count = i64::from(fixed.frequency.count()) * periods * if front { -1 } else { 1 };
+    let anchor = if front { fixed.end } else { fixed.start };
+    let expected = match fixed.frequency.unit() {
+        TenorUnit::Days => anchor.add_days(count).ok(),
+        TenorUnit::Weeks => anchor.add_days(count * 7).ok(),
+        TenorUnit::Months => i32::try_from(count)
+            .ok()
+            .and_then(|months| anchor.add_months(months).ok()),
+        TenorUnit::Years => i32::try_from(count * 12)
+            .ok()
+            .and_then(|months| anchor.add_months(months).ok()),
+    };
+    let boundary = if front {
+        period.unadjusted_start
+    } else {
+        period.unadjusted_end
+    };
+    // A nominal boundary beyond the supported date range cannot coincide with
+    // the valid contractual boundary. EOM applies to generated roll dates,
+    // while an exactly aligned raw contractual boundary remains valid too.
+    Ok(!expected.is_some_and(|date| {
+        date == boundary || (fixed.end_of_month && date.end_of_month() == boundary)
+    }))
 }
 
 fn adjust_accrual_dates(irs: &InterestRateSwap) -> bool {
@@ -213,6 +216,7 @@ pub(crate) fn projected_compounded_float_leg_schedule(
                     accrual_end,
                     day_count: float.day_count,
                     coupon_frequency: Some(float.frequency),
+                    coupon_period: if float.day_count == finstack_quant_core::dates::DayCount::Act365L { (period.accrual_start, period.accrual_end) } else { (accrual_start, accrual_end) },
                     compounding: &float.compounding,
                     fixing_calendar: cal,
                     compounded_spread: 0.0,
@@ -306,12 +310,13 @@ pub(crate) fn fixed_leg_schedule(irs: &InterestRateSwap) -> Result<CashFlowSched
         adjust_accrual_dates,
         roll_rule: crate::cashflow::builder::specs::RollRule::None,
     })?;
-    let cal = crate::cashflow::builder::calendar::resolve_calendar_strict(calendar_id)?;
+    let period_count = periods.len();
     let rate = decimal_to_f64(fixed.rate, "fixed leg rate")?;
     let flows = periods
         .into_iter()
-        .map(|period| -> Result<CashFlow> {
-            let kind = if is_irregular_fixed_period(&period, &fixed, cal, adjust_accrual_dates)? {
+        .enumerate()
+        .map(|(index, period)| -> Result<CashFlow> {
+            let kind = if is_irregular_fixed_period(&period, &fixed, index, period_count)? {
                 CFKind::Stub
             } else {
                 CFKind::Fixed
@@ -521,7 +526,7 @@ pub(crate) fn fixed_leg_annuity(
 mod tests {
     use super::*;
     use finstack_quant_core::cashflow::CFKind;
-    use finstack_quant_core::dates::{DayCount, Tenor};
+    use finstack_quant_core::dates::{DayCount, DayCountContext, StubKind, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
     use time::macros::date;
 
@@ -545,6 +550,111 @@ mod tests {
                 .all(|cf| cf.kind == CFKind::FloatReset),
             "float_leg_schedule should be coupon-only"
         );
+    }
+
+    #[test]
+    fn act365l_fixed_leg_classifies_actual_coupons_without_a_synthetic_period() {
+        for (start, end, frequency, stub, denominator, kind) in [
+            (
+                date!(2023 - 03 - 01),
+                date!(2024 - 03 - 01),
+                Tenor::annual(),
+                StubKind::ShortFront,
+                366.0,
+                CFKind::Fixed,
+            ),
+            (
+                date!(2024 - 03 - 01),
+                date!(2025 - 01 - 01),
+                Tenor::annual(),
+                StubKind::ShortFront,
+                365.0,
+                CFKind::Stub,
+            ),
+            (
+                date!(2023 - 12 - 01),
+                date!(2025 - 01 - 01),
+                Tenor::annual(),
+                StubKind::LongFront,
+                366.0,
+                CFKind::Stub,
+            ),
+            (
+                date!(2023 - 12 - 01),
+                date!(2024 - 03 - 01),
+                Tenor::quarterly(),
+                StubKind::ShortFront,
+                366.0,
+                CFKind::Fixed,
+            ),
+        ] {
+            let mut irs = InterestRateSwap::example().expect("example IRS");
+            irs.notional = Money::from((1_000_000_i64, irs.notional.currency()));
+            irs.fixed_leg.start = start;
+            irs.fixed_leg.end = end;
+            irs.fixed_leg.frequency = frequency;
+            irs.fixed_leg.stub = stub;
+            irs.fixed_leg.day_count = DayCount::Act365L;
+            irs.fixed_leg.business_day_convention = BusinessDayConvention::Unadjusted;
+            irs.fixed_leg.calendar_id = Some("weekends_only".into());
+            irs.fixed_leg.rate = Decimal::new(5, 2);
+            let schedule = fixed_leg_schedule(&irs).expect("ACT/365L fixed schedule");
+            let flows = schedule.get_flows();
+            assert_eq!(flows.len(), 1);
+            assert_eq!(flows[0].kind, kind);
+            let expected_accrual = (end - start).whole_days() as f64 / denominator;
+            assert!((flows[0].accrual_factor - expected_accrual).abs() < 1e-14);
+            assert!((flows[0].amount.amount() - 50_000.0 * expected_accrual).abs() < 1e-8);
+        }
+    }
+
+    #[test]
+    fn fixed_leg_classifies_clamped_months_on_the_original_roll_grid() {
+        for (start, end, stub, expected_kinds) in [
+            (
+                date!(2025 - 01 - 30),
+                date!(2025 - 03 - 30),
+                StubKind::ShortFront,
+                vec![CFKind::Fixed, CFKind::Fixed],
+            ),
+            (
+                date!(2025 - 02 - 28),
+                date!(2025 - 03 - 30),
+                StubKind::LongFront,
+                vec![CFKind::Fixed],
+            ),
+            (
+                date!(2025 - 02 - 28),
+                date!(2025 - 03 - 30),
+                StubKind::LongBack,
+                vec![CFKind::Stub],
+            ),
+            (
+                date!(2025 - 01 - 28),
+                date!(2025 - 03 - 30),
+                StubKind::LongBack,
+                vec![CFKind::Fixed, CFKind::Stub],
+            ),
+            (
+                date!(2025 - 01 - 29),
+                date!(2025 - 03 - 30),
+                StubKind::LongFront,
+                vec![CFKind::Stub, CFKind::Fixed],
+            ),
+        ] {
+            let mut irs = InterestRateSwap::example().expect("example IRS");
+            irs.fixed_leg.start = start;
+            irs.fixed_leg.end = end;
+            irs.fixed_leg.frequency = Tenor::monthly();
+            irs.fixed_leg.stub = stub;
+            irs.fixed_leg.day_count = DayCount::Act365L;
+            irs.fixed_leg.business_day_convention = BusinessDayConvention::Unadjusted;
+            irs.fixed_leg.calendar_id = Some("weekends_only".into());
+            irs.fixed_leg.end_of_month = false;
+            let schedule = fixed_leg_schedule(&irs).expect("monthly fixed schedule");
+            let kinds: Vec<_> = schedule.get_flows().iter().map(|cf| cf.kind).collect();
+            assert_eq!(kinds, expected_kinds, "{start} to {end}, {stub:?}");
+        }
     }
 
     #[test]

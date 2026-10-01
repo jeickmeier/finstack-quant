@@ -361,7 +361,8 @@ impl PyCashFlowBuilder {
     /// ----------
     /// market : MarketContext, optional
     ///     Market context for floating-rate projection. Fixed coupons and
-    ///     deterministic fees do not require one.
+    ///     deterministic fees do not require one. Complete supplied fixing
+    ///     observations can build floating coupons without a forward curve.
     ///
     /// Raises
     /// ------
@@ -369,6 +370,14 @@ impl PyCashFlowBuilder {
     ///     If required inputs (principal) or market data are missing.
     /// ValueError
     ///     If a spec or date validation fails (including deferred fluent errors).
+    ///     This includes negative payment/reset lags, IMM roll rules combined
+    ///     with end-of-month rolling, third-Wednesday IMM with ACT/ACT ICMA,
+    ///     and an ACT/ACT ICMA end-of-month grid whose regular anchor is not
+    ///     month-end. For front stubs that anchor is maturity; otherwise it
+    ///     is the window start. Supplied historical fixing gaps before the
+    ///     resolved curve's base date fail under every fallback policy. Explicit
+    ///     fallback covers missing curves or absent fixing series, never curve,
+    ///     date, day-count or arithmetic errors.
     #[pyo3(signature = (market=None), text_signature = "(self, market=None)")]
     fn build(
         &self,

@@ -16,7 +16,7 @@
 use crate::cashflow::builder::CashFlowSchedule;
 use crate::cashflow::primitives::{CFKind, CashFlow};
 use crate::impl_instrument_base;
-use crate::instruments::common_impl::traits::{Attributes, Instrument};
+use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::rates::cms_common::CmsReferenceSwap;
 use finstack_quant_core::cashflow::CashFlowAccrual;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
@@ -94,6 +94,7 @@ pub struct CmsSwap {
     pub cms_floor: Option<f64>,
 
     /// Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`).
+    /// Required for USD CMS; legacy contracts must name their legacy index explicitly.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub index_id: Option<IndexId>,
@@ -153,13 +154,68 @@ pub struct CmsSwap {
     pub attributes: Attributes,
 }
 
+/// Contractual dates and accrual fraction of one CMS funding coupon.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct FundingPeriod {
+    /// Inclusive accrual start, independent of the CMS observation date.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub accrual_start: Date,
+    /// Exclusive accrual end, independent of payment-date adjustment.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub accrual_end: Date,
+    /// Contractual payment date after business-day adjustment.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub payment_date: Date,
+    /// Floating index observation date; ignored for fixed funding.
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub reset_date: Date,
+    /// Positive year fraction measured using the funding leg day count.
+    pub accrual_year_fraction: f64,
+}
+
+impl From<crate::cashflow::builder::periods::SchedulePeriod> for FundingPeriod {
+    /// Retain the contractual dates and accrual of a generated funding period.
+    ///
+    /// # Arguments
+    ///
+    /// * `period` - Canonical generated schedule period; an absent reset date
+    ///   denotes a simple funding coupon observed on its accrual start.
+    fn from(period: crate::cashflow::builder::periods::SchedulePeriod) -> Self {
+        Self {
+            accrual_start: period.accrual_start,
+            accrual_end: period.accrual_end,
+            payment_date: period.payment_date,
+            reset_date: period.reset_date.unwrap_or(period.accrual_start),
+            accrual_year_fraction: period.accrual_year_fraction,
+        }
+    }
+}
+
 /// Funding leg specification for a CMS swap.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum FundingLeg {
-    /// Fixed rate funding leg.
+    /// Fixed rate funding leg with explicit contractual periods.
     Fixed {
         /// Fixed coupon rate as a decimal annual rate (0.03 = 3%).
         #[serde(with = "finstack_quant_core::wire::decimal")]
@@ -168,30 +224,12 @@ pub enum FundingLeg {
             schemars(with = "finstack_quant_core::wire::DecimalWire")
         )]
         rate: Decimal,
-        /// Payment dates for each period.
-        #[serde(with = "finstack_quant_core::wire::dates")]
-        #[cfg_attr(
-            feature = "json-schema",
-            schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
-        )]
-        payment_dates: Vec<Date>,
-        /// Accrual fractions for each period.
-        accrual_fractions: Vec<f64>,
-        /// Day count convention.
+        /// Funding accrual and payment schedule, in chronological order.
+        periods: Vec<FundingPeriod>,
+        /// Day count convention used to calculate period year fractions.
         day_count: DayCount,
     },
-    /// Floating rate funding leg.
-    ///
-    /// # Convention: no payment lag
-    ///
-    /// This leg models each period by its `payment_dates` only and assumes the
-    /// **accrual end equals the payment date** (no payment lag, no
-    /// accrual-vs-pay adjustment). The pricer projects the floating forward over
-    /// `[previous payment date, payment date]` and discounts to the payment
-    /// date. For funding with a genuine payment lag or accrual end ≠ payment
-    /// date, model the floating side as a full IRS float leg (which carries
-    /// explicit accrual start/end and payment dates) instead of this simplified
-    /// funding leg.
+    /// Simple floating funding coupons with independent reset/accrual/payment dates.
     Floating {
         /// Additive spread over the floating index in basis points (10 = 10bp).
         #[serde(with = "finstack_quant_core::wire::decimal")]
@@ -200,17 +238,9 @@ pub enum FundingLeg {
             schemars(with = "finstack_quant_core::wire::DecimalWire")
         )]
         spread_bp: Decimal,
-        /// Payment dates for each period. Each is also treated as the period's
-        /// accrual-end date (no payment lag — see the variant docs).
-        #[serde(with = "finstack_quant_core::wire::dates")]
-        #[cfg_attr(
-            feature = "json-schema",
-            schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
-        )]
-        payment_dates: Vec<Date>,
-        /// Accrual fractions for each period.
-        accrual_fractions: Vec<f64>,
-        /// Day count convention.
+        /// Funding accrual, reset and payment schedule, in chronological order.
+        periods: Vec<FundingPeriod>,
+        /// Day count convention used to calculate period year fractions.
         day_count: DayCount,
         /// Forward curve for floating rate projection.
         forward_curve_id: CurveId,
@@ -259,24 +289,19 @@ impl CmsSwap {
             )));
         }
 
-        match &self.funding_leg {
-            FundingLeg::Fixed {
-                payment_dates,
-                accrual_fractions,
-                ..
-            }
-            | FundingLeg::Floating {
-                payment_dates,
-                accrual_fractions,
-                ..
-            } => {
-                if payment_dates.len() != accrual_fractions.len() {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "CMS swap funding leg vectors must have equal length: payment_dates={}, accrual_fractions={}",
-                        payment_dates.len(),
-                        accrual_fractions.len(),
-                    )));
-                }
+        let (FundingLeg::Fixed { periods, .. } | FundingLeg::Floating { periods, .. }) =
+            &self.funding_leg;
+        for (i, period) in periods.iter().enumerate() {
+            if period.accrual_start >= period.accrual_end
+                || period.payment_date < period.accrual_start
+                || period.reset_date > period.accrual_start
+                || !period.accrual_year_fraction.is_finite()
+                || period.accrual_year_fraction <= 0.0
+                || (i > 0 && periods[i - 1].accrual_end != period.accrual_start)
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "invalid CMS funding period at index {i}: require contiguous accrual dates, reset no later than start, and positive finite accrual"
+                )));
             }
         }
 
@@ -385,11 +410,7 @@ impl CmsSwap {
                 })?;
                 FundingLeg::Fixed {
                     rate,
-                    payment_dates: fund_periods.iter().map(|p| p.payment_date).collect(),
-                    accrual_fractions: fund_periods
-                        .iter()
-                        .map(|p| p.accrual_year_fraction)
-                        .collect(),
+                    periods: fund_periods.into_iter().map(FundingPeriod::from).collect(),
                     day_count: funding_day_count,
                 }
             }
@@ -414,11 +435,7 @@ impl CmsSwap {
                 })?;
                 FundingLeg::Floating {
                     spread_bp,
-                    payment_dates: fund_periods.iter().map(|p| p.payment_date).collect(),
-                    accrual_fractions: fund_periods
-                        .iter()
-                        .map(|p| p.accrual_year_fraction)
-                        .collect(),
+                    periods: fund_periods.into_iter().map(FundingPeriod::from).collect(),
                     day_count: funding_day_count,
                     forward_curve_id,
                 }
@@ -470,7 +487,7 @@ impl CmsSwap {
                 10,
                 finstack_quant_core::dates::TenorUnit::Years,
             )?)
-            .fixing_dates(fixing_dates)
+            .fixing_dates(fixing_dates.clone())
             .payment_dates(payment_dates.clone())
             .accrual_fractions(accrual_fractions.clone())
             .day_count(DayCount::Act365F)
@@ -478,8 +495,18 @@ impl CmsSwap {
             .swap_float_day_count_opt(Some(DayCount::Act360))
             .funding_leg(FundingLeg::Fixed {
                 rate: Decimal::new(3, 2),
-                payment_dates,
-                accrual_fractions,
+                periods: fixing_dates
+                    .iter()
+                    .zip(&payment_dates)
+                    .zip(&accrual_fractions)
+                    .map(|((&start, &end), &accrual)| FundingPeriod {
+                        accrual_start: start,
+                        accrual_end: end,
+                        payment_date: end,
+                        reset_date: start,
+                        accrual_year_fraction: accrual,
+                    })
+                    .collect(),
                 day_count: DayCount::Thirty360,
             })
             .discount_curve_id(CurveId::new("USD-OIS"))
@@ -506,8 +533,14 @@ impl CmsSwap {
                 continue;
             }
 
-            let coupon_rate =
-                super::pricer::cms_coupon_rate(self, market, as_of, fixing_date, 1.0)?;
+            let coupon_rate = super::pricer::cms_coupon_rate(
+                self,
+                market,
+                as_of,
+                fixing_date,
+                payment_date,
+                1.0,
+            )?;
             let signed_amount = match self.side {
                 crate::instruments::common_impl::parameters::legs::PayReceive::Pay => {
                     -coupon_rate * accrual_fraction * self.notional.amount()
@@ -541,117 +574,93 @@ impl CmsSwap {
         Ok(flows)
     }
 
-    fn funding_leg_flows(
+    pub(super) fn funding_leg_flows(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: Date,
+        include_valuation_date: bool,
     ) -> finstack_quant_core::Result<Vec<CashFlow>> {
         use crate::instruments::common_impl::pricing::time::rate_between_on_dates;
 
         let mut flows = Vec::new();
-        match &self.funding_leg {
+        let (periods, day_count) = match &self.funding_leg {
             FundingLeg::Fixed {
-                rate,
-                payment_dates,
-                accrual_fractions,
-                day_count,
-            } => {
-                let fixed_rate = finstack_quant_core::decimal::decimal_to_f64(*rate)?;
-                let mut accrual_start = self
-                    .effective_start_date()
-                    .unwrap_or_else(|| payment_dates.first().copied().unwrap_or(as_of));
-                for (i, &payment_date) in payment_dates.iter().enumerate() {
-                    let accrual = accrual_fractions[i];
-                    let unsigned = fixed_rate * accrual * self.notional.amount();
-                    let signed = match self.side {
-                        crate::instruments::common_impl::parameters::legs::PayReceive::Pay => {
-                            unsigned
-                        }
-                        crate::instruments::common_impl::parameters::legs::PayReceive::Receive => {
-                            -unsigned
-                        }
-                    };
-                    flows.push(
-                        CashFlow::new(
-                            payment_date,
-                            None,
-                            Money::new(signed, self.notional.currency())?,
-                            CFKind::Fixed,
-                            accrual,
-                            Some(fixed_rate),
-                        )
-                        .with_accrual(CashFlowAccrual {
-                            coupon_period: None,
-                            end_is_termination_date: false,
-                            calendar_id: None,
-                            start: accrual_start,
-                            end: payment_date,
-                            day_count: *day_count,
-                            projected_index_rate: None,
-                        }),
-                    );
-                    accrual_start = payment_date;
-                }
+                periods, day_count, ..
             }
-            FundingLeg::Floating {
-                spread_bp,
-                payment_dates,
-                accrual_fractions,
-                forward_curve_id,
-                day_count,
-            } => {
-                let spread = finstack_quant_core::decimal::decimal_to_f64(*spread_bp)? / 10_000.0;
-                let fwd_curve = market.get_forward(forward_curve_id.as_ref())?;
-                let fixing_series_id = finstack_quant_core::market_data::fixings::fixing_series_id(
-                    forward_curve_id.as_str(),
-                );
-                let fixings = market.get_series(&fixing_series_id).ok();
-                let mut prev_date = self
-                    .effective_start_date()
-                    .unwrap_or_else(|| payment_dates.first().copied().unwrap_or(as_of));
-                for (i, &payment_date) in payment_dates.iter().enumerate() {
-                    let accrual = accrual_fractions[i];
-                    let fwd_rate = if prev_date < as_of {
-                        finstack_quant_core::market_data::fixings::require_fixing_value_exact(
-                            fixings,
+            | FundingLeg::Floating {
+                periods, day_count, ..
+            } => (periods, *day_count),
+        };
+        for period in periods {
+            if period.payment_date < as_of
+                || (!include_valuation_date && period.payment_date == as_of)
+            {
+                continue;
+            }
+            let (rate, index_rate, kind, reset_date) = match &self.funding_leg {
+                FundingLeg::Fixed { rate, .. } => (
+                    finstack_quant_core::decimal::decimal_to_f64(*rate)?,
+                    None,
+                    CFKind::Fixed,
+                    None,
+                ),
+                FundingLeg::Floating {
+                    spread_bp,
+                    forward_curve_id,
+                    ..
+                } => {
+                    let fwd_curve = market.get_forward(forward_curve_id.as_ref())?;
+                    let index_rate = if period.reset_date < as_of {
+                        let series_id = finstack_quant_core::market_data::fixings::fixing_series_id(
                             forward_curve_id.as_str(),
-                            prev_date,
+                        );
+                        finstack_quant_core::market_data::fixings::require_fixing_value_exact(
+                            market.get_series(&series_id).ok(),
+                            forward_curve_id.as_str(),
+                            period.reset_date,
                             as_of,
                         )?
                     } else {
-                        rate_between_on_dates(fwd_curve.as_ref(), prev_date, payment_date)?
+                        rate_between_on_dates(
+                            fwd_curve.as_ref(),
+                            period.accrual_start,
+                            period.accrual_end,
+                            period.accrual_year_fraction,
+                        )?
                     };
-                    let unsigned = (fwd_rate + spread) * accrual * self.notional.amount();
-                    let signed = match self.side {
-                        crate::instruments::common_impl::parameters::legs::PayReceive::Pay => {
-                            unsigned
-                        }
-                        crate::instruments::common_impl::parameters::legs::PayReceive::Receive => {
-                            -unsigned
-                        }
-                    };
-                    flows.push(
-                        CashFlow::new(
-                            payment_date,
-                            Some(prev_date),
-                            Money::new(signed, self.notional.currency())?,
-                            CFKind::FloatReset,
-                            accrual,
-                            Some(fwd_rate + spread),
-                        )
-                        .with_accrual(CashFlowAccrual {
-                            coupon_period: None,
-                            end_is_termination_date: false,
-                            calendar_id: None,
-                            start: prev_date,
-                            end: payment_date,
-                            day_count: *day_count,
-                            projected_index_rate: Some(fwd_rate),
-                        }),
-                    );
-                    prev_date = payment_date;
+                    (
+                        index_rate
+                            + finstack_quant_core::decimal::decimal_to_f64(*spread_bp)? / 10_000.0,
+                        Some(index_rate),
+                        CFKind::FloatReset,
+                        Some(period.reset_date),
+                    )
                 }
-            }
+            };
+            let unsigned = rate * period.accrual_year_fraction * self.notional.amount();
+            let signed = match self.side {
+                crate::instruments::common_impl::parameters::legs::PayReceive::Pay => unsigned,
+                crate::instruments::common_impl::parameters::legs::PayReceive::Receive => -unsigned,
+            };
+            flows.push(
+                CashFlow::new(
+                    period.payment_date,
+                    reset_date,
+                    Money::new(signed, self.notional.currency())?,
+                    kind,
+                    period.accrual_year_fraction,
+                    Some(rate),
+                )
+                .with_accrual(CashFlowAccrual {
+                    coupon_period: None,
+                    end_is_termination_date: false,
+                    calendar_id: None,
+                    start: period.accrual_start,
+                    end: period.accrual_end,
+                    day_count,
+                    projected_index_rate: index_rate,
+                }),
+            );
         }
         Ok(flows)
     }
@@ -789,7 +798,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CmsSwap {
                 });
             }
         }
-        let funding_flows = self.funding_leg_flows(market, as_of)?;
+        let funding_flows = self.funding_leg_flows(market, as_of, true)?;
         if let FundingLeg::Floating {
             forward_curve_id, ..
         } = &self.funding_leg
@@ -830,6 +839,18 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CmsSwap {
 
 #[cfg(test)]
 mod tests {
+    use crate::instruments::Instrument;
+
+    fn funding_period(start: Date, end: Date, accrual: f64) -> super::super::types::FundingPeriod {
+        super::super::types::FundingPeriod {
+            accrual_start: start,
+            accrual_end: end,
+            payment_date: end,
+            reset_date: start,
+            accrual_year_fraction: accrual,
+        }
+    }
+
     #[allow(dead_code, unused_imports)]
     mod date_support {
         include!(concat!(
@@ -981,8 +1002,7 @@ mod tests {
             // Zero fixed rate so pv_funding = 0 and base_value == pv_cms
             .funding_leg(FundingLeg::Fixed {
                 rate: Decimal::ZERO,
-                payment_dates: vec![pay],
-                accrual_fractions: vec![0.25],
+                periods: vec![funding_period(fixing, pay, 0.25)],
                 day_count: DayCount::Act365F,
             })
             .discount_curve_id(CurveId::new("USD-OIS"))
@@ -1146,8 +1166,7 @@ mod tests {
             .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
             .funding_leg(FundingLeg::Fixed {
                 rate: Decimal::ZERO,
-                payment_dates: vec![pay],
-                accrual_fractions: vec![0.25],
+                periods: vec![funding_period(fixing, pay, 0.25)],
                 day_count: DayCount::Act365F,
             })
             .discount_curve_id(CurveId::new("USD-OIS"))
@@ -1206,8 +1225,7 @@ mod tests {
             .day_count(DayCount::Act365F)
             .funding_leg(FundingLeg::Floating {
                 spread_bp: Decimal::TEN,
-                payment_dates: vec![pay],
-                accrual_fractions: vec![0.25],
+                periods: vec![funding_period(reset, pay, 0.25)],
                 day_count: DayCount::Act360,
                 forward_curve_id: CurveId::new("USD-LIBOR-3M"),
             })
@@ -1219,7 +1237,7 @@ mod tests {
         let market = recon_market(as_of);
 
         let error = swap
-            .funding_leg_flows(&market, as_of)
+            .funding_leg_flows(&market, as_of, true)
             .expect_err("started funding reset without fixing must fail");
         assert!(error.to_string().contains("FIXING:USD-LIBOR-3M"));
 
@@ -1231,7 +1249,7 @@ mod tests {
         )
         .expect("funding fixing");
         let flows = swap
-            .funding_leg_flows(&market.insert_series(series), as_of)
+            .funding_leg_flows(&market.insert_series(series), as_of, true)
             .expect("funding flows with fixing");
         let expected = (observed + 0.001) * 0.25 * 1_000_000.0;
         assert!((flows[0].amount.amount() - expected).abs() < 1e-8);
@@ -1252,8 +1270,10 @@ mod tests {
             .day_count(DayCount::Act365F)
             .funding_leg(FundingLeg::Fixed {
                 rate: Decimal::new(3, 2),
-                payment_dates: vec![date(2026, 6, 20), date(2026, 9, 20)],
-                accrual_fractions: vec![0.25, 0.25],
+                periods: vec![
+                    funding_period(date(2026, 3, 20), date(2026, 6, 20), 0.25),
+                    funding_period(date(2026, 6, 20), date(2026, 9, 20), 0.25),
+                ],
                 day_count: DayCount::Thirty360,
             })
             .discount_curve_id(CurveId::new("USD-OIS"))
@@ -1268,7 +1288,7 @@ mod tests {
     }
 
     #[test]
-    fn builder_rejects_misaligned_funding_leg_vectors() {
+    fn builder_rejects_invalid_funding_period_accrual() {
         let result = CmsSwap::builder()
             .id(InstrumentId::new("CMSSWAP-BAD-FUNDING"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
@@ -1282,8 +1302,10 @@ mod tests {
             .day_count(DayCount::Act365F)
             .funding_leg(FundingLeg::Floating {
                 spread_bp: Decimal::TEN,
-                payment_dates: vec![date(2026, 6, 20), date(2026, 9, 20)],
-                accrual_fractions: vec![0.25],
+                periods: vec![
+                    funding_period(date(2026, 3, 20), date(2026, 6, 20), -0.25),
+                    funding_period(date(2026, 6, 20), date(2026, 9, 20), 0.25),
+                ],
                 day_count: DayCount::Act360,
                 forward_curve_id: CurveId::new("USD-LIBOR-3M"),
             })
@@ -1294,7 +1316,7 @@ mod tests {
 
         assert!(
             result.is_err(),
-            "CMS swap builder must reject funding leg vector length mismatches"
+            "CMS swap builder must reject negative funding accrual fractions"
         );
     }
 }

@@ -15,9 +15,8 @@
 /// # Arguments
 ///
 /// * `$registry` - Expression yielding the crate's `ARTIFACTS` slice.
-/// * `$python_path` - Dotted Python path of the namespace, for `__module__`.
 macro_rules! schema_registry_functions {
-    ($registry:expr, $python_path:literal) => {
+    ($registry:expr) => {
         /// List every JSON Schema this crate publishes.
         ///
         /// Returns
@@ -131,9 +130,6 @@ macro_rules! schema_registry_functions {
             m.add_function(wrap_pyfunction!(index, m)?)?;
             m.add_function(wrap_pyfunction!(get, m)?)?;
             m.add_function(wrap_pyfunction!(validate, m)?)?;
-            for name in ["index", "get", "validate"] {
-                m.getattr(name)?.setattr("__module__", $python_path)?;
-            }
             Ok(())
         }
     };

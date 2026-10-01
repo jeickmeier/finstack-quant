@@ -3,6 +3,17 @@
 //! The [`StochasticPrepayment`] trait provides a common interface for all
 //! prepayment models that incorporate systematic risk factors.
 
+/// State belonging to one simulated prepayment path.
+///
+/// Initialize through [`StochasticPrepayment::initial_state`] at the pool's
+/// current seasoning, then retain the same state across monthly calls to
+/// [`StochasticPrepayment::sample_smm`]. The default starts in the low regime
+/// at origination; models without regimes leave this state unchanged.
+#[derive(Debug, Clone, Default)]
+pub struct PrepaymentState {
+    pub(super) high_regime: bool,
+}
+
 /// Stochastic prepayment model interface.
 ///
 /// Implementations provide conditional prepayment rates given:
@@ -23,13 +34,65 @@
 /// - market_rate is the current mortgage rate
 /// - burnout captures historical prepayment exhaustion
 pub trait StochasticPrepayment: Send + Sync + std::fmt::Debug {
+    /// Initialize a path's latent state before its first simulated month.
+    ///
+    /// # Arguments
+    ///
+    /// * `seasoning` - Completed months since origination, before the first
+    ///   simulated month. Regime models start low at origination and sample
+    ///   the distribution after this many monthly transitions.
+    /// * `uniform` - Independent uniform draw in `[0, 1)` used to select the
+    ///   initial latent state; models without regimes ignore this draw.
+    fn initial_state(&self, seasoning: u32, uniform: f64) -> PrepaymentState {
+        let _ = (seasoning, uniform);
+        PrepaymentState::default()
+    }
+
+    /// Advance one month and sample its SMM while retaining path state.
+    ///
+    /// Models without a latent regime use their factor-conditional rate.
+    /// Regime models first transition from the prior month's state, then
+    /// compute SMM from the resulting state's annual CPR.
+    ///
+    /// # Arguments
+    ///
+    /// * `seasoning` - Months since origination at the end of this simulated
+    ///   month; advance sequentially by one month after initialization.
+    /// * `factors` - Current systematic factor values, with the prepayment
+    ///   shock in the first entry; an empty slice supplies a zero shock.
+    /// * `market_rate` - Current annual mortgage refinancing rate as a decimal.
+    /// * `burnout` - Remaining prepayment propensity in `[0, 1]`, where one
+    ///   means no burnout.
+    /// * `state` - This path's persistent state, initialized at the preceding
+    ///   seasoning and updated to the current month's regime.
+    /// * `uniform` - Fresh independent uniform draw in `[0, 1)` for this
+    ///   month's latent transition, independent of systematic factors.
+    fn sample_smm(
+        &self,
+        seasoning: u32,
+        factors: &[f64],
+        market_rate: f64,
+        burnout: f64,
+        state: &mut PrepaymentState,
+        uniform: f64,
+    ) -> f64 {
+        let _ = (state, uniform);
+        self.conditional_smm(seasoning, factors, market_rate, burnout)
+    }
+
     /// Conditional SMM given factor realizations.
     ///
-    /// Returns the single monthly mortality rate conditional on:
-    /// - `seasoning`: Months since origination
-    /// - `factors`: Systematic factor values [prepay_factor, ...]
-    /// - `market_rate`: Current mortgage rate (for refi incentive)
-    /// - `burnout`: Burnout factor in [0, 1] (1 = no burnout)
+    /// Averages over latent regimes. Use [`Self::sample_smm`] for a simulated
+    /// path that must preserve regime persistence.
+    ///
+    /// # Arguments
+    ///
+    /// * `seasoning` - Months since origination; regime probabilities start
+    ///   in the low state at month zero.
+    /// * `factors` - Systematic factor values `[prepay_factor, ...]`; an empty
+    ///   slice supplies a zero prepayment shock.
+    /// * `market_rate` - Annual mortgage refinancing rate as a decimal.
+    /// * `burnout` - Burnout factor in `[0, 1]`, where one means no burnout.
     fn conditional_smm(
         &self,
         seasoning: u32,
@@ -41,6 +104,11 @@ pub trait StochasticPrepayment: Send + Sync + std::fmt::Debug {
     /// Expected (unconditional) SMM at given seasoning.
     ///
     /// This is E[SMM(t)] integrated over the factor distribution.
+    ///
+    /// # Arguments
+    ///
+    /// * `seasoning` - Months since origination at which to average monthly
+    ///   prepayment, including the latent regime distribution where present.
     fn expected_smm(&self, seasoning: u32) -> f64;
 
     /// Factor loading for correlation calculation.

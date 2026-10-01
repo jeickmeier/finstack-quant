@@ -816,7 +816,8 @@ impl PyAlmgrenChrissModel {
 
     /// Deserialize from JSON produced by ``to_json``.
     ///
-    /// Raises ``ValueError`` when the payload is malformed.
+    /// Raises ``ValueError`` when the payload is malformed or the impact
+    /// parameters violate the constructor's finiteness and range requirements.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
         serde_json::from_str(json)
@@ -938,7 +939,8 @@ impl PyKyleLambdaModel {
 
     /// Deserialize from JSON produced by ``to_json``.
     ///
-    /// Raises ``ValueError`` when the payload is malformed.
+    /// Raises ``ValueError`` when the payload is malformed or ``lambda`` is
+    /// negative or non-finite.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
         serde_json::from_str(json)
@@ -1260,13 +1262,7 @@ fn kyle_lambda(
 
 /// Register the `models.liquidity` Python domain.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "liquidity")?;
-    let qualified_name = crate::bindings::module_utils::set_submodule_package_by_package(
-        parent,
-        &m,
-        "liquidity",
-        "finstack_quant.models",
-    )?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "liquidity")?;
     m.setattr(
         "__doc__",
         "Product-independent liquidity estimation, risk, and market-impact models.",
@@ -1305,6 +1301,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule_at(py, parent, &m, &qualified_name)?;
+    crate::bindings::module_utils::attach_submodule(
+        parent,
+        &m,
+        crate::bindings::module_utils::Exposure::Python,
+    )?;
     Ok(())
 }

@@ -279,8 +279,9 @@ fn test_hull_white_1f_market_and_sigma_vegas_are_distinct() {
 
     let disc_curve = build_flat_discount_curve(0.05, as_of, "USD_OIS");
     let fwd_curve = build_flat_forward_curve(0.05, as_of, "USD_LIBOR_3M");
-    let vol_surface =
-        build_flat_vol_surface(0.01, as_of, "USD_CAP_VOL").with_quote_type(VolQuoteType::Normal);
+    let vol_surface = build_flat_vol_surface(0.01, as_of, "USD_CAP_VOL")
+        .with_quote_type(VolQuoteType::Normal)
+        .expect("valid quote convention");
 
     let market = MarketContext::new()
         .insert(disc_curve)
@@ -368,8 +369,9 @@ fn test_hull_white_1f_pricing_does_not_sample_vol_surface() {
 
     let disc_curve = build_flat_discount_curve(0.05, as_of, "USD_OIS");
     let fwd_curve = build_flat_forward_curve(0.05, as_of, "USD_LIBOR_3M");
-    let vol_surface =
-        build_flat_vol_surface(0.01, as_of, "USD_CAP_VOL").with_quote_type(VolQuoteType::Normal);
+    let vol_surface = build_flat_vol_surface(0.01, as_of, "USD_CAP_VOL")
+        .with_quote_type(VolQuoteType::Normal)
+        .expect("valid quote convention");
     let market = MarketContext::new()
         .insert(disc_curve)
         .insert(fwd_curve)

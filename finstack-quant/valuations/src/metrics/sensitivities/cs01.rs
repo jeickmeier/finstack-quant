@@ -355,29 +355,13 @@ where
     let discount_id = require_cs01_discount_id(Some(discount_curve_id), hazard_ref)?;
     debug_assert_eq!(discount_id, discount_curve_id);
     let buckets = context.hazard_spread_risk_buckets(hazard_ref)?;
-    let base_labels: Vec<_> = buckets
-        .iter()
-        .map(|bucket| super::config::format_bucket_label_cow(bucket.pillar_time))
-        .collect();
 
     let (series, total) = context.with_market_scratch(|context, scratch| {
         let mut series: Vec<(std::borrow::Cow<'static, str>, f64)> = Vec::new();
         let mut total_acc = NeumaierAccumulator::new();
 
-        for (bucket, base_label) in buckets.iter().zip(&base_labels) {
-            let duplicate_label = base_labels
-                .iter()
-                .filter(|candidate| candidate.as_ref() == base_label.as_ref())
-                .count()
-                > 1;
-            let label = if duplicate_label {
-                std::borrow::Cow::Owned(format!(
-                    "{}@{}@{}",
-                    base_label, bucket.pillar_date, bucket.quote_id
-                ))
-            } else {
-                base_label.clone()
-            };
+        for bucket in &buckets {
+            let label = std::borrow::Cow::Owned(bucket.get_metric_label(&buckets));
 
             let rebuild = |bp: f64, direction: &str| {
                 context

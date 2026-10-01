@@ -823,7 +823,7 @@ impl AssetPool {
                         "representative seasoning exceeds the supported date range".into(),
                     )
                 })?;
-                let origination = closing_date.add_months(-months);
+                let origination = closing_date.add_months(-months)?;
                 pool.assets.push(PoolAsset {
                     id: line.id.into(),
                     asset_type: line.asset_type,

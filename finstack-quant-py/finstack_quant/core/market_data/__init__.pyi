@@ -54,6 +54,7 @@ __all__ = [
     "SabrParameterData",
     "ScalarTimeSeries",
     "VolCube",
+    "VolCubeExpirySlice",
     "VolSurface",
     "context",
     "curves",
@@ -826,6 +827,11 @@ class ForwardCurve:
         """
         Forward rate (decimal) at a year fraction or date.
 
+        The stored rate is annualized on the curve's day-count basis. Convert
+        its accrual growth to the contractual index basis before calculating a
+        coupon with a different accrual convention. Rust instrument pricing
+        performs this conversion from the contractual schedule.
+
         Parameters
         ----------
         t : float, datetime.date or str
@@ -835,7 +841,7 @@ class ForwardCurve:
         Returns
         -------
         float
-            Forward rate as a decimal.
+            Simple forward rate as a decimal, annualized on the curve day count.
 
         Raises
         ------
@@ -848,12 +854,16 @@ class ForwardCurve:
         """
         Discount-factor-implied simple forward rate (decimal) over ``(t1, t2)``.
 
+        The denominator is the curve-time span ``t2 - t1``. To express the
+        implied growth on another contractual index basis, multiply by that
+        span and divide by the index accrual fraction for the same dated period.
+
         Parameters
         ----------
         t1 : float
-            Start year fraction.
+            Start year fraction from the curve base date using its day count.
         t2 : float
-            End year fraction; must be finite and greater than ``t1``.
+            End year fraction on the same curve basis; must be finite and greater than ``t1``.
 
         Returns
         -------
@@ -871,12 +881,17 @@ class ForwardCurve:
         """
         Average forward rate (decimal) over ``[t1, t2]`` from the stored knots.
 
+        This integral average remains annualized on the curve's day count.
+        For an overnight observation on another index basis, multiply by
+        ``t2 - t1`` and divide by its contractual observation accrual fraction.
+        Use ``rate_between`` for a simple term-period rate implied by projection DFs.
+
         Parameters
         ----------
         t1 : float
-            Start year fraction.
+            Start year fraction from the curve base date using its day count.
         t2 : float
-            End year fraction.
+            End year fraction on the same curve basis.
 
         Returns
         -------
@@ -1717,13 +1732,14 @@ class BaseCorrelationCurve:
             Unique curve identifier (typically index name plus maturity).
         knots : Sequence[tuple[float, float]]
             ``(detachment_pct, correlation)`` pairs; detachment in percent of
-            notional, correlation as a decimal in ``[0, 1]``.
+            notional within ``[0, 100]``, correlation as a decimal in ``[0, 1]``.
+            Decreasing correlation shapes are accepted and do not certify arbitrage-free pricing.
 
         Raises
         ------
         ValueError
-            If ``knots`` is empty, a correlation is outside ``[0, 1]``, or
-            detachment points are not strictly increasing.
+            If fewer than two knots are supplied, values are non-finite, correlations
+            are outside ``[0, 1]``, or detachments are duplicated or outside ``[0, 100]``.
 
         Examples
         --------
@@ -2076,6 +2092,8 @@ class PriceCurve:
             :meth:`MarketContext.get_vol_index_curve`.
         spot_price : float, optional
             Spot level at ``t = 0``; inferred from a ``t = 0`` knot when omitted.
+            An explicit spot is inserted at zero if that knot is absent and
+            must match any supplied zero-time knot.
         extrapolation : str, optional
             Extrapolation policy; default ``"flat_zero"``.
         interp : str, optional
@@ -2087,13 +2105,14 @@ class PriceCurve:
         ------
         ValueError
             If fewer than two knots are given, a knot is non-finite or
-            duplicated, spot cannot be inferred, a vol-index level is
+            duplicated, spot cannot be inferred or conflicts with a zero-time
+            knot, a vol-index level is
             negative, or a label is unknown.
 
         Examples
         --------
         >>> from finstack_quant.core.market_data import PriceCurve
-        >>> PriceCurve("WTI", "2025-01-01", [(0.0, 70.0), (1.0, 72.0)], spot_price=69.5).spot_price
+        >>> PriceCurve("WTI", "2025-01-01", [(0.5, 70.0), (1.0, 72.0)], spot_price=69.5).spot_price
         69.5
 
         """
@@ -2395,6 +2414,7 @@ class InflationCurve:
         base_cpi : float
             Finite, strictly positive reference CPI level at ``t = 0`` used by
             :meth:`index_ratio`; must equal any zero-time CPI knot.
+            Inserted as the zero-time interpolation knot when absent.
         knots : Sequence[tuple[float, float]]
             ``(time_years, cpi_level)`` pairs; levels must be positive.
         day_count : str, optional
@@ -2404,7 +2424,7 @@ class InflationCurve:
         interp : str, optional
             Interpolation style; default ``"log_linear"``.
         extrapolation : str, optional
-            Extrapolation policy; default ``"flat_forward"``.
+            Extrapolation policy; default ``"flat_zero"``.
 
         Raises
         ------
@@ -2775,6 +2795,7 @@ class VolSurface:
         secondary_axis: str = "strike",
         interpolation_mode: str = "vol",
         quote_type: str = "black_lognormal",
+        displacements: list[float] | None = None,
     ) -> None:
         """
         Construct a vol surface from an expiry x strike grid.
@@ -2796,7 +2817,10 @@ class VolSurface:
         interpolation_mode : str, optional
             ``"vol"`` (default, bilinear in vol) or ``"total_variance"``.
         quote_type : str, optional
-            ``"black_lognormal"`` (default) or ``"normal"``.
+            ``"black_lognormal"`` (default), ``"shifted_black_lognormal"``, or ``"normal"``.
+        displacements : list[float] | None, optional
+            One finite rate-unit displacement per expiry for shifted Black;
+            absent for other quote conventions.
 
         Raises
         ------
@@ -2991,11 +3015,48 @@ class VolSurface:
         Returns
         -------
         str
-            Either ``"black_lognormal"`` (decimal Black vol) or ``"normal"`` (absolute Bachelier vol in the underlying rate units).
+            ``"black_lognormal"`` or ``"shifted_black_lognormal"`` for decimal Black
+            vol, or ``"normal"`` for absolute Bachelier vol in rate units.
 
         Notes
         -----
         This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    def get_displacements(self) -> list[float] | None:
+        """Return the shifted-Black displacement attached to each expiry.
+
+        Returns
+        -------
+        list[float] | None
+            Rate-unit displacements aligned to ``expiries``, or ``None`` for
+            unshifted quotes.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored metadata.
+        """
+        ...
+
+    def with_displacements(self, displacements: list[float]) -> VolSurface:
+        """Return a surface with validated shifted-Black quote metadata.
+
+        Parameters
+        ----------
+        displacements : list[float]
+            Finite rate-unit shifts, one per expiry, compatible with the
+            stored strike coordinates.
+
+        Returns
+        -------
+        VolSurface
+            New immutable surface with shifted-Black quote convention.
+
+        Raises
+        ------
+        ValueError
+            If the displacement count or shifted strike domains are invalid.
         """
         ...
 
@@ -3035,6 +3096,231 @@ class VolSurface:
     def __reduce__(self) -> tuple[Any, tuple[str]]: ...
     def __repr__(self) -> str: ...
     def _repr_html_(self) -> Optional[str]: ...
+
+class VolCubeExpirySlice:
+    """Volatility grid at one fixed option expiry, indexed by tenor and strike.
+
+    Black and shifted-Black values are annual decimal volatilities; normal
+    values are absolute volatilities in forward-rate units. The fixed expiry
+    is distinct from every underlying tenor.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import VolCubeExpirySlice
+    >>> grid = VolCubeExpirySlice("SLICE", 1.0, [5.0], [0.02, 0.03], [0.2, 0.21])
+    >>> (grid.get_expiry(), grid.get_tenors(), grid.get_grid_shape())
+    (1.0, [5.0], (1, 2))
+    """
+
+    def __init__(
+        self,
+        id: str,
+        expiry: float,
+        tenors: list[float],
+        strikes: list[float],
+        vols: list[float],
+        *,
+        quote_type: str = "black_lognormal",
+        displacements: list[float] | None = None,
+    ) -> None:
+        """Construct a validated tenor-major grid at one fixed expiry.
+
+        Parameters
+        ----------
+        id : str
+            Identifier of the materialized grid.
+        expiry : float
+            Fixed option expiry in years, finite and positive.
+        tenors : list[float]
+            Increasing positive underlying tenors in years.
+        strikes : list[float]
+            Increasing finite strike coordinates in forward-rate units.
+        vols : list[float]
+            Flat tenor-major grid with ``len(tenors) * len(strikes)`` entries,
+            expressed in the declared quote convention.
+        quote_type : str, default "black_lognormal"
+            ``black_lognormal``, ``shifted_black_lognormal``, or ``normal``.
+        displacements : list[float] | None, default None
+            One rate-unit shift per tenor for shifted Black; absent otherwise.
+
+        Raises
+        ------
+        ValueError
+            If axes, dimensions, volatility values, convention, or shifts fail
+            the canonical Rust validation.
+        """
+        ...
+
+    def get_id(self) -> str:
+        """Identifier of the materialized grid.
+
+        Returns
+        -------
+        str
+            Stable grid identifier.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the validated stored value.
+        """
+        ...
+
+    def get_expiry(self) -> float:
+        """Fixed option expiry in years.
+
+        Returns
+        -------
+        float
+            Option expiry, separate from the tenor axis.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the validated stored value.
+        """
+        ...
+
+    def get_tenors(self) -> list[float]:
+        """Underlying-tenor axis in years.
+
+        Returns
+        -------
+        list[float]
+            Copy of the increasing tenor coordinates.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the validated stored value.
+        """
+        ...
+
+    def get_strikes(self) -> list[float]:
+        """Strike axis in forward-rate units.
+
+        Returns
+        -------
+        list[float]
+            Copy of the increasing strike coordinates.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the validated stored value.
+        """
+        ...
+
+    def get_vols(self) -> list[float]:
+        """Flat tenor-major volatility grid.
+
+        Returns
+        -------
+        list[float]
+            Volatilities in the declared quote convention, with strike varying fastest.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the validated stored value.
+        """
+        ...
+
+    def get_quote_type(self) -> str:
+        """Convention used by the stored volatility values.
+
+        Returns
+        -------
+        str
+            One of ``black_lognormal``, ``shifted_black_lognormal``, or ``normal``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the validated stored value.
+        """
+        ...
+
+    def get_displacements(self) -> list[float] | None:
+        """Shifted-Black displacements aligned to the tenor axis.
+
+        Returns
+        -------
+        list[float] | None
+            One shift in rate units per tenor, or ``None`` for unshifted quotes.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the validated stored value.
+        """
+        ...
+
+    def get_grid_shape(self) -> tuple[int, int]:
+        """Dimensions of the tenor-by-strike grid.
+
+        Returns
+        -------
+        tuple[int, int]
+            Pair ``(number of tenors, number of strikes)``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the validated stored value.
+        """
+        ...
+
+    def to_dataframe(self) -> pd.DataFrame:
+        """Export the grid in long form, retaining the fixed option expiry.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Columns ``expiry``, ``tenor``, ``strike``, and ``vol`` in tenor-major
+            order. Time coordinates are years and quotes use ``get_quote_type()``.
+
+        Raises
+        ------
+        ImportError
+            If pandas is unavailable.
+        """
+        ...
+
+    def to_json(self) -> str:
+        """Serialize the validated slice and all convention metadata.
+
+        Returns
+        -------
+        str
+            Canonical JSON accepted by Rust and ``from_json``.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails.
+        """
+        ...
+
+    @staticmethod
+    def from_json(json: str) -> VolCubeExpirySlice:
+        """Load a fixed-expiry slice through canonical Rust validation.
+
+        Parameters
+        ----------
+        json : str
+            Canonical JSON produced by ``to_json`` or the Rust serializer.
+
+        Returns
+        -------
+        VolCubeExpirySlice
+            Immutable slice retaining its fixed expiry, tenor axis, and shifts.
+
+        Raises
+        ------
+        ValueError
+            If JSON is malformed, contains unknown fields, or fails validation.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import VolCubeExpirySlice
+        >>> grid = VolCubeExpirySlice("S", 1.0, [5.0], [0.03], [0.2])
+        >>> VolCubeExpirySlice.from_json(grid.to_json()).get_expiry()
+        1.0
+        """
+        ...
 
 class FxDeltaVolSurface:
     """
@@ -3329,7 +3615,7 @@ class SabrParameterData:
         rho : float
             Forward/volatility correlation in ``(-1, 1)``.
         nu : float
-            Volatility of volatility; strictly positive.
+            Volatility of volatility; nonnegative, with zero giving deterministic volatility.
         shift : float, optional
             Displacement added to forward and strike (decimal rate units).
 
@@ -4288,8 +4574,9 @@ class FxMatrix:
         Parameters
         ----------
         quotes : dict[str, float]
-            Keys are six-letter ISO pairs (``"EURUSD"``) or slash-separated
-            pairs (``"EUR/USD"``); values are ``1 base = rate quote``.
+            Keys are six ASCII-letter ISO pairs (``"EURUSD"``) or
+            slash-separated pairs (``"EUR/USD"``); values are
+            ``1 base = rate quote``.
 
         Returns
         -------
@@ -4425,7 +4712,8 @@ class FxMatrix:
         KeyError
             If no direct, inverse or triangulated quote is available.
         ValueError
-            If ``policy`` is not a recognised label.
+            If ``policy`` is not a recognised label or repeated concurrent quote
+            updates prevent a coherent rate from being resolved.
         """
         ...
 
@@ -4443,7 +4731,8 @@ class FxMatrix:
         Raises
         ------
         ValueError
-            If the frame cannot be built.
+            If the frame cannot be built, concurrent quote updates prevent a
+            coherent snapshot, or the provider cannot version its snapshot quotes.
         """
         ...
 
@@ -4481,8 +4770,8 @@ class ScalarTimeSeries:
         id : str
             Series identifier.
         observations : Sequence[tuple[datetime.date or str, float, int or Decimal]]
-            Dated values; ``Decimal`` values must round-trip through ``float``
-            exactly. Dates must be unique; any order is accepted.
+            Dated values; ``Decimal`` values must be exactly representable as
+            binary ``float``. Dates must be unique; any order is accepted.
         currency : Currency or str, optional
             Currency tag for monetary series; ``None`` for unitless values.
         interpolation : str, optional
@@ -4492,7 +4781,8 @@ class ScalarTimeSeries:
         ------
         ValueError
             If ``observations`` is empty or has duplicate dates, a value is
-            non-finite, or ``interpolation`` is not a recognised label.
+            non-finite or a ``Decimal`` cannot be represented exactly as
+            ``float``, or ``interpolation`` is not a recognised label.
         TypeError
             If a value is not a float, int or ``Decimal``.
 
@@ -4720,6 +5010,11 @@ class InflationIndex:
     >>> index = InflationIndex("US-CPI", [("2025-01-01", 300.0), ("2025-02-01", 301.5)], "USD")
     >>> (index.value_on("2025-01-15"), index.lag, index.seasonality)
     (300.0, 'none', None)
+    >>> released = index.with_publication_dates([("2025-01-01", "2025-02-12")])
+    >>> released.get_publication_date("2025-01-31").isoformat()
+    '2025-02-12'
+    >>> len(released.get_publication_dates())
+    1
 
     """
 
@@ -4740,14 +5035,14 @@ class InflationIndex:
         id : str
             Index identifier (e.g. ``"US-CPI-U"``).
         observations : Sequence[tuple[datetime.date or str, float, int or Decimal]]
-            Dated index levels; ``Decimal`` values must round-trip through
-            ``float`` exactly.
+            Dated index levels; ``Decimal`` values must be exactly representable
+            as binary ``float``.
         currency : Currency or str
             Currency of the index.
         interpolation : str, optional
             ``"step"`` (default) or ``"linear"``.
         lag : str or int, optional
-            Publication lag applied before lookups: ``"none"`` (default),
+            Contractual observation lag applied before lookups: ``"none"`` (default),
             market strings such as ``"3M"`` or ``"90D"``, or an integer number
             of months.
         seasonality : Sequence[float], optional
@@ -4757,7 +5052,8 @@ class InflationIndex:
         ------
         ValueError
             If ``observations`` is empty or has duplicate dates, a label is
-            unknown, or ``seasonality`` does not have exactly 12 entries.
+            unknown, a value is non-finite or a ``Decimal`` cannot be represented
+            exactly as ``float``, or ``seasonality`` does not have exactly 12 entries.
 
         Examples
         --------
@@ -4765,6 +5061,73 @@ class InflationIndex:
         >>> InflationIndex("US-CPI", [("2025-01-01", 300.0)], "USD", lag="3M").lag
         '3M'
 
+        """
+        ...
+
+    def with_publication_dates(self, dates: Sequence[tuple[DateLike, DateLike]]) -> InflationIndex:
+        """
+        Return a new index with an explicit monthly publication schedule.
+
+        Parameters
+        ----------
+        dates : Sequence[tuple[datetime.date or str, datetime.date or str]]
+            First-of-month reference dates paired with inclusive publication
+            dates. Replaces any prior schedule independently of observation lag.
+            This declares monthly reference observations for valuation even
+            with no lag or a day lag; observation label days are not fixing dates.
+
+        Returns
+        -------
+        InflationIndex
+            New index retaining the observations and other conventions.
+
+        Raises
+        ------
+        ValueError
+            If a date is malformed, a reference key is not month start, a month
+            is duplicated, or publication precedes its reference month.
+        TypeError
+            If an entry is not a pair of supported date-like values.
+        """
+        ...
+
+    def get_publication_date(self, reference_date: DateLike) -> Optional[datetime.date]:
+        """
+        Look up the configured availability date of a reference month.
+
+        Parameters
+        ----------
+        reference_date : datetime.date or str
+            Any day in the reference month; its day component is ignored.
+
+        Returns
+        -------
+        datetime.date or None
+            Inclusive availability date, or ``None`` when unspecified. Missing
+            metadata does not authorize forecasting missing historical fixings.
+
+        Raises
+        ------
+        ValueError
+            If the reference date is malformed.
+        TypeError
+            If the reference date is not date-like or an ISO date string.
+        """
+        ...
+
+    def get_publication_dates(self) -> list[tuple[datetime.date, datetime.date]]:
+        """
+        Return the configured publication schedule in reference-month order.
+
+        Returns
+        -------
+        list[tuple[datetime.date, datetime.date]]
+            First-of-month reference dates and inclusive publication dates.
+
+        Raises
+        ------
+        ValueError
+            If an internal date cannot be converted to a Python date.
         """
         ...
 
@@ -5089,7 +5452,7 @@ class MarketContext:
         Raises
         ------
         ValueError
-            If serialization fails.
+            If the FX provider cannot supply a coherent snapshot or serialization fails.
         """
         ...
 
@@ -5163,7 +5526,8 @@ class MarketContext:
             Identifier for the scalar.
         value : float, int or Decimal
             Price or unitless value. Monetary ``Decimal`` values keep full
-            precision; unitless ``Decimal`` values must round-trip through ``float``.
+            precision; unitless ``Decimal`` values must be exactly representable
+            as binary ``float``.
         currency : Currency or str, optional
             When given, the scalar is a monetary price in this currency;
             otherwise it is unitless.
@@ -5193,16 +5557,23 @@ class MarketContext:
             Identifier for the bundle (e.g. ``"CDX-IG"``); the bundle carries
             no id of its own.
         data : CreditIndexData
-            Bundle to store.
+            Bundle whose hazard, base-correlation, and issuer curve IDs must
+            already resolve in this context. Canonical context curves replace
+            the bundle's embedded curve references; insert replacement curves
+            first when changing their values.
 
         Returns
         -------
         MarketContext
             ``self``, so inserts can be chained fluently.
 
-        Notes
-        -----
-        This method does not raise; an existing bundle under ``id`` is replaced.
+        Raises
+        ------
+        KeyError
+            If a referenced curve is absent. The context remains unchanged.
+        ValueError
+            If constituent count, recovery, or issuer data is invalid, or a
+            referenced ID resolves to the wrong curve type.
         """
         ...
 
@@ -5722,7 +6093,7 @@ class MarketContext:
         Parameters
         ----------
         days : int
-            Calendar days to roll (may be negative).
+            Signed 64-bit calendar days to roll (may be negative).
 
         Returns
         -------
@@ -5732,7 +6103,9 @@ class MarketContext:
         Raises
         ------
         ValueError
-            If a curve cannot be rebuilt after rolling.
+            If a rolled base date exceeds the supported date range or a curve cannot be rebuilt after rolling.
+        OverflowError
+            If ``days`` is outside the signed 64-bit integer range.
         """
         ...
 

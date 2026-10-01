@@ -40,6 +40,9 @@ pub(crate) struct OvernightCouponProjectionInput<'a> {
     pub day_count: DayCount,
     /// Coupon frequency required by context-sensitive day-count conventions.
     pub coupon_frequency: Option<Tenor>,
+    /// Actual full coupon boundaries enclosing the accrual window; ACT/365L
+    /// preserves this period's denominator when projecting a coupon slice.
+    pub coupon_period: (Date, Date),
     /// Shared overnight compounding convention.
     pub compounding: &'a FloatingLegCompounding,
     /// Resolved fixing calendar.
@@ -381,6 +384,12 @@ fn projected_rate(
 ) -> Result<f64> {
     match curve {
         OvernightProjectionCurve::Forward(forward) => {
+            if obs_start < forward.base_date() {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "Overnight projection for {} starts before its curve base date {}; supply the historical fixing for {obs_start}",
+                    forward.id(), forward.base_date()
+                )));
+            }
             let t0 = if obs_start <= forward.base_date() {
                 0.0
             } else {
@@ -399,11 +408,15 @@ fn projected_rate(
                     day_count_context,
                 )?
             };
-            Ok(if t1 > t0 {
-                forward.rate_period(t0, t1)
-            } else {
-                forward.rate(t0)
-            })
+            let rate_accrual = day_count.year_fraction(obs_start, obs_end, day_count_context)?;
+            if !rate_accrual.is_finite() || rate_accrual <= 0.0 || t1 <= t0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "Overnight projection requires positive curve time and index accrual for {obs_start} -> {obs_end}"
+                )));
+            }
+            // ForwardCurve rates are annualized on its own clock. Preserve the
+            // observation's growth when quoting it on the overnight index basis.
+            Ok(forward.rate_period(t0, t1) * (t1 - t0) / rate_accrual)
         }
         OvernightProjectionCurve::Discount(discount) => {
             let dcf = day_count.year_fraction(obs_start, obs_end, day_count_context)?;
@@ -543,7 +556,7 @@ pub(crate) fn project_overnight_coupon(
     let day_count_context = DayCountContext {
         calendar: Some(input.fixing_calendar),
         frequency: input.coupon_frequency,
-        coupon_period: Some((input.accrual_start, input.accrual_end)),
+        coupon_period: Some(input.coupon_period),
         ..DayCountContext::default()
     };
     let accrual_year_fraction =
@@ -793,6 +806,59 @@ mod tests {
     use time::macros::date;
 
     #[test]
+    fn overnight_projection_preserves_index_rates_across_curve_clocks() {
+        let start = date!(2025 - 01 - 02);
+        let end = date!(2025 - 04 - 02);
+        let calendar = finstack_quant_core::dates::calendar_by_id("usny").expect("USD calendar");
+        let compounding = FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };
+        let mut factors = Vec::new();
+        for (curve_day_count, curve_rate) in [
+            (DayCount::Act360, 0.04),
+            (DayCount::Act365F, 0.04 * 365.0 / 360.0),
+        ] {
+            let forward = ForwardCurve::builder("USD-SOFR", 1.0 / 360.0)
+                .base_date(start)
+                .day_count(curve_day_count)
+                .knots([(0.0, curve_rate), (1.0, curve_rate)])
+                .build()
+                .expect("forward curve");
+            let project = |curve: &ForwardCurve| {
+                project_overnight_coupon(OvernightCouponProjectionInput {
+                    curve: OvernightProjectionCurve::Forward(curve),
+                    fixings: None,
+                    fixing_id: "USD-SOFR",
+                    as_of: start,
+                    accrual_start: start,
+                    accrual_end: end,
+                    day_count: DayCount::Act360,
+                    coupon_frequency: None,
+                    coupon_period: (start, end),
+                    compounding: &compounding,
+                    fixing_calendar: calendar,
+                    compounded_spread: 0.0,
+                    need_observation_exposures: true,
+                })
+                .expect("overnight projection")
+            };
+            let projection = project(&forward);
+            for observation in &projection.observation_exposures {
+                assert!((observation.projected_rate - 0.04).abs() < 1e-13);
+            }
+            // Sensitivities are to the contractual index rate. Convert the raw
+            // curve bump so both clocks represent the same 0.01 bp index bump.
+            let curve_bump_bp = 0.01 * curve_rate / 0.04;
+            let up = forward.with_parallel_bump(curve_bump_bp).expect("up curve");
+            let down = forward
+                .with_parallel_bump(-curve_bump_bp)
+                .expect("down curve");
+            let finite_difference = (project(&up).rate - project(&down).rate) / 2e-6;
+            assert!((projection.parallel_forward_sensitivity - finite_difference).abs() < 1e-8);
+            factors.push(projection.compound_factor);
+        }
+        assert!((factors[0] - factors[1]).abs() < 1e-13);
+    }
+
+    #[test]
     fn overnight_coupon_amount_uses_compound_factor_and_projection_yf() {
         let projection = OvernightCouponProjection {
             rate: 0.04,
@@ -840,6 +906,7 @@ mod tests {
             accrual_end,
             day_count: DayCount::Act360,
             coupon_frequency: None,
+            coupon_period: (accrual_start, accrual_end),
             compounding: &compounding,
             fixing_calendar: calendar,
             compounded_spread: 0.0,
@@ -905,6 +972,7 @@ mod tests {
                 accrual_end,
                 day_count: DayCount::Act360,
                 coupon_frequency: None,
+                coupon_period: (accrual_start, accrual_end),
                 compounding: &compounding,
                 fixing_calendar: calendar,
                 compounded_spread: 0.0,
@@ -996,6 +1064,7 @@ mod tests {
                 accrual_end: date!(2025 - 04 - 02),
                 day_count: DayCount::Act360,
                 coupon_frequency: None,
+                coupon_period: (date!(2025 - 01 - 02), date!(2025 - 04 - 02)),
                 compounding: &compounding,
                 fixing_calendar: calendar,
                 compounded_spread: 0.0,
@@ -1062,6 +1131,7 @@ mod tests {
             accrual_end,
             day_count: DayCount::Act360,
             coupon_frequency: None,
+            coupon_period: (accrual_start, accrual_end),
             compounding: &compounding,
             fixing_calendar: calendar,
             compounded_spread: 0.0,
@@ -1102,6 +1172,7 @@ mod tests {
             accrual_end: date!(2025 - 01 - 03),
             day_count: DayCount::Act360,
             coupon_frequency: None,
+            coupon_period: (as_of, date!(2025 - 01 - 03)),
             compounding: &compounding,
             fixing_calendar: calendar,
             compounded_spread: 0.0,
@@ -1137,6 +1208,7 @@ mod tests {
             accrual_end: date!(2025 - 01 - 07),
             day_count: DayCount::Act360,
             coupon_frequency: None,
+            coupon_period: (as_of, date!(2025 - 01 - 07)),
             compounding: &compounding,
             fixing_calendar: calendar,
             compounded_spread: 0.0,
@@ -1196,6 +1268,7 @@ mod tests {
             accrual_end: date!(2025 - 01 - 10),
             day_count: DayCount::Bus252,
             coupon_frequency: None,
+            coupon_period: (as_of, date!(2025 - 01 - 10)),
             compounding: &compounding,
             fixing_calendar: calendar,
             compounded_spread: 0.0,
@@ -1239,6 +1312,7 @@ mod tests {
             accrual_end: date!(2025 - 07 - 01),
             day_count: DayCount::ActActIsma,
             coupon_frequency: Some(Tenor::semi_annual()),
+            coupon_period: (as_of, date!(2025 - 07 - 01)),
             compounding: &compounding,
             fixing_calendar: calendar,
             compounded_spread: 0.0,

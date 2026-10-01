@@ -645,7 +645,8 @@ impl PyTornadoEntry {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
-    /// Parameter node identifier represented by this entry.
+    /// Statement sensitivity parameter key in ``node@period`` form; DCF entries
+    /// use assumption identifiers such as ``wacc`` or ``g``.
     #[getter]
     fn parameter_id(&self) -> &str {
         &self.inner.parameter_id
@@ -734,7 +735,8 @@ impl PySensitivityResult {
         }
     }
 
-    /// Unperturbed baseline evaluation (populated by tornado runs), or ``None``.
+    /// Unperturbed baseline evaluation retained by every sensitivity run;
+    /// ``None`` only when absent from an imported result document.
     #[getter]
     fn baseline(&self) -> Option<PyStatementResult> {
         self.inner

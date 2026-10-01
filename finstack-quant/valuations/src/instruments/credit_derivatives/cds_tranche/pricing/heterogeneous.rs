@@ -1,7 +1,7 @@
 //! Heterogeneous capped loss with common recovery and integration contracts.
 use super::config::{
     CdsTranchePricer, HeteroMethod, PoolExposure, CDF_CLIP, GRID_STEP_MIN, HOMOGENEITY_TOLERANCE,
-    MAX_GRID_POINTS, NUMERICAL_TOLERANCE,
+    MAX_CONVOLUTION_WORK, MAX_GRID_POINTS, NUMERICAL_TOLERANCE,
 };
 use super::expected_loss::stochastic_recovery_exposure_scale;
 use super::saddlepoint::conditional_min_loss_normal;
@@ -38,7 +38,20 @@ impl CdsTranchePricer {
         let mut probabilities = Vec::with_capacity(count);
         let mut recoveries = Vec::with_capacity(count);
         let mut weights = Vec::with_capacity(count);
+        let mut total_weight = 0.0;
         for (id, curve) in curves {
+            let weight = index_data.get_issuer_weight(id);
+            if !weight.is_finite() || weight < 0.0 {
+                return Err(Error::Validation(
+                    "issuer weights must be finite and non-negative".to_owned(),
+                ));
+            }
+            total_weight += weight;
+            // Names without exposure must not change the loss distribution or
+            // the choice between the binomial and heterogeneous algorithms.
+            if weight == 0.0 {
+                continue;
+            }
             let time = curve.day_count().year_fraction(
                 curve.base_date(),
                 maturity,
@@ -46,15 +59,14 @@ impl CdsTranchePricer {
             )?;
             probabilities.push((1.0 - curve.sp(time)).clamp(0.0, 1.0));
             recoveries.push(index_data.get_issuer_recovery(id));
-            weights.push(index_data.get_issuer_weight(id));
+            weights.push(weight);
         }
-        if weights.iter().any(|w| !w.is_finite() || *w < 0.0)
-            || (weights.iter().sum::<f64>() - 1.0).abs() > 1e-9
-        {
+        if (total_weight - 1.0).abs() > 1e-9 {
             return Err(Error::Validation(
                 "issuer weights must preserve the full pool notional".to_owned(),
             ));
         }
+        let count = weights.len();
         let uniform = |values: &[f64]| {
             values
                 .iter()
@@ -107,9 +119,35 @@ impl CdsTranchePricer {
         let stochastic = recovery_model
             .as_ref()
             .is_some_and(|model| model.is_stochastic());
+        let grid_step = self.config.grid_step.max(GRID_STEP_MIN);
+        let exact = count <= credit::SMALL_POOL_THRESHOLD
+            || self.config.hetero_method == HeteroMethod::ExactConvolution;
+        if exact {
+            // Check resource requirements before any recovery normalization
+            // integral. Stochastic recovery first uses unscaled unit exposure
+            // as a conservative preflight. This may reject a request whose
+            // eventual scales shrink its support. Conversely, normalization
+            // can enlarge support, so actual scales are checked again below.
+            let preflight_grid_index = (0..count)
+                .map(|i| {
+                    let amount = if stochastic {
+                        1.0
+                    } else {
+                        exposure_at(i, &[0.0, 1.0])
+                    };
+                    (weights[i] * amount / grid_step).ceil()
+                })
+                .sum();
+            checked_convolution_grid(count, preflight_grid_index)?;
+        }
         let mut scales = vec![1.0; count];
         if stochastic {
             for i in 0..count {
+                if probabilities[i] * exposure_of(recoveries[i]) == 0.0 {
+                    // The scale helper returns one regardless of its second
+                    // argument when the target exposure is zero.
+                    continue;
+                }
                 let model_exposure = self.integrate_factors(&|factors| {
                     Ok(conditional_p(i, factors) * exposure_at(i, factors))
                 })?;
@@ -121,26 +159,31 @@ impl CdsTranchePricer {
         }
         // Stochastic recovery is in [0,1], so each scale bounds its exposure.
         // The PMF spans every reachable loss, including the mass above the cap.
-        let max_exposure: f64 = (0..count)
+        // Fractional-bin interpolation can round each name upward. Bound the
+        // sum of those rounded supports, not just the rounded aggregate loss,
+        // so no reachable probability mass falls off the convolution grid.
+        let max_grid_index: f64 = (0..count)
             .map(|i| {
-                weights[i]
+                (weights[i]
                     * if stochastic {
                         scales[i]
                     } else {
                         exposure_at(i, &[0.0, 1.0])
                     }
+                    / grid_step)
+                    .ceil()
             })
             .sum();
-        let grid_step = self.config.grid_step.max(GRID_STEP_MIN);
-        if !max_exposure.is_finite() {
+        if !max_grid_index.is_finite() {
             return Err(Error::Validation(
                 "non-finite heterogeneous pool exposure".to_owned(),
             ));
         }
-        let max_points = ((max_exposure / grid_step).ceil() as usize).saturating_add(2);
-        let exact = (count <= credit::SMALL_POOL_THRESHOLD
-            || self.config.hetero_method == HeteroMethod::ExactConvolution)
-            && max_points <= MAX_GRID_POINTS;
+        let max_points = if exact {
+            checked_convolution_grid(count, max_grid_index)?
+        } else {
+            0
+        };
         if !exact {
             tracing::warn!(count, max_points, "CDS tranche uses moment-matched normal approximation; conditional-loss approximation error is separate from quadrature tolerance");
         }
@@ -275,6 +318,32 @@ impl CdsTranchePricer {
     }
 }
 
+/// Check conservative PMF storage and work before allocation or convolution.
+fn checked_convolution_grid(count: usize, max_grid_index: f64) -> Result<usize> {
+    if !max_grid_index.is_finite() || max_grid_index < 0.0 {
+        return Err(Error::Validation(
+            "non-finite or negative heterogeneous grid extent".to_owned(),
+        ));
+    }
+    if max_grid_index.ceil() >= MAX_GRID_POINTS as f64 {
+        return Err(Error::Validation(format!(
+            "heterogeneous exact convolution grid is exceeding the limit of {MAX_GRID_POINTS} points; increase grid_step"
+        )));
+    }
+    let points = (max_grid_index.ceil() as usize)
+        .checked_add(1)
+        .ok_or_else(|| Error::Validation("heterogeneous grid size overflow".to_owned()))?;
+    let work = count.checked_mul(points).ok_or_else(|| {
+        Error::Validation("heterogeneous convolution work estimate overflow".to_owned())
+    })?;
+    if work > MAX_CONVOLUTION_WORK {
+        return Err(Error::Validation(format!(
+            "heterogeneous exact convolution requires up to {work} issuer-grid visits per factor evaluation, exceeding the limit of {MAX_CONVOLUTION_WORK}; increase grid_step or reduce positive-weight constituent count"
+        )));
+    }
+    Ok(points)
+}
+
 /// Convolve a single issuer's loss contribution into the destination PMF buffer.
 ///
 /// Reads the active prefix `src[..src_len]`, writes the new active prefix into
@@ -348,4 +417,33 @@ fn expected_loss_capped(pmf: &[f64], grid_step: f64, k: f64) -> f64 {
             .enumerate()
             .map(|(i, &mass)| mass * ((i as f64) * grid_step).min(k)),
     )
+}
+
+#[cfg(test)]
+mod work_limit_tests {
+    use super::*;
+
+    #[test]
+    fn convolution_work_limit_checks_boundary_without_running_convolution() {
+        // 100 * 50,000 visits is the configured budget; one extra grid point
+        // must fail even though both grids fit the independent storage cap.
+        assert_eq!(
+            checked_convolution_grid(100, 49_998.0).expect("below work limit"),
+            49_999
+        );
+        assert_eq!(
+            checked_convolution_grid(100, 49_999.0).expect("at work limit"),
+            50_000
+        );
+        assert!(checked_convolution_grid(100, 50_000.0).is_err());
+        assert!(checked_convolution_grid(65_535, 65_535.0).is_err());
+    }
+
+    #[test]
+    fn convolution_work_estimate_rejects_overflow_and_invalid_extent() {
+        assert!(checked_convolution_grid(usize::MAX, 1.0).is_err());
+        for extent in [f64::INFINITY, f64::NAN, -1.0, MAX_GRID_POINTS as f64] {
+            assert!(checked_convolution_grid(1, extent).is_err());
+        }
+    }
 }

@@ -511,7 +511,7 @@ fn analyze_lme(
 
 /// Build the `finstack_quant.models.credit.liability_management` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "liability_management")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "liability_management")?;
     m.setattr(
         "__doc__",
         "Distressed-exchange hold-versus-tender economics and issuer LME analytics.",
@@ -536,13 +536,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "liability_management",
-        "finstack_quant.models.credit",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
     Ok(())
 }

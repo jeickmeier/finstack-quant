@@ -1001,15 +1001,26 @@ where
 /// # Arguments
 ///
 /// * `f` - Function to integrate (must implement `Copy` for recursive calls)
-/// * `a` - Lower bound of integration
-/// * `b` - Upper bound of integration
+/// * `a` - Finite first endpoint, in the domain units accepted by `f`.
+/// * `b` - Finite second endpoint in the same units as `a`; values below `a`
+///   produce a signed integral.
 /// * `order` - Quadrature order per subinterval (supported: 2, 4, 8, 16)
-/// * `tol` - Error tolerance for refinement decisions
+/// * `tol` - Finite, non-negative absolute budget for the sum of all terminal
+///   quadrature error estimates, in integral units.
 /// * `max_depth` - Maximum recursion depth to prevent infinite refinement
 ///
 /// # Returns
 ///
-/// Approximate integral value with error bounded by `tol` (when possible).
+/// Approximate integral value whose summed quadrature error estimate is at most
+/// `tol`. The estimate is a refinement diagnostic, not a rigorous error bound
+/// for arbitrary integrands.
+///
+/// # Errors
+///
+/// Returns [`InputError::Invalid`] for non-finite endpoints, a negative or
+/// non-finite tolerance, or an unsupported quadrature order. Returns
+/// [`InputError::SolverConvergenceFailed`] when the summed error estimate
+/// exceeds `tol` at `max_depth`, or the value or error estimate is non-finite.
 ///
 /// # Algorithm
 ///
@@ -1018,13 +1029,11 @@ where
 /// 2. Compute integral over `[a, mid]` + `[mid, b]`
 /// 3. If difference ≤ `tol` (halved per side at each level so the leaf
 ///    budgets sum to the caller's tolerance), return composite result
-/// 4. If depth ≥ `max_depth`: accept the composite result only when the
-///    error estimate is still within the caller's *original* (un-halved)
-///    tolerance — a leaf that is locally unconverged against its halved
-///    budget but within the global tolerance is not meaningfully wrong;
-///    otherwise return `SolverConvergenceFailed` (matching
-///    [`adaptive_simpson`]'s fail-loud behaviour)
-/// 5. Otherwise, recursively refine each half
+/// 4. Otherwise, recursively refine each half until `max_depth`.
+/// 5. Sum the absolute error estimates across all terminal intervals and
+///    accept only when their total meets the original `tol`. This allows a
+///    difficult region to use unused budget from smooth regions without
+///    spending the same global budget independently on every leaf.
 ///
 /// # Complexity
 ///
@@ -1059,17 +1068,20 @@ pub fn gauss_legendre_integrate_adaptive<F2>(
 where
     F2: Fn(f64) -> f64 + Copy,
 {
-    #[allow(clippy::too_many_arguments)]
+    if !a.is_finite() || !b.is_finite() || !tol.is_finite() || tol < 0.0 {
+        return Err(InputError::Invalid.into());
+    }
+    gl_nodes_weights(order)?;
+
     fn recurse<F2>(
         f: F2,
         a: f64,
         b: f64,
         order: usize,
         tol: f64,
-        orig_tol: f64,
         depth: usize,
         max_depth: usize,
-    ) -> Result<f64, Error>
+    ) -> Result<(f64, f64), Error>
     where
         F2: Fn(f64) -> f64 + Copy,
     {
@@ -1079,34 +1091,29 @@ where
         let i2_right = gauss_legendre_integrate(f, mid, b, order)?;
         let i2 = i2_left + i2_right;
         let err = (i2 - i1).abs();
-        if err <= tol {
-            return Ok(i2);
+        if err <= tol || !err.is_finite() || depth >= max_depth {
+            return Ok((i2, err));
         }
-        if depth >= max_depth {
-            // Locally unconverged against the halved per-leaf budget. Accept
-            // when still within the caller's original tolerance (the result
-            // is not meaningfully wrong at the requested accuracy); fail
-            // loudly otherwise instead of silently returning a bad estimate.
-            if err <= orig_tol {
-                return Ok(i2);
-            }
-            return Err(crate::error::InputError::SolverConvergenceFailed {
-                iterations: depth,
-                residual: err,
-                last_x: a + 0.5 * (b - a),
-                reason: format!(
-                    "gauss_legendre_integrate_adaptive did not meet tolerance {orig_tol:.2e} at \
-                     max_depth {max_depth} (interval [{a:.6e}, {b:.6e}], error estimate {err:.2e})"
-                ),
-            }
-            .into());
-        }
-        let left = recurse(f, a, mid, order, tol * 0.5, orig_tol, depth + 1, max_depth)?;
-        let right = recurse(f, mid, b, order, tol * 0.5, orig_tol, depth + 1, max_depth)?;
-        Ok(left + right)
+        let (left, left_error) = recurse(f, a, mid, order, tol * 0.5, depth + 1, max_depth)?;
+        let (right, right_error) = recurse(f, mid, b, order, tol * 0.5, depth + 1, max_depth)?;
+        Ok((left + right, left_error + right_error))
     }
 
-    recurse(f, a, b, order, tol, tol, 0, max_depth)
+    let (value, error_estimate) = recurse(f, a, b, order, tol, 0, max_depth)?;
+    if value.is_finite() && error_estimate <= tol {
+        Ok(value)
+    } else {
+        Err(InputError::SolverConvergenceFailed {
+            iterations: max_depth,
+            residual: error_estimate,
+            last_x: a + 0.5 * (b - a),
+            reason: format!(
+                "gauss_legendre_integrate_adaptive did not meet total tolerance {tol:.2e} at \
+                 max_depth {max_depth} (interval [{a:.6e}, {b:.6e}], summed error estimate {error_estimate:.2e})"
+            ),
+        }
+        .into())
+    }
 }
 
 /// Trapezoidal rule for numerical integration.
@@ -1337,16 +1344,43 @@ mod tests {
     }
 
     #[test]
-    fn gauss_legendre_adaptive_accepts_leaf_within_original_tolerance() {
-        // At order 2 on sin(x), the parent interval misses this tolerance, so
-        // the algorithm recurses. Each child then misses the halved leaf budget
-        // but is inside the caller's original tolerance, hitting the max-depth
-        // acceptance branch instead of returning a convergence error.
-        let value = gauss_legendre_integrate_adaptive(|x| x.sin(), 0.0, 1.0, 2, 4.7e-6, 1)
-            .expect("leaf error is within original tolerance");
+    fn gauss_legendre_adaptive_shares_unused_budget_only_within_total_tolerance() {
+        // The right leaf misses its half-budget (3.25e-6), but the summed
+        // terminal error estimate (about 6.29e-6) fits the global budget.
+        let tolerance = 6.5e-6;
+        let value = gauss_legendre_integrate_adaptive(|x| x.sin(), 0.0, 1.0, 2, tolerance, 1)
+            .expect("summed leaf error is within total tolerance");
         let exact = 1.0 - 1.0_f64.cos();
 
-        assert!((value - exact).abs() < 1e-5, "value={value}, exact={exact}");
+        assert!((value - exact).abs() <= tolerance);
+        assert!(gauss_legendre_integrate_adaptive(|x| x.sin(), 0.0, 1.0, 2, 4.7e-6, 1).is_err());
+    }
+
+    #[test]
+    fn gauss_legendre_adaptive_enforces_global_polynomial_error_budget() {
+        let tolerance = 2e-10;
+        let result = gauss_legendre_integrate_adaptive(|x| x.powi(4), 0.0, 1.0, 2, tolerance, 5);
+        match result {
+            Err(Error::Input(InputError::SolverConvergenceFailed { residual, .. })) => {
+                assert!(residual > tolerance);
+            }
+            other => panic!("expected an error for the combined leaf budget, got {other:?}"),
+        }
+
+        for (a, b, exact) in [(0.0, 1.0, 0.2), (1.0, 0.0, -0.2)] {
+            let value = gauss_legendre_integrate_adaptive(|x| x.powi(4), a, b, 2, tolerance, 8)
+                .expect("sufficient refinement meets the global budget");
+            assert!((value - exact).abs() <= tolerance);
+        }
+    }
+
+    #[test]
+    fn gauss_legendre_adaptive_rejects_invalid_budget_and_non_finite_values() {
+        for tolerance in [-1.0, f64::NAN, f64::INFINITY] {
+            assert!(gauss_legendre_integrate_adaptive(|x| x, 0.0, 1.0, 2, tolerance, 5).is_err());
+        }
+        assert!(gauss_legendre_integrate_adaptive(|_| f64::NAN, 0.0, 1.0, 2, 1e-8, 5).is_err());
+        assert!(gauss_legendre_integrate_adaptive(|x| x, 0.0, 0.0, 3, 1e-8, 5).is_err());
     }
 
     // ---- Gauss-Laguerre (Golub-Welsch) ------------------------------------

@@ -33,13 +33,14 @@ impl MarketContext {
     /// (see Notes below).
     ///
     /// # Arguments
-    /// * `days` - Number of days to roll forward
+    /// * `days` - Signed calendar-day offset for each curve base date; negative values roll backward.
     ///
     /// # Returns
     /// A new `MarketContext` with all curves rolled forward.
     ///
     /// # Errors
-    /// Returns an error if any curve cannot be rolled (e.g., too few points remain).
+    /// Returns an error if any rolled curve base date exceeds the supported
+    /// calendar range or a curve cannot be rebuilt (e.g., too few points remain).
     ///
     /// # Notes
     /// - Surfaces and other market data are cloned without modification
@@ -92,7 +93,8 @@ impl MarketContext {
     /// # Errors
     ///
     /// Returns an error if any contained curve cannot roll by `days`, such as
-    /// when its day-count calculation fails or insufficient pillars survive.
+    /// when its shifted base date exceeds the supported calendar range,
+    /// its day-count calculation fails, or insufficient pillars survive.
     /// Because construction occurs in local maps before the result is exposed,
     /// no partially rolled context is returned on error.
     pub fn roll_forward_observed(

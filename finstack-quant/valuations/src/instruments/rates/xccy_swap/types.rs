@@ -639,6 +639,7 @@ impl XccySwap {
                     accrual_end,
                     day_count: leg.leg.day_count,
                     coupon_frequency: Some(leg.leg.frequency),
+                    coupon_period: (accrual_start, accrual_end),
                     compounding: &leg.leg.compounding,
                     fixing_calendar: calendar,
                     compounded_spread: 0.0,
@@ -670,7 +671,12 @@ impl XccySwap {
                     as_of,
                 )?
             } else {
-                rate_between_on_dates(fwd, period.accrual_start, period.accrual_end)?
+                rate_between_on_dates(
+                    fwd,
+                    period.accrual_start,
+                    period.accrual_end,
+                    period.accrual_year_fraction,
+                )?
             };
             if let Some(out) = projected_fixings {
                 out.push(crate::cashflow::fixings::ProjectedFixing {
@@ -1680,6 +1686,7 @@ mod tests {
             accrual_end: end,
             day_count: DayCount::Act360,
             coupon_frequency: Some(Tenor::quarterly()),
+            coupon_period: (start, end),
             compounding: &compounding,
             fixing_calendar: calendar,
             compounded_spread: 0.0,

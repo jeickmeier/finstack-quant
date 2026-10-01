@@ -566,7 +566,11 @@ async function main() {
   const day_count = w.DayCount.act360();
   const t0d = w.createDate(2024, 1, 2);
   const t1d = w.createDate(2025, 1, 2);
-  const curve = new w.DiscountCurve('USD-OIS', '2024-01-02', [0.0, 1.0, 1.0, 0.98, 5.0, 0.88]);
+  const curve = new w.DiscountCurve({
+    id: 'USD-OIS',
+    baseDate: '2024-01-02',
+    knots: [0.0, 1.0, 1.0, 0.98, 5.0, 0.88],
+  });
   const pricePerf = new w.Performance(priceDates, [prices], ['bench'], null, 'daily');
   const returnPerf = w.Performance.fromReturns(
     returnDates,

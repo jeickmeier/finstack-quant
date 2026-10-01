@@ -812,7 +812,7 @@ impl CdsIndexPricer {
                     let settlement_date = Self::settlement_date_with_delay(
                         default_date,
                         cds.protection_leg.settlement_delay,
-                    );
+                    )?;
                     projected_flows.push(CashFlow::new(
                         settlement_date,
                         None,
@@ -871,9 +871,9 @@ impl CdsIndexPricer {
     /// `Duration`, which could land the settlement on a Saturday or Sunday.
     /// `add_weekdays` is both weekend-safe and an exact (rather than
     /// ratio-approximated) weekday count.
-    fn settlement_date_with_delay(default_date: Date, settlement_delay: u16) -> Date {
+    fn settlement_date_with_delay(default_date: Date, settlement_delay: u16) -> Result<Date> {
         if settlement_delay == 0 {
-            return default_date;
+            return Ok(default_date);
         }
         default_date.add_weekdays(i32::from(settlement_delay))
     }
@@ -1331,7 +1331,8 @@ mod tests {
         for offset in 0..14 {
             let default_date = start + time::Duration::days(offset);
             for delay in [1_u16, 2, 3, 5] {
-                let settle = CdsIndexPricer::settlement_date_with_delay(default_date, delay);
+                let settle = CdsIndexPricer::settlement_date_with_delay(default_date, delay)
+                    .expect("valid settlement date");
                 assert!(
                     !settle.is_weekend(),
                     "settlement (default {default_date:?}, T+{delay}) must be a \
@@ -1347,7 +1348,7 @@ mod tests {
         // T+0 is a pass-through (same date, no business-day roll).
         let d = date(2025, 1, 4); // Saturday
         assert_eq!(
-            CdsIndexPricer::settlement_date_with_delay(d, 0),
+            CdsIndexPricer::settlement_date_with_delay(d, 0).expect("valid settlement date"),
             d,
             "T+0 settlement is a pass-through of the default date"
         );

@@ -57,6 +57,50 @@ fn test_date() -> Date {
     Date::from_calendar_date(2025, Month::January, 15).unwrap()
 }
 
+#[test]
+fn market_context_snapshot_propagates_unstable_fx_revision_errors() {
+    use finstack_quant_core::money::fx::{FxConversionPolicy, FxProvider};
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    struct UpdatingSnapshotProvider(AtomicU64);
+
+    impl FxProvider for UpdatingSnapshotProvider {
+        fn rate(
+            &self,
+            _from: Currency,
+            _to: Currency,
+            _on: Date,
+            _policy: FxConversionPolicy,
+        ) -> finstack_quant_core::Result<f64> {
+            Ok(0.9)
+        }
+
+        fn get_revision(&self) -> Option<u64> {
+            Some(self.0.load(Ordering::SeqCst))
+        }
+
+        fn snapshot_quotes(&self) -> Vec<(Currency, Currency, f64)> {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            vec![(Currency::USD, Currency::EUR, 0.9)]
+        }
+    }
+
+    let matrix = FxMatrix::try_with_config(
+        Arc::new(UpdatingSnapshotProvider(AtomicU64::new(0))),
+        FxConfig::default(),
+    )
+    .expect("valid FX config");
+    let market = MarketContext::new().insert_fx(matrix);
+    let error = MarketContextState::try_from(&market).expect_err("unstable FX snapshot");
+    assert!(error
+        .to_string()
+        .contains("changed repeatedly during snapshot capture"));
+    let error = serde_json::to_string(&market).expect_err("serde must propagate snapshot failure");
+    assert!(error
+        .to_string()
+        .contains("changed repeatedly during snapshot capture"));
+}
+
 // VolSurface Tests
 
 #[test]
@@ -113,7 +157,7 @@ fn inflation_index_roundtrip() {
 
     assert_eq!(deserialized.id, index.id);
     assert_eq!(deserialized.currency, index.currency);
-    assert_eq!(deserialized.interpolation, index.interpolation);
+    assert_eq!(deserialized.interpolation(), index.interpolation());
     assert_eq!(deserialized.lag(), index.lag());
 }
 
@@ -210,7 +254,8 @@ fn market_context_requires_hierarchy_key_and_accepts_explicit_null() {
         .build()
         .unwrap();
 
-    let state: MarketContextState = (&MarketContext::new().insert(discount)).into();
+    let state = MarketContextState::try_from(&MarketContext::new().insert(discount))
+        .expect("coherent market snapshot");
     let mut json = serde_json::to_value(state).unwrap();
     let object = json
         .as_object_mut()
@@ -270,8 +315,10 @@ fn market_context_state_schema_permits_explicit_null_hierarchy() {
 
 #[test]
 fn market_context_missing_schema_version_is_rejected_by_all_loaders() {
-    let mut json = serde_json::to_value(MarketContextState::from(&MarketContext::new()))
-        .expect("state serializes");
+    let mut json = serde_json::to_value(
+        MarketContextState::try_from(&MarketContext::new()).expect("coherent market snapshot"),
+    )
+    .expect("state serializes");
     json.as_object_mut()
         .expect("state is object")
         .remove("schema_version");
@@ -298,8 +345,10 @@ fn market_context_strict_loader_reports_zero_future_and_malformed_json() {
         0,
         finstack_quant_core::market_data::context::MARKET_CONTEXT_STATE_VERSION + 1,
     ] {
-        let mut json = serde_json::to_value(MarketContextState::from(&MarketContext::new()))
-            .expect("state serializes");
+        let mut json = serde_json::to_value(
+            MarketContextState::try_from(&MarketContext::new()).expect("coherent market snapshot"),
+        )
+        .expect("state serializes");
         json.as_object_mut()
             .expect("state is object")
             .insert("schema_version".into(), serde_json::json!(version));
@@ -327,8 +376,10 @@ fn market_context_state_rejects_unsupported_versions() {
         0,
         finstack_quant_core::market_data::context::MARKET_CONTEXT_STATE_VERSION + 1,
     ] {
-        let mut json = serde_json::to_value(MarketContextState::from(&MarketContext::new()))
-            .expect("state serializes");
+        let mut json = serde_json::to_value(
+            MarketContextState::try_from(&MarketContext::new()).expect("coherent market snapshot"),
+        )
+        .expect("state serializes");
         json.as_object_mut()
             .expect("state is object")
             .insert("schema_version".into(), serde_json::json!(version));
@@ -343,8 +394,10 @@ fn market_context_state_rejects_unsupported_versions() {
 
 #[test]
 fn market_context_state_rejects_unknown_top_level_fields() {
-    let mut json =
-        serde_json::to_value(MarketContextState::from(&MarketContext::new())).expect("state");
+    let mut json = serde_json::to_value(
+        MarketContextState::try_from(&MarketContext::new()).expect("coherent market snapshot"),
+    )
+    .expect("state");
     json.as_object_mut()
         .expect("state is object")
         .insert("unexpected".into(), serde_json::json!(true));
@@ -648,6 +701,7 @@ fn market_context_state_is_deterministically_sorted_and_roundtrips_full_snapshot
         .insert(issuer2_haz)
         .insert(base_corr)
         .insert_credit_index("CDX", credit_index)
+        .expect("canonical credit index")
         .insert_series(series)
         .insert_surface(surface)
         .insert_price(
@@ -656,7 +710,7 @@ fn market_context_state_is_deterministically_sorted_and_roundtrips_full_snapshot
         )
         .map_collateral("USD-CSA", CurveId::from("A-DISC"));
 
-    let state = MarketContextState::from(&ctx);
+    let state = MarketContextState::try_from(&ctx).expect("coherent market snapshot");
 
     // Curves are sorted by id in the state representation.
     let ids: Vec<String> = state
@@ -907,6 +961,7 @@ fn market_context_state_roundtrip_hits_more_state_serde_lines() {
         .insert(inf)
         .insert(bc)
         .insert_credit_index("CDX", credit_index)
+        .expect("canonical credit index")
         .insert_inflation_index("US-CPI", idx)
         .insert_series(series)
         .insert_surface(surface)
@@ -917,7 +972,7 @@ fn market_context_state_roundtrip_hits_more_state_serde_lines() {
         .map_collateral("USD-CSA", CurveId::from("USD-OIS"));
 
     // Roundtrip via MarketContextState explicitly
-    let state = MarketContextState::from(&ctx);
+    let state = MarketContextState::try_from(&ctx).expect("coherent market snapshot");
     let json = serde_json::to_string(&state).unwrap();
     let back_state: MarketContextState = serde_json::from_str(&json).unwrap();
     let rebuilt = MarketContext::try_from(back_state).unwrap();
@@ -1051,10 +1106,11 @@ fn forward_variance_curve_rejects_unknown_fields() {
 fn forward_variance_curve_rejects_invalid_values_on_deserialize() {
     use finstack_quant_core::market_data::term_structures::ForwardVarianceCurve;
     // Structurally valid but semantically invalid: non-positive variance.
-    let json = serde_json::json!({ "times": [0.0, 1.0], "values": [0.04, -0.05] });
+    let json = serde_json::json!({ "interpolation": "linear", "times": [0.0, 1.0], "values": [0.04, -0.05] });
     assert!(serde_json::from_value::<ForwardVarianceCurve>(json).is_err());
     // Mismatched lengths are also rejected.
-    let json = serde_json::json!({ "times": [0.0, 1.0], "values": [0.04] });
+    let json =
+        serde_json::json!({ "interpolation": "linear", "times": [0.0, 1.0], "values": [0.04] });
     assert!(serde_json::from_value::<ForwardVarianceCurve>(json).is_err());
 }
 

@@ -183,18 +183,21 @@ impl SabrSmile {
     ///
     /// Checks for two types of static arbitrage:
     ///
-    /// 1. **Butterfly arbitrage** (convexity): Call(K-δ) - 2·Call(K) + Call(K+δ) ≥ 0
-    ///    A negative butterfly spread means you can buy the wings and sell the body
-    ///    for a risk-free profit.
+    /// 1. **Butterfly arbitrage** (convexity): the call price at each interior
+    ///    strike must not exceed the strike-weighted interpolation of its
+    ///    neighbors. This applies to both uniform and nonuniform strike grids.
     ///
     /// 2. **Monotonicity arbitrage**: Call prices must decrease as strike increases.
     ///    If C(K₁) < C(K₂) for K₁ < K₂, you can buy the lower strike and sell the
     ///    higher strike for immediate profit.
     ///
     /// # Arguments
-    /// * `strikes` - Array of strikes to validate (must be sorted ascending)
-    /// * `r` - Risk-free rate for discounting
-    /// * `q` - Dividend/foreign rate
+    /// * `strikes` - Finite strikes in strictly ascending order; spacing may
+    ///   vary. Strikes must also lie in the SABR model's quote domain.
+    /// * `r` - Finite continuously compounded risk-free rate, in annual decimal
+    ///   units, used to discount forward call prices.
+    /// * `q` - Finite dividend/foreign rate in annual decimal units. The forward
+    ///   already includes carry, so this does not alter the call prices.
     ///
     /// # Returns
     /// `ArbitrageValidationResult` containing any violations found.
@@ -204,52 +207,8 @@ impl SabrSmile {
         r: f64,
         q: f64,
     ) -> Result<ArbitrageValidationResult> {
-        if strikes.len() < 3 {
-            return Ok(ArbitrageValidationResult::default());
-        }
-
         let vols = self.generate_smile(strikes)?;
-
-        let prices: Vec<f64> = strikes
-            .iter()
-            .zip(vols.iter())
-            .map(|(&k, &vol)| bs_call_price(self.forward, k, r, q, vol, self.time_to_expiry))
-            .collect();
-
-        let mut result = ArbitrageValidationResult::default();
-
-        // Tolerance for numerical noise (0.1 bp of notional)
-        let tol = 1e-6;
-
-        for i in 1..prices.len() {
-            if prices[i] > prices[i - 1] + tol {
-                result.monotonicity_violations.push(MonotonicityViolation {
-                    strike_low: strikes[i - 1],
-                    strike_high: strikes[i],
-                    price_low: prices[i - 1],
-                    price_high: prices[i],
-                });
-            }
-        }
-
-        for i in 1..prices.len() - 1 {
-            let butterfly = prices[i - 1] - 2.0 * prices[i] + prices[i + 1];
-            if butterfly < -tol {
-                let severity_pct = if prices[i] > tol {
-                    butterfly.abs() / prices[i] * 100.0
-                } else {
-                    0.0
-                };
-
-                result.butterfly_violations.push(ButterflyViolation {
-                    strike: strikes[i],
-                    butterfly_value: butterfly,
-                    severity_pct,
-                });
-            }
-        }
-
-        Ok(result)
+        self.post_repair_validation(strikes, &vols, r, q)
     }
 
     /// Quick check if the smile is arbitrage-free.
@@ -303,7 +262,8 @@ impl SabrSmile {
     ///
     /// # Arguments
     ///
-    /// * `strikes` - Array of strikes (should be sorted ascending)
+    /// * `strikes` - Finite strikes in strictly ascending order, with arbitrary
+    ///   spacing, in the SABR model's quote domain.
     /// * `r` - Risk-free rate for Black-Scholes conversion
     /// * `q` - Dividend/foreign rate
     /// * `max_iterations` - Maximum repair iterations (default: 10)
@@ -326,10 +286,7 @@ impl SabrSmile {
         q: f64,
         max_iterations: usize,
     ) -> Result<Vec<f64>> {
-        if strikes.len() < 3 {
-            return self.generate_smile(strikes);
-        }
-
+        validate_arbitrage_grid(strikes, r, q)?;
         let mut vols = self.generate_smile(strikes)?;
 
         let mut prices: Vec<f64> = strikes
@@ -353,14 +310,12 @@ impl SabrSmile {
                 }
             }
 
-            // Repair butterfly convexity: C(K-δ) - 2C(K) + C(K+δ) ≥ 0
-            for i in 1..prices.len() - 1 {
-                let butterfly = prices[i - 1] - 2.0 * prices[i] + prices[i + 1];
-                if butterfly < 0.0 {
-                    // Adjust mid-strike price to satisfy convexity
-                    // C(K) should be at most (C(K-δ) + C(K+δ)) / 2
-                    let max_mid = (prices[i - 1] + prices[i + 1]) / 2.0;
-                    prices[i] = max_mid * 0.9999; // Slightly below for numerical safety
+            // Convexity requires each middle price to lie below the chord
+            // joining its neighbors, weighted by the actual strike spacing.
+            for i in 1..prices.len().saturating_sub(1) {
+                let max_mid = convex_price_limit(strikes, &prices, i);
+                if prices[i] > max_mid {
+                    prices[i] = max_mid;
                     changed = true;
                 }
             }
@@ -446,9 +401,7 @@ impl SabrSmile {
         r: f64,
         q: f64,
     ) -> Result<ArbitrageValidationResult> {
-        if strikes.len() < 3 {
-            return Ok(ArbitrageValidationResult::default());
-        }
+        validate_arbitrage_grid(strikes, r, q)?;
         if strikes.len() != vols.len() {
             return Err(Error::Validation(format!(
                 "SABR post_repair_validation: strikes length ({}) must match \
@@ -463,6 +416,11 @@ impl SabrSmile {
             .zip(vols.iter())
             .map(|(&k, &vol)| bs_call_price(self.forward, k, r, q, vol, self.time_to_expiry))
             .collect();
+        if prices.iter().any(|price| !price.is_finite()) {
+            return Err(Error::Validation(
+                "SABR arbitrage call prices must be finite".into(),
+            ));
+        }
 
         let mut result = ArbitrageValidationResult::default();
         // Same numerical tolerance as `validate_no_arbitrage`.
@@ -479,8 +437,10 @@ impl SabrSmile {
             }
         }
 
-        for i in 1..prices.len() - 1 {
-            let butterfly = prices[i - 1] - 2.0 * prices[i] + prices[i + 1];
+        for i in 1..prices.len().saturating_sub(1) {
+            // Factor two keeps the equal-spacing spread convention:
+            // C(K-d) - 2 C(K) + C(K+d).
+            let butterfly = 2.0 * (convex_price_limit(strikes, &prices, i) - prices[i]);
             if butterfly < -tol {
                 let severity_pct = if prices[i] > tol {
                     butterfly.abs() / prices[i] * 100.0
@@ -497,6 +457,31 @@ impl SabrSmile {
 
         Ok(result)
     }
+}
+
+fn validate_arbitrage_grid(strikes: &[f64], r: f64, q: f64) -> Result<()> {
+    if !r.is_finite() || !q.is_finite() {
+        return Err(Error::Validation(
+            "SABR arbitrage rates must be finite".into(),
+        ));
+    }
+    if strikes.iter().any(|strike| !strike.is_finite())
+        || strikes
+            .windows(2)
+            .any(|pair| pair[1] <= pair[0] || !(pair[1] - pair[0]).is_finite())
+    {
+        return Err(Error::Validation(
+            "SABR arbitrage strikes must be finite and strictly ascending".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn convex_price_limit(strikes: &[f64], prices: &[f64], i: usize) -> f64 {
+    let left = strikes[i] - strikes[i - 1];
+    let right = strikes[i + 1] - strikes[i];
+    let weight = left / (left + right);
+    (1.0 - weight) * prices[i - 1] + weight * prices[i + 1]
 }
 
 /// Black-76 call vega for implied vol inversion.
@@ -542,6 +527,77 @@ mod smile_tests {
 
     use super::*;
     use crate::volatility::sabr::{SabrModel, SabrParameters};
+
+    #[test]
+    fn uneven_strike_grid_preserves_flat_arbitrage_free_smile() {
+        let params = SabrParameters::new(0.2, 1.0, 0.0, 0.0).expect("valid parameters");
+        let smile = SabrSmile::new(SabrModel::new(params), 100.0, 1.0);
+        for strikes in [[99.0, 100.0, 120.0], [80.0, 100.0, 101.0]] {
+            assert!(smile
+                .validate_no_arbitrage(&strikes, 0.05, 0.0)
+                .expect("diagnostics")
+                .is_arbitrage_free());
+            let repaired = smile
+                .repair_arbitrage(&strikes, 0.05, 0.0, 10)
+                .expect("clean repair");
+            assert!(repaired.iter().all(|vol| (vol - 0.2).abs() < 1e-12));
+            assert!(!smile
+                .post_repair_validation(&strikes, &[0.2, 0.8, 0.2], 0.05, 0.0)
+                .expect("invalid-smile diagnostics")
+                .is_arbitrage_free());
+        }
+    }
+
+    #[test]
+    fn two_strike_repair_removes_monotonicity_arbitrage() {
+        let params = SabrParameters::new(0.01, 1.0, 1.0, 0.0).expect("valid parameters");
+        let smile = SabrSmile::new(SabrModel::new(params), 100.0, 10.0);
+        let strikes = [100.0, 120.0];
+        let before = smile
+            .validate_no_arbitrage(&strikes, 0.0, 0.0)
+            .expect("raw diagnostics");
+        assert_eq!(before.monotonicity_violations.len(), 1);
+        let repaired = smile
+            .repair_arbitrage(&strikes, 0.0, 0.0, 10)
+            .expect("two-strike monotonicity repair");
+        let after = smile
+            .post_repair_validation(&strikes, &repaired, 0.0, 0.0)
+            .expect("repaired diagnostics");
+        assert!(after.is_arbitrage_free());
+    }
+
+    #[test]
+    fn arbitrage_repair_accepts_empty_and_single_strike_grids() {
+        let params = SabrParameters::new(0.2, 1.0, 0.0, 0.0).expect("valid parameters");
+        let smile = SabrSmile::new(SabrModel::new(params), 100.0, 1.0);
+        for strikes in [Vec::new(), vec![100.0]] {
+            let repaired = smile
+                .repair_arbitrage(&strikes, 0.05, 0.0, 10)
+                .expect("short-grid repair");
+            assert_eq!(repaired.len(), strikes.len());
+            assert!(smile
+                .post_repair_validation(&strikes, &repaired, 0.05, 0.0)
+                .expect("short-grid diagnostics")
+                .is_arbitrage_free());
+        }
+    }
+
+    #[test]
+    fn arbitrage_diagnostics_reject_invalid_strike_order_and_rates() {
+        let params = SabrParameters::new(0.2, 1.0, 0.0, 0.0).expect("valid parameters");
+        let smile = SabrSmile::new(SabrModel::new(params), 100.0, 1.0);
+        for strikes in [
+            [100.0, 99.0, 120.0],
+            [99.0, 100.0, 100.0],
+            [99.0, f64::NAN, 120.0],
+        ] {
+            assert!(smile.validate_no_arbitrage(&strikes, 0.0, 0.0).is_err());
+            assert!(smile.repair_arbitrage(&strikes, 0.0, 0.0, 10).is_err());
+        }
+        assert!(smile
+            .validate_no_arbitrage(&[99.0, 100.0, 120.0], f64::NAN, 0.0)
+            .is_err());
+    }
 
     /// Black-76 ATM call: df · F · (N(d1) - N(d2)).
     /// With F=K=100, σ=0.2, T=1, r=0.05:

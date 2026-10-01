@@ -390,6 +390,7 @@ impl ForwardRateAgreement {
                 fwd.as_ref(),
                 self.start_date,
                 self.maturity,
+                tau,
             )?
         };
 
@@ -602,7 +603,7 @@ mod tests {
         // FRA 3M x 6M
         let start = base + time::Duration::days(90);
         let end = base + time::Duration::days(180);
-        let fixing = start.add_weekdays(-2); // 2 business days before start for reset_lag_days
+        let fixing = start.add_weekdays(-2).expect("valid date shift"); // 2 business days before start for reset_lag_days
         let t_start = fwd
             .day_count()
             .year_fraction(base, start, DayCountContext::default())
@@ -665,7 +666,7 @@ mod tests {
 
         let start = base + time::Duration::days(90);
         let end = base + time::Duration::days(180);
-        let fixing = start.add_weekdays(-2);
+        let fixing = start.add_weekdays(-2).expect("valid date shift");
         let t_start = fwd
             .day_count()
             .year_fraction(base, start, DayCountContext::default())

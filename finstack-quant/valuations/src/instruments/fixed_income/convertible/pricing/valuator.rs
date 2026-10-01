@@ -428,10 +428,21 @@ impl ConvertibleBondValuator {
                     end: step,
                 }
             }
-            ConversionPolicy::Window { start, end } => ConversionWindow::Steps {
-                start: to_step(*start)?,
-                end: to_step(*end)?,
-            },
+            ConversionPolicy::Window { start, end } => {
+                // A seasoned voluntary window can already be open, or have
+                // ended. Intersect with the live interval before mapping:
+                // map_date_to_step does not accept dates before base_date.
+                let live_start = (*start).max(base_date);
+                let live_end = (*end).min(maturity);
+                if live_start > live_end {
+                    ConversionWindow::Never
+                } else {
+                    ConversionWindow::Steps {
+                        start: to_step(live_start)?,
+                        end: to_step(live_end)?,
+                    }
+                }
+            }
             ConversionPolicy::UponEvent(ConversionEvent::PriceTrigger(trigger)) => {
                 ConversionWindow::SpotAtLeast(trigger.level(conversion_price))
             }

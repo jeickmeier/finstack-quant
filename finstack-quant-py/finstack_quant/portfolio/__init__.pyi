@@ -3854,8 +3854,11 @@ def net_in_currency_by_date(
     cashflows : PortfolioCashflows | str
         A :class:`PortfolioCashflows` ladder (no parse), full cashflow-ladder
         JSON, or a ``{date: {ccy: {kind: money}}}`` object (optionally wrapped
-        as ``{"by_date": ...}``). Kind keys are opaque strings; amounts may be
-        JSON numbers or decimal strings.
+        as ``{"by_date": ...}``). Kind keys are opaque strings. Money objects
+        require a finite decimal-string ``amount`` and a ``currency`` matching
+        their enclosing bucket. Numeric JSON amounts are rejected by the
+        canonical Money wire contract. All ISO payment dates and currency
+        buckets are validated, including non-output currencies.
     currency : Currency | str
         ISO-4217 code selecting which per-date currency bucket to net.
 
@@ -3870,10 +3873,11 @@ def net_in_currency_by_date(
     TypeError
         If ``cashflows`` is neither a ``PortfolioCashflows`` nor a string.
     ValueError
-        If ``cashflows`` is not JSON, ``currency`` is unknown, or ``by_date``
-        is not an object.
+        If the requested ``currency`` is unknown.
     PortfolioError
-        If cashflow JSON cannot be interpreted as a classified ladder.
+        If cashflow JSON is malformed, a date/currency bucket is invalid, a
+        container is not an object, a money amount is malformed or non-finite,
+        a money currency differs from its bucket, or a bucket total overflows.
 
     Examples
     --------
@@ -4290,10 +4294,17 @@ def allocate_weights(spec_json: str | dict[str, Any] | list[Any] | pd.DataFrame)
     scheme. The Rust allocator computes normalized weights and money amounts;
     Python only passes the JSON through.
 
+    ``total_capital`` must be finite and may be positive, negative, or zero.
+    Nonnegative strategy weights allocate capital with the same sign, summing
+    to the total rounded at ``money_decimal_places`` (default 10, maximum 12).
+    Minor units go to the largest fractional remainders, with ties awarded in
+    strategy input order. Zero-weight strategies receive zero capital.
+
     Parameters
     ----------
     spec_json : str | dict | list | pandas.DataFrame
-        JSON-serialized allocation specification.
+        JSON-serialized ``WeightAllocationSpec`` with a scheme, finite signed
+        total capital, strategy rows, and any required covariance data.
 
     Returns
     -------
@@ -4307,6 +4318,9 @@ def allocate_weights(spec_json: str | dict[str, Any] | list[Any] | pd.DataFrame)
     ValueError
         If the JSON is malformed, required fields are missing, the
         scheme is unsupported, or the selected scheme cannot be evaluated.
+    PortfolioError
+        If scheme invariants fail or capital cannot be represented at the
+        requested rounding precision.
 
     Examples
     --------
@@ -4322,14 +4336,15 @@ def allocate_weights_json(spec_json: str | dict[str, Any] | list[Any] | pd.DataF
     """
     Allocate strategy weights from a JSON specification as wire JSON.
 
-    Wire twin of :func:`allocate_weights`: same input and validation,
-    returning the canonical JSON string instead of the typed wrapper.
+    Wire twin of :func:`allocate_weights`: same signed-capital, largest-remainder
+    rounding and validation, returning the canonical JSON string instead of the
+    typed wrapper.
 
     Parameters
     ----------
     spec_json : str | dict | list | pandas.DataFrame
         JSON-serialized ``WeightAllocationSpec`` selecting the scheme,
-        strategy inputs, and any covariance data.
+        finite signed total capital, strategy inputs, and any covariance data.
 
     Returns
     -------
@@ -4341,6 +4356,9 @@ def allocate_weights_json(spec_json: str | dict[str, Any] | list[Any] | pd.DataF
     ValueError
         If the JSON is malformed, required fields are missing, the scheme is
         unsupported, or the selected scheme cannot be evaluated.
+    PortfolioError
+        If scheme invariants fail or capital cannot be represented at the
+        requested rounding precision.
 
     Examples
     --------
@@ -4357,7 +4375,8 @@ def validate_allocation_json(spec_json: str | dict[str, Any] | list[Any] | pd.Da
     Validate a strategy allocation JSON specification.
 
     Performs the same Rust-side parse and semantic validation used by
-    :func:`allocate_weights` without computing allocations.
+    :func:`allocate_weights`, including allocation and capital rounding, then
+    discards the allocation result.
 
     Parameters
     ----------
@@ -4373,6 +4392,9 @@ def validate_allocation_json(spec_json: str | dict[str, Any] | list[Any] | pd.Da
     ------
     ValueError
         If the specification is malformed or invalid.
+    PortfolioError
+        If scheme invariants fail or capital cannot be represented at the
+        requested rounding precision.
 
     Examples
     --------
@@ -8298,18 +8320,24 @@ def mwr_xirr(
         terminal value / distributions positive. Accepts ``(date, amount)``
         pairs (dates as ``datetime.date`` or ISO strings), dicts with
         ``date`` and ``amount`` keys, a DataFrame with those columns, or the
-        canonical JSON array string.
+        canonical JSON array string. Dates are sorted and equal-date flows
+        netted; remaining nonzero flows must change sign exactly once.
 
     Returns
     -------
     float
-        Internal rate of return as a decimal annualized rate.
+        Unique internal rate of return as a finite decimal annualized rate
+        greater than -1, using Act/365F year fractions.
 
     Raises
     ------
     ValueError
-        If the flows are malformed, lack a sign change, or XIRR does not
-        converge.
+        If the flows are malformed, have fewer than two nonzero net dates,
+        do not have exactly one net sign change, or no sufficiently accurate
+        finite return greater than -1 can be found. Nonconventional cashflows
+        are rejected even if a solver could find one of their possible roots.
+    RuntimeError
+        If the numerical solver fails to converge within the valid return bracket.
 
     Examples
     --------
@@ -9748,10 +9776,12 @@ class MissingMetricPolicy:
         Returns
         -------
         MissingMetricPolicy
-            Policy that freezes missing-metric positions at their current
-            weights and drops them from ``WeightedSum`` and
-            ``ValueWeightedAverage`` coefficient vectors (coefficient 0,
-            omitted from a value-weighted-average denominator).
+            Policy that preserves existing positions' exact quantities and
+            weights when an in-scope standard metric, custom key, or numeric
+            attribute is missing. Drops each missing input from ``WeightedSum``
+            and ``ValueWeightedAverage`` coefficients and omits it from a
+            value-weighted-average denominator. Only expressions whose filters
+            match the position can cause it to freeze.
 
         Notes
         -----
@@ -9970,7 +10000,7 @@ class Inequality:
 
 class TradeDirection:
     """
-    Trade direction (buy/sell/hold).
+    Trade direction from the signed quantity change (buy/sell/hold).
 
     Examples
     --------
@@ -9982,12 +10012,12 @@ class TradeDirection:
     @classmethod
     def buy(cls) -> TradeDirection:
         """
-        Direction for increasing an instrument exposure.
+        Direction for increasing the signed instrument quantity.
 
         Returns
         -------
         TradeDirection
-            Direction for increasing an instrument exposure.
+            Buy direction for a positive quantity change, including covering a short.
 
         Notes
         -----
@@ -10004,12 +10034,12 @@ class TradeDirection:
     @classmethod
     def sell(cls) -> TradeDirection:
         """
-        Direction for decreasing an instrument exposure.
+        Direction for decreasing the signed instrument quantity.
 
         Returns
         -------
         TradeDirection
-            Direction for decreasing an instrument exposure.
+            Sell direction for a negative quantity change, including increasing a short.
 
         Notes
         -----
@@ -10031,7 +10061,7 @@ class TradeDirection:
         Returns
         -------
         TradeDirection
-            Direction representing no change in exposure.
+            Direction representing no change in instrument quantity.
 
         Notes
         -----
@@ -10048,12 +10078,12 @@ class TradeDirection:
     @property
     def label(self) -> str:
         """
-        Buy/sell/short label for the trade direction.
+        Buy/sell/hold label for the trade direction.
 
         Returns
         -------
         str
-            Buy/sell/short label for the trade direction.
+            Canonical ``buy``, ``sell``, or ``hold`` label.
 
         Notes
         -----
@@ -11405,6 +11435,8 @@ class CandidatePosition:
 
     Starts at weight zero and is bounded by ``min_weight`` / ``max_weight``.
     Attach candidates to a :class:`TradeUniverse` via ``with_candidate``.
+    Candidate IDs must be unique among candidates and absent from existing
+    portfolio positions; optimization raises ``PortfolioError`` for a collision.
 
     Examples
     --------
@@ -11433,6 +11465,7 @@ class CandidatePosition:
         ----------
         id : str
             Identifier that becomes the position id if the optimizer trades it.
+            Must be unique among candidates and absent from existing positions.
         entity_id : str
             Owning entity for the candidate.
         instrument : Bond | InterestRateSwap | ... | str
@@ -11536,7 +11569,8 @@ class CandidatePosition:
         Returns
         -------
         str
-            Candidate position identifier.
+            Candidate identifier, unique among candidates and absent from
+            existing positions; becomes the position identifier when traded.
 
         Notes
         -----
@@ -11784,10 +11818,13 @@ class TradeUniverse:
     @property
     def held_filter(self) -> PositionFilter | None:
         """
-        Optional filter selecting held positions.
+        Optional filter selecting positions whose weights and exact quantities
+        stay fixed under every weighting scheme, including zero-PV holdings.
         Returns
         -------
         PositionFilter or None
+            Filter defining held existing positions, or ``None`` if no explicit
+            held filter is configured.
 
         Notes
         -----
@@ -12217,12 +12254,13 @@ class TradeSpec:
     @property
     def direction(self) -> TradeDirection:
         """
-        Buy, sell, or short direction for this trade spec.
+        Buy, sell, or hold classification from the signed quantity change.
 
         Returns
         -------
         TradeDirection
-            Buy, sell, or short direction for this trade spec.
+            ``buy`` for positive ``delta_quantity``, ``sell`` for negative, and
+            ``hold`` for zero. This convention also applies to short holdings.
 
         Notes
         -----
@@ -12844,7 +12882,10 @@ class PortfolioOptimizationResult:
         Returns
         -------
         dict[str, float]
-            Implied target quantities by position ID.
+            Quantities in each position's unit convention, including percentage
+            points for ``percentage``. Held existing positions retain their exact
+            current quantity under every weighting scheme, including zero-PV
+            holdings.
 
         Notes
         -----
@@ -13048,8 +13089,9 @@ def optimize_portfolio(
     ValueError
         If supplied market JSON is malformed or schema-incompatible.
     PortfolioError
-        If the embedded portfolio specification cannot be constructed or an
-        operational optimization failure occurs before a result is available.
+        If the embedded portfolio specification cannot be constructed, candidate
+        IDs collide with existing positions or one another, or an operational
+        optimization failure occurs before a result is available.
     ValuationError
         If a required position metric cannot be valued.
     FxError
@@ -13089,6 +13131,10 @@ class SensitivityMatrix:
 
     Construct via :func:`compute_factor_sensitivities`.
 
+    JSON interchange matches WASM: ``base_currency``, ordered ``position_ids``
+    and ``factor_ids``, and nested ``data[position][factor]`` rows. Row and
+    column counts must match the axes, and every entry must be finite.
+
     Examples
     --------
     >>> from finstack_quant.core.market_data import MarketContext
@@ -13122,7 +13168,10 @@ class SensitivityMatrix:
         Parameters
         ----------
         json : str
-            Canonical payload.
+            Canonical object with required ``base_currency`` (ISO reporting
+            currency), ordered ``position_ids``/``factor_ids``, and nested
+            ``data[position][factor]`` rows. Empty factor axes require one
+            empty row per position. Unknown fields are rejected.
 
         Returns
         -------
@@ -13132,7 +13181,9 @@ class SensitivityMatrix:
         Raises
         ------
         ValueError
-            If the payload is malformed.
+            If JSON is malformed, the currency is unknown or missing, row or
+            column counts disagree with the axes, an entry is non-finite, or
+            an unknown field (including obsolete ``n_factors``) is supplied.
 
         Examples
         --------
@@ -13152,7 +13203,9 @@ class SensitivityMatrix:
         Returns
         -------
         str
-            JSON accepted by :meth:`from_json`; also backs ``pickle``.
+            Canonical monetary matrix JSON with nested rows, accepted by
+            :meth:`from_json` and WASM ``decomposeFactorRisk``; also backs
+            ``pickle``. The derived ``n_factors`` count is omitted.
 
         Notes
         -----

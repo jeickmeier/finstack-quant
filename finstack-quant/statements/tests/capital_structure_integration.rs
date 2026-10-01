@@ -1,7 +1,6 @@
 //! Capital structure integration tests for spec builders.
 #![allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 
-use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{build_periods, Date};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -9,6 +8,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_statements::capital_structure::build_instrument_from_spec;
 use finstack_quant_statements::types::{DebtInstrumentSpec, FinancialStatementInstrument};
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::{fixed_income::bond::Bond, PayReceive};
 use time::Month;
 
@@ -103,8 +103,7 @@ fn test_reporting_totals_sum_without_fx_when_same_currency() {
     )
     .expect("bond_2");
 
-    let mut instruments: IndexMap<String, Arc<dyn CashflowProvider + Send + Sync>> =
-        IndexMap::new();
+    let mut instruments: IndexMap<String, Arc<dyn Instrument>> = IndexMap::new();
     instruments.insert("BOND-1".to_string(), Arc::new(bond_1));
     instruments.insert("BOND-2".to_string(), Arc::new(bond_2));
 

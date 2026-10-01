@@ -92,12 +92,12 @@ impl PyForecastMethod {
     /// Multiplicative log-normal path:
     /// ``v[t] = v[t-1] * exp(mean - 0.5 * std_dev**2 + std_dev * z[t])``.
     ///
-    /// ``mean`` and ``std_dev`` are the per-period log-return drift and
-    /// volatility as decimal fractions (0.02 = 2% log drift per period). The
-    /// ``-0.5 * std_dev**2`` term is the standard log-normal drift adjustment,
-    /// so ``mean`` is the expected *log*-return, not the expected simple
-    /// return. When the base value is zero the path falls back to independent
-    /// ``exp(mean + std_dev * z[t])`` draws.
+    /// ``mean`` is the per-period continuously compounded expected-growth
+    /// drift: the expected growth factor is ``exp(mean)``, while the expected
+    /// log increment is ``mean - 0.5 * std_dev**2``. ``std_dev`` is log-return
+    /// volatility, expressed as a decimal fraction per period. Evaluation
+    /// requires a finite, strictly positive base; zero and negative bases
+    /// raise ``ValueError``. Use an additive normal forecast for those series.
     #[staticmethod]
     fn log_normal() -> Self {
         Self {
@@ -332,14 +332,22 @@ impl PyForecastSpec {
     /// Parameters
     /// ----------
     /// mean : float
-    ///     Per-period **log-return** drift as a decimal fraction (0.02 = 2%
-    ///     log drift per period). The ``-0.5 * std_dev**2`` convexity term is
-    ///     applied by the engine, so this is not the expected simple return.
+    ///     Per-period continuously compounded expected-growth drift. The
+    ///     expected growth factor is ``exp(mean)`` and expected log increment
+    ///     is ``mean - 0.5 * std_dev**2``. For example, ``mean=0.02`` gives
+    ///     expected simple growth ``exp(0.02) - 1``, approximately 2.0201%.
     /// std_dev : float
     ///     Per-period log-return volatility as a decimal fraction; must be
     ///     non-negative.
     /// seed : int
     ///     Seed for the deterministic standard-normal draws.
+    ///
+    /// Notes
+    /// -----
+    /// This constructor does not raise; it only stores the supplied parameters.
+    /// Evaluation requires a finite, strictly positive base value and finite
+    /// parameters; invalid inputs raise ``ValueError`` when the model is
+    /// validated or evaluated.
     #[staticmethod]
     fn log_normal(mean: f64, std_dev: f64, seed: u64) -> Self {
         Self::wrap(finstack_quant_statements::types::ForecastSpec::log_normal(

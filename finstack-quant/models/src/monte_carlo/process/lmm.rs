@@ -146,7 +146,7 @@ impl LmmParams {
         }
         // Validate finite values
         for (i, t) in tenors.iter().enumerate() {
-            if !t.is_finite() || (i > 0 && *t <= tenors[i - 1]) {
+            if !t.is_finite() || *t < 0.0 || (i > 0 && *t <= tenors[i - 1]) {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "tenors must be finite and strictly increasing, issue at index {i}"
                 )));
@@ -158,6 +158,37 @@ impl LmmParams {
                     "accrual_factors[{i}] must be positive and finite, got {tau}"
                 )));
             }
+        }
+        for (i, &time) in vol_times.iter().enumerate() {
+            if !time.is_finite() || time < 0.0 || (i > 0 && time <= vol_times[i - 1]) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "LMM volatility knots must be finite, non-negative and strictly increasing, issue at index {i}"
+                )));
+            }
+        }
+        for i in 0..num_forwards {
+            let forward = initial_forwards[i];
+            let displacement = displacements[i];
+            if !forward.is_finite()
+                || !displacement.is_finite()
+                || !((forward + displacement).is_finite() && forward + displacement > 0.0)
+                || !((1.0 + accrual_factors[i] * forward).is_finite()
+                    && 1.0 + accrual_factors[i] * forward > 0.0)
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "LMM forward {i} must have finite inputs, positive displaced level and positive accrual discount denominator"
+                )));
+            }
+        }
+        if vol_values
+            .iter()
+            .flatten()
+            .flatten()
+            .any(|value| !value.is_finite())
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "LMM factor loadings must be finite".to_string(),
+            ));
         }
 
         Ok(Self {
@@ -198,12 +229,15 @@ impl LmmParams {
 /// The process uses the terminal measure (`T_N`) numeraire convention.
 /// [`populate_path_state`](StochasticProcess::populate_path_state) stores
 /// each forward rate as `indexed_spot(i)` and additionally stores, under
-/// `"lmm_numeraire"`, the product `Π_{j ≥ first_alive} 1/(1 + τ_j F_j)` —
-/// i.e. `P(t, T_N) / P(t, T_{first_alive})`, **not** `P(t, T_N)` itself:
-/// the stub discount over `[t, T_{first_alive})` is omitted (and nothing
+/// `"lmm_numeraire"`, the product `Π_{j ≥ first_period} 1/(1 + τ_j F_j)` —
+/// i.e. `P(t, T_N) / P(t, T_{first_period})`, **not** `P(t, T_N)` itself:
+/// the stub discount over `[t, T_{first_period})` is omitted (and nothing
 /// divides by `P(0, T_N)`). Consumers must either evaluate only at tenor
 /// dates where the stub is empty, or — like the Bermudan LSMC pricer —
-/// form ratios in which the common `T_{first_alive}` reference cancels.
+/// form ratios in which the common `T_{first_period}` reference cancels.
+/// A forward fixing exactly at `t` enters this discount product but is frozen
+/// for subsequent evolution. Simulation grids must include all fixing dates
+/// and volatility knots within the simulation horizon.
 #[derive(Debug, Clone)]
 pub struct LmmProcess {
     /// Model parameters.
@@ -223,12 +257,33 @@ impl LmmProcess {
 
     /// Return index of the first alive forward at time `t`.
     ///
-    /// Forward `i` is alive if `T_i >= t` (it fixes at T_i but is still
-    /// active for evolution at that instant).
+    /// Forward `i` is alive for evolution only if `T_i > t`.
     #[inline]
     pub(crate) fn first_alive(&self, t: f64) -> usize {
-        // Find first tenor >= t (alive forwards have T_i >= t).
+        self.params.tenors[..self.params.num_forwards].partition_point(|&v| v <= t)
+    }
+
+    /// First accrual period in the terminal-numeraire ratio. Unlike evolution,
+    /// the product includes the forward that has just fixed at this instant.
+    fn first_numeraire_period(&self, t: f64) -> usize {
         self.params.tenors[..self.params.num_forwards].partition_point(|&v| v < t)
+    }
+
+    /// Whether coefficients and evolution eligibility are constant inside a
+    /// step. Only roundoff in reconstructing the step's end from `t+dt` is
+    /// allowed; the start must use the exact coefficient regime at `t`.
+    pub(crate) fn step_is_aligned(&self, t: f64, dt: f64) -> bool {
+        let end = t + dt;
+        let tolerance = 32.0 * f64::EPSILON * end.abs().max(t.abs()).max(1.0);
+        [
+            &self.params.vol_times[..],
+            &self.params.tenors[..self.params.num_forwards],
+        ]
+        .into_iter()
+        .all(|knots| {
+            let index = knots.partition_point(|&knot| knot <= t);
+            knots.get(index).is_none_or(|&knot| knot >= end - tolerance)
+        })
     }
 
     /// Compute terminal-measure drift for all alive forwards.
@@ -279,6 +334,36 @@ impl LmmProcess {
 }
 
 impl StochasticProcess for LmmProcess {
+    fn validate_time_grid(
+        &self,
+        time_grid: &crate::monte_carlo::TimeGrid,
+    ) -> finstack_quant_core::Result<()> {
+        self.params.clone().validate()?;
+        // Require exact nodes: accepting a near-knot start while selecting
+        // loadings at the unadjusted time would use the previous volatility
+        // regime for the entire following interval.
+        let horizon = time_grid.t_max();
+        for &knot in self
+            .params
+            .vol_times
+            .iter()
+            .chain(&self.params.tenors[..self.params.num_forwards])
+        {
+            if knot > 0.0
+                && knot < horizon
+                && time_grid
+                    .times()
+                    .binary_search_by(|time| time.total_cmp(&knot))
+                    .is_err()
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "LMM simulation grid must contain every fixing date and volatility knot exactly; missing model time {knot}"
+                )));
+            }
+        }
+        Ok(())
+    }
+
     fn dim(&self) -> usize {
         self.params.num_forwards
     }
@@ -320,7 +405,7 @@ impl StochasticProcess for LmmProcess {
         // Compute numeraire ratio P(t, T_N) from forwards:
         // P(t, T_N) / P(t, T_{first_alive}) = Π_{j=first_alive}^{N-1} 1/(1 + τ_j F_j)
         // We store the product of discount factors from first alive to terminal.
-        let first = self.first_alive(state.time);
+        let first = self.first_numeraire_period(state.time);
         let mut numeraire = 1.0;
         for (fwd, tau) in x[first..n]
             .iter()
@@ -412,8 +497,8 @@ mod tests {
         // Terminal forward (index 2) should have zero drift (no j > 2)
         assert!((drift[2]).abs() < 1e-15);
 
-        // Non-terminal forwards should have non-zero drift
-        assert!(drift[0].abs() > 1e-10);
+        // Forward 0 has fixed; the remaining non-terminal forward has drift.
+        assert_eq!(drift[0], 0.0);
         assert!(drift[1].abs() > 1e-10);
     }
 
@@ -425,10 +510,12 @@ mod tests {
         let mut diff = vec![0.0; 6]; // 3 forwards × 2 factors
         process.diffusion(0.0, &x, &mut diff);
 
-        // diff[i*2+k] = (F_i + d_i) * λ_{i,k}
+        // The forward fixing at t=0 is frozen; later forwards diffuse.
         let shifted = 0.03 + 0.005; // = 0.035
-        assert!((diff[0] - shifted * 0.15).abs() < 1e-12);
-        assert!((diff[1] - shifted * 0.05).abs() < 1e-12);
+        assert_eq!(diff[0], 0.0);
+        assert_eq!(diff[1], 0.0);
+        assert!((diff[2] - shifted * 0.12).abs() < 1e-12);
+        assert!((diff[3] - shifted * 0.08).abs() < 1e-12);
     }
 
     #[test]
@@ -453,10 +540,61 @@ mod tests {
     fn test_first_alive() {
         let p = simple_2f_params();
         let process = LmmProcess::new(p);
-        assert_eq!(process.first_alive(0.0), 0);
+        assert_eq!(process.first_alive(0.0), 1);
         assert_eq!(process.first_alive(0.5), 1); // T_0=0.0 < 0.5 → forward 0 dead
-        assert_eq!(process.first_alive(1.0), 1); // T_0=0.0, T_1=1.0 → forward 0 dead, 1 just fixed
+        assert_eq!(process.first_alive(1.0), 2); // Both forwards 0 and 1 have fixed.
         assert_eq!(process.first_alive(1.5), 2);
+    }
+
+    #[test]
+    fn grid_must_include_fixing_and_volatility_knots() {
+        let mut params = simple_2f_params();
+        params.vol_times = vec![0.4];
+        params.vol_values.push(params.vol_values[0].clone());
+        let process = LmmProcess::new(params);
+        let aligned = crate::monte_carlo::TimeGrid::from_times(vec![0.0, 0.4, 1.0, 2.0, 3.0])
+            .expect("valid grid");
+        assert!(process.validate_time_grid(&aligned).is_ok());
+        for times in [vec![0.0, 1.0, 2.0, 3.0], vec![0.0, 0.4, 2.0, 3.0]] {
+            let grid = crate::monte_carlo::TimeGrid::from_times(times).expect("valid grid");
+            assert!(process.validate_time_grid(&grid).is_err());
+        }
+    }
+
+    #[test]
+    fn near_volatility_knot_cannot_select_stale_coefficients_for_the_next_step() {
+        let mut params = simple_2f_params();
+        params.vol_times = vec![0.3];
+        params.vol_values = vec![vec![[0.0; 3]; 3], vec![[0.2, 0.0, 0.0]; 3]];
+        let process = LmmProcess::new(params);
+        for offset in [-1e-15, 1e-15] {
+            let near = 0.3 + offset;
+            let grid =
+                crate::monte_carlo::TimeGrid::from_times(vec![0.0, near, 1.0]).expect("valid grid");
+            assert!(process.validate_time_grid(&grid).is_err());
+        }
+        assert!(!process.step_is_aligned(0.3 - 1e-15, 0.7));
+        let exact =
+            crate::monte_carlo::TimeGrid::from_times(vec![0.0, 0.3, 1.0]).expect("valid grid");
+        assert!(process.validate_time_grid(&exact).is_ok());
+        assert_eq!(process.params.factor_loadings(1, 0.3)[0], 0.2);
+    }
+
+    #[test]
+    fn validate_rejects_invalid_lmm_domains() {
+        let mut params = simple_2f_params();
+        params.initial_forwards[0] = -0.01;
+        assert!(params.validate().is_err());
+        let mut params = simple_2f_params();
+        params.vol_values[0][0][0] = f64::NAN;
+        assert!(params.validate().is_err());
+        let mut params = simple_2f_params();
+        params.displacements[0] = f64::INFINITY;
+        assert!(params.validate().is_err());
+        let mut params = simple_2f_params();
+        params.vol_times = vec![f64::NAN];
+        params.vol_values.push(params.vol_values[0].clone());
+        assert!(params.validate().is_err());
     }
 
     #[test]

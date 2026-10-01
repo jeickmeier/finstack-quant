@@ -10,24 +10,49 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_models::factor::{BumpSizeConfig, FactorDefinition};
-use serde::Serialize;
+use serde::{Deserialize, Deserializer, Serialize};
 
 /// Default scenario count for symmetric P&L profile grids.
 ///
 /// `5` produces `[-2, -1, 0, 1, 2]`.
 pub const DEFAULT_PNL_SCENARIO_POINTS: usize = 5;
 
-/// JSON shape returned by WASM factor sensitivity helpers.
+/// Canonical monetary sensitivity JSON shared by Python and WASM.
+///
+/// The matrix serializes as nested position-by-factor rows. Its canonical
+/// deserializer rejects incorrect dimensions, non-finite entries, and unknown
+/// fields before the data reaches a risk engine.
 #[derive(Debug, Clone, Serialize)]
 pub struct SensitivityMatrixJson {
     /// Reporting currency of every monetary sensitivity.
     pub base_currency: Currency,
-    /// Ordered position identifiers.
-    pub position_ids: Vec<String>,
-    /// Ordered factor identifiers.
-    pub factor_ids: Vec<String>,
-    /// Row-major matrix as nested rows.
-    pub data: Vec<Vec<f64>>,
+    /// Validated sensitivity axes and nested rows, flattened into this object.
+    #[serde(flatten)]
+    pub matrix: SensitivityMatrix,
+}
+
+// Flattened serde structs do not reliably reject leftover unknown fields.
+// Parse the complete monetary wire explicitly, then use the canonical matrix
+// constructor for all shape and value validation.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MonetarySensitivityWire {
+    base_currency: Currency,
+    position_ids: Vec<String>,
+    factor_ids: Vec<finstack_quant_models::factor::FactorId>,
+    data: Vec<Vec<f64>>,
+}
+
+impl<'de> Deserialize<'de> for SensitivityMatrixJson {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        let wire = MonetarySensitivityWire::deserialize(deserializer)?;
+        let matrix = SensitivityMatrix::from_rows(wire.position_ids, wire.factor_ids, wire.data)
+            .map_err(serde::de::Error::custom)?;
+        Ok(Self {
+            base_currency: wire.base_currency,
+            matrix,
+        })
+    }
 }
 
 /// JSON shape returned by WASM P&L profile helpers.
@@ -177,15 +202,7 @@ impl SensitivityMatrixJson {
     pub fn from_matrix(matrix: &SensitivityMatrix, base_currency: Currency) -> Self {
         Self {
             base_currency,
-            position_ids: matrix.position_ids().to_vec(),
-            factor_ids: matrix
-                .factor_ids()
-                .iter()
-                .map(ToString::to_string)
-                .collect(),
-            data: (0..matrix.n_positions())
-                .map(|idx| matrix.position_deltas(idx).to_vec())
-                .collect(),
+            matrix: matrix.clone(),
         }
     }
 }
@@ -209,6 +226,39 @@ mod tests {
     use finstack_quant_models::factor::{FactorId, FactorType, MarketMapping};
     use finstack_quant_valuations::instruments::{Equity, InstrumentEnvelope, InstrumentJson};
     use std::sync::Arc;
+
+    #[test]
+    fn monetary_matrix_wire_roundtrip_preserves_reporting_currency_and_rows() {
+        let matrix = SensitivityMatrix::from_rows(
+            vec!["A".into()],
+            vec![FactorId::new("FX")],
+            vec![vec![2.5]],
+        )
+        .expect("valid matrix");
+        let wire = SensitivityMatrixJson::from_matrix(&matrix, Currency::EUR);
+        let value = serde_json::to_value(&wire).expect("serialize");
+        assert_eq!(
+            value,
+            serde_json::json!({
+                "base_currency": "EUR", "position_ids": ["A"],
+                "factor_ids": ["FX"], "data": [[2.5]],
+            })
+        );
+        let restored: SensitivityMatrixJson = serde_json::from_value(value).expect("deserialize");
+        assert_eq!(restored.base_currency, Currency::EUR);
+        assert_eq!(restored.matrix, matrix);
+    }
+
+    #[test]
+    fn monetary_matrix_wire_rejects_missing_currency_and_unknown_fields() {
+        for value in [
+            serde_json::json!({"position_ids": [], "factor_ids": [], "data": []}),
+            serde_json::json!({"base_currency": "BAD", "position_ids": [], "factor_ids": [], "data": []}),
+            serde_json::json!({"base_currency": "USD", "position_ids": [], "factor_ids": [], "data": [], "n_factors": 0}),
+        ] {
+            assert!(serde_json::from_value::<SensitivityMatrixJson>(value).is_err());
+        }
+    }
 
     #[test]
     fn reporting_currency_is_explicit_and_independent_of_position_order() {

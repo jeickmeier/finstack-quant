@@ -21,6 +21,245 @@ use rust_decimal::Decimal;
 use time::{Duration, Month};
 
 #[test]
+fn cap_floor_parity_matches_same_forward_swap_across_quote_volatilities() {
+    use finstack_quant_core::market_data::scalars::InflationIndex;
+    use finstack_quant_core::market_data::surfaces::VolQuoteType;
+    use finstack_quant_valuations::instruments::YoYInflationSwap;
+    use time::macros::date;
+
+    let as_of = date!(2025 - 01 - 02);
+    for start in [as_of, date!(2026 - 01 - 02)] {
+        let end = start.replace_year(start.year() + 1).unwrap();
+        let mut cap = InflationCapFloor::example().unwrap();
+        cap.start_date = start;
+        cap.maturity = end;
+        cap.rate_option_type = RateOptionType::Caplet;
+        cap.lag = Some(InflationLag::None);
+        cap.business_day_convention = BusinessDayConvention::Unadjusted;
+        let mut swap = YoYInflationSwap::example().unwrap();
+        swap.start_date = start;
+        swap.maturity = end;
+        swap.lag = Some(InflationLag::None);
+        swap.business_day_convention = BusinessDayConvention::Unadjusted;
+        for (model, quote_type, sigma) in [
+            (ModelKey::Black76, VolQuoteType::BlackLognormal, 0.0),
+            (ModelKey::Black76, VolQuoteType::BlackLognormal, 0.2),
+            (ModelKey::Black76, VolQuoteType::BlackLognormal, 0.4),
+            (ModelKey::Normal, VolQuoteType::Normal, 0.0),
+            (ModelKey::Normal, VolQuoteType::Normal, 0.01),
+            (ModelKey::Normal, VolQuoteType::Normal, 0.02),
+        ] {
+            let market = MarketContext::new()
+                .insert(flat_discount("USD-OIS", as_of, 0.03).unwrap())
+                .insert(flat_inflation_curve("US-CPI", as_of, 300.0, 0.02).unwrap())
+                .insert_inflation_index(
+                    "US-CPI",
+                    InflationIndex::new("US-CPI", vec![(as_of, 300.0)], Currency::USD).unwrap(),
+                )
+                .insert_surface(
+                    flat_vol_surface("USD-INFL-VOL", &[1.0, 2.0], &[0.01, 0.02, 0.03], sigma)
+                        .with_quote_type(quote_type)
+                        .expect("valid quote convention"),
+                );
+            for strike in [0.01, 0.02, 0.03] {
+                cap.strike = Decimal::try_from(strike).unwrap();
+                swap.fixed_rate = cap.strike;
+                let mut floor = cap.clone();
+                floor.rate_option_type = RateOptionType::Floorlet;
+                let parity = cap.npv_raw_with_model(&market, as_of, model).unwrap()
+                    - floor.npv_raw_with_model(&market, as_of, model).unwrap();
+                let swap_pv = swap.npv_raw(&market, as_of).unwrap();
+                assert!(
+                    (parity - swap_pv).abs() < 1e-7,
+                    "{model:?}, sigma {sigma}, strike {strike}, start {start}: {parity} vs {swap_pv}"
+                );
+            }
+        }
+        // A future denominator deliberately uses the same documented
+        // forward-ratio approximation as the swap; it is not a joint model.
+    }
+}
+
+#[test]
+fn zero_and_day_lag_caplets_do_not_consume_unpublished_denominators() {
+    use finstack_quant_core::market_data::scalars::{InflationIndex, InflationInterpolation};
+    use finstack_quant_core::market_data::surfaces::VolQuoteType;
+    use finstack_quant_core::market_data::term_structures::InflationCurve;
+    use finstack_quant_valuations::instruments::rates::inflation_cap_floor::InflationVolatilityExpiry;
+    use time::macros::date;
+
+    let as_of = date!(2026 - 01 - 20);
+    let last_release = date!(2026 - 03 - 13);
+    let market = MarketContext::new()
+        .insert(flat_discount("USD-OIS", as_of, 0.0).unwrap())
+        .insert(
+            InflationCurve::builder("US-CPI")
+                .base_date(date!(2025 - 12 - 01))
+                .base_cpi(310.0)
+                .knots([(0.0, 310.0), (2.0, 310.0)])
+                .build()
+                .unwrap(),
+        )
+        .insert_inflation_index(
+            "US-CPI",
+            InflationIndex::new(
+                "US-CPI",
+                vec![
+                    (date!(2026 - 01 - 01), 306.0),
+                    (date!(2026 - 02 - 01), 900.0),
+                ],
+                Currency::USD,
+            )
+            .unwrap()
+            .with_publication_dates(vec![
+                (date!(2026 - 01 - 01), date!(2026 - 02 - 13)),
+                (date!(2026 - 02 - 01), last_release),
+            ])
+            .unwrap(),
+        )
+        .insert_surface(
+            flat_vol_surface("USD-INFL-VOL", &[0.01, 1.0], &[0.0], 0.01)
+                .with_quote_type(VolQuoteType::Normal)
+                .expect("valid quote convention"),
+        );
+    for (lag, start, end) in [
+        (
+            InflationLag::None,
+            date!(2026 - 01 - 01),
+            date!(2026 - 02 - 01),
+        ),
+        (
+            InflationLag::Days(10),
+            date!(2026 - 01 - 11),
+            date!(2026 - 02 - 11),
+        ),
+    ] {
+        let mut cap = InflationCapFloor::example().unwrap();
+        cap.start_date = start;
+        cap.maturity = end;
+        cap.lag = Some(lag);
+        cap.interpolation = Some(InflationInterpolation::Step);
+        cap.rate_option_type = RateOptionType::Caplet;
+        cap.volatility_expiry = InflationVolatilityExpiry::PublicationDate;
+        cap.strike = Decimal::ZERO;
+        let t = (last_release - as_of).whole_days() as f64 / 365.0;
+        let accrual = (end - start).whole_days() as f64 / 365.0;
+        // Both unpublished CPI anchors project to 310. The forward is zero,
+        // irrespective of the future historical values already in the store.
+        let expected =
+            1_000_000.0 * accrual * 0.01 * t.sqrt() / (2.0 * std::f64::consts::PI).sqrt();
+        let actual = cap
+            .npv_raw_with_model(&market, as_of, ModelKey::Normal)
+            .unwrap();
+        assert!(
+            (actual - expected).abs() < 1e-7,
+            "{lag:?}: {actual} vs {expected}"
+        );
+    }
+}
+
+#[test]
+fn monthly_publication_controls_availability_and_explicit_quote_clock() {
+    use finstack_quant_core::market_data::scalars::{InflationIndex, InflationInterpolation};
+    use finstack_quant_core::market_data::surfaces::VolQuoteType;
+    use finstack_quant_core::market_data::term_structures::InflationCurve;
+    use finstack_quant_valuations::instruments::rates::inflation_cap_floor::InflationVolatilityExpiry;
+    use finstack_quant_valuations::instruments::{InflationSwap, Instrument, YoYInflationSwap};
+    use time::macros::date;
+
+    let as_of = date!(2026 - 01 - 20);
+    let release = date!(2026 - 02 - 13);
+    let january = date!(2026 - 01 - 01);
+    let index = InflationIndex::new(
+        "US-CPI",
+        vec![
+            (date!(2025 - 01 - 01), 300.0),
+            (date!(2025 - 12 - 01), 305.0),
+        ],
+        Currency::USD,
+    )
+    .unwrap()
+    .with_interpolation(InflationInterpolation::Step)
+    .with_publication_dates(vec![(january, release)])
+    .unwrap();
+    let market = MarketContext::new()
+        .insert(flat_discount("USD-OIS", as_of, 0.0).unwrap())
+        .insert(
+            InflationCurve::builder("US-CPI")
+                .base_date(date!(2025 - 12 - 01))
+                .base_cpi(306.0)
+                .knots([(0.0, 306.0), (2.0, 306.0)])
+                .build()
+                .unwrap(),
+        )
+        .insert_inflation_index("US-CPI", index.clone())
+        .insert_surface(
+            flat_vol_surface("USD-INFL-VOL", &[0.01, 1.0], &[0.02], 0.01)
+                .with_quote_type(VolQuoteType::Normal)
+                .expect("valid quote convention"),
+        );
+    let mut cap = InflationCapFloor::example().unwrap();
+    cap.start_date = date!(2025 - 04 - 01);
+    cap.maturity = date!(2026 - 04 - 01);
+    cap.strike = Decimal::try_from(0.02).unwrap();
+    cap.rate_option_type = RateOptionType::Caplet;
+    cap.interpolation = Some(InflationInterpolation::Step);
+    // Existing reference-date quotes cannot be silently reinterpreted after
+    // that reference date has passed while the observation is still unknown.
+    assert!(cap
+        .npv_raw_with_model(&market, as_of, ModelKey::Normal)
+        .is_err());
+    cap.volatility_expiry = InflationVolatilityExpiry::PublicationDate;
+    let pv = cap
+        .npv_raw_with_model(&market, as_of, ModelKey::Normal)
+        .unwrap();
+    let t = (release - as_of).whole_days() as f64 / 365.0;
+    let expected = 1_000_000.0 * 0.01 * t.sqrt() / (2.0 * std::f64::consts::PI).sqrt();
+    assert!((pv - expected).abs() < 1e-7, "{pv} vs {expected}");
+
+    let mut zc = InflationSwap::example().unwrap();
+    zc.start_date = cap.start_date;
+    zc.maturity = cap.maturity;
+    let mut yoy = YoYInflationSwap::example().unwrap();
+    yoy.start_date = cap.start_date;
+    yoy.maturity = cap.maturity;
+    for valuation_date in [as_of, release - Duration::days(1)] {
+        assert!(zc.value(&market, valuation_date).is_ok());
+        assert!(yoy.value(&market, valuation_date).is_ok());
+        assert!(
+            cap.npv_raw_with_model(&market, valuation_date, ModelKey::Normal)
+                .unwrap()
+                > 0.0
+        );
+    }
+    for valuation_date in [release, release + Duration::days(1)] {
+        assert!(zc.value(&market, valuation_date).is_err());
+        assert!(yoy.value(&market, valuation_date).is_err());
+        assert!(cap
+            .npv_raw_with_model(&market, valuation_date, ModelKey::Normal)
+            .is_err());
+    }
+    let mut observations = index.observations();
+    observations.push((january, 306.0));
+    let published = InflationIndex::new("US-CPI", observations, Currency::USD)
+        .unwrap()
+        .with_publication_dates(index.get_publication_dates())
+        .unwrap();
+    let published_market = market.insert_inflation_index("US-CPI", published);
+    for valuation_date in [release, release + Duration::days(1)] {
+        assert!(zc.value(&published_market, valuation_date).is_ok());
+        assert!(yoy.value(&published_market, valuation_date).is_ok());
+        let fixed_pv = cap
+            .npv_raw_with_model(&published_market, valuation_date, ModelKey::Normal)
+            .unwrap();
+        assert!(
+            fixed_pv.abs() < 1e-7,
+            "known ATM payoff must have no time value"
+        );
+    }
+}
+
+#[test]
 fn test_caplet_intrinsic_after_fixing() {
     let as_of = Date::from_calendar_date(2025, Month::April, 15).unwrap();
     let start = as_of - Duration::days(60);
@@ -99,7 +338,8 @@ fn test_floor_value_with_negative_forward_normal_model() {
     let infl_curve = flat_inflation_curve("US-CPI-U", as_of, 300.0, -0.01).unwrap();
     let index = simple_index("US-CPI-U", as_of, 300.0, Currency::USD, InflationLag::None);
     let vol_surface = flat_vol_surface("US-CPI-VOL", &[1.0], &[0.0], 0.01)
-        .with_quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::Normal);
+        .with_quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::Normal)
+        .expect("valid quote convention");
 
     let ctx = MarketContext::new()
         .insert(disc)
@@ -158,106 +398,6 @@ fn test_floor_value_with_negative_forward_normal_model() {
 
     assert!(floor_pv.amount() > cap_pv.amount());
     assert!(floor_pv.amount() > 0.0);
-}
-
-/// Regression test (item 3): the YoY caplet must apply the convexity / timing
-/// adjustment to the forward — feeding the raw deterministic CPI-ratio forward
-/// into Black-76 omits it.
-///
-/// A YoY caplet pays `(CPI(Tᵢ)/CPI(Tᵢ₋₁) − 1 − K)⁺`. Under stochastic
-/// inflation the payment-measure expected YoY ratio carries a Jensen
-/// convexity (`+σ_I²·τ`) that raises the forward above the deterministic
-/// ratio. With zero-lag (so the fixing is genuinely in the future) and a
-/// non-trivial inflation vol, the convexity-adjusted caplet must be worth
-/// strictly more than the same caplet priced with the convexity suppressed.
-///
-/// The convexity is suppressed here by setting the inflation vol surface to a
-/// near-zero level (`σ_I ≈ 0` ⇒ `C ≈ 0`, no adjustment) and compared against a
-/// market with a realistic 2% inflation vol. A higher `σ_I` both raises the
-/// forward (convexity) and adds option time value — both push the cap price
-/// up, but the convexity contribution is the item-3 fix.
-#[test]
-fn test_yoy_caplet_applies_convexity_adjustment() {
-    // YoY caplet on a 1-year period starting one year out, so the period is
-    // [Tᵢ₋₁, Tᵢ] = [+1y, +2y] and the deterministic forward YoY rate ≈ 2.5%.
-    let as_of = Date::from_calendar_date(2025, Month::January, 2).unwrap();
-    let start = Date::from_calendar_date(2026, Month::January, 2).unwrap();
-    let end = Date::from_calendar_date(2027, Month::January, 2).unwrap();
-    let notional = Money::new(5_000_000.0, Currency::USD).expect("valid money fixture");
-
-    let build_caplet = |vol_surface_id: &str| {
-        InflationCapFloor::builder()
-            .id("INF-CAP-CVX".into())
-            .rate_option_type(RateOptionType::Caplet)
-            .notional(notional)
-            // Slightly OTM strike so the option carries time value and is
-            // sensitive to the forward-raising convexity adjustment.
-            .strike(Decimal::try_from(0.030).expect("valid decimal"))
-            .start_date(start)
-            .maturity(end)
-            .frequency(Tenor::new(1, TenorUnit::Years).expect("valid tenor fixture"))
-            .day_count(DayCount::Act365F)
-            .stub(StubKind::None)
-            .business_day_convention(BusinessDayConvention::Following)
-            .calendar_id_opt(None)
-            .inflation_index_id(CurveId::new("US-CPI-U"))
-            .discount_curve_id(CurveId::new("USD-OIS"))
-            .vol_surface_id(CurveId::new(vol_surface_id))
-            // Zero lag so the fixing date is in the future and the convexity
-            // adjustment (which requires t_fix > 0) is active.
-            .lag_opt(Some(InflationLag::Months(0)))
-            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
-            .attributes(Attributes::new())
-            .build()
-            .unwrap()
-    };
-
-    // No inflation INDEX is inserted: forced curve projection for CPI(start)
-    // and CPI(end), so the deterministic forward YoY rate is a genuine ~2.5%
-    // (an index would extrapolate flat past its last observation).
-    //
-    // Market A: negligible inflation vol -> convexity ~ 0.
-    let ctx_flat = MarketContext::new()
-        .insert(flat_discount("USD-OIS", as_of, 0.02).unwrap())
-        .insert(flat_inflation_curve("US-CPI-U", as_of, 300.0, 0.025).unwrap())
-        .insert_surface(flat_vol_surface(
-            "US-CPI-VOL-LO",
-            &[1.0, 5.0],
-            &[0.025],
-            1e-6,
-        ));
-
-    // Market B: realistic 2% inflation vol -> non-trivial convexity.
-    let ctx_vol = MarketContext::new()
-        .insert(flat_discount("USD-OIS", as_of, 0.02).unwrap())
-        .insert(flat_inflation_curve("US-CPI-U", as_of, 300.0, 0.025).unwrap())
-        .insert_surface(flat_vol_surface(
-            "US-CPI-VOL-HI",
-            &[1.0, 5.0],
-            &[0.025],
-            0.02,
-        ));
-
-    let pv_no_convexity = build_caplet("US-CPI-VOL-LO")
-        .npv_with_model(&ctx_flat, as_of, ModelKey::Black76)
-        .unwrap();
-    let pv_with_convexity = build_caplet("US-CPI-VOL-HI")
-        .npv_with_model(&ctx_vol, as_of, ModelKey::Black76)
-        .unwrap();
-
-    assert!(
-        pv_with_convexity.amount() > pv_no_convexity.amount(),
-        "a YoY caplet priced with inflation vol (convexity adjustment active) \
-         must be worth more than one with the convexity suppressed: \
-         with={}, without={}",
-        pv_with_convexity.amount(),
-        pv_no_convexity.amount()
-    );
-    assert!(
-        pv_with_convexity.amount() > 0.0,
-        "YoY caplet with vol must have positive value, got {}",
-        pv_with_convexity.amount()
-    );
 }
 
 #[test]

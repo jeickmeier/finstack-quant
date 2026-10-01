@@ -114,14 +114,24 @@ def _detail_section(df: Any, title: str, drop_total_kind: str, currency: str) ->
         kind = str(r["kind"])
         if kind == drop_total_kind:
             continue
-        comp = kind.rsplit(".", maxsplit=1)[-1].replace("_", " ").title()
+        comp = str(r["sub"]).replace(".", " / ").replace("_", " ").title()
+        if kind in {"credit_factor.level", "credit_factor.adder"}:
+            comp += " Total"
+        elif kind.endswith((".rates", ".credit", ".by_bucket")) or kind == "credit_factor.adder_by_issuer":
+            comp += " (Breakdown)"
+        keys = [r["key_a"], r["key_b"]]
+        if kind.startswith("carry."):
+            keys[0] = None
+        identifiers = [key for key in keys if isinstance(key, str) and key]
+        if identifiers:
+            comp += " · " + " / ".join(identifiers)
         data.append({"Component": comp, "Amount": float(r["amount"])})
     if not data:
         return None
     body = tables.data_table(
         data,
         columns=["Component", "Amount"],
-        formats={"Component": str, "Amount": lambda x: fmt.money(x, currency, dp=0)},
+        formats={"Amount": lambda x: fmt.money(x, currency, dp=0)},
         neg_columns={"Amount"},
     )
     return Section(title, body)
@@ -193,7 +203,8 @@ def attribution_tearsheet(
     ------
     ValueError
         If no precomputed attribution is supplied, ``sections`` contains an
-        unknown name, or an attribution JSON payload cannot be decoded.
+        unknown name, an attribution JSON payload cannot be decoded, or any
+        attribution amount uses a currency different from its total P&L.
 
     Examples:
     --------
@@ -211,6 +222,7 @@ def attribution_tearsheet(
         payload = attribution if isinstance(attribution, str) else json.dumps(attribution)
         attribution = PnlAttribution.from_json(payload)
 
+    attribution.validate_currencies()
     wanted = _resolve_sections(sections, ALL_SECTIONS, valid_label="valid")
     cur = attribution.currency
     kpis = [

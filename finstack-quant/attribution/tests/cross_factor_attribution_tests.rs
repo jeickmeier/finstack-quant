@@ -258,7 +258,7 @@ fn single_factor_instrument_has_zero_cross_factor() {
             .id(InstrumentId::new("DEP-1Y"))
             .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
             .start_date(as_of_t0)
-            .maturity(as_of_t0.add_months(12))
+            .maturity(as_of_t0.add_months(12).expect("valid date shift"))
             .day_count(DayCount::Act360)
             .fixed_rate_opt(Some(Decimal::ZERO))
             .discount_curve_id(CurveId::new("USD-OIS"))

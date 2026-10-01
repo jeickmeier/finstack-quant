@@ -127,7 +127,7 @@ pub use json::{
     PaymentProgramSpec,
 };
 pub use traits::{
-    schedule_from_classified_flows, schedule_from_dated_flows, CashflowProvider,
+    dated_flows, schedule_from_classified_flows, schedule_from_dated_flows, CashflowProvider,
     CashflowScheduleSource, ScheduleBuildOpts,
 };
 

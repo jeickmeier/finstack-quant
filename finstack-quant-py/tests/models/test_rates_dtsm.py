@@ -91,3 +91,15 @@ def test_yield_pca_typed_api() -> None:
     assert pca.truncated(1).explained_variance_ratio == pca.variance_explained[:1]
     with pytest.raises(ValueError, match=r"n_components must be in"):
         pca.truncated(0)
+
+
+def test_reextracting_factors_clears_stale_var_state() -> None:
+    original = DieboldLi().fit(YieldPanel(TENORS, YIELDS))
+    replacement_yields = [[value + 0.01 for value in row] for row in YIELDS]
+    replacement = original.extract_factors(YieldPanel(TENORS, replacement_yields))
+    assert original.phi is not None
+    assert replacement.phi is None
+    assert replacement.mu is None
+    assert replacement.q_cov is None
+    with pytest.raises(ValueError, match="fit_var"):
+        replacement.forecast(1)

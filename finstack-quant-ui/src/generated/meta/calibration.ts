@@ -1462,6 +1462,28 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_1a0c0b834c9e63a93be3",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CurveAdjustmentSegment"
+  },
+  {
+    "path": "#/$defs/d_1a0c0b834c9e63a93be3/properties/slope",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CurveAdjustmentSegment/properties/slope",
+    "description": "Function slope on this segment.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_1a0c0b834c9e63a93be3/properties/start",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CurveAdjustmentSegment/properties/start",
+    "description": "Segment origin in the source curve's time coordinates.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_1a0c0b834c9e63a93be3/properties/value",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CurveAdjustmentSegment/properties/value",
+    "description": "Right-hand function value at the segment origin.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_1b2ccb88c9229e7463e8",
     "source": "https://finstack_quant.dev/schemas/common/1/date.schema.json#",
     "description": "ISO 8601 calendar date string.",
@@ -1592,15 +1614,16 @@ export default [
     "path": "#/$defs/d_354032bddbd823c2e3f2/properties/max_iterations",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SolverConfig/properties/max_iterations",
     "default": 100,
-    "description": "Maximum iterations available to each solver invocation.",
+    "description": "Positive maximum number of iterations available to each solver invocation.",
     "format": "uint",
-    "minimum": 0
+    "minimum": 1
   },
   {
     "path": "#/$defs/d_354032bddbd823c2e3f2/properties/tolerance",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SolverConfig/properties/tolerance",
     "default": 1e-12,
-    "description": "Numerical convergence tolerance; distinct from economic fit acceptance.",
+    "description": "Positive finite numerical convergence tolerance, distinct from economic fit acceptance.",
+    "exclusiveMinimum": 0,
     "format": "double"
   },
   {
@@ -1846,7 +1869,7 @@ export default [
     "path": "#/$defs/d_3d7928f8797773779aed/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsValuationConvention/oneOf/1",
     "const": "bloomberg_cdsw_clean",
-    "description": "Bloomberg CDSW clean principal presentation and premium-leg policy.\n\nThis is the industry-standard convention used by Bloomberg CDSW and\nthe ISDA Standard Upfront Model. It is the default for new\n`CreditDefaultSwap` instances:\n\n- Premium cashflows accrue between business-day-adjusted dates that\n  match the Bloomberg CDSW cashflow schedule.\n- The final coupon period is inclusive of the maturity date (extra\n  day) per CDSW convention.\n- The reported NPV is the clean principal value (Bloomberg\n  \"Principal\" line). Cash settlement is `Principal + Accrued`.\n- Par spread uses the risky annuity denominator (matches the CDSW\n  screen for investment-grade credits).\n- Hazard rebootstrap inside risk metrics (CS01, recovery01, etc.)\n  inherits the same CDSW pricer convention so sensitivities are\n  self-consistent with the base PV."
+    "description": "Bloomberg CDSW clean principal presentation and premium-leg policy.\n\nThis is the industry-standard convention used by Bloomberg CDSW and\nthe ISDA Standard Upfront Model. It is the default for new\n`CreditDefaultSwap` instances:\n\n- Intermediate premium cashflows accrue between business-day-adjusted\n  dates. Final accrual ends on unadjusted maturity; the final payment\n  follows the business-day convention independently.\n- The final coupon period is inclusive of the maturity date (extra\n  day) per CDSW convention.\n- The reported NPV is the clean principal value (Bloomberg\n  \"Principal\" line). Cash settlement is `Principal + Accrued`.\n- Par spread uses the risky annuity denominator (matches the CDSW\n  screen for investment-grade credits).\n- Hazard rebootstrap inside risk metrics (CS01, recovery01, etc.)\n  inherits the same CDSW pricer convention so sensitivities are\n  self-consistent with the base PV."
   },
   {
     "path": "#/$defs/d_3d7928f8797773779aed/oneOf/2",
@@ -1870,6 +1893,43 @@ export default [
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/VolSurfaceSolveConfig/properties/validation_tolerance",
     "default": 0.001,
     "description": "Tolerance for determining calibration *success* (applied to vol residuals).\n\nAfter each expiry slice is calibrated, the final `|σ_model − σ_mkt|`\nresiduals are compared against this tolerance. If `max_residual >\nvalidation_tolerance`, the calibration report will have `success = false`\neven if the slice solver converged.\n\nThis is distinct from `solver.tolerance()` which controls when the\nnumerical solver terminates. See [`CalibrationConfig`] for a full\nexplanation.\n\nDefault: `1e-3` (0.10 vol points in decimal vol).",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_44550d6839f96bb19179",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveTransform",
+    "description": "Source interpolation and a single accumulated transformation, never a chain\nof nested curves. The adjustment is stored as its piecewise-linear derivative\nso evaluating beyond a completed triangular shock does not subtract large\nquadratic polynomials."
+  },
+  {
+    "path": "#/$defs/d_44550d6839f96bb19179/properties/adjustment",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveTransform/properties/adjustment",
+    "description": "Cumulative derivative of the additive log-discount adjustment.",
+    "ref": "#/$defs/PiecewiseLinearAdjustment",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PiecewiseLinearAdjustment"
+  },
+  {
+    "path": "#/$defs/d_44550d6839f96bb19179/properties/offset",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveTransform/properties/offset",
+    "description": "Current origin in the source interpolation's year-fraction coordinates.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_44550d6839f96bb19179/properties/source_points",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveTransform/properties/source_points",
+    "description": "Original, untransformed interpolation pillars."
+  },
+  {
+    "path": "#/$defs/d_44550d6839f96bb19179/properties/source_points/items",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveTransform/properties/source_points/items"
+  },
+  {
+    "path": "#/$defs/d_44550d6839f96bb19179/properties/source_points/items/prefixItems/0",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveTransform/properties/source_points/items/prefixItems/0",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_44550d6839f96bb19179/properties/source_points/items/prefixItems/1",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveTransform/properties/source_points/items/prefixItems/1",
     "format": "double"
   },
   {
@@ -1905,7 +1965,7 @@ export default [
   {
     "path": "#/$defs/d_482bae9be5d021df13ce",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationLag",
-    "description": "Publication lag for inflation index reference dates.\n\nInflation indices are published with a delay (typically 2-4 weeks). Securities\nusing these indices incorporate a lag to ensure the reference index is published\nby the settlement date.\n\n# Standard Lags by Market\n\n- **US TIPS**: 3-month lag (reference index from 3 months prior)\n- **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)\n- **French OATi**: 3-month lag\n- **German index-linked**: 3-month lag\n\n# Rationale\n\nThe lag ensures:\n1. Reference index is published before settlement\n2. Index value is known at coupon payment date\n3. No estimation or forecasting required for payment calculation\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationLag;\n\nlet tips_lag = InflationLag::Months(3);  // US TIPS standard\nlet gilt_lag = InflationLag::Months(3);  // UK modern gilts\nlet no_lag = InflationLag::None;         // Inflation swaps (forecast-based)\n```"
+    "description": "Contractual observation lag for inflation index reference dates.\n\nInflation indices are published with a delay (typically 2-4 weeks). Securities\nusing these indices incorporate an observation lag to ensure the reference\nindex is published by settlement. This lag does not specify the actual\npublication date; use [`InflationIndex::with_publication_dates`] for that.\n\n# Standard Lags by Market\n\n- **US TIPS**: 3-month lag (reference index from 3 months prior)\n- **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)\n- **French OATi**: 3-month lag\n- **German index-linked**: 3-month lag\n\n# Rationale\n\nThe lag ensures:\n1. Reference index is published before settlement\n2. Index value is known at coupon payment date\n3. No estimation or forecasting required for payment calculation\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationLag;\n\nlet tips_lag = InflationLag::Months(3);  // US TIPS standard\nlet gilt_lag = InflationLag::Months(3);  // UK modern gilts\nlet no_lag = InflationLag::None;         // Inflation swaps (forecast-based)\n```"
   },
   {
     "path": "#/$defs/d_482bae9be5d021df13ce/oneOf/0",
@@ -2612,6 +2672,24 @@ export default [
     "const": "nss"
   },
   {
+    "path": "#/$defs/d_7badbe6d060a37bc56dc",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationPublicationWire"
+  },
+  {
+    "path": "#/$defs/d_7badbe6d060a37bc56dc/properties/publication_date",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationPublicationWire/properties/publication_date",
+    "description": "Inclusive date on which the observation must be available.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_7badbe6d060a37bc56dc/properties/reference_month",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationPublicationWire/properties/reference_month",
+    "description": "First calendar day of the reference month.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
     "path": "#/$defs/d_7d8265a72b3debd33f3e",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendSchedule",
     "description": "Dividend schedule for an equity or ETF underlying.\n\nContains a time-ordered sequence of dividend events used for pricing equity\nderivatives and calculating total return. The schedule can be referenced by\nmultiple instruments via its [`CurveId`] in the market context.\n\n# Usage in Pricing\n\n- **Discrete dividends**: Subtract PV of future dividends from spot for option pricing\n- **Ex-dividend adjustments**: Reduce forward price by dividend amount\n- **Dividend futures**: Sum dividends in contract period\n- **Total return**: Include dividend reinvestment in performance\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::dividends::DividendSchedule;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet schedule = DividendSchedule::builder(\"AAPL-DIVS\")\n    .underlying(\"AAPL\")\n    .currency(Currency::USD)\n    .cash(\n        Date::from_calendar_date(2025, Month::March, 15).expect(\"Valid date\"),\n        Money::new(0.24, Currency::USD).expect(\"valid money fixture\")\n    ).build().expect(\"Valid dividends\");\n\nassert_eq!(schedule.get_events().len(), 1);\n```"
@@ -3004,6 +3082,17 @@ export default [
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/10/properties/observations/items/prefixItems/1",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/10/properties/observations/items/prefixItems/1",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/10/properties/publication_dates",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/10/properties/publication_dates",
+    "description": "Explicit monthly observation availability; no release dates are inferred."
+  },
+  {
+    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/10/properties/publication_dates/items",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/10/properties/publication_dates/items",
+    "ref": "#/$defs/InflationPublicationWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationPublicationWire"
   },
   {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/10/properties/seasonality",
@@ -6133,7 +6222,7 @@ export default [
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/10",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/10",
     "const": "act_act_isma",
-    "description": "Actual/Actual (ICMA) day count convention.\n\nUses actual days in numerator and actual days in the coupon period\nas denominator, requiring knowledge of payment frequency.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251 - \"Actual/Actual (ICMA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ICMA\" (A007)\n- **Also known as**: Act/Act (ICMA), Act/Act (ISMA), ISMA-99\n\n# Algorithm\n\n1. Determine quasi-coupon periods based on payment frequency\n2. For each period: (actual days) / (actual days in coupon period)\n3. Sum fractions across periods\n\n# Usage\n\nStandard for:\n- International bonds with regular coupons\n- Eurobonds with semi-annual or annual payments\n- ICMA-governed securities\n\n# Requirements\n\nRequires `frequency` in [`DayCountContext`] to determine regular coupon periods.\nFor irregular first/last coupons, use\n[`act_act_isma_year_fraction_with_reference_period`].\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 15).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::July, 15).expect(\"Valid date\");\nlet frequency = Tenor::semi_annual(); // Semi-annual\n\nlet yf = DayCount::ActActIsma.year_fraction(\n    start,\n    end,\n    DayCountContext { frequency: Some(frequency), ..Default::default() }\n).expect(\"Year fraction calculation should succeed\");\n\n// Full semi-annual period = 0.5 year fraction (6 months / 12 months)\nassert!((yf - 0.5).abs() < 1e-6);\n```\n\n# References\n\n- ICMA (2010). \"ICMA Rule Book.\" Rule 251. `docs/REFERENCES.md#icma-rule-book`\n- ISMA (1999). \"Recommendations for Accrued Interest Calculations.\""
+    "description": "Actual/Actual (ICMA) day count convention.\n\nUses actual days in numerator and actual days in the coupon period\nas denominator, requiring knowledge of payment frequency.\nExplicit reference coupon boundaries must be unadjusted regular dates\nfrom the contractual nominal month grid, rather than payment dates.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251 - \"Actual/Actual (ICMA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ICMA\" (A007)\n- **Also known as**: Act/Act (ICMA), Act/Act (ISMA), ISMA-99\n\n# Algorithm\n\n1. Determine quasi-coupon periods based on payment frequency\n2. For each period: (actual days) / (actual days in coupon period)\n3. Sum fractions across periods\n\n# Usage\n\nStandard for:\n- International bonds with regular coupons\n- Eurobonds with semi-annual or annual payments\n- ICMA-governed securities\n\n# Requirements\n\nRequires `frequency` in [`DayCountContext`] to determine regular coupon periods.\nFor irregular first/last coupons, use\n[`act_act_isma_year_fraction_with_reference_period`].\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 15).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::July, 15).expect(\"Valid date\");\nlet frequency = Tenor::semi_annual(); // Semi-annual\n\nlet yf = DayCount::ActActIsma.year_fraction(\n    start,\n    end,\n    DayCountContext { frequency: Some(frequency), ..Default::default() }\n).expect(\"Year fraction calculation should succeed\");\n\n// Full semi-annual period = 0.5 year fraction (6 months / 12 months)\nassert!((yf - 0.5).abs() < 1e-6);\n```\n\n# References\n\n- ICMA (2010). \"ICMA Rule Book.\" Rule 251. `docs/REFERENCES.md#icma-rule-book`\n- ISMA (1999). \"Recommendations for Accrued Interest Calculations.\""
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/11",
@@ -6157,7 +6246,7 @@ export default [
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/3",
     "const": "act_365l",
-    "description": "Actual/365 Leap day count convention (Actual/365L) per ICMA Rule 251.\n\nYear fraction = (actual days) / (365 or 366), where the denominator\nrule depends on the coupon frequency supplied via [`DayCountContext`]:\n\n- **Annual** (or no frequency supplied): 366 if February 29 falls in\n  the interval `(start, end]` (exclusive of start, inclusive of end),\n  else 365.\n- **Non-annual**: 366 if the period END date falls in a leap year,\n  else 365.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251.1(i)(c)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365L\" (A008)\n- **Also known as**: Act/365L, ISMA-Year\n\nNote: this is **not** ACT/ACT AFB (Association Française des Banques),\nwhich uses a different (sub-period splitting) algorithm. The former\n`act_365afb` parse alias was removed because it conflated the two\nconventions. Use [`DayCount::ActActAfb`] for AFB / Actual/Actual Euro.\n\n# Usage\n\nUsed in:\n- GBP floating-rate notes\n- Some European bond markets\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\n// Period containing Feb 29, 2024 (leap year)\nlet start = Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2024, Month::March, 1).expect(\"Valid date\");\n\nlet yf = DayCount::Act365L.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n// 29 days / 366 (leap year denominator)\nassert_eq!(yf, 29.0 / 366.0);\n```"
+    "description": "Actual/365 Leap day count convention (Actual/365L) per ICMA Rule 251.\n\nYear fraction = (actual days) / (365 or 366), where the denominator\nrule depends on the coupon frequency and enclosing `coupon_period`\nsupplied via [`DayCountContext`]. Both are required:\n\n- **Annual**: 366 if February 29 falls in\n  `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),\n  else 365.\n- **Non-annual**: 366 if the next coupon date falls in a leap year,\n  else 365.\n\nPartial accrual keeps the enclosing coupon's denominator. Accrual\ndates outside that coupon are rejected; sum separate coupon slices\nfor calculations spanning multiple coupon periods.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251.1(i)(c)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365L\" (A008)\n- **Also known as**: Act/365L, ISMA-Year\n\nNote: this is **not** ACT/ACT AFB (Association Française des Banques),\nwhich uses a different (sub-period splitting) algorithm. The former\n`act_365afb` parse alias was removed because it conflated the two\nconventions. Use [`DayCount::ActActAfb`] for AFB / Actual/Actual Euro.\n\n# Usage\n\nUsed in:\n- GBP floating-rate notes\n- Some European bond markets\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};\nuse time::Month;\n\n// Period containing Feb 29, 2024 (leap year)\nlet start = Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2024, Month::March, 1).expect(\"Valid date\");\n\nlet ctx = DayCountContext {\n    frequency: Some(Tenor::annual()),\n    coupon_period: Some((start, end)),\n    ..DayCountContext::default()\n};\nlet yf = DayCount::Act365L.year_fraction(start, end, ctx).expect(\"Year fraction calculation should succeed\");\n// 29 days / 366 (leap year denominator)\nassert_eq!(yf, 29.0 / 366.0);\n```"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/4",
@@ -6187,7 +6276,7 @@ export default [
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/8",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/8",
     "const": "nl_365",
-    "description": "NL/365 (Actual/365 No Leap) day count convention.\n\nYear fraction = (actual days excluding any February 29) / 365\n\n# Standards Reference\n\n- **Also known as**: Act/365 No Leap, NL365, Actual/365NL\n- Counts the actual calendar days in `[start, end)` and removes every\n  February 29 that falls in the period, so a full leap year still\n  yields exactly 1.0.\n\n# Usage\n\nUsed in:\n- Some Canadian money-market and mortgage instruments\n- Legacy systems that ignore leap days for accrual\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\n// Full leap year 2024: 366 actual days, Feb 29 excluded → 365/365 = 1.0\nlet start = Date::from_calendar_date(2024, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\n\nlet yf = DayCount::Nl365.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\nassert_eq!(yf, 1.0);\n```"
+    "description": "NL/365 (Actual/365 No Leap) day count convention.\n\nYear fraction = (actual days excluding any February 29) / 365\n\n# Standards Reference\n\n- **Also known as**: Act/365 No Leap, NL365, Actual/365NL\n- Counts the actual calendar days in `(start, end]` and removes every\n  February 29 that falls in the period, so a full leap year still\n  yields exactly 1.0.\n\n# Usage\n\nUsed in:\n- Some Canadian money-market and mortgage instruments\n- Legacy systems that ignore leap days for accrual\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\n// Full leap year 2024: 366 actual days, Feb 29 excluded → 365/365 = 1.0\nlet start = Date::from_calendar_date(2024, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\n\nlet yf = DayCount::Nl365.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\nassert_eq!(yf, 1.0);\n```"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/9",
@@ -6797,6 +6886,21 @@ export default [
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/0/properties/rate_calibration/anyOf/1"
   },
   {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/0/properties/transform",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/0/properties/transform",
+    "description": "Canonical source interpolation and accumulated continuous transformations."
+  },
+  {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/0/properties/transform/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/0/properties/transform/anyOf/0",
+    "ref": "#/$defs/DiscountCurveTransform",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveTransform"
+  },
+  {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/0/properties/transform/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/0/properties/transform/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/1",
     "description": "Pre-built forward-rate curve."
@@ -6899,6 +7003,21 @@ export default [
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/1/properties/tenor",
     "description": "Index tenor in years",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/1/properties/transform",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/1/properties/transform",
+    "description": "Canonical source interpolation and cumulative continuous transformations."
+  },
+  {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/1/properties/transform/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/1/properties/transform/anyOf/0",
+    "ref": "#/$defs/ForwardCurveTransform",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ForwardCurveTransform"
+  },
+  {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/1/properties/transform/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/1/properties/transform/anyOf/1"
   },
   {
     "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/2",
@@ -7503,6 +7622,28 @@ export default [
     "description": "Bootstrap a piecewise-constant short-rate volatility schedule at quote expiries."
   },
   {
+    "path": "#/$defs/d_f1a590578006650bb43d",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PiecewiseLinearAdjustment",
+    "description": "A flat function representation: repeated shocks merge on a breakpoint union\nrather than forming a recursively nested transformation history."
+  },
+  {
+    "path": "#/$defs/d_f1a590578006650bb43d/properties/initial_value",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PiecewiseLinearAdjustment/properties/initial_value",
+    "description": "Constant value before the first breakpoint.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_f1a590578006650bb43d/properties/segments",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PiecewiseLinearAdjustment/properties/segments",
+    "description": "Sorted, merged linear segments."
+  },
+  {
+    "path": "#/$defs/d_f1a590578006650bb43d/properties/segments/items",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PiecewiseLinearAdjustment/properties/segments/items",
+    "ref": "#/$defs/CurveAdjustmentSegment",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CurveAdjustmentSegment"
+  },
+  {
     "path": "#/$defs/d_f2494b65293b81ee2ea2",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/IrFutureContractId",
     "description": "Stable identifier for an Interest Rate Future contract (e.g., \"CME:SR3\").\n\nUsed to look up [`IrFutureConventions`](crate::market::conventions::defs::IrFutureConventions)\nfrom the convention registry."
@@ -7542,7 +7683,7 @@ export default [
   {
     "path": "#/$defs/d_fa1f99a63e484452eafa",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RollRule",
-    "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode. The IMM modes\nforce a quarterly grid: the schedule frequency and stub rule configured on\n[`ScheduleParams`] are overridden with quarterly / short-back, matching\n`ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates\n  for rate, currency, and equity index futures).\n- **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll\n  dates). When the start date is not itself a roll date, the first period\n  accrues from the roll date immediately **preceding** the start (standard\n  front accrual per the ISDA Big Bang Protocol, April 2009).\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::specs::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)"
+    "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode. The IMM modes\nforce a quarterly grid: the schedule frequency and stub rule configured on\n[`ScheduleParams`] are overridden with quarterly / short-back, matching\n`ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates\n  for rate, currency, and equity index futures). Cashflow schedules retain\n  the contractual maturity as a short final stub when it is off-grid.\n- **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll\n  dates). When the start date is not itself a roll date, the first period\n  accrues from the roll date immediately **preceding** the start (standard\n  front accrual per the ISDA Big Bang Protocol, April 2009).\n  Interior coupon or payment-program windows start at their declared\n  boundary; front accrual is applied only once at the instrument start.\n\nExplicit roll grids cannot be combined with `end_of_month`. ACT/ACT ICMA\nsupports the CDS twentieth grid; third-Wednesday IMM with ACT/ACT ICMA is\nrejected because the available ICMA reference calculation requires nominal\nmonth-grid coupons.\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::specs::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)"
   },
   {
     "path": "#/$defs/d_fa1f99a63e484452eafa/oneOf/0",
@@ -7561,6 +7702,48 @@ export default [
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RollRule/oneOf/2",
     "const": "cds_imm",
     "description": "CDS IMM dates: 20th of Mar/Jun/Sep/Dec with post-Big-Bang front accrual."
+  },
+  {
+    "path": "#/$defs/d_fb5d44c23c59cc156917",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ForwardCurveTransform"
+  },
+  {
+    "path": "#/$defs/d_fb5d44c23c59cc156917/properties/adjustment",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ForwardCurveTransform/properties/adjustment",
+    "description": "Cumulative additive rate adjustment in source time coordinates.",
+    "ref": "#/$defs/PiecewiseLinearAdjustment",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PiecewiseLinearAdjustment"
+  },
+  {
+    "path": "#/$defs/d_fb5d44c23c59cc156917/properties/offset",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ForwardCurveTransform/properties/offset",
+    "description": "Current curve origin in the source curve's year-fraction coordinates.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_fb5d44c23c59cc156917/properties/scale",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ForwardCurveTransform/properties/scale",
+    "description": "Accumulated parallel multiplicative factor on the source interpolation.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_fb5d44c23c59cc156917/properties/source_points",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ForwardCurveTransform/properties/source_points",
+    "description": "Original interpolation pillars, independent of current curve samples."
+  },
+  {
+    "path": "#/$defs/d_fb5d44c23c59cc156917/properties/source_points/items",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ForwardCurveTransform/properties/source_points/items"
+  },
+  {
+    "path": "#/$defs/d_fb5d44c23c59cc156917/properties/source_points/items/prefixItems/0",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ForwardCurveTransform/properties/source_points/items/prefixItems/0",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_fb5d44c23c59cc156917/properties/source_points/items/prefixItems/1",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ForwardCurveTransform/properties/source_points/items/prefixItems/1",
+    "format": "double"
   },
   {
     "path": "#/$defs/d_fc123a39e4a8423ed13b",

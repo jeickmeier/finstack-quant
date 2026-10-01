@@ -3,6 +3,7 @@
 use finstack_quant_core::dates::{adjust, Date, DateExt, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
+use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurfaceAxis};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::PriceId;
 use finstack_quant_core::InputError;
@@ -16,7 +17,7 @@ use crate::instruments::fixed_income::convertible::{
 use crate::metrics::bump_discount_curve_parallel;
 use finstack_quant_models::TreeGreeks;
 
-use super::tsiveriotis_zhang::{TsiveriotisZhangEngine, TzMarketInputs};
+use super::tsiveriotis_zhang::{terminal_payoff, TsiveriotisZhangEngine, TzMarketInputs};
 use super::valuator::ConvertibleBondValuator;
 
 /// Compute the conversion value for any conversion policy given the spot price.
@@ -243,6 +244,8 @@ fn resolve_volatility(
         Err(err) => return Err(err),
     }
     let surface = ctx.get_surface(vol_surface_id)?;
+    surface.require_quote_type(VolQuoteType::BlackLognormal)?;
+    surface.require_secondary_axis(VolSurfaceAxis::Strike)?;
     Ok(finstack_quant_models::volatility::get_surface_vol_clamped(
         &surface,
         time_to_maturity,
@@ -307,7 +310,13 @@ fn price_convertible_bond_with_inputs(
             .map(|cf| cf.amount.amount())
             .sum();
 
-        let redemption_value = bond.notional.amount() + maturity_coupon;
+        let redemption_value = bond
+            .call_put
+            .iter()
+            .flat_map(|schedule| &schedule.puts)
+            .filter(|put| put.start <= bond.maturity && bond.maturity <= put.end)
+            .map(|put| bond.notional.amount() * put.price_pct_of_par / 100.0)
+            .fold(bond.notional.amount(), f64::max);
         let conversion_value = compute_conversion_value(bond, inputs.spot)?;
 
         let is_mandatory = matches!(
@@ -334,13 +343,14 @@ fn price_convertible_bond_with_inputs(
                 ConversionEvent::QualifiedIpo | ConversionEvent::ChangeOfControl,
             ) => false,
         };
-        let payoff = if is_mandatory && can_convert {
-            conversion_value
-        } else if can_convert {
-            redemption_value.max(conversion_value)
-        } else {
-            redemption_value
-        };
+        let (payoff, _) = terminal_payoff(
+            conversion_value,
+            redemption_value,
+            maturity_coupon,
+            can_convert,
+            is_mandatory,
+            0.0,
+        );
 
         return Money::new(payoff, bond.notional.currency());
     }
@@ -733,4 +743,49 @@ pub(super) fn accrual_index(
             frequency,
         },
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use finstack_quant_core::market_data::surfaces::VolSurface;
+
+    #[test]
+    fn volatility_resolution_rejects_incompatible_surface_contracts() {
+        let base = VolSurface::builder("EQUITY-VOL")
+            .expiries(&[1.0])
+            .strikes(&[100.0])
+            .row(&[0.2])
+            .build()
+            .expect("Black surface");
+        let market = MarketContext::new().insert_surface(base.clone());
+        assert_eq!(
+            resolve_volatility(&market, "EQUITY-VOL", 1.0, 100.0).expect("volatility"),
+            0.2
+        );
+
+        let incompatible = [
+            (
+                base.clone()
+                    .with_quote_type(VolQuoteType::Normal)
+                    .expect("normal surface"),
+                "black_lognormal",
+            ),
+            (
+                base.clone()
+                    .with_displacements(&[10.0])
+                    .expect("shifted surface"),
+                "black_lognormal",
+            ),
+            (base.with_secondary_axis(VolSurfaceAxis::Tenor), "strike"),
+        ];
+        for (surface, expected) in incompatible {
+            let invalid_market = market.clone().insert_surface(surface);
+            let error = resolve_volatility(&invalid_market, "EQUITY-VOL", 1.0, 100.0)
+                .expect_err("convertible tree requires unshifted Black strike surfaces");
+            let message = error.to_string();
+            assert!(message.contains("EQUITY-VOL"), "{message}");
+            assert!(message.contains(expected), "{message}");
+        }
+    }
 }

@@ -17,6 +17,40 @@ test('COS rejects an empty expansion', () => {
   assert.throws(() => facade.models.bsCosPrice(100, 100, 0.05, 0, 0.2, 1, true, 0));
 });
 
+test('COS reports invalid market inputs as exceptions without a panic', () => {
+  for (const invalid of [NaN, Infinity, -100, 0]) {
+    for (const isCall of [true, false]) {
+      assert.throws(() => facade.models.bsCosPrice(invalid, 100, 0.05, 0, 0.2, 1, isCall), /spot/);
+      assert.throws(
+        () => facade.models.bsCosPrice(100, invalid, 0.05, 0, 0.2, 1, isCall),
+        /strike/
+      );
+    }
+  }
+  assert.throws(
+    () => facade.models.vgCosPrice(100, 100, 0.05, 0, -0.2, -0.1, 0.2, 1, true),
+    /sigma/
+  );
+  assert.throws(
+    () => facade.models.mertonJumpCosPrice(100, 100, 0.05, 0, 0.2, -0.1, 0.1, -0.1, 1, true),
+    /lambda/
+  );
+});
+
+test('SABR diagnostics accept a flat smile on uneven strikes', () => {
+  const params = new facade.models.volatility.SabrParameters(0.2, 1, 0, 0);
+  const smile = new facade.models.volatility.SabrSmile(params, 100, 1);
+  try {
+    const result = smile.arbitrageDiagnostics([99, 100, 120]);
+    assert.equal(result.arbitrage_free, true);
+    assert.deepEqual(result.butterfly_violations, []);
+    assert.throws(() => smile.arbitrageDiagnostics([100, 99, 120]), /ascending/);
+  } finally {
+    smile.free();
+    params.free();
+  }
+});
+
 test('seasoned lookbacks match independent continuous-maximum payoff values', () => {
   for (const [strikeType, isCall, expected] of [
     ['fixed', true, 24.326644378668],

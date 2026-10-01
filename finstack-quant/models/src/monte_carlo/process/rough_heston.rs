@@ -23,7 +23,8 @@
 //! The driving noise W̃ is a standard Brownian motion; the fractional memory
 //! structure arises from the `(t − s)^{α−1}` kernel.  Consequently the rough
 //! Heston engine does **not** require the fBM generator infrastructure — each
-//! step consumes two standard normal variates.
+//! step consumes three independent standard normals: two Brownian increments
+//! and a bridge innovation for the singular near-field kernel integral.
 //!
 //! # Design Notes
 //!
@@ -68,7 +69,7 @@
 //!
 //! let process = RoughHestonProcess::new(params);
 //! assert_eq!(process.dim(), 2);
-//! assert_eq!(process.num_factors(), 2);
+//! assert_eq!(process.num_factors(), 3);
 //! ```
 
 use super::super::paths::ProcessParams;
@@ -183,8 +184,9 @@ impl RoughHestonParams {
 ///
 /// State: \[S, V\] (spot price and instantaneous variance).
 ///
-/// Factors: 2 — both are standard normal variates (the fractional memory
-/// structure is encoded in the Volterra kernel, **not** via fBM increments).
+/// Noise factors: 3 — spot and variance Brownian increments, plus an
+/// independent bridge normal for the near-field kernel integral. The captured
+/// state still has two entries; fractional memory lives in the discretization.
 #[derive(Debug, Clone)]
 pub struct RoughHestonProcess {
     params: RoughHestonParams,
@@ -208,7 +210,7 @@ impl StochasticProcess for RoughHestonProcess {
     }
 
     fn num_factors(&self) -> usize {
-        2 // Two standard Brownian motions (no fBM needed)
+        3 // Two Brownian motions and one independent kernel bridge innovation
     }
 
     /// Formal drift — mirrors classical Heston coefficients for metadata.
@@ -285,6 +287,28 @@ mod tests {
         }
         .validate();
         assert!(params.is_ok());
+    }
+
+    #[test]
+    fn parameter_json_rejects_invalid_nested_hurst() {
+        let params = RoughHestonParams {
+            r: 0.05,
+            q: 0.02,
+            hurst: make_hurst(0.1),
+            kappa: 2.0,
+            theta: 0.04,
+            sigma_v: 0.3,
+            rho: -0.7,
+            v0: 0.04,
+        };
+        let mut json = serde_json::to_value(&params).expect("serialize parameters");
+        let restored: RoughHestonParams =
+            serde_json::from_value(json.clone()).expect("valid nested Hurst exponent");
+        assert_eq!(restored.hurst, params.hurst);
+        for h in [-0.5, 0.0, 1.0, 1.5] {
+            json["hurst"]["h"] = serde_json::json!(h);
+            assert!(serde_json::from_value::<RoughHestonParams>(json.clone()).is_err());
+        }
     }
 
     #[test]
@@ -470,7 +494,7 @@ mod tests {
         );
 
         assert_eq!(process.dim(), 2);
-        assert_eq!(process.num_factors(), 2);
+        assert_eq!(process.num_factors(), 3);
     }
 
     #[test]

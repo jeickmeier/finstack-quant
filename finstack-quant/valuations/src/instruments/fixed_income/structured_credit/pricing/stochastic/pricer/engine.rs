@@ -17,6 +17,7 @@ use finstack_quant_core::math::stats::OnlineStats;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{HashMap, Result};
 use finstack_quant_models::correlation::{CopulaSpec, LatentFactorSpec, RecoverySpec};
+use finstack_quant_models::credit::pool::prepayment::PrepaymentState;
 use finstack_quant_models::credit::pool::{
     MacroCreditFactors, PerNameCopulaDefault, StochasticDefault, StochasticDefaultSpec,
     StochasticPrepaySpec, StochasticPrepayment,
@@ -48,6 +49,9 @@ const PER_NAME_SEED_SALT: u64 = 0x5350_4552_4E41_4D45; // "SPERNAME"
 /// default results, are unchanged.
 const PREPAY_FACTOR_SEED_SALT: u64 = 0x5052_4550_4159_5A32; // "PREPAYZ2"
 
+/// Independent stream for initial prepayment regimes and monthly transitions.
+const PREPAY_REGIME_SEED_SALT: u64 = 0x5052_4550_4159_5247; // "PREPAYRG"
+
 /// Seed salt for the instrument-collateral process draws.
 ///
 /// Revolver spread and utilization shocks of instrument pools are drawn from
@@ -76,6 +80,25 @@ pub(crate) struct StochasticPricer {
     config: StochasticPricerConfig,
 }
 
+/// Mutable prepayment state isolated to one simulation path.
+struct PrepaymentPath {
+    burnout: f64,
+    model_state: PrepaymentState,
+    transition_rng: PhiloxRng,
+    mirror_draws: bool,
+}
+
+impl PrepaymentPath {
+    fn next_uniform(&mut self) -> f64 {
+        let uniform = self.transition_rng.next_u01();
+        if self.mirror_draws {
+            1.0 - uniform
+        } else {
+            uniform
+        }
+    }
+}
+
 /// Loop-invariant state built once per pricing run and shared read-only
 /// across all paths.
 ///
@@ -84,7 +107,7 @@ pub(crate) struct StochasticPricer {
 /// loop, where 10k paths × 360 months would mean millions of identical
 /// `Box<dyn>` allocations plus deep hazard-curve clones — is bit-identical:
 /// every trait method takes `&self` and no model carries cross-call state
-/// (path burnout lives in the caller's `&mut f64`).
+/// (burnout and latent regimes live in the caller's [`PrepaymentPath`]).
 pub(crate) struct PreparedRun {
     /// Default model from
     /// [`build_with_seasoning_offset`](StochasticDefaultSpec::build_with_seasoning_offset)
@@ -973,9 +996,8 @@ impl StochasticPricer {
         })? as usize;
         let months_per_period = months_per_period.max(1);
         let payment_periods = self.payment_period_count(instrument);
-        // Burnout is PATH state — it accumulates across the whole
-        // path, so it is seeded once here and advanced month by month.
-        let mut burnout = 1.0_f64;
+        // Burnout and the latent regime persist across payment periods.
+        let mut prepayment = self.prepayment_path(prepared, path);
         let mut shocks = Vec::with_capacity(payment_periods);
 
         for period in 0..payment_periods {
@@ -998,7 +1020,7 @@ impl StochasticPricer {
                 start as u32,
                 month_slice,
                 prepay_slice,
-                &mut burnout,
+                &mut prepayment,
             );
             shock.systematic_z = self.period_systematic_z(prepared, month_slice);
             shock.per_name = self.copula_period_input(prepared, start as u32, month_slice);
@@ -1006,6 +1028,28 @@ impl StochasticPricer {
         }
 
         Ok(shocks)
+    }
+
+    fn prepayment_path(&self, prepared: &PreparedRun, path: (usize, bool)) -> PrepaymentPath {
+        let (path_index, antithetic) = path;
+        let stream_index = if antithetic {
+            path_index / 2
+        } else {
+            path_index
+        };
+        let mut prepayment = PrepaymentPath {
+            burnout: 1.0,
+            model_state: PrepaymentState::default(),
+            transition_rng: PhiloxRng::new(self.config.tree_config.seed ^ PREPAY_REGIME_SEED_SALT)
+                .substream(stream_index as u64),
+            mirror_draws: antithetic && path_index % 2 == 1,
+        };
+        if let Some(model) = prepared.prepay_model.as_deref() {
+            let uniform = prepayment.next_uniform();
+            prepayment.model_state =
+                model.initial_state(self.config.tree_config.seasoning_months, uniform);
+        }
+        prepayment
     }
 
     /// Build the per-name copula plan for one payment period.
@@ -1073,10 +1117,16 @@ impl StochasticPricer {
         start_month: u32,
         factors: &[f64],
         prepay_factors: &[f64],
-        burnout: &mut f64,
+        prepayment: &mut PrepaymentPath,
     ) -> PeriodPoolShock {
         if factors.is_empty() {
-            return self.monthly_shock(prepared, start_month.saturating_add(1), 0.0, 0.0, burnout);
+            return self.monthly_shock(
+                prepared,
+                start_month.saturating_add(1),
+                0.0,
+                0.0,
+                prepayment,
+            );
         }
 
         let mut prepay_survival = 1.0;
@@ -1089,7 +1139,7 @@ impl StochasticPricer {
                 start_month.saturating_add(offset as u32 + 1),
                 *factor,
                 prepay_factor,
-                burnout,
+                prepayment,
             );
             prepay_survival *= 1.0 - shock.smm;
             default_survival *= 1.0 - shock.mdr;
@@ -1110,7 +1160,7 @@ impl StochasticPricer {
         month_offset: u32,
         z: f64,
         z_prepay: f64,
-        burnout: &mut f64,
+        prepayment: &mut PrepaymentPath,
     ) -> PeriodPoolShock {
         let stochastic = self.has_stochastic_rates();
         let factor = if stochastic { z } else { 0.0 };
@@ -1127,7 +1177,7 @@ impl StochasticPricer {
         let prepay_factors = [prepay_factor];
 
         PeriodPoolShock::pool_wide(
-            self.conditional_smm(prepared, seasoning, &prepay_factors, burnout),
+            self.conditional_smm(prepared, seasoning, &prepay_factors, prepayment),
             self.conditional_mdr(prepared, seasoning, &factor_path),
             // Recovery is a CREDIT quantity and stays on the credit factor, so
             // defaults and recoveries continue to co-move as the sign
@@ -1153,20 +1203,23 @@ impl StochasticPricer {
         prepared: &PreparedRun,
         seasoning: u32,
         factors: &[f64],
-        burnout: &mut f64,
+        prepayment: &mut PrepaymentPath,
     ) -> f64 {
         if let Some(model) = prepared.prepay_model.as_deref() {
+            let uniform = prepayment.next_uniform();
             let realized = model
-                .conditional_smm(
+                .sample_smm(
                     seasoning,
                     factors,
                     self.config.tree_config.market_refi_rate,
-                    *burnout,
+                    prepayment.burnout,
+                    &mut prepayment.model_state,
+                    uniform,
                 )
                 .clamp(0.0, 0.50);
             if model.has_burnout() {
                 let expected = model.expected_smm(seasoning);
-                *burnout = model.update_burnout(*burnout, realized, expected);
+                prepayment.burnout = model.update_burnout(prepayment.burnout, realized, expected);
             }
             return realized;
         }
@@ -1707,7 +1760,8 @@ mod tests {
             test_date(),
             Date::from_calendar_date(2030, Month::January, 1).expect("valid date"),
             "USD-OIS",
-        );
+        )
+        .expect("valid structured-credit dates");
         deal.calendar_id = Some("nyse".into());
         deal
     }
@@ -1788,6 +1842,7 @@ mod tests {
             maturity,
             "USD-OIS",
         )
+        .expect("valid structured-credit dates")
         .with_calendar_id("nyse");
         instrument.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
         instrument.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -2100,7 +2155,15 @@ mod tests {
                 .expect("prepared run");
             let shocks: Vec<_> = zs
                 .iter()
-                .map(|&z| pricer.monthly_shock(&prepared, 36, z, z, &mut 1.0))
+                .map(|&z| {
+                    pricer.monthly_shock(
+                        &prepared,
+                        36,
+                        z,
+                        z,
+                        &mut pricer.prepayment_path(&prepared, (0, false)),
+                    )
+                })
                 .collect();
             let mdrs: Vec<f64> = shocks.iter().map(|s| s.mdr).collect();
             let recoveries: Vec<f64> = shocks.iter().map(|s| s.recovery_rate).collect();
@@ -2264,6 +2327,7 @@ mod per_name_copula_tests {
             maturity(),
             "USD-OIS",
         )
+        .expect("valid structured-credit dates")
         .with_calendar_id("nyse");
         sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
         sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -2893,16 +2957,17 @@ mod per_name_copula_tests {
             .prepare_run(&deal, &MarketContext::new())
             .expect("prepared run");
         let factors: Vec<f64> = (0..24).map(|_| 1.5_f64).collect();
-        let mut burnout = 1.0_f64;
+        let mut prepayment = pricer.prepayment_path(&prepared, (0, false));
         let _ = pricer
             .path_shocks_from_factors(&deal, &factors, (0, false), &prepared)
             .expect("path shocks");
 
         // Exercise the month loop directly so the state is observable.
         for month in 1..=24u32 {
-            let _ = pricer.monthly_shock(&prepared, month, 1.5, 1.5, &mut burnout);
+            let _ = pricer.monthly_shock(&prepared, month, 1.5, 1.5, &mut prepayment);
         }
 
+        let burnout = prepayment.burnout;
         assert!(
             burnout < 1.0,
             "after 24 months of above-expectation prepayment the burnout factor \
@@ -2910,6 +2975,63 @@ mod per_name_copula_tests {
              means the channel is still inert."
         );
         assert!(burnout > 0.0, "burnout must stay in (0, 1], got {burnout}");
+    }
+
+    #[test]
+    fn regime_switching_paths_preserve_monthly_markov_transitions() {
+        let deal = clo_deal(24);
+        let mut cfg = copula_config(0.06, 0.20, 24, PoolGranularity::PerName, 16);
+        cfg.tree_config.seasoning_months = 0;
+        cfg.tree_config.prepay_spec = StochasticPrepaySpec::RegimeSwitching {
+            low_cpr: 0.04,
+            high_cpr: 0.80,
+            transition_up: 0.10,
+            transition_down: 0.20,
+            factor_loading: 0.4,
+            cpr_volatility: 0.0,
+        };
+        let pricer = StochasticPricer::new(cfg);
+        let prepared = pricer
+            .prepare_run(&deal, &MarketContext::new())
+            .expect("prepared run");
+        let low = 1.0 - 0.96_f64.powf(1.0 / 12.0);
+        let high = 1.0 - 0.20_f64.powf(1.0 / 12.0);
+        let mut first_sum = 0.0;
+        let mut high_months = 0;
+        let mut high_to_high = 0;
+        let paths = 4_000;
+        for path_index in 0..paths {
+            let mut prepayment = pricer.prepayment_path(&prepared, (path_index, false));
+            let mut previous_high = false;
+            for month in 1..=12 {
+                let smm = pricer
+                    .monthly_shock(&prepared, month, 0.0, 0.0, &mut prepayment)
+                    .smm;
+                assert!((smm - low).abs() < 1e-14 || (smm - high).abs() < 1e-14);
+                let current_high = (smm - high).abs() < 1e-14;
+                if month == 1 {
+                    first_sum += smm;
+                } else if previous_high {
+                    high_months += 1;
+                    high_to_high += usize::from(current_high);
+                }
+                previous_high = current_high;
+            }
+        }
+        let first_mean = first_sum / paths as f64;
+        assert!((first_mean - (0.9 * low + 0.1 * high)).abs() < 0.002);
+        assert!((high_to_high as f64 / high_months as f64 - 0.8).abs() < 0.02);
+
+        // Path-indexed streams reproduce exactly and antithetic uniforms
+        // remain complementary, including the initialization draw.
+        let mut first = pricer.prepayment_path(&prepared, (8, true));
+        let mut repeated = pricer.prepayment_path(&prepared, (8, true));
+        let mut paired = pricer.prepayment_path(&prepared, (9, true));
+        for _ in 0..12 {
+            let uniform = first.next_uniform();
+            assert_eq!(uniform, repeated.next_uniform());
+            assert_eq!(uniform + paired.next_uniform(), 1.0);
+        }
     }
 
     /// `period_factor_scale` hits its analytic limits at φ = 0 and φ = 1.

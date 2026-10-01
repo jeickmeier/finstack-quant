@@ -72,7 +72,7 @@ pub use adi::CraigSneydStepper;
 pub use boundary::BoundaryCondition;
 pub use bridge::BlackScholesPde;
 pub use bridge2d::HestonPde;
-pub use exercise::{ExerciseType, PenaltyExercise};
+pub use exercise::{ExerciseError, ExerciseType, PenaltyExercise};
 pub use grid::{Grid1D, PdeGridError};
 pub use grid2d::Grid2D;
 pub use operator::TridiagOperator;

@@ -150,7 +150,7 @@ pub(crate) fn extract_currency(obj: &Bound<'_, PyAny>) -> PyResult<Currency> {
 
 /// Build the `finstack_quant.core.currency` submodule and register [`PyCurrency`].
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let module = PyModule::new(py, "currency")?;
+    let module = crate::bindings::module_utils::new_submodule(parent, "currency")?;
     module.setattr(
         "__doc__",
         "ISO-4217 currency bindings (finstack-quant-core).",
@@ -171,13 +171,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let all = PyList::new(py, &name_refs)?;
     module.setattr("__all__", all)?;
 
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &module,
-        "currency",
-        "finstack_quant.core",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
 
     Ok(())

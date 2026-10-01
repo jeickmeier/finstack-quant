@@ -79,7 +79,7 @@ pub(crate) fn periodic_risk_free_rate(risk_free_rate: f64, ann_factor: f64) -> f
     if (ann_factor - 1.0).abs() <= f64::EPSILON {
         return risk_free_rate;
     }
-    (1.0 + risk_free_rate).powf(1.0 / ann_factor) - 1.0
+    (risk_free_rate.ln_1p() / ann_factor).exp_m1()
 }
 
 /// Linearly annualized excess return after geometric rf decompounding.
@@ -180,18 +180,34 @@ impl WealthEngine {
         }
     }
 
-    /// Apply one simple return and return the reconstructed wealth level.
+    /// Apply one simple return without reconstructing wealth.
     ///
-    /// Starting wealth is `1`. The returned value is `exp(Σ ln g)` or
-    /// [`f64::NAN`] once a non-finite return has been seen.
-    pub(crate) fn step(&mut self, r: f64) -> f64 {
+    /// Returns at or below `-1.0` use the growth-factor floor. Non-finite
+    /// returns invalidate the current and all subsequent log-growth values.
+    pub(crate) fn step(&mut self, r: f64) {
         if self.invalid || !r.is_finite() {
             self.invalid = true;
-            return f64::NAN;
+            return;
         }
-        let g = (1.0 + r).max(MIN_GROWTH_FACTOR);
-        self.acc.add(g.ln());
-        self.acc.total().exp()
+        let log_growth = if r > -1.0 {
+            r.ln_1p()
+        } else {
+            MIN_GROWTH_FACTOR.ln()
+        };
+        self.acc.add(log_growth);
+    }
+
+    /// Accumulated log growth from starting wealth `1`.
+    ///
+    /// Returns `0.0` before the first observation and [`f64::NAN`] once a
+    /// non-finite return has been seen. Callers can annualize or compare
+    /// wealth in log space without overflowing or rounding small wealth to zero.
+    pub(crate) fn log_growth(&self) -> f64 {
+        if self.invalid {
+            f64::NAN
+        } else {
+            self.acc.total()
+        }
     }
 }
 
@@ -219,7 +235,8 @@ pub(crate) fn comp_sum(returns: &[f64]) -> Vec<f64> {
     let mut engine = WealthEngine::new();
     let mut out = Vec::with_capacity(returns.len());
     for &r in returns {
-        out.push(engine.step(r) - 1.0);
+        engine.step(r);
+        out.push(engine.log_growth().exp_m1());
     }
     out
 }
@@ -248,11 +265,10 @@ pub(crate) fn comp_total(returns: &[f64]) -> f64 {
         return 0.0;
     }
     let mut engine = WealthEngine::new();
-    let mut last = 1.0;
     for &r in returns {
-        last = engine.step(r);
+        engine.step(r);
     }
-    last - 1.0
+    engine.log_growth().exp_m1()
 }
 
 #[cfg(test)]

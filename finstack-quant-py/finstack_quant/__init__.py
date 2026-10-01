@@ -44,9 +44,8 @@ __all__ = [
 ]
 
 # Lazily importable domains. `__all__` also carries `__version__`, which is a
-# plain attribute bound above, and `schema`, which is a compiled submodule with
-# no pure-Python shim package; neither is routed through the package importer.
-_SUBMODULES: frozenset[str] = frozenset(__all__) - {"__version__", "schema"}
+# plain attribute served by `__getattr__` rather than the package importer.
+_SUBMODULES: frozenset[str] = frozenset(__all__) - {"__version__"}
 
 if TYPE_CHECKING:
     # Declared for type checkers and IDEs; resolved lazily via `__getattr__`.
@@ -81,17 +80,6 @@ def __getattr__(name: str) -> ModuleType | str:
 
         globals()["__version__"] = version
         return version
-    if name == "schema":
-        # A compiled submodule, not a shim package, so it is bound from the
-        # extension directly and registered under its dotted path so that
-        # `import finstack_quant.schema` works as well as attribute access.
-        import sys as _sys
-
-        from finstack_quant.finstack_quant import schema as _schema
-
-        globals()["schema"] = _schema
-        _sys.modules.setdefault("finstack_quant.schema", _schema)
-        return _schema
     if name in _SUBMODULES:
         mod = _importlib.import_module(f".{name}", __name__)
         globals()[name] = mod

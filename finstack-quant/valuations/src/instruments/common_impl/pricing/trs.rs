@@ -36,7 +36,7 @@
 
 use crate::instruments::common_impl::parameters::legs::FinancingLegSpec;
 use crate::instruments::common_impl::parameters::trs_common::TrsScheduleSpec;
-use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, DayCountContext};
+use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, DayCountContext, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
@@ -76,11 +76,10 @@ fn signed_year_fraction(
 ///
 /// For compounded periods that have already started
 /// (`period_start <= as_of < period_end`), the function splices realized daily
-/// fixings (from `fixings`) with projected overnight forwards, matching the
-/// behaviour of `compounded_spliced_projection` used by `pv_floating_leg`.
-/// Fully-future periods (`period_start > as_of`) are projected entirely from the
-/// forward curve via `compounded_forward_projection`. A missing realized fixing
-/// for an in-progress period is a hard error (not a silent projection).
+/// fixings (from `fixings`) with projected overnight forwards through the shared
+/// overnight coupon projector. Fully-future periods (`period_start > as_of`)
+/// use the same projector with entirely projected observations. Missing realized
+/// fixings for an in-progress period are errors.
 /// Projected TRS financing coupon for one accrual window.
 struct FinancingPeriodProjection {
     /// Index rate excluding spread.
@@ -126,6 +125,7 @@ fn financing_period_projection(
     period_start: Date,
     period_end: Date,
     period_year_fraction: f64,
+    coupon_frequency: Tenor,
     as_of: Date,
     calendar_id: &str,
     currency: Currency,
@@ -145,7 +145,7 @@ fn financing_period_projection(
                     as_of,
                 )?
             } else {
-                rate_between_on_dates(fwd, period_start, period_end)?
+                rate_between_on_dates(fwd, period_start, period_end, period_year_fraction)?
             };
             FinancingPeriodProjection::new(
                 rate,
@@ -189,7 +189,14 @@ fn financing_period_projection(
                 accrual_start,
                 accrual_end,
                 day_count: financing.day_count,
-                coupon_frequency: None,
+                coupon_frequency: Some(coupon_frequency),
+                coupon_period: if financing.day_count
+                    == finstack_quant_core::dates::DayCount::Act365L
+                {
+                    (period_start, period_end)
+                } else {
+                    (accrual_start, accrual_end)
+                },
                 compounding: &compounding,
                 fixing_calendar: calendar,
                 compounded_spread: 0.0,
@@ -213,6 +220,7 @@ fn financing_period_rate(
     period_start: Date,
     period_end: Date,
     period_year_fraction: f64,
+    coupon_frequency: Tenor,
     as_of: Date,
     calendar_id: &str,
     currency: Currency,
@@ -224,6 +232,7 @@ fn financing_period_rate(
         period_start,
         period_end,
         period_year_fraction,
+        coupon_frequency,
         as_of,
         calendar_id,
         currency,
@@ -407,7 +416,7 @@ impl TrsEngine {
         let fwd = market.get_forward(financing.forward_curve_id.as_str())?;
         // For compounded legs, realized fixings for in-progress periods
         // are sourced from MarketContext using the canonical `FIXING:{forward_curve_id}`
-        // key.  The same pattern is used by `basis_swap` / `pv_floating_leg`.
+        // key, shared by the basis-swap and overnight coupon projectors.
         // `get_fixing_series` returns `None` (not an error) when absent; the
         // error is deferred to `financing_period_rate` when a fixing is actually
         // required for an in-progress period.
@@ -420,7 +429,6 @@ impl TrsEngine {
 
         let mut total_pv = NeumaierAccumulator::new();
         let currency = notional.currency();
-        let ctx = DayCountContext::default();
         let spread_decimal = financing.spread_bp.to_f64().ok_or_else(|| {
             finstack_quant_core::Error::Validation(format!(
                 "TRS financing spread_bp ({}) is not representable as f64",
@@ -439,6 +447,12 @@ impl TrsEngine {
 
             // Use the financing leg's day count for accrual (not the schedule DC
             // which governs date generation).
+            let ctx = DayCountContext {
+                frequency: Some(schedule.params.frequency),
+                coupon_period: (financing.day_count == DayCount::Act365L)
+                    .then_some((period_start, period_end)),
+                ..Default::default()
+            };
             let yf = financing
                 .day_count
                 .year_fraction(period_start, period_end, ctx)?;
@@ -454,6 +468,7 @@ impl TrsEngine {
                 period_start,
                 period_end,
                 yf,
+                schedule.params.frequency,
                 as_of,
                 schedule.params.calendar_id.as_str(),
                 currency,
@@ -514,7 +529,6 @@ impl TrsEngine {
         let period_schedule = schedule.period_schedule()?;
 
         let mut annuity = NeumaierAccumulator::new();
-        let ctx = DayCountContext::default();
 
         for i in 1..period_schedule.dates.len() {
             let period_start = period_schedule.dates[i - 1];
@@ -528,6 +542,12 @@ impl TrsEngine {
             // Term legs accrue on the schedule year fraction. Overnight legs
             // use the projector fraction so the spread term matches
             // `unsigned_coupon` (`N × spread × proj_yf`).
+            let ctx = DayCountContext {
+                frequency: Some(schedule.params.frequency),
+                coupon_period: (financing.day_count == DayCount::Act365L)
+                    .then_some((period_start, period_end)),
+                ..Default::default()
+            };
             let schedule_yf = financing
                 .day_count
                 .year_fraction(period_start, period_end, ctx)?;
@@ -538,6 +558,7 @@ impl TrsEngine {
                 period_start,
                 period_end,
                 schedule_yf,
+                schedule.params.frequency,
                 as_of,
                 schedule.params.calendar_id.as_str(),
                 notional.currency(),
@@ -588,7 +609,6 @@ impl TrsEngine {
         let period_schedule = schedule.period_schedule()?;
 
         let mut total_pv = NeumaierAccumulator::new();
-        let ctx = DayCountContext::default();
 
         for i in 1..period_schedule.dates.len() {
             let period_start = period_schedule.dates[i - 1];
@@ -599,6 +619,12 @@ impl TrsEngine {
                 continue;
             }
 
+            let ctx = DayCountContext {
+                frequency: Some(schedule.params.frequency),
+                coupon_period: (financing.day_count == DayCount::Act365L)
+                    .then_some((period_start, period_end)),
+                ..Default::default()
+            };
             let yf = financing
                 .day_count
                 .year_fraction(period_start, period_end, ctx)?;
@@ -613,6 +639,7 @@ impl TrsEngine {
                 period_start,
                 period_end,
                 yf,
+                schedule.params.frequency,
                 as_of,
                 schedule.params.calendar_id.as_str(),
                 notional.currency(),
@@ -637,9 +664,7 @@ mod tests {
     use crate::instruments::common_impl::parameters::legs::FinancingLegSpec;
     use crate::instruments::common_impl::parameters::trs_common::TrsScheduleSpec;
     use crate::instruments::common_impl::pricing::swap_legs;
-    use crate::instruments::common_impl::pricing::time::{
-        rate_between_on_dates, relative_df_discount_curve,
-    };
+    use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
     use crate::instruments::rates::irs::FloatingLegCompounding;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{
@@ -655,6 +680,121 @@ mod tests {
 
     fn date(y: i32, m: u8, d: u8) -> Date {
         Date::from_calendar_date(y, Month::try_from(m).expect("month"), d).expect("date")
+    }
+
+    #[test]
+    fn act365l_financing_coupons_preserve_actual_periods_and_the_pv_spread_identity() {
+        for (start, end, frequency, stub, denominator) in [
+            (
+                date(2023, 3, 1),
+                date(2024, 3, 1),
+                Tenor::annual(),
+                StubKind::ShortFront,
+                366.0,
+            ),
+            (
+                date(2023, 12, 1),
+                date(2024, 3, 1),
+                Tenor::quarterly(),
+                StubKind::ShortFront,
+                366.0,
+            ),
+            (
+                date(2024, 3, 1),
+                date(2025, 1, 1),
+                Tenor::annual(),
+                StubKind::ShortFront,
+                365.0,
+            ),
+            (
+                date(2023, 12, 1),
+                date(2025, 1, 1),
+                Tenor::annual(),
+                StubKind::LongFront,
+                366.0,
+            ),
+        ] {
+            let as_of = start.previous_day().expect("valuation date");
+            let schedule = TrsScheduleSpec::from_params(
+                start,
+                end,
+                ScheduleParams {
+                    frequency,
+                    day_count: DayCount::Act365L,
+                    business_day_convention: BusinessDayConvention::Unadjusted,
+                    calendar_id: "weekends_only".into(),
+                    stub,
+                    end_of_month: false,
+                    payment_lag_days: 0,
+                    adjust_accrual_dates: false,
+                    roll_rule: crate::cashflow::builder::specs::RollRule::None,
+                },
+            );
+            let market = MarketContext::new()
+                .insert(
+                    DiscountCurve::builder("DISC")
+                        .base_date(as_of)
+                        .day_count(DayCount::Act365F)
+                        .knots([(0.0, 1.0), (3.0, 1.0)])
+                        .build()
+                        .expect("flat discount"),
+                )
+                .insert(
+                    // Quote the tested coupon span in the curve's ACT/365F
+                    // time so its simple period rate is exactly 5%.
+                    ForwardCurve::builder("TERM", (end - start).whole_days() as f64 / 365.0)
+                        .base_date(as_of)
+                        .day_count(DayCount::Act365F)
+                        .knots([(0.0, 0.05), (3.0, 0.05)])
+                        .build()
+                        .expect("flat forward"),
+                );
+            let notional = Money::from((1_000_000_i64, Currency::USD));
+            let total_fraction = (end - start).whole_days() as f64 / denominator;
+            for compounding in [
+                FloatingLegCompounding::Simple,
+                FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
+            ] {
+                let financing = FinancingLegSpec {
+                    discount_curve_id: CurveId::new("DISC"),
+                    forward_curve_id: CurveId::new("TERM"),
+                    spread_bp: Decimal::from(100),
+                    day_count: DayCount::Act365L,
+                    compounding,
+                };
+                let annuity =
+                    TrsEngine::financing_annuity(&financing, &schedule, notional, &market, as_of)
+                        .expect("ACT/365L annuity");
+                let float_pv = TrsEngine::pv_financing_float_only(
+                    &financing, &schedule, notional, &market, as_of,
+                )
+                .expect("ACT/365L floating PV");
+                let total_pv =
+                    TrsEngine::pv_financing_leg(&financing, &schedule, notional, &market, as_of)
+                        .expect("ACT/365L financing PV");
+                let expected_float = if matches!(compounding, FloatingLegCompounding::Simple) {
+                    50_000.0 * total_fraction
+                } else {
+                    let mut factor = 1.0;
+                    let mut day = start;
+                    while day < end {
+                        let next = day
+                            .add_weekdays(1)
+                            .expect("next overnight interval")
+                            .min(end);
+                        factor *= 1.0 + 0.05 * (next - day).whole_days() as f64 / denominator;
+                        day = next;
+                    }
+                    1_000_000.0 * (factor - 1.0)
+                };
+                assert!((annuity / notional.amount() - total_fraction).abs() < 1e-14);
+                assert!(
+                    (float_pv - expected_float).abs() < 1e-7,
+                    "{start} -> {end}, {compounding}: expected {expected_float}, got {float_pv}"
+                );
+                assert!((total_pv.amount() - float_pv - 0.01 * annuity).abs() < 1e-7);
+            }
+        }
     }
 
     struct FlatReturnModel {
@@ -822,7 +962,7 @@ mod tests {
     }
 
     #[test]
-    fn trs_financing_leg_uses_curve_time_for_forward_rates() {
+    fn trs_financing_leg_uses_curve_clock_and_contractual_accrual() {
         let as_of = date(2024, 12, 31);
         let start = date(2025, 1, 1);
         let end = date(2026, 1, 1);
@@ -880,6 +1020,7 @@ mod tests {
         let period_schedule = schedule.period_schedule().expect("schedule");
         let mut expected = 0.0;
         let mut naive = 0.0;
+        let mut curve_accrual_pv = 0.0;
         let ctx_day_count = DayCountContext::default();
 
         for i in 1..period_schedule.dates.len() {
@@ -890,9 +1031,18 @@ mod tests {
                 .day_count
                 .year_fraction(period_start, period_end, ctx_day_count)
                 .expect("yf");
-            let fwd_rate = rate_between_on_dates(&fwd, period_start, period_end).expect("fwd");
+            let growth = fwd
+                .df_on_date_curve(period_start)
+                .expect("start projection DF")
+                / fwd.df_on_date_curve(period_end).expect("end projection DF")
+                - 1.0;
             let df = relative_df_discount_curve(&disc, as_of, period_end).expect("df");
-            expected += 1_000_000.0 * fwd_rate * yf * df;
+            expected += 1_000_000.0 * growth * df;
+            let curve_accrual = fwd
+                .day_count()
+                .year_fraction(period_start, period_end, ctx_day_count)
+                .expect("curve accrual");
+            curve_accrual_pv += 1_000_000.0 * growth / curve_accrual * yf * df;
 
             let t_start = schedule
                 .params
@@ -912,6 +1062,10 @@ mod tests {
         let diff = (pv.amount() - expected).abs();
         let tol = 1e-8 * 1_000_000.0;
         assert!(diff < tol, "PV should use curve time: diff={}", diff);
+        assert!(
+            (expected - curve_accrual_pv).abs() > 100.0,
+            "curve clock must not replace contractual coupon accrual"
+        );
         assert!(
             (expected - naive).abs() > 1e-6,
             "Expected curve-based forward/DF to differ from naive time mapping"
@@ -1123,6 +1277,7 @@ mod tests {
             period_start,
             period_end,
             year_fraction,
+            Tenor::quarterly(),
             as_of,
             crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID,
             Currency::USD,
@@ -1140,6 +1295,7 @@ mod tests {
             period_start,
             period_end,
             year_fraction,
+            Tenor::quarterly(),
             as_of,
             crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID,
             Currency::USD,
@@ -1152,8 +1308,9 @@ mod tests {
             &fwd,
             None,
             period_end,
-            period_end.add_months(3),
+            period_end.add_months(3).expect("valid date shift"),
             year_fraction,
+            Tenor::quarterly(),
             as_of,
             crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID,
             Currency::USD,
@@ -1265,6 +1422,7 @@ mod tests {
             start,
             end,
             yf,
+            Tenor::quarterly(),
             start,
             "usny",
             Currency::USD,
@@ -1281,6 +1439,7 @@ mod tests {
             accrual_end: end,
             day_count: DayCount::Act360,
             coupon_frequency: None,
+            coupon_period: (start, end),
             compounding: &compounding,
             fixing_calendar: calendar,
             compounded_spread: 0.0,
@@ -1299,6 +1458,7 @@ mod tests {
             start,
             end,
             0.50,
+            Tenor::quarterly(),
             start,
             "usny",
             Currency::USD,

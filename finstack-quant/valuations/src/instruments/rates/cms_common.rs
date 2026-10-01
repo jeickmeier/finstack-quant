@@ -47,10 +47,9 @@ pub fn cms_tenor_months(tenor: Tenor, label: &str) -> Result<i32> {
 /// Reference swap of a CMS fixing, with its leg conventions resolved.
 ///
 /// Resolution order for every leg field is explicit override >
-/// `index_id` > currency market convention. The default USD CMS reference uses the
-/// registered USD-LIBOR-3M convention (semi-annual 30/360 fixed versus
-/// quarterly ACT/360 floating), distinct from the `USD-SOFR-OIS` index
-/// (annual/annual OIS).
+/// `index_id` > currency market convention. The USD CMS reference requires an
+/// explicitly selected index: use `USD-SOFR-OIS` for SOFR or an explicit
+/// legacy index for historical contracts. Omitting a USD index is an error.
 #[derive(Debug, Clone, Copy)]
 pub struct CmsReferenceSwap<'a> {
     /// Instrument label used in error messages (e.g. `CMS option 'ID'`).
@@ -82,7 +81,11 @@ impl CmsReferenceSwap<'_> {
             return ConventionRegistry::try_global()?.require_rate_index(index_id);
         }
         let id = match self.currency {
-            Currency::USD => "USD-LIBOR-3M",
+            Currency::USD => {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "{} requires explicit index_id for USD CMS (for example USD-SOFR-OIS or a legacy index)", self.label
+                )))
+            },
             Currency::EUR => "EUR-ESTR-OIS",
             Currency::GBP => "GBP-SONIA-OIS",
             Currency::JPY => "JPY-TONAR-OIS",
@@ -286,6 +289,51 @@ pub(crate) fn signed_act365f_year_fraction(start: Date, end: Date) -> Result<f64
     }
 }
 
+/// Value and first two rate derivatives of the payment-to-annuity mapping.
+///
+/// # Arguments
+///
+/// * `rate` - Decimal par swap rate, with `1 + rate / m` strictly positive.
+/// * `tenor` - Positive reference-swap maturity in years.
+/// * `m` - Positive fixed-leg payment frequency in payments per year.
+/// * `delay` - Signed ACT/365F years from reference-swap start to coupon payment.
+pub(crate) fn annuity_weight(rate: f64, tenor: f64, m: f64, delay: f64) -> (f64, f64, f64) {
+    let n = tenor * m;
+    let x = rate / m;
+    // Series avoids cancellation in A, A' and A'' near zero. Keep fourth
+    // order so the second derivative remains accurate across the branch.
+    let (a, ap, app) = if (n * x).abs() < 1e-3 {
+        let c1 = -(n + 1.0) / 2.0;
+        let c2 = (n + 1.0) * (n + 2.0) / 6.0;
+        let c3 = -(n + 1.0) * (n + 2.0) * (n + 3.0) / 24.0;
+        let c4 = (n + 1.0) * (n + 2.0) * (n + 3.0) * (n + 4.0) / 120.0;
+        (
+            tenor * (1.0 + x * (c1 + x * (c2 + x * (c3 + x * c4)))),
+            tenor / m * (c1 + x * (2.0 * c2 + x * (3.0 * c3 + x * 4.0 * c4))),
+            tenor / (m * m) * (2.0 * c2 + x * (6.0 * c3 + x * 12.0 * c4)),
+        )
+    } else {
+        let q = (-n * x.ln_1p()).exp();
+        let b = -(-n * x.ln_1p()).exp_m1();
+        let bp = n * q / (m + rate);
+        let bpp = -n * (n + 1.0) * q / (m + rate).powi(2);
+        (
+            b / rate,
+            bp / rate - b / rate.powi(2),
+            bpp / rate - 2.0 * bp / rate.powi(2) + 2.0 * b / rate.powi(3),
+        )
+    };
+    let delta = m * delay;
+    let weight = (-delta * x.ln_1p()).exp() / a;
+    let log_prime = -delta / (m + rate) - ap / a;
+    let log_second = delta / (m + rate).powi(2) - app / a + (ap / a).powi(2);
+    (
+        weight,
+        weight * log_prime,
+        weight * (log_prime.powi(2) + log_second),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -347,15 +395,29 @@ mod tests {
             currency: Currency::USD,
             ..base
         };
+        assert!(usd.resolved_fixed_frequency().is_err());
+        let sofr = IndexId::new("USD-SOFR-OIS");
+        let explicit_sofr = CmsReferenceSwap {
+            index_id: Some(&sofr),
+            ..usd
+        };
         assert_eq!(
-            usd.resolved_fixed_frequency().expect("registry"),
+            explicit_sofr.resolved_fixed_frequency().expect("SOFR"),
+            Tenor::annual()
+        );
+        let libor = IndexId::new("USD-LIBOR-3M");
+        let explicit_legacy = CmsReferenceSwap {
+            index_id: Some(&libor),
+            ..usd
+        };
+        assert_eq!(
+            explicit_legacy.resolved_fixed_frequency().expect("legacy"),
             Tenor::semi_annual()
         );
         assert_eq!(
-            usd.resolved_fixed_day_count().expect("registry"),
+            explicit_legacy.resolved_fixed_day_count().expect("legacy"),
             DayCount::Thirty360
         );
-        assert_eq!(usd.payments_per_year().expect("registry"), 2.0);
     }
 
     #[test]

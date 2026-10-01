@@ -470,7 +470,7 @@ export type D_40C29976C86Ef72069C6 =
       preferred_irr: {
         /**
          * LP preferred-return hurdle as an annual decimal IRR (`0.08` = 8%),
-         * compounded on the spec's `day_count`.
+         * compounded on the spec's `day_count`; must be finite and greater than -1.
          */
         hurdle_irr: number;
       };
@@ -496,7 +496,7 @@ export type D_40C29976C86Ef72069C6 =
         gp_share: number;
         /**
          * Annual decimal IRR hurdle (`0.12` = 12%) the LP must reach (at
-         * 100% payout) before this tier's split activates.
+         * 100% payout) before this tier's split activates; must be finite and greater than -1.
          */
         hurdle_irr: number;
         /**

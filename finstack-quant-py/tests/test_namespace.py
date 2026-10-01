@@ -580,17 +580,3 @@ class TestCalibrationNamespace:
             "PikSchedule",
         ):
             assert hasattr(instruments, name)
-
-    def test_models_extension_submodules_are_registered(self) -> None:
-        """PyO3 model submodules should have stable extension-qualified names."""
-        import sys
-
-        from finstack_quant.finstack_quant import models as ext_models
-
-        root_package = ext_models.__package__
-        assert root_package == "finstack_quant.finstack_quant.models"
-        for name in ("correlation", "credit", "monte_carlo"):
-            module = getattr(ext_models, name)
-            qualified = f"{root_package}.{name}"
-            assert module.__package__ == qualified
-            assert sys.modules[qualified] is module

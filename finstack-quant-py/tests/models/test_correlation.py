@@ -1,5 +1,8 @@
 """Tests for correlation types: copulas, Bernoulli, factor models, bounds."""
 
+from collections.abc import Callable
+import struct
+
 import pytest
 
 from finstack_quant.models.correlation import (
@@ -10,6 +13,7 @@ from finstack_quant.models.correlation import (
     cholesky_decompose,
     correlation_bounds,
     joint_probabilities,
+    nearest_correlation,
     validate_correlation_matrix,
 )
 
@@ -245,6 +249,17 @@ def test_matrix_helpers_accept_two_dimensional_input() -> None:
         validate_correlation_matrix(rows, 3)
     with pytest.raises(ValueError, match="requires 9"):
         validate_correlation_matrix([1.0, 0.0, 0.0, 1.0], 3)
+
+
+@pytest.mark.parametrize("operation", [validate_correlation_matrix, nearest_correlation, cholesky_decompose])
+@pytest.mark.parametrize("matrix", [[], [[]]])
+def test_matrix_helpers_reject_dimension_product_overflow(
+    operation: Callable[..., object], matrix: list[object]
+) -> None:
+    """Oversized dimensions raise ValueError before Rust can panic or allocate."""
+    n = 1 << (struct.calcsize("P") * 4)
+    with pytest.raises(ValueError, match=r"dimension.*overflows"):
+        operation(matrix, n)
 
 
 def test_simulate_portfolio_loss_accepts_dataframe() -> None:

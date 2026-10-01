@@ -9,8 +9,6 @@ Examples:
 
 """
 
-import sys as _sys
-
 from finstack_quant.finstack_quant import core as _core
 
 currency = _core.currency
@@ -30,24 +28,6 @@ table = _core.table
 # rationale lives beside the declarations in the binding crate's `src/errors.rs`.
 FinstackError = _core.FinstackError
 schema = _core.schema
-
-_submodules = {
-    "currency": currency,
-    "money": money,
-    "config": config,
-    "types": types,
-    "dates": dates,
-    "math": math,
-    "market_data": market_data,
-    "rating_scales": rating_scales,
-    "schema": schema,
-    "table": table,
-}
-
-for _name, _mod in _submodules.items():
-    _key = f"finstack_quant.core.{_name}"
-    if _key not in _sys.modules:
-        _sys.modules[_key] = _mod
 
 __all__: list[str] = [
     "FinstackError",

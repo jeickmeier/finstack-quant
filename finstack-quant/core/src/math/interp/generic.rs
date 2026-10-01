@@ -22,7 +22,8 @@ use crate::error::InputError;
 /// - **Shared state**: `knots`, `values`, `extrapolation` are common to all interpolators.
 /// - **Strategy-specific state**: Stored in the generic `strategy: S` field.
 /// - **Validation**: Centralized in the constructor; strategies can add extra checks.
-/// - **Serialization**: Preserved via custom serde on wrapper types (LinearDf, etc.).
+/// - **Serialization**: Stores canonical knots, values, extrapolation, and validation
+///   policy. Deserialization validates these inputs and rebuilds strategy caches.
 ///
 /// # Example
 ///
@@ -43,18 +44,40 @@ use crate::error::InputError;
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(bound(serialize = "S: serde::Serialize"))]
-#[serde(bound(deserialize = "S: serde::de::DeserializeOwned"))]
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(bound(serialize = ""))]
 pub struct Interpolator<S: InterpolationStrategy> {
     /// Strictly increasing knot times.
     knots: Box<[f64]>,
     /// Values at each knot (semantics depend on strategy).
     values: Box<[f64]>,
     /// Strategy-specific precomputed state.
+    #[serde(skip)]
     strategy: S,
     /// Extrapolation policy for out-of-bounds evaluation.
     extrapolation: ExtrapolationPolicy,
+    /// Validation policy reapplied when rebuilding from serialized inputs.
+    validation: ValidationPolicy,
+}
+
+impl<'de, S: InterpolationStrategy> serde::Deserialize<'de> for Interpolator<S> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(serde::Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct RawInterpolator {
+            knots: Box<[f64]>,
+            values: Box<[f64]>,
+            extrapolation: ExtrapolationPolicy,
+            validation: ValidationPolicy,
+        }
+
+        let raw = RawInterpolator::deserialize(deserializer)?;
+        Self::new(raw.knots, raw.values, raw.extrapolation, raw.validation)
+            .map_err(serde::de::Error::custom)
+    }
 }
 
 impl<S: InterpolationStrategy> Interpolator<S> {
@@ -126,6 +149,7 @@ impl<S: InterpolationStrategy> Interpolator<S> {
             values,
             strategy,
             extrapolation,
+            validation,
         })
     }
 

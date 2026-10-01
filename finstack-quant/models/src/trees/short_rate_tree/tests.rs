@@ -11,6 +11,129 @@ use time::Month;
 
 const TEST_CURVE_ID: &str = "USD-OIS";
 
+struct InvalidDiscountCurve<'a>(&'a DiscountCurve);
+
+impl finstack_quant_core::market_data::traits::Discounting for InvalidDiscountCurve<'_> {
+    fn id(&self) -> &finstack_quant_core::types::CurveId {
+        self.0.id()
+    }
+    fn base_date(&self) -> finstack_quant_core::dates::Date {
+        self.0.base_date()
+    }
+    fn df(&self, _t: f64) -> f64 {
+        f64::NAN
+    }
+}
+
+#[test]
+fn failed_recalibration_preserves_rates_times_and_transition_lattice() {
+    let curve = create_flat_curve(0.05);
+    let market = MarketContext::new();
+    for config in [
+        ShortRateTreeConfig::ho_lee(8, 0.01),
+        ShortRateTreeConfig::bdt(8, 0.2, 0.1),
+    ] {
+        let mut tree = ShortRateTree::new(config);
+        tree.calibrate(&curve, 1.0).expect("initial calibration");
+        let before = tree.clone();
+        let value_before = tree
+            .price(HashMap::default(), 1.0, &market, &ConstantValuator)
+            .expect("price");
+        assert!(tree.calibrate(&InvalidDiscountCurve(&curve), 2.0).is_err());
+        assert_eq!(tree.time_steps, before.time_steps);
+        assert_eq!(tree.rates, before.rates);
+        assert_eq!(tree.bk_trinomial.is_some(), before.bk_trinomial.is_some());
+        let quality = tree.calibration_result().expect("quality");
+        let before_quality = before.calibration_result().expect("previous quality");
+        assert_eq!(quality.converged, before_quality.converged);
+        assert_eq!(quality.max_error_bp, before_quality.max_error_bp);
+        let value_after = tree
+            .price(HashMap::default(), 1.0, &market, &ConstantValuator)
+            .expect("price after failure");
+        assert_eq!(value_after, value_before);
+    }
+}
+
+#[test]
+fn pricing_requires_the_calibrated_horizon_for_every_short_rate_model() {
+    let curve = create_test_curve();
+    let market = MarketContext::new();
+    for config in [
+        ShortRateTreeConfig::ho_lee(20, 0.01),
+        ShortRateTreeConfig::bdt(20, 0.2, 0.0),
+        ShortRateTreeConfig::bdt(20, 0.2, 0.1),
+    ] {
+        let mut tree = ShortRateTree::new(config);
+        tree.calibrate(&curve, 1.0).expect("calibration");
+        for horizon in [2.0, 0.0, -1.0, f64::NAN, f64::INFINITY] {
+            assert!(
+                tree.price(HashMap::default(), horizon, &market, &ConstantValuator)
+                    .is_err(),
+                "must not reuse calibrated nodes over horizon {horizon}"
+            );
+        }
+        let price = tree
+            .price(HashMap::default(), 1.0, &market, &ConstantValuator)
+            .expect("matching horizon");
+        assert!((price - curve.df(1.0)).abs() < 1e-8);
+        let nearby = tree
+            .price(HashMap::default(), 1.0 + 1e-12, &market, &ConstantValuator)
+            .expect("roundoff in horizon");
+        assert_eq!(
+            nearby, price,
+            "use the stored grid after horizon validation"
+        );
+    }
+}
+
+#[test]
+fn invalid_later_discount_targets_fail_without_replacing_calibration() {
+    struct InvalidLaterDiscount<'a> {
+        curve: &'a DiscountCurve,
+        target: f64,
+    }
+    impl finstack_quant_core::market_data::traits::Discounting for InvalidLaterDiscount<'_> {
+        fn id(&self) -> &finstack_quant_core::types::CurveId {
+            self.curve.id()
+        }
+        fn base_date(&self) -> finstack_quant_core::dates::Date {
+            self.curve.base_date()
+        }
+        fn df(&self, time: f64) -> f64 {
+            if time < 0.75 {
+                self.curve.df(time)
+            } else {
+                self.target
+            }
+        }
+    }
+    let curve = create_flat_curve(0.02);
+    for config in [
+        ShortRateTreeConfig::ho_lee(2, 0.01),
+        ShortRateTreeConfig::bdt(2, 0.2, 0.0),
+        ShortRateTreeConfig::bdt(2, 0.2, 0.1),
+    ] {
+        let mut tree = ShortRateTree::new(config);
+        tree.calibrate(&curve, 1.0).expect("valid calibration");
+        let previous_rates = std::sync::Arc::clone(&tree.rates);
+        let previous_error = tree.calibration_result().expect("quality").max_error_bp;
+        for target in [0.0, -0.1, f64::NAN, f64::INFINITY] {
+            let invalid = InvalidLaterDiscount {
+                curve: &curve,
+                target,
+            };
+            assert!(tree.calibrate(&invalid, 1.0).is_err(), "target={target}");
+            assert_eq!(tree.rates, previous_rates);
+            assert_eq!(
+                tree.calibration_result()
+                    .expect("prior quality")
+                    .max_error_bp,
+                previous_error
+            );
+        }
+    }
+}
+
 fn create_test_curve() -> DiscountCurve {
     DiscountCurve::builder(TEST_CURVE_ID)
         .base_date(

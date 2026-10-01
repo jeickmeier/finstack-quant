@@ -359,7 +359,6 @@ allowed-unresolved-imports = [
     "pandas.**",
     "numpy.**",
     "finstack_quant.finstack_quant",
-    "finstack_quant.finstack_quant.**",
 ]
 
 # __init__.py files bridge the native Rust extension (finstack_quant.finstack_quant)

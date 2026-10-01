@@ -120,8 +120,9 @@ pub enum LgdType {
 
 /// Configuration for ECL calculation.
 ///
-/// Controls time bucket granularity, scenario specifications, staging
-/// parameters, and LGD methodology.
+/// Controls time bucket granularity, staging parameters, and LGD methodology.
+/// Probability-weighted scenarios are supplied once, alongside their PD sources
+/// to [`compute_ecl_weighted`] or [`EclEngine::new`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EclConfig {
@@ -129,15 +130,6 @@ pub struct EclConfig {
     /// Must be finite and at least 0.0001 years, limiting a 100-year
     /// exposure to one million buckets. Default: quarterly (0.25).
     pub bucket_width_years: f64,
-
-    /// Macro scenario specifications with probability weights.
-    /// Weights must sum to 1.0 and each weight must lie in \[0, 1\].
-    ///
-    /// When non-empty, [`compute_ecl_weighted`] and [`EclEngine`] require
-    /// the same ids and weights (tolerance 1e-6, same order) as the
-    /// `pd_sources` argument. The `pd_sources` weights remain the priced
-    /// weights and are still validated independently.
-    pub scenarios: Vec<MacroScenario>,
 
     /// Staging configuration for IFRS 9.
     pub staging: StagingConfig,
@@ -171,9 +163,9 @@ fn default_stage3_time_to_recovery_years() -> f64 {
 }
 
 impl EclConfig {
-    /// Validate the configuration invariants: scenario weights sum to 1.0
-    /// (within 1e-6), bucket width is finite and at least 0.0001 years, and
-    /// at least one scenario is present.
+    /// Validate staging thresholds, finite bucket width, LGD methodology
+    /// parameters, and Stage 3 recovery time. Scenario weights are validated
+    /// where PD sources are supplied.
     ///
     /// `EclConfig` exposes public fields and can be constructed directly
     /// (bypassing [`EclConfigBuilder`]), so every public entry point that
@@ -185,37 +177,10 @@ impl EclConfig {
     ///
     /// Returns [`Error::Validation`] when any invariant is violated.
     pub fn validate(&self) -> Result<()> {
-        let mut total_weight = 0.0;
-        for scenario in &self.scenarios {
-            if !scenario.weight.is_finite() || !(0.0..=1.0).contains(&scenario.weight) {
-                return Err(Error::Validation(format!(
-                    "scenario '{}' weight must be in [0, 1], got {}",
-                    scenario.id, scenario.weight
-                )));
-            }
-            if scenario
-                .lgd_override
-                .is_some_and(|lgd| !(0.0..=1.0).contains(&lgd))
-            {
-                return Err(Error::Validation(
-                    "scenario LGD must be finite and in [0, 1]".into(),
-                ));
-            }
-            total_weight += scenario.weight;
-        }
-        if (total_weight - 1.0).abs() > 1e-6 {
-            return Err(Error::Validation(format!(
-                "Scenario weights must sum to 1.0, got {total_weight:.6}"
-            )));
-        }
+        self.staging.validate()?;
         if !self.bucket_width_years.is_finite() || self.bucket_width_years < 1e-4 {
             return Err(Error::Validation(
                 "bucket_width_years must be finite and at least 0.0001 years".to_string(),
-            ));
-        }
-        if self.scenarios.is_empty() {
-            return Err(Error::Validation(
-                "At least one scenario is required".to_string(),
             ));
         }
         match self.lgd_type {
@@ -239,14 +204,6 @@ impl EclConfig {
                     return Err(Error::Validation(format!(
                         "ttc_lgd must be a finite value in [0, 1], got {lgd}"
                     )));
-                }
-                if self.scenarios.iter().any(|s| s.lgd_override.is_some()) {
-                    return Err(Error::Validation(
-                        "lgd_type = ThroughTheCycle pins the LGD; scenario lgd_override \
-                         entries would be silently ignored — remove them or use \
-                         PointInTime/Downturn"
-                            .to_string(),
-                    ));
                 }
                 if self.downturn_lgd.is_some() {
                     return Err(Error::Validation(
@@ -289,27 +246,22 @@ impl EclConfig {
 /// Builder for [`EclConfig`].
 ///
 /// Validates configuration on `build()`:
-/// - Scenario weights must sum to 1.0 (within 1e-6 tolerance)
 /// - Bucket width must be finite and at least 0.0001 years
 ///
 /// # Examples
 ///
 /// ```rust
 /// use finstack_quant_statements_analytics::analysis::{
-///     EclConfigBuilder, LgdType, MacroScenario,
+///     EclConfigBuilder, LgdType,
 /// };
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let config = EclConfigBuilder::new()
 ///     .bucket_width(0.25)
-///     .scenarios(vec![
-///         MacroScenario { id: "base".to_string(), weight: 0.7, lgd_override: None },
-///         MacroScenario { id: "downside".to_string(), weight: 0.3, lgd_override: Some(0.55) },
-///     ])
 ///     .lgd_type(LgdType::PointInTime)
 ///     .build()?;
 ///
-/// assert_eq!(config.scenarios.len(), 2);
+/// assert_eq!(config.bucket_width_years, 0.25);
 /// # Ok(())
 /// # }
 /// ```
@@ -322,8 +274,8 @@ impl EclConfigBuilder {
     ///
     /// # Returns
     ///
-    /// A builder initialized with quarterly buckets, one 100% base scenario,
-    /// default IFRS 9 staging thresholds, and point-in-time LGD.
+    /// A builder initialized with quarterly buckets, default IFRS 9 staging
+    /// thresholds, and point-in-time LGD.
     pub fn new() -> Self {
         Self {
             config: EclConfig::default(),
@@ -355,34 +307,6 @@ impl EclConfigBuilder {
     /// The updated builder.
     pub fn staging(mut self, staging: StagingConfig) -> Self {
         self.config.staging = staging;
-        self
-    }
-
-    /// Replace all scenarios.
-    ///
-    /// # Arguments
-    ///
-    /// * `scenarios` - Complete probability-weighted macro scenario set.
-    ///
-    /// # Returns
-    ///
-    /// The updated builder.
-    pub fn scenarios(mut self, scenarios: Vec<MacroScenario>) -> Self {
-        self.config.scenarios = scenarios;
-        self
-    }
-
-    /// Add a single scenario.
-    ///
-    /// # Arguments
-    ///
-    /// * `scenario` - Scenario to append to the existing scenario set.
-    ///
-    /// # Returns
-    ///
-    /// The updated builder.
-    pub fn add_scenario(mut self, scenario: MacroScenario) -> Self {
-        self.config.scenarios.push(scenario);
         self
     }
 
@@ -455,9 +379,8 @@ impl EclConfigBuilder {
     ///
     /// # Errors
     ///
-    /// Returns an error when scenario weights do not sum to 1.0, when bucket
-    /// width is not finite and at least 0.0001 years, or when no scenarios are
-    /// configured.
+    /// Returns an error for a bucket width below 0.0001 years or non-finite,
+    /// incompatible LGD methodology settings, or an invalid recovery horizon.
     pub fn build(self) -> Result<EclConfig> {
         self.config.validate()?;
         Ok(self.config)
@@ -588,7 +511,7 @@ fn effective_lgd(config: &EclConfig, base_lgd: f64) -> Result<f64> {
 ///   credit-impaired calculation horizon.
 /// * `pd_source` - Term structure supplying cumulative default probabilities
 ///   for the exposure's current rating.
-/// * `config` - ECL bucketing, scenarios, and stage-3 recovery-time policy.
+/// * `config` - ECL bucketing, LGD methodology, and Stage 3 recovery-time policy.
 ///
 /// # Returns
 ///
@@ -757,9 +680,12 @@ pub fn compute_ecl(
 /// * `exposure` - Credit exposure to value; scenario LGD overrides apply to a
 ///   cloned copy and do not mutate this input.
 /// * `stage` - Assigned IFRS 9 stage used by every scenario calculation.
-/// * `pd_sources` - Non-empty scenario and PD-term-structure pairs; scenario
-///   weights must satisfy the configured probability validation.
-/// * `config` - ECL bucketing and recovery-time calculation parameters.
+/// * `pd_sources` - Non-empty pairs defining each scenario exactly once:
+///   its ID, probability weight, optional decimal LGD override in `[0, 1]`,
+///   and reporting-date PD curve. Weights must be finite, non-negative, and
+///   sum to 1 within `1e-6`.
+/// * `config` - Integration bucket width in years, LGD methodology, staging
+///   policy, and Stage 3 recovery horizon in years.
 ///
 /// # LGD methodology interaction
 ///
@@ -780,8 +706,7 @@ pub fn compute_ecl(
 ///
 /// Returns an error if `pd_sources` is empty, if exposure validation fails,
 /// if any scenario PD source cannot provide cumulative PDs for the exposure,
-/// if a non-empty [`EclConfig::scenarios`] list does not match the priced
-/// scenario ids and weights, or if `config.lgd_type ==
+/// if scenario weights or LGD overrides are invalid, or if `config.lgd_type ==
 /// `[`LgdType::ThroughTheCycle`] and any scenario sets `lgd_override`.
 ///
 /// # Examples
@@ -836,7 +761,7 @@ pub fn compute_ecl_weighted(
         ));
     }
     validate_scenario_weights(pd_sources.iter().map(|(scenario, _)| *scenario))?;
-    validate_config_scenarios_match_pd_sources(config, pd_sources)?;
+    config.validate()?;
 
     let mut weighted_ecl = 0.0;
     let mut scenario_results = Vec::with_capacity(pd_sources.len());
@@ -903,40 +828,6 @@ pub(crate) fn validate_scenario_weights<'a>(
     Ok(())
 }
 
-/// Require `config.scenarios` ids and weights to match `pd_sources` when
-/// the config list is non-empty.
-fn validate_config_scenarios_match_pd_sources(
-    config: &EclConfig,
-    pd_sources: &[(&MacroScenario, &dyn PdTermStructure)],
-) -> Result<()> {
-    if config.scenarios.is_empty() {
-        return Ok(());
-    }
-    if config.scenarios.len() != pd_sources.len() {
-        return Err(Error::Validation(format!(
-            "EclConfig.scenarios length ({}) does not match pd_sources ({})",
-            config.scenarios.len(),
-            pd_sources.len()
-        )));
-    }
-    for (config_scenario, (priced_scenario, _)) in config.scenarios.iter().zip(pd_sources.iter()) {
-        if config_scenario.id != priced_scenario.id {
-            return Err(Error::Validation(format!(
-                "EclConfig.scenarios id '{}' does not match pd_sources id '{}'",
-                config_scenario.id, priced_scenario.id
-            )));
-        }
-        if (config_scenario.weight - priced_scenario.weight).abs() > 1e-6 {
-            return Err(Error::Validation(format!(
-                "EclConfig.scenarios weight for '{}' ({}) does not match \
-                 pd_sources weight ({})",
-                config_scenario.id, config_scenario.weight, priced_scenario.weight
-            )));
-        }
-    }
-    Ok(())
-}
-
 // Stateful facade
 
 /// Stateful ECL engine wrapping staging + calculation + aggregation.
@@ -959,7 +850,7 @@ fn validate_config_scenarios_match_pd_sources(
 ///     vec![(&scenario, &pd_curve)];
 ///
 /// let engine = EclEngine::new(config, pd_sources);
-/// assert_eq!(engine.config().scenarios.len(), 1);
+/// assert_eq!(engine.config().bucket_width_years, 0.25);
 /// # Ok(())
 /// # }
 /// ```
@@ -976,9 +867,12 @@ impl<'a> EclEngine<'a> {
     ///
     /// # Arguments
     ///
-    /// * `config` - ECL bucket, staging, scenario, and LGD settings.
-    /// * `pd_sources` - Probability-weighted macro scenarios paired with their
-    ///   PD term structures.
+    /// * `config` - ECL integration bucket width, IFRS 9 staging thresholds,
+    ///   LGD methodology, and Stage 3 recovery-time settings.
+    /// * `pd_sources` - Authoritative scenario IDs, probability weights, and
+    ///   optional LGD overrides paired with current reporting-date PD curves.
+    ///   Weights must be finite, non-negative, and sum to 1 within `1e-6`.
+    ///   The first curve supplies current risk for SICR staging.
     ///
     /// # Returns
     ///
@@ -987,9 +881,8 @@ impl<'a> EclEngine<'a> {
     /// # Errors
     ///
     /// Construction does not validate `pd_sources`; [`Self::process_exposure`]
-    /// returns an error if the source list is empty or if a non-empty
-    /// [`EclConfig::scenarios`] list does not match the priced scenario
-    /// ids and weights.
+    /// returns an error if the source list is empty, scenario weights or LGD
+    /// overrides are invalid, or configuration or PD lookups are invalid.
     pub fn new(
         config: EclConfig,
         pd_sources: Vec<(&'a MacroScenario, &'a dyn PdTermStructure)>,
@@ -1001,7 +894,16 @@ impl<'a> EclEngine<'a> {
     ///
     /// # Arguments
     ///
-    /// * `exposure` - Exposure to stage and measure.
+    /// * `exposure` - Exposure to stage and measure, including its rating at
+    ///   initial recognition and current drawn/undrawn amounts in base currency.
+    /// * `origination_pd_source` - Initial-recognition PD snapshot for this
+    ///   exposure, keyed by its origination rating and returning cumulative
+    ///   decimal probabilities from initial recognition. Its conditional PD
+    ///   from `elapsed_years` to `elapsed_years + min(remaining maturity, 30)`
+    ///   is compared with the first current scenario source. Supply this
+    ///   exposure's original snapshot even if its rating is unchanged.
+    /// * `elapsed_years` - Finite, non-negative exposure age in years since
+    ///   initial recognition, using the original PD curve's time basis.
     ///
     /// # Returns
     ///
@@ -1011,7 +913,12 @@ impl<'a> EclEngine<'a> {
     ///
     /// Returns an error if the engine has no PD sources, if staging fails, or
     /// if ECL calculation fails for any scenario.
-    pub fn process_exposure(&self, exposure: &Exposure) -> Result<ExposureEclResult> {
+    pub fn process_exposure(
+        &self,
+        exposure: &Exposure,
+        origination_pd_source: &dyn PdTermStructure,
+        elapsed_years: f64,
+    ) -> Result<ExposureEclResult> {
         // Use base scenario PD for staging
         let base_pd = self
             .pd_sources
@@ -1020,7 +927,13 @@ impl<'a> EclEngine<'a> {
             .ok_or_else(|| {
                 Error::Validation("At least one PD source is required for EclEngine".to_string())
             })?;
-        let stage_result = classify_stage(exposure, base_pd, &self.config.staging)?;
+        let stage_result = classify_stage(
+            exposure,
+            base_pd,
+            origination_pd_source,
+            elapsed_years,
+            &self.config.staging,
+        )?;
         let ecl_result =
             compute_ecl_weighted(exposure, stage_result.stage, &self.pd_sources, &self.config)?;
         Ok(ExposureEclResult {
@@ -1087,44 +1000,25 @@ mod tests {
 
     #[test]
     fn test_ecl_config_builder_valid() {
-        let config = EclConfigBuilder::new()
-            .bucket_width(0.5)
-            .scenarios(vec![
-                MacroScenario {
-                    id: "base".into(),
-                    weight: 0.6,
-                    lgd_override: None,
-                },
-                MacroScenario {
-                    id: "down".into(),
-                    weight: 0.4,
-                    lgd_override: Some(0.55),
-                },
-            ])
-            .build();
-        assert!(config.is_ok());
-        let config = config.unwrap();
-        assert!((config.bucket_width_years - 0.5).abs() < 1e-10);
-        assert_eq!(config.scenarios.len(), 2);
+        let config = EclConfigBuilder::new().bucket_width(0.5).build().unwrap();
+        assert_eq!(config.bucket_width_years, 0.5);
     }
 
     #[test]
-    fn test_ecl_config_builder_invalid_weights() {
-        let config = EclConfigBuilder::new()
-            .scenarios(vec![
-                MacroScenario {
-                    id: "base".into(),
-                    weight: 0.5,
-                    lgd_override: None,
-                },
-                MacroScenario {
-                    id: "down".into(),
-                    weight: 0.3,
-                    lgd_override: None,
-                },
-            ])
-            .build();
-        assert!(config.is_err());
+    fn weighted_ecl_rejects_invalid_scenario_weights() {
+        let scenario = MacroScenario {
+            id: "base".into(),
+            weight: 0.8,
+            lgd_override: None,
+        };
+        let curve = make_pd_curve();
+        let result = compute_ecl_weighted(
+            &make_exposure(),
+            Stage::Stage1,
+            &[(&scenario, &curve)],
+            &EclConfig::default(),
+        );
+        assert!(result.is_err());
     }
 
     #[test]
@@ -1613,14 +1507,11 @@ mod tests {
             weight: 0.4,
             lgd_override: Some(0.60), // Higher LGD in downside
         };
-        let config = EclConfigBuilder::new()
-            .scenarios(vec![base_scenario, down_scenario])
-            .build()
-            .unwrap();
+        let config = EclConfig::default();
 
         let pd_sources: Vec<(&MacroScenario, &dyn PdTermStructure)> = vec![
-            (&config.scenarios[0], &curve as &dyn PdTermStructure),
-            (&config.scenarios[1], &curve as &dyn PdTermStructure),
+            (&base_scenario, &curve as &dyn PdTermStructure),
+            (&down_scenario, &curve as &dyn PdTermStructure),
         ];
 
         let result = compute_ecl_weighted(&exposure, Stage::Stage1, &pd_sources, &config).unwrap();
@@ -1645,14 +1536,18 @@ mod tests {
     fn test_ecl_engine_process_exposure() {
         let curve = make_pd_curve();
         let config = EclConfig::default();
-        let scenario = &config.scenarios[0];
+        let scenario = MacroScenario {
+            id: "base".into(),
+            weight: 1.0,
+            lgd_override: None,
+        };
 
         let pd_sources: Vec<(&MacroScenario, &dyn PdTermStructure)> =
-            vec![(scenario, &curve as &dyn PdTermStructure)];
-        let engine = EclEngine::new(config.clone(), pd_sources);
+            vec![(&scenario, &curve as &dyn PdTermStructure)];
+        let engine = EclEngine::new(config, pd_sources);
 
         let exposure = make_exposure();
-        let result = engine.process_exposure(&exposure).unwrap();
+        let result = engine.process_exposure(&exposure, &curve, 0.0).unwrap();
 
         assert_eq!(result.stage_result.stage, Stage::Stage1);
         assert!(result.ecl_result.ecl > 0.0);
@@ -1670,9 +1565,10 @@ mod tests {
 
     #[test]
     fn test_ecl_engine_rejects_empty_pd_sources() {
+        let curve = make_pd_curve();
         let engine = EclEngine::new(EclConfig::default(), Vec::new());
         let exposure = make_exposure();
-        let result = engine.process_exposure(&exposure);
+        let result = engine.process_exposure(&exposure, &curve, 0.0);
 
         assert!(result.is_err());
     }
@@ -1703,55 +1599,93 @@ mod tests {
     }
 
     #[test]
-    fn config_scenarios_must_match_pd_sources() {
+    fn scenario_source_controls_the_weighted_allowance() {
         let curve = one_year_2pct_curve();
-        let mismatch = EclConfigBuilder::new()
-            .scenarios(vec![
-                MacroScenario {
-                    id: "base".into(),
-                    weight: 0.7,
-                    lgd_override: None,
-                },
-                MacroScenario {
-                    id: "down".into(),
-                    weight: 0.3,
-                    lgd_override: None,
-                },
-            ])
-            .build()
-            .unwrap();
-        let priced = MacroScenario {
+        let exposure = lgd_test_exposure();
+        let scenario = MacroScenario {
+            id: "downside".into(),
+            weight: 1.0,
+            lgd_override: Some(0.90),
+        };
+        let result = compute_ecl_weighted(
+            &exposure,
+            Stage::Stage1,
+            &[(&scenario, &curve)],
+            &EclConfig::default(),
+        )
+        .unwrap();
+        let expected = exposure.ead * 0.02 * 0.90;
+        assert!((result.ecl - expected).abs() < 1e-9);
+        assert_eq!(result.scenario_breakdown[0].0, "downside");
+    }
+
+    #[test]
+    fn unchanged_rating_uses_origination_risk_snapshot_in_engine() {
+        let current = RawPdCurve::new("BBB", vec![(0.0, 0.0), (1.0, 0.04), (5.0, 0.20)]).unwrap();
+        let origination =
+            RawPdCurve::new("BBB", vec![(0.0, 0.0), (1.0, 0.002), (5.0, 0.01)]).unwrap();
+        let scenario = MacroScenario {
             id: "base".into(),
             weight: 1.0,
             lgd_override: None,
         };
-        let pd_sources: Vec<(&MacroScenario, &dyn PdTermStructure)> = vec![(&priced, &curve)];
-        let err = compute_ecl_weighted(&lgd_test_exposure(), Stage::Stage1, &pd_sources, &mismatch)
-            .unwrap_err();
-        assert!(err.to_string().contains("does not match"), "got {err}");
-
-        let matched = EclConfigBuilder::new()
-            .scenarios(vec![
-                MacroScenario {
-                    id: "base".into(),
-                    weight: 0.7,
-                    lgd_override: None,
-                },
-                MacroScenario {
-                    id: "down".into(),
-                    weight: 0.3,
-                    lgd_override: None,
-                },
-            ])
-            .build()
+        let engine = EclEngine::new(EclConfig::default(), vec![(&scenario, &current)]);
+        let exposure = Exposure {
+            ead: 100.0,
+            eir: 0.0,
+            lgd: 0.40,
+            remaining_maturity_years: 5.0,
+            ..make_exposure()
+        };
+        let result = engine
+            .process_exposure(&exposure, &origination, 0.0)
             .unwrap();
-        let pd_sources: Vec<(&MacroScenario, &dyn PdTermStructure)> = vec![
-            (&matched.scenarios[0], &curve),
-            (&matched.scenarios[1], &curve),
-        ];
-        assert!(
-            compute_ecl_weighted(&lgd_test_exposure(), Stage::Stage1, &pd_sources, &matched)
-                .is_ok()
-        );
+        assert_eq!(result.stage_result.stage, Stage::Stage2);
+        assert!((result.ecl_result.ecl - 8.0).abs() < 1e-12);
+
+        // A second origination cohort with the same rating but unchanged risk
+        // must retain its own initial-recognition snapshot on the same engine.
+        let higher_origination_risk = &current;
+        let unchanged = engine
+            .process_exposure(&exposure, higher_origination_risk, 0.0)
+            .unwrap();
+        assert_eq!(unchanged.stage_result.stage, Stage::Stage1);
+        assert!((unchanged.ecl_result.ecl - 1.6).abs() < 1e-12);
+    }
+
+    #[test]
+    fn aged_exposure_compares_the_conditional_origination_window() {
+        let current = RawPdCurve::new("BBB", vec![(0.0, 0.0), (1.0, 0.025), (2.0, 0.05)]).unwrap();
+        let origination = RawPdCurve::new(
+            "BBB",
+            vec![(0.0, 0.0), (2.0, 0.10), (3.0, 0.14), (5.0, 0.16)],
+        )
+        .unwrap();
+        let scenario = MacroScenario {
+            id: "base".into(),
+            weight: 1.0,
+            lgd_override: None,
+        };
+        let engine = EclEngine::new(EclConfig::default(), vec![(&scenario, &current)]);
+        let exposure = Exposure {
+            ead: 100.0,
+            eir: 0.0,
+            lgd: 0.40,
+            remaining_maturity_years: 2.0,
+            ..make_exposure()
+        };
+        // Original remaining-window risk is (16% - 14%) / (1 - 14%),
+        // not the original first-two-year PD of 10%.
+        let result = engine
+            .process_exposure(&exposure, &origination, 3.0)
+            .unwrap();
+        assert_eq!(result.stage_result.stage, Stage::Stage2);
+        assert!((result.ecl_result.ecl - 2.0).abs() < 1e-12);
+        let expected_delta = 0.05 - (0.16 - 0.14) / (1.0 - 0.14);
+        assert!(result.stage_result.triggers.iter().any(|trigger| matches!(
+            trigger,
+            super::super::staging::StagingTrigger::PdDeltaAbsolute { delta, .. }
+                if (*delta - expected_delta).abs() < 1e-12
+        )));
     }
 }

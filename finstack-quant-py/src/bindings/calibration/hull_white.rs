@@ -190,17 +190,17 @@ impl PyCapFloorQuote {
     /// strike : float
     ///     Strike rate as a decimal.
     /// volatility : float
-    ///     Normal (absolute) or lognormal (decimal) volatility (> 0).
+    ///     Normal/Bachelier volatility in decimal rate units (> 0).
     /// is_cap : bool, default True
     ///     ``True`` for a cap, ``False`` for a floor.
     /// is_normal_vol : bool, default True
-    ///     ``True`` for a normal (Bachelier) quote, ``False`` for Black lognormal.
+    ///     Must be ``True``; lognormal cap/floor quotes are unsupported.
     ///
     /// Raises
     /// ------
     /// ValueError
     ///     If the maturity or volatility is not positive and finite, or the
-    ///     strike is not finite (lognormal quotes also require a positive strike).
+    ///     strike is not finite, or ``is_normal_vol`` is ``False``.
     #[new]
     #[pyo3(signature = (maturity, strike, volatility, is_cap = true, is_normal_vol = true))]
     #[pyo3(text_signature = "(maturity, strike, volatility, is_cap=True, is_normal_vol=True)")]
@@ -390,9 +390,9 @@ impl PyHullWhiteCalibrationParams {
 /// Examples
 /// --------
 /// >>> from finstack_quant.calibration.hull_white import HullWhiteParams
-/// >>> p = HullWhiteParams.from_json('{"kappa": 0.03, "volatility": {"times": [1.0, 2.0], "values": [0.01, 0.012]}}')
+/// >>> p = HullWhiteParams.from_json('{"kappa": 0.03, "volatility": {"times": [0.0, 1.0], "values": [0.01, 0.012]}}')
 /// >>> (p.kappa, p.times, p.values)
-/// (0.03, [1.0, 2.0], [0.01, 0.012])
+/// (0.03, [0.0, 1.0], [0.01, 0.012])
 #[pyclass(
     name = "HullWhiteParams",
     module = "finstack_quant.calibration.hull_white",
@@ -413,7 +413,7 @@ impl PyHullWhiteParams {
         self.inner.kappa
     }
 
-    /// Right end-points (years) of the constant-sigma intervals.
+    /// Increasing sigma segment start times in model years, beginning at zero.
     #[getter]
     fn times(&self) -> Vec<f64> {
         self.inner.volatility.times().to_vec()
@@ -480,7 +480,7 @@ impl PyHullWhiteParams {
 /// Examples
 /// --------
 /// >>> from finstack_quant.calibration.hull_white import CapFloorCalibrationConfig
-/// >>> cfg = CapFloorCalibrationConfig(frequency="quarterly", fixed_kappa=0.05)
+/// >>> cfg = CapFloorCalibrationConfig(1e-4, frequency="quarterly", fixed_kappa=0.05)
 /// >>> (cfg.frequency, cfg.fixed_kappa)
 /// ('quarterly', 0.05)
 #[pyclass(
@@ -626,7 +626,10 @@ impl PyPiecewiseSigmaCalibrationConfig {
     /// ------
     /// ValueError
     ///     If ``frequency`` is not one of the accepted strings. Numeric bounds
-    ///     are validated when the bootstrap runs.
+    ///     are validated when the bootstrap runs: ``fixed_kappa`` must be in
+    ///     [0.001, 1.0], sigma bounds must be finite and satisfy
+    ///     ``0 < sigma_min < sigma_max``, and ``fit_tolerance`` must be finite
+    ///     and positive.
     #[new]
     #[pyo3(signature = (fixed_kappa, sigma_min, sigma_max, fit_tolerance, frequency = "semi_annual"))]
     #[pyo3(
@@ -724,7 +727,8 @@ fn cap_floor_quotes(quotes: Vec<PyRef<'_, PyCapFloorQuote>>) -> Vec<CapFloorQuot
 /// discount : DiscountCurve
 ///     Discount curve the swap annuities and forwards are read from.
 /// quotes : list[SwaptionQuote]
-///     At least two swaption quotes (two free parameters).
+///     At least two swaption quotes (two free parameters), with expiry and
+///     tenor in ACT/365F years from the discount curve's base date.
 /// fit_tolerance : float
 ///     Required positive maximum reconstructed quote error: decimal rate volatility
 ///     for normal quotes, relative volatility for Black quotes. Independent of solver tolerance.
@@ -764,16 +768,10 @@ fn calibrate_hull_white_to_swaptions(
     let initial_guess = initial_guess.map(|p| p.inner);
     let (params, report) = py
         .detach(move || {
-            let model_curve = finstack_quant_models::rates::clock::ModelDiscountCurve::new(
-                curve.as_ref(),
-                curve.base_date(),
-            )?;
-            let df = |t| model_curve.get_df(t).unwrap_or(f64::NAN);
             rust_hw::calibrate_hull_white_to_swaptions(
-                &df,
+                curve.as_ref(),
                 &quotes,
                 frequency,
-                None,
                 initial_guess,
                 fit_tolerance,
             )
@@ -787,6 +785,10 @@ fn calibrate_hull_white_to_swaptions(
 
 /// Fit scalar Hull-White (kappa, sigma) to cap/floor quotes.
 ///
+/// Uses regular numerical schedules from ``config.frequency`` and quote maturity,
+/// with no calendar or settlement adjustment. Use ``CalibrationStep.cap_floor_hull_white``
+/// with an ``index_id`` to calibrate convention-driven market contracts.
+///
 /// Parameters
 /// ----------
 /// discount : DiscountCurve
@@ -794,7 +796,8 @@ fn calibrate_hull_white_to_swaptions(
 /// forward : DiscountCurve | None, default None
 ///     Curve projecting the caplet forwards; ``discount`` when ``None``.
 /// quotes : list[CapFloorQuote]
-///     Cap/floor quotes (one quote requires ``config.fixed_kappa``).
+///     Normal/Bachelier cap/floor quotes in ACT/365F years from the discount
+///     curve's base date (one quote requires ``config.fixed_kappa``).
 /// config : CapFloorCalibrationConfig
 ///     Required fit tolerance in normal-vol units, frequency, fixed kappa and initial guess.
 ///
@@ -822,24 +825,19 @@ fn calibrate_hull_white_to_cap_floors(
 ) -> PyResult<(PyHullWhiteCalibrationParams, PyCalibrationReport)> {
     let discount = curve_of(discount, "discount")?;
     let forward = match forward {
-        Some(curve) if !curve.is_none() => curve_of(curve, "forward")?,
-        _ => Arc::clone(&discount),
+        Some(curve) if !curve.is_none() => Some(curve_of(curve, "forward")?),
+        _ => None,
     };
     let quotes = cap_floor_quotes(quotes);
     let config = config.inner;
     let (params, report) = py
         .detach(move || {
-            let model_discount = finstack_quant_models::rates::clock::ModelDiscountCurve::new(
+            rust_hw::calibrate_hull_white_to_cap_floors(
                 discount.as_ref(),
-                discount.base_date(),
-            )?;
-            let model_forward = finstack_quant_models::rates::clock::ModelDiscountCurve::new(
-                forward.as_ref(),
-                discount.base_date(),
-            )?;
-            let discount_df = |t| model_discount.get_df(t).unwrap_or(f64::NAN);
-            let forward_df = |t| model_forward.get_df(t).unwrap_or(f64::NAN);
-            rust_hw::calibrate_hull_white_to_cap_floors(&discount_df, &forward_df, &quotes, config)
+                &quotes,
+                config,
+                forward.as_deref(),
+            )
         })
         .map_err(core_to_py)?;
     Ok((
@@ -850,13 +848,19 @@ fn calibrate_hull_white_to_cap_floors(
 
 /// Bootstrap a piecewise-constant Hull-White sigma schedule to cap/floor quotes.
 ///
+/// Uses regular numerical schedules from ``config.frequency`` and quote maturity,
+/// with no calendar or settlement adjustment. Use ``CalibrationStep.cap_floor_hull_white``
+/// with an ``index_id`` to calibrate convention-driven market contracts.
+///
 /// Parameters
 /// ----------
 /// discount : DiscountCurve
 ///     Discounting curve.
 /// quotes : list[CapFloorQuote]
-///     Cap/floor quotes with strictly increasing maturities; each maturity
-///     adds one sigma interval.
+///     Normal/Bachelier cap/floor quotes with distinct maturities in ACT/365F
+///     years from the discount curve's base date. Rust sorts the quotes; each
+///     quote adds a sigma segment, with later segments starting at the previous
+///     quote's last caplet fixing. The final segment extends beyond the last quote.
 /// config : PiecewiseSigmaCalibrationConfig
 ///     Fixed kappa, sigma brackets and payment frequency.
 /// forward : DiscountCurve | None, default None
@@ -870,10 +874,12 @@ fn calibrate_hull_white_to_cap_floors(
 /// Raises
 /// ------
 /// ValueError
-///     If no quotes are supplied, the configuration bounds are invalid, or a
-///     curve argument is not a ``DiscountCurve``.
+///     If quotes are empty or invalid, maturities or live fixing horizons are
+///     not distinct and increasing, numeric configuration is invalid, or curve
+///     arguments or discount factors are invalid. Also raised when an interval
+///     cannot be bracketed within the sigma bounds or reaches the upper bound.
 /// RuntimeError
-///     If an interval's sigma cannot be bracketed or solved.
+///     If an interval's sigma solve or implied normal-vol inversion fails to converge.
 #[pyfunction]
 #[pyo3(signature = (discount, quotes, config, forward = None))]
 #[pyo3(text_signature = "(discount, quotes, config, forward=None)")]
@@ -886,28 +892,18 @@ fn bootstrap_hull_white_sigma_schedule_to_cap_floors(
 ) -> PyResult<(PyHullWhiteParams, PyCalibrationReport)> {
     let discount = curve_of(discount, "discount")?;
     let forward = match forward {
-        Some(curve) if !curve.is_none() => curve_of(curve, "forward")?,
-        _ => Arc::clone(&discount),
+        Some(curve) if !curve.is_none() => Some(curve_of(curve, "forward")?),
+        _ => None,
     };
     let quotes = cap_floor_quotes(quotes);
     let config = config.inner;
     let (params, report) = py
         .detach(move || {
-            let model_discount = finstack_quant_models::rates::clock::ModelDiscountCurve::new(
-                discount.as_ref(),
-                discount.base_date(),
-            )?;
-            let model_forward = finstack_quant_models::rates::clock::ModelDiscountCurve::new(
-                forward.as_ref(),
-                discount.base_date(),
-            )?;
-            let discount_df = |t| model_discount.get_df(t).unwrap_or(f64::NAN);
-            let forward_df = |t| model_forward.get_df(t).unwrap_or(f64::NAN);
             rust_hw::bootstrap_hull_white_sigma_schedule_to_cap_floors(
-                &discount_df,
-                &forward_df,
+                discount.as_ref(),
                 &quotes,
                 config,
+                forward.as_deref(),
             )
         })
         .map_err(core_to_py)?;
@@ -919,7 +915,7 @@ fn bootstrap_hull_white_sigma_schedule_to_cap_floors(
 
 /// Register the `finstack_quant.calibration.hull_white` namespace.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "hull_white")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "hull_white")?;
     m.setattr("__doc__", MODULE_DOC)?;
     m.add_class::<PyCapFloorCalibrationConfig>()?;
     m.add_class::<PyCapFloorQuote>()?;
@@ -956,13 +952,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             ],
         )?,
     )?;
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "hull_white",
-        "finstack_quant.calibration",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
     Ok(())
 }

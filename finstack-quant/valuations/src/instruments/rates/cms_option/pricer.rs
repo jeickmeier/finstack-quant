@@ -10,12 +10,12 @@
 //! The convexity adjustment accounts for the difference between the CMS rate
 //! (which is a martingale under the payment measure) and the forward swap rate
 //! (martingale under the annuity measure). Per Hagan (2003), the adjustment
-//! depends on the annuity sensitivity to rate changes:
+//! depends on the payment-bond and annuity sensitivities to rate changes:
 //!
 //! ```text
 //! CMS_Rate ≈ Forward_Swap_Rate + Convexity_Adjustment
-//! Convexity_Adjustment = 0.5 * σ² * T * G(S)
-//! where G(S) ≈ swap_tenor / (1 + S * swap_tenor)²
+//! Convexity_Adjustment = F² * σ² * T * d(log h(F))/dF
+//! h(F) = (1 + F/m)^(-m*payment_delay) / A_par(F)
 //! ```
 //!
 //! # Accuracy Limitations
@@ -33,7 +33,7 @@
 //! - Hull, J. (2018). "Options, Futures, and Other Derivatives." `docs/REFERENCES.md#hull-options-futures`
 
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::rates::cms_common::par_annuity;
+use crate::instruments::rates::cms_common::annuity_weight;
 use crate::instruments::rates::cms_option::types::CmsOption;
 use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
@@ -119,7 +119,7 @@ impl CmsOptionPricer {
                 inst.cms_tenor,
                 "CmsOption cms_tenor",
             )?;
-            let swap_end = swap_start.add_months(swap_tenor_months);
+            let swap_end = swap_start.add_months(swap_tenor_months)?;
 
             // Calculate annuity and forward rate
             let (forward_swap_rate, _) =
@@ -176,6 +176,10 @@ impl CmsOptionPricer {
                     inst.cms_tenor.to_years(),
                     forward_swap_rate,
                     reference_swap.payments_per_year()?,
+                    crate::instruments::rates::cms_common::signed_act365f_year_fraction(
+                        swap_start,
+                        payment_date,
+                    )?,
                 )
             } else {
                 0.0
@@ -281,18 +285,20 @@ pub(crate) fn compute_pv(inst: &CmsOption, curves: &MarketContext, as_of: Date) 
 /// CA ≈ (g'(F) / g(F)) · Var^A[S] ≈ (g'(F) / g(F)) · F² · σ² · T
 /// ```
 ///
-/// where `g(k) = DF_pay / A_par(k)` is the Radon-Nikodym derivative between the
-/// payment measure and the annuity measure. Because `DF_pay` is independent of
-/// `k`, `g'(F)/g(F) = −A_par'(F)/A_par(F)`. The bracket `g'/g` has units of
-/// `1/rate`, so `CA = (g'/g)·F²·σ²T` has units of a rate — dimensionally
-/// consistent.
+/// where `g(k) = (1+k/m)^(-m*delay) / A_par(k)` is the Radon-Nikodym derivative between the
+/// payment measure and the annuity measure. The zero-delay convenience function
+/// assumes payment at reference-swap start. For actual coupon dates use
+/// [`convexity_adjustment_with_frequency`], including the payment-bond sensitivity
+/// `-m*delay/(m+F)` as well as `-A_par'(F)/A_par(F)`.
 ///
 /// The earlier `0.5·σ²T·G(S)` form with `G(S) = swap_tenor/(1+S·tenor)²` was
 /// dimensionally wrong: `G(S)` carries units of *years*, so the result was not
 /// a rate and was oversized by one-to-two orders of magnitude.
 ///
-/// The fixed-leg payment frequency is assumed semi-annual (`m = 2`), the
-/// dominant market convention. Callers needing the exact schedule should use
+/// This convenience function assumes semiannual fixed coupons (`m = 2`)
+/// and payment at reference-swap start. It does not infer a market convention.
+/// Callers needing the resolved frequency and actual payment delay should use
+/// [`convexity_adjustment_with_frequency`]. For higher-order effects use
 /// the static-replication pricer (`replication_pricer`,
 /// `ModelKey::StaticReplication`), which captures convexity to all orders.
 ///
@@ -318,7 +324,14 @@ pub fn convexity_adjustment(
     swap_tenor: f64,
     forward_rate: f64,
 ) -> f64 {
-    convexity_adjustment_with_frequency(volatility, time_to_fixing, swap_tenor, forward_rate, 2.0)
+    convexity_adjustment_with_frequency(
+        volatility,
+        time_to_fixing,
+        swap_tenor,
+        forward_rate,
+        2.0,
+        0.0,
+    )
 }
 
 /// First-order CMS convexity adjustment using the actual reference-swap fixed
@@ -332,12 +345,14 @@ pub fn convexity_adjustment(
 /// * `forward_rate` - Forward par swap rate before convexity adjustment.
 /// * `payments_per_year` - Fixed-leg payment frequency, such as `2.0` for
 ///   semiannual coupons, used by the annuity proxy.
+/// * `payment_delay` - Signed ACT/365F years from reference-swap start to coupon payment.
 pub fn convexity_adjustment_with_frequency(
     volatility: f64,
     time_to_fixing: f64,
     swap_tenor: f64,
     forward_rate: f64,
     payments_per_year: f64,
+    payment_delay: f64,
 ) -> f64 {
     if forward_rate <= 0.0
         || time_to_fixing <= 0.0
@@ -348,16 +363,76 @@ pub fn convexity_adjustment_with_frequency(
         return 0.0;
     }
 
-    let a_par = |k: f64| par_annuity(k, swap_tenor, payments_per_year);
-    let a0 = a_par(forward_rate);
-    if a0.abs() < 1e-12 {
-        return 0.0;
-    }
-
-    // g'(F)/g(F) = −A_par'(F)/A_par(F), with A_par' via a central difference.
-    let h = (forward_rate * 1e-4).max(1e-7);
-    let a_prime = (a_par(forward_rate + h) - a_par(forward_rate - h)) / (2.0 * h);
-    let g_log_deriv = -a_prime / a0;
+    let (weight, derivative, _) =
+        annuity_weight(forward_rate, swap_tenor, payments_per_year, payment_delay);
+    let g_log_deriv = derivative / weight;
 
     g_log_deriv * forward_rate * forward_rate * volatility * volatility * time_to_fixing
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::instruments::rates::cms_option::replication_pricer::{
+        replicated_cms_optionlet, CmsOptionletInputs,
+    };
+    use crate::instruments::OptionType;
+    use finstack_quant_core::market_data::surfaces::VolSurface;
+
+    #[test]
+    fn payment_delay_coefficient_matches_measure_change() {
+        let f = 0.04;
+        let vol = 0.20;
+        let t = 2.0;
+        let m = 2.0;
+        let base = convexity_adjustment_with_frequency(vol, t, 10.0, f, m, 0.0);
+        for delay in [-2.0 / 365.0, 0.25, 5.0] {
+            let adjusted = convexity_adjustment_with_frequency(vol, t, 10.0, f, m, delay);
+            let expected_change = -m * delay / (m + f) * f * f * vol * vol * t;
+            assert!((adjusted - base - expected_change).abs() < 1e-15);
+            assert_eq!(
+                convexity_adjustment_with_frequency(0.0, t, 10.0, f, m, delay),
+                0.0
+            );
+        }
+    }
+
+    #[test]
+    fn first_order_mean_converges_to_normalized_replication_at_variance_order() {
+        let f = 0.04;
+        for delay in [0.0, 0.25, 5.0] {
+            let errors: Vec<f64> = [0.04, 0.02]
+                .into_iter()
+                .map(|vol| {
+                    let surface = VolSurface::builder("CMS-CONVERGENCE")
+                        .expiries(&[1.0, 2.0])
+                        .strikes(&[0.01, 0.08])
+                        .row(&[vol, vol])
+                        .row(&[vol, vol])
+                        .build()
+                        .expect("flat Black surface");
+                    let inputs = CmsOptionletInputs {
+                        forward_rate: f,
+                        time_to_fixing: 1.0,
+                        df_pay: 1.0,
+                        vol_surface: &surface,
+                        cms_tenor: 10.0,
+                        payments_per_year: 2.0,
+                        payment_delay: delay,
+                    };
+                    let mean = replicated_cms_optionlet(&inputs, 0.0, OptionType::Call)
+                        .expect("positive-rate mean");
+                    let approximate =
+                        f + convexity_adjustment_with_frequency(vol, 1.0, 10.0, f, 2.0, delay);
+                    (mean - approximate).abs()
+                })
+                .collect();
+            // Halving volatility quarters the retained variance term; the
+            // omitted higher-order terms must decay materially faster.
+            assert!(
+                errors[1] < errors[0] * 0.15 + 1e-12,
+                "delay={delay}: {errors:?}"
+            );
+        }
+    }
 }

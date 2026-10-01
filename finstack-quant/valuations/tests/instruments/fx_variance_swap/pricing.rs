@@ -4,7 +4,7 @@ use crate::instruments::test_support::date::date;
 use crate::instruments::test_support::discount_forward_curves::flat_discount_with_tenor;
 use crate::instruments::test_support::volatility::flat_vol_surface;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{DayCount, Tenor};
+use finstack_quant_core::dates::{DayCount, DayCountContext, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
 use finstack_quant_core::money::Money;
@@ -23,7 +23,9 @@ fn test_forward_variance_flat_surface() {
     let for_curve = flat_discount_with_tenor("EUR-OIS", as_of, 0.01, 2.0);
 
     let expiries = [1.0];
-    let strikes = [0.8, 1.0, 1.2, 1.4, 1.6];
+    // A dense strip isolates the variance model from a five-strike
+    // quadrature error, which previously consumed most of the tolerance.
+    let strikes: Vec<_> = (50..=600).map(|i| f64::from(i) * 0.005).collect();
     let vol = 0.20;
     let vol_surface = flat_vol_surface("EURUSD-VOL", &expiries, &strikes, vol);
 
@@ -62,10 +64,23 @@ fn test_forward_variance_flat_surface() {
         .unwrap();
 
     let fwd_var = swap.remaining_forward_variance(&ctx, as_of).unwrap();
+    let dates = swap.observation_dates().expect("observation schedule");
+    // Under deterministic rates and volatility each log return has variance
+    // sigma² dt and mean (r_dom-r_for-sigma²/2) dt. Normalize their squared
+    // moments by the contractual count, not by one calendar year.
+    let expected_sum: f64 = dates
+        .windows(2)
+        .map(|window| {
+            let dt = DayCount::Act365F
+                .year_fraction(window[0], window[1], DayCountContext::default())
+                .expect("return interval");
+            vol * vol * dt + ((0.02 - 0.01 - 0.5 * vol * vol) * dt).powi(2)
+        })
+        .sum();
+    let expected = swap.annualization_factor() * expected_sum / (dates.len() - 1) as f64;
     assert!(
-        (fwd_var - vol * vol).abs() < 5e-3,
-        "forward variance {}",
-        fwd_var
+        (fwd_var - expected).abs() < 1e-5,
+        "forward variance {fwd_var} vs discrete lognormal expectation {expected}"
     );
 
     let fair_swap = FxVarianceSwap::builder()

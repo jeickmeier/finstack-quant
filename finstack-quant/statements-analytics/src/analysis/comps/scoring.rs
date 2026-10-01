@@ -59,7 +59,7 @@ pub struct ScoringDimension {
     /// Optional explanatory metric for single-factor regression.
     /// Omit it to score the dependent metric against its peer distribution.
     pub x_extractor: Option<MetricExtractor>,
-    /// Weight of this dimension in the composite score (0.0 to 1.0).
+    /// Finite, non-negative relative weight in the composite score; zero disables it.
     pub weight: f64,
     /// Rich/cheap sign convention for the Y metric (default:
     /// [`ScoreDirection::HigherIsCheap`], i.e. spread-like).
@@ -152,6 +152,9 @@ pub struct RelativeValueResult {
 /// signals are unitless, so configured weights compare like with like.
 /// Each dimension's [`ScoringDimension::direction`] maps its signal onto
 /// the composite sign convention: positive = cheap.
+/// Unusable dimensions are excluded and the remaining weights are normalized.
+/// A regression dimension requires a finite fitted residual and positive peer
+/// residual dispersion; it never falls back to a univariate score.
 ///
 /// # Arguments
 ///
@@ -162,9 +165,8 @@ pub struct RelativeValueResult {
 ///
 /// # Errors
 ///
-/// Returns validation errors for an empty dimension set or unusable peer data,
-/// and propagates metric extraction, regression, and statistical-calculation
-/// errors for the configured dimensions.
+/// Returns validation errors for an empty dimension set, negative/non-finite
+/// weights, no usable positive-weight dimension, or a non-finite composite.
 pub fn score_relative_value(
     peer_set: &PeerSet,
     dimensions: &[ScoringDimension],
@@ -174,14 +176,32 @@ pub fn score_relative_value(
             "at least one scoring dimension is required".into(),
         ));
     }
+    if dimensions
+        .iter()
+        .any(|dim| !dim.weight.is_finite() || dim.weight < 0.0)
+    {
+        return Err(Error::Validation(
+            "scoring dimension weights must be finite and non-negative".into(),
+        ));
+    }
+    if !dimensions.iter().any(|dim| dim.weight > 0.0) {
+        return Err(Error::Validation(
+            "at least one usable positive-weight scoring dimension is required".into(),
+        ));
+    }
 
     let mut dim_scores = Vec::with_capacity(dimensions.len());
     let mut weighted_sum = 0.0;
     let mut total_weight = 0.0;
     let mut confidence_num = 0.0;
     let mut confidence_den = 0.0;
+    let mut weight_scale = 0.0;
+    let mut confidence_scale = 0.0;
 
     for dim in dimensions {
+        if dim.weight == 0.0 {
+            continue;
+        }
         // Extract Y values from peers and subject
         let peer_y = extract_values(peer_set, &dim.y_extractor);
         let subject_y = extract_subject_value(peer_set, &dim.y_extractor);
@@ -190,8 +210,12 @@ pub fn score_relative_value(
             _ => continue, // Skip dimension if data is insufficient
         };
 
-        let pctile = percentile_rank(peer_vals, subject_val).unwrap_or(0.5);
-        let zs = z_score(peer_vals, subject_val).unwrap_or(0.0);
+        let (Some(pctile), Some(zs)) = (
+            percentile_rank(peer_vals, subject_val),
+            z_score(peer_vals, subject_val),
+        ) else {
+            continue;
+        };
 
         let (reg_residual, r_sq, std_residual) = if let Some(x_extractor) = &dim.x_extractor {
             // Extract (x, y) pairwise per peer so a peer missing one metric
@@ -225,16 +249,42 @@ pub fn score_relative_value(
         // or the raw z-score for univariate dimensions. The dimension's
         // direction flag then maps it to the composite convention
         // (positive = cheap).
-        let raw_signal = std_residual.unwrap_or(zs);
+        let raw_signal = if dim.x_extractor.is_some() {
+            let Some(signal) = std_residual else {
+                continue;
+            };
+            signal
+        } else {
+            zs
+        };
         let score = match dim.direction {
             ScoreDirection::HigherIsCheap => raw_signal,
             ScoreDirection::HigherIsRich => -raw_signal,
         };
-        weighted_sum += dim.weight * score;
-        total_weight += dim.weight;
+        // Scaling all weights by the same factor preserves their relative
+        // influence while avoiding overflow from large finite input weights.
+        if dim.weight > weight_scale {
+            let factor = weight_scale / dim.weight;
+            weighted_sum *= factor;
+            total_weight *= factor;
+            weight_scale = dim.weight;
+        }
+        let weight = dim.weight / weight_scale;
+        weighted_sum += weight * score;
+        total_weight += weight;
         if let Some(rsq) = r_sq {
-            confidence_num += dim.weight * rsq;
-            confidence_den += dim.weight;
+            // Confidence averages only regression dimensions. Scale that
+            // subset independently so a large univariate weight cannot erase
+            // otherwise usable regression confidence by underflow.
+            if dim.weight > confidence_scale {
+                let factor = confidence_scale / dim.weight;
+                confidence_num *= factor;
+                confidence_den *= factor;
+                confidence_scale = dim.weight;
+            }
+            let confidence_weight = dim.weight / confidence_scale;
+            confidence_num += confidence_weight * rsq;
+            confidence_den += confidence_weight;
         }
 
         dim_scores.push(DimensionScore {
@@ -247,16 +297,22 @@ pub fn score_relative_value(
         });
     }
 
-    let composite = if total_weight > 0.0 {
-        weighted_sum / total_weight
-    } else {
-        0.0
-    };
+    if total_weight <= 0.0 {
+        return Err(Error::Validation(
+            "no usable positive-weight scoring dimension".into(),
+        ));
+    }
+    let composite = weighted_sum / total_weight;
     let confidence = if confidence_den > 0.0 {
         confidence_num / confidence_den
     } else {
         0.0
     };
+    if !composite.is_finite() || !confidence.is_finite() {
+        return Err(Error::Validation(
+            "relative value score must be finite".into(),
+        ));
+    }
 
     Ok(RelativeValueResult {
         company_id: peer_set.subject.id.clone(),
@@ -340,9 +396,147 @@ fn extract_subject_value(peer_set: &PeerSet, extractor: &MetricExtractor) -> Opt
 
 /// Extract a single metric value from a `CompanyMetrics`.
 fn extract_single(metrics: &CompanyMetrics, extractor: &MetricExtractor) -> Option<f64> {
-    match extractor {
+    let value = match extractor {
         MetricExtractor::Named(name) => metrics.named_metric(name),
         MetricExtractor::Multiple(multiple) => compute_multiple(metrics, *multiple),
         MetricExtractor::Custom(key) => metrics.custom.get(key).copied(),
+    };
+    value.filter(|value| value.is_finite())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::analysis::comps::PeriodBasis;
+
+    fn company(id: &str, leverage: Option<f64>, spread: Option<f64>) -> CompanyMetrics {
+        let mut company = CompanyMetrics::new(id);
+        company.leverage = leverage;
+        company.oas_bp = spread;
+        company
+    }
+
+    fn dimension(regression: bool, weight: f64) -> ScoringDimension {
+        ScoringDimension {
+            label: if regression {
+                "regression"
+            } else {
+                "univariate"
+            }
+            .into(),
+            y_extractor: MetricExtractor::Named("oas_bp".into()),
+            x_extractor: regression.then(|| MetricExtractor::Named("leverage".into())),
+            weight,
+            direction: ScoreDirection::HigherIsCheap,
+        }
+    }
+
+    #[test]
+    fn unusable_regression_does_not_fall_back_to_an_univariate_signal() {
+        let peers = vec![
+            company("a", Some(1.0), Some(10.0)),
+            company("b", Some(2.0), Some(20.0)),
+            company("c", Some(3.0), Some(30.0)),
+        ];
+        // Subject is exactly on a perfect peer fair-value line but has a high
+        // raw spread; substituting its z-score falsely labels it cheap.
+        let set = PeerSet::new(
+            company("subject", Some(4.0), Some(40.0)),
+            peers,
+            PeriodBasis::Ltm,
+        );
+        assert!(score_relative_value(&set, &[dimension(true, 1.0)]).is_err());
+        let result =
+            score_relative_value(&set, &[dimension(true, f64::MAX), dimension(false, 1.0)])
+                .expect("usable univariate evidence");
+        assert_eq!(result.dimensions.len(), 1);
+        assert_eq!(result.dimensions[0].label, "univariate");
+        assert_eq!(result.composite_score, 2.0);
+        assert_eq!(result.confidence, 0.0);
+    }
+
+    #[test]
+    fn no_data_or_zero_dispersion_is_unavailable_instead_of_neutral() {
+        let subject = company("subject", Some(1.0), Some(10.0));
+        for peers in [
+            vec![],
+            vec![company("a", None, None)],
+            vec![
+                company("a", None, Some(10.0)),
+                company("b", None, Some(10.0)),
+            ],
+        ] {
+            let set = PeerSet::new(subject.clone(), peers, PeriodBasis::Ltm);
+            assert!(score_relative_value(&set, &[dimension(false, 1.0)]).is_err());
+        }
+    }
+
+    #[test]
+    fn missing_subject_predictor_excludes_regression() {
+        let peers = vec![
+            company("a", Some(1.0), Some(10.0)),
+            company("b", Some(2.0), Some(23.0)),
+            company("c", Some(3.0), Some(30.0)),
+        ];
+        let set = PeerSet::new(
+            company("subject", None, Some(40.0)),
+            peers,
+            PeriodBasis::Ltm,
+        );
+        assert!(score_relative_value(&set, &[dimension(true, 1.0)]).is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_weights_and_requires_positive_usable_weight() {
+        let peers = vec![
+            company("a", None, Some(10.0)),
+            company("b", None, Some(20.0)),
+        ];
+        let set = PeerSet::new(
+            company("subject", None, Some(30.0)),
+            peers,
+            PeriodBasis::Ltm,
+        );
+        for weight in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            assert!(score_relative_value(&set, &[dimension(false, weight)]).is_err());
+        }
+        let result = score_relative_value(
+            &set,
+            &[dimension(false, f64::MAX), dimension(false, f64::MAX)],
+        )
+        .expect("large finite weights normalize");
+        assert!(result.composite_score.is_finite());
+        assert_eq!(
+            result.composite_score,
+            z_score(&[10.0, 20.0], 30.0).expect("z score")
+        );
+    }
+
+    #[test]
+    fn univariate_weight_does_not_underflow_regression_confidence() {
+        let peers = vec![
+            company("a", Some(1.0), Some(10.0)),
+            company("b", Some(2.0), Some(23.0)),
+            company("c", Some(3.0), Some(30.0)),
+        ];
+        let set = PeerSet::new(
+            company("subject", Some(4.0), Some(40.0)),
+            peers,
+            PeriodBasis::Ltm,
+        );
+        let result = score_relative_value(
+            &set,
+            &[
+                dimension(true, f64::MIN_POSITIVE),
+                dimension(false, f64::MAX),
+            ],
+        )
+        .expect("usable evidence");
+        assert_eq!(result.dimensions.len(), 2);
+        let regression_r_squared = result.dimensions[0]
+            .r_squared
+            .expect("regression confidence");
+        assert!(regression_r_squared > 0.9);
+        assert_eq!(result.confidence, regression_r_squared);
     }
 }

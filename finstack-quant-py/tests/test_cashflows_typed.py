@@ -829,6 +829,43 @@ class TestCashFlowSchedule:
         wal = schedule.wal(dt.date(2025, 1, 15))
         assert wal == pytest.approx(1.0, abs=1e-12)
 
+    @pytest.mark.parametrize("scale", [1e100, 1e30, 10.0])
+    @pytest.mark.parametrize("principal_delta", [False, True])
+    def test_scale_amounts_overflow_is_value_error(self, scale: float, principal_delta: bool) -> None:
+        from finstack_quant.cashflows.builder import CashFlowMeta, CashFlowSchedule, Notional
+        from finstack_quant.cashflows.primitives import CashFlow, CFKind
+        from finstack_quant.core.dates import DayCount
+
+        amount = "10000000000000000000000000000" if scale == 10.0 else "1"
+        if principal_delta:
+            row = CashFlow("2025-06-01", Money(0, "USD"), CFKind.NOTIONAL).with_principal_delta(Money(amount, "USD"))
+        else:
+            row = CashFlow("2025-06-01", Money(amount, "USD"), CFKind.FIXED)
+        schedule = CashFlowSchedule.from_parts([row], Notional.par(0, "USD"), DayCount.ACT_360, CashFlowMeta())
+        original = schedule.to_json()
+        with pytest.raises(ValueError, match="conversion overflow"):
+            schedule.scale_amounts(scale)
+        assert schedule.to_json() == original
+
+    def test_weighted_average_life_includes_revolving_repayment(self) -> None:
+        from finstack_quant.cashflows.builder import CashFlowMeta, CashFlowSchedule, Notional
+        from finstack_quant.cashflows.primitives import CashFlow, CFKind
+        from finstack_quant.core.dates import DayCount
+
+        row = CashFlow("2026-01-01", Money(100, "USD"), CFKind.REVOLVING_REPAYMENT)
+        schedule = CashFlowSchedule.from_parts([row], Notional.par(100, "USD"), DayCount.ACT_360, CashFlowMeta())
+        assert schedule.wal(dt.date(2025, 1, 1)) == pytest.approx(1.0)
+
+    def test_calendar_year_ladder_rejects_mixed_currency(self) -> None:
+        from finstack_quant.cashflows.builder import CashFlowMeta, CashFlowSchedule, Notional
+        from finstack_quant.cashflows.primitives import CashFlow, CFKind
+        from finstack_quant.core.dates import DayCount
+
+        rows = [CashFlow("2025-06-01", Money(100, currency), CFKind.FIXED) for currency in ("USD", "EUR")]
+        schedule = CashFlowSchedule.from_parts(rows, Notional.par(0, "USD"), DayCount.ACT_360, CashFlowMeta())
+        with pytest.raises(ValueError, match=r"[Cc]urrency"):
+            schedule.calendar_year_ladder([100.0, 100.0])
+
     def test_outstanding_by_date(self) -> None:
         schedule = self._bond()
         path = schedule.outstanding_by_date()
@@ -880,6 +917,23 @@ class TestCashFlowSchedule:
         assert set(df["currency"]) == {"USD"}
         assert df["amount"].sum() == pytest.approx(sum(f.amount.amount for f in schedule.get_flows()), abs=1e-9)
         assert isinstance(df, pd.DataFrame)
+
+    def test_dataframe_outstanding_uses_economic_dates_and_initial_notional(self) -> None:
+        from finstack_quant.cashflows.builder import CashFlowMeta, CashFlowSchedule, Notional
+        from finstack_quant.cashflows.primitives import CashFlow, CFKind
+        from finstack_quant.core.dates import DayCount
+
+        rows = [
+            CashFlow("2025-01-02", Money(1, "USD"), CFKind.FIXED),
+            CashFlow("2025-01-05", Money(1, "USD"), CFKind.FIXED),
+            CashFlow("2025-01-06", Money(20, "USD"), CFKind.NOTIONAL)
+            .with_principal_delta(Money(-20, "USD"))
+            .with_principal_date("2025-01-05"),
+        ]
+        schedule = CashFlowSchedule.from_parts(
+            rows, Notional.par(100, "USD"), DayCount.ACT_360, CashFlowMeta(issue_date="2025-01-01")
+        )
+        assert schedule.to_dataframe(outstanding=True)["outstanding"].tolist() == [100.0, 80.0, 80.0]
 
     def test_json_round_trip_matches_json_bridge(self) -> None:
         from finstack_quant.cashflows import validate_cashflow_schedule_json
@@ -938,6 +992,48 @@ class TestAccrual:
 
         schedule = self._semiannual_bond()
         assert accrued_interest_amount(schedule, dt.date(2024, 12, 31)).amount == pytest.approx(0.0)
+
+    @pytest.mark.parametrize("coupon_rate", ["-2", "-4"])
+    def test_compounded_accrual_rejects_invalid_period_rate(self, coupon_rate: str) -> None:
+        from finstack_quant.cashflows import accrued_interest
+        from finstack_quant.cashflows.accrual import AccrualConfig, AccrualIndex, AccrualMethod, accrued_interest_amount
+        from finstack_quant.cashflows.builder import CashFlowSchedule, FixedCouponSpec, ScheduleParams
+
+        schedule = (
+            CashFlowSchedule
+            .builder()
+            .principal(Money(100, "USD"), "2025-01-01", "2026-01-01")
+            .fixed_cf(FixedCouponSpec(coupon_rate, ScheduleParams.semiannual_30360()))
+            .build()
+        )
+        config = AccrualConfig(method=AccrualMethod.COMPOUNDED)
+        index = AccrualIndex.build(schedule, config)
+        with pytest.raises(ValueError, match="compounded period rate"):
+            index.accrued_at("2025-04-01")
+        with pytest.raises(ValueError, match="compounded period rate"):
+            accrued_interest_amount(schedule, "2025-04-01", config)
+        with pytest.raises(ValueError, match="compounded period rate"):
+            accrued_interest(schedule.to_json(), "2025-04-01", config.to_json())
+
+    def test_compounded_accrual_accepts_valid_negative_period_rate(self) -> None:
+        from math import sqrt
+
+        from finstack_quant.cashflows import accrued_interest
+        from finstack_quant.cashflows.accrual import AccrualConfig, AccrualIndex, AccrualMethod, accrued_interest_amount
+        from finstack_quant.cashflows.builder import CashFlowSchedule, FixedCouponSpec, ScheduleParams
+
+        schedule = (
+            CashFlowSchedule
+            .builder()
+            .principal(Money(100, "USD"), "2025-01-01", "2026-01-01")
+            .fixed_cf(FixedCouponSpec("-0.4", ScheduleParams.semiannual_30360()))
+            .build()
+        )
+        config = AccrualConfig(method=AccrualMethod.COMPOUNDED)
+        expected = 100.0 * (sqrt(0.8) - 1.0)
+        assert AccrualIndex.build(schedule, config).accrued_at("2025-04-01").amount == pytest.approx(expected)
+        assert accrued_interest_amount(schedule, "2025-04-01", config).amount == pytest.approx(expected)
+        assert accrued_interest(schedule.to_json(), "2025-04-01", config.to_json()) == pytest.approx(expected)
 
     def test_accrual_method_is_hashable(self) -> None:
         from finstack_quant.cashflows.accrual import AccrualMethod

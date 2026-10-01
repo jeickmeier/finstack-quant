@@ -14,6 +14,10 @@ use crate::Result;
 /// Checks that retained earnings flow correctly across periods:
 /// RE(t) = RE(t−1) + NI(t) − Dividends(t) ± Adjustments(t).
 ///
+/// Every configured balance, flow, and adjustment must use the same
+/// scalar/monetary units and currency. Execution rejects incompatible units or
+/// invalid numeric tolerances; it performs no FX conversion.
+///
 /// # Sign convention
 ///
 /// * `net_income_node` carries the [`SignConventionPolicy::InflowPositive`]
@@ -63,6 +67,15 @@ impl Check for RetainedEarningsReconciliation {
     }
 
     fn execute(&self, context: &CheckContext) -> Result<CheckResult> {
+        crate::checks::helpers::validate_identity_inputs(
+            self.id(),
+            context,
+            self.tolerance,
+            [&self.retained_earnings_node, &self.net_income_node]
+                .into_iter()
+                .chain(self.dividends_node.iter())
+                .chain(&self.other_adjustments),
+        )?;
         let mut findings = Vec::new();
         let periods = &context.model.periods;
 

@@ -389,7 +389,7 @@ impl MarketContext {
     /// #     .knots([(0.0, 0.01), (5.0, 0.015)])
     /// #     .build()
     /// #     .expect("... creation should succeed"));
-    /// # let base_corr = Arc::new(BaseCorrelationCurve::builder("CDX")
+    /// # let base_corr = Arc::new(BaseCorrelationCurve::builder("CDX-BC")
     /// #     .knots([(3.0, 0.25), (10.0, 0.55)])
     /// #     .build()
     /// #     .expect("... creation should succeed"));
@@ -397,10 +397,11 @@ impl MarketContext {
     /// #     .num_constituents(125)
     /// #     .recovery_rate(0.4)
     /// #     .index_credit_curve(Arc::clone(&hazard))
-    /// #     .base_correlation_curve(base_corr)
+    /// #     .base_correlation_curve(Arc::clone(&base_corr))
     /// #     .build()
     /// #     .expect("... builder should succeed");
-    /// # let ctx = MarketContext::new().insert_credit_index("CDX-IG", data);
+    /// # let ctx = MarketContext::new().insert(hazard).insert(base_corr)
+    /// #     .insert_credit_index("CDX-IG", data).expect("index dependencies are present");
     /// let idx = ctx.get_credit_index("CDX-IG").expect("Credit index should exist");
     /// assert_eq!(idx.num_constituents, 125);
     /// ```

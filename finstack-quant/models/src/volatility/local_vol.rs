@@ -46,7 +46,14 @@
 //!   John Wiley & Sons. Chapter 2. `docs/REFERENCES.md#gatheral-volatility-surface`
 
 use crate::closed_form::black_call;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolGridOpts, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
+
+fn validate_implied_surface(surface: &VolSurface) -> finstack_quant_core::Result<()> {
+    surface.require_secondary_axis(VolSurfaceAxis::Strike)?;
+    surface.require_quote_type(VolQuoteType::BlackLognormal)
+}
 
 /// Local volatility surface extracted from an implied volatility surface
 /// via the Dupire formula.
@@ -92,7 +99,7 @@ impl LocalVolSurface {
     ///
     /// # Arguments
     ///
-    /// * `surface` — implied volatility surface (bilinear-interpolated)
+    /// * `surface` — unshifted Black implied volatilities on expiry and strike axes (bilinear-interpolated).
     /// * `forward` — forward price under the forward measure (assumed constant across expiries for simplicity)
     ///
     /// The Dupire ratio is evaluated on **undiscounted** forward call prices — discounting
@@ -106,11 +113,13 @@ impl LocalVolSurface {
     /// # Errors
     ///
     /// Returns an error if the surface has fewer than 2 expiries or 3 strikes
-    /// (insufficient for finite differences).
+    /// (insufficient for finite differences), does not use a strike axis, or
+    /// contains normal or displaced-Black quotes.
     pub fn from_implied_vol(
         surface: &VolSurface,
         forward: f64,
     ) -> finstack_quant_core::Result<Self> {
+        validate_implied_surface(surface)?;
         let expiries = surface.expiries().to_vec();
         let strikes = surface.strikes().to_vec();
         let n_exp = expiries.len();
@@ -299,19 +308,21 @@ impl LocalVolSurface {
     ///
     /// # Arguments
     ///
-    /// * `surface` — implied volatility surface
+    /// * `surface` — unshifted Black implied volatilities on expiry and strike axes; other quote conventions and axes are rejected before smoothing.
     /// * `forward` — forward price
     /// * `sigma_strikes` — Gaussian kernel width in strike-space units (≥ 0)
     ///
     /// # Errors
     ///
     /// Returns an error if the surface has fewer than 2 expiries or 3 strikes,
-    /// or if `sigma_strikes` is negative.
+    /// if its axis or quote convention is unsupported, or if `sigma_strikes`
+    /// is negative.
     pub fn from_implied_vol_smoothed(
         surface: &VolSurface,
         forward: f64,
         sigma_strikes: f64,
     ) -> finstack_quant_core::Result<Self> {
+        validate_implied_surface(surface)?;
         if sigma_strikes < 0.0 {
             return Err(finstack_quant_core::Error::Validation(
                 "sigma_strikes must be non-negative".to_string(),
@@ -357,13 +368,20 @@ impl LocalVolSurface {
             }
         }
 
-        // Build a smoothed VolSurface and delegate to the standard extractor.
-        let mut builder = VolSurface::builder(surface.id().as_str());
-        builder = builder.expiries(&expiries).strikes(&strikes);
-        for ei in 0..n_exp {
-            builder = builder.row(&smoothed_vols[ei * n_str..(ei + 1) * n_str]);
-        }
-        let smoothed_surface = builder.build()?;
+        // Smoothing changes values only, preserving the full artifact contract
+        // before the canonical extractor validates it again.
+        let smoothed_surface = VolSurface::from_grid_opts(
+            surface.id().as_str(),
+            &expiries,
+            &strikes,
+            &smoothed_vols,
+            VolGridOpts {
+                secondary_axis: surface.secondary_axis(),
+                quote_type: surface.quote_type(),
+                interpolation_mode: surface.interpolation_mode(),
+            },
+            surface.get_displacements(),
+        )?;
 
         Self::from_implied_vol(&smoothed_surface, forward)
     }
@@ -492,6 +510,26 @@ mod tests {
             LocalVolSurface::from_implied_vol(&surface, 100.0).expect("extraction should succeed");
 
         assert_eq!(lv.grid_shape(), (4, 7));
+    }
+
+    #[test]
+    fn local_vol_rejects_unsupported_conventions_before_smoothing() {
+        let base = test_surface();
+        let shifted = base.clone().with_displacements(&[20.0; 4]).unwrap();
+        let normal = base.clone().with_quote_type(VolQuoteType::Normal).unwrap();
+        let tenor_grid = base.with_secondary_axis(VolSurfaceAxis::Tenor);
+        for surface in [shifted, normal, tenor_grid] {
+            let expected_error = LocalVolSurface::from_implied_vol(&surface, 100.0)
+                .expect_err("unshifted Black extraction must reject incompatible metadata")
+                .to_string();
+            for width in [0.0, 7.5] {
+                let smoothed_error =
+                    LocalVolSurface::from_implied_vol_smoothed(&surface, 100.0, width)
+                        .expect_err("smoothing must preserve and enforce input convention")
+                        .to_string();
+                assert_eq!(smoothed_error, expected_error);
+            }
+        }
     }
 
     /// Pins the row-major (expiry = slow axis, strike = fast axis) storage

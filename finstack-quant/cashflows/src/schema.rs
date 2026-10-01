@@ -246,7 +246,7 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         "schemas/cashflow/1/coupon_specs.schema.json",
         "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json",
         "FixedCouponSpec",
-        "Fixed and floating coupon specification.",
+        "Fixed coupon specification.",
     )
     .with_packager(package_cashflow_schema)
     .with_summary("Coupon rate, frequency, day count and stub handling for one leg.")

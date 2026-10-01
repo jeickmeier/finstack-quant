@@ -19,7 +19,9 @@ pub fn level_payment_per_unit(period_rate: f64, periods: f64) -> f64 {
     if period_rate.abs() < 1e-12 {
         return 1.0 / periods;
     }
-    let denom = 1.0 - (1.0 + period_rate).powf(-periods);
+    // log1p/expm1 preserve the annuity limit without subtracting nearly
+    // equal numbers when the periodic coupon is close to zero.
+    let denom = -(-periods * period_rate.ln_1p()).exp_m1();
     if denom.is_finite() && denom.abs() > 1e-12 {
         period_rate / denom
     } else {

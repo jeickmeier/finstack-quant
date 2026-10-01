@@ -626,7 +626,8 @@ fn optional_results(
 ///     JSON string.
 /// results : StatementResult | str | None
 ///     Pre-computed evaluation results; when provided the model is not
-///     re-evaluated.
+///     re-evaluated. Accounting identity checks require supplied node-unit
+///     metadata to agree with the model's declarations or explicit monetary values.
 ///
 /// Returns
 /// -------
@@ -636,8 +637,10 @@ fn optional_results(
 /// Raises
 /// ------
 /// ValueError
-///     If the spec is malformed, a formula check does not parse, or the
-///     evaluation fails.
+///     If a model, spec, or results payload is malformed, a check configuration
+///     is invalid, formula parsing or evaluation fails, accounting operands
+///     have incompatible currencies/units, or supplied result units conflict
+///     with the model's declarations or explicit monetary values.
 /// KeyError
 ///     If a check references a node missing from the model.
 ///
@@ -676,6 +679,8 @@ fn run_checks(
 ///     Typed node mapping, its serde dict, or JSON string.
 /// results : StatementResult | str | None
 ///     Pre-computed evaluation results; skips re-evaluation when provided.
+///     Supplied accounting-node units must agree with the model's declarations
+///     or explicit monetary values.
 ///
 /// Returns
 /// -------
@@ -685,7 +690,9 @@ fn run_checks(
 /// Raises
 /// ------
 /// ValueError
-///     If the mapping is malformed or the evaluation fails.
+///     If a model, mapping, or results payload is malformed, evaluation fails,
+///     accounting operands have incompatible currencies/units, or supplied
+///     result units conflict with model declarations or explicit monetary values.
 /// KeyError
 ///     If a mapped node is missing from the model.
 ///

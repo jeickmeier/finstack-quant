@@ -218,7 +218,8 @@ impl PyYieldPanel {
 
     /// Deserialize from JSON produced by ``to_json``.
     ///
-    /// Raises ``ValueError`` when the payload is malformed.
+    /// Raises ``ValueError`` when the payload is malformed or violates the
+    /// panel's observation, tenor, yield, or date-alignment requirements.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
         serde_json::from_str(json)
@@ -357,7 +358,8 @@ impl PyFactorTimeSeries {
 
     /// Deserialize from JSON produced by ``to_json``.
     ///
-    /// Raises ``ValueError`` when the payload is malformed.
+    /// Raises ``ValueError`` when the payload is malformed or has non-finite
+    /// values or misaligned factor, residual, date, or fit-statistic dimensions.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
         serde_json::from_str(json)
@@ -469,7 +471,8 @@ impl PyDieboldLi {
 
     /// Extract level/slope/curvature factors from ``panel`` via OLS.
     ///
-    /// Returns a new model; the receiver is unchanged.
+    /// Returns a new model with prior VAR state cleared; fit it again before
+    /// forecasting. The receiver is unchanged.
     ///
     /// Raises ``ValueError`` if the panel has fewer than three tenors or the
     /// loading matrix is singular.
@@ -486,7 +489,8 @@ impl PyDieboldLi {
     /// Returns a new model; the receiver is unchanged.
     ///
     /// Raises ``ValueError`` if factors have not been extracted or fewer than
-    /// five observations are available.
+    /// five observations are available, or ``I - Phi`` is singular and the
+    /// fitted dynamics have no finite unconditional mean.
     fn fit_var(&self, py: Python<'_>) -> PyResult<Self> {
         let model = self.inner.clone();
         py.detach(|| model.fit_var())
@@ -523,7 +527,8 @@ impl PyDieboldLi {
 
     /// Deserialize from JSON produced by ``to_json``.
     ///
-    /// Raises ``ValueError`` when the payload is malformed or ``lambda`` is invalid.
+    /// Raises ``ValueError`` when the payload is malformed, ``lambda`` is invalid,
+    /// or its factor history, tenor grid, or fitted VAR state is inconsistent.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
         serde_json::from_str(json)
@@ -634,7 +639,8 @@ impl PyYieldForecast {
 
     /// Deserialize from JSON produced by ``to_json``.
     ///
-    /// Raises ``ValueError`` when the payload is malformed.
+    /// Raises ``ValueError`` when the payload is malformed, the horizon is zero,
+    /// or yields, tenors, factors, and confidence bands violate their invariants.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
         serde_json::from_str(json)
@@ -828,7 +834,8 @@ impl PyYieldPca {
 
     /// Deserialize from JSON produced by ``to_json``.
     ///
-    /// Raises ``ValueError`` when the payload is malformed.
+    /// Raises ``ValueError`` when the payload is malformed or its loadings,
+    /// scores, eigenvalues, means, or variance vectors are invalid or misaligned.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
         serde_json::from_str(json)
@@ -966,7 +973,8 @@ impl PyYieldPcaView {
 
     /// Deserialize from JSON produced by ``to_json``.
     ///
-    /// Raises ``ValueError`` when the payload is malformed.
+    /// Raises ``ValueError`` when the payload is malformed or its loadings,
+    /// scores, eigenvalues, means, or variance vectors are invalid or misaligned.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
         serde_json::from_str(json)
@@ -1188,7 +1196,7 @@ fn nelson_siegel_yields(lambda_: f64, factors: [f64; 3], tenors: Vec<f64>) -> Py
 
 /// Build the `finstack_quant.models.rates.dtsm` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "dtsm")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "dtsm")?;
     m.setattr(
         "__doc__",
         "Dynamic term structure models: Diebold-Li dynamic Nelson-Siegel and yield-curve PCA.",
@@ -1223,13 +1231,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "dtsm",
-        "finstack_quant.models.rates",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Python,
     )?;
 
     Ok(())

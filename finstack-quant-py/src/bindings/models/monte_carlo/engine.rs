@@ -16,7 +16,11 @@ pub(super) fn py_mc_defaults() -> PyResult<&'static ConvenienceDefaults> {
         .map_err(core_to_py)
 }
 
-/// Simulate a compact set of GBM spot paths through Rust path capture.
+/// Simulate compact GBM spot paths with Rust's exact GBM transitions.
+///
+/// The compact output and shared time grids must satisfy
+/// ``(num_paths + 3) * (num_steps + 1) <= 64_000_000`` scalar values,
+/// including time zero in every path.
 ///
 /// Parameters
 /// ----------
@@ -31,9 +35,11 @@ pub(super) fn py_mc_defaults() -> PyResult<&'static ConvenienceDefaults> {
 /// expiry : float
 ///     Positive simulation horizon in years.
 /// num_steps : int
-///     Number of equally spaced steps over the horizon.
+///     Positive number of equally spaced steps over the horizon, subject to
+///     the aggregate storage limit above.
 /// num_paths : int
-///     Number of captured paths (at most ``100_000``).
+///     Number of captured paths in ``[1, 100_000]``, subject to the aggregate
+///     storage limit above.
 /// seed : int, optional
 ///     Deterministic Philox seed. ``None`` uses the Rust ``GbmPathConfig``
 ///     default seed (``42``), so two calls without a seed are identical.
@@ -48,9 +54,11 @@ pub(super) fn py_mc_defaults() -> PyResult<&'static ConvenienceDefaults> {
 /// Raises
 /// ------
 /// ValueError
-///     If an input is out of domain (non-positive ``spot`` / ``vol`` /
-///     ``expiry``, zero ``num_steps`` or ``num_paths``, the path cap is
-///     exceeded) or ``antithetic`` is ``True``.
+///     If ``spot``, ``vol``, or ``expiry`` is non-positive or non-finite;
+///     ``rate`` or ``div_yield`` is non-finite; ``num_steps`` is zero or
+///     cannot form a time grid; ``num_paths`` is outside ``[1, 100_000]``;
+///     the compact output and shared time grids exceed ``64_000_000`` scalar
+///     values; a simulated spot is non-finite; or ``antithetic`` is ``True``.
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
 #[pyo3(signature = (spot, rate, div_yield, vol, expiry, num_steps, num_paths, seed=None, antithetic=false))]
@@ -201,7 +209,8 @@ fn price_heston(
 /// expiry : float
 ///     Time to expiry in years.
 /// num_paths : int, optional
-///     Simulated paths. Defaults to the configured European-pricer default.
+///     Independent path estimators in ``[2, 10_000_000]``; each antithetic
+///     pair counts once. Defaults to the configured European-pricer default.
 /// seed : int, optional
 ///     RNG seed. The same seed reproduces the same price on any thread count.
 /// num_steps : int, optional
@@ -272,7 +281,8 @@ fn price_heston_call(
 /// expiry : float
 ///     Time to expiry in years.
 /// num_paths : int, optional
-///     Simulated paths. Defaults to the configured European-pricer default.
+///     Independent path estimators in ``[2, 10_000_000]``; each antithetic
+///     pair counts once. Defaults to the configured European-pricer default.
 /// seed : int, optional
 ///     RNG seed. The same seed reproduces the same price on any thread count.
 /// num_steps : int, optional

@@ -164,3 +164,71 @@ fn single_strategy_risk_budget_still_validates_budget() {
         allocate_weights_json(&wrong_sum.to_string()).expect_err("risk budget must sum to one");
     assert!(err.to_string().contains("sum"));
 }
+
+#[test]
+fn capital_rounding_preserves_sign_and_budget_with_deterministic_ties() {
+    for total_capital in [0.02_f64, -0.02, 0.0] {
+        let spec = json!({
+            "scheme": "equal",
+            "total_capital": total_capital,
+            "strategies": [{"id": "a"}, {"id": "b"}, {"id": "c"}, {"id": "d"}],
+            "money_decimal_places": 2
+        });
+        let result: Value = serde_json::from_str(
+            &allocate_weights_json(&spec.to_string()).expect("signed minor-unit allocation"),
+        )
+        .unwrap();
+        let capitals: Vec<f64> = result["allocations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| row["capital"].as_f64().unwrap())
+            .collect();
+        assert!(capitals.iter().all(|capital| capital.is_finite()));
+        assert!(capitals
+            .iter()
+            .all(|capital| capital * total_capital >= 0.0));
+        assert!((capitals.iter().sum::<f64>() - total_capital).abs() < 1e-12);
+        assert_eq!(
+            capitals,
+            vec![total_capital / 2.0, total_capital / 2.0, 0.0, 0.0]
+        );
+    }
+}
+
+#[test]
+fn capital_rounding_assigns_largest_remainders_and_keeps_zero_weights_zero() {
+    let spec = json!({
+        "scheme": "fixed",
+        "total_capital": 0.03,
+        "strategies": [
+            {"id": "a", "fixed_weight": 0.6},
+            {"id": "b", "fixed_weight": 0.3},
+            {"id": "c", "fixed_weight": 0.1},
+            {"id": "zero", "fixed_weight": 0.0}
+        ],
+        "money_decimal_places": 2
+    });
+    let result: Value = serde_json::from_str(
+        &allocate_weights_json(&spec.to_string()).expect("largest remainder allocation"),
+    )
+    .unwrap();
+    let capitals: Vec<f64> = result["allocations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| row["capital"].as_f64().unwrap())
+        .collect();
+    assert_eq!(capitals, vec![0.02, 0.01, 0.0, 0.0]);
+}
+
+#[test]
+fn allocation_rejects_minor_unit_overflow_instead_of_serializing_null_capital() {
+    let spec = json!({
+        "scheme": "equal", "total_capital": 1e308,
+        "strategies": [{"id": "only"}], "money_decimal_places": 2
+    });
+    let error = allocate_weights_json(&spec.to_string())
+        .expect_err("finite capital with overflowing rounded minor units must fail");
+    assert!(error.to_string().contains("finite minor units"));
+}

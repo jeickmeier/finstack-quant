@@ -165,25 +165,30 @@ impl PyHullWhiteParams {
     }
 }
 
-/// Hull-White futures/FRA convexity adjustment for a forward rate over
-/// ``[t_settle, t_end]``.
+/// Low-rate, small-variance Hull-White approximation to the simple-deposit
+/// futures-minus-forward rate bias over ``[t_settle, t_end]``.
 ///
 /// Parameters
 /// ----------
 /// kappa : float
-///     Mean-reversion speed in inverse years (Ho-Lee limit near zero).
+///     Finite non-negative mean-reversion speed in inverse years; zero uses
+///     the Ho-Lee limit.
 /// sigma : float
-///     Short-rate volatility in absolute rate units per square-root year.
+///     Finite non-negative short-rate volatility in absolute decimal rate
+///     units per square-root year.
 /// t_settle : float
-///     Settlement/fixing time in years.
+///     Settlement/fixing time in years using the deposit day-count convention.
 /// t_end : float
-///     End of the accrual period in years (``> t_settle``).
+///     End of the accrual period on the same day-count basis; ``t_end -
+///     t_settle`` is the deposit accrual fraction.
 ///
 /// Returns
 /// -------
 /// float
-///     Additive adjustment in decimal rate units; ``0.0`` when
-///     ``t_settle <= 0`` or the period is empty.
+///     Approximate futures-minus-forward bias in decimal rate units; ``0.0``
+///     for non-positive fixing time or accrual. Non-finite inputs or negative
+///     ``kappa``/``sigma`` return ``NaN`` before degenerate-period handling.
+///     The Ho-Lee limit is ``0.5 * sigma**2 * t_settle * (2*t_end - t_settle)``.
 #[pyfunction]
 #[pyo3(text_signature = "(kappa, sigma, t_settle, t_end)")]
 fn hw1f_convexity_adjustment(kappa: f64, sigma: f64, t_settle: f64, t_end: f64) -> f64 {
@@ -339,7 +344,7 @@ fn hw1f_cap_floor_price(
 
 /// Build the `finstack_quant.models.rates.hull_white` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "hull_white")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "hull_white")?;
     m.setattr(
         "__doc__",
         "Hull-White one-factor parameters and closed-form pricing kernels.",
@@ -362,13 +367,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "hull_white",
-        "finstack_quant.models.rates",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Python,
     )?;
     Ok(())
 }

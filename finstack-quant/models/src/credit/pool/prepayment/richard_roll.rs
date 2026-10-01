@@ -33,7 +33,7 @@
 //! - Richard, S.F., & Roll, R. (1989). "Prepayments on Fixed-Rate Mortgage-Backed Securities."
 //!   *Journal of Portfolio Management*, 15(3), 9-14. `docs/REFERENCES.md#richard-roll-1989`
 
-use super::super::clamped_cpr_to_smm;
+use super::super::{clamped_cpr_to_smm, expected_shocked_smm};
 use super::traits::StochasticPrepayment;
 
 /// Richard-Roll prepayment model for RMBS.
@@ -176,13 +176,10 @@ impl StochasticPrepayment for RichardRollPrepay {
         let refi_mult = self.refi_multiplier(self.pool_coupon);
         let season_mult = self.seasoning_multiplier(seasoning);
         let month_mult = self.seasonality_multiplier((seasoning % 12) + 1);
-        // Jensen correction: `conditional_smm` applies a lognormal factor
-        // shock `e^{βσz}`, so E[shock] = e^{β²σ²/2}, not 1.
-        let jensen = (0.5 * (self.factor_loading * self.cpr_volatility).powi(2)).exp();
-
-        let expected_cpr =
-            (self.base_cpr * refi_mult * season_mult * month_mult * jensen).clamp(0.0, 1.0);
-        clamped_cpr_to_smm(expected_cpr)
+        // Average the clipped monthly rate, not the annual CPR before its
+        // nonlinear conversion. Burnout is one under this baseline convention.
+        let base_cpr = self.base_cpr * refi_mult * season_mult * month_mult;
+        expected_shocked_smm(base_cpr, self.factor_loading * self.cpr_volatility)
     }
 
     fn factor_loading(&self) -> f64 {
@@ -230,6 +227,22 @@ impl StochasticPrepayment for RichardRollPrepay {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn expected_smm_integrates_the_monthly_rate_used_for_burnout() {
+        let model =
+            RichardRollPrepay::with_all_params(0.20, 0.0, 20.0, 0.05, 0.10, 0.0, 1.0, 1.0, 30);
+        let step = 0.0001;
+        let integrated: f64 = (0..200_000)
+            .map(|i| {
+                let z = -10.0 + (f64::from(i) + 0.5) * step;
+                let density = (-0.5 * z * z).exp() / (2.0 * std::f64::consts::PI).sqrt();
+                model.conditional_smm(30, &[z], 0.05, 1.0) * density * step
+            })
+            .sum();
+        assert!((model.expected_smm(30) - integrated).abs() < 2e-6);
+        assert!(model.has_burnout());
+    }
+
     /// Refi incentive moves SMM in the right direction: above-market coupons
     /// prepay faster; below-market coupons prepay slower.
     #[test]

@@ -51,15 +51,16 @@ impl EuropeanPricer {
     ///
     /// # Arguments
     ///
-    /// * `num_paths` - Independent Monte Carlo path estimators; must be positive.
+    /// * `num_paths` - Independent Monte Carlo path estimators; at least two are
+    ///   required to estimate sampling uncertainty.
     ///
     /// # Errors
     ///
-    /// Returns a validation error when `num_paths` is zero.
+    /// Returns a validation error when `num_paths` is less than two.
     pub fn new(num_paths: usize) -> Result<Self> {
-        if num_paths == 0 {
+        if num_paths < 2 {
             return Err(finstack_quant_core::Error::Validation(
-                "EuropeanPricer num_paths must be positive".to_string(),
+                "EuropeanPricer requires at least two independent path estimators".to_string(),
             ));
         }
         Ok(Self {
@@ -436,6 +437,25 @@ mod tests {
     use crate::closed_form::{black_scholes_spot_call, black_scholes_spot_put};
     use crate::monte_carlo::payoff::vanilla::EuropeanCall;
     use crate::monte_carlo::process::gbm::GbmParams;
+
+    #[test]
+    fn european_pricer_requires_two_independent_estimators() {
+        for num_paths in [0, 1] {
+            assert!(EuropeanPricer::new(num_paths).is_err());
+        }
+        let pricer = EuropeanPricer::new(2)
+            .expect("two independent estimators")
+            .with_parallel(false);
+        let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 0.2).unwrap());
+        let call = EuropeanCall::new(100.0, 1.0, 1);
+        let estimate = pricer
+            .price(&gbm, 100.0, 1.0, 1, &call, Currency::USD, 0.95)
+            .expect("minimum-size estimate");
+        assert_eq!(estimate.num_paths, 2);
+        assert!(estimate.stderr.is_finite());
+        assert!(estimate.ci_95.0.amount().is_finite());
+        assert!(estimate.ci_95.1.amount().is_finite());
+    }
 
     #[test]
     fn test_european_pricer_basic() {

@@ -198,15 +198,15 @@ def _tarn_market_json() -> str:
     })
 
 
-def _sabr_cube_json(cube_id: str, alpha: float, forward: float) -> dict[str, object]:
-    params = {"alpha": alpha, "beta": 0.5, "rho": -0.20, "nu": 0.40}
+def _flat_black_surface_json(surface_id: str, vol: float) -> dict[str, object]:
     return {
-        "id": cube_id,
+        "id": surface_id,
         "expiries": [0.25, 1.0, 5.0],
-        "tenors": [2.0, 10.0],
-        "params": [params] * 6,
-        "forwards": [forward] * 6,
+        "strikes": [0.01, 0.10],
+        "secondary_axis": "strike",
+        "quote_type": "black_lognormal",
         "interpolation_mode": "vol",
+        "vols_row_major": [vol] * 6,
     }
 
 
@@ -244,17 +244,17 @@ def _cms_spread_market_json() -> str:
             },
         ],
         "fx": None,
-        "surfaces": [],
+        "surfaces": [
+            _flat_black_surface_json("USD-SWAPTION-VOL-10Y", 0.25),
+            _flat_black_surface_json("USD-SWAPTION-VOL-2Y", 0.20),
+        ],
         "prices": {},
         "series": [],
         "inflation_indices": [],
         "dividends": [],
         "credit_indices": [],
         "fx_delta_vol_surfaces": [],
-        "vol_cubes": [
-            _sabr_cube_json("USD-SWAPTION-VOL-10Y", 0.035, 0.045),
-            _sabr_cube_json("USD-SWAPTION-VOL-2Y", 0.035, 0.030),
-        ],
+        "vol_cubes": [],
         "collateral": {},
         "hierarchy": None,
     })
@@ -471,6 +471,7 @@ def _cms_spread_option_json() -> str:
             "short_vol_surface_id": "USD-SWAPTION-VOL-2Y",
             "discount_curve_id": "USD-OIS",
             "forward_curve_id": "USD-SOFR-3M",
+            "index_id": "USD-SOFR-OIS",
             "correlation": 0.5,
             "day_count": "act_365f",
             "attributes": {},
@@ -592,9 +593,8 @@ def test_structured_credit_stochastic_json_details_include_all_tranches() -> Non
 
 
 def test_structured_credit_stochastic_json_missing_market_data_raises() -> None:
-    # Missing discount curves surface as Calibration failures, which the
-    # binding layer maps to RuntimeError (see errors.rs valuations_to_py).
-    with pytest.raises(RuntimeError, match="Curve not found"):
+    # Missing market data preserves its lookup error, mapped to Python KeyError.
+    with pytest.raises(KeyError, match="USD-OIS"):
         price_instrument(
             _structured_credit_json(),
             _market_json(include_discount=False),

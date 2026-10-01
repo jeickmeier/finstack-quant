@@ -29,6 +29,74 @@ fn eom_rejects_incompatible_schedule_rules() {
 }
 
 #[test]
+fn schedule_calendar_setters_replace_the_previous_representation() {
+    use finstack_quant_core::dates::WEEKENDS_ONLY;
+    let builder = || ScheduleBuilder::new(make_date(2025, 6, 4), make_date(2025, 7, 4)).unwrap();
+    let replaced_id = builder()
+        .adjust_with_id(BusinessDayConvention::Following, "usny")
+        .adjust_with(BusinessDayConvention::Following, &WEEKENDS_ONLY)
+        .build()
+        .unwrap();
+    assert_eq!(
+        replaced_id.payment_dates.last(),
+        Some(&make_date(2025, 7, 4))
+    );
+    let replaced_calendar = builder()
+        .adjust_with(BusinessDayConvention::Following, &WEEKENDS_ONLY)
+        .adjust_with_id(BusinessDayConvention::Following, "usny")
+        .build()
+        .unwrap();
+    assert_eq!(
+        replaced_calendar.payment_dates.last(),
+        Some(&make_date(2025, 7, 7))
+    );
+    // Replacing an invalid deferred ID must discard its pending lookup too.
+    assert!(builder()
+        .adjust_with_id(BusinessDayConvention::Following, "invalid_calendar")
+        .adjust_with(BusinessDayConvention::Following, &WEEKENDS_ONLY)
+        .build()
+        .is_ok());
+}
+
+#[test]
+fn eom_roll_grid_accepts_regular_quarters_from_february() {
+    for (year, feb_end) in [(2024, 29), (2025, 28)] {
+        for stub in [
+            StubKind::None,
+            StubKind::ShortBack,
+            StubKind::LongBack,
+            StubKind::ShortFront,
+            StubKind::LongFront,
+        ] {
+            let schedule =
+                ScheduleBuilder::new(make_date(year, 2, feb_end), make_date(year, 8, 31))
+                    .unwrap()
+                    .frequency(Tenor::quarterly())
+                    .end_of_month(true)
+                    .stub_rule(stub)
+                    .build()
+                    .unwrap();
+            assert_eq!(
+                schedule.dates.as_slice(),
+                [
+                    make_date(year, 2, feb_end),
+                    make_date(year, 5, 31),
+                    make_date(year, 8, 31)
+                ]
+            );
+        }
+    }
+    assert!(
+        ScheduleBuilder::new(make_date(2025, 2, 28), make_date(2025, 8, 28))
+            .unwrap()
+            .frequency(Tenor::quarterly())
+            .end_of_month(true)
+            .build()
+            .is_err()
+    );
+}
+
+#[test]
 fn test_basic_schedule() {
     let start = make_date(2025, 1, 15);
     let end = make_date(2025, 4, 15);
@@ -430,6 +498,115 @@ fn test_long_back_even_schedule_emits_all_dates() {
 }
 
 #[test]
+fn stub_schedules_terminate_at_finite_date_boundaries() {
+    let maximum = time::Date::MAX;
+    let minimum = time::Date::MIN;
+    for frequency in [
+        Tenor::monthly(),
+        Tenor::annual(),
+        Tenor::weekly(),
+        Tenor::parse("2D").unwrap(),
+    ] {
+        for stub in [StubKind::ShortBack, StubKind::LongBack] {
+            let start = make_date(maximum.year(), 12, 30);
+            let schedule = ScheduleBuilder::new(start, maximum)
+                .unwrap()
+                .frequency(frequency)
+                .stub_rule(stub)
+                .build()
+                .expect("a back stub needs no unrepresentable successor");
+            assert_eq!(schedule.dates, vec![start, maximum]);
+        }
+        for stub in [StubKind::ShortFront, StubKind::LongFront] {
+            let end = make_date(minimum.year(), 1, 2);
+            let schedule = ScheduleBuilder::new(minimum, end)
+                .unwrap()
+                .frequency(frequency)
+                .stub_rule(stub)
+                .build()
+                .expect("a front stub needs no unrepresentable predecessor");
+            assert_eq!(schedule.dates, vec![minimum, end]);
+        }
+    }
+}
+
+#[test]
+fn monthly_stubs_preserve_contractual_boundary_endpoints_with_eom() {
+    let maximum = time::Date::MAX;
+    let minimum = time::Date::MIN;
+    for eom in [false, true] {
+        for stub in [StubKind::ShortBack, StubKind::LongBack] {
+            let start = make_date(maximum.year(), 12, 1);
+            let schedule = ScheduleBuilder::new(start, maximum)
+                .unwrap()
+                .frequency(Tenor::monthly())
+                .stub_rule(stub)
+                .end_of_month(eom)
+                .build()
+                .unwrap();
+            assert_eq!(schedule.dates, vec![start, maximum]);
+        }
+        for stub in [StubKind::ShortFront, StubKind::LongFront] {
+            let end = make_date(minimum.year(), 1, 31);
+            let schedule = ScheduleBuilder::new(minimum, end)
+                .unwrap()
+                .frequency(Tenor::monthly())
+                .stub_rule(stub)
+                .end_of_month(eom)
+                .build()
+                .unwrap();
+            assert_eq!(schedule.dates, vec![minimum, end]);
+        }
+    }
+}
+
+#[test]
+fn aligned_long_stubs_keep_regular_anchors_at_both_date_boundaries() {
+    let maximum = time::Date::MAX;
+    let minimum = time::Date::MIN;
+    let cases = [
+        vec![
+            make_date(maximum.year(), 10, 31),
+            make_date(maximum.year(), 11, 30),
+            maximum,
+        ],
+        vec![
+            minimum,
+            make_date(minimum.year(), 2, 1),
+            make_date(minimum.year(), 3, 1),
+        ],
+    ];
+    for expected in cases {
+        for stub in [StubKind::LongBack, StubKind::LongFront] {
+            let schedule = ScheduleBuilder::new(expected[0], expected[2])
+                .unwrap()
+                .frequency(Tenor::monthly())
+                .stub_rule(stub)
+                .build()
+                .expect("aligned schedules do not need another comparison roll");
+            assert_eq!(schedule.dates, expected);
+        }
+    }
+}
+
+#[test]
+fn boundary_rolls_keep_noninteger_and_invalid_tenor_errors() {
+    let start = make_date(time::Date::MAX.year(), 12, 1);
+    let end = time::Date::MAX;
+    let error = ScheduleBuilder::new(start, end)
+        .unwrap()
+        .frequency(Tenor::monthly())
+        .build()
+        .expect_err("no-stub schedules still require exact tenor alignment");
+    assert!(error
+        .to_string()
+        .contains("requires the tenor to divide evenly"));
+
+    // Unsupported tenor sizes are rejected before a schedule can be built.
+    assert!(Tenor::parse("4294967295M").is_err());
+}
+
+#[test]
 fn test_end_of_month_convention() {
     // EOM snaps INTERMEDIATE roll dates to month-end; the user-provided
     // start and end dates are contractual and emitted verbatim.
@@ -439,6 +616,7 @@ fn test_end_of_month_convention() {
     let dates: Vec<_> = ScheduleBuilder::new(start, end)
         .unwrap()
         .frequency(Tenor::monthly())
+        .stub_rule(StubKind::ShortBack)
         .end_of_month(true)
         .build()
         .unwrap()
@@ -475,6 +653,7 @@ fn test_end_of_month_with_leap_year() {
     let dates: Vec<_> = ScheduleBuilder::new(start, end)
         .unwrap()
         .frequency(Tenor::monthly())
+        .stub_rule(StubKind::ShortBack)
         .end_of_month(true)
         .build()
         .unwrap()
@@ -518,6 +697,7 @@ fn test_eom_jan30_roll_to_feb_leap_year() {
     let dates: Vec<_> = ScheduleBuilder::new(start, end)
         .unwrap()
         .frequency(Tenor::monthly())
+        .stub_rule(StubKind::ShortBack)
         .end_of_month(true)
         .build()
         .unwrap()
@@ -539,6 +719,7 @@ fn test_eom_jan30_roll_to_feb_non_leap() {
     let dates: Vec<_> = ScheduleBuilder::new(start, end)
         .unwrap()
         .frequency(Tenor::monthly())
+        .stub_rule(StubKind::ShortBack)
         .end_of_month(true)
         .build()
         .unwrap()
@@ -616,6 +797,27 @@ fn test_adjustment_collision_keeps_maturity_date() {
 }
 
 // IMM Schedule Tests
+
+#[test]
+fn imm_schedule_stops_at_last_representable_roll() {
+    let start = make_date(time::Date::MAX.year(), 1, 1);
+    let end = time::Date::MAX;
+    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+        .expect("valid date range")
+        .imm()
+        .build()
+        .expect("finite IMM schedule")
+        .into_iter()
+        .collect();
+
+    assert_eq!(dates.len(), 5);
+    assert_eq!(dates[0], start);
+    assert_eq!(
+        dates[4],
+        finstack_quant_core::dates::third_wednesday(time::Month::December, end.year())
+            .expect("last IMM date")
+    );
+}
 
 #[test]
 fn test_imm_schedule_basic() {

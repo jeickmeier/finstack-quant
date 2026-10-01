@@ -41,7 +41,8 @@ pub struct GbmEuropeanFdSpec {
     pub vol: f64,
     /// Time to expiry in years; also the uniform-grid horizon.
     pub expiry: f64,
-    /// Simulated paths; `None` uses the registry binding default.
+    /// Independent estimators; `None` uses the registry binding default.
+    /// Each estimator uses two physical paths when the registry enables antithetics.
     pub num_paths: Option<usize>,
     /// RNG seed; `None` uses the registry binding default.
     pub seed: Option<u64>,
@@ -81,7 +82,8 @@ enum FdKind {
 ///
 /// An [`Estimate`] whose `mean` is the delta, `stderr` the estimator's
 /// standard error, `ci_95` the symmetric normal 95% band, and `num_paths` the
-/// path count used per bumped valuation.
+/// independent estimator count used per bumped valuation. `num_simulated_paths`
+/// records the physical path count, including antithetic partners.
 ///
 /// # Errors
 ///
@@ -228,7 +230,12 @@ fn run_gbm_fd(spec: GbmEuropeanFdSpec, kind: FdKind) -> Result<Estimate> {
         stderr,
         (value - half_width, value + half_width),
         num_paths,
-    ))
+    )
+    .with_num_simulated_paths(if defaults.antithetic {
+        2 * num_paths
+    } else {
+        num_paths
+    }))
 }
 
 #[cfg(test)]

@@ -146,6 +146,11 @@
           "type": "string"
         },
         {
+          "const": "shifted_black_lognormal",
+          "description": "Displaced Black volatility; per-expiry displacements accompany the grid.",
+          "type": "string"
+        },
+        {
           "const": "normal",
           "description": "Normal (Bachelier) implied volatility, absolute rate units.",
           "type": "string"
@@ -706,7 +711,7 @@
                 },
                 "quote_type": {
                   "$ref": "#/$defs/VolQuoteType",
-                  "description": "Volatility quoting convention."
+                  "description": "Volatility quoting convention. Shifted Black quotes require a\n`ShiftedLognormal` calibration plan supplying their displacement;\nHull-White calibration rejects them because its quote contract\ncarries no displacement."
                 },
                 "strike": {
                   "description": "Strike rate",
@@ -756,7 +761,7 @@
                 },
                 "quote_type": {
                   "$ref": "#/$defs/VolQuoteType",
-                  "description": "Volatility quoting convention."
+                  "description": "Volatility quoting convention. Hull-White calibration accepts\nnormal and unshifted Black quotes; it rejects shifted Black\nbecause this quote does not carry a displacement."
                 },
                 "strike": {
                   "description": "Strike rate.",

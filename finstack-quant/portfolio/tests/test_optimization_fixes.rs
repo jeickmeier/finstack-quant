@@ -8,8 +8,9 @@ use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 use finstack_quant_core::money::Money;
 use finstack_quant_portfolio::builder::PortfolioBuilder;
 use finstack_quant_portfolio::optimization::{
-    CandidatePosition, DefaultLpOptimizer, MetricExpr, MissingMetricPolicy, Objective,
-    PerPositionMetric, PortfolioOptimizationProblem, WeightingScheme,
+    CandidatePosition, Constraint, DefaultLpOptimizer, Inequality, MetricExpr, MissingMetricPolicy,
+    Objective, PerPositionMetric, PortfolioOptimizationProblem, PositionFilter, TradeDirection,
+    TradeUniverse, WeightingScheme,
 };
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
@@ -178,6 +179,266 @@ impl Instrument for MetricInstrument {
         Ok(ValuationResult::stamped(self.id(), as_of, self.value)
             .with_measures(self.measures.clone()))
     }
+}
+
+fn regression_position(id: &str, value: f64, quantity: f64, unit: PositionUnit) -> Position {
+    Position::new(
+        id,
+        "ENT_A",
+        id,
+        Arc::new(MetricInstrument::new(
+            id,
+            Money::new(value, Currency::USD).unwrap(),
+            IndexMap::new(),
+        )),
+        quantity,
+        unit,
+    )
+    .unwrap()
+}
+
+fn regression_portfolio(positions: Vec<Position>) -> finstack_quant_portfolio::Portfolio {
+    let mut builder = PortfolioBuilder::new("REGRESSION")
+        .base_currency(Currency::USD)
+        .as_of(create_date(2024, Month::January, 1).unwrap())
+        .entity(Entity::new("ENT_A"));
+    for position in positions {
+        builder = builder.position(position);
+    }
+    builder.build().unwrap()
+}
+
+#[test]
+fn candidate_position_id_must_not_collide_with_existing_holdings() {
+    let portfolio = regression_portfolio(vec![regression_position(
+        "COLLISION",
+        100.0,
+        1.0,
+        PositionUnit::Units,
+    )]);
+    let candidate = CandidatePosition::new(
+        "COLLISION",
+        "ENT_A",
+        Arc::new(MetricInstrument::new(
+            "NEW_INSTRUMENT",
+            Money::new(100.0, Currency::USD).unwrap(),
+            IndexMap::new(),
+        )),
+        PositionUnit::Units,
+    );
+    let problem = PortfolioOptimizationProblem::new(
+        portfolio,
+        Objective::Maximize(MetricExpr::WeightedSum {
+            metric: PerPositionMetric::Constant(1.0),
+            filter: None,
+        }),
+    )
+    .with_trade_universe(TradeUniverse::default().with_candidate(candidate));
+    let error = DefaultLpOptimizer
+        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+        .expect_err("candidate ID collision must fail before solving");
+    assert!(error.to_string().contains("COLLISION"));
+    assert!(error.to_string().contains("already exists"));
+}
+
+#[test]
+fn held_zero_and_tiny_pv_positions_retain_exact_quantities() {
+    for (value, quantity, unit) in [
+        (0.0, 5.0, PositionUnit::Units),
+        (0.0, 50.0, PositionUnit::Percentage),
+        (1e-15, 5.0, PositionUnit::Units),
+    ] {
+        let portfolio = regression_portfolio(vec![
+            regression_position("HELD", value, quantity, unit),
+            regression_position("TRADEABLE", 100.0, 1.0, PositionUnit::Units),
+        ]);
+        let problem = PortfolioOptimizationProblem::new(
+            portfolio,
+            Objective::Maximize(MetricExpr::WeightedSum {
+                metric: PerPositionMetric::Constant(1.0),
+                filter: None,
+            }),
+        )
+        .with_trade_universe(TradeUniverse::filtered(PositionFilter::ByPositionIds(
+            vec!["TRADEABLE".into()],
+        )));
+        let result = DefaultLpOptimizer
+            .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+            .unwrap();
+        assert!(result.status.is_feasible());
+        assert_eq!(result.implied_quantities["HELD"], quantity);
+        assert!(result.to_trade_list().is_empty());
+        assert_eq!(
+            result
+                .to_rebalanced_portfolio()
+                .unwrap()
+                .get_position("HELD")
+                .unwrap()
+                .quantity,
+            quantity,
+        );
+    }
+}
+
+#[test]
+fn trade_direction_follows_quantity_changes_for_shorts_and_negative_pv() {
+    for (multiplier, expected_direction) in
+        [(2.0, TradeDirection::Sell), (0.5, TradeDirection::Buy)]
+    {
+        let portfolio = regression_portfolio(vec![regression_position(
+            "SHORT",
+            100.0,
+            -10.0,
+            PositionUnit::Units,
+        )]);
+        let mut problem = PortfolioOptimizationProblem::new(
+            portfolio,
+            Objective::Maximize(MetricExpr::WeightedSum {
+                metric: PerPositionMetric::Constant(1.0),
+                filter: None,
+            }),
+        );
+        problem.weighting = WeightingScheme::UnitScaling;
+        problem.constraints = vec![Constraint::Budget { rhs: multiplier }];
+        let result = DefaultLpOptimizer
+            .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+            .unwrap();
+        let trades = result.to_trade_list();
+        assert_eq!(trades.len(), 1);
+        assert_eq!(trades[0].direction, expected_direction);
+        assert_eq!(trades[0].delta_quantity, -10.0 * multiplier + 10.0);
+    }
+
+    let portfolio = regression_portfolio(vec![
+        regression_position("LIABILITY", -100.0, 1.0, PositionUnit::Units),
+        regression_position("ASSET", 200.0, 1.0, PositionUnit::Units),
+    ]);
+    let problem = PortfolioOptimizationProblem::new(
+        portfolio,
+        Objective::Maximize(MetricExpr::WeightedSum {
+            metric: PerPositionMetric::Constant(1.0),
+            filter: None,
+        }),
+    );
+    let result = DefaultLpOptimizer
+        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+        .unwrap();
+    let trades = result.to_trade_list();
+    let liability_trade = trades
+        .iter()
+        .find(|trade| trade.position_id == "LIABILITY")
+        .unwrap();
+    assert_eq!(liability_trade.direction, TradeDirection::Sell);
+    assert_eq!(liability_trade.delta_quantity, -1.0);
+}
+
+#[test]
+fn exclude_freezes_missing_attributes_and_custom_keys_in_objectives_and_bounds() {
+    for metric in [
+        PerPositionMetric::Attribute("score".into()),
+        PerPositionMetric::CustomKey("custom_score".into()),
+    ] {
+        for use_bound in [false, true] {
+            let scored = Position::new(
+                "SCORED",
+                "ENT_A",
+                "SCORED",
+                Arc::new(MetricInstrument::new(
+                    "SCORED",
+                    Money::new(100.0, Currency::USD).unwrap(),
+                    IndexMap::from([(MetricId::custom("custom_score"), 1.0)]),
+                )),
+                1.0,
+                PositionUnit::Units,
+            )
+            .unwrap()
+            .with_attribute("score", 1.0);
+            let portfolio = regression_portfolio(vec![
+                scored,
+                regression_position("MISSING", 100.0, 1.0, PositionUnit::Units),
+            ]);
+            let mut problem = PortfolioOptimizationProblem::new(
+                portfolio,
+                Objective::Maximize(MetricExpr::WeightedSum {
+                    metric: if use_bound {
+                        PerPositionMetric::Constant(1.0)
+                    } else {
+                        metric.clone()
+                    },
+                    filter: None,
+                }),
+            );
+            problem.missing_metric_policy = MissingMetricPolicy::Exclude;
+            if use_bound {
+                problem.constraints.push(Constraint::MetricBound {
+                    label: None,
+                    metric: MetricExpr::WeightedSum {
+                        metric: metric.clone(),
+                        filter: None,
+                    },
+                    op: Inequality::Ge,
+                    rhs: 0.5,
+                });
+            }
+            let result = DefaultLpOptimizer
+                .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+                .unwrap();
+            assert!(result.status.is_feasible());
+            assert_eq!(result.optimal_weights["MISSING"], 0.5);
+            assert_eq!(result.implied_quantities["MISSING"], 1.0);
+        }
+    }
+}
+
+#[test]
+fn exclude_missing_inputs_only_freeze_positions_matching_expression_filters() {
+    let scored = Position::new(
+        "SCORED",
+        "ENT_A",
+        "SCORED",
+        Arc::new(MetricInstrument::new(
+            "SCORED",
+            Money::new(100.0, Currency::USD).unwrap(),
+            IndexMap::from([(MetricId::custom("custom_score"), 1.0)]),
+        )),
+        1.0,
+        PositionUnit::Units,
+    )
+    .unwrap()
+    .with_attribute("score", 1.0);
+    let portfolio = regression_portfolio(vec![
+        scored,
+        regression_position("MISSING", 100.0, 1.0, PositionUnit::Units),
+        regression_position("OUTSIDE", 100.0, 1.0, PositionUnit::Units),
+    ]);
+    let mut problem = PortfolioOptimizationProblem::new(
+        portfolio,
+        Objective::Maximize(MetricExpr::WeightedSum {
+            metric: PerPositionMetric::Attribute("score".into()),
+            filter: Some(PositionFilter::ByPositionIds(vec![
+                "SCORED".into(),
+                "MISSING".into(),
+            ])),
+        }),
+    );
+    problem.missing_metric_policy = MissingMetricPolicy::Exclude;
+    problem.constraints.push(Constraint::MetricBound {
+        label: None,
+        metric: MetricExpr::WeightedSum {
+            metric: PerPositionMetric::CustomKey("custom_score".into()),
+            filter: Some(PositionFilter::ByPositionIds(vec!["SCORED".into()])),
+        },
+        op: Inequality::Ge,
+        rhs: 0.0,
+    });
+    let result = DefaultLpOptimizer
+        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+        .unwrap();
+    assert!(result.status.is_feasible());
+    assert!((result.optimal_weights["MISSING"] - 1.0 / 3.0).abs() < 1e-12);
+    assert_eq!(result.implied_quantities["MISSING"], 1.0);
+    assert_eq!(result.optimal_weights["OUTSIDE"], 0.0);
+    assert!((result.optimal_weights["SCORED"] - 2.0 / 3.0).abs() < 1e-12);
 }
 
 #[test]

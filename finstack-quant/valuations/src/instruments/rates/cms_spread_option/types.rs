@@ -24,9 +24,14 @@ use rust_decimal::Decimal;
 ///
 /// # Pricing Approach
 ///
-/// 1. Each CMS rate has SABR marginal distribution (reuses CMS option SABR calibration)
-/// 2. Joint distribution via Gaussian copula with rank correlation
-/// 3. CMS convexity adjustment applied to each leg via static replication
+/// 1. Each CMS rate has a lognormal payment-measure marginal from a flat-strike
+///    Black volatility surface (or a tenor-axis ATM surface).
+/// 2. A Gaussian copula couples the two rates.
+/// 3. The shared first-order CMS convexity approximation sets each marginal mean.
+///
+/// Nonflat smiles and SABR cubes are unsupported and return a validation error.
+/// The registered `StaticReplication` model key selects this approximation;
+/// it does not implement SABR smile replication.
 ///
 /// # References
 ///
@@ -68,9 +73,11 @@ pub struct CmsSpreadOption {
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub payment_date: Date,
-    /// Swaption volatility surface for long tenor.
+    /// Black swaption volatility surface for the long tenor. The selected
+    /// expiry slice must be flat across strikes; tenor-axis ATM surfaces are valid.
     pub long_vol_surface_id: CurveId,
-    /// Swaption volatility surface for short tenor.
+    /// Black swaption volatility surface for the short tenor, subject to the
+    /// same flat-strike restriction as the long-tenor surface.
     pub short_vol_surface_id: CurveId,
     /// Discount curve ID.
     pub discount_curve_id: CurveId,
@@ -92,13 +99,12 @@ pub struct CmsSpreadOption {
     //
     // The forward swap rate of each CMS leg must be projected on the correct
     // annuity / day-count basis. These fields plumb the actual instrument /
-    // market swap conventions through to `resolve_leg`; when unset they
-    // default to the USD market standard (semi-annual 30/360 fixed,
-    // quarterly Act/360 float), so existing USD instruments are unaffected.
+    // market swap conventions through to `resolve_leg`.
     /// Rate-index convention-registry key of the underlying CMS swaps (e.g. `EUR-ESTR-OIS`).
     ///
-    /// When set, provides default values for the fixed/float frequency and
-    /// day count. Individual fields still override the convention when set.
+    /// Required for USD CMS; other supported currencies use their registered
+    /// overnight-index default when omitted. Supplies calendar, settlement lag
+    /// and default leg conventions. Individual leg fields override the index.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub index_id: Option<IndexId>,
     /// Fixed leg frequency of the underlying CMS swaps (overrides convention).
@@ -322,8 +328,7 @@ mod tests {
     use crate::instruments::PricingOptions;
     use crate::pricer::{standard_pricer_registry, ModelKey};
     use finstack_quant_core::market_data::context::MarketContext;
-    use finstack_quant_core::market_data::surfaces::SabrParameterData;
-    use finstack_quant_core::market_data::surfaces::VolCube;
+    use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
     use time::Month;
 
@@ -331,22 +336,18 @@ mod tests {
         Date::from_calendar_date(year, month, day).expect("valid date")
     }
 
-    fn sabr_cube(id: &str, alpha: f64, forward: f64) -> VolCube {
-        let params = SabrParameterData::new(alpha, 0.5, -0.20, 0.40).expect("valid SABR params");
-        VolCube::builder(id)
+    fn flat_surface(id: &str, vol: f64) -> VolSurface {
+        VolSurface::builder(id)
             .expiries(&[0.25, 1.0, 5.0])
-            .tenors(&[2.0, 10.0])
-            .node(params, forward)
-            .node(params, forward)
-            .node(params, forward)
-            .node(params, forward)
-            .node(params, forward)
-            .node(params, forward)
+            .strikes(&[0.005, 0.04, 0.10])
+            .row(&[vol; 3])
+            .row(&[vol; 3])
+            .row(&[vol; 3])
             .build()
-            .expect("vol cube")
+            .expect("flat Black surface")
     }
 
-    fn market(as_of: Date, alpha: f64) -> MarketContext {
+    fn market(as_of: Date, vol: f64) -> MarketContext {
         let discount = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .day_count(DayCount::Act365F)
@@ -363,8 +364,8 @@ mod tests {
         MarketContext::new()
             .insert(discount)
             .insert(forward)
-            .insert_vol_cube(sabr_cube("USD-SWAPTION-VOL-10Y", alpha, 0.045))
-            .insert_vol_cube(sabr_cube("USD-SWAPTION-VOL-2Y", alpha, 0.030))
+            .insert_surface(flat_surface("USD-SWAPTION-VOL-10Y", vol))
+            .insert_surface(flat_surface("USD-SWAPTION-VOL-2Y", vol))
     }
 
     fn price_amount(opt: &CmsSpreadOption, market: &MarketContext, as_of: Date) -> f64 {
@@ -434,7 +435,7 @@ mod tests {
     #[test]
     fn static_replication_pricer_returns_positive_price() {
         let as_of = date(2025, Month::January, 1);
-        let market = market(as_of, 0.030);
+        let market = market(as_of, 0.30);
         let mut opt = CmsSpreadOption::example().expect("example");
         opt.expiry = date(2026, Month::January, 1);
         opt.payment_date = date(2026, Month::January, 5);
@@ -451,7 +452,7 @@ mod tests {
     #[test]
     fn lower_correlation_increases_curve_spread_option_value() {
         let as_of = date(2025, Month::January, 1);
-        let market = market(as_of, 0.035);
+        let market = market(as_of, 0.35);
         let mut low_corr = CmsSpreadOption::example().expect("example");
         low_corr.expiry = date(2026, Month::January, 1);
         low_corr.payment_date = date(2026, Month::January, 5);
@@ -468,7 +469,7 @@ mod tests {
     }
 
     #[test]
-    fn higher_sabr_volatility_increases_option_value() {
+    fn higher_flat_volatility_increases_option_value() {
         let as_of = date(2025, Month::January, 1);
         let mut opt = CmsSpreadOption::example().expect("example");
         opt.expiry = date(2026, Month::January, 1);
@@ -476,8 +477,8 @@ mod tests {
         opt.strike = Decimal::new(10, 3);
         opt.correlation = 0.50;
 
-        let low_vol = price_amount(&opt, &market(as_of, 0.015), as_of);
-        let high_vol = price_amount(&opt, &market(as_of, 0.060), as_of);
+        let low_vol = price_amount(&opt, &market(as_of, 0.15), as_of);
+        let high_vol = price_amount(&opt, &market(as_of, 0.60), as_of);
 
         assert!(high_vol > low_vol);
     }
@@ -493,35 +494,11 @@ mod tests {
     /// resolved conventions pick up the instrument's `index_id`.
     #[test]
     fn swap_conventions_resolve_from_index_id() {
-        use finstack_quant_core::dates::{DayCount, Tenor, TenorUnit};
+        use finstack_quant_core::dates::{Tenor, TenorUnit};
 
-        // Default (no convention set) -> USD market standard.
         let mut opt = CmsSpreadOption::example().expect("example");
         opt.index_id = None;
-        assert_eq!(
-            opt.reference_swap()
-                .resolved_fixed_frequency()
-                .expect("registry"),
-            Tenor::semi_annual()
-        );
-        assert_eq!(
-            opt.reference_swap()
-                .resolved_float_frequency()
-                .expect("registry"),
-            Tenor::quarterly()
-        );
-        assert_eq!(
-            opt.reference_swap()
-                .resolved_fixed_day_count()
-                .expect("registry"),
-            DayCount::Thirty360
-        );
-        assert_eq!(
-            opt.reference_swap()
-                .resolved_float_day_count()
-                .expect("registry"),
-            DayCount::Act360
-        );
+        assert!(opt.reference_swap().resolved_fixed_frequency().is_err());
 
         // EUR convention -> annual fixed leg (the case the hard-coded path got wrong).
         opt.index_id = Some(IndexId::new("EUR-ESTR-OIS"));
@@ -544,18 +521,19 @@ mod tests {
         );
     }
 
-    /// A non-USD CMS spread must price on its own annuity basis. Switching the
-    /// underlying-swap convention from USD (semi-annual fixed) to EUR (annual
-    /// fixed) changes the forward swap rate annuity and therefore the price;
-    /// the pre-fix hard-coded path produced an identical (USD) price for both.
+    /// A CMS spread must use its index's complete reference-swap conventions,
+    /// including calendars and settlement lag, for each projected forward.
     #[test]
     fn non_usd_convention_changes_price() {
         let as_of = date(2025, Month::January, 1);
-        let market = market(as_of, 0.035);
+        let market = market(as_of, 0.35);
 
         let mut usd = CmsSpreadOption::example().expect("example");
-        usd.expiry = date(2026, Month::January, 1);
-        usd.payment_date = date(2026, Month::January, 5);
+        // Juneteenth closes the USD calendar on June 19, 2026;
+        // TARGET remains open. Identical annual ACT/360 coupons otherwise
+        // need not give different prices just because their index names differ.
+        usd.expiry = date(2026, Month::June, 17);
+        usd.payment_date = date(2026, Month::June, 24);
         usd.strike = Decimal::ZERO;
         usd.correlation = 0.50;
         usd.index_id = Some(IndexId::new("USD-SOFR-OIS"));
@@ -563,6 +541,14 @@ mod tests {
         let mut eur = usd.clone();
         eur.index_id = Some(IndexId::new("EUR-ESTR-OIS"));
 
+        assert_ne!(
+            usd.reference_swap()
+                .reference_swap_start(usd.expiry)
+                .expect("USD start"),
+            eur.reference_swap()
+                .reference_swap_start(eur.expiry)
+                .expect("EUR start"),
+        );
         let usd_value = price_amount(&usd, &market, as_of);
         let eur_value = price_amount(&eur, &market, as_of);
 

@@ -481,7 +481,9 @@ pub fn revalue_affected(
         "dependency index is stale: positions were mutated without updating \
          the index — call Portfolio::rebuild_index after direct mutation"
     );
-    let affected_indices = portfolio.dependency_index().affected_positions(changed);
+    let affected_indices = portfolio
+        .dependency_index()
+        .affected_positions(changed, market)?;
     let refresh_base_currency = changed
         .iter()
         .any(|key| matches!(key, crate::dependencies::MarketFactorKey::Fx { .. }));

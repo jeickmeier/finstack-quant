@@ -771,11 +771,13 @@ def simulate_gbm_paths(
     antithetic: bool = False,
 ) -> GbmPathSummary:
     """
-    Simulate compact GBM spot paths through Rust path capture.
+    Simulate compact GBM spot paths with Rust's exact GBM transitions.
 
     ``num_paths`` is the estimator and simulated-path count because captured
     paths do not support antithetic pairing. Passing ``antithetic=True`` raises
-    ``ValueError``.
+    ``ValueError``. The compact output and shared time grids must satisfy
+    ``(num_paths + 3) * (num_steps + 1) <= 64_000_000`` scalar values,
+    including time zero in every path.
 
     Parameters
     ----------
@@ -790,9 +792,11 @@ def simulate_gbm_paths(
     expiry : float
         Positive time to maturity in years.
     num_steps : int
-        Number of equally spaced simulation steps over the expiry horizon.
+        Positive number of equally spaced simulation steps over the expiry
+        horizon, subject to the aggregate storage limit above.
     num_paths : int
-        Number of independently simulated paths retained in the summary.
+        Number of independently simulated paths retained in the summary,
+        in ``[1, 100_000]`` and subject to the aggregate storage limit above.
     seed : int or None, default None
         Optional deterministic Philox seed; ``None`` uses the Rust
         ``GbmPathConfig`` default (``42``), so unseeded calls are repeatable.
@@ -813,7 +817,9 @@ def simulate_gbm_paths(
         ``div_yield`` is non-finite; ``vol`` is not strictly positive or is
         non-finite; ``expiry`` is non-finite or not strictly positive; ``num_steps`` is
         zero or cannot form a time grid; ``num_paths`` is zero or exceeds the
-        ``100_000``-path capture limit; or ``antithetic`` is ``True``.
+        ``100_000``-path capture limit; the compact output and shared time grids
+        exceed ``64_000_000`` scalar values; a simulated spot is non-finite;
+        or ``antithetic`` is ``True``.
 
     Examples
     --------
@@ -889,7 +895,8 @@ class EuropeanPricer:
         Parameters
         ----------
         num_paths : int, optional
-            Path count. Defaults to the registry default (``100_000``).
+            Independent path count in ``[2, 10_000_000]``. Defaults to the
+            registry default (``100_000``); the upper limit is checked when pricing.
         seed : int, optional
             RNG seed. Defaults to the registry default (``42``).
         use_parallel : bool, optional
@@ -898,7 +905,7 @@ class EuropeanPricer:
         Raises
         ------
         ValueError
-            If the embedded Monte Carlo defaults registry cannot be loaded.
+            If the path count is less than two or embedded defaults cannot be loaded.
 
         Examples
         --------
@@ -1112,7 +1119,9 @@ class PathDependentPricer:
         Parameters
         ----------
         num_paths : int, optional
-            Path count. Defaults to the registry default.
+            Path budget of at least two. Without Sobol, counts independent
+            estimators, with each antithetic pair counted once; with Sobol,
+            counts points across independent scrambles. Defaults to the registry default.
         seed : int, optional
             RNG seed. Defaults to the registry default.
         use_parallel : bool, optional
@@ -1133,7 +1142,7 @@ class PathDependentPricer:
         Raises
         ------
         ValueError
-            If the embedded Monte Carlo defaults registry cannot be loaded or
+            If the path budget is less than two, embedded defaults cannot be loaded, or
             the configuration is inconsistent (``use_sobol`` with
             ``use_parallel``).
 
@@ -1365,6 +1374,13 @@ class LsmcPricer:
     continuous American. Immediate exercise at valuation (``t = 0``) floors
     the reported price at intrinsic.
 
+    Independent paths must be in ``[1, 10_000_000]`` and time steps in
+    ``[1, 100_000]``. Each pricing pass retains at most ``64_000_000`` spot
+    values, including time zero and both rows of every antithetic pair:
+    ``num_paths * (2 if antithetic else 1) * (num_steps + 1)``. Construction
+    checks the storage limit without antithetic partners; pricing checks
+    the selected pairing before allocating paths.
+
     Examples
     --------
     >>> from finstack_quant.models.monte_carlo import LsmcPricer
@@ -1388,13 +1404,15 @@ class LsmcPricer:
         Parameters
         ----------
         num_paths : int, optional
-            Path count. Defaults to the registry default.
+            Independent path count in ``[2, 10_000_000]``. Defaults to the
+            registry default; subject to the retained-storage limit above.
         seed : int, optional
             RNG seed. Defaults to the registry default.
         use_parallel : bool, optional
             Parallel path generation flag. Defaults to the registry default.
         num_steps : int, optional
-            Time-grid steps and exercise dates. Defaults to the registry value.
+            Time-grid steps and exercise dates in ``[1, 100_000]``. Defaults
+            to the registry value; subject to the retained-storage limit above.
         basis : str, optional
             Regression basis family. One of ``"laguerre"``,
             ``"polynomial"``, or ``"normalized_polynomial"``. Defaults to
@@ -1405,13 +1423,16 @@ class LsmcPricer:
             in ``[1, 4]``.
         antithetic : bool, optional
             Pair each path with its sign-flipped counterpart (``Z`` and
-            ``-Z``). Defaults to the registry default (``True``).
+            ``-Z``). Defaults to the registry default (``True``). Both rows
+            count toward the retained-storage limit when pricing.
 
         Raises
         ------
         ValueError
             If ``basis`` is not a recognized family or ``basis_degree`` is
-            out of range.
+            out of range; the independent path or step count is outside the
+            documented range; or the paths without antithetic partners exceed
+            ``64_000_000`` retained spot values including time zero.
 
         Examples
         --------
@@ -1555,8 +1576,9 @@ class LsmcPricer:
         currency : str, optional
             ISO currency code. Defaults to USD.
         num_steps : int, optional
-            Per-call override of the exercise grid; defaults to the instance
-            ``num_steps``.
+            Per-call exercise-grid override in ``[1, 100_000]``; defaults to
+            the instance ``num_steps``. Subject to the retained-storage limit
+            described by :class:`LsmcPricer`.
         basis : str, optional
             Per-call override of the regression basis family; defaults to
             the instance ``basis``.
@@ -1582,8 +1604,9 @@ class LsmcPricer:
             with the normalized-polynomial basis; ``rate`` or ``div_yield``
             is non-finite; ``vol`` is negative or non-finite; ``expiry`` is
             non-finite or not strictly positive;
-            the configured time-step or path count is zero; or
-            ``currency`` is unknown.
+            the time-step or independent path count is outside the documented
+            range; retained spots exceed ``64_000_000`` values including time
+            zero and both rows of each antithetic pair; or ``currency`` is unknown.
         TypeError
             If a non-``None`` ``currency`` is neither a string nor a ``Currency`` instance.
 
@@ -1627,8 +1650,9 @@ class LsmcPricer:
         currency : str, optional
             ISO currency code. Defaults to USD.
         num_steps : int, optional
-            Per-call override of the exercise grid; defaults to the instance
-            ``num_steps``.
+            Per-call exercise-grid override in ``[1, 100_000]``; defaults to
+            the instance ``num_steps``. Subject to the retained-storage limit
+            described by :class:`LsmcPricer`.
         basis : str, optional
             Per-call override of the regression basis family; defaults to
             the instance ``basis``.
@@ -1654,8 +1678,9 @@ class LsmcPricer:
             with the normalized-polynomial basis; ``rate`` or ``div_yield``
             is non-finite; ``vol`` is negative or non-finite; ``expiry`` is
             non-finite or not strictly positive;
-            the configured time-step or path count is zero; or
-            ``currency`` is unknown.
+            the time-step or independent path count is outside the documented
+            range; retained spots exceed ``64_000_000`` values including time
+            zero and both rows of each antithetic pair; or ``currency`` is unknown.
         TypeError
             If a non-``None`` ``currency`` is neither a string nor a ``Currency`` instance.
 
@@ -1704,8 +1729,9 @@ class LsmcPricer:
         currency : str, optional
             ISO currency code. Defaults to USD.
         num_steps : int, optional
-            Per-call override of the exercise grid; defaults to the instance
-            ``num_steps``.
+            Per-call exercise-grid override in ``[1, 100_000]``; defaults to
+            the instance ``num_steps``. Subject to the retained-storage limit
+            described by :class:`LsmcPricer`.
         basis : str, optional
             Per-call override of the regression basis family; defaults to
             the instance ``basis``.
@@ -1721,7 +1747,11 @@ class LsmcPricer:
         Raises
         ------
         ValueError
-            If ``pricing_seed`` equals the pricer's training seed.
+            If ``pricing_seed`` equals the pricer's training seed; the time-step
+            or independent path count is outside the documented range; or each
+            pass exceeds ``64_000_000`` retained spot values including time zero
+            and both rows of each antithetic pair. The input validation errors
+            documented by :meth:`price_american_put` also apply.
         """
         ...
 
@@ -1763,8 +1793,9 @@ class LsmcPricer:
             Seed for the pricing pass; must differ from the pricer's training
             seed.
         num_steps : int, optional
-            Per-call override of the exercise grid; defaults to the instance
-            ``num_steps``.
+            Per-call exercise-grid override in ``[1, 100_000]``; defaults to
+            the instance ``num_steps``. Subject to the retained-storage limit
+            described by :class:`LsmcPricer`.
         basis : str, optional
             Per-call override of the regression basis family; defaults to
             the instance ``basis``.
@@ -1774,8 +1805,9 @@ class LsmcPricer:
         currency : str, optional
             ISO currency code. Defaults to USD.
         num_steps : int, optional
-            Per-call override of the exercise grid; defaults to the instance
-            ``num_steps``.
+            Per-call exercise-grid override in ``[1, 100_000]``; defaults to
+            the instance ``num_steps``. Subject to the retained-storage limit
+            described by :class:`LsmcPricer`.
         basis : str, optional
             Per-call override of the regression basis family; defaults to
             the instance ``basis``.
@@ -1791,7 +1823,11 @@ class LsmcPricer:
         Raises
         ------
         ValueError
-            If ``pricing_seed`` equals the pricer's training seed.
+            If ``pricing_seed`` equals the pricer's training seed; the time-step
+            or independent path count is outside the documented range; or each
+            pass exceeds ``64_000_000`` retained spot values including time zero
+            and both rows of each antithetic pair. The input validation errors
+            documented by :meth:`price_american_put` also apply.
         """
         ...
 
@@ -1842,7 +1878,8 @@ def price_heston_call(
     expiry : float
         Time to maturity in years.
     num_paths : int, optional
-        Path count (registry default ``100_000``).
+        Independent path estimators in ``[2, 10_000_000]``; each antithetic
+        pair counts once. The registry default is ``100_000``.
     seed : int, optional
         RNG seed (registry default ``42``).
     num_steps : int, optional
@@ -1920,7 +1957,8 @@ def price_heston_put(
     expiry : float
         Positive time to the European put expiry in years.
     num_paths : int or None, default None
-        Optional number of Monte Carlo paths; ``None`` selects the engine default.
+        Independent path estimators in ``[2, 10_000_000]``; each antithetic
+        pair counts once. ``None`` selects the engine default.
     seed : int or None, default None
         Optional deterministic random seed for reproducible path generation.
     num_steps : int or None, default None

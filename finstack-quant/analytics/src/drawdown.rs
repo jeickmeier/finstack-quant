@@ -48,6 +48,8 @@ pub struct DrawdownEpisode {
 ///
 /// where `wealth[i] = Π(1 + r[j]) for j ≤ i` and `peak[i]` is the running
 /// maximum of wealth up to and including `i`.
+/// Log wealth and log peaks are compared directly, keeping drawdowns finite
+/// even when reconstructing absolute wealth would overflow.
 ///
 /// # Arguments
 ///
@@ -67,14 +69,15 @@ pub(crate) fn to_drawdown_series(returns: &[f64]) -> Vec<f64> {
         return vec![];
     }
     let mut engine = crate::returns::WealthEngine::new();
-    let mut peak = 1.0;
+    let mut log_peak = 0.0;
     let mut dd = Vec::with_capacity(returns.len());
     for &r in returns {
-        let wealth = engine.step(r);
-        if wealth > peak {
-            peak = wealth;
+        engine.step(r);
+        let log_wealth = engine.log_growth();
+        if log_wealth > log_peak {
+            log_peak = log_wealth;
         }
-        dd.push(wealth / peak - 1.0);
+        dd.push((log_wealth - log_peak).exp_m1());
     }
     dd
 }
@@ -337,10 +340,10 @@ mod tests {
             .collect();
         let cs = crate::returns::comp_sum(&r);
         let mut engine = crate::returns::WealthEngine::new();
-        let mut last_wealth = 1.0;
         for &ret in &r {
-            last_wealth = engine.step(ret);
+            engine.step(ret);
         }
+        let last_wealth = engine.log_growth().exp();
         let comp_wealth = 1.0 + cs.last().copied().unwrap_or(0.0);
         assert!((comp_wealth - last_wealth).abs() < 1e-12);
 
@@ -348,7 +351,8 @@ mod tests {
         let mut engine = crate::returns::WealthEngine::new();
         let mut peak = 1.0;
         for (i, &ret) in r.iter().enumerate() {
-            let wealth = engine.step(ret);
+            engine.step(ret);
+            let wealth = engine.log_growth().exp();
             if wealth > peak {
                 peak = wealth;
             }
@@ -547,9 +551,13 @@ pub(crate) fn mean_drawdown(drawdowns: &[f64]) -> f64 {
 }
 
 /// `numerator / denominator` with signed infinity when `denominator == 0.0`
-/// and `0.0` when both are zero. Shared by all six drawdown-derived ratios.
+/// and `0.0` when both are zero. NaN inputs remain NaN. Shared by all six
+/// drawdown-derived ratios.
 #[inline]
 fn ratio_or_sign_infinity(numerator: f64, denominator: f64) -> f64 {
+    if numerator.is_nan() || denominator.is_nan() {
+        return f64::NAN;
+    }
     if denominator == 0.0 {
         if numerator > 0.0 {
             f64::INFINITY
@@ -575,7 +583,7 @@ fn ratio_or_sign_infinity(numerator: f64, denominator: f64) -> f64 {
 ///
 /// # Returns
 ///
-/// The Calmar ratio (positive when CAGR and max drawdown have the same sign).
+/// The Calmar ratio (positive for positive CAGR, negative for negative CAGR).
 /// Returns `f64::INFINITY` if `max_dd` is zero and `cagr_val` is positive,
 /// `f64::NEG_INFINITY` if negative, or `0.0` if both are zero.
 ///
@@ -643,18 +651,22 @@ pub(crate) fn martin_ratio(cagr_val: f64, ulcer: f64) -> f64 {
 ///
 /// * `cagr_val`       - Compound annual growth rate.
 /// * `avg_dd`         - Average of the top-N worst drawdowns (negative number).
-/// * `risk_free_rate` - Annualized risk-free rate.
+/// * `risk_free_rate` - Finite annualized risk-free rate as a decimal fraction.
 ///
 /// # Returns
 ///
 /// The Sterling ratio. Returns `±∞` if `avg_dd` is zero and the excess
-/// return is nonzero, or `0.0` if both are zero.
+/// return is nonzero, or `0.0` if both are zero. Returns [`f64::NAN`] for
+/// non-finite risk-free rates.
 ///
 /// # References
 ///
 /// - Kestner (1996): see docs/REFERENCES.md#kestner1996
 #[must_use]
 pub(crate) fn sterling_ratio(cagr_val: f64, avg_dd: f64, risk_free_rate: f64) -> f64 {
+    if !risk_free_rate.is_finite() {
+        return f64::NAN;
+    }
     ratio_or_sign_infinity(cagr_val - risk_free_rate, avg_dd.abs())
 }
 
@@ -675,18 +687,22 @@ pub(crate) fn sterling_ratio(cagr_val: f64, avg_dd: f64, risk_free_rate: f64) ->
 ///
 /// * `cagr_val`       - Compound annual growth rate.
 /// * `dd_episodes`    - Slice of max-drawdown values from each episode (negative).
-/// * `risk_free_rate` - Annualized risk-free rate.
+/// * `risk_free_rate` - Finite annualized risk-free rate as a decimal fraction.
 ///
 /// # Returns
 ///
 /// The Burke ratio. Returns `0.0` if `dd_episodes` is empty, or `±∞`
-/// if the RMS of episodes is zero with nonzero excess return.
+/// if the RMS of episodes is zero with nonzero excess return. Returns
+/// [`f64::NAN`] for non-finite risk-free rates, including with no episodes.
 ///
 /// # References
 ///
 /// - Burke (1994): see docs/REFERENCES.md#burke1994
 #[must_use]
 pub(crate) fn burke_ratio(cagr_val: f64, dd_episodes: &[f64], risk_free_rate: f64) -> f64 {
+    if cagr_val.is_nan() || !risk_free_rate.is_finite() {
+        return f64::NAN;
+    }
     if dd_episodes.is_empty() {
         return 0.0;
     }
@@ -706,14 +722,18 @@ pub(crate) fn burke_ratio(cagr_val: f64, dd_episodes: &[f64], risk_free_rate: f6
 ///
 /// * `cagr_val`       - Compound annual growth rate.
 /// * `pain`           - Pain index (from [`pain_index`]).
-/// * `risk_free_rate` - Annualized risk-free rate.
+/// * `risk_free_rate` - Finite annualized risk-free rate as a decimal fraction.
 ///
 /// # Returns
 ///
 /// The pain ratio. Returns `±∞` if the pain index is zero and the
-/// excess return is nonzero, or `0.0` if both are zero.
+/// excess return is nonzero, or `0.0` if both are zero. Returns [`f64::NAN`]
+/// for non-finite risk-free rates.
 #[must_use]
 pub(crate) fn pain_ratio(cagr_val: f64, pain: f64, risk_free_rate: f64) -> f64 {
+    if !risk_free_rate.is_finite() {
+        return f64::NAN;
+    }
     ratio_or_sign_infinity(cagr_val - risk_free_rate, pain)
 }
 

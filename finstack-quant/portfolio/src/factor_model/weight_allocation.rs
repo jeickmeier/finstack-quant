@@ -28,13 +28,16 @@ pub enum AllocationScheme {
 pub struct WeightAllocationSpec {
     /// Allocation scheme to apply.
     pub scheme: AllocationScheme,
-    /// Total capital to allocate across strategies.
+    /// Finite signed capital to allocate across strategies. Rounded allocations
+    /// retain this sign and sum to the total rounded at `money_decimal_places`.
     pub total_capital: f64,
     /// Strategy input rows.
     pub strategies: Vec<StrategyAllocationInput>,
     /// Optional covariance matrix for `risk_budget`, row-major as nested lists.
     pub covariance: Option<Vec<Vec<f64>>>,
-    /// Number of decimal places for capital rounding.
+    /// Number of decimal places for capital rounding, default 10 and at most 12.
+    /// Rounded minor units must remain finite and representable by the
+    /// floating-point output.
     #[serde(default = "default_money_decimal_places")]
     pub money_decimal_places: u32,
 }
@@ -74,7 +77,8 @@ pub struct StrategyAllocation {
     pub id: String,
     /// Fully invested allocation weight.
     pub weight: f64,
-    /// Rounded capital allocation.
+    /// Rounded capital allocation with the sign of total capital. Fractional
+    /// minor units are assigned by largest remainder, breaking ties by input order.
     pub capital: f64,
     /// Sample volatility used by inverse-volatility allocation, when applicable.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -98,10 +102,14 @@ pub struct AllocationDiagnostics {
 ///
 /// This is the canonical entry point. Use [`allocate_weights_json`] only at
 /// wire boundaries that must exchange JSON documents.
+/// Capital retains the sign of `total_capital` and sums to its rounded total.
+/// Minor units are assigned by largest fractional remainder, with ties awarded
+/// in strategy input order; zero-weight strategies receive zero capital.
 ///
 /// # Errors
 ///
-/// Returns [`Error::ValidationFailed`] when inputs violate scheme invariants.
+/// Returns [`Error::ValidationFailed`] when inputs violate scheme invariants or
+/// capital cannot be represented at the requested rounding precision.
 ///
 /// # Arguments
 ///
@@ -117,7 +125,8 @@ pub fn allocate_weights(spec: &WeightAllocationSpec) -> Result<WeightAllocationR
 ///
 /// # Errors
 ///
-/// Returns [`Error::ValidationFailed`] when inputs violate scheme invariants.
+/// Returns [`Error::ValidationFailed`] when inputs violate scheme invariants or
+/// capital cannot be represented at the requested rounding precision.
 ///
 /// # Arguments
 ///
@@ -134,7 +143,8 @@ pub fn allocate_weights_json(spec_json: &str) -> Result<String> {
 ///
 /// # Errors
 ///
-/// Returns [`Error::ValidationFailed`] when inputs violate scheme invariants.
+/// Returns [`Error::ValidationFailed`] when inputs violate scheme invariants or
+/// capital cannot be represented at the requested rounding precision.
 ///
 /// # Arguments
 ///
@@ -515,37 +525,68 @@ fn risk_contribution_fractions(weights: &[f64], covariance: &[f64]) -> Result<Ve
 }
 
 fn rounded_capitals(total_capital: f64, weights: &[f64], decimal_places: u32) -> Result<Vec<f64>> {
-    let mut capitals = weights
+    let scale = 10_f64.powi(decimal_places as i32);
+    let target_units = (total_capital.abs() * scale).round();
+    let weights_sum = neumaier_total(weights.iter().copied());
+    if !target_units.is_finite()
+        || !weights_sum.is_finite()
+        || weights_sum <= 0.0
+        || weights
+            .iter()
+            .any(|weight| !weight.is_finite() || *weight < 0.0)
+    {
+        return Err(Error::validation(
+            "allocation capital rounding requires finite minor units and nonnegative weights",
+        ));
+    }
+    let mut units = Vec::with_capacity(weights.len());
+    let mut remainders = Vec::with_capacity(weights.len());
+    for (idx, weight) in weights.iter().enumerate() {
+        // Normalize the accepted sum-to-one tolerance before rounding so the
+        // minor-unit budget is conserved even for caller-supplied fixed weights.
+        let exact_units = target_units * (*weight / weights_sum);
+        let whole_units = exact_units.floor();
+        units.push(whole_units);
+        remainders.push((idx, exact_units - whole_units));
+    }
+    let residual = (target_units - neumaier_total(units.iter().copied())).round();
+    let fractional_count = remainders
         .iter()
-        .map(|weight| round_to(total_capital * weight, decimal_places))
-        .collect::<Vec<_>>();
-    let target_total = round_to(total_capital, decimal_places);
-    let current_total = neumaier_total(capitals.iter().copied());
-    let residual = round_to(target_total - current_total, decimal_places);
-    if residual.abs() > 0.0 {
-        let idx = largest_weight_index(weights).ok_or_else(|| {
-            Error::validation("allocation requires at least one weight for capital rounding")
-        })?;
-        capitals[idx] = round_to(capitals[idx] + residual, decimal_places);
+        .filter(|(_, fraction)| *fraction > 0.0)
+        .count();
+    if !residual.is_finite() || residual < 0.0 || residual > fractional_count as f64 {
+        return Err(Error::validation(
+            "allocation capital is not representable at the requested rounding precision",
+        ));
+    }
+    remainders.sort_by(|left, right| {
+        right
+            .1
+            .total_cmp(&left.1)
+            .then_with(|| left.0.cmp(&right.0))
+    });
+    for (rank, (idx, _)) in remainders.into_iter().enumerate() {
+        if rank as f64 >= residual {
+            break;
+        }
+        let adjusted = units[idx] + 1.0;
+        if adjusted <= units[idx] {
+            return Err(Error::validation(
+                "allocation capital is not representable at the requested rounding precision",
+            ));
+        }
+        units[idx] = adjusted;
+    }
+    let capitals: Vec<f64> = units
+        .into_iter()
+        .map(|units| total_capital.signum() * units / scale)
+        .collect();
+    if capitals.iter().any(|capital| !capital.is_finite()) {
+        return Err(Error::validation(
+            "allocation rounded capital must be finite",
+        ));
     }
     Ok(capitals)
-}
-
-fn largest_weight_index(weights: &[f64]) -> Option<usize> {
-    let mut best: Option<(usize, f64)> = None;
-    for (idx, weight) in weights.iter().enumerate() {
-        let magnitude = weight.abs();
-        match best {
-            Some((_, best_magnitude)) if magnitude <= best_magnitude => {}
-            _ => best = Some((idx, magnitude)),
-        }
-    }
-    best.map(|(idx, _)| idx)
-}
-
-fn round_to(value: f64, decimal_places: u32) -> f64 {
-    let scale = 10_f64.powi(decimal_places as i32);
-    (value * scale).round() / scale
 }
 
 fn validate_weights_sum_to_one(weights: &[f64], label: &str) -> Result<()> {

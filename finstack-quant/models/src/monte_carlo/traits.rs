@@ -95,7 +95,14 @@ pub trait RandomStream: Clone + Send + Sync {
     /// Implementations must never return exactly 0.0 or 1.0: consumers feed
     /// these values into inverse CDFs and logs, and antithetic sampling
     /// mirrors them as `1 − u`, so either boundary value would produce
-    /// infinities. Use a grid-centred mapping such as `(bits + 0.5)·2⁻⁵³`.
+    /// infinities. For `f64`, use at most 52 random bits in a centred mapping
+    /// such as `(bits + 0.5)·2⁻⁵²` so its endpoints and their mirrors stay
+    /// representable strictly inside the unit interval.
+    ///
+    /// # Arguments
+    ///
+    /// * `out` - Caller-owned buffer filled with uniforms whose values and
+    ///   antithetic complements are strictly between zero and one.
     fn fill_u01(&mut self, out: &mut [f64]);
 
     /// Fill a buffer with standard normal random numbers N(0,1).
@@ -103,7 +110,7 @@ pub trait RandomStream: Clone + Send + Sync {
     /// Implementations may use Box-Muller, inverse CDF, or other transforms.
     fn fill_std_normals(&mut self, out: &mut [f64]);
 
-    /// Generate a single uniform random number in [0, 1).
+    /// Generate a single uniform random number in the open interval (0, 1).
     fn next_u01(&mut self) -> f64 {
         let mut buf = [0.0];
         self.fill_u01(&mut buf);
@@ -680,6 +687,25 @@ pub trait StochasticProcess: Send + Sync {
         None
     }
 
+    /// Validate that simulation intervals preserve the process's event boundaries.
+    ///
+    /// # Arguments
+    ///
+    /// * `time_grid` - Model times in years, starting at zero; processes with
+    ///   fixing or coefficient discontinuities may require those times as nodes.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when a step crosses an event that the
+    /// process's discretization cannot integrate within one interval.
+    fn validate_time_grid(
+        &self,
+        time_grid: &crate::monte_carlo::TimeGrid,
+    ) -> finstack_quant_core::Result<()> {
+        let _ = time_grid;
+        Ok(())
+    }
+
     /// Populate a [`PathState`] from the raw state vector.
     ///
     /// This is the bridge between process-specific storage and payoff logic.
@@ -883,6 +909,18 @@ pub trait Discretization<P: StochasticProcess + ?Sized>: Send + Sync {
 /// assert_eq!(payoff.value(Currency::USD).expect("valid payoff").amount(), 12.0);
 /// ```
 pub trait Payoff: Send + Sync + Clone {
+    /// Whether GBM likelihood-ratio delta and vega need no explicit payoff derivative.
+    ///
+    /// Return `true` only when the payoff, conditional on post-zero simulated
+    /// spots, is independent of the initial spot and volatility. Time-zero
+    /// fixings and extrema depend explicitly on initial spot; continuous
+    /// barrier bridge corrections depend explicitly on volatility. Those
+    /// payoffs require a pathwise derivative or common-random-number bumps.
+    /// Unknown custom payoffs remain unsupported unless they opt in.
+    fn supports_lrm_greeks(&self) -> bool {
+        false
+    }
+
     /// Process one path event such as a fixing, barrier check, or cashflow date.
     ///
     /// The engine passes a mutable [`PathState`] so payoffs can record

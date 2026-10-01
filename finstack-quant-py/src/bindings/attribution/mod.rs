@@ -21,7 +21,7 @@ use pyo3::types::PyList;
 
 /// Register the attribution submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "attribution")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "attribution")?;
     m.setattr("__doc__", "P&L attribution across multiple methodologies.")?;
     m.add_class::<PyPnlAttribution>()?;
     m.add_class::<PyReturnContributionResult>()?;
@@ -57,13 +57,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "attribution",
-        crate::bindings::module_utils::ROOT_PACKAGE,
-        crate::bindings::module_utils::ParentNameSource::Name,
+        crate::bindings::module_utils::Exposure::Python,
     )?;
     Ok(())
 }

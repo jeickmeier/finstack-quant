@@ -189,7 +189,7 @@ fn bench_rough_heston_step(c: &mut Criterion) {
         let process = RoughHestonProcess::new(params);
         let scheme = RoughHestonHybrid::new(&times, 0.1).expect("valid scheme");
         let work_size = 2 * num_steps + 1;
-        let z = [0.5_f64, -0.3];
+        let z = [0.5_f64, -0.3, 0.2];
 
         group.bench_with_input(BenchmarkId::new("steps", num_steps), &num_steps, |b, &n| {
             let mut work = vec![0.0; work_size];

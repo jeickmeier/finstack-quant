@@ -389,8 +389,7 @@ impl Bond {
             }
             if cf.kind.is_interest_like() {
                 if let Some(rule) = &ex_coupon {
-                    let ex_date = rule.ex_date(cf.date)?;
-                    if entitlement_date >= ex_date && entitlement_date < cf.date {
+                    if rule.is_ex_coupon(cf.date, entitlement_date)? {
                         continue;
                     }
                 }
@@ -595,6 +594,35 @@ mod tests {
             flows.iter().any(|(d, _)| *d == coupon_date),
             "cum-coupon flows must include the next coupon"
         );
+    }
+
+    #[test]
+    fn gilt_record_date_keeps_coupon_in_pricing_and_model_grid() {
+        let mut bond = ex_coupon_bond();
+        bond.settlement_convention
+            .as_mut()
+            .expect("settlement convention")
+            .ex_coupon_calendar_id = Some("gblo".into());
+        let market = MarketContext::new();
+        let payment = date!(2025 - 07 - 01);
+        let record = date!(2025 - 06 - 20);
+        let next_settlement = date!(2025 - 06 - 23);
+        for (settlement, entitled) in [(record, true), (next_settlement, false)] {
+            let flows = bond
+                .pricing_dated_cashflows(&market, settlement)
+                .expect("pricing flows");
+            assert_eq!(flows.iter().any(|(date, _)| *date == payment), entitled);
+            let model =
+                crate::instruments::fixed_income::bond::pricing::time_basis::bond_model_schedule(
+                    &bond, settlement,
+                )
+                .expect("model grid");
+            assert_eq!(
+                model.coupons.iter().any(|(_, _, date)| *date == payment),
+                entitled
+            );
+            assert_eq!(model.accrued > 0.0, entitled);
+        }
     }
 
     /// Entitlement is a settlement-date rule: a trade whose settlement lands

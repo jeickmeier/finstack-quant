@@ -167,7 +167,10 @@ pub struct FxRateResult {
 
 /// Serializable state of an FxMatrix.
 /// Contains the configuration and cached quotes that can be persisted and restored.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+/// Serialization fails with an ordinary serializer error if any captured
+/// explicit or provider rate is non-finite or non-positive, including rates
+/// that overflow after a mutable underlying provider changes under a shock.
+#[derive(Clone, Debug, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct FxMatrixState {
@@ -180,6 +183,14 @@ pub struct FxMatrixState {
     /// rebuild a quote-only provider; arbitrary live provider behavior is not
     /// serialized. Required even when the provider has no snapshot quotes.
     pub provider_quotes: Vec<(Currency, Currency, f64)>,
+    /// Captured date/policy-scoped provider quotes. These override captured
+    /// pair-global provider quotes for their scope while remaining below
+    /// explicit matrix quotes in either direction. Required even when empty.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<(Currency, Currency, String, FxConversionPolicy, f64)>")
+    )]
+    pub provider_pinned_quotes: Vec<(Currency, Currency, Date, FxConversionPolicy, f64)>,
     /// Pinned, date/policy-scoped quotes as `(from, to, on, policy, rate)`.
     ///
     /// Required: a snapshot that omits it would silently re-derive those
@@ -189,4 +200,31 @@ pub struct FxMatrixState {
         schemars(with = "Vec<(Currency, Currency, String, FxConversionPolicy, f64)>")
     )]
     pub pinned_quotes: Vec<(Currency, Currency, Date, FxConversionPolicy, f64)>,
+}
+
+impl Serialize for FxMatrixState {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::{Error, SerializeStruct};
+
+        for &(from, to, rate) in self.quotes.iter().chain(&self.provider_quotes) {
+            super::provider::validate_fx_rate(from, to, rate).map_err(S::Error::custom)?;
+        }
+        for &(from, to, _, _, rate) in self
+            .pinned_quotes
+            .iter()
+            .chain(&self.provider_pinned_quotes)
+        {
+            super::provider::validate_fx_rate(from, to, rate).map_err(S::Error::custom)?;
+        }
+        let mut state = serializer.serialize_struct("FxMatrixState", 5)?;
+        state.serialize_field("config", &self.config)?;
+        state.serialize_field("quotes", &self.quotes)?;
+        state.serialize_field("provider_quotes", &self.provider_quotes)?;
+        state.serialize_field("provider_pinned_quotes", &self.provider_pinned_quotes)?;
+        state.serialize_field("pinned_quotes", &self.pinned_quotes)?;
+        state.end()
+    }
 }

@@ -219,6 +219,7 @@ impl<'a> ScheduleBuilder<'a> {
     ) -> Self {
         self.conv = Some(conv);
         self.cal = Some(cal);
+        self.deferred_calendar_id = None;
         self
     }
 
@@ -227,6 +228,8 @@ impl<'a> ScheduleBuilder<'a> {
     /// When enabled, computed intermediate roll dates are snapped to the
     /// last day of their month. The user-provided start and end dates are
     /// contractual and are never snapped.
+    /// With [`StubKind::None`], maturity must lie on the resulting EOM roll
+    /// grid. Use an explicit stub rule for a maturity between roll dates.
     /// EOM requires a month/year tenor and cannot be combined with IMM or CDS IMM.
     ///
     /// # Arguments
@@ -378,6 +381,7 @@ impl<'a> ScheduleBuilder<'a> {
     #[must_use]
     pub fn adjust_with_id(mut self, conv: BusinessDayConvention, calendar_id: &str) -> Self {
         self.conv = Some(conv);
+        self.cal = None;
         self.deferred_calendar_id = Some(calendar_id.to_string());
         self
     }
@@ -474,7 +478,7 @@ impl<'a> ScheduleBuilder<'a> {
         // Generate dates based on mode
         let mut dates = if self.imm_mode {
             // Standard IMM: generate dates using next_imm to get proper third Wednesdays
-            let mut imm_dates = generate_imm_dates(self.start, self.end);
+            let mut imm_dates = generate_imm_dates(self.start, self.end)?;
             if imm_dates.is_empty() {
                 // No IMM date falls inside [start, end]: a silently empty
                 // schedule means zero cashflows / PV = 0 downstream. Error
@@ -503,7 +507,7 @@ impl<'a> ScheduleBuilder<'a> {
             let adj_start = if crate::dates::imm::is_cds_date(self.start) {
                 self.start
             } else {
-                prev_cds_date(self.start)
+                prev_cds_date(self.start)?
             };
 
             let builder = BuilderInternal {

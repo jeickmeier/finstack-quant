@@ -23,7 +23,7 @@ use crate::types::{EntityId, PositionId};
 use crate::valuation::PortfolioValuation;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::math::summation::neumaier_sum;
+use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::HashSet;
 use finstack_quant_valuations::metrics::MetricId;
 use indexmap::IndexMap;
@@ -278,15 +278,11 @@ pub(crate) fn is_summable(metric_id: &str) -> bool {
 ///
 /// Position-level risk sensitivities are typically denominated in the instrument's
 /// native currency. Before portfolio-level summation, each metric value is
-/// multiplied by the implied FX rate from the position's native currency to the
-/// portfolio base currency:
-///
-/// ```text
-/// metric_base = metric_native × (value_base / value_native)
-/// ```
-///
-/// For positions where the native PV is zero (or the position is already in
-/// base currency), no conversion is applied.
+/// multiplied by the market spot FX rate from the position's native currency
+/// to the portfolio base currency. If the quote is unavailable, the ratio
+/// `value_base / value_native` is used only when native PV is safely away from
+/// zero. Missing quotes and unreliable ratios fail with an FX conversion error.
+/// Positions already in base currency use a conversion factor of one.
 ///
 /// # Warning: scalar spot and vol Greeks are not summed
 ///
@@ -431,10 +427,9 @@ fn fx_rate_for_position(
         return Ok(1.0);
     }
 
-    // Prefer the market spot: the PV-implied ratio `value_base / value_native`
-    // carries base-currency quantization noise from the valuation step
-    // (value_base was rounded to currency decimals), and that noise would
-    // scale every summable risk metric (DV01, CS01, deltas).
+    // Prefer the explicit market quote over inferring a rate from two PVs.
+    // Money preserves precision; the ratio is useful only when the quote is
+    // unavailable and the native PV is safely away from zero.
     if let Ok(rate) = crate::fx::spot_rate_to_base(native_currency, as_of, market, base_currency) {
         return Ok(rate);
     }
@@ -479,8 +474,9 @@ fn aggregate_collected_metrics(collected: Vec<PositionMetricData>) -> PortfolioM
     let mut by_position: IndexMap<PositionId, PositionMetrics> = IndexMap::with_capacity(n);
 
     // IndexMap keeps aggregated/by_entity insertion order stable for snapshots.
-    let mut metric_values: IndexMap<MetricId, Vec<f64>> = IndexMap::new();
-    let mut entity_values: IndexMap<MetricId, IndexMap<EntityId, Vec<f64>>> = IndexMap::new();
+    let mut metric_values: IndexMap<MetricId, NeumaierAccumulator> = IndexMap::new();
+    let mut entity_values: IndexMap<MetricId, IndexMap<EntityId, NeumaierAccumulator>> =
+        IndexMap::new();
     let mut skipped_metrics: Vec<SkippedMetric> = Vec::new();
     let mut unaggregated: HashSet<String> = HashSet::default();
 
@@ -513,14 +509,14 @@ fn aggregate_collected_metrics(collected: Vec<PositionMetricData>) -> PortfolioM
                 metric_values
                     .entry(metric_id.clone())
                     .or_default()
-                    .push(value_base);
+                    .add(value_base);
 
                 entity_values
                     .entry(metric_id.clone())
                     .or_default()
                     .entry(entity_id.clone())
                     .or_default()
-                    .push(value_base);
+                    .add(value_base);
             }
         }
 
@@ -537,7 +533,7 @@ fn aggregate_collected_metrics(collected: Vec<PositionMetricData>) -> PortfolioM
         IndexMap::with_capacity(metric_values.len());
 
     for (metric_id, values) in metric_values {
-        let total = neumaier_sum(values);
+        let total = values.total();
 
         let by_entity: IndexMap<EntityId, f64> = entity_values
             .shift_remove(&metric_id)
@@ -545,7 +541,7 @@ fn aggregate_collected_metrics(collected: Vec<PositionMetricData>) -> PortfolioM
             .flat_map(|entity_map| {
                 entity_map
                     .into_iter()
-                    .map(|(eid, vals)| (eid, neumaier_sum(vals)))
+                    .map(|(eid, vals)| (eid, vals.total()))
             })
             .collect();
 
@@ -746,12 +742,8 @@ mod tests {
         assert_eq!(position_metrics.currency, Currency::USD);
     }
 
-    /// Risk metrics must be converted at the market spot, not at the
-    /// PV-implied ratio `value_base / value_native`: `value_base` was
-    /// quantized to base-currency decimals when the valuation ran, so the
-    /// implied ratio carries rounding noise that would scale every summable
-    /// metric (DV01, CS01, deltas). Here the implied ratio is
-    /// 3.60 / 3.33 ≈ 1.0811 while the true spot is 1.08.
+    /// An explicit spot quote takes precedence over an inconsistent PV snapshot.
+    /// Here the supplied PV ratio is 3.60 / 3.33, while spot is 1.08.
     #[test]
     fn fx_rate_for_position_prefers_matrix_spot_over_pv_implied_ratio() {
         let as_of = date!(2024 - 01 - 01);
@@ -759,7 +751,7 @@ mod tests {
             position_id: PositionId::from("EUR_POS".to_string()),
             entity_id: EntityId::from("ENTITY".to_string()),
             value_native: Money::new(3.33, Currency::EUR).expect("valid money fixture"),
-            // Quantized during valuation: 3.33 * 1.08 = 3.5964 -> 3.60 USD.
+            // Deliberately inconsistent with the current market spot.
             value_base: Money::new(3.60, Currency::USD).expect("valid money fixture"),
             metric_scale: 1.0,
             risk_metrics_complete: true,
@@ -919,5 +911,27 @@ mod tests {
                 "by_entity order for {key} must be deterministic"
             );
         }
+    }
+    #[test]
+    fn streaming_metric_totals_preserve_mixed_sign_cancellation() {
+        let metric = MetricId::Dv01;
+        let collected = [1e16, 1.0, -1e16]
+            .into_iter()
+            .enumerate()
+            .map(|(index, value)| PositionMetricData {
+                position_id: format!("P{index}").into(),
+                entity_id: "ENTITY".into(),
+                currency: Currency::USD,
+                metrics: IndexMap::from([(metric.clone(), value)]),
+                fx_rate: 1.0,
+            })
+            .collect();
+        let result = aggregate_collected_metrics(collected);
+        assert_eq!(result.aggregated[&metric].total, 1.0);
+        assert_eq!(
+            result.aggregated[&metric].by_entity[&EntityId::new("ENTITY")],
+            1.0
+        );
+        assert_eq!(result.by_position.len(), 3);
     }
 }

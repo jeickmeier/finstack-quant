@@ -7,7 +7,6 @@
 //!
 //! Where Gamma(t) is computed at current time, and Gamma(t+h) at a later time.
 
-use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::equity::equity_option::EquityOption;
 use crate::metrics::bump_scalar_price;
 use crate::metrics::{MetricCalculator, MetricContext};
@@ -20,7 +19,7 @@ impl MetricCalculator for ColorCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let option: &EquityOption = context.instrument_as()?;
         let as_of = context.as_of;
-        let base_pv = context.base_value.amount();
+        let base_pv = context.reprice_instrument_raw(option, &context.curves, as_of)?;
 
         let t = option.day_count.year_fraction(
             as_of,
@@ -49,17 +48,20 @@ impl MetricCalculator for ColorCalculator {
         };
 
         let curves_up = bump_scalar_price(&context.curves, &option.spot_id, bump_pct)?;
-        let pv_up = option.value(&curves_up, as_of)?.amount();
+        let pv_up = context.reprice_instrument_raw(option, &curves_up, as_of)?;
         let curves_down = bump_scalar_price(&context.curves, &option.spot_id, -bump_pct)?;
-        let pv_down = option.value(&curves_down, as_of)?.amount();
+        let pv_down = context.reprice_instrument_raw(option, &curves_down, as_of)?;
         let gamma_t = (pv_up - 2.0 * base_pv + pv_down) / (spot_bump * spot_bump);
 
         let rolled_date = as_of + time::Duration::days(time_bump_days as i64);
-        let base_pv_future = option.value(&context.curves, rolled_date)?.amount();
+        let base_pv_future =
+            context.reprice_instrument_raw(option, &context.curves, rolled_date)?;
         let curves_up_future = bump_scalar_price(&context.curves, &option.spot_id, bump_pct)?;
-        let pv_up_future = option.value(&curves_up_future, rolled_date)?.amount();
+        let pv_up_future =
+            context.reprice_instrument_raw(option, &curves_up_future, rolled_date)?;
         let curves_down_future = bump_scalar_price(&context.curves, &option.spot_id, -bump_pct)?;
-        let pv_down_future = option.value(&curves_down_future, rolled_date)?.amount();
+        let pv_down_future =
+            context.reprice_instrument_raw(option, &curves_down_future, rolled_date)?;
         let gamma_t_future =
             (pv_up_future - 2.0 * base_pv_future + pv_down_future) / (spot_bump * spot_bump);
 

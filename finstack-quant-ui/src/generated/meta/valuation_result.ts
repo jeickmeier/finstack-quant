@@ -658,12 +658,12 @@ export default [
   {
     "path": "#/$defs/d_55fd8d302833a65d16f6/properties/ingest_scale_by_currency",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/RoundingContext/properties/ingest_scale_by_currency",
-    "description": "Ingest scale map snapshot by currency code."
+    "description": "Validated ingest scale snapshot by currency code, with values in `0..=28`."
   },
   {
     "path": "#/$defs/d_55fd8d302833a65d16f6/properties/ingest_scale_by_currency/additionalProperties",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/RoundingContext/properties/ingest_scale_by_currency/additionalProperties",
-    "format": "uint32",
+    "maximum": 28,
     "minimum": 0
   },
   {
@@ -676,12 +676,12 @@ export default [
   {
     "path": "#/$defs/d_55fd8d302833a65d16f6/properties/output_scale_by_currency",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/RoundingContext/properties/output_scale_by_currency",
-    "description": "Output scale map snapshot by currency code."
+    "description": "Validated output scale snapshot by currency code, with values in `0..=28`."
   },
   {
     "path": "#/$defs/d_55fd8d302833a65d16f6/properties/output_scale_by_currency/additionalProperties",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/RoundingContext/properties/output_scale_by_currency/additionalProperties",
-    "format": "uint32",
+    "maximum": 28,
     "minimum": 0
   },
   {

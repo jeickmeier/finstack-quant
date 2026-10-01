@@ -61,7 +61,7 @@ pub use types::{
     ArbitrageReport, ArbitrageSeverity, ArbitrageType, ArbitrageViolation, ViolationLocation,
 };
 
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurface, VolSurfaceAxis};
 use std::collections::BTreeMap;
 
 /// Configuration for the arbitrage detection suite.
@@ -152,32 +152,11 @@ fn local_vol_density_violations(
     forward_prices: &[f64],
     tolerance: f64,
 ) -> Vec<ArbitrageViolation> {
-    let all_equal = forward_prices
-        .windows(2)
-        .all(|w| (w[0] - w[1]).abs() < 1e-14);
-
-    if all_equal {
-        return LocalVolDensityCheck {
-            forward: forward_prices[0],
-            tolerance,
-        }
-        .check(surface);
+    LocalVolDensityCheck {
+        forwards: forward_prices.to_vec(),
+        tolerance,
     }
-
-    let mut violations = Vec::new();
-    for (i, &expiry) in surface.expiries().iter().enumerate() {
-        let checker = LocalVolDensityCheck {
-            forward: forward_prices[i],
-            tolerance,
-        };
-        violations.extend(
-            checker
-                .check(surface)
-                .into_iter()
-                .filter(|v| (v.location.expiry - expiry).abs() < 1e-12),
-        );
-    }
-    violations
+    .check(surface)
 }
 
 /// Run butterfly, calendar-spread, and local-vol density checks on a surface.
@@ -202,10 +181,14 @@ fn local_vol_density_violations(
 ///
 /// Returns an error if required forwards are missing, non-finite, non-positive,
 /// or have the wrong length, or if tolerance is non-finite or negative.
+/// Only unshifted Black quotes on a strike axis are supported; normal,
+/// displaced-Black, and tenor-axis surfaces return a convention error.
 pub fn check_surface(
     surface: &VolSurface,
     config: &ArbitrageCheckConfig,
 ) -> finstack_quant_core::Result<ArbitrageReport> {
+    surface.require_secondary_axis(VolSurfaceAxis::Strike)?;
+    surface.require_quote_type(VolQuoteType::BlackLognormal)?;
     validate_tolerance(config.tolerance)?;
     if config.forward_prices.is_none()
         && (config.check_butterfly

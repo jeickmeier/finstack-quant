@@ -170,6 +170,7 @@ fn test_mid_period_maturity_caps_interest_accrual() {
         legal_maturity(),
         "USD_OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     let clo_mid = StructuredCredit::new_clo(
@@ -180,6 +181,7 @@ fn test_mid_period_maturity_caps_interest_accrual() {
         legal_maturity(),
         "USD_OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     // Act -- shared market for deterministic comparison
@@ -242,6 +244,7 @@ fn test_pre_defaulted_asset_generates_zero_pool_interest() {
         legal_maturity(),
         "USD_OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     // Act
@@ -302,6 +305,7 @@ fn test_pre_defaulted_asset_does_not_affect_performing_pool_flows() {
         legal_maturity(),
         "USD_OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     let clo_mixed = StructuredCredit::new_clo(
@@ -312,6 +316,7 @@ fn test_pre_defaulted_asset_does_not_affect_performing_pool_flows() {
         legal_maturity(),
         "USD_OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     // Act -- shared market for deterministic comparison
@@ -378,6 +383,7 @@ fn test_reinvestment_end_reconciles_pool_outstanding() {
         legal_maturity(),
         "USD_OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     let market = flat_market();
@@ -473,6 +479,7 @@ fn test_reinvestment_vs_no_reinvestment_produces_consistent_results() {
         legal_maturity(),
         "USD_OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     // Deal WITHOUT reinvestment (same pool, no reinvestment period)
@@ -493,6 +500,7 @@ fn test_reinvestment_vs_no_reinvestment_produces_consistent_results() {
         legal_maturity(),
         "USD_OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     // Act -- shared market context

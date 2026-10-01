@@ -157,14 +157,11 @@ fn factor_model_config_schema() -> PyResult<String> {
     schema_json(canonical::factor_model_config_schema().map_err(core_to_py)?)
 }
 
-schema_registry_functions!(
-    finstack_quant_models::factor::schema::ARTIFACTS,
-    "finstack_quant.models.factor.schema"
-);
+schema_registry_functions!(finstack_quant_models::factor::schema::ARTIFACTS);
 
 /// Register the `finstack_quant.models.factor.schema` Python namespace.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "schema")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "schema")?;
     m.setattr("__doc__", MODULE_DOC)?;
     add_registry_functions(&m)?;
 
@@ -182,22 +179,15 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "index",
         "validate",
     ];
-    for name in exports {
-        m.getattr(name)?
-            .setattr("__module__", "finstack_quant.models.factor.schema")?;
-    }
 
     let all = PyList::new(py, exports)?;
     m.setattr("__all__", all)?;
-    // Explicit public path: unlike its sibling subpackages this module has no
-    // pure-Python shim, so it owns `finstack_quant.models.factor.schema` itself.
-    // Deriving from the parent's `__package__` would put it on the extension's
-    // private path, where `import finstack_quant.models.factor.schema` cannot see it.
-    crate::bindings::module_utils::register_submodule_at(
-        py,
+    // Unlike its sibling subpackages this module has no pure-Python shim, so the
+    // compiled module itself owns `finstack_quant.models.factor.schema`.
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "finstack_quant.models.factor.schema",
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
 
     Ok(())

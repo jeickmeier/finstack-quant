@@ -8,6 +8,67 @@ await init({
   module_or_path: readFileSync(new URL('../../pkg/finstack_quant_wasm_bg.wasm', import.meta.url)),
 });
 
+test('metric override patches preserve omitted fields and explicitly clear nullable fields', () => {
+  const fixture = JSON.parse(
+    readFileSync(
+      new URL(
+        '../../../finstack-quant/valuations/tests/fixtures/production_icma.json',
+        import.meta.url
+      )
+    )
+  );
+  fixture.instrument.instrument.spec.metric_pricing_overrides = {
+    theta_period: { count: 1, unit: 'weeks' },
+    bump_config: { rate_bump_bp: 2, vol_bump_decimal: 0.02, adaptive_bumps: true },
+  };
+  fixture.market.curves[0].knot_points = [
+    [0, 1],
+    [2, Math.exp(-0.06)],
+  ];
+  const instrumentJson = JSON.stringify(fixture.instrument);
+  const marketJson = JSON.stringify(fixture.market);
+  const price = (patch) =>
+    valuations.instruments.priceInstrument(
+      instrumentJson,
+      marketJson,
+      '2024-05-01',
+      'discounting',
+      ['theta', 'theta_period_days'],
+      patch === undefined ? undefined : JSON.stringify(patch)
+    );
+  const weekly = price();
+  assert.equal(weekly.measures.theta_period_days, 7);
+  assert.ok(Math.abs(weekly.measures.theta) > 0.01);
+  for (const patch of [{}, { bump_config: { rate_bump_bp: 3 } }]) {
+    assert.deepEqual(price(patch).measures, weekly.measures);
+  }
+
+  const prepared = JSON.parse(
+    valuations.instruments.validateInstrumentJson(
+      instrumentJson,
+      JSON.stringify({ bump_config: { rate_bump_bp: 3 } })
+    )
+  ).instrument.spec.metric_pricing_overrides;
+  assert.deepEqual(prepared.theta_period, { count: 1, unit: 'weeks' });
+  assert.equal(prepared.bump_config.rate_bump_bp, 3);
+  assert.equal(prepared.bump_config.vol_bump_decimal, 0.02);
+  assert.equal(prepared.bump_config.adaptive_bumps, true);
+
+  const daily = price({ theta_period: null });
+  assert.equal(daily.measures.theta_period_days, 1);
+  assert.ok(Math.abs(daily.measures.theta - weekly.measures.theta) > 0.01);
+  const withoutHorizon = structuredClone(fixture.instrument);
+  delete withoutHorizon.instrument.spec.metric_pricing_overrides.theta_period;
+  const defaultHorizon = valuations.instruments.priceInstrument(
+    JSON.stringify(withoutHorizon),
+    marketJson,
+    '2024-05-01',
+    'discounting',
+    ['theta', 'theta_period_days']
+  );
+  assert.deepEqual(daily.measures, defaultHorizon.measures);
+});
+
 // schema-rejection-test: behavior_overrides
 test('structured credit rejects the retired behavior_overrides channel', () => {
   const fixture = JSON.parse(

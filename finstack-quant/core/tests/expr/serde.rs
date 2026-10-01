@@ -6,13 +6,10 @@
 //! - Evaluation types (CompiledExpr, EvalOpts, EvaluationResult)
 //! - Context types (SimpleContext)
 
-use finstack_quant_core::config::{
-    ResultsMeta, RoundingContext, RoundingMode, ToleranceConfig, NUMERIC_MODE_F64,
-};
+use finstack_quant_core::config::{ResultsMeta, RoundingContext, NUMERIC_MODE_F64};
 use finstack_quant_core::expr::{
     CompiledExpr, EvalOpts, EvaluationResult, Expr, ExprNode, Function, SimpleContext,
 };
-use std::collections::BTreeMap;
 
 #[test]
 fn test_expr_ast_serde_roundtrip() {
@@ -129,13 +126,7 @@ fn test_evaluation_result_serde() {
         values: vec![1.0, 2.0, 3.0, 4.0, 5.0],
         metadata: ResultsMeta {
             numeric_mode: NUMERIC_MODE_F64.to_owned(),
-            rounding: RoundingContext {
-                mode: RoundingMode::Bankers,
-                ingest_scale_by_currency: BTreeMap::new(),
-                output_scale_by_currency: BTreeMap::new(),
-                tolerances: ToleranceConfig::default(),
-                version: 1,
-            },
+            rounding: RoundingContext::default(),
             fx_policy_applied: None,
             parallel: false,
             timestamp: None,
@@ -228,13 +219,7 @@ fn test_compiled_expr_serde() {
     // Create a compiled expression with a plan
     let meta = ResultsMeta {
         numeric_mode: NUMERIC_MODE_F64.to_owned(),
-        rounding: RoundingContext {
-            mode: RoundingMode::Bankers,
-            ingest_scale_by_currency: BTreeMap::new(),
-            output_scale_by_currency: BTreeMap::new(),
-            tolerances: ToleranceConfig::default(),
-            version: 1,
-        },
+        rounding: RoundingContext::default(),
         fx_policy_applied: None,
         parallel: false,
         timestamp: None,
@@ -253,10 +238,47 @@ fn test_compiled_expr_serde() {
         serde_json::from_str(&json).expect("Failed to deserialize CompiledExpr");
 
     // Verify AST is preserved
-    assert_eq!(compiled.ast.id, deserialized.ast.id);
+    assert_eq!(compiled.get_ast().id, deserialized.get_ast().id);
 
     // Verify plan is preserved if it existed
     assert_eq!(compiled.has_plan(), deserialized.has_plan());
+}
+
+#[test]
+fn compiled_expression_serialization_rebuilds_plans_from_the_tree() {
+    use finstack_quant_core::config::{results_meta, FinstackConfig};
+    let meta = results_meta(&FinstackConfig::default());
+    let context = SimpleContext::new(["x"]).expect("unique column");
+    let data = [0.0, 0.0];
+    let columns: &[&[f64]] = &[&data];
+    for eager in [false, true] {
+        let compiled = if eager {
+            CompiledExpr::with_planning(Expr::literal(1.0), meta.clone()).expect("plan")
+        } else {
+            CompiledExpr::new(Expr::literal(1.0))
+        };
+        assert_eq!(
+            compiled
+                .eval(&context, columns, EvalOpts::default())
+                .expect("eval")
+                .values,
+            [1.0, 1.0]
+        );
+        let mut serialized = serde_json::to_value(&compiled).expect("serialize");
+        assert!(serialized.get("plan").is_none());
+        serialized["ast"] = serde_json::to_value(Expr::literal(2.0)).expect("new tree");
+        let restored: CompiledExpr =
+            serde_json::from_value(serialized.clone()).expect("deserialize");
+        let result = restored
+            .eval(&context, columns, EvalOpts::default())
+            .expect("rebuilt eval");
+        assert_eq!(result.values, [2.0, 2.0]);
+        if eager {
+            assert_eq!(result.metadata, meta);
+        }
+        serialized["plan"] = serde_json::json!({});
+        assert!(serde_json::from_value::<CompiledExpr>(serialized).is_err());
+    }
 }
 
 #[test]

@@ -31,7 +31,7 @@ fn monthly_observations(
 ) -> Vec<(Date, f64)> {
     (0..months)
         .map(|i| {
-            let date = start.add_months(i as i32);
+            let date = start.add_months(i as i32).expect("valid date shift");
             let value = start_value * (1.0 + monthly_rate).powi(i as i32);
             (date, value)
         })

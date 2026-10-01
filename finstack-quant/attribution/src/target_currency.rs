@@ -111,21 +111,19 @@ pub fn translate_to_target_currency(
     // Total in target_currency = MTM translation + the total-return add-back.
     //
     // Native `total_pnl` follows the total-return convention: the methods add
-    // intra-period coupon income on top of the raw MTM (`mark_to_market_pnl`)
+    // intra-period economic cash on top of the raw MTM (`mark_to_market_pnl`)
     // via `apply_total_return_carry`. The MTM component is rebuilt from the
-    // T0/T1 values; the coupon add-back (total − MTM, zero when no cashflows
+    // T0/T1 values; the economic-cash add-back (total − MTM, zero when no cashflows
     // occurred) must travel at T1 FX — the same rate at which the translated
-    // `carry` still contains it — or the recomputed residual is polluted by
-    // the full coupon and `total_pnl` silently flips to MTM-only (quant
-    // review M6).
+    // `carry` still contains it — to preserve the total-return identity.
     let native_total_pnl = translated.total_pnl;
     let native_mtm = translated.mark_to_market_pnl.unwrap_or(native_total_pnl);
-    let coupon_addback_native = native_total_pnl.checked_sub(native_mtm)?;
+    let cash_addback_native = native_total_pnl.checked_sub(native_mtm)?;
 
     let val_t1_native = val_t0.checked_add(native_mtm)?;
     let val_t1_at_t1 = market_t1.convert_money(val_t1_native, target_currency, as_of_t1)?;
     let translated_mtm = val_t1_at_t1.checked_sub(val_t0_at_t0)?;
-    translated.total_pnl = translated_mtm.checked_add(translate(coupon_addback_native)?)?;
+    translated.total_pnl = translated_mtm.checked_add(translate(cash_addback_native)?)?;
 
     if translated.mark_to_market_pnl.is_some() {
         translated.mark_to_market_pnl = Some(translated_mtm);
@@ -157,6 +155,9 @@ pub fn translate_to_target_currency(
         *m = translate(*m)?;
     }
 
+    // Residual is derived below; replace its native-currency placeholder
+    // before canonical validation checks every Money leaf.
+    translated.residual = Money::from((0_i64, target_currency));
     translated.compute_residual()?;
     *attribution = translated;
     Ok(())
@@ -297,6 +298,8 @@ mod tests {
             date!(2025 - 01 - 16),
         )
         .expect("translate");
+        attr.validate_currencies()
+            .expect("every translated amount uses the reporting currency");
 
         // translated_mtm = 1100×1.20 − 1000×1.10 = 220 USD;
         // coupon add-back at T1 FX = 30 × 1.20 = 36 USD → total 256 USD.
@@ -329,6 +332,8 @@ mod tests {
             date!(2025 - 01 - 16),
         )
         .expect("translate");
+        attr.validate_currencies()
+            .expect("every translated amount uses the reporting currency");
 
         // Per-factor amounts converted at T1 FX (1.20).
         assert_eq!(attr.total_pnl.currency(), Currency::USD);
@@ -426,6 +431,8 @@ mod tests {
             date!(2025 - 01 - 16),
         )
         .expect("translate");
+        attr.validate_currencies()
+            .expect("every translated amount uses the reporting currency");
 
         let assert_usd = |m: Money, native: f64, label: &str| {
             assert_eq!(m.currency(), Currency::USD, "{label} must be USD");
@@ -515,6 +522,8 @@ mod tests {
             date!(2025 - 01 - 16),
         )
         .expect("translate");
+        attr.validate_currencies()
+            .expect("every translated amount uses the reporting currency");
 
         // With no FX move between T0 and T1, fx_translation_pnl should be 0.
         assert!(attr.fx_translation_pnl.amount().abs() < 1e-9);
@@ -564,6 +573,8 @@ mod tests {
             date!(2025 - 01 - 16),
         )
         .expect("translate");
+        attr.validate_currencies()
+            .expect("every translated amount uses the reporting currency");
 
         let rates = attr.rates_detail.as_ref().expect("rates detail");
         assert_eq!(rates.discount_total.currency(), Currency::USD);

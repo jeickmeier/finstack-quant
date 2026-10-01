@@ -11,9 +11,7 @@
 use crate::adapters::traits::ScenarioEffect;
 use crate::engine::ExecutionContext;
 use crate::warning::Warning;
-use finstack_quant_core::market_data::bumps::{
-    BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
-};
+use finstack_quant_core::market_data::bumps::MarketBump;
 use finstack_quant_core::market_data::term_structures::BASE_CORR_DETACHMENT_MATCH_TOLERANCE;
 use finstack_quant_core::types::CurveId;
 
@@ -79,14 +77,10 @@ pub(crate) fn base_corr_parallel_effects(
     points: f64,
     ctx: &ExecutionContext,
 ) -> Vec<ScenarioEffect> {
-    let bump = MarketBump::Curve {
-        id: surface_id.clone(),
-        spec: BumpSpec {
-            mode: BumpMode::Additive,
-            units: BumpUnits::Fraction,
-            value: points,
-            bump_type: BumpType::Parallel,
-        },
+    let bump = MarketBump::BaseCorrBucketPts {
+        surface_id: surface_id.clone(),
+        detachments: None,
+        points,
     };
     let mut effects = vec![ScenarioEffect::MarketBump(bump)];
     effects.extend(

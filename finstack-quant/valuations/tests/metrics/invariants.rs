@@ -470,7 +470,7 @@ mod cds_invariants {
             hazard_rate in 0.005f64..0.05f64,
         ) {
             let as_of = date!(2025 - 01 - 01);
-            let maturity = as_of.add_months(60); // 5Y CDS
+            let maturity = as_of.add_months(60).expect("valid date shift"); // 5Y CDS
             // Build the hazard curve at the trade recovery so the ISDA
             // recovery-consistency guard (same R in both legs) is satisfied.
             let (disc, hazard) = build_test_curves(0.04, hazard_rate, recovery);
@@ -510,7 +510,7 @@ mod cds_invariants {
             hazard_rate in 0.01f64..0.03f64,
         ) {
             let as_of = date!(2025 - 01 - 01);
-            let maturity = as_of.add_months(60);
+            let maturity = as_of.add_months(60).expect("valid date shift");
 
             let cds_low_recovery = crate::metrics::credit_support::cds_buy_protection(
                 "PROP_RECOVERY_LOW",
@@ -618,7 +618,7 @@ mod cs01_invariants {
             hazard_rate in 0.01f64..0.03f64,
         ) {
             let as_of = date!(2025 - 01 - 01);
-            let maturity = as_of.add_months(60);
+            let maturity = as_of.add_months(60).expect("valid date shift");
 
             let cds = crate::metrics::credit_support::cds_buy_protection(
                 "PROP_CS01_TEST",
@@ -734,7 +734,7 @@ mod cs_gamma_consistency {
     #[test]
     fn cs_gamma_rejects_unreplayable_par_spread_sidecars() {
         let as_of = date!(2025 - 01 - 01);
-        let maturity = as_of.add_months(60); // 5Y CDS
+        let maturity = as_of.add_months(60).expect("valid date shift"); // 5Y CDS
 
         let cds = crate::metrics::credit_support::cds_buy_protection(
             "CS_GAMMA_CONSISTENCY",
@@ -757,7 +757,7 @@ mod cs_gamma_consistency {
     #[test]
     fn cs_gamma_requires_replay_recipe_without_par_spreads() {
         let as_of = date!(2025 - 01 - 01);
-        let maturity = as_of.add_months(60); // 5Y CDS
+        let maturity = as_of.add_months(60).expect("valid date shift"); // 5Y CDS
 
         let cds = crate::metrics::credit_support::cds_buy_protection(
             "CS_GAMMA_FALLBACK",
@@ -860,7 +860,7 @@ mod bucketed_cs01_invariants {
     #[test]
     fn test_bucketed_cs01_consistency() {
         let as_of = date!(2025 - 01 - 01);
-        let maturity = as_of.add_months(60); // 5Y CDS
+        let maturity = as_of.add_months(60).expect("valid date shift"); // 5Y CDS
 
         let cds = crate::metrics::credit_support::cds_buy_protection(
             "CS01_BUCKET_TEST",

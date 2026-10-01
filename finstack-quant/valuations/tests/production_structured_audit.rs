@@ -4,7 +4,7 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec, RepLine, StructuredCredit,
+    DealType, DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec, RepLine, StructuredCredit,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use time::macros::date;
@@ -20,6 +20,23 @@ fn market(as_of: Date) -> MarketContext {
 }
 
 #[test]
+fn production_structured_constructor_rejects_date_overflow() {
+    let base = StructuredCredit::example().expect("example");
+    for deal_type in [DealType::Abs, DealType::Clo, DealType::Cmbs, DealType::Rmbs] {
+        assert!(StructuredCredit::apply_deal_defaults(
+            "BOUNDARY",
+            deal_type,
+            base.pool.clone(),
+            base.tranches.clone(),
+            Date::MAX,
+            Date::MAX,
+            "USD-OIS",
+        )
+        .is_err());
+    }
+}
+
+#[test]
 fn production_structured_constructor_uses_closing_date() {
     let base = StructuredCredit::example().expect("example");
     let closing = date!(2026 - 09 - 09);
@@ -32,7 +49,8 @@ fn production_structured_constructor_uses_closing_date() {
                 closing,
                 base.maturity,
                 "USD-OIS",
-            ),
+            )
+            .expect("valid structured-credit dates"),
             date!(2026 - 10 - 09),
         ),
         (
@@ -43,7 +61,8 @@ fn production_structured_constructor_uses_closing_date() {
                 closing,
                 base.maturity,
                 "USD-OIS",
-            ),
+            )
+            .expect("valid structured-credit dates"),
             date!(2026 - 12 - 09),
         ),
         (
@@ -54,7 +73,8 @@ fn production_structured_constructor_uses_closing_date() {
                 closing,
                 base.maturity,
                 "USD-OIS",
-            ),
+            )
+            .expect("valid structured-credit dates"),
             date!(2026 - 10 - 09),
         ),
         (
@@ -65,7 +85,8 @@ fn production_structured_constructor_uses_closing_date() {
                 closing,
                 base.maturity,
                 "USD-OIS",
-            ),
+            )
+            .expect("valid structured-credit dates"),
             date!(2026 - 10 - 09),
         ),
     ] {

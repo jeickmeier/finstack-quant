@@ -3,7 +3,8 @@
 //! This module centralizes the pattern of computing:
 //! - **Curve time**: year fraction from a curve's base_date using the curve's day_count
 //! - **Relative discount factors**: DF from `as_of` to `target` using curve-consistent mapping
-//! - **Forward rate projection**: rate over a date interval using forward curve's time basis
+//! - **Forward rate projection**: projection-DF growth on the curve clock, annualized
+//!   using the contractual index accrual fraction
 //!
 //! # Background
 //!
@@ -196,8 +197,10 @@ pub fn curve_time(fwd: &ForwardCurve, date: Date) -> Result<f64> {
 
 /// Compute the discount-factor-implied term forward over a date interval.
 ///
-/// This is the date-based equivalent of `fwd.rate_between(t1, t2)` that ensures
-/// times are computed using the curve's own day count and base date.
+/// Dates are mapped to projection discount factors using the curve's own day
+/// count and base date. The resulting growth is divided by the contractual
+/// index accrual fraction, which can use a different day-count convention.
+/// The curve clock therefore cannot change the economics of a quoted rate.
 ///
 /// # Arguments
 ///
@@ -206,16 +209,22 @@ pub fn curve_time(fwd: &ForwardCurve, date: Date) -> Result<f64> {
 /// * `start` - Period start date
 /// * `end` - Exclusive period end date after `start`; historical/straddling
 ///   periods are rejected rather than projected.
+/// * `accrual_year_fraction` - Finite, strictly positive year fraction for
+///   `[start, end]` under the contractual index day count, including any coupon
+///   frequency or reference-period context required by that convention. For
+///   example, a 90-calendar-day ACT/360 fixing uses `90.0 / 360.0`, regardless
+///   of the forward curve's time basis.
 ///
 /// # Returns
 ///
 /// Simple forward rate over `[start, end]` implied by the forward curve's
-/// projection discount factors.
+/// projection discount factors, annualized on `accrual_year_fraction`.
 ///
 /// # Errors
 ///
 /// Returns an error if `end <= start`, if `start` is before the curve base
-/// date, or if time computation fails. A period starting before the curve base
+/// date, if `accrual_year_fraction` is non-finite or non-positive, or if time
+/// computation fails. A period starting before the curve base
 /// is historical or straddles the projection boundary and therefore requires
 /// an observed fixing; it is never clamped to the curve base.
 ///
@@ -228,10 +237,16 @@ pub fn curve_time(fwd: &ForwardCurve, date: Date) -> Result<f64> {
 /// // let fwd_rate = fwd.rate_between(t1, t2)?;
 ///
 /// // Use:
-/// let fwd_rate = rate_between_on_dates(&fwd, start, end)?;
+/// let accrual = index_day_count.year_fraction(start, end, coupon_context)?;
+/// let fwd_rate = rate_between_on_dates(&fwd, start, end, accrual)?;
 /// ```
 #[inline]
-pub fn rate_between_on_dates(fwd: &ForwardCurve, start: Date, end: Date) -> Result<f64> {
+pub fn rate_between_on_dates(
+    fwd: &ForwardCurve,
+    start: Date,
+    end: Date,
+    accrual_year_fraction: f64,
+) -> Result<f64> {
     if end <= start {
         return Err(finstack_quant_core::Error::Validation(format!(
             "term forward period requires end > start; got start={start}, end={end}"
@@ -246,9 +261,22 @@ pub fn rate_between_on_dates(fwd: &ForwardCurve, start: Date, end: Date) -> Resu
             start
         )));
     }
+    if !accrual_year_fraction.is_finite() || accrual_year_fraction <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "term forward requires a finite positive contractual accrual fraction; got {accrual_year_fraction}"
+        )));
+    }
     let t_start = curve_time(fwd, start)?;
     let t_end = curve_time(fwd, end)?;
-    fwd.rate_between(t_start, t_end)
+    let growth = fwd.rate_between(t_start, t_end)? * (t_end - t_start);
+    let rate = growth / accrual_year_fraction;
+    if !rate.is_finite() {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "term forward for '{}' over {start} -> {end} is not finite on accrual {accrual_year_fraction}",
+            fwd.id()
+        )));
+    }
+    Ok(rate)
 }
 
 /// Compute the Simpson-rule integral average over a date interval.
@@ -427,7 +455,10 @@ mod tests {
         let start = date(2024, 4, 1);
         let end = date(2024, 7, 1);
 
-        let rate = rate_between_on_dates(&fwd, start, end).expect("should succeed");
+        let accrual = DayCount::Act360
+            .year_fraction(start, end, DayCountContext::default())
+            .expect("contractual accrual");
+        let rate = rate_between_on_dates(&fwd, start, end, accrual).expect("should succeed");
         let t_start = curve_time(&fwd, start).expect("valid start time");
         let t_end = curve_time(&fwd, end).expect("valid end time");
         let expected =
@@ -442,7 +473,7 @@ mod tests {
         let base = date(2024, 1, 1);
         let fwd = test_forward_curve(base, DayCount::Act360);
 
-        let error = rate_between_on_dates(&fwd, date(2023, 12, 1), date(2024, 2, 1))
+        let error = rate_between_on_dates(&fwd, date(2023, 12, 1), date(2024, 2, 1), 0.25)
             .expect_err("a straddling term period requires a historical fixing");
 
         assert!(
@@ -456,13 +487,52 @@ mod tests {
         let base = date(2024, 1, 1);
         let fwd = test_forward_curve(base, DayCount::Act360);
 
-        let error = rate_between_on_dates(&fwd, date(2023, 10, 1), date(2023, 12, 1))
+        let error = rate_between_on_dates(&fwd, date(2023, 10, 1), date(2023, 12, 1), 0.25)
             .expect_err("a historical term period requires a fixing");
 
         assert!(
             error.to_string().contains("historical fixing"),
             "unexpected error: {error}"
         );
+    }
+
+    #[test]
+    fn term_forward_preserves_contractual_rate_across_curve_clocks() {
+        let base = date(2025, 1, 2);
+        let start = date(2025, 4, 2);
+        let end = date(2025, 7, 2);
+        let accrual = 91.0 / 360.0;
+        for (day_count, denominator) in [(DayCount::Act360, 360.0), (DayCount::Act365F, 365.0)] {
+            // Rescale both the curve clock and its annualized rates, preserving
+            // projection-DF growth at every contractual interval boundary.
+            let t_start = 90.0 / denominator;
+            let t_end = 181.0 / denominator;
+            let curve_rate = 0.04 * denominator / 360.0;
+            let fwd = ForwardCurve::builder("USD-TERM-3M", 0.25)
+                .base_date(base)
+                .day_count(day_count)
+                .knots([(0.0, curve_rate), (t_end, curve_rate)])
+                .projection_grid(vec![0.0, t_start, t_end])
+                .build()
+                .expect("equivalent forward curve");
+
+            let rate =
+                rate_between_on_dates(&fwd, start, end, accrual).expect("contractual forward rate");
+            assert!((rate - 0.04).abs() < 1e-14, "{day_count:?}: {rate}");
+            let growth = fwd.df(t_start).expect("start DF") / fwd.df(t_end).expect("end DF") - 1.0;
+            assert!((rate * accrual - growth).abs() < 1e-14);
+        }
+    }
+
+    #[test]
+    fn term_forward_rejects_invalid_contractual_accrual() {
+        let base = date(2025, 1, 2);
+        let fwd = test_forward_curve(base, DayCount::Act360);
+        for accrual in [0.0, -0.25, f64::NAN, f64::INFINITY] {
+            let error = rate_between_on_dates(&fwd, base, date(2025, 4, 2), accrual)
+                .expect_err("invalid contractual accrual");
+            assert!(error.to_string().contains("contractual accrual"));
+        }
     }
 
     #[test]

@@ -16,7 +16,7 @@ use pyo3::types::PyList;
 
 /// Register the `analytics` submodule on the parent module.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "analytics")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "analytics")?;
     m.setattr(
         "__doc__",
         "Performance analytics centred on the Performance class.",
@@ -51,13 +51,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "analytics",
-        crate::bindings::module_utils::ROOT_PACKAGE,
-        crate::bindings::module_utils::ParentNameSource::Name,
+        crate::bindings::module_utils::Exposure::Python,
     )?;
 
     Ok(())

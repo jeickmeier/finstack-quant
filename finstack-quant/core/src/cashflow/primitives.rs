@@ -13,6 +13,21 @@ use crate::dates::{Date, DayCount};
 use crate::error::{InputError, NonFiniteKind};
 use crate::money::Money;
 
+/// Keep invalid rate observations from becoming absent rates in JSON.
+fn serialize_optional_rate<S>(rate: &Option<f64>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    if let Some(rate) = rate {
+        if !rate.is_finite() {
+            return Err(serde::ser::Error::custom(InputError::NonFiniteValue {
+                kind: NonFiniteKind::classify(*rate),
+            }));
+        }
+    }
+    serde::Serialize::serialize(rate, serializer)
+}
+
 /// Enumeration of cash-flow kinds for classification and ordering.
 ///
 /// Used to distinguish between different types of cashflows for
@@ -360,14 +375,22 @@ pub struct CashFlowAccrual {
     /// Day-count convention used for the accrual factor.
     pub day_count: DayCount,
     /// Projected index rate before spread, gearing, caps, or floors.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Serialization rejects non-finite rates instead of encoding them as absent.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "serialize_optional_rate"
+    )]
     pub projected_index_rate: Option<f64>,
     /// Calendar identifier for calendar-dependent day counts, including BUS/252.
     /// Required for BUS/252; otherwise optional. Joint calendars use `+`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub calendar_id: Option<String>,
-    /// Regular reference coupon period for ACT/ACT ICMA, including stub accrual.
-    /// `None` leaves reference-period selection to the schedule accrual caller.
+    /// Unadjusted regular reference coupon period for ACT/ACT ICMA, or the
+    /// actual full contractual coupon period for ACT/365L, including when
+    /// this flow represents only a rate or balance subinterval.
+    /// ACT/365L metadata must retain these boundaries to select the original
+    /// coupon's denominator; other conventions may leave this field `None`.
     #[serde(
         default,
         with = "crate::wire::optional_date_pair",
@@ -417,7 +440,12 @@ pub struct CashFlow {
     /// This is stored at cashflow creation time when available.
     /// For instruments with intra-period events (e.g., revolving credit with draws/repays),
     /// this may represent a time-weighted average rate across sub-periods.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Serialization rejects non-finite rates instead of encoding them as absent.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "serialize_optional_rate"
+    )]
     pub rate: Option<f64>,
     /// Optional contractual accrual metadata owned by this flow.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -650,6 +678,74 @@ mod tests {
     fn cashflow_size_is_reasonable() {
         let size = size_of::<CashFlow>();
         assert!(size <= 168, "CashFlow grew to {size} bytes");
+    }
+
+    #[test]
+    fn cashflow_json_rejects_non_finite_rate_metadata() {
+        let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid start");
+        let end = Date::from_calendar_date(2025, Month::July, 1).expect("valid end");
+        for rate in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let mut flow = CashFlow::new(
+                end,
+                None,
+                Money::from((25_i64, Currency::USD)),
+                CFKind::Fixed,
+                0.5,
+                Some(rate),
+            );
+            assert!(flow.validate().is_err());
+            assert!(serde_json::to_string(&flow).is_err());
+            assert!(serde_json::to_value(&flow).is_err());
+
+            flow.rate = Some(0.05);
+            let accrual = CashFlowAccrual {
+                start,
+                end,
+                day_count: DayCount::Act360,
+                projected_index_rate: Some(rate),
+                calendar_id: None,
+                coupon_period: None,
+                end_is_termination_date: false,
+            };
+            assert!(serde_json::to_string(&accrual).is_err());
+            flow.accrual = Some(accrual);
+            assert!(flow.validate().is_err());
+            assert!(serde_json::to_string(&flow).is_err());
+            assert!(serde_json::to_value(&flow).is_err());
+        }
+    }
+
+    #[test]
+    fn cashflow_json_preserves_absent_and_finite_negative_rates() {
+        let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid start");
+        let end = Date::from_calendar_date(2025, Month::July, 1).expect("valid end");
+        for rate in [None, Some(-0.05), Some(0.0), Some(0.05)] {
+            let flow = CashFlow::new(
+                end,
+                None,
+                Money::from((-25_i64, Currency::USD)),
+                CFKind::Fixed,
+                0.5,
+                rate,
+            )
+            .with_accrual(CashFlowAccrual {
+                start,
+                end,
+                day_count: DayCount::Act360,
+                projected_index_rate: rate,
+                calendar_id: None,
+                coupon_period: None,
+                end_is_termination_date: false,
+            });
+            let json = serde_json::to_value(&flow).expect("finite rates serialize");
+            if rate.is_none() {
+                assert!(json.get("rate").is_none());
+                assert!(json["accrual"].get("projected_index_rate").is_none());
+            }
+            let restored: CashFlow = serde_json::from_value(json).expect("valid cashflow JSON");
+            assert_eq!(restored, flow);
+            assert!(restored.validate().is_ok());
+        }
     }
 
     #[test]

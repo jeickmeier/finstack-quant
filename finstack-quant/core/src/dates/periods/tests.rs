@@ -7,6 +7,75 @@ fn d(year: i32, month: Month, day: u8) -> Date {
 }
 
 #[test]
+fn january_fiscal_start_labels_round_trip_to_containing_year() {
+    for day in [1, 2, 15, 31] {
+        let config = FiscalConfig::new(1, day).unwrap();
+        for date in [
+            d(2025, Month::January, 1),
+            d(2025, Month::January, day),
+            d(2025, Month::December, 31),
+        ] {
+            let year = date.fiscal_year(config);
+            let plan = build_fiscal_periods(&format!("FY{year}..FY{year}"), config, None).unwrap();
+            assert!(
+                plan.periods[0].start <= date && date < plan.periods[0].end,
+                "{date} must be inside FY{year} for {config:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn leap_fiscal_subperiods_partition_the_annual_interval() {
+    let config = FiscalConfig::new(2, 29).unwrap();
+    for year in [2024, 2025, 2026] {
+        let annual = build_fiscal_periods(&format!("FY{year}..FY{year}"), config, None).unwrap();
+        for (kind, count) in [("M", 12), ("Q", 4), ("H", 2)] {
+            let plan = build_fiscal_periods(
+                &format!("FY{year}{kind}1..FY{}{kind}1", year + 1),
+                config,
+                None,
+            )
+            .unwrap();
+            assert_eq!(plan.periods[0].start, annual.periods[0].start);
+            assert_eq!(plan.periods[count - 1].end, annual.periods[0].end);
+            for adjacent in plan.periods.windows(2) {
+                assert_eq!(
+                    adjacent[0].end, adjacent[1].start,
+                    "fiscal {kind} periods must cover every day"
+                );
+            }
+            assert_eq!(
+                plan.periods[..count]
+                    .iter()
+                    .map(|period| (period.end - period.start).whole_days())
+                    .sum::<i64>(),
+                (annual.periods[0].end - annual.periods[0].start).whole_days()
+            );
+        }
+    }
+}
+
+#[test]
+fn actuals_cutoff_requires_matching_period_kind_and_calendar() {
+    for cutoff in ["2025Q1", "2025", "FY2025M02"] {
+        let error = build_periods("2025M01..M04", Some(cutoff)).unwrap_err();
+        assert!(error.to_string().contains("same period kind and calendar"));
+    }
+    let fiscal = FiscalConfig::us_federal();
+    assert!(build_fiscal_periods("FY2025M01..M04", fiscal, Some("2025Q1")).is_err());
+    for plan in [
+        build_periods("2025M01..M04", Some("2025M02")).unwrap(),
+        build_fiscal_periods("FY2025M01..M04", fiscal, Some("2025M02")).unwrap(),
+    ] {
+        assert_eq!(
+            plan.periods.iter().map(|p| p.is_actual).collect::<Vec<_>>(),
+            [true, true, false, false]
+        );
+    }
+}
+
+#[test]
 fn build_periods_weekly_uses_iso_week_bounds() {
     let plan = build_periods("2025W01..W01", None).expect("weekly plan");
     assert_eq!(plan.periods.len(), 1);
@@ -84,7 +153,9 @@ fn prev_rolls_to_previous_iso_year_last_week() {
 fn prior_observation_date_daily_is_one_calendar_day() {
     let first = d(2024, Month::January, 3);
     assert_eq!(
-        PeriodKind::Daily.prior_observation_date(first),
+        PeriodKind::Daily
+            .prior_observation_date(first)
+            .expect("valid prior date"),
         d(2024, Month::January, 2)
     );
 }
@@ -93,7 +164,9 @@ fn prior_observation_date_daily_is_one_calendar_day() {
 fn prior_observation_date_weekly_is_seven_days() {
     let first = d(2024, Month::January, 8);
     assert_eq!(
-        PeriodKind::Weekly.prior_observation_date(first),
+        PeriodKind::Weekly
+            .prior_observation_date(first)
+            .expect("valid prior date"),
         d(2024, Month::January, 1)
     );
 }
@@ -102,29 +175,41 @@ fn prior_observation_date_weekly_is_seven_days() {
 fn prior_observation_date_month_end_clamps() {
     let jan31 = d(2023, Month::January, 31);
     assert_eq!(
-        PeriodKind::Monthly.prior_observation_date(jan31),
+        PeriodKind::Monthly
+            .prior_observation_date(jan31)
+            .expect("valid prior date"),
         d(2022, Month::December, 31)
     );
     let feb28 = d(2023, Month::February, 28);
     assert_eq!(
-        PeriodKind::Monthly.prior_observation_date(feb28),
+        PeriodKind::Monthly
+            .prior_observation_date(feb28)
+            .expect("valid prior date"),
         d(2023, Month::January, 28)
     );
     let mar31 = d(2023, Month::March, 31);
     assert_eq!(
-        PeriodKind::Monthly.prior_observation_date(mar31),
+        PeriodKind::Monthly
+            .prior_observation_date(mar31)
+            .expect("valid prior date"),
         d(2023, Month::February, 28)
     );
     assert_eq!(
-        PeriodKind::Quarterly.prior_observation_date(jan31),
+        PeriodKind::Quarterly
+            .prior_observation_date(jan31)
+            .expect("valid prior date"),
         d(2022, Month::October, 31)
     );
     assert_eq!(
-        PeriodKind::SemiAnnual.prior_observation_date(jan31),
+        PeriodKind::SemiAnnual
+            .prior_observation_date(jan31)
+            .expect("valid prior date"),
         d(2022, Month::July, 31)
     );
     assert_eq!(
-        PeriodKind::Annual.prior_observation_date(jan31),
+        PeriodKind::Annual
+            .prior_observation_date(jan31)
+            .expect("valid prior date"),
         d(2022, Month::January, 31)
     );
 }
@@ -407,4 +492,41 @@ fn parse_id_rejects_bad_ranges() {
     assert!(PeriodId::from_str("2025M13").is_err());
     assert!(PeriodId::from_str("2025W99").is_err());
     assert!(PeriodId::from_str("2025D500").is_err());
+}
+
+#[test]
+fn period_builders_reject_unsupported_dates_and_excessive_work() {
+    for range in [
+        "1..2147483647",
+        "2147483647..2147483647",
+        "9999D365..D365",
+        "9999W52..W52",
+        "2025D1..FY2025D2",
+        "2025Q1..FY2025Q2",
+    ] {
+        assert!(build_periods(range, None).is_err(), "{range}");
+    }
+    let err = build_periods("1D1..9998D365", None).expect_err("bounded period count");
+    assert!(err.to_string().contains("100000-period limit"));
+    let config = FiscalConfig::us_federal();
+    assert!(build_fiscal_periods("FY2147483647..FY2147483647", config, None).is_err());
+    assert!(build_fiscal_periods("FY1D1..FY9999D365", config, None).is_err());
+}
+
+#[test]
+fn period_builder_does_not_step_beyond_the_requested_terminal_period() {
+    let plan = build_periods("9999D364..D364", None).expect("exclusive end is representable");
+    assert_eq!(plan.periods.len(), 1);
+    assert_eq!(plan.periods[0].end, Date::MAX);
+    let first_half = build_periods("9999H1..H1", None).expect("half-year end is representable");
+    assert_eq!(first_half.periods[0].end.month(), Month::July);
+}
+
+#[test]
+fn period_year_stepping_rejects_integer_overflow() {
+    assert!(PeriodId::annual(i32::MAX).next().is_err());
+    assert!(PeriodId::annual(i32::MIN).prev().is_err());
+    assert!(PeriodId::annual(i32::MAX)
+        .next_fiscal(FiscalConfig::us_federal())
+        .is_err());
 }

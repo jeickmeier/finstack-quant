@@ -44,6 +44,13 @@ test('core.Currency creation', () => {
   assert.equal(usd.code, 'USD');
 });
 
+test('core log-normal CDF preserves underflowed tail probabilities', () => {
+  assert.ok(Math.abs(core.logNormCdf(-40) + 804.6084420137538) < 1e-12);
+  assert.equal(core.logNormCdf(-Infinity), -Infinity);
+  assert.ok(core.logNormCdf(Infinity) === 0);
+  assert.ok(Number.isNaN(core.logNormCdf(NaN)));
+});
+
 test('core.Money amount and lossless amountDecimal', () => {
   const usd = new core.Currency('USD');
   const m = new core.Money(1234.56, usd);
@@ -63,6 +70,71 @@ test('core date integer widths match generated runtime types', () => {
   const end = core.createDate(2025, 1, 3);
   assert.ok(core.dateFromEpochDays(start) instanceof Int32Array);
   assert.equal(typeof core.DayCount.act360().calendarDays(start, end), 'bigint');
+});
+
+test('core date inputs reject truncation, wrapping and non-finite epoch days', () => {
+  for (const value of [257, 1.5, Number.NaN, Infinity, -Infinity]) {
+    assert.throws(() => core.createDate(2025, value, 1));
+    assert.throws(() => core.createDate(2025, 1, value));
+  }
+  assert.throws(() => core.createDate(2025.9, 1, 1));
+  assert.throws(() => core.createDate(2 ** 32 + 2025, 1, 1));
+
+  const dayCount = core.DayCount.act360();
+  const context = new core.DayCountContext();
+  const start = core.createDate(2025, 1, 1);
+  const end = core.createDate(2025, 1, 3);
+  try {
+    for (const value of [Number.NaN, Infinity, -Infinity, 0.5, 2 ** 32, -(2 ** 32)]) {
+      assert.throws(() => core.dateFromEpochDays(value));
+      assert.throws(() => core.adjust(value, 'following', 'target2'));
+      assert.throws(() => dayCount.yearFraction(value, end));
+      assert.throws(() => dayCount.yearFraction(start, value));
+      assert.throws(() => dayCount.signedYearFraction(value, end));
+      assert.throws(() => dayCount.yearFractionWithContext(start, value, context));
+      assert.throws(() => dayCount.calendarDays(value, end));
+      assert.throws(() => context.withCouponPeriod(value, end));
+      assert.throws(() => context.withCouponPeriod(start, value));
+    }
+    for (const value of [0, -1, 252.5, 65536, 65788, Number.NaN, Infinity]) {
+      assert.throws(() => context.withBusBasis(value));
+    }
+    const validBasis = context.withBusBasis(252);
+    validBasis.free();
+    assert.deepEqual([...core.dateFromEpochDays(start)], [2025, 1, 1]);
+    assert.equal(dayCount.calendarDays(start, end), 2n);
+  } finally {
+    context.free();
+    dayCount.free();
+  }
+});
+
+test('core matrix dimensions reject fractional, wrapped and non-finite numbers', () => {
+  for (const value of [0, -1, 1.9, Number.NaN, Infinity, 2 ** 32 + 1]) {
+    assert.throws(() => core.choleskyDecomposition([4], value), /finite positive integer/);
+    assert.throws(() => core.choleskySolve([2], [4], value), /finite positive integer/);
+    assert.throws(() => core.applyLowerTriangular([2], value, [4]), /finite positive integer/);
+  }
+  assert.throws(() => core.choleskyDecomposition([], 65536), /dimension is too large/);
+  assert.deepEqual([...core.choleskyDecomposition([4], 1)], [2]);
+  assert.deepEqual([...core.choleskySolve([2], [4], 1)], [1]);
+  assert.deepEqual([...core.applyLowerTriangular([2], 1, [4])], [8]);
+});
+
+test('core Cholesky solve rejects non-finite inputs and overflowing solutions', () => {
+  for (const value of [Number.NaN, Infinity, -Infinity]) {
+    assert.throws(() => core.choleskySolve([value], [1], 1));
+    assert.throws(() => core.choleskySolve([1], [value], 1));
+  }
+  assert.throws(() => core.choleskySolve([1e-160], [1], 1));
+  assert.deepEqual([...core.choleskySolve([2, NaN, 1, 3], [6, 12], 2)], [1, 1]);
+});
+
+test('core correlation documents canonical missing-data and constant-series behavior', () => {
+  assert.equal(core.correlation([], []), 0);
+  assert.equal(core.correlation([1], [2]), 0);
+  assert.equal(core.correlation([1, 1], [2, 3]), 0);
+  assert.ok(Number.isNaN(core.correlation([1, 2], [3])));
 });
 
 test('core ACT/ACT ICMA short-month rolls require a reference period', () => {
@@ -91,22 +163,37 @@ test('wasm-bindgen handles expose free and conditional Symbol.dispose', () => {
 });
 
 test('DiscountCurve uses canonical forward and explicit negative-rate validation', () => {
+  const options = { id: 'CHF-OIS', baseDate: '2025-01-01', knots: [0, 1, 1, 1.002] };
+  assert.throws(() => new core.DiscountCurve(options), /non-increasing/);
+  const curve = new core.DiscountCurve({
+    ...options,
+    validationMode: 'negative_rate_friendly',
+    forwardFloor: -0.01,
+  });
+  try {
+    assert.ok(curve.forward(0, 1) < 0);
+    assert.equal(curve.forwardRate, undefined);
+  } finally {
+    curve.free();
+  }
+});
+
+test('DiscountCurve accepts typed-array options and rejects unknown fields', () => {
+  const options = {
+    id: 'USD-OIS',
+    baseDate: '2025-01-01',
+    knots: new Float64Array([0, 1, 1, 0.99]),
+  };
+  const curve = new core.DiscountCurve(options);
+  try {
+    assert.equal(curve.df(1), 0.99);
+  } finally {
+    curve.free();
+  }
   assert.throws(
-    () => new core.DiscountCurve('CHF-OIS', '2025-01-01', [0, 1, 1, 1.002]),
-    /non-increasing/
+    () => new core.DiscountCurve({ ...options, interpolation: 'linear' }),
+    /unknown field/
   );
-  const curve = new core.DiscountCurve(
-    'CHF-OIS',
-    '2025-01-01',
-    [0, 1, 1, 1.002],
-    undefined,
-    undefined,
-    undefined,
-    'negative_rate_friendly',
-    -0.01
-  );
-  assert.ok(curve.forward(0, 1) < 0);
-  assert.equal(curve.forwardRate, undefined);
 });
 
 test('ForwardCurve options expose resetLag', () => {
@@ -124,14 +211,23 @@ test('ForwardCurve options expose resetLag', () => {
 });
 
 test('ForwardCurve options accept typed arrays', () => {
-  const curve = new core.ForwardCurve({
+  const options = {
     id: 'USD-SOFR',
     tenor: 0.25,
     baseDate: '2025-01-01',
     knots: new Float64Array([0, 0.04, 1, 0.045]),
     dayCount: 'act_360',
-  });
-  assert.equal(curve.rate(1), 0.045);
+  };
+  const curve = new core.ForwardCurve(options);
+  try {
+    assert.equal(curve.rate(1), 0.045);
+  } finally {
+    curve.free();
+  }
+  assert.throws(
+    () => new core.ForwardCurve({ ...options, interpolation: 'linear' }),
+    /unknown field/
+  );
 });
 
 test('coupon profile variants use separate explicit entrypoints', () => {
@@ -152,6 +248,31 @@ test('core VolCube is a data-only artifact', () => {
   }
 });
 
+test('core VolCube rejects overflowing grid and flat-parameter dimensions', () => {
+  const axis = Float64Array.from({ length: 65536 }, (_, index) => index + 1);
+  assert.throws(
+    () => new core.VolCube('GRID-OVERFLOW', axis, axis, [], []),
+    /grid dimensions are too large/
+  );
+  const shorter = axis.subarray(0, 32768);
+  assert.throws(
+    () => new core.VolCube('PARAMETER-OVERFLOW', shorter, shorter, [], []),
+    /parameter dimensions are too large/
+  );
+  const cube = new core.VolCube(
+    'VALID-AFTER-REJECTION',
+    [1],
+    [2],
+    [0.01, 0, -0.2, 0.4, NaN],
+    [0.02]
+  );
+  try {
+    assert.equal(cube.id, 'VALID-AFTER-REJECTION');
+  } finally {
+    cube.free();
+  }
+});
+
 test('core.FxDeltaVolSurface constructs from 25-delta quotes', () => {
   const surface = new core.FxDeltaVolSurface(
     'EURUSD-VOL',
@@ -162,6 +283,17 @@ test('core.FxDeltaVolSurface constructs from 25-delta quotes', () => {
   );
   assert.equal(surface.id, 'EURUSD-VOL');
   assert.equal(surface.numExpiries, 3);
+});
+
+test('core FX delta surface absent wings use omitted arguments, not empty arrays', () => {
+  const surface = new core.FxDeltaVolSurface('EURUSD', [1], [0.1], [0], [0], undefined, undefined);
+  try {
+    assert.equal(surface.numExpiries, 1);
+  } finally {
+    surface.free();
+  }
+  assert.throws(() => new core.FxDeltaVolSurface('EURUSD', [1], [0.1], [0], [0], [], []));
+  assert.throws(() => new core.FxDeltaVolSurface('EURUSD', [1], [0.1], [0], [0], [0], undefined));
 });
 
 test('core FX pair convention helpers', () => {

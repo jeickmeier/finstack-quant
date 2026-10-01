@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/amortization_spec.schema.json",
-      "bytes": 6141,
+      "bytes": 7006,
       "kind": "component",
       "path": "schemas/cashflow/1/amortization_spec.schema.json",
       "summary": "How principal is repaid over the schedule.",
@@ -10,7 +10,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json",
-      "bytes": 10323,
+      "bytes": 11038,
       "kind": "component",
       "path": "schemas/cashflow/1/coupon_specs.schema.json",
       "summary": "Coupon rate, frequency, day count and stub handling for one leg.",
@@ -18,7 +18,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json",
-      "bytes": 5002,
+      "bytes": 5090,
       "kind": "component",
       "path": "schemas/cashflow/1/default_model_spec.schema.json",
       "summary": "Hazard or CDR assumption driving credit losses.",
@@ -50,7 +50,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/schedule_params.schema.json",
-      "bytes": 8210,
+      "bytes": 8938,
       "kind": "component",
       "path": "schemas/cashflow/1/schedule_params.schema.json",
       "summary": "Start, end, frequency, calendar and roll rules for a payment schedule.",

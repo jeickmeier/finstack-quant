@@ -1010,10 +1010,10 @@ impl BondValuator {
         tree: &RatesCreditTree,
         oas_bp: f64,
     ) -> Result<f64> {
-        if tree.config.rate_vol != 0.0 || tree.config.hazard_vol != 0.0 {
+        if tree.get_config().rate_vol != 0.0 || tree.get_config().hazard_vol != 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "deterministic rates-credit bond rollback requires zero rate_vol and hazard_vol, got {} and {}",
-                tree.config.rate_vol, tree.config.hazard_vol
+                tree.get_config().rate_vol, tree.get_config().hazard_vol
             )));
         }
         if !oas_bp.is_finite() {

@@ -1,0 +1,21 @@
+{
+  "id": "sofr",
+  "name": "USD SOFR Fixing and Value-Date Calendar",
+  "ignore_weekends": false,
+  "notes": "Treasury repo reference-rate calendar, distinct from Federal Reserve banking days (usny) and bond trading sessions (sifma). Full repo-market closures have no SOFR on or for that date; the preceding business-day fixing carries across the closure. Good Friday remains a closure even when government securities trade an early-close session, as confirmed for 2021, 2023 and 2026. New Year's Day and Veterans Day have no Friday substitute for Saturday holidays; Independence Day, Christmas and Juneteenth (from 2022) do. Sources: <https://www.newyorkfed.org/markets/reference-rates/additional-information-about-reference-rates>, <https://www.newyorkfed.org/markets/opolicy/operating_policy_250328a>, <https://www.newyorkfed.org/markets/opolicy/operating_policy_260312a>, <https://www.newyorkfed.org/markets/opolicy/operating_policy_260618a>, <https://www.newyorkfed.org/markets/opolicy/operating_policy_181204>. SOFR first value date was 2018-04-02. Recurring rules project the published convention; future exceptional closures still require announced-schedule maintenance.",
+  "rules": [
+    { "type": "fixed", "name": "New Year's Day", "month": "january", "day": 1, "observed": "mon_if_sun" },
+    { "type": "nth_weekday", "name": "Martin Luther King Jr. Day", "n": 3, "weekday": "monday", "month": "january" },
+    { "type": "nth_weekday", "name": "Washington's Birthday", "n": 3, "weekday": "monday", "month": "february" },
+    { "type": "easter_offset", "name": "Good Friday", "days": -3 },
+    { "type": "nth_weekday", "name": "Memorial Day", "n": -1, "weekday": "monday", "month": "may" },
+    { "type": "fixed", "name": "Juneteenth National Independence Day", "month": "june", "day": 19, "observed": "fri_if_sat_mon_if_sun", "from_year": 2022 },
+    { "type": "fixed", "name": "Independence Day", "month": "july", "day": 4, "observed": "fri_if_sat_mon_if_sun" },
+    { "type": "nth_weekday", "name": "Labor Day", "n": 1, "weekday": "monday", "month": "september" },
+    { "type": "nth_weekday", "name": "Columbus Day", "n": 2, "weekday": "monday", "month": "october" },
+    { "type": "fixed", "name": "Veterans Day", "month": "november", "day": 11, "observed": "mon_if_sun" },
+    { "type": "nth_weekday", "name": "Thanksgiving Day", "n": 4, "weekday": "thursday", "month": "november" },
+    { "type": "fixed", "name": "Christmas Day", "month": "december", "day": 25, "observed": "fri_if_sat_mon_if_sun" },
+    { "type": "exact_date", "name": "National Day of Mourning for George H. W. Bush", "year": 2018, "month": "december", "day": 5 }
+  ]
+}

@@ -80,8 +80,8 @@ fn test_default_config_hetero_method() {
 
     // Assert
     assert!(
-        matches!(config.hetero_method, HeteroMethod::NormalApprox),
-        "Default heterogeneous method should be the moment-matched normal approximation"
+        matches!(config.hetero_method, HeteroMethod::ExactConvolution),
+        "Default heterogeneous method must retain discrete issuer exposures"
     );
 }
 

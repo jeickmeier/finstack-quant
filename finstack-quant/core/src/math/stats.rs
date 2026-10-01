@@ -44,7 +44,7 @@
 //! - Kahan, W. (1965). "Further Remarks on Reducing Truncation Errors."
 //!   *Communications of the ACM*, 8(1), 40. `docs/REFERENCES.md#kahan-1965`
 
-use super::special_functions::standard_normal_inv_cdf;
+use super::special_functions::{standard_normal_inv_cdf, student_t_inv_cdf};
 use super::summation::kahan_sum;
 
 /// Arithmetic mean.
@@ -545,7 +545,10 @@ pub fn realized_variance(
 /// Returns [`Error::Validation`](crate::Error::Validation) if the four slices have different lengths.
 ///
 /// # Returns
-/// Annualized realized variance
+/// Annualized realized variance. Parkinson, Garman-Klass, and Rogers-Satchell
+/// use each complete OHLC bar, including a single bar. Close-to-close requires
+/// two closing levels, and Yang-Zhang requires three bars; shorter samples
+/// return zero.
 pub fn realized_variance_ohlc(
     open: &[f64],
     high: &[f64],
@@ -591,7 +594,7 @@ pub fn realized_variance_ohlc(
             )));
         }
     }
-    if n < 2 {
+    if n == 0 {
         return Ok(0.0);
     }
 
@@ -840,24 +843,36 @@ impl OnlineStats {
         self.std_dev() / (self.count as f64).sqrt()
     }
 
-    /// Confidence interval at specified level.
+    /// Student-t confidence interval for the population mean.
     ///
-    /// Returns `(mean, mean)` when fewer than 2 samples are available
-    /// (standard error is undefined so no interval can be constructed).
+    /// Uses the sample standard deviation and `count - 1` degrees of freedom.
+    /// Coverage is exact for independent Gaussian observations and approximate
+    /// for other distributions when their sample means are approximately normal.
+    /// For randomized quasi-Monte Carlo, update this accumulator with independent
+    /// replicate means, not the dependent paths within each replicate.
+    ///
+    /// Returns `(NaN, NaN)` when fewer than two samples are available or `alpha`
+    /// is non-finite or outside `(0, 1)`, because no interval can be estimated.
     ///
     /// # Arguments
     ///
-    /// * `alpha` - Significance level (e.g., 0.05 for 95% CI)
+    /// * `alpha` - Finite significance probability strictly between zero and
+    ///   one; for example, `0.05` requests a two-sided 95% interval.
     ///
     /// # Returns
     ///
-    /// (lower, upper) bounds of the confidence interval.
+    /// Lower and upper bounds in the observations' units, or two `NaN` values
+    /// when the sample size or significance probability is invalid.
     pub fn confidence_interval(&self, alpha: f64) -> (f64, f64) {
-        if self.count <= 1 {
-            return (self.mean, self.mean);
+        if self.count <= 1 || !alpha.is_finite() || alpha <= 0.0 || alpha >= 1.0 {
+            return (f64::NAN, f64::NAN);
         }
-        let z = standard_normal_inv_cdf(1.0 - alpha / 2.0);
-        let margin = z * self.stderr();
+        // Use the lower tail and symmetry to avoid rounding 1 - alpha/2 to 1.
+        let critical = match student_t_inv_cdf(alpha / 2.0, (self.count - 1) as f64) {
+            Ok(value) => -value,
+            Err(_) => return (f64::NAN, f64::NAN),
+        };
+        let margin = critical * self.stderr();
         (self.mean - margin, self.mean + margin)
     }
 
@@ -1046,6 +1061,82 @@ mod tests {
     use super::*;
 
     #[test]
+    fn range_estimators_use_each_observed_bar_from_the_first() {
+        let open: [f64; 3] = [100.0, 101.0, 99.0];
+        let high: [f64; 3] = [103.0, 104.0, 102.0];
+        let low: [f64; 3] = [98.0, 97.0, 96.0];
+        let close: [f64; 3] = [102.0, 99.0, 100.0];
+        for method in [
+            RealizedVarMethod::Parkinson,
+            RealizedVarMethod::GarmanKlass,
+            RealizedVarMethod::RogersSatchell,
+        ] {
+            assert_eq!(
+                realized_variance_ohlc(&[], &[], &[], &[], method, 252.0).unwrap(),
+                0.0
+            );
+            for n in 1..=3 {
+                let sum: f64 = (0..n)
+                    .map(|i| {
+                        let hl = (high[i] / low[i]).ln();
+                        let co = (close[i] / open[i]).ln();
+                        match method {
+                            RealizedVarMethod::Parkinson => {
+                                hl * hl / (4.0 * std::f64::consts::LN_2)
+                            }
+                            RealizedVarMethod::GarmanKlass => {
+                                0.5 * hl * hl - (2.0 * std::f64::consts::LN_2 - 1.0) * co * co
+                            }
+                            RealizedVarMethod::RogersSatchell => {
+                                (high[i] / close[i]).ln() * (high[i] / open[i]).ln()
+                                    + (low[i] / close[i]).ln() * (low[i] / open[i]).ln()
+                            }
+                            _ => unreachable!(),
+                        }
+                    })
+                    .sum();
+                let actual = realized_variance_ohlc(
+                    &open[..n],
+                    &high[..n],
+                    &low[..n],
+                    &close[..n],
+                    method,
+                    252.0,
+                )
+                .unwrap();
+                assert!((actual - 252.0 * sum / n as f64).abs() < 1e-12);
+                assert!(actual > 0.0);
+            }
+        }
+        for n in 1..=2 {
+            assert_eq!(
+                realized_variance_ohlc(
+                    &open[..n],
+                    &high[..n],
+                    &low[..n],
+                    &close[..n],
+                    RealizedVarMethod::YangZhang,
+                    252.0,
+                )
+                .unwrap(),
+                0.0
+            );
+        }
+        assert_eq!(
+            realized_variance_ohlc(
+                &open[..1],
+                &high[..1],
+                &low[..1],
+                &close[..1],
+                RealizedVarMethod::CloseToClose,
+                252.0,
+            )
+            .unwrap(),
+            0.0
+        );
+    }
+
+    #[test]
     fn test_online_stats_basic() {
         let mut stats = OnlineStats::new();
         stats.update(1.0);
@@ -1103,6 +1194,46 @@ mod tests {
         assert!(lower < stats.mean());
         assert!(upper > stats.mean());
         assert!(lower < 50.5 && upper > 50.5);
+    }
+
+    #[test]
+    fn confidence_intervals_account_for_estimated_small_sample_variance() {
+        let mut pair = OnlineStats::new();
+        pair.update(0.0);
+        pair.update(2.0);
+        // With one degree of freedom Student-t is Cauchy, giving an
+        // independent analytic critical value cot(pi * alpha / 2).
+        let critical = 1.0 / (std::f64::consts::PI * 0.025).tan();
+        let (lower, upper) = pair.confidence_interval(0.05);
+        assert!((lower - (1.0 - critical)).abs() < 1e-10);
+        assert!((upper - (1.0 + critical)).abs() < 1e-10);
+
+        let mut replicates = OnlineStats::new();
+        for value in 1..=16 {
+            replicates.update(f64::from(value));
+        }
+        // Tabulated 97.5th percentile for 15 degrees of freedom, appropriate
+        // to the 16 independent replicate means used by the RQMC pricer.
+        let expected_half_width = 2.131_449_545_559_323 * replicates.stderr();
+        assert!((replicates.ci_half_width() - expected_half_width).abs() < 1e-10);
+    }
+
+    #[test]
+    fn confidence_intervals_reject_insufficient_samples_and_invalid_alpha() {
+        let mut stats = OnlineStats::new();
+        for count in 0..=1 {
+            if count == 1 {
+                stats.update(42.0);
+            }
+            let (lower, upper) = stats.confidence_interval(0.05);
+            assert!(lower.is_nan() && upper.is_nan());
+            assert!(stats.ci_half_width().is_nan());
+        }
+        stats.update(43.0);
+        for alpha in [0.0, 1.0, -0.1, 1.1, f64::NAN, f64::INFINITY] {
+            let (lower, upper) = stats.confidence_interval(alpha);
+            assert!(lower.is_nan() && upper.is_nan());
+        }
     }
 
     #[test]

@@ -16,20 +16,28 @@ use super::overnight::{
 use super::rate_helpers::{calculate_floating_rate, FloatingRateParams};
 
 /// Contractual dates and year fraction for one floating coupon.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy)]
 pub struct FloatingCouponPeriod {
     /// Date on which the coupon starts accruing and captures principal.
     pub accrual_start: Date,
     /// Contractual end of the coupon accrual period.
     pub accrual_end: Date,
-    /// Date on which the cash portion is paid and the PIK portion capitalizes.
+    /// Date on which the cash portion is paid. PIK capitalizes at `accrual_end`.
     ///
     /// Business-day adjustment can place this date before an unadjusted
     /// contractual accrual end, such as a Sunday month-end paid on Friday.
     pub payment_date: Date,
     /// Day-count convention used for partial accrued-interest calculations.
     pub day_count: DayCount,
-    /// Full contractual coupon accrual factor in years.
+    /// Contractual calendar, coupon frequency, reference period, and termination
+    /// convention retained for full and partial day-count calculations.
+    pub day_count_context: DayCountContext<'static>,
+    /// Full coupon or balance-segment accrual factor in years.
+    ///
+    /// For ACT/365L this factor owns the contractual 365/366 denominator,
+    /// which can come from a larger original coupon period rather than this
+    /// segment's end date. Partial accrued interest prorates the stored factor
+    /// by actual days. Other conventions must match `day_count_context`.
     pub accrual_factor: f64,
 }
 
@@ -102,8 +110,8 @@ impl CompiledFloatingCoupon {
     ///
     /// # Arguments
     ///
-    /// * `period` - Contractual accrual/payment dates, day count, and full
-    ///   accrual factor.
+    /// * `period` - Contractual accrual/payment dates, day count, and coupon
+    ///   or balance-segment accrual factor in years.
     /// * `economics` - Cash/PIK split plus decimal-rate adjustment rules.
     /// * `observation` - Term fixing or compiled overnight observation rule.
     ///
@@ -115,9 +123,14 @@ impl CompiledFloatingCoupon {
     ///
     /// Returns [`Error::Validation`] for invalid dates, accrual, split, rate
     /// parameters, term tenor, or overnight accumulator configuration.
+    /// Propagates day-count errors when the supplied contractual context is
+    /// incomplete; rejects an accrual factor inconsistent with that context.
+    /// ACT/365L instead validates the stored factor's implied actual-day
+    /// denominator as 365 or 366, preserving a larger coupon's convention
+    /// when this descriptor represents only one balance segment.
     pub fn compile(
         period: FloatingCouponPeriod,
-        economics: FloatingCouponEconomics,
+        mut economics: FloatingCouponEconomics,
         observation: FloatingRateObservation,
     ) -> Result<Self> {
         if period.accrual_end <= period.accrual_start {
@@ -141,20 +154,75 @@ impl CompiledFloatingCoupon {
             )));
         }
         economics.rate_params.validate()?;
+        let contractual_accrual = if period.day_count == DayCount::Act365L {
+            let actual_days = (period.accrual_end - period.accrual_start).whole_days() as f64;
+            let denominator = actual_days / period.accrual_factor;
+            if (denominator - 365.0).abs() > 1e-9 && (denominator - 366.0).abs() > 1e-9 {
+                return Err(Error::Validation(format!(
+                    "ACT/365L coupon accrual factor must imply a 365 or 366 day denominator, got {denominator}",
+                )));
+            }
+            period.accrual_factor
+        } else {
+            period.day_count.year_fraction(
+                period.accrual_start,
+                period.accrual_end,
+                period.day_count_context,
+            )?
+        };
+        if (contractual_accrual - period.accrual_factor).abs()
+            > 1e-12 * contractual_accrual.abs().max(1.0)
+        {
+            return Err(Error::Validation(format!(
+                "floating coupon accrual factor {} differs from contractual day count {contractual_accrual}",
+                period.accrual_factor,
+            )));
+        }
         match &observation {
             FloatingRateObservation::Term { tenor_years, .. }
                 if !tenor_years.is_finite() || *tenor_years <= 0.0 =>
             {
                 return Err(Error::Validation(format!(
                     "floating term-index tenor must be positive and finite, got {tenor_years}"
-                )))
+                )));
             }
             FloatingRateObservation::Overnight {
                 schedule,
                 day_count_basis,
                 constraints,
             } => {
+                if schedule.accrual_period() != (period.accrual_start, period.accrual_end) {
+                    return Err(Error::Validation(
+                        "overnight observations must match the contractual coupon period".into(),
+                    ));
+                }
                 let _ = schedule.accumulator(*day_count_basis, *constraints)?;
+                if constraints.application
+                    == super::specs::OvernightIndexConstraintApplication::Daily
+                {
+                    for (name, economic_bound, observation_bound) in [
+                        (
+                            "index_floor_bp",
+                            economics.rate_params.index_floor_bp,
+                            constraints.index_floor_bp,
+                        ),
+                        (
+                            "index_cap_bp",
+                            economics.rate_params.index_cap_bp,
+                            constraints.index_cap_bp,
+                        ),
+                    ] {
+                        if economic_bound.is_some() && economic_bound != observation_bound {
+                            return Err(Error::Validation(format!(
+                                "overnight daily {name} must match the observation constraint"
+                            )));
+                        }
+                    }
+                    // Daily index bounds belong to observation replay, not the
+                    // annualized compound rate produced by that replay.
+                    economics.rate_params.index_floor_bp = None;
+                    economics.rate_params.index_cap_bp = None;
+                }
             }
             FloatingRateObservation::Term { .. } => {}
         }
@@ -219,11 +287,12 @@ impl CompiledFloatingCoupon {
                 "floating term-index fixing must be finite, got {index_rate}"
             )));
         }
-        if state.term_index_rate.replace(index_rate).is_some() {
+        if state.term_index_rate.is_some() {
             return Err(Error::Validation(
                 "floating term-index fixing was supplied more than once".to_string(),
             ));
         }
+        state.term_index_rate = Some(index_rate);
         Ok(())
     }
 
@@ -249,7 +318,7 @@ impl CompiledFloatingCoupon {
                 "floating coupon notional must be non-negative and finite, got {notional}"
             )));
         }
-        if state.notional.replace(notional).is_some() {
+        if state.notional.is_some() {
             return Err(Error::Validation(
                 "floating coupon notional was captured more than once".to_string(),
             ));
@@ -262,6 +331,7 @@ impl CompiledFloatingCoupon {
         {
             state.overnight = Some(schedule.accumulator(*day_count_basis, *constraints)?);
         }
+        state.notional = Some(notional);
         Ok(())
     }
 
@@ -332,6 +402,28 @@ impl CompiledFloatingCoupon {
         constrained_index_rate: f64,
         projected_index_rate: f64,
     ) -> Result<FloatingCouponSettlement> {
+        self.settle_index_rate_for_accrual(
+            notional,
+            constrained_index_rate,
+            projected_index_rate,
+            self.period.accrual_factor,
+        )
+    }
+
+    /// Settle a constant-balance segment without cloning the observation schedule.
+    pub(crate) fn settle_index_rate_for_accrual(
+        &self,
+        notional: f64,
+        constrained_index_rate: f64,
+        projected_index_rate: f64,
+        accrual_factor: f64,
+    ) -> Result<FloatingCouponSettlement> {
+        if !accrual_factor.is_finite() || accrual_factor < 0.0 {
+            return Err(Error::Validation(
+                "floating coupon segment accrual factor must be non-negative and finite"
+                    .to_string(),
+            ));
+        }
         if !notional.is_finite() || notional < 0.0 {
             return Err(Error::Validation(format!(
                 "floating coupon notional must be non-negative and finite, got {notional}"
@@ -344,7 +436,7 @@ impl CompiledFloatingCoupon {
         }
         let all_in_rate =
             calculate_floating_rate(constrained_index_rate, self.settlement_rate_params());
-        let total_amount = notional * self.period.accrual_factor * all_in_rate;
+        let total_amount = notional * accrual_factor * all_in_rate;
         let cash_amount = total_amount * self.economics.cash_fraction;
         let pik_amount = total_amount * self.economics.pik_fraction;
         if !all_in_rate.is_finite()
@@ -378,7 +470,8 @@ impl CompiledFloatingCoupon {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Validation`] when required state is missing and
+    /// Returns [`Error::Validation`] when required state is missing or overnight
+    /// replay has not reached the full contractual accrual end, and
     /// propagates settlement validation.
     pub fn settle(&self, state: &FloatingCouponReplayState) -> Result<FloatingCouponSettlement> {
         let notional = state.notional.ok_or_else(|| {
@@ -392,15 +485,15 @@ impl CompiledFloatingCoupon {
                 self.settle_index_rate(notional, index_rate, index_rate)
             }
             FloatingRateObservation::Overnight { .. } => {
-                let replay = state
-                    .overnight
-                    .as_ref()
-                    .ok_or_else(|| {
-                        Error::Validation(
-                            "floating overnight coupon settled before replay".to_string(),
-                        )
-                    })?
-                    .result()?;
+                let accumulator = state.overnight.as_ref().ok_or_else(|| {
+                    Error::Validation("floating overnight coupon settled before replay".to_string())
+                })?;
+                if !accumulator.is_complete() {
+                    return Err(Error::Validation(
+                        "floating overnight coupon settled before full contractual replay".into(),
+                    ));
+                }
+                let replay = accumulator.result()?;
                 self.settle_index_rate(notional, replay.constrained_rate, replay.projected_rate)
             }
         }
@@ -412,8 +505,9 @@ impl CompiledFloatingCoupon {
     ///
     /// * `state` - Replay state containing accrual-start notional and the rate
     ///   observed through the requested date.
-    /// * `date` - Exercise or reporting date; dates outside the open accrual
-    ///   interval return zero.
+    /// * `date` - Exercise or reporting date; dates before accrual start or on
+    ///   or after both cash payment and accrual end return zero. The caller
+    ///   separates cash entitlement at payment from PIK entitlement at accrual end.
     ///
     /// # Returns
     ///
@@ -421,34 +515,50 @@ impl CompiledFloatingCoupon {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Validation`] for missing active state and propagates
+    /// Returns [`Error::Validation`] for missing active state or overnight
+    /// replay through a different date, and propagates
     /// day-count and overnight replay errors.
     pub fn accrued_amount(&self, state: &FloatingCouponReplayState, date: Date) -> Result<f64> {
-        if date <= self.period.accrual_start || date >= self.period.payment_date {
+        if date <= self.period.accrual_start
+            || date >= self.period.payment_date.max(self.period.accrual_end)
+        {
             return Ok(0.0);
         }
         let notional = state.notional.ok_or_else(|| {
             Error::Validation("active floating coupon has no captured notional".to_string())
         })?;
         let elapsed_end = date.min(self.period.accrual_end);
-        let elapsed = self.period.day_count.year_fraction(
-            self.period.accrual_start,
-            elapsed_end,
-            DayCountContext::default(),
-        )?;
+        let mut context = self.period.day_count_context;
+        context.end_is_termination_date &= elapsed_end == self.period.accrual_end;
+        let elapsed = if self.period.day_count == DayCount::Act365L {
+            // ACT/365L chooses its 365/366 denominator from the full coupon
+            // period, including a future leap day or the contractual end year.
+            // Truncating the period at a reporting date must not change it.
+            super::periods::prorated_actual_accrual(
+                (self.period.accrual_start, self.period.accrual_end),
+                self.period.accrual_start,
+                elapsed_end,
+                self.period.accrual_factor,
+            )?
+        } else {
+            self.period
+                .day_count
+                .year_fraction(self.period.accrual_start, elapsed_end, context)?
+        };
         let index_rate = match &self.observation {
             FloatingRateObservation::Term { .. } => state.term_index_rate.ok_or_else(|| {
                 Error::Validation("active floating term coupon has no fixing".to_string())
             })?,
             FloatingRateObservation::Overnight { .. } => {
-                state
-                    .overnight
-                    .as_ref()
-                    .ok_or_else(|| {
-                        Error::Validation("active overnight coupon has no replay state".to_string())
-                    })?
-                    .result()?
-                    .constrained_rate
+                let accumulator = state.overnight.as_ref().ok_or_else(|| {
+                    Error::Validation("active overnight coupon has no replay state".to_string())
+                })?;
+                if accumulator.accrued_through() != elapsed_end {
+                    return Err(Error::Validation(
+                        "overnight accrued interest requires replay through the requested accrual date".into(),
+                    ));
+                }
+                accumulator.result()?.constrained_rate
             }
         };
         let amount =
@@ -519,6 +629,7 @@ mod tests {
                 accrual_end: date!(2025 - 04 - 15),
                 payment_date: date!(2025 - 04 - 15),
                 day_count: DayCount::Act360,
+                day_count_context: DayCountContext::default(),
                 accrual_factor: 0.25,
             },
             economics(),
@@ -558,6 +669,7 @@ mod tests {
                 accrual_end: date!(2024 - 03 - 31),
                 payment_date: date!(2024 - 03 - 29),
                 day_count: DayCount::Act360,
+                day_count_context: DayCountContext::default(),
                 accrual_factor: 60.0 / 360.0,
             },
             economics(),
@@ -577,6 +689,16 @@ mod tests {
             .expect("notional is captured");
         let settled = coupon.settle(&state).expect("coupon settles");
         assert!((settled.total_amount - (100.0 * 60.0 / 360.0 * 0.04)).abs() < 1.0e-12);
+        let after_cash_payment = coupon
+            .accrued_amount(&state, date!(2024 - 03 - 30))
+            .expect("PIK remains accrued until its contractual end");
+        assert!((after_cash_payment - 100.0 * 59.0 / 360.0 * 0.04).abs() < 1e-12);
+        assert_eq!(
+            coupon
+                .accrued_amount(&state, date!(2024 - 03 - 31))
+                .expect("both entitlements settled"),
+            0.0,
+        );
     }
 
     #[test]
@@ -597,15 +719,15 @@ mod tests {
             index_cap_bp: Some(600.0),
         };
         let mut overnight_economics = economics();
-        // Daily index bounds are already applied by the observation replay.
-        overnight_economics.rate_params.index_floor_bp = None;
-        overnight_economics.rate_params.index_cap_bp = None;
+        overnight_economics.rate_params.index_floor_bp = constraints.index_floor_bp;
+        overnight_economics.rate_params.index_cap_bp = constraints.index_cap_bp;
         let coupon = CompiledFloatingCoupon::compile(
             FloatingCouponPeriod {
                 accrual_start: start,
                 accrual_end: end,
                 payment_date: end,
                 day_count: DayCount::Act360,
+                day_count_context: DayCountContext::default(),
                 accrual_factor: 7.0 / 360.0,
             },
             overnight_economics,
@@ -638,5 +760,393 @@ mod tests {
             .expect("one-shot coupon settles");
         assert!((replayed.projected_index_rate - projected.projected_index_rate).abs() < 1e-12);
         assert!((replayed.total_amount - projected.total_amount).abs() < 1e-12);
+    }
+
+    fn weekly_coupon(
+        params: FloatingRateParams,
+        application: OvernightIndexConstraintApplication,
+    ) -> CompiledFloatingCoupon {
+        CompiledFloatingCoupon::compile(
+            FloatingCouponPeriod {
+                accrual_start: date!(2025 - 01 - 06),
+                accrual_end: date!(2025 - 01 - 13),
+                payment_date: date!(2025 - 01 - 13),
+                day_count: DayCount::Act360,
+                day_count_context: DayCountContext::default(),
+                accrual_factor: 7.0 / 360.0,
+            },
+            FloatingCouponEconomics {
+                cash_fraction: 1.0,
+                pik_fraction: 0.0,
+                rate_params: params.clone(),
+            },
+            FloatingRateObservation::Overnight {
+                schedule: OvernightObservationSchedule::compile(
+                    date!(2025 - 01 - 06),
+                    date!(2025 - 01 - 13),
+                    FloatingLegCompounding::sofr(),
+                    &WEEKENDS_ONLY,
+                )
+                .expect("observations"),
+                day_count_basis: 360.0,
+                constraints: OvernightRateConstraints {
+                    application,
+                    index_floor_bp: params.index_floor_bp,
+                    index_cap_bp: params.index_cap_bp,
+                },
+            },
+        )
+        .expect("coupon")
+    }
+
+    #[test]
+    fn daily_index_caps_preserve_compound_growth_and_all_in_bounds() {
+        let params = FloatingRateParams {
+            index_cap_bp: Some(500.0),
+            ..Default::default()
+        };
+        let coupon = weekly_coupon(params.clone(), OvernightIndexConstraintApplication::Daily);
+        let mut state = coupon.replay_state();
+        coupon
+            .capture_notional(&mut state, 100_000_000.0)
+            .expect("notional");
+        coupon
+            .advance_overnight(&mut state, coupon.period().accrual_end, |_| Ok(0.06))
+            .expect("replay");
+        let settlement = coupon.settle(&state).expect("settlement");
+        let growth = (1.0_f64 + 0.05 / 360.0).powi(4) * (1.0 + 0.05 * 3.0 / 360.0) - 1.0;
+        assert!((settlement.total_amount - 100_000_000.0 * growth).abs() < 1e-7);
+        assert!(settlement.all_in_rate > 0.05);
+
+        for (application, all_in_cap, expected_rate) in [
+            (OvernightIndexConstraintApplication::Period, None, 0.05),
+            (
+                OvernightIndexConstraintApplication::Daily,
+                Some(500.0),
+                0.05,
+            ),
+        ] {
+            let coupon = weekly_coupon(
+                FloatingRateParams {
+                    all_in_cap_bp: all_in_cap,
+                    ..params.clone()
+                },
+                application,
+            );
+            let mut state = coupon.replay_state();
+            coupon
+                .capture_notional(&mut state, 100.0)
+                .expect("notional");
+            coupon
+                .advance_overnight(&mut state, coupon.period().accrual_end, |_| Ok(0.06))
+                .expect("replay");
+            assert!(
+                (coupon.settle(&state).expect("settlement").all_in_rate - expected_rate).abs()
+                    < 1e-12
+            );
+        }
+    }
+
+    #[test]
+    fn negative_daily_index_floor_and_all_in_floor_remain_distinct() {
+        let coupon = weekly_coupon(
+            FloatingRateParams {
+                index_floor_bp: Some(-100.0),
+                ..Default::default()
+            },
+            OvernightIndexConstraintApplication::Daily,
+        );
+        let mut state = coupon.replay_state();
+        coupon
+            .capture_notional(&mut state, 100.0)
+            .expect("notional");
+        coupon
+            .advance_overnight(&mut state, coupon.period().accrual_end, |_| Ok(-0.02))
+            .expect("replay");
+        let settlement = coupon.settle(&state).expect("settlement");
+        let growth = (1.0_f64 - 0.01 / 360.0).powi(4) * (1.0 - 0.01 * 3.0 / 360.0) - 1.0;
+        assert!((settlement.total_amount - 100.0 * growth).abs() < 1e-12);
+        let coupon = weekly_coupon(
+            FloatingRateParams {
+                index_floor_bp: Some(-100.0),
+                all_in_floor_bp: Some(0.0),
+                ..Default::default()
+            },
+            OvernightIndexConstraintApplication::Daily,
+        );
+        let mut state = coupon.replay_state();
+        coupon
+            .capture_notional(&mut state, 100.0)
+            .expect("notional");
+        coupon
+            .advance_overnight(&mut state, coupon.period().accrual_end, |_| Ok(-0.02))
+            .expect("replay");
+        assert_eq!(coupon.settle(&state).expect("settlement").total_amount, 0.0);
+    }
+
+    #[test]
+    fn unfinished_overnight_coupons_cannot_settle() {
+        let coupon = weekly_coupon(
+            FloatingRateParams::with_spread(100.0),
+            OvernightIndexConstraintApplication::Daily,
+        );
+        let mut state = coupon.replay_state();
+        coupon
+            .capture_notional(&mut state, 100.0)
+            .expect("notional");
+        assert!(coupon.settle(&state).is_err());
+        coupon
+            .advance_overnight(&mut state, date!(2025 - 01 - 07), |_| Ok(0.03))
+            .expect("partial replay");
+        assert!(coupon.settle(&state).is_err());
+        coupon
+            .advance_overnight(&mut state, coupon.period().accrual_end, |_| Ok(0.03))
+            .expect("full replay");
+        assert!(coupon.settle(&state).is_ok());
+    }
+
+    #[test]
+    fn overnight_accrued_interest_rejects_stale_and_future_replay_state() {
+        let coupon = weekly_coupon(
+            Default::default(),
+            OvernightIndexConstraintApplication::Daily,
+        );
+        let mut state = coupon.replay_state();
+        coupon
+            .capture_notional(&mut state, 100.0)
+            .expect("notional");
+        coupon
+            .advance_overnight(&mut state, date!(2025 - 01 - 08), |_| Ok(0.03))
+            .expect("partial replay");
+        assert!(coupon
+            .accrued_amount(&state, date!(2025 - 01 - 07))
+            .is_err());
+        assert!(coupon
+            .accrued_amount(&state, date!(2025 - 01 - 09))
+            .is_err());
+        assert!(coupon.accrued_amount(&state, date!(2025 - 01 - 08)).is_ok());
+    }
+
+    #[test]
+    fn contradictory_daily_bounds_and_inconsistent_accrual_are_rejected() {
+        let coupon = weekly_coupon(
+            FloatingRateParams {
+                index_cap_bp: Some(500.0),
+                ..Default::default()
+            },
+            OvernightIndexConstraintApplication::Daily,
+        );
+        let mut economics = coupon.economics().clone();
+        economics.rate_params.index_cap_bp = Some(400.0);
+        assert!(CompiledFloatingCoupon::compile(
+            coupon.period(),
+            economics,
+            coupon.observation().clone()
+        )
+        .is_err());
+        let mut period = coupon.period();
+        period.accrual_factor *= 2.0;
+        assert!(CompiledFloatingCoupon::compile(
+            period,
+            coupon.economics().clone(),
+            coupon.observation().clone()
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn duplicate_fixing_and_notional_errors_preserve_locked_state() {
+        let coupon = CompiledFloatingCoupon::compile(
+            FloatingCouponPeriod {
+                accrual_start: date!(2025 - 01 - 06),
+                accrual_end: date!(2025 - 01 - 13),
+                payment_date: date!(2025 - 01 - 13),
+                day_count: DayCount::Act360,
+                day_count_context: DayCountContext::default(),
+                accrual_factor: 7.0 / 360.0,
+            },
+            economics(),
+            FloatingRateObservation::Term {
+                reset_date: date!(2025 - 01 - 06),
+                tenor_years: 0.25,
+            },
+        )
+        .expect("coupon");
+        let mut state = coupon.replay_state();
+        coupon.observe_term(&mut state, 0.03).expect("fixing");
+        coupon
+            .capture_notional(&mut state, 100.0)
+            .expect("notional");
+        let before = coupon.settle(&state).expect("settlement");
+        assert!(coupon.observe_term(&mut state, 0.09).is_err());
+        assert!(coupon.capture_notional(&mut state, 200.0).is_err());
+        assert_eq!(coupon.settle(&state).expect("settlement"), before);
+        assert_eq!(coupon.locked_term_index_rate(&state), Some(0.03));
+        assert_eq!(coupon.captured_notional(&state), Some(100.0));
+    }
+
+    #[test]
+    fn act365l_balance_segment_uses_its_stored_contractual_denominator() {
+        let period = FloatingCouponPeriod {
+            accrual_start: date!(2023 - 12 - 01),
+            accrual_end: date!(2023 - 12 - 15),
+            payment_date: date!(2024 - 03 - 01),
+            day_count: DayCount::Act365L,
+            day_count_context: DayCountContext {
+                frequency: Some(finstack_quant_core::dates::Tenor::quarterly()),
+                ..Default::default()
+            },
+            // The original coupon ends in leap year 2024, although this
+            // balance segment ends before the year boundary.
+            accrual_factor: 14.0 / 366.0,
+        };
+        let economics = FloatingCouponEconomics {
+            cash_fraction: 1.0,
+            pik_fraction: 0.0,
+            rate_params: Default::default(),
+        };
+        let observation = FloatingRateObservation::Term {
+            reset_date: period.accrual_start,
+            tenor_years: 0.25,
+        };
+        let coupon =
+            CompiledFloatingCoupon::compile(period, economics.clone(), observation.clone())
+                .expect("stored contractual leap denominator");
+        let mut state = coupon.replay_state();
+        coupon.observe_term(&mut state, 0.05).expect("fixing");
+        coupon
+            .capture_notional(&mut state, 100.0)
+            .expect("notional");
+        assert!(
+            (coupon
+                .accrued_amount(&state, date!(2023 - 12 - 08))
+                .expect("partial accrual")
+                - 100.0 * 0.05 * 7.0 / 366.0)
+                .abs()
+                < 1e-12
+        );
+        let mut invalid_period = period;
+        invalid_period.accrual_factor = 14.0 / 364.0;
+        assert!(CompiledFloatingCoupon::compile(invalid_period, economics, observation).is_err());
+    }
+
+    #[test]
+    fn act365l_accrued_interest_keeps_the_full_coupon_leap_denominator() {
+        use finstack_quant_core::dates::Tenor;
+        for (start, end, cutoff, frequency, elapsed_days) in [
+            (
+                date!(2023 - 03 - 01),
+                date!(2024 - 03 - 01),
+                date!(2023 - 04 - 01),
+                Tenor::annual(),
+                31.0,
+            ),
+            (
+                date!(2023 - 12 - 01),
+                date!(2024 - 03 - 01),
+                date!(2023 - 12 - 15),
+                Tenor::quarterly(),
+                14.0,
+            ),
+        ] {
+            let context = DayCountContext {
+                frequency: Some(frequency),
+                coupon_period: Some((start, end)),
+                ..Default::default()
+            };
+            let coupon = CompiledFloatingCoupon::compile(
+                FloatingCouponPeriod {
+                    accrual_start: start,
+                    accrual_end: end,
+                    payment_date: end,
+                    day_count: DayCount::Act365L,
+                    day_count_context: context,
+                    accrual_factor: DayCount::Act365L
+                        .year_fraction(start, end, context)
+                        .expect("full accrual"),
+                },
+                FloatingCouponEconomics {
+                    cash_fraction: 1.0,
+                    pik_fraction: 0.0,
+                    rate_params: Default::default(),
+                },
+                FloatingRateObservation::Term {
+                    reset_date: start,
+                    tenor_years: frequency.to_years(),
+                },
+            )
+            .expect("coupon");
+            let mut state = coupon.replay_state();
+            coupon.observe_term(&mut state, 0.05).expect("fixing");
+            coupon
+                .capture_notional(&mut state, 100_000_000.0)
+                .expect("notional");
+            let expected = 100_000_000.0 * 0.05 * elapsed_days / 366.0;
+            assert!(
+                (coupon
+                    .accrued_amount(&state, cutoff)
+                    .expect("partial accrual")
+                    - expected)
+                    .abs()
+                    < 1e-7
+            );
+        }
+    }
+
+    #[test]
+    fn accrued_interest_retains_frequency_reference_period_and_calendar() {
+        use finstack_quant_core::dates::Tenor;
+        let start = date!(2024 - 03 - 01);
+        let end = date!(2024 - 06 - 01);
+        let cutoff = date!(2024 - 04 - 01);
+        let context = DayCountContext {
+            calendar: Some(&WEEKENDS_ONLY),
+            frequency: Some(Tenor::quarterly()),
+            coupon_period: Some((start, end)),
+            ..Default::default()
+        };
+        for day_count in [DayCount::Act365L, DayCount::ActActIsma, DayCount::Bus252] {
+            let coupon = CompiledFloatingCoupon::compile(
+                FloatingCouponPeriod {
+                    accrual_start: start,
+                    accrual_end: end,
+                    payment_date: end,
+                    day_count,
+                    day_count_context: context,
+                    accrual_factor: day_count
+                        .year_fraction(start, end, context)
+                        .expect("full accrual"),
+                },
+                FloatingCouponEconomics {
+                    cash_fraction: 1.0,
+                    pik_fraction: 0.0,
+                    rate_params: Default::default(),
+                },
+                FloatingRateObservation::Term {
+                    reset_date: start,
+                    tenor_years: 0.25,
+                },
+            )
+            .expect("coupon");
+            let mut state = coupon.replay_state();
+            coupon.observe_term(&mut state, 0.05).expect("fixing");
+            coupon
+                .capture_notional(&mut state, 100_000_000.0)
+                .expect("notional");
+            let expected = match day_count {
+                DayCount::Act365L => 100_000_000.0 * 0.05 * 31.0 / 366.0,
+                DayCount::ActActIsma => 100_000_000.0 * 0.05 * 31.0 / (92.0 * 4.0),
+                DayCount::Bus252 => 100_000_000.0 * 0.05 * 21.0 / 252.0,
+                _ => unreachable!("test conventions"),
+            };
+            assert!(
+                (coupon
+                    .accrued_amount(&state, cutoff)
+                    .expect("partial accrual")
+                    - expected)
+                    .abs()
+                    < 1e-7
+            );
+        }
     }
 }

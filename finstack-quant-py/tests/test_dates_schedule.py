@@ -28,6 +28,55 @@ def test_default_frequency_is_monthly() -> None:
     assert len(schedule) == 13
 
 
+def test_eom_regular_schedule_uses_the_month_end_roll_grid() -> None:
+    schedule = Schedule.builder(date(2025, 2, 28), date(2025, 8, 31)).frequency("3M").end_of_month(True).build()
+    assert schedule.dates == [date(2025, 2, 28), date(2025, 5, 31), date(2025, 8, 31)]
+    with pytest.raises(ValueError, match="requires the tenor to divide evenly"):
+        Schedule.builder(date(2025, 2, 28), date(2025, 8, 28)).frequency("3M").end_of_month(True).build()
+
+
+def test_nl365_uses_exclusive_start_inclusive_end_leap_days() -> None:
+    from finstack_quant.core.dates import DayCount
+
+    assert DayCount.NL_365.year_fraction("2024-02-28", "2024-02-29") == 0.0
+    assert DayCount.NL_365.year_fraction("2024-02-29", "2024-03-01") == pytest.approx(1.0 / 365.0)
+
+
+def test_fiscal_boundaries_and_actuals_cutoffs_are_consistent() -> None:
+    from finstack_quant.core.dates import build_fiscal_periods, build_periods, fiscal_year
+
+    january = FiscalConfig(1, 2)
+    year = fiscal_year(date(2025, 1, 2), january)
+    period = build_fiscal_periods(f"FY{year}..FY{year}", january).periods[0]
+    assert period.start == date(2025, 1, 2)
+    assert period.end == date(2026, 1, 2)
+    leap = build_fiscal_periods("FY2024M12..FY2025M01", FiscalConfig(2, 29)).periods
+    assert leap[0].end == leap[1].start == date(2024, 2, 29)
+    with pytest.raises(ValueError, match="same period kind and calendar"):
+        build_periods("2025M01..M04", "2025Q1")
+
+
+@pytest.mark.parametrize("stub", ["short_back", "long_back"])
+@pytest.mark.parametrize("frequency", ["1M", "1Y", "1W", "2D"])
+def test_back_stub_terminates_at_python_date_max(stub: str, frequency: str) -> None:
+    start = date(9999, 12, 30)
+    schedule = Schedule.builder(start, date.max).frequency(frequency).stub_rule(stub).build()
+    assert schedule.dates == [start, date.max]
+
+
+@pytest.mark.parametrize("stub", ["long_back", "long_front"])
+@pytest.mark.parametrize(
+    "expected",
+    [
+        [date(9999, 10, 31), date(9999, 11, 30), date.max],
+        [date.min, date(1, 2, 1), date(1, 3, 1)],
+    ],
+)
+def test_aligned_long_stubs_preserve_boundary_anchors(stub: str, expected: list[date]) -> None:
+    schedule = Schedule.builder(expected[0], expected[-1]).frequency("1M").stub_rule(stub).build()
+    assert schedule.dates == expected
+
+
 def test_imm_modes_use_last_call_wins() -> None:
     start = date(2025, 1, 15)
     end = date(2025, 9, 30)
@@ -275,3 +324,28 @@ def test_empty_schedule_dataframe() -> None:
     frame = schedule.to_dataframe()
     assert frame.empty
     assert list(frame.columns) == ["period_start", "period_end", "payment_date", "fixing_date"]
+
+
+@pytest.mark.parametrize("offset", [-(2**31), 2**31 - 1])
+def test_date_extensions_reject_extreme_offsets(offset: int) -> None:
+    from finstack_quant.core.dates import add_months, add_weekdays
+
+    for shift in (add_months, add_weekdays):
+        with pytest.raises(ValueError, match="supported date range"):
+            shift("2025-01-01", offset)
+
+
+def test_business_day_shift_rejects_calendar_boundary() -> None:
+    from finstack_quant.core.dates import add_business_days
+
+    with pytest.raises(ValueError, match="supported date range"):
+        add_business_days("9999-12-31", 1, "weekends_only")
+
+
+@pytest.mark.parametrize("days", [-(2**63), 2**63 - 1])
+def test_market_roll_rejects_extreme_day_offsets(days: int) -> None:
+    from finstack_quant.core.market_data import DiscountCurve, MarketContext
+
+    context = MarketContext().insert(DiscountCurve.flat("USD-OIS", "2025-01-01", 0.05))
+    with pytest.raises(ValueError, match="supported date range"):
+        context.roll_forward(days)

@@ -117,7 +117,9 @@ fn total_variance_materialized_slice_matches_canonical_cube_query() {
         finstack_quant_models::volatility::materialize_cube_expiry_slice(&cube, 3.0, &[strike])
             .unwrap();
     let expected = finstack_quant_models::volatility::get_cube_vol_clamped(&cube, 3.0, 2.0, strike);
-    let actual = finstack_quant_models::volatility::get_surface_vol(&surface, 2.0, strike).unwrap();
+    let actual =
+        finstack_quant_models::volatility::get_cube_expiry_slice_vol(&surface, 2.0, strike)
+            .unwrap();
     assert!((actual - expected).abs() < 1e-12);
 
     assert!(
@@ -301,8 +303,67 @@ fn test_vol_cube_materialize_expiry_slice() {
     let surface =
         finstack_quant_models::volatility::materialize_cube_expiry_slice(&cube, 1.0, &strikes)
             .unwrap();
-    assert_eq!(surface.expiries(), &[5.0, 10.0]);
-    assert_eq!(surface.strikes(), &strikes[..]);
+    assert_eq!(surface.get_expiry(), 1.0);
+    assert_eq!(surface.get_tenors(), &[5.0, 10.0]);
+    assert_eq!(surface.get_strikes(), &strikes[..]);
+}
+
+#[test]
+fn expiry_slice_preserves_coordinates_through_vol_source() {
+    use finstack_quant_models::volatility::{materialize_cube_expiry_slice, VolSource};
+    use std::sync::Arc;
+    let p0 = SabrParameterData::new(0.1, 1.0, 0.0, 0.0).unwrap();
+    let p1 = SabrParameterData::new(0.3, 1.0, 0.0, 0.0).unwrap();
+    let cube = VolCube::from_grid("AXIS", &[1.0], &[5.0, 10.0], &[p0, p1], &[0.03; 2]).unwrap();
+    let slice = materialize_cube_expiry_slice(&cube, 1.0, &[0.02, 0.03, 0.04]).unwrap();
+    let serialized = serde_json::to_value(&slice).unwrap();
+    assert_eq!(serialized["expiry"], 1.0);
+    assert!(serialized.get("expiries").is_none());
+    let source = VolSource::CubeExpirySlice(Arc::new(serde_json::from_value(serialized).unwrap()));
+    assert!((source.get_vol(1.0, 10.0, 0.03).unwrap() - 0.3).abs() < 1e-14);
+    assert!((source.get_vol_clamped(1.0, 10.0, 0.03).unwrap() - 0.3).abs() < 1e-14);
+    assert!(source.get_vol(2.0, 10.0, 0.03).is_err());
+}
+
+#[test]
+fn shifted_materialization_preserves_convention_and_displacement_rows() {
+    use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurface};
+    use finstack_quant_models::volatility::{
+        materialize_cube_expiry_slice, materialize_cube_tenor_slice, VolSource,
+        VolatilityConvention,
+    };
+    use std::sync::Arc;
+    let p0 = SabrParameterData::new_with_shift(0.2, 1.0, 0.0, 0.0, Some(0.02)).unwrap();
+    let p1 = SabrParameterData::new_with_shift(0.2, 1.0, 0.0, 0.0, Some(0.04)).unwrap();
+    let cube = VolCube::from_grid("SHIFT", &[1.0, 3.0], &[5.0], &[p0, p1], &[0.03; 2]).unwrap();
+    let surface = materialize_cube_tenor_slice(&cube, 5.0, &[0.02, 0.03, 0.04]).unwrap();
+    assert_eq!(surface.quote_type(), VolQuoteType::ShiftedBlackLognormal);
+    assert!(surface
+        .require_quote_type(VolQuoteType::BlackLognormal)
+        .is_err());
+    assert_eq!(surface.get_displacements(), Some(&[0.02, 0.04][..]));
+    let restored: VolSurface =
+        serde_json::from_str(&serde_json::to_string(&surface).unwrap()).unwrap();
+    for artifact in [
+        restored,
+        surface.scaled(1.01).unwrap(),
+        surface.bump_point(1.0, 0.03, 0.01).unwrap(),
+        surface.apply_bucket_bump(None, None, 1.0).unwrap(),
+    ] {
+        assert_eq!(artifact.get_displacements(), surface.get_displacements());
+        let source = VolSource::Surface(Arc::new(artifact));
+        assert_eq!(
+            source.get_convention(2.0, 5.0).unwrap(),
+            VolatilityConvention::ShiftedLognormal { shift: 0.03 }
+        );
+    }
+    let slice = materialize_cube_expiry_slice(&cube, 1.0, &[0.03]).unwrap();
+    let source = VolSource::CubeExpirySlice(Arc::new(slice));
+    assert_eq!(
+        source.get_convention(1.0, 5.0).unwrap(),
+        VolatilityConvention::ShiftedLognormal { shift: 0.02 }
+    );
+    assert!((source.get_vol(1.0, 5.0, 0.03).unwrap() - 0.2).abs() < 1e-14);
 }
 
 #[test]
@@ -321,19 +382,24 @@ fn materialized_expiry_slice_interpolates_direct_vol_along_tenor() {
     let low = finstack_quant_models::volatility::get_cube_vol(&cube, 1.0, 1.0, strike).unwrap();
     let high = finstack_quant_models::volatility::get_cube_vol(&cube, 1.0, 4.0, strike).unwrap();
     assert!(
-        (finstack_quant_models::volatility::get_surface_vol(&surface, 1.0, strike).unwrap() - low)
+        (finstack_quant_models::volatility::get_cube_expiry_slice_vol(&surface, 1.0, strike)
+            .unwrap()
+            - low)
             .abs()
             < 1e-14
     );
     assert!(
-        (finstack_quant_models::volatility::get_surface_vol(&surface, 4.0, strike).unwrap() - high)
+        (finstack_quant_models::volatility::get_cube_expiry_slice_vol(&surface, 4.0, strike)
+            .unwrap()
+            - high)
             .abs()
             < 1e-14
     );
 
     let direct_vol_interpolation = 0.5 * (low + high);
     let materialized =
-        finstack_quant_models::volatility::get_surface_vol(&surface, tenor, strike).unwrap();
+        finstack_quant_models::volatility::get_cube_expiry_slice_vol(&surface, tenor, strike)
+            .unwrap();
     assert!(
         (materialized - direct_vol_interpolation).abs() < 1e-14,
         "materialized tenor interpolation {materialized} must use direct vol {direct_vol_interpolation}"
@@ -622,6 +688,33 @@ fn test_vol_cube_materialize_expiry_slice_normal() {
         &cube, 1.0, &strikes,
     )
     .unwrap();
-    assert_eq!(surface.quote_type(), VolQuoteType::Normal);
-    assert_eq!(surface.expiries(), &[5.0, 10.0]);
+    assert_eq!(surface.get_quote_type(), VolQuoteType::Normal);
+    assert_eq!(surface.get_expiry(), 1.0);
+    assert_eq!(surface.get_tenors(), &[5.0, 10.0]);
+}
+
+#[test]
+fn zero_vol_of_vol_cube_preserves_the_exact_black_limit() {
+    use finstack_quant_models::volatility::get_cube_vol;
+
+    let node = SabrParameterData::new(0.2, 1.0, -0.5, 0.0).unwrap();
+    for mode in [
+        VolInterpolationMode::Vol,
+        VolInterpolationMode::TotalVariance,
+    ] {
+        let cube = VolCube::from_grid("BLACK", &[1.0, 5.0], &[2.0, 10.0], &[node; 4], &[0.03; 4])
+            .unwrap()
+            .with_interpolation_mode(mode);
+        for expiry in [1.0, 3.0, 5.0] {
+            for tenor in [2.0, 6.0, 10.0] {
+                for strike in [0.02, 0.03, 0.04] {
+                    let vol = get_cube_vol(&cube, expiry, tenor, strike).unwrap();
+                    assert!(
+                        (vol - 0.2).abs() < 1e-14,
+                        "{expiry}x{tenor}, K={strike}: {vol}"
+                    );
+                }
+            }
+        }
+    }
 }

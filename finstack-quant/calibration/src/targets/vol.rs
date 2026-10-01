@@ -12,7 +12,7 @@ use crate::validation::ValidationConfig;
 use crate::CalibrationReport;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{VolInterpolationMode, VolSurface};
 use finstack_quant_core::Result;
 use finstack_quant_models::{SabrCalibrator, SabrModel, SabrParameters, SabrShift};
 use std::collections::BTreeMap;
@@ -237,7 +237,8 @@ impl VolSurfaceTarget {
             &params.target_expiries,
             &params.target_strikes,
             &grid,
-        )?;
+        )?
+        .with_interpolation_mode(VolInterpolationMode::TotalVariance);
 
         let residuals = surface_quote_residuals(
             &surface,
@@ -606,8 +607,8 @@ mod tests {
             expiry_extrapolation: SurfaceExtrapolationPolicy::Clamp,
         };
 
-        let expiry_1y = base_date.add_months(12);
-        let expiry_2y = base_date.add_months(24);
+        let expiry_1y = base_date.add_months(12).expect("valid date shift");
+        let expiry_2y = base_date.add_months(24).expect("valid date shift");
 
         // One valid expiry (all strikes > 0), one invalid expiry (strike=0 triggers SABR error).
         let quotes = vec![

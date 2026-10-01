@@ -48,7 +48,7 @@ pub struct CmsOption {
         schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
     )]
     pub payment_dates: Vec<Date>,
-    /// Accrual fractions for each period
+    /// Finite nonnegative accrual fractions for each period; zero gives a zero coupon.
     pub accrual_fractions: Vec<f64>,
     /// Option type (call or put on CMS rate)
     pub option_type: OptionType,
@@ -61,7 +61,7 @@ pub struct CmsOption {
     ///
     /// When set, provides default values for `swap_fixed_frequency`, `swap_float_frequency`,
     /// `swap_fixed_day_count`, and `swap_float_day_count`. Individual fields still
-    /// override the convention when explicitly set.
+    /// override the convention when explicitly set. Required for USD CMS.
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub index_id: Option<IndexId>,
@@ -146,6 +146,13 @@ impl CmsOption {
                 self.payment_dates.len(),
                 self.accrual_fractions.len(),
             )));
+        }
+        for (index, accrual) in self.accrual_fractions.iter().enumerate() {
+            if !accrual.is_finite() || *accrual < 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CmsOption accrual_fractions[{index}] must be finite and nonnegative, got {accrual}"
+                )));
+            }
         }
         Ok(())
     }
@@ -310,5 +317,18 @@ mod validation_tests {
             result.is_err(),
             "CMS option builder must reject schedule vector length mismatches"
         );
+    }
+    #[test]
+    fn accruals_require_finite_nonnegative_values() {
+        let mut inst = CmsOption::example().expect("example");
+        for invalid in [-0.25, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            inst.accrual_fractions[0] = invalid;
+            let error = inst.validate().expect_err("invalid accrual").to_string();
+            assert!(error.contains("accrual_fractions[0]"));
+        }
+        for valid in [0.0, 0.25] {
+            inst.accrual_fractions[0] = valid;
+            inst.validate().expect("nonnegative accrual");
+        }
     }
 }

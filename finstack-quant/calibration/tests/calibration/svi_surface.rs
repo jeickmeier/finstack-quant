@@ -27,7 +27,8 @@
 
 use finstack_quant_calibration::api::engine;
 use finstack_quant_calibration::api::schema::{
-    CalibrationEnvelope, CalibrationPlan, CalibrationStep, StepParams, SviSurfaceParams,
+    CalibrationEnvelope, CalibrationPlan, CalibrationStep, StepParams, SurfaceExtrapolationPolicy,
+    SviSurfaceParams, VolSurfaceModel, VolSurfaceParams,
 };
 use finstack_quant_calibration::quotes::ids::QuoteId;
 use finstack_quant_calibration::quotes::market_quote::MarketQuote;
@@ -274,4 +275,100 @@ fn svi_surface_grid_is_calendar_monotone_under_nonflat_curve() {
          (worst drop {max_violation:.3e}). The cross-expiry interpolation \
          must recompute log-moneyness per slice."
     );
+}
+
+#[test]
+fn calibrated_surfaces_preserve_total_variance_between_published_expiries() {
+    let base_date = Date::from_calendar_date(2025, Month::January, 3).expect("base date");
+    let expiries = vec![182.0 / 365.0, 1.0];
+    let strikes = vec![80.0, 90.0, 100.0, 110.0, 120.0];
+    let discount = DiscountCurve::builder(DISCOUNT_ID)
+        .base_date(base_date)
+        .knots([(0.0, 1.0), (5.0, 1.0)])
+        .build()
+        .expect("zero-rate discount curve");
+    let source_market = MarketContext::new().insert(discount);
+    let mut quotes = Vec::new();
+    for (days, total_variance) in [(182, 0.04_f64), (365, 0.0401)] {
+        let expiry = base_date + time::Duration::days(days);
+        let vol = (total_variance / (days as f64 / 365.0)).sqrt();
+        for &strike in &strikes {
+            quotes.push(MarketQuote::Vol(VolQuote::OptionVol {
+                id: QuoteId::new(format!("flat-{days}-{strike}")),
+                underlying: UNDERLYING.into(),
+                expiry,
+                strike,
+                vol,
+                option_type: OptionType::Call,
+            }));
+        }
+    }
+    let (prior_market, mut market_data) = cal_utils::split_market_context(&source_market);
+    cal_utils::extend_market_data(&mut market_data, &quotes);
+    let steps = [
+        StepParams::VolSurface(VolSurfaceParams {
+            vol_surface_id: "FLAT-VOL".into(),
+            base_date,
+            underlying_ticker: UNDERLYING.into(),
+            model: VolSurfaceModel::Sabr,
+            discount_curve_id: Some(DISCOUNT_ID.into()),
+            beta: 1.0,
+            target_expiries: expiries.clone(),
+            target_strikes: strikes.clone(),
+            spot_override: Some(SPOT),
+            dividend_yield_override: Some(0.0),
+            expiry_extrapolation: SurfaceExtrapolationPolicy::Error,
+        }),
+        StepParams::SviSurface(SviSurfaceParams {
+            vol_surface_id: "FLAT-VOL".into(),
+            base_date,
+            underlying_ticker: UNDERLYING.into(),
+            discount_curve_id: Some(DISCOUNT_ID.into()),
+            target_expiries: expiries.clone(),
+            target_strikes: strikes.clone(),
+            spot_override: Some(SPOT),
+            dividend_yield_override: Some(0.0),
+        }),
+    ];
+    for params in steps {
+        let mut settings = CalibrationConfig::default();
+        settings.vol_surface.validation_tolerance = 1e-6;
+        let envelope = CalibrationEnvelope {
+            schema_url: None,
+            schema: finstack_quant_calibration::api::schema::CalibrationSchema::CURRENT,
+            plan: CalibrationPlan {
+                id: "delivered-total-variance".into(),
+                description: None,
+                quote_sets: [("flat".into(), cal_utils::quote_set_ids(&quotes))].into(),
+                settings,
+                steps: vec![CalibrationStep {
+                    id: "surface".into(),
+                    quote_set: "flat".into(),
+                    params,
+                }],
+            },
+            market_data: market_data.clone(),
+            prior_market: prior_market.clone(),
+        };
+        let result = engine::execute(&envelope).expect("flat-smile calibration");
+        assert!(result.result.report.success, "{:?}", result.result.report);
+        let context = MarketContext::try_from(result.result.final_market).expect("restore context");
+        let surface = context.get_surface("FLAT-VOL").expect("delivered surface");
+        for &strike in &strikes {
+            let mut previous_variance = 0.0;
+            for n in 0..=40 {
+                let expiry = expiries[0] + (expiries[1] - expiries[0]) * f64::from(n) / 40.0;
+                let vol =
+                    finstack_quant_models::volatility::get_surface_vol(&surface, expiry, strike)
+                        .expect("public surface lookup");
+                let variance = vol * vol * expiry;
+                assert!(
+                    variance + 1e-12 >= previous_variance,
+                    "delivered surface loses calendar monotonicity at T={expiry}, K={strike}: \
+                     {previous_variance} -> {variance}"
+                );
+                previous_variance = variance;
+            }
+        }
+    }
 }

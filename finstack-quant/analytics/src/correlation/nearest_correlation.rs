@@ -91,7 +91,7 @@ impl Default for NearestCorrelationOpts {
 ///
 /// # Errors
 ///
-/// * [`Error::InvalidSize`] if `input.len() != n * n`.
+/// * [`Error::InvalidSize`] if `n * n` overflows or `input.len() != n * n`.
 /// * [`Error::NotSymmetric`] if the input deviates from symmetry by more than
 ///   `1e-6` at any off-diagonal entry.
 /// * [`Error::DiagonalNotOne`] if any diagonal entry is further than `1e-3`
@@ -105,12 +105,13 @@ pub fn nearest_correlation_matrix(
     n: usize,
     opts: NearestCorrelationOpts,
 ) -> Result<Vec<f64>> {
-    if input.len() != n * n {
+    let size = n.checked_mul(n).filter(|&size| size == input.len());
+    let Some(size) = size else {
         return Err(Error::InvalidSize {
             expected: n,
             actual: input.len(),
         });
-    }
+    };
     if n == 0 {
         return Ok(Vec::new());
     }
@@ -155,19 +156,19 @@ pub fn nearest_correlation_matrix(
     // Dykstra-projection iteration. Pre-allocate `prev`, `next`, `r`, `s`
     // outside the loop; swap `prev` and `next` per iteration to avoid the
     // per-iteration `clone()`.
-    let mut s = vec![0.0_f64; n * n];
-    let mut r = vec![0.0_f64; n * n];
+    let mut s = vec![0.0_f64; size];
+    let mut r = vec![0.0_f64; size];
     let mut prev = y;
-    let mut next = vec![0.0_f64; n * n];
+    let mut next = vec![0.0_f64; size];
     for _ in 0..opts.max_iter {
         // Dykstra correction: r = prev - s
-        for k in 0..(n * n) {
+        for k in 0..size {
             r[k] = prev[k] - s[k];
         }
 
         let x = project_psd(&r, n)?;
 
-        for k in 0..(n * n) {
+        for k in 0..size {
             s[k] = x[k] - r[k];
         }
 
@@ -333,6 +334,16 @@ mod tests {
         let err = nearest_correlation_matrix(&input, 3, NearestCorrelationOpts::default())
             .expect_err("size mismatch");
         assert!(matches!(err, Error::InvalidSize { .. }));
+    }
+
+    #[test]
+    fn rejects_overflowing_dimensions_without_panicking() {
+        for n in [usize::MAX, 1usize << (usize::BITS / 2)] {
+            let err = nearest_correlation_matrix(&[], n, NearestCorrelationOpts::default())
+                .expect_err("an overflowing dimension is invalid");
+            assert!(matches!(err, Error::InvalidSize { expected, actual: 0 } if expected == n));
+            assert!(err.to_string().contains("Invalid matrix size"));
+        }
     }
 
     #[test]

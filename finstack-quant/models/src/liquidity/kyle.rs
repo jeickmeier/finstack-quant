@@ -27,13 +27,33 @@ use super::impact::{ExecutionTrajectory, ImpactEstimate, TradeParams};
 /// Lambda can be estimated from the Amihud ratio or regressed from
 /// trade-and-quote data.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(try_from = "RawKyleLambdaModel")]
 pub struct KyleLambdaModel {
     /// Price impact per unit of order flow.
     lambda: f64,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawKyleLambdaModel {
+    lambda: f64,
+}
+
+impl TryFrom<RawKyleLambdaModel> for KyleLambdaModel {
+    type Error = finstack_quant_core::Error;
+
+    fn try_from(raw: RawKyleLambdaModel) -> Result<Self> {
+        Self::new(raw.lambda)
+    }
+}
+
 impl KyleLambdaModel {
     /// Create a new Kyle model with a given lambda.
+    ///
+    /// # Arguments
+    ///
+    /// * `lambda` - Finite non-negative price impact per unit of signed order flow,
+    ///   in price units per share or contract.
     ///
     /// # Errors
     ///
@@ -130,17 +150,7 @@ impl KyleLambdaModel {
     ///
     /// Returns a validation error for non-finite or non-positive trade inputs.
     pub fn estimate_cost(&self, params: &TradeParams) -> Result<ImpactEstimate> {
-        if !params.quantity.is_finite() {
-            return Err(invalid_input("quantity must be finite"));
-        }
-        if !params.horizon_days.is_finite() || params.horizon_days <= 0.0 {
-            return Err(invalid_input("horizon_days must be finite and positive"));
-        }
-        if !params.daily_volatility.is_finite() || params.daily_volatility <= 0.0 {
-            return Err(invalid_input(
-                "daily_volatility must be finite and positive",
-            ));
-        }
+        params.validate()?;
 
         let q = params.quantity;
 
@@ -205,12 +215,7 @@ impl KyleLambdaModel {
         if num_buckets == 0 {
             return Err(invalid_input("num_buckets must be > 0"));
         }
-        if !params.quantity.is_finite() {
-            return Err(invalid_input("quantity must be finite"));
-        }
-        if !params.horizon_days.is_finite() || params.horizon_days <= 0.0 {
-            return Err(invalid_input("horizon_days must be finite and positive"));
-        }
+        params.validate()?;
 
         let q = params.quantity;
         let t = params.horizon_days;
@@ -277,6 +282,34 @@ impl KyleLambdaModel {
 mod tests {
     use super::*;
     use crate::liquidity::types::LiquidityProfile;
+
+    #[test]
+    fn deserialization_revalidates_lambda() {
+        let model = KyleLambdaModel::new(0.001).unwrap();
+        let json = serde_json::to_string(&model).unwrap();
+        assert_eq!(
+            serde_json::from_str::<KyleLambdaModel>(&json).unwrap(),
+            model
+        );
+        assert!(serde_json::from_str::<KyleLambdaModel>(r#"{"lambda":-1.0}"#).is_err());
+    }
+
+    #[test]
+    fn cost_and_trajectory_reject_invalid_consumed_trade_inputs() {
+        let model = KyleLambdaModel::new(0.001).unwrap();
+        for volatility in [f64::NAN, f64::INFINITY, -0.01, 0.0] {
+            let mut params = test_params(1000.0).unwrap();
+            params.daily_volatility = volatility;
+            assert!(model.estimate_cost(&params).is_err());
+            assert!(model.optimal_trajectory(&params, 1).is_err());
+        }
+        for reference_price in [f64::NAN, f64::INFINITY, -1.0, 0.0] {
+            let mut params = test_params(1000.0).unwrap();
+            params.reference_price = Some(reference_price);
+            assert!(model.estimate_cost(&params).is_err());
+            assert!(model.optimal_trajectory(&params, 1).is_err());
+        }
+    }
 
     fn test_profile() -> std::result::Result<LiquidityProfile, Box<dyn std::error::Error>> {
         Ok(LiquidityProfile::new(

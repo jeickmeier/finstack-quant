@@ -23,6 +23,7 @@ time = { workspace = true, features = ["macros", "formatting", "parsing", "serde
 smallvec = { version = "1.15", default-features = false }
 phf = { version = "0.13", features = ["macros"], default-features = false }
 rustc-hash = { workspace = true }
+lru = { version = "0.18", default-features = false }
 indexmap = { workspace = true, features = ["serde"] }
 rust_decimal = { workspace = true }
 schemars = { workspace = true, optional = true }

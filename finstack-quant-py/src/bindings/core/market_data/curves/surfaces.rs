@@ -16,22 +16,26 @@ use super::helpers::{
 };
 use crate::errors::core_to_py;
 
-/// Extract a row-major volatility grid from a flat list, a nested list of
-/// rows, or any object exposing ``tolist()`` (e.g. a 2-D numpy array).
-fn extract_vol_grid(obj: &Bound<'_, PyAny>) -> PyResult<Vec<f64>> {
+enum VolInput {
+    Flat(Vec<f64>),
+    Rows(Vec<Vec<f64>>),
+}
+
+/// Preserve nested rows until the canonical Rust constructor validates their shape.
+fn extract_vol_grid(obj: &Bound<'_, PyAny>) -> PyResult<VolInput> {
     if let Ok(rows) = obj.extract::<Vec<Vec<f64>>>() {
-        return Ok(rows.into_iter().flatten().collect());
+        return Ok(VolInput::Rows(rows));
     }
     if let Ok(flat) = obj.extract::<Vec<f64>>() {
-        return Ok(flat);
+        return Ok(VolInput::Flat(flat));
     }
     if obj.hasattr("tolist")? {
         let listed = obj.call_method0("tolist")?;
         if let Ok(rows) = listed.extract::<Vec<Vec<f64>>>() {
-            return Ok(rows.into_iter().flatten().collect());
+            return Ok(VolInput::Rows(rows));
         }
         if let Ok(flat) = listed.extract::<Vec<f64>>() {
-            return Ok(flat);
+            return Ok(VolInput::Flat(flat));
         }
     }
     Err(pyo3::exceptions::PyTypeError::new_err(
@@ -92,7 +96,9 @@ impl PyVolSurface {
     /// interpolation_mode : str, optional
     ///     ``"vol"`` (default, bilinear in vol) or ``"total_variance"``.
     /// quote_type : str, optional
-    ///     ``"black_lognormal"`` (default) or ``"normal"``.
+    ///     ``"black_lognormal"`` (default), ``"shifted_black_lognormal"``, or ``"normal"``.
+    /// displacements : list[float] | None, optional
+    ///     Shifted-Black rate displacements, one per expiry; absent for other conventions.
     ///
     /// Raises
     /// ------
@@ -108,7 +114,8 @@ impl PyVolSurface {
     /// >>> VolSurface("EQ-VOL", [1.0], [90.0, 100.0], [0.22, 0.20]).strikes
     /// [90.0, 100.0]
     #[new]
-    #[pyo3(signature = (id, expiries, strikes, vols, *, secondary_axis="strike", interpolation_mode="vol", quote_type="black_lognormal"))]
+    #[pyo3(signature = (id, expiries, strikes, vols, *, secondary_axis="strike", interpolation_mode="vol", quote_type="black_lognormal", displacements=None))]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         id: &str,
         expiries: Vec<f64>,
@@ -117,22 +124,35 @@ impl PyVolSurface {
         secondary_axis: &str,
         interpolation_mode: &str,
         quote_type: &str,
+        displacements: Option<Vec<f64>>,
     ) -> PyResult<Self> {
         let axis = parse_vol_surface_axis(secondary_axis)?;
         let mode = parse_vol_interpolation_mode(interpolation_mode)?;
         let quote = parse_vol_quote_type(quote_type)?;
         let grid = extract_vol_grid(vols)?;
-        let surface = VolSurface::from_grid_opts(
-            id,
-            &expiries,
-            &strikes,
-            &grid,
-            VolGridOpts {
-                secondary_axis: axis,
-                quote_type: quote,
-                interpolation_mode: mode,
-            },
-        )
+        let opts = VolGridOpts {
+            secondary_axis: axis,
+            interpolation_mode: mode,
+            quote_type: quote,
+        };
+        let surface = match grid {
+            VolInput::Flat(values) => VolSurface::from_grid_opts(
+                id,
+                &expiries,
+                &strikes,
+                &values,
+                opts,
+                displacements.as_deref(),
+            ),
+            VolInput::Rows(rows) => VolSurface::from_rows_opts(
+                id,
+                &expiries,
+                &strikes,
+                &rows,
+                opts,
+                displacements.as_deref(),
+            ),
+        }
         .map_err(core_to_py)?;
 
         Ok(Self {
@@ -227,10 +247,45 @@ impl PyVolSurface {
         self.inner.secondary_axis().to_string()
     }
 
-    /// Quoting convention of the stored volatilities (``"black_lognormal"`` or ``"normal"``).
+    /// Stored quote convention: ``"black_lognormal"``, ``"shifted_black_lognormal"``, or ``"normal"``.
     #[getter]
     fn quote_type(&self) -> String {
         self.inner.quote_type().to_string()
+    }
+
+    /// Return the per-expiry shifted-Black displacements in rate units.
+    ///
+    /// Returns
+    /// -------
+    /// list[float] | None
+    ///     One displacement per expiry, or ``None`` for unshifted quotes.
+    fn get_displacements(&self) -> Option<Vec<f64>> {
+        self.inner.get_displacements().map(<[f64]>::to_vec)
+    }
+
+    /// Return a shifted-Black surface retaining one displacement per expiry.
+    ///
+    /// Parameters
+    /// ----------
+    /// displacements : list[float]
+    ///     Finite displacements in strike/rate units, aligned to the expiry axis.
+    ///
+    /// Returns
+    /// -------
+    /// VolSurface
+    ///     New validated surface with shifted-Black quote metadata.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the displacement count differs from the expiry count or a shift is non-finite.
+    fn with_displacements(&self, displacements: Vec<f64>) -> PyResult<Self> {
+        self.inner
+            .as_ref()
+            .clone()
+            .with_displacements(&displacements)
+            .map(|surface| Self::from_inner(Arc::new(surface)))
+            .map_err(core_to_py)
     }
 
     /// Interpolation contract between grid points (``"vol"`` or ``"total_variance"``).
@@ -480,7 +535,7 @@ impl PySabrParameterData {
     /// rho : float
     ///     Forward/volatility correlation in ``(-1, 1)``.
     /// nu : float
-    ///     Volatility of volatility; strictly positive.
+    ///     Volatility of volatility; nonnegative, with zero giving deterministic volatility.
     /// shift : float, optional
     ///     Displacement added to forward and strike (decimal rate units, e.g. ``0.03``).
     ///
@@ -520,7 +575,7 @@ impl PySabrParameterData {
         self.inner.rho
     }
 
-    /// Volatility of volatility (strictly positive).
+    /// Volatility of volatility (nonnegative; zero gives deterministic volatility).
     #[getter]
     fn nu(&self) -> f64 {
         self.inner.nu

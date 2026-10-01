@@ -64,6 +64,7 @@ impl CheckSuite {
         model: &FinancialModelSpec,
         results: &StatementResult,
     ) -> Result<CheckReport> {
+        self.config.validate()?;
         let context = CheckContext {
             model,
             results,
@@ -277,10 +278,11 @@ impl CheckSuiteSpec {
     ///
     /// # Errors
     ///
-    /// This currently returns `Ok` for every deserialized spec because checks
-    /// are materialized without runtime I/O or model access. Formula syntax and
-    /// references are validated when the suite runs against a model.
+    /// Returns an error when configured tolerances or materiality thresholds
+    /// are negative or non-finite. Formula syntax and references are validated
+    /// when the suite runs against a model.
     pub fn resolve(&self) -> Result<CheckSuite> {
+        self.config.validate()?;
         let mut checks: Vec<Box<dyn Check>> = self
             .builtin_checks
             .iter()
@@ -375,7 +377,10 @@ pub struct FormulaCheckSpec {
     pub formula: String,
     /// Template for the finding message (`{period}` is replaced at runtime).
     pub message_template: String,
-    /// Numeric tolerance for floating-point comparisons.
+    /// Finite, nonnegative absolute residual bound in the formula's result units.
+    /// When present, the formula passes when its absolute result is at most
+    /// this bound. When absent, the formula is a predicate and any finite
+    /// nonzero result passes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tolerance: Option<f64>,
 }

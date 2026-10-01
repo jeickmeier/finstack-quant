@@ -11,8 +11,6 @@ Examples:
 True
 """
 
-import sys as _sys
-
 from finstack_quant.finstack_quant import calibration as _calibration
 
 CalibrationConfig = _calibration.CalibrationConfig
@@ -39,11 +37,6 @@ validate_calibration = _calibration.validate_calibration
 validate_calibration_json = _calibration.validate_calibration_json
 hull_white = _calibration.hull_white
 schema = _calibration.schema
-
-if "finstack_quant.calibration.schema" not in _sys.modules:
-    _sys.modules["finstack_quant.calibration.schema"] = schema
-if "finstack_quant.calibration.hull_white" not in _sys.modules:
-    _sys.modules["finstack_quant.calibration.hull_white"] = hull_white
 
 __all__ = [
     "CalibrationConfig",

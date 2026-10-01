@@ -1,11 +1,11 @@
 use super::characteristic_fn::{heston_pj_characteristic_function, HestonCfStatus};
+use super::fourier_prices::validate_heston_inputs;
 use super::params::HESTON_TAIL_DIAGNOSTIC_THRESHOLD;
 use super::quadrature::{composite_gauss_legendre_grid, HESTON_TAIL_WINDOW_FRACTION};
 use super::{HestonFourierSettings, HestonPricingParams};
 use finstack_quant_core::{Error, Result};
 use num_complex::Complex;
 use std::f64::consts::PI;
-use tracing::warn;
 
 /// Cached Heston Fourier data for pricing multiple strikes with shared parameters.
 ///
@@ -22,6 +22,8 @@ pub struct HestonStripPricer {
     /// Start of the tail window `u_max * (1 - HESTON_TAIL_WINDOW_FRACTION)`,
     /// precomputed from `grid` so `probability` does not rescan it per call.
     tail_window_start: f64,
+    /// Largest CF magnitude in the final tenth of the integration interval.
+    tail_cf_magnitude: f64,
     /// Cached `psi_1(phi) / (i * phi)` values on the grid.
     psi1_over_iphi: Vec<Complex<f64>>,
     /// Cached `psi_2(phi) / (i * phi)` values on the grid.
@@ -31,22 +33,23 @@ pub struct HestonStripPricer {
     pub(super) integrand_corrupted: bool,
 }
 
-/// Maximum fraction of integration nodes that may be non-finite or zeroed
-/// before the cached strip integral is rejected.
-///
-/// A Heston characteristic function that overflows at a node makes
-/// [`heston_pj_characteristic_function`] return a zeroed value with
-/// [`HestonCfStatus::Overflow`]. A few such nodes (typically in the tail,
-/// where the integrand is already tiny) are harmless, but when a large
-/// fraction of nodes are corrupted the Gil-Pelaez integral silently loses
-/// mass and yields a plausible-but-wrong probability. Legitimate
-/// [`HestonCfStatus::Underflow`] nodes (well-formed inputs, |ψ| → 0) are
-/// *not* corruption and do not count toward this threshold.
-pub(super) const HESTON_STRIP_MAX_CORRUPT_FRACTION: f64 = 0.05;
+/// No overflow-corrupted characteristic-function node is acceptable. Legitimate
+/// tail underflow remains valid and does not count toward this threshold.
+pub(super) const HESTON_STRIP_MAX_CORRUPT_FRACTION: f64 = 0.0;
 
 impl HestonStripPricer {
     /// Build a strip pricer with characteristic-function values cached on the
     /// composite Gauss-Legendre integration grid.
+    ///
+    /// Returns `None` for invalid inputs, non-positive maturity, or a grid
+    /// exceeding the node budget. Prices reject unresolved tails and corrupt nodes.
+    ///
+    /// # Arguments
+    ///
+    /// * `spot` - Positive finite underlying price in quote units.
+    /// * `time` - Positive finite remaining maturity in years.
+    /// * `params` - Finite rates and valid canonical Heston variance parameters.
+    /// * `settings` - Validated integration extent, quadrature order, and panel count.
     #[must_use]
     pub fn new(
         spot: f64,
@@ -54,6 +57,11 @@ impl HestonStripPricer {
         params: &HestonPricingParams,
         settings: &HestonFourierSettings,
     ) -> Option<Self> {
+        validate_heston_inputs(spot, time, params).ok()?;
+        settings.validate().ok()?;
+        if time <= 0.0 {
+            return None;
+        }
         let grid =
             composite_gauss_legendre_grid(0.0, settings.u_max, settings.gl_order, settings.panels)?;
         let i = Complex::new(0.0, 1.0);
@@ -70,6 +78,8 @@ impl HestonStripPricer {
         let mut interior_nodes = 0_usize;
         let mut corrupted_nodes = 0_usize;
         let mut ok_nodes = 0_usize;
+        let mut tail_cf_magnitude = 0.0_f64;
+        let tail_window_start = settings.u_max * (1.0 - HESTON_TAIL_WINDOW_FRACTION);
 
         for (phi, _) in &grid {
             if phi.abs() < settings.phi_eps {
@@ -92,6 +102,9 @@ impl HestonStripPricer {
                 ok_nodes += 1;
             }
 
+            if *phi >= tail_window_start {
+                tail_cf_magnitude = tail_cf_magnitude.max(psi1.norm()).max(psi2.norm());
+            }
             psi1_over_iphi.push(psi1 / denom);
             psi2_over_iphi.push(psi2 / denom);
         }
@@ -101,16 +114,10 @@ impl HestonStripPricer {
         // integral then degenerates to the 0.5 baseline and the resulting
         // price is plausible-but-wrong. Partial underflow (decayed tail) is
         // legitimate and does not count.
-        let integrand_corrupted = interior_nodes > 0
-            && ((corrupted_nodes as f64) / (interior_nodes as f64)
+        let integrand_corrupted = interior_nodes == 0
+            || ((corrupted_nodes as f64) / (interior_nodes as f64)
                 > HESTON_STRIP_MAX_CORRUPT_FRACTION
                 || ok_nodes == 0);
-
-        // `u_max` (largest grid abscissa) and the tail-window start are fixed
-        // once the grid is built, so compute them here rather than rescanning
-        // the grid on every `probability` call.
-        let u_max = grid.iter().map(|(phi, _)| *phi).fold(0.0_f64, f64::max);
-        let tail_window_start = u_max * (1.0 - HESTON_TAIL_WINDOW_FRACTION);
 
         Some(Self {
             spot,
@@ -118,6 +125,7 @@ impl HestonStripPricer {
             params: *params,
             grid,
             tail_window_start,
+            tail_cf_magnitude,
             psi1_over_iphi,
             psi2_over_iphi,
             integrand_corrupted,
@@ -144,11 +152,12 @@ impl HestonStripPricer {
         for ((phi, weight), cached) in self.grid.iter().zip(cached_values.iter()) {
             let exp_term = (-i * *phi * log_strike).exp();
             let value = (exp_term * *cached).re;
-            if value.is_finite() {
-                integral += *weight * value;
-                if *phi >= tail_window_start {
-                    tail_abs_mass += weight.abs() * value.abs();
-                }
+            if !value.is_finite() {
+                return (f64::NAN, f64::NAN, f64::INFINITY);
+            }
+            integral += *weight * value;
+            if *phi >= tail_window_start {
+                tail_abs_mass += weight.abs() * value.abs();
             }
         }
 
@@ -159,8 +168,17 @@ impl HestonStripPricer {
     /// Price a single European call using the cached strip pricer.
     ///
     /// Returns a structured convergence error when characteristic-function
-    /// corruption or a non-finite integral makes the Heston result unreliable.
+    /// corruption, an unresolved tail, or invalid bounds make the result unreliable.
+    ///
+    /// # Arguments
+    ///
+    /// * `strike` - Positive finite exercise price in the same quote units as spot.
     pub fn price_call(&self, strike: f64) -> Result<f64> {
+        if !strike.is_finite() || strike <= 0.0 {
+            return Err(Error::Validation(
+                "Heston strike must be finite and positive".to_string(),
+            ));
+        }
         if self.integrand_corrupted {
             return Err(Error::Calibration {
                 category: "heston_fourier".to_string(),
@@ -175,32 +193,33 @@ impl HestonStripPricer {
         let (p1, raw_p1, tail_p1) = self.probability(log_strike, &self.psi1_over_iphi);
         let (p2, raw_p2, tail_p2) = self.probability(log_strike, &self.psi2_over_iphi);
 
-        // Audit item 4: surface a diagnostic when the truncated-tail estimate or
-        // a pre-clamp probability excursion shows the integral was mis-truncated
-        // at `u_max`, instead of silently relying on the `[0, 1]` clamp.
-        let tail = tail_p1.max(tail_p2);
-        let raw_excursion = (raw_p1 - raw_p1.clamp(0.0, 1.0))
-            .abs()
-            .max((raw_p2 - raw_p2.clamp(0.0, 1.0)).abs());
-        if tail > HESTON_TAIL_DIAGNOSTIC_THRESHOLD
-            || raw_excursion > HESTON_TAIL_DIAGNOSTIC_THRESHOLD
+        let discounted_spot = self.spot * (-self.params.q * self.time).exp();
+        let discounted_strike = strike * (-self.params.r * self.time).exp();
+        let price_tolerance = HESTON_TAIL_DIAGNOSTIC_THRESHOLD * discounted_spot;
+        let tail_price = discounted_spot * tail_p1 + discounted_strike * tail_p2;
+        let probability_excursion =
+            discounted_spot * (raw_p1 - p1).abs() + discounted_strike * (raw_p2 - p2).abs();
+        // The CF magnitude catches unresolved short-time tails even when
+        // cancellation makes the final-window probability integral tiny.
+        if self.tail_cf_magnitude > 1e-8
+            || tail_price > price_tolerance
+            || probability_excursion > price_tolerance
+            || !tail_price.is_finite()
         {
-            warn!(
-                spot = self.spot,
-                strike,
-                time = self.time,
-                tail_estimate = tail,
-                raw_probability_excursion = raw_excursion,
-                "Heston strip Gil-Pelaez integral truncated at u_max with a \
-                 non-negligible residual tail; the price may be mis-truncated — \
-                 consider a larger u_max"
-            );
+            return Err(Error::Calibration {
+                category: "heston_fourier".to_string(),
+                message: format!("Heston integration tail is unresolved: price-tail estimate={tail_price}, CF magnitude={}", self.tail_cf_magnitude),
+            });
         }
 
         let call_price = self.spot * (-self.params.q * self.time).exp() * p1
             - strike * (-self.params.r * self.time).exp() * p2;
 
-        if !call_price.is_finite() {
+        let lower_bound = (discounted_spot - discounted_strike).max(0.0);
+        if !call_price.is_finite()
+            || call_price < lower_bound - price_tolerance
+            || call_price > discounted_spot + price_tolerance
+        {
             return Err(Error::Calibration {
                 category: "heston_fourier".to_string(),
                 message: format!(
@@ -211,10 +230,14 @@ impl HestonStripPricer {
             });
         }
 
-        Ok(call_price.max(0.0))
+        Ok(call_price.clamp(lower_bound, discounted_spot))
     }
 
     /// Price a strip of European calls using the cached strip pricer.
+    ///
+    /// # Arguments
+    ///
+    /// * `strikes` - Positive finite exercise prices in spot units and result order.
     pub fn price_calls(&self, strikes: &[f64]) -> Result<Vec<f64>> {
         strikes
             .iter()

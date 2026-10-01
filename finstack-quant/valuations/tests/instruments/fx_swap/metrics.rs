@@ -84,7 +84,14 @@ fn test_ir01_domestic_sign() {
     let dates = TestDates::standard();
     let market = setup_standard_market(dates.as_of);
 
-    let swap = create_standard_fx_swap("IR01_DOM", dates.near_date, dates.far_date_1y, 1_000_000.0);
+    let swap = create_fx_swap_with_rates(
+        "IR01_DOM",
+        dates.near_date,
+        dates.far_date_1y,
+        1_000_000.0,
+        1.10,
+        1.15,
+    );
 
     let result = swap
         .price_with_metrics(
@@ -97,11 +104,11 @@ fn test_ir01_domestic_sign() {
 
     let dv01_domestic = *result.measures.get("dv01_domestic").unwrap();
 
-    // Increase in domestic rates decreases domestic DFs, increases forward rate,
-    // increases far leg domestic cashflow. For a typical swap, IR01 domestic > 0
+    // Higher domestic rates reduce the fixed far quote-currency receipt more
+    // than the much earlier near-date payment, so this contract loses value.
     assert!(
-        dv01_domestic > 0.0,
-        "Domestic DV01 should be positive, got: {}",
+        dv01_domestic < 0.0,
+        "Domestic DV01 should be negative, got: {}",
         dv01_domestic
     );
 
@@ -118,7 +125,14 @@ fn test_ir01_foreign_sign() {
     let dates = TestDates::standard();
     let market = setup_standard_market(dates.as_of);
 
-    let swap = create_standard_fx_swap("IR01_FOR", dates.near_date, dates.far_date_1y, 1_000_000.0);
+    let swap = create_fx_swap_with_rates(
+        "IR01_FOR",
+        dates.near_date,
+        dates.far_date_1y,
+        1_000_000.0,
+        1.10,
+        1.15,
+    );
 
     let result = swap
         .price_with_metrics(
@@ -131,14 +145,14 @@ fn test_ir01_foreign_sign() {
 
     let dv01_foreign = *result.measures.get("dv01_foreign").unwrap();
 
-    // Foreign IR01 can be positive or negative depending on the swap structure.
-    // For a par swap with model-derived forward, the effects partially offset.
-    // Key test: value should be finite and non-zero
+    // Higher foreign rates reduce the fixed far base-currency liability more
+    // than the near-date receipt, so this contract gains value.
     assert!(
         dv01_foreign.is_finite(),
         "Foreign DV01 should be finite, got: {}",
         dv01_foreign
     );
+    assert!(dv01_foreign > 0.0, "Foreign DV01 should be positive");
 }
 
 #[test]
@@ -147,11 +161,23 @@ fn test_ir01_sensitivity_scales_with_tenor() {
     let dates = TestDates::standard();
     let market = setup_standard_market(dates.as_of);
 
-    let swap_1m =
-        create_standard_fx_swap("IR01_1M", dates.near_date, dates.far_date_1m, 1_000_000.0);
+    let swap_1m = create_fx_swap_with_rates(
+        "IR01_1M",
+        dates.near_date,
+        dates.far_date_1m,
+        1_000_000.0,
+        1.10,
+        1.15,
+    );
 
-    let swap_1y =
-        create_standard_fx_swap("IR01_1Y", dates.near_date, dates.far_date_1y, 1_000_000.0);
+    let swap_1y = create_fx_swap_with_rates(
+        "IR01_1Y",
+        dates.near_date,
+        dates.far_date_1y,
+        1_000_000.0,
+        1.10,
+        1.15,
+    );
 
     let result_1m = swap_1m
         .price_with_metrics(
@@ -174,10 +200,46 @@ fn test_ir01_sensitivity_scales_with_tenor() {
     let dv01_1m = result_1m.measures.get("dv01_domestic").unwrap().abs();
     let dv01_1y = result_1y.measures.get("dv01_domestic").unwrap().abs();
 
-    // Both should be non-zero
-    // Note: For FX swaps, DV01 may not scale linearly with tenor due to the swap structure
+    // Independent central-bump value of the two fixed quote-currency flows.
+    let domestic = market.get_discount("USD-OIS").expect("domestic curve");
+    let expected = |far_date| {
+        let day_count = domestic.day_count();
+        let dc_context = finstack_quant_core::dates::DayCountContext::default();
+        let t_near = day_count
+            .year_fraction(dates.as_of, dates.near_date, dc_context)
+            .expect("near tenor");
+        let t_far = day_count
+            .year_fraction(dates.as_of, far_date, dc_context)
+            .expect("far tenor");
+        let near_df = domestic
+            .df_between_dates(dates.as_of, dates.near_date)
+            .expect("near DF");
+        let far_df = domestic
+            .df_between_dates(dates.as_of, far_date)
+            .expect("far DF");
+        (1_000_000.0 * 1.10 * near_df * (0.0001 * t_near).sinh()
+            - 1_000_000.0 * 1.15 * far_df * (0.0001 * t_far).sinh())
+        .abs()
+    };
+    approx_eq(
+        dv01_1m,
+        expected(dates.far_date_1m),
+        1e-7,
+        "1M domestic DV01",
+    );
+    approx_eq(
+        dv01_1y,
+        expected(dates.far_date_1y),
+        1e-7,
+        "1Y domestic DV01",
+    );
+
     assert!(dv01_1m > 1e-10, "1M DV01 should be non-zero");
     assert!(dv01_1y > 1e-10, "1Y DV01 should be non-zero");
+    assert!(
+        dv01_1y > 10.0 * dv01_1m,
+        "1Y fixed far receipt should carry much more domestic rate risk"
+    );
 }
 
 #[test]
@@ -199,9 +261,13 @@ fn test_fx01_calculation() {
 
     let fx01 = *result.measures.get("fx01").unwrap();
 
-    // FX01 should be finite. For a par swap with model-derived forward,
-    // the FX01 can be positive (spot increase benefits foreign leg).
+    // Omitted rates re-resolve to fair outright forwards after the spot bump,
+    // preserving par value. Explicit-rate exposure is tested below.
     assert!(fx01.is_finite(), "FX01 should be finite, got: {}", fx01);
+    assert!(
+        fx01.abs() < 1e-8,
+        "Market-default swap remains par after spot changes"
+    );
 }
 
 #[test]
@@ -210,11 +276,23 @@ fn test_fx01_scales_with_notional() {
     let dates = TestDates::standard();
     let market = setup_standard_market(dates.as_of);
 
-    let swap_1m =
-        create_standard_fx_swap("FX01_1M", dates.near_date, dates.far_date_1y, 1_000_000.0);
+    let swap_1m = create_fx_swap_with_rates(
+        "FX01_1M",
+        dates.near_date,
+        dates.far_date_1y,
+        1_000_000.0,
+        1.10,
+        1.15,
+    );
 
-    let swap_5m =
-        create_standard_fx_swap("FX01_5M", dates.near_date, dates.far_date_1y, 5_000_000.0);
+    let swap_5m = create_fx_swap_with_rates(
+        "FX01_5M",
+        dates.near_date,
+        dates.far_date_1y,
+        5_000_000.0,
+        1.10,
+        1.15,
+    );
 
     let result_1m = swap_1m
         .price_with_metrics(
@@ -237,12 +315,29 @@ fn test_fx01_scales_with_notional() {
     let fx01_1m = *result_1m.measures.get("fx01").unwrap();
     let fx01_5m = *result_5m.measures.get("fx01").unwrap();
 
-    // Both FX01 values should be non-zero and finite
-    // The relationship between notional and FX01 is complex due to the swap structure
+    // Contract rates stay fixed, so FX01 is 1% of the foreign-leg PV converted
+    // at spot and scales linearly with base notional.
     assert!(fx01_1m.abs() > 1e-10, "FX01 for 1M should be non-zero");
     assert!(fx01_5m.abs() > 1e-10, "FX01 for 5M should be non-zero");
     assert!(fx01_1m.is_finite(), "FX01 for 1M should be finite");
     assert!(fx01_5m.is_finite(), "FX01 for 5M should be finite");
+    let foreign = market.get_discount("EUR-OIS").expect("foreign curve");
+    let expected = 1_000_000.0
+        * 1.1
+        * 0.01
+        * (foreign
+            .df_between_dates(dates.as_of, dates.near_date)
+            .expect("near DF")
+            - foreign
+                .df_between_dates(dates.as_of, dates.far_date_1y)
+                .expect("far DF"));
+    approx_eq(
+        fx01_1m,
+        expected,
+        1e-7,
+        "FX01 from fixed base-currency cashflows",
+    );
+    approx_eq(fx01_5m, 5.0 * fx01_1m, 1e-7, "FX01 scales with notional");
 }
 
 #[test]

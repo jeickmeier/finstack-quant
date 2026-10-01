@@ -240,12 +240,13 @@ impl PyRateQuote {
     /// rate : float | Rate
     ///     Fixed par rate as a decimal.
     /// spread_decimal : float | None, default None
-    ///     Optional floating-leg spread as a decimal (``0.0010`` = 10 bp).
+    ///     Optional finite floating-leg spread as a decimal (``0.0010`` = 10 bp).
+    ///     ``None`` omits the spread; non-finite numbers are rejected.
     ///
     /// Raises
     /// ------
     /// ValueError
-    ///     If the pillar cannot be parsed or the rate is not finite.
+    ///     If the pillar cannot be parsed or the rate or supplied spread is not finite.
     #[staticmethod]
     #[pyo3(signature = (id, index, pillar, rate, spread_decimal = None))]
     #[pyo3(text_signature = "(id, index, pillar, rate, spread_decimal=None)")]
@@ -264,7 +265,14 @@ impl PyRateQuote {
         fields.insert("rate".into(), Value::from(extract_rate_decimal(rate)?));
         fields.insert(
             "spread_decimal".into(),
-            spread_decimal.map_or(Value::Null, Value::from),
+            spread_decimal
+                .map(|spread| {
+                    serde_json::Number::from_f64(spread)
+                        .map(Value::Number)
+                        .ok_or_else(|| value_error("spread_decimal must be finite"))
+                })
+                .transpose()?
+                .unwrap_or(Value::Null),
         );
         Self::build(fields, "swap")
     }
@@ -1090,20 +1098,23 @@ impl PyCalibrationStep {
     /// currency : str | Currency
     ///     Curve currency.
     /// base_date : datetime.date | str
-    ///     Curve base date.
+    ///     Valuation and calibration-instrument start date. The output curve's
+    ///     reference CPI date is this date minus ``observation_lag``.
     /// discount_curve_id : str
     ///     Discount curve used for swap present values.
     /// index : str
     ///     Inflation index identifier (e.g. ``"USA-CPI-U"``).
     /// observation_lag : str
-    ///     Observation lag tenor (e.g. ``"3M"``).
+    ///     Whole-month observation lag (e.g. ``"3M"``, up to 255 months), or
+    ///     no lag (``""``, ``"none"``, ``"0"``, ``"0M"``, or ``"0D"``).
+    ///     Parsing is case-insensitive. Calibration rejects nonzero day lags.
     /// base_cpi : float
-    ///     CPI level at the base date.
+    ///     Contractual reference CPI at the start date after observation lag and
+    ///     monthly interpolation. Supplied index fixings must reproduce this level.
     /// quotes, quote_set, curve_id
     ///     As in ``discount``.
     /// **params
-    ///     Optional wire fields: ``notional``, ``method``, ``interpolation``,
-    ///     ``seasonal_factors``.
+    ///     Optional wire fields: ``notional``, ``method``, ``interpolation``.
     ///
     /// Raises
     /// ------
@@ -1218,6 +1229,8 @@ impl PyCalibrationStep {
     ///     ``sabr_interpolation``, ``calendar_id``, ``fixed_day_count``,
     ///     ``swap_index``, ``vol_tolerance``,
     ///     ``sabr_extrapolation``, ``allow_sabr_missing_bucket_fallback``.
+    ///     ``target_expiries`` are ACT/365F years from ``base_date``;
+    ///     ``fixed_day_count`` controls coupon accruals only.
     ///
     /// Raises
     /// ------
@@ -1412,27 +1425,35 @@ impl PyCalibrationStep {
     /// id : str
     ///     Step identifier (default quote-set name).
     /// discount_curve_id : str
-    ///     Discounting curve (scalars are written as ``"{discount_curve_id}_CAPFLOOR_HW1F"``).
+    ///     Discounting curve and output-key prefix. Scalar fits write
+    ///     ``"{discount_curve_id}_CAPFLOOR_HW1F_KAPPA"`` and
+    ///     ``"{discount_curve_id}_CAPFLOOR_HW1F_SIGMA"``. Piecewise fits write
+    ///     the same kappa scalar and a sigma series at
+    ///     ``"{discount_curve_id}_CAPFLOOR_HW1F_SIGMA_SCHEDULE"``.
     /// forward_curve_id : str
     ///     Curve projecting the caplet forwards.
+    /// index_id : str
+    ///     Term-rate index identifier (e.g. ``"EUR-EURIBOR-3M"``). Rust derives
+    ///     payment and fixing dates, calendars, accruals, and settlement from its
+    ///     conventions. Overnight indices are rejected by this calibration model.
     /// currency : str | Currency
-    ///     Model currency.
+    ///     Model currency, which must match the index conventions.
     /// base_date : datetime.date | str
     ///     Valuation date.
     /// quotes, quote_set
     ///     As in ``discount``.
     /// **params
     ///     Optional wire fields: ``fixed_kappa``, ``initial_kappa``,
-    ///     ``initial_sigma``, ``payment_frequency``, ``volatility_mode``.
+    ///     ``initial_sigma``, ``volatility_mode``. ``fit_tolerance`` is required.
     ///
     /// Raises
     /// ------
     /// ValueError
     ///     If a field is unknown or has the wrong shape.
     #[staticmethod]
-    #[pyo3(signature = (id, discount_curve_id, forward_curve_id, currency, base_date, quotes = None, quote_set = None, **params))]
+    #[pyo3(signature = (id, discount_curve_id, forward_curve_id, index_id, currency, base_date, quotes = None, quote_set = None, **params))]
     #[pyo3(
-        text_signature = "(id, discount_curve_id, forward_curve_id, currency, base_date, quotes=None, quote_set=None, **params)"
+        text_signature = "(id, discount_curve_id, forward_curve_id, index_id, currency, base_date, quotes=None, quote_set=None, **params)"
     )]
     #[allow(clippy::too_many_arguments)]
     fn cap_floor_hull_white(
@@ -1440,6 +1461,7 @@ impl PyCalibrationStep {
         id: &str,
         discount_curve_id: &str,
         forward_curve_id: &str,
+        index_id: &str,
         currency: &Bound<'_, PyAny>,
         base_date: &Bound<'_, PyAny>,
         quotes: Option<&Bound<'_, PyAny>>,
@@ -1449,6 +1471,7 @@ impl PyCalibrationStep {
         let f = fields(vec![
             ("discount_curve_id", Value::String(discount_curve_id.into())),
             ("forward_curve_id", Value::String(forward_curve_id.into())),
+            ("index_id", Value::String(index_id.into())),
             ("currency", Value::String(currency_code(currency)?)),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
         ]);

@@ -50,6 +50,7 @@ market.fx = {
   quotes: [["EUR", "USD", 1.1]],
   pinned_quotes: [],
   provider_quotes: [],
+  provider_pinned_quotes: [],
 };
 const fx = await read("instruments/json_examples/fx_forward.json");
 const fxSwap = await read("instruments/json_examples/fx_swap.json");

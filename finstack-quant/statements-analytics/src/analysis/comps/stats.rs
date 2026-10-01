@@ -36,7 +36,8 @@ pub struct PeerStats {
 /// single bad observation cannot poison the mean and standard deviation;
 /// `count` reflects the number of finite observations used.
 ///
-/// Returns `None` if no finite values remain. The slice is not modified;
+/// Returns `None` if no finite values remain or a computed statistic is
+/// non-finite. The slice is not modified;
 /// an internal sorted copy is used for percentile computations.
 ///
 /// # Arguments
@@ -62,7 +63,7 @@ pub fn peer_stats(values: &[f64]) -> Option<PeerStats> {
         os.update(v);
     }
 
-    Some(PeerStats {
+    let stats = PeerStats {
         count: n,
         mean: m,
         median,
@@ -72,7 +73,20 @@ pub fn peer_stats(values: &[f64]) -> Option<PeerStats> {
         q1,
         q3,
         iqr: q3 - q1,
-    })
+    };
+    [
+        stats.mean,
+        stats.median,
+        stats.std_dev,
+        stats.min,
+        stats.max,
+        stats.q1,
+        stats.q3,
+        stats.iqr,
+    ]
+    .iter()
+    .all(|value| value.is_finite())
+    .then_some(stats)
 }
 
 /// Percentile rank of `value` within a peer set (0.0 = lowest, 1.0 = highest).
@@ -111,7 +125,7 @@ pub fn percentile_rank(values: &[f64], value: f64) -> Option<f64> {
 /// and standard deviation.
 ///
 /// Returns `None` if fewer than 2 finite values, standard deviation is
-/// zero, or `value` is non-finite.
+/// zero, or an input subject/computed result is non-finite.
 ///
 /// # Arguments
 ///
@@ -132,10 +146,11 @@ pub fn z_score(values: &[f64], value: f64) -> Option<f64> {
         return None;
     }
     let sd = os.std_dev();
-    if sd < 1e-15 {
+    if !sd.is_finite() || sd < 1e-15 {
         return None;
     }
-    Some((value - os.mean()) / sd)
+    let score = (value - os.mean()) / sd;
+    score.is_finite().then_some(score)
 }
 
 /// OLS regression result for fair-value estimation.
@@ -243,5 +258,16 @@ fn percentile_sorted(sorted: &[f64], p: f64) -> f64 {
     } else {
         let frac = rank - lo as f64;
         sorted[lo] * (1.0 - frac) + sorted[hi] * frac
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn finite_extreme_inputs_cannot_return_non_finite_statistics() {
+        assert!(peer_stats(&[-f64::MAX, f64::MAX]).is_none());
+        assert!(z_score(&[-f64::MAX, f64::MAX], 0.0).is_none());
     }
 }

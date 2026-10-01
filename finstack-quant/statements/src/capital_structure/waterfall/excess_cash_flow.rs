@@ -1,41 +1,37 @@
 //! ECF calculation, cash-interest deduction rules, and sweep sizing.
 
-use crate::capital_structure::cashflows::CashflowBreakdown;
-use crate::capital_structure::state::CapitalStructureState;
 use crate::capital_structure::waterfall_spec::EcfSweepSpec;
 use crate::error::Result;
 use crate::evaluator::EvaluationContext;
+use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
-use indexmap::IndexMap;
 
 use super::eval_value_or_formula;
-use super::payment_in_kind::is_pik_enabled;
+
+/// Debt service already paid by priorities ahead of the ECF sweep.
+#[derive(Default)]
+pub(super) struct EcfDeductions {
+    /// Cash interest paid, including carried coupon arrears.
+    pub cash_interest: f64,
+    /// Scheduled principal paid, including carried amortization arrears.
+    pub scheduled_principal: f64,
+    /// Fees paid, including carried fee arrears.
+    pub fees: f64,
+}
 
 /// Calculate Excess Cash Flow and determine sweep amount.
 ///
 /// Per S&P LCD / standard LPA definitions, ECF deducts **cash interest paid**,
 /// not contractual interest. When `ecf_spec.cash_interest_node` is omitted, the
-/// fallback sums contractual cash interest only for instruments that are **not**
-/// in PIK mode for the current period (PIK'd coupons are not paid in cash).
-/// This keeps ECF consistent with the PIK toggle evaluated earlier in the same
-/// waterfall step.
-///
-/// When `deduct_scheduled_principal` is true (scheduled `Amortization` ranks
-/// ahead of the prepayment priority in the waterfall), total scheduled
-/// principal is also deducted from ECF before the sweep percentage is applied,
-/// per the standard LPA ECF definition. Without this deduction the sweep would
-/// double-spend the cash already consumed by scheduled amortization.
-///
-/// Fees paid ahead of the prepayment priority are likewise deducted here so the
-/// sweep amount is computed from post-fee excess cash instead of being reduced
-/// after the sweep percentage has already been applied.
+/// fallback deducts cash interest actually allocated by earlier priorities,
+/// including carried arrears. PIK coupons and unpaid claims consume no cash.
+/// Fees and scheduled principal paid by earlier priorities are also deducted
+/// before applying the sweep percentage. Later priorities reserve no cash.
 pub(super) fn calculate_ecf_sweep(
     context: &EvaluationContext,
     ecf_spec: &EcfSweepSpec,
-    contractual_flows: &IndexMap<String, CashflowBreakdown>,
-    state: &CapitalStructureState,
-    deduct_scheduled_principal: bool,
-    deduct_fees: bool,
+    paid: &EcfDeductions,
+    currency: Currency,
     warnings: &mut Vec<crate::evaluator::EvalWarning>,
 ) -> Result<Money> {
     if !(0.0..=1.0).contains(&ecf_spec.sweep_percentage) {
@@ -71,52 +67,15 @@ pub(super) fn calculate_ecf_sweep(
     let cash_interest = if let Some(ref expr) = ecf_spec.cash_interest_node {
         eval_value_or_formula(context, expr, warnings)?
     } else {
-        contractual_flows
-            .iter()
-            .filter(|(instrument_id, _)| !is_pik_enabled(state, instrument_id))
-            .map(|(_, cf)| cf.interest_expense_cash.amount())
-            .sum()
+        paid.cash_interest
     }
     .max(0.0);
 
-    let scheduled_principal = if deduct_scheduled_principal {
-        contractual_flows
-            .values()
-            .map(|cf| cf.principal_payment.amount().max(0.0))
-            .sum()
-    } else {
-        0.0
-    };
-
-    let fees = if deduct_fees {
-        contractual_flows
-            .values()
-            .map(|cf| cf.fees.amount().max(0.0))
-            .sum()
-    } else {
-        0.0
-    };
-
-    let ecf = ebitda - taxes - capex - wc_change - cash_interest - scheduled_principal - fees;
+    let ecf =
+        ebitda - taxes - capex - wc_change - cash_interest - paid.scheduled_principal - paid.fees;
     let sweep_amount = ecf * ecf_spec.sweep_percentage;
-    let currency = base_currency(contractual_flows)?;
 
     // Every ECF input is finite (`eval_value_or_formula` enforces it), but the
     // arithmetic above can still overflow `Decimal`'s range on extreme inputs.
     super::money_from_expr(sweep_amount.max(0.0), currency, &ecf_spec.ebitda_node)
-}
-
-/// Get base currency from contractual flows (assumes all same currency).
-fn base_currency(
-    flows: &IndexMap<String, CashflowBreakdown>,
-) -> Result<finstack_quant_core::currency::Currency> {
-    flows
-        .values()
-        .next()
-        .map(|cf| cf.interest_expense_cash.currency())
-        .ok_or_else(|| {
-            crate::error::Error::capital_structure(
-                "Cannot determine base currency for ECF sweep: no contractual flows provided",
-            )
-        })
 }

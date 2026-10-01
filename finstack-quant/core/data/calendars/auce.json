@@ -1,17 +1,18 @@
 {
   "id": "auce",
-  "name": "Australia (Commonwealth) Holiday Calendar",
+  "name": "Australia (Sydney / New South Wales) Banking Holidays",
   "ignore_weekends": false,
   "rules": [
     { "type": "fixed", "name": "New Year's Day", "month": "january", "day": 1, "observed": "next_monday" },
-    { "type": "weekday_shift", "name": "Australia Day", "weekday": "monday", "month": "january", "day": 26, "dir": "after" },
+    { "type": "fixed", "name": "Australia Day", "month": "january", "day": 26, "observed": "next_monday" },
     { "type": "easter_offset", "name": "Good Friday", "days": -3 },
     { "type": "easter_offset", "name": "Easter Monday", "days": 0 },
     { "type": "fixed", "name": "ANZAC Day", "month": "april", "day": 25 },
     { "type": "nth_weekday", "name": "King's Birthday", "n": 2, "weekday": "monday", "month": "june" },
     { "type": "nth_weekday", "name": "Bank Holiday", "n": 1, "weekday": "monday", "month": "august" },
     { "type": "nth_weekday", "name": "Labour Day", "n": 1, "weekday": "monday", "month": "october" },
-    { "type": "fixed", "name": "Christmas Day", "month": "december", "day": 25, "observed": "next_monday" },
-    { "type": "fixed", "name": "Boxing Day", "month": "december", "day": 26, "observed": "next_monday" }
-  ]
+    { "type": "fixed", "name": "Christmas Day", "month": "december", "day": 25, "observed": "mon_if_sat_tue_if_sun" },
+    { "type": "fixed", "name": "Boxing Day", "month": "december", "day": 26, "observed": "mon_if_sat_tue_if_sun" }
+  ],
+  "notes": "Sydney/NSW banking calendar, including the August bank holiday and October Labour Day. It is not a universal Australian state or ASX trading calendar. Modern Australia Day observance is January 26, Mondayized only on weekends; exceptional historical notices require dated maintenance."
 }

@@ -2,13 +2,23 @@
   "instrumentSource": "finstack-quant/valuations/tests/instruments/json_examples/structured_credit.json",
   "instrumentSha256": "3edd86cb88dcd3d1c3f84597475eda01bc79e384690c23475266f57217da4b59",
   "marketSource": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-  "marketSha256": "d9f52e6d4012bf12e4eafca7b4b031a58c21cca9d8543467b80e2ae86d380474",
+  "marketSha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
   "asOf": "2024-01-01",
   "trancheId": "CLONOTES-A",
   "grid": {
-    "cprs": [0, 0.05, 0.15],
-    "cdrs": [0, 0.03],
-    "severities": [0.2, 0.6],
+    "cprs": [
+      0,
+      0.05,
+      0.15
+    ],
+    "cdrs": [
+      0,
+      0.03
+    ],
+    "severities": [
+      0.2,
+      0.6
+    ],
     "recovery_lag": null
   },
   "cases": [

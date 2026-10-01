@@ -1,6 +1,6 @@
 //! Finite-difference and repricing utilities for portfolio sensitivities.
 //!
-use crate::dependencies::{flatten_dependencies, MarketFactorKey};
+use crate::dependencies::{resolved_dependencies, MarketFactorKey};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::{CurveStorage, MarketContext};
@@ -72,8 +72,10 @@ fn exact_curve_key(market: &MarketContext, curve_id: &CurveId) -> Option<MarketF
         CurveStorage::Forward(_) => RatesCurveKind::Forward,
         CurveStorage::Hazard(_) => RatesCurveKind::Credit,
         CurveStorage::Inflation(_) => RatesCurveKind::Inflation,
-        CurveStorage::BaseCorrelation(_)
-        | CurveStorage::Price(_)
+        CurveStorage::BaseCorrelation(_) => {
+            return Some(MarketFactorKey::BaseCorrelation(curve_id.clone()));
+        }
+        CurveStorage::Price(_)
         | CurveStorage::VolIndex(_)
         | CurveStorage::BasisSpread(_)
         | CurveStorage::Parametric(_) => return None,
@@ -156,7 +158,7 @@ impl FactorRepricingPlan {
                 instrument
                     .market_dependencies()
                     .ok()
-                    .map(|dependencies| flatten_dependencies(&dependencies))
+                    .and_then(|dependencies| resolved_dependencies(&dependencies, market).ok())
             })
             .collect();
 
@@ -248,11 +250,18 @@ pub trait FactorSensitivityEngine: Send + Sync {
     ///
     /// # Arguments
     ///
-    /// * `positions` - `(id, instrument, weight)` rows in matrix order.
+    /// * `positions` - `(id, instrument, weight)` rows in matrix order. Weights
+    ///   are finite signed unit multipliers applied to base-currency deltas.
     /// * `factors` - Factor definitions that select the market bumps.
     /// * `market` - Unbumped market snapshot; engines bump it per factor.
     /// * `as_of` - Valuation date for pricing and spot FX lookup.
     /// * `base_currency` - Reporting currency for every converted PV.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for a non-finite weight, bumped PV, or final
+    /// weighted sensitivity. Propagates bump construction, pricing, and spot
+    /// FX lookup failures.
     fn compute_sensitivities(
         &self,
         positions: &[(String, &dyn Instrument, f64)],

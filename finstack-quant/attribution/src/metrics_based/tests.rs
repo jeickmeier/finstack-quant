@@ -538,7 +538,7 @@ fn test_metrics_based_rates_bucketed_dv01() {
     let market_t1 = MarketContext::new().insert(make_flat_curve("USD-OIS", as_of_t1, 0.0201));
 
     let mut measures_t0 = IndexMap::new();
-    measures_t0.insert(MetricId::custom("bucketed_dv01::USD-OIS"), -400.0);
+    measures_t0.insert(MetricId::custom("bucketed_dv01::USD-OIS::5y"), -400.0);
 
     let val_t0 = ValuationResult::stamped_with_meta(
         "TEST-RATES",
@@ -700,114 +700,355 @@ fn test_metric_id_new_variants() {
 }
 
 #[test]
-fn test_extract_bucketed_dv01_per_curve() {
+fn keyrates_preserve_nonstandard_and_fractional_coordinates() {
     use finstack_quant_core::types::CurveId;
-
-    // Test with explicit per-curve keys
-    let mut measures = IndexMap::new();
-    measures.insert(MetricId::custom("bucketed_dv01::USD-OIS"), -100.0);
-    measures.insert(MetricId::custom("bucketed_dv01::USD-SOFR"), -50.0);
-    measures.insert(MetricId::custom("bucketed_dv01::EUR-OIS"), -75.0);
-
-    let curve_ids = vec![
-        CurveId::new("USD-OIS"),
-        CurveId::new("USD-SOFR"),
-        CurveId::new("EUR-OIS"),
-    ];
-
-    let bucketed = extract_bucketed_dv01_per_curve(&measures, &curve_ids);
-
-    assert_eq!(bucketed.len(), 3);
-    assert_eq!(bucketed.get(&CurveId::new("USD-OIS")), Some(&-100.0));
-    assert_eq!(bucketed.get(&CurveId::new("USD-SOFR")), Some(&-50.0));
-    assert_eq!(bucketed.get(&CurveId::new("EUR-OIS")), Some(&-75.0));
+    let measures = IndexMap::from([
+        (MetricId::custom("bucketed_dv01::USD-OIS::1.4y"), -10.0),
+        (MetricId::custom("bucketed_dv01::USD-OIS::4y"), -40.0),
+        (MetricId::custom("bucketed_dv01::USD-OIS::9y"), -90.0),
+    ]);
+    let curves = [CurveId::new("USD-OIS")];
+    let result = extract_keyrate_per_curve(&measures, &curves, "bucketed_dv01")
+        .expect("all supplied coordinates are canonical");
+    assert_eq!(
+        result[&curves[0]],
+        [(1.4, -10.0), (4.0, -40.0), (9.0, -90.0)]
+    );
 }
 
 #[test]
-fn test_extract_bucketed_dv01_single_curve() {
+fn keyrates_reject_partial_declared_curve_coverage() {
     use finstack_quant_core::types::CurveId;
-
-    // Test with single curve using base key
-    let mut measures = IndexMap::new();
-    measures.insert(MetricId::custom("bucketed_dv01"), -250.0);
-
-    let curve_ids = vec![CurveId::new("USD-OIS")];
-
-    let bucketed = extract_bucketed_dv01_per_curve(&measures, &curve_ids);
-
-    assert_eq!(bucketed.len(), 1);
-    assert_eq!(bucketed.get(&CurveId::new("USD-OIS")), Some(&-250.0));
-}
-
-/// Audit Major (shifts.rs): the producer NEVER emits a `bucketed_dv01::{curve}`
-/// per-curve total — it flattens per-tenor keys `bucketed_dv01::{curve}::{label}`
-/// plus a scalar `bucketed_dv01` total. With only the real producer shape
-/// present, the per-curve extraction must derive the total by summing the
-/// per-tenor keys.
-#[test]
-fn test_extract_bucketed_dv01_sums_per_tenor_keys_when_direct_key_absent() {
-    use finstack_quant_core::types::CurveId;
-
-    // Real producer shape: ONLY per-tenor keys, no "bucketed_dv01::USD-OIS".
-    let mut measures = IndexMap::new();
-    measures.insert(MetricId::custom("bucketed_dv01::USD-OIS::5y"), -100.0);
-    measures.insert(MetricId::custom("bucketed_dv01::USD-OIS::10y"), -200.0);
-    measures.insert(MetricId::custom("bucketed_dv01::USD-OIS::30y"), -50.0);
-
-    let curve_ids = vec![CurveId::new("USD-OIS")];
-    let bucketed = extract_bucketed_dv01_per_curve(&measures, &curve_ids);
-
-    assert_eq!(bucketed.len(), 1);
-    assert_eq!(bucketed.get(&CurveId::new("USD-OIS")), Some(&-350.0));
-
-    // The direct per-curve key, when present, wins over the per-tenor sum
-    // (backward compatibility).
-    let mut measures_direct = IndexMap::new();
-    measures_direct.insert(MetricId::custom("bucketed_dv01::USD-OIS"), -999.0);
-    measures_direct.insert(MetricId::custom("bucketed_dv01::USD-OIS::5y"), -100.0);
-    let bucketed_direct = extract_bucketed_dv01_per_curve(&measures_direct, &curve_ids);
-    assert_eq!(bucketed_direct.get(&CurveId::new("USD-OIS")), Some(&-999.0));
-
-    // Pattern 2 (scalar `bucketed_dv01` total attributed to the single curve)
-    // must fire for a curve declared as BOTH discount and projection: the
-    // deduped `rates_curve_ids` has length 1, so the single-curve branch is
-    // reachable (before the dedup fix the list had length 2 and it was not).
-    let mut measures_scalar = IndexMap::new();
-    measures_scalar.insert(MetricId::custom("bucketed_dv01"), -250.0);
-    let deduped_single = vec![CurveId::new("USD-OIS")];
-    let bucketed_scalar = extract_bucketed_dv01_per_curve(&measures_scalar, &deduped_single);
-    assert_eq!(bucketed_scalar.get(&CurveId::new("USD-OIS")), Some(&-250.0));
+    let measures = IndexMap::from([(MetricId::custom("bucketed_dv01::USD-OIS::5y"), -100.0)]);
+    let curves = [CurveId::new("USD-OIS"), CurveId::new("USD-SOFR")];
+    let error = extract_keyrate_per_curve(&measures, &curves, "bucketed_dv01")
+        .expect_err("one recognized curve cannot make an incomplete family valid");
+    assert!(error.to_string().contains("USD-SOFR"));
 }
 
 #[test]
-fn test_extract_bucketed_dv01_empty() {
+fn keyrates_reject_unknown_and_duplicate_coordinates() {
     use finstack_quant_core::types::CurveId;
-
-    // Test with no bucketed metrics
-    let measures = IndexMap::new();
-    let curve_ids = vec![CurveId::new("USD-OIS")];
-
-    let bucketed = extract_bucketed_dv01_per_curve(&measures, &curve_ids);
-
-    assert_eq!(bucketed.len(), 0);
+    let curves = [CurveId::new("USD-OIS")];
+    for labels in [["5y", "unrecognized"], ["1y", "12m"]] {
+        let measures = labels
+            .into_iter()
+            .map(|label| {
+                (
+                    MetricId::custom(format!("bucketed_dv01::USD-OIS::{label}")),
+                    -1.0,
+                )
+            })
+            .collect();
+        assert!(extract_keyrate_per_curve(&measures, &curves, "bucketed_dv01").is_err());
+    }
 }
 
 #[test]
-fn test_extract_bucketed_dv01_partial_coverage() {
+fn credit_nonstandard_buckets_all_contribute_to_public_attribution() {
+    use finstack_quant_core::market_data::term_structures::HazardCurve;
+    let date = date!(2025 - 01 - 15);
+    let instrument: Arc<dyn Instrument> = Arc::new(CreditCurvesTestInstrument::new(
+        "NONSTANDARD-CREDIT",
+        Money::from((100_000_i64, Currency::USD)),
+        &["HZ"],
+    ));
+    let hazard = |spread| {
+        HazardCurve::builder("HZ")
+            .base_date(date)
+            .recovery_rate(0.4)
+            .knots([(1.0, 0.02), (4.0, 0.02), (9.0, 0.02)])
+            .par_spreads([(1.0, spread), (4.0, spread), (9.0, spread)])
+            .build()
+            .expect("hazard fixture")
+    };
+    let opening = MarketContext::new().insert(hazard(100.0));
+    let closing = MarketContext::new().insert(hazard(110.0));
+    let measures = IndexMap::from([
+        (MetricId::custom("bucketed_cs01::HZ::1y"), -1.0),
+        (MetricId::custom("bucketed_cs01::HZ::4y"), -40.0),
+        (MetricId::custom("bucketed_cs01::HZ::9y"), -90.0),
+        (MetricId::Cs01, -131.0),
+    ]);
+    let val_t0 = ValuationResult::stamped(
+        instrument.id(),
+        date,
+        Money::from((100_000_i64, Currency::USD)),
+    )
+    .with_measures(measures);
+    let val_t1 = ValuationResult::stamped(
+        instrument.id(),
+        date,
+        Money::from((98_690_i64, Currency::USD)),
+    );
+    let result = attribute_pnl_metrics_based(
+        &instrument,
+        &opening,
+        &closing,
+        &val_t0,
+        &val_t1,
+        date,
+        date,
+    )
+    .expect("all three supplied credit coordinates are measurable");
+    assert!((result.credit_curves_pnl.amount() + 1_310.0).abs() < 1e-8);
+    assert!(result.residual.amount().abs() < 1e-8);
+    assert!(!result.result_invalid);
+}
+
+fn exact_credit_recipe_curve(
+    base: Date,
+    quotes: &[(Date, &str, f64)],
+) -> finstack_quant_core::market_data::term_structures::HazardCurve {
+    use finstack_quant_calibration::api::schema::HazardCurveParams;
+    use finstack_quant_calibration::quotes::{
+        cds::CdsQuote,
+        ids::{Pillar, QuoteId},
+    };
+    use finstack_quant_calibration::CalibrationMethod;
+    use finstack_quant_core::dates::DayCountContext;
+    use finstack_quant_core::market_data::term_structures::{
+        HazardCalibrationInput, HazardCalibrationRecipe, HazardCurve, ParInterp, Seniority,
+    };
     use finstack_quant_core::types::CurveId;
+    use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
+    let convention = CdsConventionKey {
+        currency: Currency::USD,
+        doc_clause: CdsDocClause::IsdaNa,
+    };
+    let day_count =
+        finstack_quant_valuations::market::conventions::ConventionRegistry::try_global()
+            .expect("convention registry")
+            .resolve_cds(&convention)
+            .expect("USD ISDA-NA conventions")
+            .day_count;
+    let inputs: Vec<_> = quotes
+        .iter()
+        .map(|(date, id, spread)| {
+            let quote = CdsQuote::CdsParSpread {
+                id: QuoteId::new(*id),
+                entity: "ENTITY".into(),
+                convention: convention.clone(),
+                pillar: Pillar::Date(*date),
+                spread_bp: *spread,
+                recovery_rate: 0.4,
+            };
+            HazardCalibrationInput {
+                quote: serde_json::to_value(quote).expect("quote serialization"),
+                pillar_date: *date,
+                pillar_time: day_count
+                    .year_fraction(base, *date, DayCountContext::default())
+                    .expect("pillar time"),
+            }
+        })
+        .collect();
+    let params = HazardCurveParams {
+        curve_id: CurveId::new("HZ"),
+        entity: "ENTITY".into(),
+        seniority: Seniority::Senior,
+        currency: Currency::USD,
+        base_date: base,
+        discount_curve_id: CurveId::new("D"),
+        recovery_rate: 0.4,
+        notional: 1.0,
+        method: CalibrationMethod::Bootstrap,
+        interpolation: InterpStyle::LogLinear,
+        par_interp: ParInterp::Linear,
+        doc_clause: Some("isda_na".into()),
+        cds_valuation_convention: None,
+    };
+    let recipe = HazardCalibrationRecipe::new(
+        serde_json::to_value(params).expect("parameters"),
+        inputs.clone(),
+        inputs.clone(),
+        serde_json::to_value(finstack_quant_calibration::CalibrationConfig::default())
+            .expect("policy"),
+    )
+    .expect("complete replay contract");
+    HazardCurve::builder("HZ")
+        .base_date(base)
+        .day_count(day_count)
+        .recovery_rate(0.4)
+        .knots(inputs.iter().map(|input| (input.pillar_time, 0.02)))
+        .hazard_calibration(recipe)
+        .build()
+        .expect("recipe fixture")
+}
 
-    // Test with some curves having bucketed metrics and others not
-    let mut measures = IndexMap::new();
-    measures.insert(MetricId::custom("bucketed_dv01::USD-OIS"), -100.0);
-    // USD-SOFR is missing
+#[test]
+fn credit_duplicate_display_labels_match_exact_quote_id_and_pillar() {
+    use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
+    use finstack_quant_core::types::CurveId;
+    use finstack_quant_valuations::recalibration::RecalibrationProvider;
+    let base = date!(2025 - 01 - 15);
+    let first = date!(2026 - 03 - 20);
+    let second = date!(2026 - 06 - 20);
+    let source =
+        exact_credit_recipe_curve(base, &[(first, "FIRST", 100.0), (second, "SECOND", 200.0)]);
+    let provider = CachedRecalibrationProvider::new();
+    let coordinates = provider
+        .hazard_spread_risk_buckets(&source)
+        .expect("typed coordinates");
+    let labels: Vec<_> = coordinates
+        .iter()
+        .map(|bucket| bucket.get_metric_label(&coordinates))
+        .collect();
+    assert!(labels.iter().all(|label| label.starts_with("1y@")));
+    let measures = IndexMap::from([
+        (
+            MetricId::custom(format!("bucketed_cs01::HZ::{}", labels[0])),
+            -1.0,
+        ),
+        (
+            MetricId::custom(format!("bucketed_cs01::HZ::{}", labels[1])),
+            -40.0,
+        ),
+    ]);
+    let opening = MarketContext::new().insert(source);
+    let closing = MarketContext::new().insert(exact_credit_recipe_curve(
+        base,
+        &[(first, "FIRST", 110.0), (second, "SECOND", 220.0)],
+    ));
+    let curves = [CurveId::new("HZ")];
+    let matched = extract_credit_keyrates(&measures, &curves, &opening, &closing, &provider)
+        .expect("exact identities match");
+    let result = &matched[&curves[0]];
+    assert_eq!(
+        result
+            .iter()
+            .map(|bucket| bucket.quote_index)
+            .collect::<Vec<_>>(),
+        [Some(0), Some(1)]
+    );
+    assert_eq!(
+        result
+            .iter()
+            .map(|bucket| bucket.move_bp)
+            .collect::<Vec<_>>(),
+        [10.0, 20.0]
+    );
+    assert_eq!(
+        result
+            .iter()
+            .map(|bucket| bucket.tenor_years)
+            .collect::<Vec<_>>(),
+        coordinates
+            .iter()
+            .map(|bucket| bucket.pillar_time)
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        (result
+            .iter()
+            .map(|bucket| bucket.sensitivity * bucket.move_bp)
+            .sum::<f64>()
+            + 810.0)
+            .abs()
+            < 1e-10
+    );
 
-    let curve_ids = vec![CurveId::new("USD-OIS"), CurveId::new("USD-SOFR")];
+    let instrument: Arc<dyn Instrument> = Arc::new(CreditCurvesTestInstrument::new(
+        "EXACT-CREDIT",
+        Money::from((100_000_i64, Currency::USD)),
+        &["HZ"],
+    ));
+    let valuation_t0 = ValuationResult::stamped(
+        instrument.id(),
+        base,
+        Money::from((100_000_i64, Currency::USD)),
+    )
+    .with_measures(measures.clone());
+    let valuation_t1 = ValuationResult::stamped(
+        instrument.id(),
+        base,
+        Money::from((99_190_i64, Currency::USD)),
+    );
+    let attribution = attribute_pnl_metrics_based(
+        &instrument,
+        &opening,
+        &closing,
+        &valuation_t0,
+        &valuation_t1,
+        base,
+        base,
+    )
+    .expect("exact quote-space risks reach public attribution");
+    assert!((attribution.credit_curves_pnl.amount() + 810.0).abs() < 1e-10);
+    assert!(attribution.residual.amount().abs() < 1e-10);
+    assert!(!attribution.result_invalid);
 
-    let bucketed = extract_bucketed_dv01_per_curve(&measures, &curve_ids);
+    let mut incomplete = measures.clone();
+    incomplete.shift_remove_index(1);
+    assert!(extract_credit_keyrates(&incomplete, &curves, &opening, &closing, &provider).is_err());
+    let wrong_id = MarketContext::new().insert(exact_credit_recipe_curve(
+        base,
+        &[(first, "FIRST", 110.0), (second, "OTHER", 220.0)],
+    ));
+    assert!(extract_credit_keyrates(&measures, &curves, &opening, &wrong_id, &provider).is_err());
+    let wrong_pillar = MarketContext::new().insert(exact_credit_recipe_curve(
+        base,
+        &[
+            (first, "FIRST", 110.0),
+            (date!(2026 - 09 - 20), "SECOND", 220.0),
+        ],
+    ));
+    assert!(
+        extract_credit_keyrates(&measures, &curves, &opening, &wrong_pillar, &provider).is_err()
+    );
+}
 
-    assert_eq!(bucketed.len(), 1);
-    assert_eq!(bucketed.get(&CurveId::new("USD-OIS")), Some(&-100.0));
-    assert_eq!(bucketed.get(&CurveId::new("USD-SOFR")), None);
+#[test]
+fn credit_rejects_invalid_serialized_closing_pillar() {
+    use finstack_quant_calibration::quotes::ids::Pillar;
+    use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
+    use finstack_quant_core::market_data::term_structures::HazardCurve;
+    use finstack_quant_core::types::CurveId;
+    use finstack_quant_valuations::recalibration::RecalibrationProvider;
+
+    let base = date!(2025 - 01 - 15);
+    let pillar = date!(2026 - 03 - 20);
+    let opening_curve = exact_credit_recipe_curve(base, &[(pillar, "QUOTE", 100.0)]);
+    let closing_curve = exact_credit_recipe_curve(base, &[(pillar, "QUOTE", 110.0)]);
+    let provider = CachedRecalibrationProvider::new();
+    let buckets = provider
+        .hazard_spread_risk_buckets(&opening_curve)
+        .expect("opening quote binding");
+    let label = buckets[0].get_metric_label(&buckets);
+    let measures = IndexMap::from([(
+        MetricId::custom(format!("bucketed_cs01::HZ::{label}")),
+        -1.0,
+    )]);
+
+    // Stored coordinates still match the opening quote, but the typed closing
+    // quote now resolves to another contractual date. Core storage validation
+    // cannot interpret the calibration-owned quote payload.
+    let mut recipe = closing_curve
+        .hazard_calibration()
+        .expect("closing recipe")
+        .clone();
+    recipe.spread_risk_inputs[0].quote["pillar"] =
+        serde_json::to_value(Pillar::Date(date!(2026 - 06 - 20))).expect("pillar payload");
+    assert!(recipe.validate().is_ok());
+    let invalid_closing = HazardCurve::builder("HZ")
+        .base_date(base)
+        .day_count(closing_curve.day_count())
+        .recovery_rate(0.4)
+        .knots(closing_curve.knot_points())
+        .hazard_calibration(recipe)
+        .build()
+        .expect("core stores the opaque payload");
+    let opening = MarketContext::new().insert(opening_curve);
+    let closing = MarketContext::new().insert(invalid_closing);
+    let error = extract_credit_keyrates(
+        &measures,
+        &[CurveId::new("HZ")],
+        &opening,
+        &closing,
+        &provider,
+    )
+    .err()
+    .expect("typed closing replay binding must be validated");
+    assert!(error.to_string().contains("not stored pillar"), "{error}");
 }
 
 /// `Vanna` (∂²V/∂S_abs∂σ, per unit spot per vol point) must NOT be used as
@@ -1382,10 +1623,10 @@ impl Instrument for CreditCurvesTestInstrument {
 /// unconditionally set `credit_has_data = true` — when every keyrate curve is
 /// skipped (shift unmeasurable), the aggregate `Cs01 × avg(Δs)` fallback must
 /// still run. Fixture: MISSING-HAZ carries per-tenor CS01 but is absent from
-/// both markets; ACME-HAZ has no per-tenor CS01 but measurably widened, and an
-/// aggregate Cs01 is present → credit P&L must use the aggregate fallback.
+/// Missing supplied bucket endpoints must fail instead of silently taking
+/// aggregate CS01 on a different subset of the declared credit curves.
 #[test]
-fn test_credit_aggregate_fallback_when_all_keyrate_curves_unmeasurable() {
+fn credit_rejects_unmeasurable_supplied_keyrate_curves() {
     use finstack_quant_core::market_data::term_structures::HazardCurve;
 
     let as_of_t0 = date!(2025 - 01 - 15);
@@ -1412,15 +1653,6 @@ fn test_credit_aggregate_fallback_when_all_keyrate_curves_unmeasurable() {
     let market_t0 = MarketContext::new().insert(hazard(as_of_t0, 0.02));
     let market_t1 = MarketContext::new().insert(hazard(as_of_t1, 0.03));
 
-    let expected_shift_bp = measure_credit_curve_shift(
-        "ACME-HAZ",
-        &market_t0,
-        &market_t1,
-        TenorSamplingMethod::Standard,
-    )
-    .expect("ACME-HAZ shift should be measurable");
-    assert!(expected_shift_bp > 0.0);
-
     let aggregate_cs01 = -50.0_f64;
     let mut measures_t0 = IndexMap::new();
     measures_t0.insert(MetricId::custom("bucketed_cs01::MISSING-HAZ::5y"), -30.0);
@@ -1440,7 +1672,7 @@ fn test_credit_aggregate_fallback_when_all_keyrate_curves_unmeasurable() {
         meta,
     );
 
-    let attribution = attribute_pnl_metrics_based(
+    let error = attribute_pnl_metrics_based(
         &instrument,
         &market_t0,
         &market_t1,
@@ -1449,28 +1681,8 @@ fn test_credit_aggregate_fallback_when_all_keyrate_curves_unmeasurable() {
         as_of_t0,
         as_of_t1,
     )
-    .expect("metrics-based attribution should succeed");
-
-    let credit_pnl = attribution.credit_curves_pnl.amount();
-    let expected_pnl = aggregate_cs01 * expected_shift_bp;
-    assert!(
-        credit_pnl != 0.0,
-        "aggregate Cs01 fallback must run when every keyrate curve was skipped; got 0"
-    );
-    assert!(
-        (credit_pnl - expected_pnl).abs() < 1e-9,
-        "credit P&L must be Cs01 × avg shift = {expected_pnl}; got {credit_pnl}"
-    );
-    // Skipped keyrate curves must be visible in the notes.
-    assert!(
-        attribution
-            .meta
-            .notes
-            .iter()
-            .any(|n| n.contains("MISSING-HAZ")),
-        "skipped keyrate credit curve must be noted; notes: {:?}",
-        attribution.meta.notes
-    );
+    .expect_err("missing supplied credit curve cannot be attributed");
+    assert!(error.to_string().contains("MISSING-HAZ"));
 }
 
 /// Test instrument declaring TWO spot (market-scalar) dependencies, in

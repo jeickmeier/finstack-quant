@@ -3,14 +3,14 @@ import { basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import prettier from "prettier";
 import { isDeepStrictEqual } from "node:util";
-import { withoutMetadata } from "./registry-metadata.mjs";
+import { wasmVersion, withoutMetadata } from "./registry-metadata.mjs";
 
 import ts from "typescript";
 import { shadcnItems } from "./shadcn.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const read = (path) => readFile(`${root}${path}`, "utf8").then(JSON.parse);
-const { registryWasmVersion } = await read("package.json");
+const wasm = `finstack-quant-wasm@${await wasmVersion(root)}`;
 const roots = await read("src/generated/roots.json");
 const modules = new Set(await readdir(`${root}src/generated/instrument`));
 const file = (path) => ({
@@ -76,7 +76,7 @@ const items = [
       "big.js@7.0.1",
       "@tanstack/react-table@9.2.4",
       "@types/big.js@6.2.2",
-      `finstack-quant-wasm@${registryWasmVersion}`,
+      wasm,
     ],
   ),
   item(
@@ -101,12 +101,7 @@ const items = [
     "contract-provenance.json",
   ]),
   item("finstack-views", ["views.ts", "generated/curve-views.json"]),
-  item(
-    "finstack-host",
-    ["host.ts"],
-    ["finstack-codec"],
-    [`finstack-quant-wasm@${registryWasmVersion}`],
-  ),
+  item("finstack-host", ["host.ts"], ["finstack-codec"], [wasm]),
 ];
 for (const entry of items) {
   const stock = new Set();

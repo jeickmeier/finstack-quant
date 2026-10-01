@@ -116,7 +116,8 @@ fn imm_roll_rule_pins_third_wednesday_grid() {
             d(2025, 1, 15),
             d(2025, 3, 19),
             d(2025, 6, 18),
-            d(2025, 9, 17)
+            d(2025, 9, 17),
+            d(2025, 12, 17)
         ],
         "IMM grid starts with the contractual start then third Wednesdays"
     );
@@ -126,11 +127,153 @@ fn imm_roll_rule_pins_third_wednesday_grid() {
             d(2025, 3, 19),
             d(2025, 6, 18),
             d(2025, 9, 17),
-            d(2025, 12, 17)
+            d(2025, 12, 17),
+            d(2025, 12, 31)
         ]
     );
     for period in &periods {
         assert_eq!(period.payment_date, period.accrual_end);
+    }
+}
+
+fn fixed_schedule(
+    start: Date,
+    end: Date,
+    params: ScheduleParams,
+    payment_window: Option<(Date, CouponType)>,
+) -> CashFlowSchedule {
+    let mut builder = CashFlowSchedule::builder();
+    let _ = builder
+        .principal(
+            Money::new(1_000_000.0, Currency::USD).expect("money"),
+            start,
+            end,
+        )
+        .fixed_cf(FixedCouponSpec {
+            coupon_type: CouponType::Cash,
+            rate: Decimal::new(5, 2),
+            schedule: params,
+        });
+    if let Some((window_start, split)) = payment_window {
+        let _ = builder.add_payment_window(window_start, end, split);
+    }
+    builder.build(None).expect("coupon schedule")
+}
+
+fn coupon_total(schedule: &CashFlowSchedule) -> f64 {
+    schedule
+        .get_flows()
+        .iter()
+        .filter(|flow| matches!(flow.kind, CFKind::Fixed | CFKind::Stub))
+        .map(|flow| flow.amount.amount())
+        .sum()
+}
+
+#[test]
+fn imm_coupons_accrue_through_off_grid_maturity() {
+    let mut params = ScheduleParams::quarterly_act360();
+    params.roll_rule = RollRule::Imm;
+    params.business_day_convention = BusinessDayConvention::Unadjusted;
+    for (start, end) in [
+        (d(2025, 1, 15), d(2025, 12, 31)),
+        // A coupon horizon need not contain a futures roll at all.
+        (d(2025, 10, 1), d(2025, 11, 1)),
+    ] {
+        let schedule = fixed_schedule(start, end, params.clone(), None);
+        let expected = 1_000_000.0 * 0.05 * (end - start).whole_days() as f64 / 360.0;
+        assert!((coupon_total(&schedule) - expected).abs() < 1e-8);
+        let coupons: Vec<_> = schedule
+            .get_flows()
+            .iter()
+            .filter(|flow| matches!(flow.kind, CFKind::Fixed | CFKind::Stub))
+            .collect();
+        assert_eq!(
+            coupons
+                .last()
+                .expect("terminal coupon")
+                .accrual
+                .as_ref()
+                .expect("accrual")
+                .end,
+            end
+        );
+        if coupons.len() > 2 {
+            assert!(coupons[1..coupons.len() - 1]
+                .iter()
+                .all(|flow| flow.kind == CFKind::Fixed));
+        }
+    }
+}
+
+#[test]
+fn cds_interior_payment_windows_never_repeat_front_accrual() {
+    let start = d(2024, 3, 20);
+    let end = d(2024, 12, 20);
+    let switch = d(2024, 6, 10);
+    for day_count in [DayCount::Act360, DayCount::ActActIsma] {
+        let mut params = ScheduleParams::quarterly_act360();
+        params.roll_rule = RollRule::CdsImm;
+        params.day_count = day_count;
+        params.business_day_convention = BusinessDayConvention::Unadjusted;
+        let baseline = fixed_schedule(start, end, params.clone(), None);
+        let overridden =
+            fixed_schedule(start, end, params.clone(), Some((switch, CouponType::Cash)));
+        assert!((coupon_total(&baseline) - coupon_total(&overridden)).abs() < 1e-8);
+        for split in [CouponType::Cash, CouponType::Pik] {
+            let schedule = fixed_schedule(start, end, params.clone(), Some((switch, split)));
+            let mut intervals: Vec<_> = schedule
+                .get_flows()
+                .iter()
+                .filter_map(|flow| {
+                    flow.accrual
+                        .as_ref()
+                        .map(|accrual| (accrual.start, accrual.end))
+                })
+                .collect();
+            intervals.sort_unstable();
+            assert_eq!(intervals.first().expect("first coupon").0, start);
+            assert_eq!(intervals.last().expect("last coupon").1, end);
+            assert!(
+                intervals.windows(2).all(|pair| pair[0].1 == pair[1].0),
+                "overlapping or missing coupon accrual: {intervals:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn cds_effective_frequency_controls_day_counts_and_coupon_kinds() {
+    let start = d(2024, 3, 20);
+    let end = d(2024, 12, 20);
+    for day_count in [DayCount::ActActIsma, DayCount::Act365L] {
+        let mut params = ScheduleParams::quarterly_act360();
+        params.roll_rule = RollRule::CdsImm;
+        params.day_count = day_count;
+        params.business_day_convention = BusinessDayConvention::Unadjusted;
+        let reference = fixed_schedule(start, end, params.clone(), None);
+        let reference_periods =
+            build_periods(BuildPeriodsParams::from_schedule(&params, start, end, None))
+                .expect("quarterly periods");
+        for frequency in [Tenor::monthly(), Tenor::semi_annual(), Tenor::annual()] {
+            params.frequency = frequency;
+            params.stub = StubKind::LongFront;
+            let schedule = fixed_schedule(start, end, params.clone(), None);
+            assert!((coupon_total(&schedule) - coupon_total(&reference)).abs() < 1e-8);
+            assert!(!schedule
+                .get_flows()
+                .iter()
+                .any(|flow| flow.kind == CFKind::Stub));
+            let periods =
+                build_periods(BuildPeriodsParams::from_schedule(&params, start, end, None))
+                    .expect("effective quarterly periods");
+            assert_eq!(periods.len(), reference_periods.len());
+            for (period, reference) in periods.iter().zip(&reference_periods) {
+                assert_eq!(
+                    period.accrual_year_fraction,
+                    reference.accrual_year_fraction
+                );
+            }
+        }
     }
 }
 

@@ -170,9 +170,10 @@ pub use vanilla::{
     bs_greeks, bs_price, checked_closed_form_value, vanilla_expiry_payoff, BsGreeks, ONE_PERCENT,
 };
 pub use volatility::{
-    bachelier_call, bachelier_delta_call, bachelier_delta_put, bachelier_gamma, bachelier_put,
-    bachelier_vega, black_call, black_delta_call, black_delta_put, black_gamma, black_put,
-    black_scholes_spot_call, black_scholes_spot_put, black_shifted_call, black_shifted_put,
+    bachelier_call, bachelier_delta_call, bachelier_delta_put, bachelier_gamma, bachelier_greeks,
+    bachelier_price, bachelier_put, bachelier_vega, black76_greeks, black76_price, black_call,
+    black_delta_call, black_delta_put, black_gamma, black_put, black_scholes_spot_call,
+    black_scholes_spot_put, black_shifted_call, black_shifted_price, black_shifted_put,
     black_shifted_vega, black_vega, brenner_subrahmanyam_approx, implied_vol_initial_guess,
-    manaster_koehler_approx,
+    manaster_koehler_approx, ForwardGreeks,
 };

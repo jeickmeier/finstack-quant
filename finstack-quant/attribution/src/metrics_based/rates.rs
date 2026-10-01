@@ -2,9 +2,7 @@ use super::super::helpers::*;
 use super::super::types::*;
 use super::context::AttributionInputs;
 use super::shifts::{
-    average_over, extract_bucketed_dv01_per_curve, extract_keyrate_per_curve,
-    measure_per_tenor_rate_shift, measure_rate_curve_shift_bp, rate_curve_abs_shift_bp,
-    twist_diagnostic_note,
+    average_over, measure_per_tenor_rate_shift, rate_curve_abs_shift_bp, twist_diagnostic_note,
 };
 use finstack_quant_core::config::{RoundingContext, ZeroKind};
 use finstack_quant_core::math::NeumaierAccumulator;
@@ -42,20 +40,11 @@ pub(super) fn apply(
     // Accuracy ladder (best first):
     //   (a) key-rate aware: Σ_curve Σ_tenor DV01_{curve,tenor} × Δr_{curve,tenor}.
     //       Correct for non-parallel (steepener / twist) curve moves.
-    //   (b) per-curve bucketed: Σ_curve DV01_curve × avg(Δr_curve). Correct for
-    //       cross-curve basis but assumes each curve moved in parallel.
-    //   (c) aggregate: DV01_total × avg(Δr). Coarsest.
+    //   (b) aggregate: DV01_total × avg(Δr), a parallel-move approximation.
 
     let curve_ids = &inputs.rates_curve_ids;
-    // (a) per-tenor (key-rate) DV01 — the most accurate input.
-    let keyrate_dv01 =
-        extract_keyrate_per_curve(&inputs.val_t0.measures, curve_ids, "bucketed_dv01");
-    // (b) per-curve total DV01 — fallback when no per-tenor series exist.
-    let bucketed_dv01 = extract_bucketed_dv01_per_curve(&inputs.val_t0.measures, curve_ids);
-
+    let keyrate_dv01 = &inputs.rate_keyrates;
     let has_keyrate = !keyrate_dv01.is_empty();
-    let has_bucketed = !bucketed_dv01.is_empty();
-    let mut rates_pnl = 0.0;
     // Average rate shift used for the rates convexity / large-move blocks.
     // - Key-rate / bucketed branches: average only over curves with data.
     // - Fallback branch: preamble average over all rates curves with a
@@ -66,8 +55,7 @@ pub(super) fn apply(
         // KEY-RATE AWARE: pair per-tenor DV01 with the per-tenor curve shift
         // so a steepener is not collapsed to average-shift × parallel-DV01.
         //
-        // Curves without per-tenor data fall through to per-curve bucketed DV01
-        // when present, rather than being dropped into residual with no note.
+        // Input construction has validated complete declared-curve coverage.
         let mut rates_acc = NeumaierAccumulator::new();
         let mut shift_acc = NeumaierAccumulator::new();
         // DV01-weighted shift for the convexity block: Σ|DV01_i|·Δr_i and
@@ -78,24 +66,8 @@ pub(super) fn apply(
         let mut weight_acc = NeumaierAccumulator::new();
         let mut shift_terms = 0usize;
         let mut curves_with_data = 0usize;
-        let mut curves_via_fallback: Vec<String> = Vec::new();
         for curve_id in curve_ids {
             let Some(buckets) = keyrate_dv01.get(curve_id) else {
-                // Per-curve fallback for mixed coverage.
-                if let Some(&dv01_for_curve) = bucketed_dv01.get(curve_id) {
-                    if let Some(shift) = measure_rate_curve_shift_bp(
-                        curve_id.as_str(),
-                        inputs.market_t0,
-                        inputs.market_t1,
-                    ) {
-                        rates_acc.add(dv01_for_curve * shift);
-                        shift_acc.add(shift);
-                        weighted_shift_acc.add(dv01_for_curve.abs() * shift);
-                        weight_acc.add(dv01_for_curve.abs());
-                        shift_terms += 1;
-                        curves_via_fallback.push(curve_id.as_str().to_string());
-                    }
-                }
                 continue;
             };
             let tenors: Vec<f64> = buckets.iter().map(|(t, _)| *t).collect();
@@ -116,7 +88,7 @@ pub(super) fn apply(
             }
             curves_with_data += 1;
         }
-        rates_pnl = rates_acc.total();
+        let rates_pnl = rates_acc.total();
         attribution.rates_curves_pnl = factor_money_or_invalid(
             rates_pnl,
             inputs.val_t1.value.currency(),
@@ -145,49 +117,6 @@ pub(super) fn apply(
                 curves_with_data
             ));
         }
-        if !curves_via_fallback.is_empty() {
-            attribution.meta.notes.push(format!(
-                "Rates curves without per-tenor DV01 attributed via per-curve bucketed DV01 \
-                     (parallel-move assumption): {}",
-                curves_via_fallback.join(", ")
-            ));
-        }
-    } else if has_bucketed {
-        // PER-CURVE BUCKETED: sum per-curve contributions. Each curve is still
-        // assumed to move in parallel (no per-tenor series available).
-        let mut total_shift = 0.0;
-        let mut curves_with_data = 0usize;
-        for curve_id in curve_ids {
-            if let Some(&dv01_for_curve) = bucketed_dv01.get(curve_id) {
-                if let Some(shift) = measure_rate_curve_shift_bp(
-                    curve_id.as_str(),
-                    inputs.market_t0,
-                    inputs.market_t1,
-                ) {
-                    rates_pnl += dv01_for_curve * shift;
-                    total_shift += shift;
-                    curves_with_data += 1;
-                }
-            }
-        }
-
-        attribution.rates_curves_pnl = factor_money_or_invalid(
-            rates_pnl,
-            inputs.val_t1.value.currency(),
-            "rates curves P&L (bucketed)",
-            &mut attribution.meta.notes,
-            non_finite_detected,
-        );
-
-        if curves_with_data > 0 {
-            convexity_avg_shift_bp = Some(total_shift / curves_with_data as f64);
-            attribution.meta.notes.push(format!(
-                "Rates attribution computed using per-curve bucketed DV01 across {} curves \
-                     (each curve assumed to move in parallel); provide per-tenor BucketedDv01 \
-                     series for key-rate-aware attribution of non-parallel moves",
-                curves_with_data
-            ));
-        }
     } else if let Some(dv01) = inputs.val_t0.measures.get(MetricId::Dv01.as_str()) {
         // Fallback: use aggregate DV01 with the preamble's average shift.
         let avg_shift = if let Some(avg_shift) = inputs.shifts.avg_rate_shift_bp {
@@ -201,7 +130,7 @@ pub(super) fn apply(
                 );
             0.0
         };
-        rates_pnl = dv01 * avg_shift;
+        let rates_pnl = dv01 * avg_shift;
         convexity_avg_shift_bp = inputs.shifts.avg_rate_shift_bp;
 
         attribution.rates_curves_pnl = factor_money_or_invalid(

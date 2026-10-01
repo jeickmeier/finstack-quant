@@ -1,4 +1,4 @@
-//! Expected variance metric (blend of realized and forward).
+//! Expected contractual variance, shared with the PV calculation.
 
 use super::super::types::FxVarianceSwap;
 use crate::metrics::{MetricCalculator, MetricContext};
@@ -10,23 +10,10 @@ pub(crate) struct ExpectedVarianceCalculator;
 impl MetricCalculator for ExpectedVarianceCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let swap = context.instrument_as::<FxVarianceSwap>()?;
-        let as_of = context.as_of;
-
-        if as_of >= swap.final_observation_date()? {
-            return swap.partial_realized_variance(&context.curves, as_of);
-        }
-
-        if as_of < swap.start_date {
-            return swap.remaining_forward_variance(&context.curves, as_of);
-        }
-
-        // Shared with `compute_pv` so the reported expected variance can
-        // never drift from the variance implied by the booked PV (W-32/W-33):
-        // day-count time weighting AND day-count-basis realized annualization.
-        crate::instruments::fx::fx_variance_swap::pricer::seasoned_expected_variance(
+        crate::instruments::fx::fx_variance_swap::pricer::expected_variance(
             swap,
             &context.curves,
-            as_of,
+            context.as_of,
         )
     }
 }
@@ -50,12 +37,10 @@ mod tests {
     use std::sync::Arc;
     use time::macros::date;
 
-    /// W-32 regression: the expected-variance metric must blend realized and
-    /// forward variance by the day-count `time_elapsed_fraction`, identical to
-    /// the pricer. An observation-count weight drifts for weekend-skipping
-    /// daily schedules and would diverge from the booked PV.
+    /// The metric uses the contractual return-sample normalization, identical
+    /// to PV even for a weekend gap before the last fixing.
     #[test]
-    fn expected_variance_uses_time_weighting_not_observation_count() {
+    fn expected_variance_uses_contractual_sample_normalization() {
         let start = date!(2025 - 01 - 06); // Monday
         let maturity = date!(2025 - 06 - 30); // Monday
         let as_of = date!(2025 - 06 - 27); // Friday, near maturity
@@ -139,14 +124,11 @@ mod tests {
             .expect("forward");
         let expected_count = realized * count_w + forward * (1.0 - count_w);
 
-        // The metric must equal the pricer's shared seasoned blend (day-count
-        // weight AND day-count-basis realized annualization), so payoff(metric)
-        // discounted reproduces the booked PV exactly.
-        let expected_time =
-            crate::instruments::fx::fx_variance_swap::pricer::seasoned_expected_variance(
-                &swap, &market, as_of,
-            )
-            .expect("seasoned blend");
+        // The same expected contractual variance drives metric and PV.
+        let expected_shared = crate::instruments::fx::fx_variance_swap::pricer::expected_variance(
+            &swap, &market, as_of,
+        )
+        .expect("seasoned blend");
         let dom = market.get_discount("USD-OIS").expect("curve");
         let df = dom
             .df_between_dates(as_of, swap.maturity)
@@ -166,9 +148,9 @@ mod tests {
             .expect("expected variance");
 
         assert!(
-            (metric - expected_time).abs() < 1e-9,
-            "expected variance must use the time-weighted blend: metric={metric} \
-             time-weighted={expected_time}"
+            (metric - expected_shared).abs() < 1e-9,
+            "expected variance must use the shared sample-normalized value: metric={metric} \
+             sample-normalized={expected_shared}"
         );
         let pv_from_metric = swap.payoff(metric).expect("valid payoff").amount() * df;
         assert!(
@@ -179,8 +161,8 @@ mod tests {
             pv_from_metric
         );
         assert!(
-            (metric - expected_count).abs() > 1e-9,
-            "expected variance must differ from the observation-count blend"
+            (metric - expected_count).abs() < 1e-9,
+            "expected variance must preserve the return sample denominator"
         );
         let _ = MetricId::ExpectedVariance;
     }

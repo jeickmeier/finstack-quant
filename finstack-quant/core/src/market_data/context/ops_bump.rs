@@ -13,6 +13,19 @@ use super::{ContextMutationInfo, ContextScratchBump, CurveStorage, MarketContext
 impl MarketContext {
     /// Apply a scalar price bump in place and return a token that restores the
     /// original value.
+    ///
+    /// Money arithmetic preserves the stored Decimal amount. Invalid inputs,
+    /// non-finite scalar results, and Decimal overflow leave the context unchanged.
+    ///
+    /// # Arguments
+    ///
+    /// * `price_id` - Identifier of the scalar price to shock.
+    /// * `bump_pct` - Finite relative price change as a decimal; `0.01` adds 1%.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing price, a non-finite input or result, or
+    /// a Money amount that exceeds Decimal's representable range after the shock.
     pub fn apply_price_bump_pct_in_place(
         &mut self,
         price_id: &str,
@@ -31,13 +44,16 @@ impl MarketContext {
         })?;
         let bumped = match current {
             crate::market_data::scalars::MarketScalar::Unitless(v) => {
-                crate::market_data::scalars::MarketScalar::Unitless(v * (1.0 + bump_pct))
+                let bumped = v * (1.0 + bump_pct);
+                if !bumped.is_finite() {
+                    return Err(crate::Error::Validation(
+                        "price bump must produce a finite scalar".into(),
+                    ));
+                }
+                crate::market_data::scalars::MarketScalar::Unitless(bumped)
             }
             crate::market_data::scalars::MarketScalar::Price(m) => {
-                crate::market_data::scalars::MarketScalar::Price(crate::money::Money::new(
-                    m.amount() * (1.0 + bump_pct),
-                    m.currency(),
-                )?)
+                crate::market_data::scalars::MarketScalar::Price(m.checked_mul_f64(1.0 + bump_pct)?)
             }
         };
         Arc::make_mut(&mut self.prices).insert(key.clone(), bumped);
@@ -192,7 +208,8 @@ impl MarketContext {
     /// # Arguments
     ///
     /// * `bumps` - Curve, FX, vol-surface, and base-correlation shocks applied
-    ///   together on a cloned context.
+    ///   in iterator order on a cloned context. Repeated targets compose in
+    ///   that order; for example, factors `1.1` and `1.2` multiply to `1.32`.
     pub fn bump<I>(&self, bumps: I) -> Result<Self>
     where
         I: IntoIterator<Item = MarketBump>,
@@ -206,17 +223,19 @@ impl MarketContext {
     ///
     /// Use this in production workflows where silent credit-index invalidation
     /// is a risk.
+    ///
+    /// # Arguments
+    ///
+    /// * `bumps` - Shocks applied in iterator order to a cloned context.
+    ///   Repeated or overlapping targets compose sequentially. Failure returns
+    ///   no partially bumped context and leaves the source unchanged.
     pub fn bump_observed<I>(&self, bumps: I) -> Result<(Self, ContextMutationInfo)>
     where
         I: IntoIterator<Item = MarketBump>,
     {
-        use crate::collections::HashMap;
         use crate::error::InputError;
 
-        let mut curve_bumps: HashMap<CurveId, BumpSpec> = HashMap::default();
-        let mut fx_bumps = Vec::new();
-        let mut vol_bumps = Vec::new();
-        let mut base_corr_bumps = Vec::new();
+        let mut ctx = self.clone();
         let mut needs_credit_rebind = false;
         let mut processed_bumps = 0usize;
 
@@ -225,7 +244,7 @@ impl MarketContext {
             match bump {
                 MarketBump::Curve { id, spec } => {
                     spec.validate_finite()?;
-                    curve_bumps.insert(id, spec);
+                    needs_credit_rebind |= ctx.apply_curve_bump(id, spec)?;
                 }
                 MarketBump::FxPct {
                     base,
@@ -233,7 +252,11 @@ impl MarketContext {
                     pct,
                     as_of,
                 } => {
-                    fx_bumps.push((base, quote, pct, as_of));
+                    let fx = ctx.fx.as_ref().ok_or_else(|| InputError::NotFound {
+                        id: "FX matrix".to_string(),
+                    })?;
+                    let bumped = fx.with_bumped_rate(base, quote, pct / 100.0, as_of)?;
+                    ctx.fx = Some(Arc::new(bumped));
                 }
                 MarketBump::VolBucketPct {
                     vol_surface_id,
@@ -245,69 +268,36 @@ impl MarketContext {
                     // multiplicative `apply_bucket_bump` path as filtered bumps so
                     // semantics (vol × (1 + pct/100)) are identical with or without
                     // filters.
-                    vol_bumps.push((vol_surface_id, expiries, strikes, pct));
+                    let surface = ctx.get_surface(vol_surface_id.as_str())?;
+                    let bumped = surface
+                        .apply_bucket_bump(expiries.as_deref(), strikes.as_deref(), pct)
+                        .ok_or(InputError::DimensionMismatch)?;
+                    ctx.insert_surface_mut(bumped);
                 }
                 MarketBump::BaseCorrBucketPts {
                     surface_id,
                     detachments,
                     points,
                 } => {
-                    base_corr_bumps.push((surface_id, detachments, points));
+                    let curve = ctx.get_base_correlation(surface_id.as_str())?;
+                    let bumped = curve
+                        .apply_bucket_bump(detachments.as_deref(), points)
+                        .ok_or(InputError::DimensionMismatch)?;
+                    needs_credit_rebind |= ctx.curve_affects_credit_indices(&surface_id);
+                    Arc::make_mut(&mut ctx.curves)
+                        .insert(surface_id, CurveStorage::BaseCorrelation(Arc::new(bumped)));
                 }
             }
         }
 
-        let mut ctx = self.clone();
-
-        for (base, quote, pct, as_of) in fx_bumps {
-            let fx = ctx.fx.as_ref().ok_or_else(|| InputError::NotFound {
-                id: "FX matrix".to_string(),
-            })?;
-            let bumped = fx.with_bumped_rate(base, quote, pct / 100.0, as_of)?;
-            ctx.fx = Some(Arc::new(bumped));
-        }
-
-        for (vol_surface_id, expiries, strikes, pct) in vol_bumps {
-            let surface =
-                ctx.get_surface(vol_surface_id.as_str())
-                    .map_err(|_| InputError::NotFound {
-                        id: vol_surface_id.to_string(),
-                    })?;
-            let bumped = surface
-                .apply_bucket_bump(expiries.as_deref(), strikes.as_deref(), pct)
-                .ok_or(InputError::DimensionMismatch)?;
-            ctx = ctx.insert_surface(bumped);
-        }
-
-        for (surface_id, detachments, points) in base_corr_bumps {
-            let curve = ctx.get_base_correlation(surface_id.as_str()).map_err(|_| {
-                InputError::NotFound {
-                    id: surface_id.to_string(),
-                }
-            })?;
-            let bumped = curve
-                .apply_bucket_bump(detachments.as_deref(), points)
-                .ok_or(InputError::DimensionMismatch)?;
-            Arc::make_mut(&mut ctx.curves)
-                .insert(surface_id, CurveStorage::BaseCorrelation(Arc::new(bumped)));
-            needs_credit_rebind = true;
-        }
-
-        let curve_invalidated = if !curve_bumps.is_empty() {
-            ctx.apply_curve_bumps(curve_bumps)?
+        let invalidated_credit_indices = if needs_credit_rebind {
+            ctx.rebind_all_credit_indices()
         } else {
             Vec::new()
         };
-        let mut mutation_info = ContextMutationInfo::default();
-        if needs_credit_rebind {
-            let base_corr_invalidated = ctx.rebind_all_credit_indices();
-            mutation_info.invalidated_credit_indices = base_corr_invalidated;
-        }
-        for id in curve_invalidated {
-            if !mutation_info.invalidated_credit_indices.contains(&id) {
-                mutation_info.invalidated_credit_indices.push(id);
-            }
-        }
+        let mutation_info = ContextMutationInfo {
+            invalidated_credit_indices,
+        };
 
         tracing::debug!(
             processed_bumps,
@@ -319,58 +309,41 @@ impl MarketContext {
         Ok((ctx, mutation_info))
     }
 
-    /// Apply curve bumps using the centralized bump-and-rebuild logic in `CurveStorage`.
+    /// Apply one curve, surface, price, or series bump and report whether credit
+    /// indices must be rebound after the ordered batch finishes.
     ///
-    /// This method iterates over the bump specifications and applies them to curves,
-    /// surfaces, prices, or series. The `CurveStorage::apply_bump_preserving_id` method
-    /// handles the curve-specific bumping and ID preservation logic.
-    fn apply_curve_bumps(
-        &mut self,
-        bumps: crate::collections::HashMap<CurveId, BumpSpec>,
-    ) -> Result<Vec<CurveId>> {
-        let mut needs_credit_rebind = false;
-        for (curve_id, bump_spec) in bumps {
-            let cid = curve_id.as_str();
+    /// `CurveStorage::apply_bump_preserving_id` handles curve-specific bumping
+    /// and ID preservation.
+    fn apply_curve_bump(&mut self, curve_id: CurveId, bump_spec: BumpSpec) -> Result<bool> {
+        let cid = curve_id.as_str();
 
-            if let Some(storage) = Arc::make_mut(&mut self.curves).get_mut(cid) {
-                storage.apply_bump_preserving_id(&curve_id, bump_spec)?;
-                if !needs_credit_rebind {
-                    needs_credit_rebind = self.curve_affects_credit_indices(&curve_id);
-                }
-                continue;
-            }
-
-            if let Some(original) = self.surfaces.get(cid).cloned() {
-                let bumped = original.apply_bump(bump_spec)?;
-                Arc::make_mut(&mut self.surfaces).insert(curve_id.clone(), Arc::new(bumped));
-                continue;
-            }
-
-            if let Some(original) = self.prices.get(cid).cloned() {
-                let bumped = original.apply_bump(bump_spec)?;
-                Arc::make_mut(&mut self.prices).insert(curve_id.clone(), bumped);
-                continue;
-            }
-
-            if let Some(original) = self.series.get(cid).cloned() {
-                let bumped = original.apply_bump(bump_spec)?;
-                Arc::make_mut(&mut self.series).insert(curve_id.clone(), bumped);
-                continue;
-            }
-
-            return Err(crate::error::InputError::NotFound {
-                id: cid.to_string(),
-            }
-            .into());
+        if let Some(storage) = Arc::make_mut(&mut self.curves).get_mut(cid) {
+            storage.apply_bump_preserving_id(&curve_id, bump_spec)?;
+            return Ok(self.curve_affects_credit_indices(&curve_id));
         }
 
-        let invalidated = if needs_credit_rebind {
-            self.rebind_all_credit_indices()
-        } else {
-            Vec::new()
-        };
+        if let Some(original) = self.surfaces.get(cid).cloned() {
+            let bumped = original.apply_bump(bump_spec)?;
+            Arc::make_mut(&mut self.surfaces).insert(curve_id, Arc::new(bumped));
+            return Ok(false);
+        }
 
-        Ok(invalidated)
+        if let Some(original) = self.prices.get(cid).cloned() {
+            let bumped = original.apply_bump(bump_spec)?;
+            Arc::make_mut(&mut self.prices).insert(curve_id, bumped);
+            return Ok(false);
+        }
+
+        if let Some(original) = self.series.get(cid).cloned() {
+            let bumped = original.apply_bump(bump_spec)?;
+            Arc::make_mut(&mut self.series).insert(curve_id, bumped);
+            return Ok(false);
+        }
+
+        Err(crate::error::InputError::NotFound {
+            id: cid.to_string(),
+        }
+        .into())
     }
 }
 
@@ -396,6 +369,109 @@ mod tests {
             units: BumpUnits::Fraction,
             value,
             bump_type: BumpType::Parallel,
+        }
+    }
+
+    #[test]
+    fn ordered_bumps_compose_repeated_scalar_targets() {
+        let context = MarketContext::new().insert_price("SPOT", MarketScalar::Unitless(100.0));
+        let bumped = context
+            .bump([1.1, 1.2].map(|factor| MarketBump::Curve {
+                id: CurveId::new("SPOT"),
+                spec: BumpSpec::multiplier(factor),
+            }))
+            .expect("ordered scalar bumps");
+        let MarketScalar::Unitless(value) = bumped.get_price("SPOT").expect("spot") else {
+            panic!("unitless spot");
+        };
+        assert!((*value - 132.0).abs() < 1e-12);
+        assert!(matches!(
+            context.get_price("SPOT"),
+            Ok(MarketScalar::Unitless(100.0))
+        ));
+
+        let failed = context.bump([
+            MarketBump::Curve {
+                id: CurveId::new("SPOT"),
+                spec: BumpSpec::multiplier(1.1),
+            },
+            MarketBump::Curve {
+                id: CurveId::new("SPOT"),
+                spec: BumpSpec::multiplier(f64::NAN),
+            },
+        ]);
+        assert!(failed.is_err());
+        assert!(matches!(
+            context.get_price("SPOT"),
+            Ok(MarketScalar::Unitless(100.0))
+        ));
+    }
+
+    #[test]
+    fn ordered_bumps_compose_mixed_bucket_and_parallel_shocks_to_one_curve() {
+        let context = MarketContext::new()
+            .insert(DiscountCurve::flat("USD", as_of(), 0.05).expect("flat discount curve"));
+        let bumps = [
+            BumpSpec::parallel_bp(10.0),
+            BumpSpec::triangular_key_rate_bp(3.0, 5.0, 7.0, 20.0),
+            BumpSpec::parallel_bp(-4.0),
+        ]
+        .map(|spec| MarketBump::Curve {
+            id: CurveId::new("USD"),
+            spec,
+        });
+        let batched = context.bump(bumps.clone()).expect("composed curve shocks");
+        let sequential = bumps.into_iter().fold(context.clone(), |market, bump| {
+            market.bump([bump]).expect("single curve shock")
+        });
+        let original = context.get_discount("USD").expect("original curve");
+        let batched = batched.get_discount("USD").expect("batched curve");
+        let sequential = sequential.get_discount("USD").expect("sequential curve");
+        for (time, weight) in [
+            (1.0, 0.0),
+            (3.0, 0.0),
+            (4.0, 0.5),
+            (5.0, 1.0),
+            (6.0, 0.5),
+            (7.0, 0.0),
+            (10.0, 0.0),
+        ] {
+            let expected = original.df(time) * (-(0.0006_f64 + 0.002 * weight) * time).exp();
+            assert!((batched.df(time) - expected).abs() < 1e-14);
+            assert!((batched.df(time) - sequential.df(time)).abs() < 1e-14);
+            assert!((original.df(time) - (-0.05 * time).exp()).abs() < 1e-14);
+        }
+    }
+
+    #[test]
+    fn ordered_bumps_preserve_mixed_surface_operations() {
+        let surface = VolSurface::builder("VOL")
+            .expiries(&[1.0, 2.0])
+            .strikes(&[90.0, 100.0])
+            .row(&[0.2, 0.2])
+            .row(&[0.2, 0.2])
+            .build()
+            .expect("surface");
+        let context = MarketContext::new().insert_surface(surface);
+        let additive = MarketBump::Curve {
+            id: CurveId::new("VOL"),
+            spec: surface_spec(0.1),
+        };
+        let relative = MarketBump::VolBucketPct {
+            vol_surface_id: CurveId::new("VOL"),
+            expiries: None,
+            strikes: None,
+            pct: 50.0,
+        };
+        let add_then_scale = context
+            .bump([additive.clone(), relative.clone()])
+            .expect("bumps");
+        let scale_then_add = context.bump([relative, additive]).expect("bumps");
+        for value in add_then_scale.get_surface("VOL").expect("surface").vols() {
+            assert!((*value - 0.45).abs() < 1e-12);
+        }
+        for value in scale_then_add.get_surface("VOL").expect("surface").vols() {
+            assert!((*value - 0.4).abs() < 1e-12);
         }
     }
 
@@ -568,6 +644,59 @@ mod tests {
             match ctx.get_price("SPOT").expect("unchanged spot") {
                 MarketScalar::Unitless(value) => assert_eq!(value.to_bits(), 100.0f64.to_bits()),
                 MarketScalar::Price(_) => panic!("expected unitless price"),
+            }
+        }
+    }
+
+    #[test]
+    fn scratch_money_bump_preserves_decimal_precision_and_zero_identity() {
+        let original = crate::money::Money::from_decimal_str("1.0000000000000001", Currency::USD)
+            .expect("exact price");
+        let mut ctx = MarketContext::new().insert_price("SPOT", MarketScalar::Price(original));
+        for (percentage, expected) in [(0.0, "1.0000000000000001"), (0.01, "1.010000000000000101")]
+        {
+            let token = ctx
+                .apply_price_bump_pct_in_place("SPOT", percentage)
+                .expect("checked bump");
+            let MarketScalar::Price(actual) = ctx.get_price("SPOT").expect("price") else {
+                panic!("expected Money price");
+            };
+            assert_eq!(
+                actual.amount_decimal(),
+                crate::money::Money::from_decimal_str(expected, Currency::USD)
+                    .expect("expected exact price")
+                    .amount_decimal()
+            );
+            ctx.revert_scratch_bump(token).expect("restore");
+            let MarketScalar::Price(restored) = ctx.get_price("SPOT").expect("price") else {
+                panic!("expected Money price");
+            };
+            assert_eq!(restored.amount_decimal(), original.amount_decimal());
+        }
+    }
+
+    #[test]
+    fn overflowing_scratch_price_bumps_leave_the_original_price_unchanged() {
+        for original in [
+            MarketScalar::Unitless(f64::MAX),
+            MarketScalar::Price(
+                crate::money::Money::from_decimal_str(
+                    "10000000000000000000000000000",
+                    Currency::USD,
+                )
+                .expect("representable price"),
+            ),
+        ] {
+            let mut ctx = MarketContext::new().insert_price("SPOT", original.clone());
+            assert!(ctx.apply_price_bump_pct_in_place("SPOT", 9.0).is_err());
+            match (ctx.get_price("SPOT").expect("price"), &original) {
+                (MarketScalar::Unitless(actual), MarketScalar::Unitless(expected)) => {
+                    assert_eq!(actual.to_bits(), expected.to_bits());
+                }
+                (MarketScalar::Price(actual), MarketScalar::Price(expected)) => {
+                    assert_eq!(actual.amount_decimal(), expected.amount_decimal());
+                }
+                _ => panic!("price variant changed after a failed bump"),
             }
         }
     }

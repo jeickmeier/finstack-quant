@@ -23,7 +23,7 @@ use crate::dates::date_extensions::DateExt;
 use crate::dates::Date;
 use core::fmt;
 use core::str::FromStr;
-use time::{Duration, Month};
+use time::Month;
 
 /// Period frequency type.
 ///
@@ -139,13 +139,15 @@ impl PeriodKind {
     ///
     /// # Returns
     ///
-    /// The prior observation date. Saturates at [`Date::MIN`] if
-    /// subtraction would underflow the calendar.
-    #[must_use]
-    pub fn prior_observation_date(self, first: Date) -> Date {
+    /// The prior observation date.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if subtracting the observation period underflows the calendar.
+    pub fn prior_observation_date(self, first: Date) -> crate::Result<Date> {
         match self {
-            Self::Daily => first.checked_sub(Duration::days(1)).unwrap_or(Date::MIN),
-            Self::Weekly => first.checked_sub(Duration::days(7)).unwrap_or(Date::MIN),
+            Self::Daily => first.add_days(-1),
+            Self::Weekly => first.add_days(-7),
             Self::Monthly => first.add_months(-1),
             Self::Quarterly => first.add_months(-3),
             Self::SemiAnnual => first.add_months(-6),
@@ -246,27 +248,6 @@ impl PeriodKind {
             PeriodKind::SemiAnnual => 2,
             PeriodKind::Annual => 1,
         }
-    }
-
-    fn step_forward(self, mut year: i32, mut index: u16) -> (i32, u16) {
-        let max = self.max_index_for_year(year);
-        if index >= max {
-            year += 1;
-            index = 1;
-        } else {
-            index += 1;
-        }
-        (year, index)
-    }
-
-    fn step_backward(self, mut year: i32, mut index: u16) -> (i32, u16) {
-        if index == 1 {
-            year -= 1;
-            index = self.max_index_for_year(year);
-        } else {
-            index -= 1;
-        }
-        (year, index)
     }
 }
 
@@ -676,11 +657,14 @@ impl PeriodPlan {
 ///
 /// If `actuals_until` is provided, every period with an identifier less than or
 /// equal to that boundary is marked actual and later periods are marked forecast.
+/// The cutoff must use the same period kind and fiscal/Gregorian identifiers
+/// as the range; a quarterly cutoff is invalid for a monthly range.
 ///
 /// # Arguments
 ///
 /// * `range` - Period range expression using the crate's calendar-period syntax
-/// * `actuals_until` - Optional inclusive boundary separating actuals from forecasts
+/// * `actuals_until` - Optional inclusive boundary separating actuals from forecasts,
+///   using the same period kind and calendar as `range`.
 ///
 /// # Returns
 ///
@@ -689,7 +673,10 @@ impl PeriodPlan {
 /// # Errors
 ///
 /// Returns an error if the range cannot be parsed, the start and end identifiers
-/// are incompatible, or the `actuals_until` boundary cannot be parsed.
+/// are incompatible, the `actuals_until` boundary cannot be parsed or uses a
+/// different period kind/calendar, a period's
+/// start or exclusive end is outside the supported date range, or the range
+/// exceeds 100,000 periods. These checks precede allocation of the period list.
 ///
 /// # Examples
 ///
@@ -716,7 +703,8 @@ pub fn build_periods(range: &str, actuals_until: Option<&str>) -> crate::Result<
 ///
 /// * `range` - Fiscal period range expression
 /// * `fiscal_config` - Fiscal-year start-month configuration
-/// * `actuals_until` - Optional inclusive fiscal-period boundary for actual results
+/// * `actuals_until` - Optional inclusive fiscal-period boundary for actual results,
+///   with the same period kind as `range`; unprefixed identifiers are fiscal.
 ///
 /// # Returns
 ///
@@ -724,8 +712,11 @@ pub fn build_periods(range: &str, actuals_until: Option<&str>) -> crate::Result<
 ///
 /// # Errors
 ///
-/// Returns an error if the fiscal identifiers cannot be parsed or if the fiscal
-/// configuration produces invalid calendar boundaries.
+/// Returns an error if the fiscal identifiers cannot be parsed, the actuals
+/// cutoff has a different period kind from the range, or if the fiscal
+/// configuration produces invalid calendar boundaries, a period's start or
+/// exclusive end is outside the supported date range, or the range exceeds
+/// 100,000 periods. These checks precede allocation of the period list.
 pub fn build_fiscal_periods(
     range: &str,
     fiscal_config: FiscalConfig,

@@ -171,6 +171,31 @@ pub struct HazardSpreadRiskBucket {
     pub pillar_time: f64,
 }
 
+impl HazardSpreadRiskBucket {
+    /// Return the canonical metric label for this exact replay quote.
+    ///
+    /// # Arguments
+    ///
+    /// * `buckets` - Complete ordered replay bucket list for the same hazard
+    ///   curve. Quotes sharing a formatted tenor gain their contractual date
+    ///   and quote identifier so distinct risk coordinates remain distinct.
+    pub fn get_metric_label(&self, buckets: &[Self]) -> String {
+        use crate::metrics::sensitivities::config::format_bucket_label_cow;
+        let label = format_bucket_label_cow(self.pillar_time);
+        if buckets
+            .iter()
+            .filter(|bucket| format_bucket_label_cow(bucket.pillar_time) == label)
+            .take(2)
+            .count()
+            > 1
+        {
+            format!("{label}@{}@{}", self.pillar_date, self.quote_id)
+        } else {
+            label.into_owned()
+        }
+    }
+}
+
 /// Quote-recalibration service injected into pricing and risk requests.
 pub trait RecalibrationProvider: Send + Sync {
     /// Rebuild a rate market from stored quote recipes.

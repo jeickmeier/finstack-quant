@@ -85,7 +85,12 @@ pub(in crate::builder) fn emit_amortization_on(
                 .and_then(|map| map.get(&d))
             {
                 let target = f64_to_decimal(rem_after.amount())?;
-                let pay = (*outstanding - target).max(Decimal::ZERO).min(*outstanding);
+                if target > *outstanding {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "StepRemaining target {target} exceeds outstanding principal {outstanding} on {d}"
+                    )));
+                }
+                let pay = *outstanding - target;
                 emit_principal_repayment(d, params.ccy, outstanding, pay, new_flows)?;
             }
         }
@@ -132,14 +137,13 @@ pub(in crate::builder) fn emit_amortization_on(
                 .as_ref()
                 .and_then(|map| map.get(&d))
             {
-                let amount = f64_to_decimal(amt.amount())?.max(Decimal::ZERO);
-                emit_principal_repayment(
-                    d,
-                    params.ccy,
-                    outstanding,
-                    amount.min(*outstanding),
-                    new_flows,
-                )?;
+                let amount = f64_to_decimal(amt.amount())?;
+                if amount > *outstanding {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "CustomPrincipal repayment {amount} exceeds outstanding principal {outstanding} on {d}"
+                    )));
+                }
+                emit_principal_repayment(d, params.ccy, outstanding, amount, new_flows)?;
             }
         }
     }

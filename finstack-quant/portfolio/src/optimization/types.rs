@@ -1,7 +1,8 @@
 //! Problem, decision-space, constraint, and solver types for portfolio optimization.
 //!
-use crate::types::AttributeTest;
+use crate::types::{AttributeTest, AttributeValue};
 use finstack_quant_valuations::metrics::MetricId;
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
 /// How optimization weights are defined.
@@ -28,6 +29,8 @@ pub enum WeightingScheme {
     /// have non-zero `pv_per_unit`. Zero-PV candidates are rejected at
     /// decision-space construction time under this scheme because their
     /// implied quantity would be undefined.
+    /// Held existing positions retain their exact current quantity, including
+    /// holdings with zero or negligible PV.
     ValueWeight,
 
     /// `w_i` is share of signed deal notional; still normalized so `∑ w_i = 1`
@@ -94,6 +97,36 @@ pub enum PerPositionMetric {
     Constant(f64),
 }
 
+impl PerPositionMetric {
+    /// Resolve a metric against one decision item's values and attributes.
+    ///
+    /// # Arguments
+    ///
+    /// * `measures` - Instrument metric values keyed by canonical metric name.
+    /// * `attributes` - Position attributes supplying numeric values or indicator tests.
+    /// * `pv_base` - Held present value in the portfolio reporting currency.
+    /// * `pv_native` - Held present value in the instrument's native currency.
+    pub(crate) fn resolve(
+        &self,
+        measures: &IndexMap<String, f64>,
+        attributes: &IndexMap<String, AttributeValue>,
+        pv_base: f64,
+        pv_native: f64,
+    ) -> Option<f64> {
+        match self {
+            Self::Metric(id) => measures.get(id.as_str()).copied(),
+            Self::CustomKey(key) => measures.get(key).copied(),
+            Self::PvBase => Some(pv_base),
+            Self::PvNative => Some(pv_native),
+            Self::Attribute(key) => attributes.get(key).and_then(AttributeValue::as_number),
+            Self::AttributeIndicator(test) => {
+                Some(if test.evaluate(attributes) { 1.0 } else { 0.0 })
+            }
+            Self::Constant(value) => Some(*value),
+        }
+    }
+}
+
 /// How to handle missing metrics for a position.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -102,13 +135,14 @@ pub enum MissingMetricPolicy {
     #[default]
     Zero,
 
-    /// Freeze the position at its current weight and drop it from metric
+    /// Freeze the position at its current quantity and drop missing inputs from metric
     /// coefficient vectors (`WeightedSum` and `ValueWeightedAverage` alike).
     ///
     /// Missing metrics are not treated as zero in the objective or in
     /// constraint rows: the coefficient is `0` and the name is omitted from
     /// a `ValueWeightedAverage` denominator, matching “excluded from
-    /// constraint evaluation”.
+    /// constraint evaluation”. This applies to standard metrics, custom keys,
+    /// and numeric attributes only where the expression's filter matches.
     Exclude,
 
     /// Fail with error if any required metric is missing.
@@ -166,7 +200,8 @@ pub enum Objective {
 // - **`PV_PER_UNIT_TOL`**: smallest `|pv_per_unit|` we will divide by when
 //   reconstructing implied quantities under `ValueWeight`. Below this we
 //   either reject the candidate (decision-space) or set the implied
-//   quantity to zero (LP solver) — see the call sites for which.
+//   quantity to zero (LP solver) — see the call sites for which. Held existing
+//   positions bypass reconstruction and retain their exact current quantity.
 // - **`MIN_WEIGHT_TOL`**: smallest `|min_weight|` that we treat as
 //   "non-zero" when classifying candidates as long-only or
 //   long-short-eligible.
@@ -199,8 +234,9 @@ pub const MIN_WEIGHT_TOL: f64 = 1e-12;
 /// even when individual positions are far from zero.
 pub const GROSS_BASE_TOL: f64 = 1e-6;
 
-/// Smallest absolute weight we report in the post-solve trade list.
-/// Below this, the position is treated as not held / not traded.
+/// Smallest absolute weight change we report in the post-solve trade list.
+/// Candidate additions below this target weight are omitted from the rebalanced
+/// portfolio; held existing quantities are preserved regardless of their weight.
 pub const WEIGHT_TOL: f64 = 1e-9;
 
 /// Smallest absolute constraint slack at which a constraint is reported

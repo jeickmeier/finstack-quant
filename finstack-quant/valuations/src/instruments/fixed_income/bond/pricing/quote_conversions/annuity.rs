@@ -1,4 +1,6 @@
-use crate::instruments::common_impl::pricing::time::{rate_between_on_dates, rate_period_on_dates};
+use crate::instruments::common_impl::pricing::time::{
+    curve_time, rate_between_on_dates, rate_period_on_dates,
+};
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
@@ -104,11 +106,13 @@ pub fn periods_per_year(
 /// * `disc` - Discount curve supplying date-based fixed-leg discount factors.
 /// * `day_count` - Fixed-leg accrual day-count convention.
 /// * `frequency` - Optional coupon frequency required by conventions such as
-///   ACT/ACT (ICMA); `None` is valid for conventions without it.
+///   ACT/ACT (ICMA) and ACT/365L; `None` is valid for conventions without it.
 /// * `schedule` - Ordered coupon boundary/payment dates; adjacent pairs form
 ///   accrual periods and the first date anchors the leg. For ICMA, the first
 ///   coupon anchors one quasi-coupon grid for the entire leg, preserving EOM
 ///   rolls and both front and back stubs.
+///   For ACT/365L, every adjacent pair must be a full contractual coupon;
+///   rate or balance subintervals cannot replace its original boundaries.
 ///
 /// # Returns
 ///
@@ -142,7 +146,15 @@ pub fn fixed_leg_annuity(
     let mut ann = 0.0;
     let mut prev = schedule[0];
     for &d in &schedule[1..] {
-        let alpha = day_count.year_fraction(prev, d, dc_ctx)?;
+        let context = if day_count == finstack_quant_core::dates::DayCount::Act365L {
+            DayCountContext {
+                coupon_period: Some((prev, d)),
+                ..dc_ctx
+            }
+        } else {
+            dc_ctx
+        };
+        let alpha = day_count.year_fraction(prev, d, context)?;
         let p = disc.df_on_date_curve(d)?;
         ann += alpha * p;
         prev = d;
@@ -166,7 +178,7 @@ pub fn fixed_leg_annuity(
 /// * `disc` - Discount curve supplying date-based fixed-leg discount factors.
 /// * `day_count` - Fixed-leg accrual day-count convention.
 /// * `frequency` - Optional coupon frequency required by conventions such as
-///   ACT/ACT (ICMA); `None` is valid for conventions without it.
+///   ACT/ACT (ICMA) and ACT/365L; `None` is valid for conventions without it.
 /// * `schedule` - Ordered coupon boundary/payment dates; the first and last
 ///   dates define the discount-ratio numerator.
 ///
@@ -209,9 +221,12 @@ pub fn par_rate_and_annuity_from_discount(
 ///
 /// * `disc` - Discount curve supplying present-value factors for both legs.
 /// * `fwd` - Forward curve supplying date-based floating reference rates.
+///   This curve-convention helper also uses its day count for floating coupon
+///   accrual; callers with an explicit floating convention must use that basis
+///   when calculating the floating leg.
 /// * `fixed_day_count` - Fixed-leg accrual day-count convention.
 /// * `fixed_frequency` - Optional fixed coupon frequency required by
-///   ACT/ACT-style accrual calculations.
+///   ACT/ACT-style and ACT/365L accrual calculations.
 /// * `schedule` - Ordered swap coupon boundary/payment dates shared by both
 ///   legs.
 /// * `float_spread_bp` - Contractual floating-leg spread in basis points,
@@ -285,7 +300,7 @@ pub(crate) fn floating_leg_pv_and_annuity(
                 })?;
                 fixings.value_on_exact(prev)?
             }
-            _ => asset_swap_projection_rate(fwd, prev, d)?,
+            _ => asset_swap_projection_rate(fwd, prev, d, yf)?,
         };
         float_pv.add((forward + spread) * yf * df);
         float_ann.add(yf * df);
@@ -298,17 +313,163 @@ pub(crate) fn floating_leg_pv_and_annuity(
 ///
 /// Overnight indices represent observation rates that are averaged over the
 /// coupon window. Term indices instead use the discount-factor-implied simple
-/// forward for the whole accrual period.
+/// forward for the whole accrual period, annualized using the floating leg
+/// accrual fraction rather than the curve's time coordinate.
 fn asset_swap_projection_rate(
     fwd: &ForwardCurve,
     start: Date,
     end: Date,
+    accrual_year_fraction: f64,
 ) -> finstack_quant_core::Result<f64> {
     const MAX_OVERNIGHT_TENOR_YEARS: f64 = 1.0 / 52.0;
 
     if fwd.tenor() <= MAX_OVERNIGHT_TENOR_YEARS {
-        rate_period_on_dates(fwd, start, end)
+        if end <= start
+            || start < fwd.base_date()
+            || !accrual_year_fraction.is_finite()
+            || accrual_year_fraction <= 0.0
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "asset-swap overnight projection requires a future positive accrual period".into(),
+            ));
+        }
+        let curve_accrual = curve_time(fwd, end)? - curve_time(fwd, start)?;
+        let rate = rate_period_on_dates(fwd, start, end)? * curve_accrual / accrual_year_fraction;
+        if !rate.is_finite() || curve_accrual <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "asset-swap overnight projection produced an invalid rate or curve accrual".into(),
+            ));
+        }
+        Ok(rate)
     } else {
-        rate_between_on_dates(fwd, start, end)
+        rate_between_on_dates(fwd, start, end, accrual_year_fraction)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use finstack_quant_core::dates::{DayCount, Tenor};
+    use time::macros::date;
+
+    #[test]
+    fn floating_asset_swap_uses_contractual_accrual_with_a_different_curve_clock() {
+        let start = date!(2025 - 04 - 02);
+        let end = date!(2025 - 07 - 02);
+        let disc = DiscountCurve::builder("USD-DISC")
+            .base_date(start)
+            .knots([(0.0, 1.0), (1.0, 1.0)])
+            .build()
+            .expect("zero discounting");
+        for tenor in [0.25, 1.0 / 365.0] {
+            let fwd = ForwardCurve::builder("USD-INDEX", tenor)
+                .base_date(start)
+                .day_count(DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+                .knots([(0.0, 0.04), (1.0, 0.07)])
+                .build()
+                .expect("forward curve");
+            let spread_bp = 125.0;
+            let accrual = (end - start).whole_days() as f64 / 360.0;
+            let growth = if tenor > 1.0 / 52.0 {
+                fwd.df_on_date_curve(start).expect("start DF")
+                    / fwd.df_on_date_curve(end).expect("end DF")
+                    - 1.0
+            } else {
+                // Exact integral of the linear raw curve on its ACT/365F clock.
+                let curve_time = (end - start).whole_days() as f64 / 365.0;
+                (0.04 + 0.5 * (0.07 - 0.04) * curve_time) * curve_time
+            };
+            let (pv, annuity) = floating_leg_pv_and_annuity(
+                &disc,
+                &fwd,
+                DayCount::Act360,
+                &[start, end],
+                spread_bp,
+                None,
+            )
+            .expect("floating asset swap");
+            assert!((annuity - accrual).abs() < 1e-14);
+            assert!((pv - growth - spread_bp * 1e-4 * accrual).abs() < 1e-14);
+        }
+    }
+
+    #[test]
+    fn act365l_annuity_preserves_annual_coupon_denominators_across_slices() {
+        let schedule = [
+            date!(2023 - 03 - 01),
+            date!(2024 - 03 - 01),
+            date!(2025 - 03 - 01),
+        ];
+        let disc = DiscountCurve::builder("ACT365L-ANNUITY")
+            .base_date(schedule[0])
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (366.0 / 365.0, 0.97), (731.0 / 365.0, 0.93)])
+            .build()
+            .expect("discount curve");
+        let annuity = fixed_leg_annuity(&disc, DayCount::Act365L, Some(Tenor::annual()), &schedule)
+            .expect("annual ACT/365L annuity");
+        assert!((annuity - 1.90).abs() < 1e-14);
+
+        // A balance or rate split changes cashflow weights, never the full
+        // coupon's denominator. These two slices reconstruct each unit coupon.
+        let mut segmented_annuity = 0.0;
+        for (start, end, split, denominator, df) in [
+            (schedule[0], schedule[1], date!(2023 - 06 - 01), 366.0, 0.97),
+            (schedule[1], schedule[2], date!(2024 - 06 - 01), 365.0, 0.93),
+        ] {
+            let context = DayCountContext {
+                frequency: Some(Tenor::annual()),
+                coupon_period: Some((start, end)),
+                ..DayCountContext::default()
+            };
+            let first = DayCount::Act365L
+                .year_fraction(start, split, context)
+                .expect("first slice");
+            let second = DayCount::Act365L
+                .year_fraction(split, end, context)
+                .expect("second slice");
+            assert!((first - (split - start).whole_days() as f64 / denominator).abs() < 1e-14);
+            assert!((second - (end - split).whole_days() as f64 / denominator).abs() < 1e-14);
+            segmented_annuity += (first + second) * df;
+        }
+        assert!((annuity - segmented_annuity).abs() < 1e-14);
+        assert!(fixed_leg_annuity(&disc, DayCount::Act365L, None, &schedule).is_err());
+    }
+
+    #[test]
+    fn act365l_annuity_uses_actual_stub_and_nonannual_boundaries() {
+        for (start, end, frequency, denominator) in [
+            (
+                date!(2024 - 03 - 01),
+                date!(2025 - 01 - 01),
+                Tenor::annual(),
+                365.0,
+            ),
+            (
+                date!(2023 - 12 - 01),
+                date!(2025 - 01 - 01),
+                Tenor::annual(),
+                366.0,
+            ),
+            (
+                date!(2024 - 03 - 01),
+                date!(2024 - 06 - 01),
+                Tenor::quarterly(),
+                366.0,
+            ),
+        ] {
+            let disc = DiscountCurve::builder("ACT365L-STUB-ANNUITY")
+                .base_date(start)
+                .day_count(DayCount::Act365F)
+                .knots([(0.0, 1.0), (3.0, 1.0)])
+                .build()
+                .expect("flat curve");
+            let annuity =
+                fixed_leg_annuity(&disc, DayCount::Act365L, Some(frequency), &[start, end])
+                    .expect("ACT/365L annuity");
+            let expected = (end - start).whole_days() as f64 / denominator;
+            assert!((annuity - expected).abs() < 1e-14, "{start} -> {end}");
+        }
     }
 }

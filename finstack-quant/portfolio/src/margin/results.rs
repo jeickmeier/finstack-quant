@@ -119,17 +119,13 @@ pub struct PortfolioMarginResult {
     pub total_segregated_im: Money,
     /// Results by netting set
     pub by_netting_set: HashMap<NettingSetId, NettingSetMargin>,
-    /// Number of positions included in margin calculation (i.e. those that
-    /// successfully landed in a netting set with computed margin).
+    /// Number of positions whose MTM was successfully included in a netting set.
+    /// Sensitivity or collateral-model failures can still mark them degraded.
     pub total_positions: usize,
-    /// Number of positions for which the engine did not produce a margin
-    /// figure. This is the count of `portfolio.positions.len() -
-    /// total_positions` and therefore conflates two qualitatively different
-    /// cases: (a) positions whose instruments are not marginable at all and
-    /// (b) positions whose sensitivity computation failed and were
-    /// recorded in [`Self::degraded_positions`]. Callers that need to
-    /// distinguish the two should subtract `degraded_positions.len()` from
-    /// this count to recover the count of truly non-marginable positions.
+    /// Number of distinct positions not registered for margin or marked degraded.
+    /// A position failing both MTM and sensitivity calculation is counted once.
+    /// Includes stale registered position IDs absent from the supplied portfolio.
+    /// Subtract `degraded_positions.len()` to count unregistered positions.
     pub positions_without_margin: usize,
     /// Positions whose sensitivity or VM valuation failed during aggregation.
     /// Each entry pairs the position id with the originating error message.

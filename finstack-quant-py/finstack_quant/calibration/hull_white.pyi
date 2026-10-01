@@ -192,17 +192,18 @@ class CapFloorQuote:
         strike : float
             Strike rate as a decimal per annum.
         volatility : float
-            Quoted flat volatility: decimal per annum for normal quotes,
-            annualized decimal for lognormal quotes.
+            Normal/Bachelier flat volatility in decimal rate units per square
+            root year; ``0.009`` means 90 bp normal volatility.
         is_cap : bool, default True
             True for a cap, False for a floor.
         is_normal_vol : bool, default True
-            True when ``volatility`` is a normal (Bachelier) volatility.
+            Must be True. Lognormal cap/floor quotes are unsupported.
 
         Raises
         ------
         ValueError
-            If ``maturity`` or ``volatility`` is not strictly positive.
+            If ``maturity`` or ``volatility`` is not finite and strictly
+            positive, ``strike`` is not finite, or ``is_normal_vol`` is False.
 
         """
 
@@ -445,14 +446,15 @@ class HullWhiteParams:
     @property
     def times(self) -> list[float]:
         """
-        Right endpoints of the volatility intervals, in years, increasing.
+        Increasing volatility segment start times in model years, beginning at zero.
 
         This property does not raise.
 
         Returns
         -------
         list[float]
-            Right endpoints of the volatility intervals, in years, increasing.
+            Start times with ``values[i]`` applying on ``[times[i], times[i+1])``;
+            the final value extrapolates flat beyond the last start time.
         """
 
     @property
@@ -670,9 +672,10 @@ class PiecewiseSigmaCalibrationConfig:
         Raises
         ------
         ValueError
-            If ``fixed_kappa`` or ``sigma_min`` is not strictly positive,
-            ``sigma_min`` is not below ``sigma_max``, or ``frequency`` is not
-            recognized.
+            If ``frequency`` is not recognized. Numeric constraints are validated
+            when the bootstrap runs: ``fixed_kappa`` must be in [0.001, 1.0],
+            sigma bounds must be finite and satisfy ``0 < sigma_min < sigma_max``,
+            and ``fit_tolerance`` must be finite and positive.
 
         """
 
@@ -757,7 +760,8 @@ def calibrate_hull_white_to_swaptions(
     discount : DiscountCurve
         Discount curve the swap annuities and forwards are read from.
     quotes : list[SwaptionQuote]
-        At least two swaption quotes, one per free parameter.
+        At least two swaption quotes, one per free parameter, with expiry and
+        tenor in ACT/365F years from the discount curve's base date.
     fit_tolerance : float
         Required positive maximum absolute reconstructed quote error. Normal
         quotes use decimal rate volatility (0.0001 is one basis point); Black
@@ -811,14 +815,21 @@ def calibrate_hull_white_to_cap_floors(
 ) -> tuple[HullWhiteCalibrationParams, CalibrationReport]:
     """Fit scalar Hull-White parameters to cap/floor quotes.
 
+    Uses regular numerical schedules from ``config.frequency`` and quote maturity,
+    with no calendar or settlement adjustment. Use
+    ``CalibrationStep.cap_floor_hull_white`` with an ``index_id`` for
+    convention-driven market contracts.
+
     Parameters
     ----------
     discount : DiscountCurve
         Discounting curve.
     quotes : list[CapFloorQuote]
-        Cap/floor quotes; a single quote requires ``config.fixed_kappa``.
+        Normal/Bachelier cap/floor quotes, with maturity in ACT/365F years from
+        the discount curve's base date. A single quote requires ``config.fixed_kappa``.
     forward : DiscountCurve | None, default None
-        Curve projecting the caplet forwards; ``discount`` when None.
+        Curve projecting the caplet forwards; ``discount`` when None. Rust
+        maps its day count and base date to the discount curve's valuation date.
     config : CapFloorCalibrationConfig
         Required quote-fit budget, frequency, fixed kappa and initial guess.
         Reports with ``success=False`` must not be treated as accepted fits.
@@ -864,17 +875,25 @@ def bootstrap_hull_white_sigma_schedule_to_cap_floors(
 ) -> tuple[HullWhiteParams, CalibrationReport]:
     """Bootstrap a piecewise-constant Hull-White volatility schedule.
 
+    Uses regular numerical schedules from ``config.frequency`` and quote maturity,
+    with no calendar or settlement adjustment. Use
+    ``CalibrationStep.cap_floor_hull_white`` with an ``index_id`` for
+    convention-driven market contracts.
+
     Parameters
     ----------
     discount : DiscountCurve
         Discounting curve.
     quotes : list[CapFloorQuote]
-        Cap/floor quotes with strictly increasing maturities; each maturity adds
-        one volatility interval.
+        Normal/Bachelier cap/floor quotes with distinct maturities in ACT/365F
+        years from the discount curve's base date. Rust sorts the quotes; each
+        quote adds a sigma segment, with later segments starting at the previous
+        quote's last caplet fixing. The final segment extends beyond the last quote.
     config : PiecewiseSigmaCalibrationConfig
         Fixed mean reversion, volatility brackets and payment frequency.
     forward : DiscountCurve | None, default None
-        Curve projecting the caplet forwards; ``discount`` when None.
+        Curve projecting the caplet forwards; ``discount`` when None. Rust
+        maps its day count and base date to the discount curve's valuation date.
 
     Returns
     -------
@@ -884,10 +903,12 @@ def bootstrap_hull_white_sigma_schedule_to_cap_floors(
     Raises
     ------
     ValueError
-        If no quotes are supplied, the configuration bounds are invalid, or a
-        curve argument is not a ``DiscountCurve``.
+        If quotes are empty or invalid, maturities or live fixing horizons are
+        not distinct and increasing, numeric configuration is invalid, or curve
+        arguments or discount factors are invalid. Also raised when an interval
+        cannot be bracketed within the sigma bounds or reaches the upper bound.
     RuntimeError
-        If an interval's volatility cannot be bracketed or solved.
+        If an interval's sigma solve or implied normal-vol inversion fails to converge.
 
     Examples:
     --------

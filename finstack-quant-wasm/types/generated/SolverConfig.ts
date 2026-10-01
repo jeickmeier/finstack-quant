@@ -20,10 +20,10 @@
  */
 export type SolverConfig = {
 /**
- * Numerical convergence tolerance; distinct from economic fit acceptance.
+ * Positive finite numerical convergence tolerance, distinct from economic fit acceptance.
  */
 tolerance: number,
 /**
- * Maximum iterations available to each solver invocation.
+ * Positive maximum number of iterations available to each solver invocation.
  */
 max_iterations: number, };

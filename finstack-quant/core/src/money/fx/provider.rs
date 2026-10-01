@@ -150,12 +150,43 @@ pub trait FxProvider: Send + Sync {
         policy: FxConversionPolicy,
     ) -> crate::Result<f64>;
 
+    /// Return the revision of the provider's current quote state, if cacheable.
+    ///
+    /// `Some(revision)` permits matrices to reuse observations only while this
+    /// revision remains unchanged. Every change that can affect a rate must
+    /// publish a different revision before the mutation completes; a revision
+    /// must never be reused for different quote state. Immutable providers can
+    /// return `Some(0)`.
+    ///
+    /// The default `None` disables observation caching. Use it for live or
+    /// externally updated providers that cannot track every quote change. The
+    /// matrix still honors its explicit global quotes and pinned fixings.
+    fn get_revision(&self) -> Option<u64> {
+        None
+    }
+
     /// Return all stored quotes for serialization.
     ///
     /// The default implementation returns an empty vec (appropriate for
     /// providers that compute rates on-the-fly). Providers that hold a
-    /// quote map should override this to enable full FxMatrix round-trips.
+    /// quote map should override this and [`get_revision`](Self::get_revision)
+    /// to enable coherent FxMatrix round-trips.
     fn snapshot_quotes(&self) -> Vec<(Currency, Currency, f64)> {
+        Vec::new()
+    }
+
+    /// Return stored date- and policy-scoped quotes for serialization.
+    ///
+    /// Each tuple contains the source currency, target currency, observation
+    /// date, conversion policy, and units of target currency per source unit.
+    /// These quotes override this provider's pair-global snapshot quotes for
+    /// their scope, but remain below explicit quotes in the containing matrix.
+    /// Implementations must use stored snapshot data without querying live
+    /// rates or freezing a reference-date observation. The default is empty
+    /// for providers without serializable scoped state. Providers exposing
+    /// stored quotes must also implement [`get_revision`](Self::get_revision)
+    /// so matrices can detect updates between snapshot hooks.
+    fn snapshot_pinned_quotes(&self) -> Vec<(Currency, Currency, Date, FxConversionPolicy, f64)> {
         Vec::new()
     }
 }

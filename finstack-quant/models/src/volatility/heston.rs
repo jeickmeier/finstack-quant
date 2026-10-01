@@ -54,36 +54,10 @@
 //!   model." *Wilmott Magazine*, September 2005. (Characteristic-function
 //!   tail decay rate used for the quadrature truncation bound.)
 
-use finstack_quant_core::math::gauss_legendre_grid;
 use num_complex::Complex64;
-use std::f64::consts::PI;
 
 const HESTON_G_DENOM_EPS: f64 = 1e-8;
 const HESTON_EXPONENT_REAL_LIMIT: f64 = 700.0;
-
-/// Target log-magnitude decay of the characteristic function at the
-/// truncation point of the Gil-Pelaez integrals: `ln(1e12) ≈ 27.63`,
-/// i.e. truncate where `|ψ(φ)|` has decayed below ~1e-12.
-const HESTON_TAIL_LOG_TARGET: f64 = 27.631_021_115_928_547;
-
-/// Width (in φ-space) of each composite Gauss-Legendre panel used for the
-/// Gil-Pelaez inversion. With 16-node panels this keeps the node density at
-/// the level historically used for the `[0, 50]` strip (128 nodes), which
-/// resolves integrand oscillation `e^{-iφ ln(S/K)}` out to deep wings
-/// (|ln(S/K)| ≈ 2 gives ~2 oscillation periods per panel).
-const HESTON_QUAD_PANEL_WIDTH: f64 = 6.25;
-
-/// Bounds on the number of composite quadrature panels per integral.
-const HESTON_QUAD_MIN_PANELS: usize = 8;
-const HESTON_QUAD_MAX_PANELS: usize = 320;
-
-/// Number of composite Gauss-Legendre panels for a Gil-Pelaez integral over
-/// `[lower, upper]`, keeping panel width at most [`HESTON_QUAD_PANEL_WIDTH`].
-fn quadrature_panels(lower: f64, upper: f64) -> usize {
-    let span = (upper - lower).max(0.0);
-    let panels = (span / HESTON_QUAD_PANEL_WIDTH).ceil() as usize;
-    panels.clamp(HESTON_QUAD_MIN_PANELS, HESTON_QUAD_MAX_PANELS)
-}
 
 /// Heston stochastic volatility model parameters.
 ///
@@ -151,80 +125,6 @@ impl TryFrom<RawHestonParams> for HestonParams {
 
     fn try_from(raw: RawHestonParams) -> finstack_quant_core::Result<Self> {
         Self::new(raw.v0, raw.kappa, raw.theta, raw.sigma_v, raw.rho)
-    }
-}
-
-/// Log-space spot/strike and discounting inputs shared by Gil–Pelaez \(P_j\) integration.
-#[derive(Clone, Copy)]
-struct HestonPjCoords {
-    /// Natural log of spot (\(\ln S\)).
-    x: f64,
-    /// Natural log of strike (\(\ln K\)).
-    ln_k: f64,
-    /// Risk-free rate (continuous).
-    r: f64,
-    /// Dividend yield (continuous).
-    q: f64,
-    /// Time to expiry in years.
-    t: f64,
-}
-
-struct HestonStripCache {
-    grid: Vec<(f64, f64)>,
-    psi1_over_iphi: Vec<Complex64>,
-    psi2_over_iphi: Vec<Complex64>,
-}
-
-impl HestonStripCache {
-    fn new(params: &HestonParams, coords: HestonPjCoords, upper_limit: f64) -> Option<Self> {
-        let order = 16;
-        let grid = gauss_legendre_grid(
-            1e-8,
-            upper_limit,
-            order,
-            quadrature_panels(1e-8, upper_limit),
-        )
-        .ok()?;
-        let i = Complex64::i();
-        let mut psi1_over_iphi = Vec::with_capacity(grid.len());
-        let mut psi2_over_iphi = Vec::with_capacity(grid.len());
-
-        for (phi, _) in &grid {
-            let denom = i * *phi;
-            let psi1 = params.char_func_j(1, *phi, coords.x, coords.r, coords.q, coords.t);
-            let psi2 = params.char_func_j(2, *phi, coords.x, coords.r, coords.q, coords.t);
-            psi1_over_iphi.push(if psi1.is_finite() {
-                psi1 / denom
-            } else {
-                Complex64::new(0.0, 0.0)
-            });
-            psi2_over_iphi.push(if psi2.is_finite() {
-                psi2 / denom
-            } else {
-                Complex64::new(0.0, 0.0)
-            });
-        }
-
-        Some(Self {
-            grid,
-            psi1_over_iphi,
-            psi2_over_iphi,
-        })
-    }
-
-    fn probability(&self, log_strike: f64, cached_values: &[Complex64]) -> f64 {
-        let i = Complex64::i();
-        let mut integral = 0.0;
-
-        for ((phi, weight), cached) in self.grid.iter().zip(cached_values) {
-            let exp_term = (-i * *phi * log_strike).exp();
-            let value = (exp_term * *cached).re;
-            if value.is_finite() {
-                integral += *weight * value;
-            }
-        }
-
-        (0.5 + integral / PI).clamp(0.0, 1.0)
     }
 }
 
@@ -391,7 +291,8 @@ impl HestonParams {
     ///
     /// # Returns
     ///
-    /// Option price (non-negative).
+    /// Option price (non-negative), or `NaN` if inputs are invalid or numerical
+    /// convergence cannot be established.
     #[must_use]
     pub fn price_european(
         &self,
@@ -402,85 +303,29 @@ impl HestonParams {
         t: f64,
         is_call: bool,
     ) -> f64 {
-        if t <= 0.0 {
-            if !spot.is_finite() || !strike.is_finite() {
-                return f64::NAN;
-            }
-            return if is_call {
-                (spot - strike).max(0.0)
-            } else {
-                (strike - spot).max(0.0)
-            };
-        }
-        if !spot.is_finite()
-            || !strike.is_finite()
-            || !r.is_finite()
-            || !q.is_finite()
-            || !t.is_finite()
-            || spot <= 0.0
-            || strike <= 0.0
-        {
-            return f64::NAN;
-        }
-
-        // Degenerate case: very small vol-of-vol → use Black-Scholes with the
-        // time-averaged deterministic variance (σ_v → 0 limit of CIR).
-        if self.sigma_v < 1e-10 {
-            return bs_call_fallback(
-                spot,
-                strike,
-                r,
-                q,
-                t,
-                self.deterministic_avg_vol(t),
-                is_call,
-            );
-        }
-
-        let (p1, p2) = self.compute_p1_p2(spot, strike, r, q, t);
-        if !p1.is_finite() || !p2.is_finite() {
-            return f64::NAN;
-        }
-
-        // Compute the put via parity from the UNclamped call, then clamp each
-        // result once at the end. Clamping the call before applying parity
-        // would shift the put by the clamped amount and break parity.
-        let call = spot * (-q * t).exp() * p1 - strike * (-r * t).exp() * p2;
-
-        if is_call {
-            call.max(0.0)
+        let params = crate::closed_form::heston::HestonPricingParams { r, q, model: *self };
+        let result = if is_call {
+            crate::closed_form::heston::heston_call_price_fourier(spot, strike, t, &params, None)
         } else {
-            (call - spot * (-q * t).exp() + strike * (-r * t).exp()).max(0.0)
-        }
-    }
-
-    /// Volatility of the σ_v → 0 deterministic-variance limit over `[0, t]`.
-    ///
-    /// When vol-of-vol vanishes, the CIR variance follows the deterministic
-    /// path `v(s) = θ + (v₀ − θ)e^{−κs}`. The Black-Scholes-equivalent
-    /// volatility is the square root of the time-averaged variance:
-    ///
-    /// ```text
-    /// v̄ = θ + (v₀ − θ)(1 − e^{−κT}) / (κT),   σ = √v̄
-    /// ```
-    ///
-    /// Using `√v₀` instead (the pre-fix behaviour) ignores mean reversion and
-    /// is correct only when `v₀ = θ`.
-    fn deterministic_avg_vol(&self, t: f64) -> f64 {
-        let kt = self.kappa * t;
-        let v_bar = if kt > 1e-12 {
-            self.theta + (self.v0 - self.theta) * (1.0 - (-kt).exp()) / kt
-        } else {
-            self.v0
+            crate::closed_form::heston::heston_put_price_fourier(spot, strike, t, &params, None)
         };
-        v_bar.max(0.0).sqrt()
+        result.unwrap_or(f64::NAN)
     }
 
     /// Price a strip of European options sharing the same expiry and model inputs.
     ///
-    /// Reuses the strike-independent part of the Fourier integrand across all
-    /// strikes, reducing characteristic-function evaluations from O(strikes x grid)
-    /// to O(grid).
+    /// Reuses the canonical checked Fourier driver and its strike-independent
+    /// characteristic-function evaluations. Returns `NaN` in every entry if input
+    /// validation or convergence fails.
+    ///
+    /// # Arguments
+    ///
+    /// * `spot` - Positive finite current underlying price in quote units.
+    /// * `strikes` - Positive finite exercise prices, in result order and spot units.
+    /// * `r` - Finite continuously compounded domestic rate, annual decimal.
+    /// * `q` - Finite continuous dividend yield or foreign rate, annual decimal.
+    /// * `t` - Finite time to expiry in years; non-positive values use expiry payoff.
+    /// * `is_call` - Whether to price calls (`true`) or puts (`false`).
     #[must_use]
     pub fn price_european_strip(
         &self,
@@ -491,293 +336,13 @@ impl HestonParams {
         t: f64,
         is_call: bool,
     ) -> Vec<f64> {
-        if strikes.is_empty() {
-            return Vec::new();
-        }
-
-        if t <= 0.0 {
-            return strikes
-                .iter()
-                .map(|&strike| {
-                    if !spot.is_finite() || !strike.is_finite() {
-                        f64::NAN
-                    } else if is_call {
-                        (spot - strike).max(0.0)
-                    } else {
-                        (strike - spot).max(0.0)
-                    }
-                })
-                .collect();
-        }
-
-        if !spot.is_finite()
-            || !r.is_finite()
-            || !q.is_finite()
-            || !t.is_finite()
-            || spot <= 0.0
-            || strikes
-                .iter()
-                .any(|&strike| !strike.is_finite() || strike <= 0.0)
-        {
-            return strikes.iter().map(|_| f64::NAN).collect();
-        }
-
-        if self.sigma_v < 1e-10 {
-            let vol = self.deterministic_avg_vol(t);
-            return strikes
-                .iter()
-                .map(|&strike| bs_call_fallback(spot, strike, r, q, t, vol, is_call))
-                .collect();
-        }
-
-        let coords = HestonPjCoords {
-            x: spot.ln(),
-            ln_k: strikes[0].ln(),
-            r,
-            q,
-            t,
-        };
-
-        let upper_limit = self.integration_upper_limit(t);
-        let Some(cache) = HestonStripCache::new(self, coords, upper_limit) else {
-            return strikes
-                .iter()
-                .map(|&strike| self.price_european(spot, strike, r, q, t, is_call))
-                .collect();
-        };
-
-        strikes
-            .iter()
-            .map(|&strike| {
-                let log_strike = strike.ln();
-                let p1 = cache.probability(log_strike, &cache.psi1_over_iphi);
-                let p2 = cache.probability(log_strike, &cache.psi2_over_iphi);
-                // Parity is applied to the unclamped call; clamp once at the end.
-                let call = spot * (-q * t).exp() * p1 - strike * (-r * t).exp() * p2;
-
-                if is_call {
-                    call.max(0.0)
-                } else {
-                    (call - spot * (-q * t).exp() + strike * (-r * t).exp()).max(0.0)
-                }
-            })
-            .collect()
-    }
-
-    /// Compute both P₁ and P₂ in a single Gauss-Legendre pass.
-    ///
-    /// Evaluates char_func_j for j=1 and j=2 at each quadrature point
-    /// simultaneously, halving the number of integration passes compared
-    /// to two separate `compute_pj` calls.
-    fn compute_p1_p2(&self, spot: f64, strike: f64, r: f64, q: f64, t: f64) -> (f64, f64) {
-        let coords = HestonPjCoords {
-            x: spot.ln(),
-            ln_k: strike.ln(),
-            r,
-            q,
-            t,
-        };
-
-        let upper_limit = self.integration_upper_limit(t);
-        self.compute_p1_p2_with_upper_limit(coords, upper_limit)
-    }
-
-    fn compute_p1_p2_with_upper_limit(
-        &self,
-        coords: HestonPjCoords,
-        upper_limit: f64,
-    ) -> (f64, f64) {
-        let (i1, i2) = self
-            .compute_p1_p2_interval_integral(coords, 1e-8, upper_limit)
-            .unwrap_or((f64::NAN, f64::NAN));
-
-        (
-            if i1.is_finite() {
-                (0.5 + i1 / PI).clamp(0.0, 1.0)
-            } else {
-                f64::NAN
-            },
-            if i2.is_finite() {
-                (0.5 + i2 / PI).clamp(0.0, 1.0)
-            } else {
-                f64::NAN
-            },
-        )
-    }
-
-    /// Gauss-Legendre integration computing both P₁ and P₂ integrands at each
-    /// quadrature point, sharing the `exp(-iφ ln K)/(iφ)` factor.
-    fn compute_p1_p2_interval_integral(
-        &self,
-        coords: HestonPjCoords,
-        lower: f64,
-        upper: f64,
-    ) -> Option<(f64, f64)> {
-        if !(lower.is_finite() && upper.is_finite()) || upper <= lower {
-            return None;
-        }
-
-        let integrand_pair = |phi: f64| -> (f64, f64) {
-            (
-                self.fourier_integrand(1, phi, coords),
-                self.fourier_integrand(2, phi, coords),
-            )
-        };
-
-        let panels = quadrature_panels(lower, upper);
-        let grid = gauss_legendre_grid(lower, upper, 16, panels).ok()?;
-        let mut sum1 = 0.0_f64;
-        let mut sum2 = 0.0_f64;
-
-        for (phi, weight) in grid {
-            let (f1, f2) = integrand_pair(phi);
-            sum1 += weight * f1;
-            sum2 += weight * f2;
-        }
-
-        Some((sum1, sum2))
-    }
-
-    /// Compute probability P_j via Fourier inversion (single-j variant for tests).
-    ///
-    /// P_j = 1/2 + (1/π) ∫₀^∞ Re[exp(-iφ ln K) ψ_j(φ) / (iφ)] dφ
-    #[cfg(test)]
-    fn compute_pj(&self, j: u8, spot: f64, strike: f64, r: f64, q: f64, t: f64) -> f64 {
-        let coords = HestonPjCoords {
-            x: spot.ln(),
-            ln_k: strike.ln(),
-            r,
-            q,
-            t,
-        };
-
-        let upper_limit = self.integration_upper_limit(t);
-        self.compute_pj_with_upper_limit(j, coords, upper_limit)
-    }
-
-    #[cfg(test)]
-    fn compute_pj_with_upper_limit(&self, j: u8, coords: HestonPjCoords, upper_limit: f64) -> f64 {
-        let integral = self
-            .compute_pj_interval_integral(j, coords, 1e-8, upper_limit)
-            .unwrap_or(f64::NAN);
-
-        if !integral.is_finite() {
-            return f64::NAN;
-        }
-
-        (0.5 + integral / PI).clamp(0.0, 1.0)
-    }
-
-    #[cfg(test)]
-    fn compute_pj_interval_integral(
-        &self,
-        j: u8,
-        coords: HestonPjCoords,
-        lower: f64,
-        upper: f64,
-    ) -> Option<f64> {
-        if !(lower.is_finite() && upper.is_finite()) || upper <= lower {
-            return None;
-        }
-
-        let integrand = |phi: f64| -> f64 { self.fourier_integrand(j, phi, coords) };
-
-        finstack_quant_core::math::integration::gauss_legendre_integrate_composite(
-            integrand,
-            lower,
-            upper,
-            16,
-            quadrature_panels(lower, upper),
-        )
-        .ok()
-    }
-
-    fn fourier_integrand(&self, j: u8, phi: f64, coords: HestonPjCoords) -> f64 {
-        if phi.abs() < 1e-10 {
-            return self.fourier_integrand_origin_limit(j, coords);
-        }
-
-        let i = Complex64::i();
-        let psi = self.char_func_j(j, phi, coords.x, coords.r, coords.q, coords.t);
-        if !psi.is_finite() {
-            return 0.0;
-        }
-        let exp_term = (-i * phi * coords.ln_k).exp();
-        let val = (exp_term * psi / (i * phi)).re;
-        if val.is_finite() {
-            val
+        let params = crate::closed_form::heston::HestonPricingParams { r, q, model: *self };
+        let result = if is_call {
+            crate::closed_form::heston::heston_call_prices_fourier(spot, strikes, t, &params, None)
         } else {
-            0.0
-        }
-    }
-
-    fn fourier_integrand_origin_limit(&self, j: u8, coords: HestonPjCoords) -> f64 {
-        let h = 1.0e-5;
-        let psi_plus = self.char_func_j(j, h, coords.x, coords.r, coords.q, coords.t);
-        let psi_minus = self.char_func_j(j, -h, coords.x, coords.r, coords.q, coords.t);
-        if !(psi_plus.is_finite() && psi_minus.is_finite()) {
-            return 0.0;
-        }
-        let dpsi = (psi_plus - psi_minus) / (2.0 * h);
-        let first_log_moment = (dpsi / Complex64::i()).re;
-        let limit = first_log_moment - coords.ln_k;
-        if limit.is_finite() {
-            limit
-        } else {
-            0.0
-        }
-    }
-
-    /// Upper integration limit for the Gil-Pelaez inversion.
-    ///
-    /// Chooses the truncation point `φ_max` so the characteristic function
-    /// magnitude has decayed below ~1e-12, covering both tail regimes:
-    ///
-    /// 1. **Asymptotic (large `φ·t`)**: `|ψ(φ)| ≈ exp(−C∞ φ)` with
-    ///    `C∞ = √(1−ρ²) (v₀ + κθT) / σ` (Kahl & Jäckel 2005, "Not-so-complex
-    ///    logarithms in the Heston model", *Wilmott*, Sec. 5). This dominates
-    ///    for long maturities and high vol-of-vol, where decay is far slower
-    ///    than Gaussian.
-    /// 2. **Pre-asymptotic (short-dated, `d·t ≲ 1`)**: the CF behaves
-    ///    Black-Scholes-like, `|ψ(φ)| ≈ exp(−½ v̄ t φ²)`; using
-    ///    `v̄ = min(v₀, θ)` is conservative.
-    ///
-    /// `φ_max` is the larger of the two bounds, clamped to `[50, 2000]`. The
-    /// composite quadrature scales its panel count with the interval (see
-    /// [`quadrature_panels`]) so node density — and therefore resolution of
-    /// the `e^{-iφ ln K}` oscillation, including deep wings — is preserved
-    /// regardless of the truncation point.
-    fn integration_upper_limit(&self, t: f64) -> f64 {
-        if self.sigma_v > 0.0 && t > 0.0 {
-            let c_inf = (1.0 - self.rho * self.rho).sqrt()
-                * (self.v0 + self.kappa * self.theta * t)
-                / self.sigma_v;
-            let exp_bound = if c_inf > 0.0 {
-                HESTON_TAIL_LOG_TARGET / c_inf
-            } else {
-                f64::INFINITY
-            };
-            let v_min = self.v0.min(self.theta);
-            let gauss_bound = if v_min > 0.0 {
-                (2.0 * HESTON_TAIL_LOG_TARGET / (v_min * t)).sqrt()
-            } else {
-                f64::INFINITY
-            };
-            exp_bound.max(gauss_bound).clamp(50.0, 2_000.0)
-        } else {
-            100.0
-        }
-    }
-
-    /// Characteristic function ψ_j(φ) for the Heston model.
-    ///
-    /// Uses the "Little Heston Trap" formulation (Albrecher et al. 2007)
-    /// which places −d in the numerator of g, ensuring |g exp(−dT)| < 1
-    /// and avoiding branch-cut discontinuities.
-    fn char_func_j(&self, j: u8, phi: f64, x: f64, r: f64, q: f64, t: f64) -> Complex64 {
-        // Delegates to the shared canonical CF; this driver treats a zeroed
-        // value the same whether it overflowed or underflowed.
-        heston_pj_characteristic_function(j, phi, x, r, q, t, self).0
+            crate::closed_form::heston::heston_put_prices_fourier(spot, strikes, t, &params, None)
+        };
+        result.unwrap_or_else(|_| vec![f64::NAN; strikes.len()])
     }
 }
 
@@ -858,6 +423,10 @@ pub fn heston_pj_characteristic_function(
     let one = Complex64::new(1.0, 0.0);
     let zero = Complex64::new(0.0, 0.0);
 
+    if phi == 0.0 {
+        return (one, HestonCfStatus::Ok);
+    }
+
     // For P₁: u = 0.5, b = κ − ρσ (stock numeraire)
     // For P₂: u = −0.5, b = κ (money market numeraire)
     let (u_j, b_j) = if j == 1 {
@@ -882,7 +451,10 @@ pub fn heston_pj_characteristic_function(
     if !g_denom.is_finite() || g_denom.norm() <= g_denom_limit {
         return (zero, HestonCfStatus::Overflow);
     }
-    let g = (bm - d) / g_denom;
+    // Rationalize (bm-d)/sigma² before subtraction loses its significant
+    // digits. This remains well conditioned as vol-of-vol tends to zero.
+    let scaled_difference = Complex64::new(-phi * phi, 2.0 * u_j * phi) / g_denom;
+    let g = sigma_sq * scaled_difference / g_denom;
     if !g.is_finite() {
         return (zero, HestonCfStatus::Overflow);
     }
@@ -892,14 +464,25 @@ pub fn heston_pj_characteristic_function(
         return (zero, HestonCfStatus::Overflow);
     }
 
-    // C = (r−q)iφT + (a/σ²)[(b−ρσiφ−d)T − 2 ln((1−g exp(−dT))/(1−g))]
-    let c_val = i * phi * (r - q) * t
-        + (a / sigma_sq)
-            * ((bm - d) * t
-                - Complex64::new(2.0, 0.0) * ((one - g * exp_minus_dt) / (one - g)).ln());
-
-    // D = (b−ρσiφ−d)/σ² × (1−exp(−dT))/(1−g exp(−dT))
-    let d_val = ((bm - d) / sigma_sq) * (one - exp_minus_dt) / (one - g * exp_minus_dt);
+    let one_minus_exp = if (d * t).norm() < 1e-4 {
+        let z = -d * t;
+        // -expm1(z), evaluated without cancellation for small complex z.
+        -z * (one + z * (0.5 + z * (1.0 / 6.0 + z * (1.0 / 24.0 + z / 120.0))))
+    } else {
+        one - exp_minus_dt
+    };
+    // log((1-g exp(-dT))/(1-g))/sigma² = log1p(w)/w * w/sigma².
+    // Computing w/sigma² directly preserves the deterministic limit even if
+    // sigma² underflows. No Black-Scholes substitution is needed.
+    let scaled_w = scaled_difference / g_denom * one_minus_exp / (one - g);
+    let w = sigma_sq * scaled_w;
+    let log1p_ratio = if w.norm() < 1e-4 {
+        one + w * (-0.5 + w * (1.0 / 3.0 + w * (-0.25 + w / 5.0)))
+    } else {
+        (one + w).ln() / w
+    };
+    let c_val = i * phi * (r - q) * t + a * (scaled_difference * t - 2.0 * scaled_w * log1p_ratio);
+    let d_val = scaled_difference * one_minus_exp / (one - g * exp_minus_dt);
     if !c_val.is_finite() || !d_val.is_finite() {
         return (zero, HestonCfStatus::Overflow);
     }
@@ -920,16 +503,9 @@ pub fn heston_pj_characteristic_function(
     (psi, HestonCfStatus::Ok)
 }
 
-/// Black-Scholes fallback for degenerate Heston (σ_v ≈ 0).
-fn bs_call_fallback(
-    spot: f64,
-    strike: f64,
-    r: f64,
-    q: f64,
-    t: f64,
-    vol: f64,
-    is_call: bool,
-) -> f64 {
+/// Independent Black-Scholes reference for the deterministic-variance limit.
+#[cfg(test)]
+fn bs_reference(spot: f64, strike: f64, r: f64, q: f64, t: f64, vol: f64, is_call: bool) -> f64 {
     use finstack_quant_core::math::special_functions::norm_cdf;
 
     if vol <= 0.0 || t <= 0.0 {
@@ -1043,7 +619,7 @@ mod tests {
         // sigma_v → 0: Heston degenerates to Black-Scholes
         let p = HestonParams::new(var, 2.0, var, 1e-12, 0.0).expect("valid");
         let heston = p.price_european(100.0, 100.0, 0.05, 0.0, 1.0, true);
-        let bs = bs_call_fallback(100.0, 100.0, 0.05, 0.0, 1.0, vol, true);
+        let bs = bs_reference(100.0, 100.0, 0.05, 0.0, 1.0, vol, true);
 
         assert!(
             (heston - bs).abs() < 0.01,
@@ -1052,7 +628,7 @@ mod tests {
     }
 
     #[test]
-    fn sigma_v_zero_fallback_uses_time_averaged_variance() {
+    fn sigma_v_zero_limit_uses_time_averaged_variance() {
         // v0 ≠ θ: the σ_v → 0 limit is the time-averaged deterministic CIR
         // variance, NOT v0. v̄ = θ + (v0−θ)(1−e^{−κT})/(κT).
         let v0 = 0.01;
@@ -1083,18 +659,18 @@ mod tests {
             "closed form v̄={v_bar:.10} vs brute force {v_bar_numeric:.10}"
         );
 
-        // The fallback price must match Black-Scholes at σ = √v̄ (≈ 23.5%),
+        // The limiting price must match Black-Scholes at σ = √v̄ (≈ 23.5%),
         // not at √v0 = 10%.
         let heston = p.price_european(100.0, 100.0, 0.05, 0.0, t, true);
-        let bs_avg = bs_call_fallback(100.0, 100.0, 0.05, 0.0, t, v_bar.sqrt(), true);
-        let bs_v0 = bs_call_fallback(100.0, 100.0, 0.05, 0.0, t, v0.sqrt(), true);
+        let bs_avg = bs_reference(100.0, 100.0, 0.05, 0.0, t, v_bar.sqrt(), true);
+        let bs_v0 = bs_reference(100.0, 100.0, 0.05, 0.0, t, v0.sqrt(), true);
         assert!(
             (heston - bs_avg).abs() < 1e-10,
-            "fallback should use √v̄: heston={heston:.6}, bs(√v̄)={bs_avg:.6}"
+            "limit should use √v̄: heston={heston:.6}, bs(√v̄)={bs_avg:.6}"
         );
         assert!(
             (heston - bs_v0).abs() > 1.0,
-            "fallback must not collapse to √v0: heston={heston:.6}, bs(√v0)={bs_v0:.6}"
+            "limit must not collapse to √v0: heston={heston:.6}, bs(√v0)={bs_v0:.6}"
         );
     }
 
@@ -1170,72 +746,25 @@ mod tests {
     }
 
     #[test]
-    fn heston_upper_bound_captures_short_dated_tail() {
-        // Short-dated/low-variance parameters where the CF decays
-        // Black-Scholes-like (exp(-v t phi^2 / 2)); the pre-fix sigma_v-based
-        // heuristic truncated at phi=500 and left material tail mass.
-        let p = HestonParams::new(0.01, 3.0, 0.01, 0.02, -0.5).expect("valid");
-        let spot: f64 = 100.0;
-        let strike: f64 = 100.0;
-        let r: f64 = 0.01;
-        let q: f64 = 0.0;
-        let t: f64 = 0.005;
-        let coords = HestonPjCoords {
-            x: spot.ln(),
-            ln_k: strike.ln(),
-            r,
-            q,
-            t,
-        };
-        let upper = p.integration_upper_limit(t);
-
-        let at_heuristic = p.compute_pj(1, spot, strike, r, q, t);
-        let extended = p.compute_pj_with_upper_limit(1, coords, 2.0 * upper);
-        let truncated = p.compute_pj_with_upper_limit(1, coords, 0.5 * upper);
-
-        assert!(
-            (truncated - extended).abs() > 1e-6,
-            "test case should exercise a materially non-zero tail: upper={upper}, truncated={truncated}, extended={extended}"
-        );
-        assert!(
-            (at_heuristic - extended).abs() < 1e-8,
-            "heuristic upper limit should capture the integrand tail: upper={upper}, at_heuristic={at_heuristic}, extended={extended}"
-        );
-    }
-
-    #[test]
-    fn heston_characteristic_function_handles_extreme_inputs() {
+    fn heston_characteristic_function_is_normalized_with_positive_correlation() {
         let p = HestonParams::new(0.04, 0.1, 0.04, 1.0, 0.9).expect("valid");
-        let psi = p.char_func_j(1, 0.0, 100.0_f64.ln(), 0.05, 0.0, 1.0);
-        assert!(
-            psi.is_finite(),
-            "characteristic function should stay finite"
-        );
+        for j in [1, 2] {
+            let (psi, status) =
+                heston_pj_characteristic_function(j, 0.0, 100.0_f64.ln(), 0.05, 0.0, 1.0, &p);
+            assert_eq!(status, HestonCfStatus::Ok);
+            assert_eq!(psi, Complex64::new(1.0, 0.0));
+        }
     }
 
     #[test]
-    fn heston_fourier_integrand_origin_uses_finite_limit() {
-        let p = HestonParams::new(0.04, 2.0, 0.04, 0.3, -0.5).expect("valid");
-        let coords = HestonPjCoords {
-            x: 100.0_f64.ln(),
-            ln_k: 100.0_f64.ln(),
-            r: 0.05,
-            q: 0.01,
-            t: 1.0,
-        };
-
-        let origin = p.fourier_integrand_origin_limit(1, coords);
-        let nearby = p.fourier_integrand(1, 1.0e-6, coords);
-
-        assert!(origin.is_finite());
-        assert!(
-            origin.abs() > 1.0e-6,
-            "origin limit should not be silently zero"
-        );
-        assert!(
-            (origin - nearby).abs() < 1.0e-3,
-            "origin={origin}, nearby={nearby}"
-        );
+    fn public_heston_paths_share_short_expiry_convergence() {
+        let params = HestonParams::new(0.04, 2.0, 0.04, 0.3, -0.7).expect("valid");
+        for (t, expected) in [(0.001, 0.254803543342), (0.0001, 0.080038149868)] {
+            let scalar = params.price_european(100.0, 100.0, 0.05, 0.0, t, true);
+            let strip = params.price_european_strip(100.0, &[100.0], 0.05, 0.0, t, true);
+            assert!((scalar - expected).abs() < 1e-9, "t={t}, price={scalar}");
+            assert!((strip[0] - scalar).abs() < 1e-12);
+        }
     }
 
     #[test]

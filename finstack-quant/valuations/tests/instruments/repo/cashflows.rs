@@ -26,8 +26,8 @@ fn test_cashflow_schedule_structure() {
 
     let cashflows = repo.dated_cashflows(&context, date(2025, 1, 10)).unwrap();
 
-    // Should have exactly 2 cashflows: initial outflow and final inflow
-    assert_eq!(cashflows.len(), 2);
+    // Initial principal, maturity interest, and maturity principal.
+    assert_eq!(cashflows.len(), 3);
 }
 
 #[test]
@@ -50,8 +50,11 @@ fn test_full_schedule_marks_initial_exchange_as_notional() {
         .cashflow_schedule(&context, date(2025, 1, 10))
         .expect("repo full schedule");
 
-    assert_eq!(schedule.get_flows().len(), 2);
+    assert_eq!(schedule.get_flows().len(), 3);
     assert_eq!(schedule.get_flows()[0].kind, CFKind::Notional);
+    assert_eq!(schedule.get_flows()[1].kind, CFKind::Fixed);
+    assert_eq!(schedule.get_flows()[2].kind, CFKind::Notional);
+    assert_eq!(schedule.get_flows()[2].amount, repo.cash_amount);
 }
 
 #[test]
@@ -101,9 +104,10 @@ fn test_final_cashflow_includes_interest() {
 
     let cashflows = repo.dated_cashflows(&context, date(2025, 1, 10)).unwrap();
 
-    let (maturity_date, cash_inflow) = &cashflows[1];
+    let maturity_date = cashflows[1].0;
+    let cash_inflow = cashflows[1].1.checked_add(cashflows[2].1).unwrap();
 
-    assert_eq!(*maturity_date, date(2025, 4, 15));
+    assert_eq!(maturity_date, date(2025, 4, 15));
     assert!(
         cash_inflow.amount() > 1_000_000.0,
         "Final flow should include interest"
@@ -112,7 +116,7 @@ fn test_final_cashflow_includes_interest() {
 
     // Verify it matches total repayment
     let expected_repayment = repo.total_repayment().unwrap();
-    assert_money_approx_eq(*cash_inflow, expected_repayment, 0.01);
+    assert_money_approx_eq(cash_inflow, expected_repayment, 0.01);
 }
 
 #[test]
@@ -149,6 +153,7 @@ fn test_cashflow_dates_match_repo_dates() {
         cashflows[1].0, adj_maturity,
         "Second cashflow should be at adjusted maturity"
     );
+    assert_eq!(cashflows[2].0, adj_maturity);
 }
 
 #[test]
@@ -170,7 +175,12 @@ fn test_cashflow_net_present_value() {
     let cashflows = repo.dated_cashflows(&context, date(2025, 1, 10)).unwrap();
 
     // Net cashflow should equal interest amount (ignoring time value)
-    let net_undiscounted = cashflows[0].1.checked_add(cashflows[1].1).unwrap();
+    let net_undiscounted = cashflows
+        .iter()
+        .try_fold(Money::from((0_i64, Currency::USD)), |total, (_, cash)| {
+            total.checked_add(*cash)
+        })
+        .unwrap();
     let interest = repo.interest_amount().unwrap();
 
     assert_money_approx_eq(net_undiscounted, interest, 0.01);
@@ -232,8 +242,9 @@ fn test_dated_flows_exclude_settled_start_leg_mid_life() {
         .dated_cashflows(&context, date(2025, 2, 1))
         .expect("mid-life dated flows should build");
 
-    assert_eq!(cashflows.len(), 1);
+    assert_eq!(cashflows.len(), 2);
     assert_eq!(cashflows[0].0, date(2025, 4, 15));
+    assert_eq!(cashflows[1].0, date(2025, 4, 15));
     assert!(cashflows[0].1.amount() > 0.0);
 }
 
@@ -256,7 +267,8 @@ fn test_zero_rate_cashflows() {
     let cashflows = repo.dated_cashflows(&context, date(2025, 1, 10)).unwrap();
 
     // Final cashflow should equal principal (no interest)
-    assert_eq!(cashflows[1].1.amount(), 1_000_000.0);
+    assert_eq!(cashflows[1].1.amount(), 0.0);
+    assert_eq!(cashflows[2].1.amount(), 1_000_000.0);
 }
 
 #[test]
@@ -277,12 +289,12 @@ fn test_overnight_repo_cashflows() {
 
     let cashflows = repo.dated_cashflows(&context, date(2025, 1, 14)).unwrap();
 
-    assert_eq!(cashflows.len(), 2);
+    assert_eq!(cashflows.len(), 3);
     assert_eq!(cashflows[0].0, date(2025, 1, 15));
     assert!(cashflows[1].0 > date(2025, 1, 15), "Maturity after start");
 
     // Small interest for overnight
-    let interest = cashflows[1].1.amount() - 5_000_000.0;
+    let interest = cashflows[1].1.amount();
     assert!(interest > 0.0);
     assert!(interest < 1000.0, "Overnight interest should be small");
 }
@@ -316,6 +328,7 @@ fn test_cashflows_currency_consistency() {
     // All cashflows should be in EUR
     assert_eq!(cashflows[0].1.currency(), Currency::EUR);
     assert_eq!(cashflows[1].1.currency(), Currency::EUR);
+    assert_eq!(cashflows[2].1.currency(), Currency::EUR);
 }
 
 #[test]
@@ -337,7 +350,8 @@ fn test_large_notional_cashflows() {
     let cashflows = repo.dated_cashflows(&context, date(2025, 1, 10)).unwrap();
 
     assert_eq!(cashflows[0].1.amount(), -100_000_000.0);
-    assert!(cashflows[1].1.amount() > 100_000_000.0);
+    assert_eq!(cashflows[2].1.amount(), 100_000_000.0);
+    assert!(cashflows[1].1.amount() > 0.0);
 
     // Interest should be proportionally scaled
     let interest = repo.interest_amount().unwrap();

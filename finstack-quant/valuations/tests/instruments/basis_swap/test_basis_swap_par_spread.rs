@@ -45,6 +45,104 @@ fn market() -> MarketContext {
 }
 
 #[test]
+fn par_spread_preserves_end_of_month_on_sloped_curves() {
+    let as_of = d(2025, 1, 1);
+    let ctx = MarketContext::new()
+        .insert(
+            DiscountCurve::builder("USD-OIS")
+                .base_date(as_of)
+                .knots([(0.0, 1.0), (1.0, 0.97), (3.0, 0.88)])
+                .build()
+                .unwrap(),
+        )
+        .insert(
+            ForwardCurve::builder("USD-SOFR-3M", 1.0 / 12.0)
+                .base_date(as_of)
+                .day_count(DayCount::Act360)
+                .knots([(0.0, 0.01), (1.0, 0.05), (3.0, 0.09)])
+                .build()
+                .unwrap(),
+        )
+        .insert(
+            ForwardCurve::builder("USD-SOFR-1M", 1.0 / 12.0)
+                .base_date(as_of)
+                .day_count(DayCount::Act360)
+                .knots([(0.0, 0.02), (1.0, 0.055), (3.0, 0.095)])
+                .build()
+                .unwrap(),
+        );
+    let mut swap = BasisSwap::example().unwrap();
+    for leg in [&mut swap.primary_leg, &mut swap.reference_leg] {
+        leg.start = d(2025, 4, 30);
+        leg.end = d(2027, 4, 30);
+        leg.frequency = Tenor::monthly();
+        leg.end_of_month = true;
+        leg.day_count = DayCount::Act360;
+        leg.stub = StubKind::ShortBack;
+        leg.calendar_id = Some(CALENDAR_ID.into());
+        leg.spread_bp = Decimal::ZERO;
+    }
+    let result = swap
+        .price_with_metrics(&ctx, as_of, &[MetricId::BasisParSpread], Default::default())
+        .unwrap();
+    swap.primary_leg.spread_bp =
+        Decimal::try_from(result.measures[MetricId::BasisParSpread.as_str()]).unwrap();
+    let residual = swap.value(&ctx, as_of).unwrap().amount();
+    assert!(residual.abs() < 1e-5, "par residual: {residual}");
+
+    // Verify this fixture distinguishes EOM from a same-day-of-month roll;
+    // otherwise a false EOM-preservation test could pass by coincidence.
+    swap.primary_leg.end_of_month = false;
+    assert!(swap.value(&ctx, as_of).unwrap().amount().abs() > 1.0);
+}
+
+#[test]
+fn par_spread_preserves_separate_fixing_calendar() {
+    use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+
+    // May 26 is a holiday in the payment calendar but a business day in the
+    // explicitly selected fixing calendar. Both exact observations are present
+    // so silently dropping the fixing calendar causes a measurable wrong price.
+    let as_of = d(2025, 5, 27);
+    let ctx = market()
+        .insert_series(
+            ScalarTimeSeries::new(
+                "FIXING:USD-SOFR-3M",
+                vec![(d(2025, 5, 23), 0.01), (d(2025, 5, 26), 0.04)],
+                None,
+            )
+            .unwrap(),
+        )
+        .insert_series(
+            ScalarTimeSeries::new("FIXING:USD-SOFR-1M", vec![(d(2025, 5, 23), 0.03)], None)
+                .unwrap(),
+        );
+    let mut swap = BasisSwap::example().unwrap();
+    for leg in [&mut swap.primary_leg, &mut swap.reference_leg] {
+        leg.start = as_of;
+        leg.end = d(2025, 8, 27);
+        leg.frequency = Tenor::quarterly();
+        leg.day_count = DayCount::Act360;
+        leg.calendar_id = Some(CALENDAR_ID.into());
+        leg.reset_lag_days = 1;
+        leg.spread_bp = Decimal::ZERO;
+    }
+    swap.primary_leg.fixing_calendar_id = Some("weekends_only".into());
+    let result = swap
+        .price_with_metrics(&ctx, as_of, &[MetricId::BasisParSpread], Default::default())
+        .unwrap();
+    let par = result.measures[MetricId::BasisParSpread.as_str()];
+    // Same accrual/payment convention gives an exact spread of 3% - 4%.
+    assert!((par + 100.0).abs() < 1e-9, "par spread: {par}");
+    swap.primary_leg.spread_bp = Decimal::try_from(par).unwrap();
+    assert!(swap.value(&ctx, as_of).unwrap().amount().abs() < 1e-7);
+    assert_eq!(
+        swap.primary_leg.fixing_calendar_id.as_deref(),
+        Some("weekends_only")
+    );
+}
+
+#[test]
 fn par_spread_zeros_npv() {
     // Test that applying the computed par spread results in zero NPV
     let ctx = market();

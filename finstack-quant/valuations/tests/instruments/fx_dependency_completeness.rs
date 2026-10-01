@@ -40,7 +40,7 @@ fn build_fx_matrix(base: Currency, quote: Currency, rate: f64) -> FxMatrix {
 #[test]
 fn test_fx_forward_dependencies_complete() {
     let as_of = date!(2025 - 01 - 01);
-    let maturity = as_of.add_months(6);
+    let maturity = as_of.add_months(6).expect("valid date shift");
 
     let forward = FxForward::builder()
         .id(InstrumentId::new("EURUSD-FWD-DEPS"))
@@ -79,7 +79,7 @@ fn test_fx_forward_dependencies_complete() {
 #[test]
 fn test_missing_fx_matrix_fails() {
     let as_of = date!(2025 - 01 - 01);
-    let maturity = as_of.add_months(6);
+    let maturity = as_of.add_months(6).expect("valid date shift");
 
     let forward = FxForward::builder()
         .id(InstrumentId::new("EURUSD-FWD-MISSING-FX"))

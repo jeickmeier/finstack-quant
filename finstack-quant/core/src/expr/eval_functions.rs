@@ -41,7 +41,9 @@
 use super::ast::Function;
 use super::context::SimpleContext;
 use super::eval::CompiledExpr;
-use crate::math::{finite_count, finite_max_or_nan, finite_min_or_nan, quantile_linear_or_nan};
+use crate::math::{
+    finite_count, finite_max_or_nan, finite_min_or_nan, quantile_linear_or_nan, NeumaierAccumulator,
+};
 
 impl CompiledExpr {
     #[inline]
@@ -289,18 +291,10 @@ impl CompiledExpr {
             out.fill(f64::NAN);
             return Ok(());
         };
-        if base.iter().any(|v| v.is_nan()) {
-            Self::rolling_apply_into(base, win, out, &mut |w| {
-                w.iter().copied().sum::<f64>() / w.len() as f64
-            });
-        } else {
-            Self::rolling_sum_incremental(base, win, out);
-            let w = win as f64;
-            for v in out.iter_mut() {
-                if !v.is_nan() {
-                    *v /= w;
-                }
-            }
+        Self::rolling_sum_incremental(base, win, out);
+        let w = win as f64;
+        for v in out.iter_mut() {
+            *v /= w;
         }
         Ok(())
     }
@@ -322,33 +316,71 @@ impl CompiledExpr {
             out.fill(f64::NAN);
             return Ok(());
         };
-        if base.iter().any(|v| v.is_nan()) {
-            Self::rolling_apply_into(base, win, out, &mut |w| w.iter().copied().sum());
-        } else {
-            Self::rolling_sum_incremental(base, win, out);
-        }
+        Self::rolling_sum_incremental(base, win, out);
         Ok(())
     }
 
-    /// O(n) incremental rolling sum (shared by rolling_sum and rolling_mean).
-    /// Requires NaN-free input; caller must check.
+    /// Compensated rolling sum shared by all rolling_sum/rolling_mean inputs.
+    ///
+    /// Nonfinite membership is counted separately so expired NaNs/infinities
+    /// cannot poison later windows. Rebuilding once per window bounds accumulated
+    /// update error while retaining O(n) work for ordinary finite arithmetic.
     fn rolling_sum_incremental(base: &[f64], win: usize, out: &mut [f64]) {
         let len = base.len();
         if win == 0 {
             out.fill(f64::NAN);
             return;
         }
-        let mut sum = 0.0_f64;
+        let mut sum = NeumaierAccumulator::new();
+        let mut nan_count = 0_usize;
+        let mut positive_infinities = 0_usize;
+        let mut negative_infinities = 0_usize;
         for i in 0..len {
-            sum += base[i];
             if i >= win {
-                sum -= base[i - win];
+                let expired = base[i - win];
+                if expired.is_nan() {
+                    nan_count -= 1;
+                } else if expired == f64::INFINITY {
+                    positive_infinities -= 1;
+                } else if expired == f64::NEG_INFINITY {
+                    negative_infinities -= 1;
+                } else {
+                    sum.add(-expired);
+                }
             }
-            if i + 1 >= win {
-                out[i] = sum;
+            let value = base[i];
+            if value.is_nan() {
+                nan_count += 1;
+            } else if value == f64::INFINITY {
+                positive_infinities += 1;
+            } else if value == f64::NEG_INFINITY {
+                negative_infinities += 1;
             } else {
-                out[i] = f64::NAN;
+                sum.add(value);
             }
+
+            // An exceptional overflow may require more frequent rebuilding;
+            // it must not leave the accumulator corrupted after it expires.
+            if (i >= win && i % win == 0) || !sum.total().is_finite() {
+                sum = NeumaierAccumulator::new();
+                for &value in &base[(i + 1).saturating_sub(win)..=i] {
+                    if value.is_finite() {
+                        sum.add(value);
+                    }
+                }
+            }
+            out[i] = if i + 1 < win
+                || nan_count > 0
+                || (positive_infinities > 0 && negative_infinities > 0)
+            {
+                f64::NAN
+            } else if positive_infinities > 0 {
+                f64::INFINITY
+            } else if negative_infinities > 0 {
+                f64::NEG_INFINITY
+            } else {
+                sum.total()
+            };
         }
     }
 
@@ -359,8 +391,7 @@ impl CompiledExpr {
     /// `[0.001, 0.999]`, which silently rescaled slow EWMs and wrongly excluded
     /// the valid `alpha = 1.0`). Both now funnel through this helper so a given
     /// `alpha` always means the same thing. Non-finite or non-positive inputs are
-    /// floored to a tiny epsilon (which keeps the `adjust = true` bias weight
-    /// `alpha / (1 - (1 - alpha)^n)` away from `0/0`); values above 1 are capped.
+    /// floored to a tiny positive smoothing factor; values above 1 are capped.
     #[inline]
     fn resolve_ewm_alpha(raw: f64) -> f64 {
         const EWM_ALPHA_FLOOR: f64 = 1e-12;
@@ -657,12 +688,15 @@ impl CompiledExpr {
                 return Ok(());
             };
             for (i, slot) in out.iter_mut().enumerate() {
-                let shifted_idx = i as i32 - n;
-                *slot = if shifted_idx >= 0 && shifted_idx < base.len() as i32 {
-                    base[shifted_idx as usize]
+                let shifted_idx = if n >= 0 {
+                    i.checked_sub(n as usize)
                 } else {
-                    f64::NAN
+                    i.checked_add(n.unsigned_abs() as usize)
                 };
+                *slot = shifted_idx
+                    .and_then(|index| base.get(index))
+                    .copied()
+                    .unwrap_or(f64::NAN);
             }
             return Ok(());
         }
@@ -941,20 +975,14 @@ impl CompiledExpr {
                 .map(|&x| x > 0.0)
                 .unwrap_or(true);
 
-            // Seed the EMA state from the first non-NaN observation; leading
-            // NaNs emit NaN and must not poison the recursion (previously a
-            // leading NaN seeded `ema`/`ema_sq` and `.max(0.0)` silently
-            // converted the resulting NaN variance to 0.0 — see
-            // ). Interior NaNs
-            // after the seed keep the existing skip-NaN semantics: the state
-            // is unchanged and NaN is emitted for that position.
-            let mut ema = 0.0_f64;
-            let mut ema_sq = 0.0_f64;
-            // Integer observation counter so the adjust weight uses `powi`,
-            // which is a deterministic multiplication chain across platforms
-            // (`powf` with an integral exponent may differ in the last ulp
-            // between libm implementations).
-            let mut n: i32 = 0;
+            // Keep the mean as an offset from the latest observation. Both
+            // the weighted variance recurrence and its mean differences then
+            // avoid subtracting large raw moments or repeatedly rounding a
+            // large absolute mean. NaNs emit NaN without advancing the state.
+            let mut origin = 0.0_f64;
+            let mut mean_offset = 0.0_f64;
+            let mut variance = 0.0_f64;
+            let mut weight_sum = 0.0_f64;
             let mut seeded = false;
 
             for &value in base.iter() {
@@ -963,26 +991,28 @@ impl CompiledExpr {
                     continue;
                 }
                 if !seeded {
-                    ema = value;
-                    ema_sq = value * value;
-                    n = 1;
+                    origin = value;
+                    weight_sum = 1.0;
                     seeded = true;
                     // Existing convention: variance of a single observation is 0.0.
                     out.push(0.0);
                     continue;
                 }
-                n = n.saturating_add(1);
                 let weight = if adjust {
-                    alpha / (1.0 - (1.0 - alpha).powi(n))
+                    weight_sum = 1.0 + (1.0 - alpha) * weight_sum;
+                    1.0 / weight_sum
                 } else {
                     alpha
                 };
-                ema = ((1.0 - weight) * ema) + (weight * value);
-                ema_sq = ((1.0 - weight) * ema_sq) + (weight * value * value);
-                // Clamp small negative values from floating-point cancellation
-                // to 0.0, but let a NaN variance stay NaN instead of becoming 0.0.
-                let raw = ema_sq - ema * ema;
-                let variance = if raw.is_nan() { f64::NAN } else { raw.max(0.0) };
+                if weight >= 1.0 {
+                    variance = 0.0;
+                    mean_offset = 0.0;
+                } else {
+                    let delta = (value - origin) - mean_offset;
+                    variance = (1.0 - weight) * (variance + weight * delta * delta);
+                    mean_offset = -(1.0 - weight) * delta;
+                }
+                origin = value;
                 out.push(if take_sqrt { variance.sqrt() } else { variance });
             }
         }

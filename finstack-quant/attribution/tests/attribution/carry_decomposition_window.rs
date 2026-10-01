@@ -19,6 +19,94 @@ use finstack_quant_valuations::metrics::MetricId;
 use std::sync::Arc;
 use time::macros::date;
 
+#[test]
+fn zero_coupon_maturity_and_amortization_preserve_principal_without_income() {
+    use finstack_quant_cashflows::builder::AmortizationSpec;
+    use finstack_quant_core::dates::{DayCount, Tenor};
+    use finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec;
+    use finstack_quant_valuations::metrics::collect_period_cash;
+
+    let t0 = date!(2025 - 07 - 14);
+    let t1 = date!(2025 - 07 - 16);
+    let payment = date!(2025 - 07 - 15);
+    let market = MarketContext::new().insert(flat_disc("USD-OIS", t0, 0.04));
+    for amortizing in [false, true] {
+        let mut spec =
+            CashflowSpec::fixed(0.0, Tenor::semi_annual(), DayCount::Act365F).expect("zero coupon");
+        if amortizing {
+            spec = CashflowSpec::amortizing(
+                spec,
+                AmortizationSpec::StepRemaining {
+                    schedule: vec![(payment, Money::from((500_000_i64, Currency::USD)))],
+                },
+            );
+        }
+        let bond = Bond::builder()
+            .id("PRINCIPAL-CARRY".into())
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
+            .issue_date(date!(2024 - 07 - 15))
+            .maturity(if amortizing {
+                date!(2026 - 07 - 15)
+            } else {
+                payment
+            })
+            .cashflow_spec(spec)
+            .discount_curve_id("USD-OIS".into())
+            .build()
+            .expect("bond");
+        let instrument: Arc<dyn Instrument> = Arc::new(bond);
+        let cash = collect_period_cash(instrument.as_ref(), &market, t0, t1, Currency::USD)
+            .expect("period cash");
+        assert_eq!(cash.income.amount(), 0.0);
+        assert_eq!(
+            cash.total.amount(),
+            if amortizing { 500_000.0 } else { 1_000_000.0 }
+        );
+
+        for method in [
+            AttributionMethod::Parallel,
+            AttributionMethod::Waterfall(finstack_quant_attribution::default_waterfall_order()),
+            AttributionMethod::Taylor(Default::default()),
+        ] {
+            let attribution = attribute_pnl(
+                &method,
+                &AttributionRequest::new(
+                    &instrument,
+                    &market,
+                    &market,
+                    t0,
+                    t1,
+                    &FinstackConfig::default(),
+                ),
+            )
+            .expect("attribution");
+            let detail = attribution.carry_detail.as_ref().expect("carry detail");
+            let coupon = detail.coupon_income.as_ref().expect("income line").total;
+            assert_eq!(
+                coupon.amount(),
+                0.0,
+                "principal must not become coupon income"
+            );
+            let partition = coupon.amount()
+                + detail.pull_to_par.map_or(0.0, |m| m.amount())
+                + detail
+                    .roll_down
+                    .as_ref()
+                    .map_or(0.0, |line| line.total.amount());
+            assert!((partition - attribution.carry.amount()).abs() < 1e-8);
+            assert!(attribution.carry.amount() > 0.0 && attribution.carry.amount() < 1_000.0);
+            let raw = attribution.mark_to_market_pnl.expect("raw PV change");
+            assert!(
+                (raw.checked_add(cash.total).expect("total return").amount()
+                    - attribution.total_pnl.amount())
+                .abs()
+                    < 1e-8
+            );
+            assert!(attribution.residual.amount().abs() < 0.01);
+        }
+    }
+}
+
 fn flat_disc(id: &str, as_of: time::Date, rate: f64) -> DiscountCurve {
     let tenors = [0.0, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0];
     let knots: Vec<(f64, f64)> = tenors.iter().map(|&t| (t, (-rate * t).exp())).collect();

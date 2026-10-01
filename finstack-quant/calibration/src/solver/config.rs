@@ -24,13 +24,36 @@ use serde::{Deserialize, Serialize};
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
 pub struct SolverConfig {
-    /// Numerical convergence tolerance; distinct from economic fit acceptance.
+    /// Positive finite numerical convergence tolerance, distinct from economic fit acceptance.
+    #[cfg_attr(feature = "json-schema", schemars(extend("exclusiveMinimum" = 0.0)))]
     tolerance: f64,
-    /// Maximum iterations available to each solver invocation.
+    /// Positive maximum number of iterations available to each solver invocation.
+    #[cfg_attr(feature = "json-schema", schemars(range(min = 1)))]
     max_iterations: usize,
 }
 
 impl SolverConfig {
+    /// Validate the numerical stopping tolerance and iteration budget.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] if tolerance is not
+    /// finite and positive or the iteration budget is zero.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        if !self.tolerance.is_finite() || self.tolerance <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "solver tolerance must be finite and positive, got {}",
+                self.tolerance
+            )));
+        }
+        if self.max_iterations == 0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "solver max_iterations must be positive".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Get the numerical convergence tolerance (default `1e-12`).
     pub fn tolerance(&self) -> f64 {
         self.tolerance
@@ -56,7 +79,7 @@ impl SolverConfig {
     ///
     /// # Arguments
     ///
-    /// * `max_iterations` - Maximum number of iterations per numerical solve.
+    /// * `max_iterations` - Positive maximum number of iterations per numerical solve.
     pub fn with_max_iterations(mut self, max_iterations: usize) -> Self {
         self.max_iterations = max_iterations;
         self
@@ -112,5 +135,24 @@ mod tests {
         let json = serde_json::to_string(&config).expect("serialize");
         let deserialized: SolverConfig = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(config, deserialized);
+    }
+
+    #[test]
+    fn solver_config_rejects_invalid_stopping_settings() {
+        for tolerance in [0.0, -1e-8, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(SolverConfig::default()
+                .with_tolerance(tolerance)
+                .validate()
+                .expect_err("invalid tolerance")
+                .to_string()
+                .contains("tolerance"));
+        }
+        assert!(SolverConfig::default()
+            .with_max_iterations(0)
+            .validate()
+            .expect_err("zero iteration budget")
+            .to_string()
+            .contains("max_iterations"));
+        SolverConfig::default().validate().expect("valid defaults");
     }
 }

@@ -94,6 +94,7 @@ fn clo(cdr: f64) -> StructuredCredit {
     .expect("structure");
     let mut deal =
         StructuredCredit::new_clo("CLO-DIAG", pool, tranches, close(), maturity(), "USD-OIS")
+            .expect("valid structured-credit dates")
             .with_calendar_id("nyse")
             .with_coverage_triggers(vec![CoverageTestSpec::oc("A", 1.20)])
             .expect("coverage test");

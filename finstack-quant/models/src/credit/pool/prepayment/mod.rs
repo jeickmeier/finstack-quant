@@ -27,4 +27,4 @@ pub(crate) use factor_correlated::FactorCorrelatedPrepay;
 pub(crate) use regime_switching::RegimeSwitchingPrepay;
 pub use richard_roll::RichardRollPrepay;
 pub use spec::StochasticPrepaySpec;
-pub use traits::StochasticPrepayment;
+pub use traits::{PrepaymentState, StochasticPrepayment};

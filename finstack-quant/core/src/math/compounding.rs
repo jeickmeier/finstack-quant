@@ -64,8 +64,10 @@ use std::num::NonZeroU32;
 ///
 /// # Ordering of Rates
 ///
-/// For positive rates and t > 0: `r_simple > r_annual > r_continuous`
-/// (less frequent compounding requires a higher quoted rate for the same DF).
+/// For a common discount factor below one, annual and simple rates both exceed
+/// the continuous rate. Their ordering depends on the maturity `t` in years:
+/// `r_annual > r_simple` for `0 < t < 1`, they agree at `t = 1`, and
+/// `r_simple > r_annual` for `t > 1`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]

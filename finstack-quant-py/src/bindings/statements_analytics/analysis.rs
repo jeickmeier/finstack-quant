@@ -91,9 +91,12 @@ fn extract_scenario_set(
 /// Raises
 /// ------
 /// ValueError
-///     If the configuration is malformed or a scenario fails to evaluate.
+///     If the configuration is malformed, has duplicate parameters or
+///     non-finite values, exceeds 128 parameters, 10,000 scenarios or
+///     10 million model node-period evaluation cells, references a missing
+///     perturbed parameter or target metric, or a scenario fails.
 /// KeyError
-///     If a perturbed parameter or target metric is missing from the model.
+///     If model evaluation cannot find required data or a formula reference.
 ///
 /// Examples
 /// --------
@@ -134,12 +137,16 @@ fn run_sensitivity(
 /// Returns
 /// -------
 /// list[TornadoEntry]
-///     Typed entries sorted by descending absolute swing.
+///     Typed entries sorted by descending absolute swing, with parameter IDs
+///     preserving the perturbed ``node@period`` key.
 ///
 /// Raises
 /// ------
 /// ValueError
-///     If ``period`` does not parse or ``result`` is malformed JSON.
+///     If ``period`` does not parse, ``result`` is malformed JSON, the run
+///     uses a full grid, a scenario does not contain exactly one perturbed
+///     parameter, its unperturbed baseline is absent, the target metric/period
+///     is missing, or a metric value or impact is non-finite.
 ///
 /// Examples
 /// --------
@@ -152,7 +159,7 @@ fn run_sensitivity(
 /// >>> cfg = SensitivityConfig("diagonal", [ParameterSpec.with_percentages("revenue", "2025Q2", 110.0, [-10.0, 10.0])], ["profit"])
 /// >>> entries = generate_tornado_entries(run_sensitivity(b.build(), cfg), "profit", "2025Q2")
 /// >>> [entry.parameter_id for entry in entries]
-/// ['revenue']
+/// ['revenue@2025Q2']
 #[pyfunction]
 #[pyo3(signature = (result, metric_node, period=None))]
 fn generate_tornado_entries(
@@ -170,6 +177,7 @@ fn generate_tornado_entries(
             metric_node,
             period_id,
         )
+        .map_err(statements_to_py)?
         .into_iter()
         .map(PyTornadoEntry::from_inner)
         .collect(),
@@ -460,10 +468,10 @@ impl PyForecastMetrics {
         self.inner.mae
     }
 
-    /// Mean absolute percentage error in percent (``5.0`` = 5%); ``NaN``
-    /// when every actual is zero.
+    /// Mean absolute percentage error in percent (``5.0`` = 5%); ``None``
+    /// when every absolute actual is below ``1e-10`` and excluded from MAPE.
     #[getter]
-    fn mape(&self) -> f64 {
+    fn mape(&self) -> Option<f64> {
         self.inner.mape
     }
 
@@ -473,9 +481,10 @@ impl PyForecastMetrics {
         self.inner.mape_effective_n
     }
 
-    /// Symmetric MAPE in percent.
+    /// Symmetric MAPE in percent, or ``None`` when every denominator
+    /// ``(abs(actual) + abs(forecast)) / 2`` is below ``1e-10``.
     #[getter]
-    fn smape(&self) -> f64 {
+    fn smape(&self) -> Option<f64> {
         self.inner.smape
     }
 
@@ -499,7 +508,8 @@ impl PyForecastMetrics {
     /// Export as a pandas ``Series`` indexed by metric name.
     ///
     /// Index: ``mae``, ``mape``, ``mape_effective_n``, ``smape``, ``rmse``,
-    /// ``n``; counts are cast to float.
+    /// ``n``; counts are cast to float and unavailable percentages become
+    /// pandas ``NaN``.
     fn to_series<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let labels: Vec<String> = ["mae", "mape", "mape_effective_n", "smape", "rmse", "n"]
             .iter()
@@ -507,9 +517,9 @@ impl PyForecastMetrics {
             .collect();
         let values = vec![
             self.inner.mae,
-            self.inner.mape,
+            self.inner.mape.unwrap_or(f64::NAN),
             self.inner.mape_effective_n as f64,
-            self.inner.smape,
+            self.inner.smape.unwrap_or(f64::NAN),
             self.inner.rmse,
             self.inner.n as f64,
         ];
@@ -550,19 +560,21 @@ impl PyForecastMetrics {
 /// Parameters
 /// ----------
 /// actual : list[float]
-///     Observed values.
+///     Finite observed values in consistent units; negative values are accepted.
 /// forecast : list[float]
-///     Forecast values; same length as ``actual``.
+///     Finite forecast values in the same units and aligned with ``actual``.
 ///
 /// Returns
 /// -------
 /// ForecastMetrics
-///     Typed metrics with ``summary()`` and ``to_series()``.
+///     Typed metrics with ``summary()`` and ``to_series()``. ``mape`` and
+///     ``smape`` are ``None`` when no denominator contributes; JSON emits ``null``.
 ///
 /// Raises
 /// ------
 /// ValueError
-///     If the sequences are empty or of different lengths.
+///     If the sequences are empty, of different lengths, contain a non-finite
+///     value, or metric arithmetic overflows.
 ///
 /// Examples
 /// --------

@@ -166,7 +166,7 @@ fn test_amortization_spec_step_remaining_validation_currency_mismatch() {
 }
 
 #[test]
-fn test_amortization_spec_step_remaining_validation_increasing() {
+fn step_remaining_increases_require_funding_before_target() {
     let date1 = Date::from_calendar_date(2025, time::Month::March, 1).unwrap();
     let date2 = Date::from_calendar_date(2025, time::Month::June, 1).unwrap();
 
@@ -181,13 +181,29 @@ fn test_amortization_spec_step_remaining_validation_increasing() {
                 (
                     date2,
                     Money::new(750_000.0, Currency::USD).expect("valid money fixture"),
-                ), // Increasing - invalid
+                ), // Requires an intervening draw or PIK capitalization.
             ],
         },
     };
 
     let result = notional.validate();
-    assert!(result.is_err());
+    assert!(
+        result.is_ok(),
+        "structural validation cannot know future funding"
+    );
+    let mut builder = finstack_quant_cashflows::builder::CashFlowSchedule::builder();
+    let _ = builder
+        .principal(
+            notional.initial,
+            Date::from_calendar_date(2025, time::Month::January, 1).unwrap(),
+            Date::from_calendar_date(2025, time::Month::December, 1).unwrap(),
+        )
+        .amortization(notional.amort);
+    assert!(builder
+        .build(None)
+        .expect_err("unfunded increase must fail at its effective date")
+        .to_string()
+        .contains("exceeds outstanding principal"));
 }
 
 #[test]

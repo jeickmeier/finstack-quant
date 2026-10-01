@@ -245,6 +245,7 @@
       "type": "cms_option",
       "spec": {
         "id": "USD-CMS10Y-FLOORLET-ATM-20260516",
+        "index_id": "USD-LIBOR-3M",
         "strike": "0.0404026801",
         "cms_tenor": {
           "count": 10,

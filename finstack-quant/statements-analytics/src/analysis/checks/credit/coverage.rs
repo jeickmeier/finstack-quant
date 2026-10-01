@@ -7,7 +7,7 @@ use finstack_quant_statements::checks::{
     Check, CheckCategory, CheckContext, CheckFinding, CheckResult, Materiality, Severity,
 };
 use finstack_quant_statements::types::NodeId;
-use finstack_quant_statements::Result;
+use finstack_quant_statements::{Error, Result};
 
 /// Flags periods where a coverage ratio (e.g. DSCR, interest coverage)
 /// falls below configurable warning and error floors.
@@ -46,6 +46,12 @@ impl Check for CoverageFloorCheck {
 
         for period_spec in &context.model.periods {
             let pid = &period_spec.id;
+            crate::analysis::units::validate_matching_units(
+                context.results,
+                self.numerator_node.as_str(),
+                self.denominator_node.as_str(),
+                pid,
+            )?;
 
             let Some(num) = get_finite_node_value(context.results, &self.numerator_node, pid)
             else {
@@ -82,6 +88,11 @@ impl Check for CoverageFloorCheck {
             }
 
             let ratio = num / denom;
+            if !ratio.is_finite() {
+                return Err(Error::eval(format!(
+                    "Coverage ratio is not finite in {pid}"
+                )));
+            }
 
             let severity = if ratio < self.min_error {
                 Some(Severity::Error)

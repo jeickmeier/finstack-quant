@@ -452,7 +452,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for QuantoOpt
             bumps.vol_bump_decimal,
         )?;
         let pv_bumped = self.value(&bumped, as_of)?.amount();
-        Ok(Some((pv_bumped - base_pv) / bumps.vol_bump_decimal))
+        Ok(Some((pv_bumped - base_pv) / bumps.vol_bump_decimal / 100.0))
     }
 
     fn option_rho_bp(
@@ -675,6 +675,10 @@ impl crate::instruments::common_impl::traits::Instrument for QuantoOption {
 
     fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
         None
+    }
+
+    fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
+        Some(self.expiry)
     }
 
     fn valuation_details(

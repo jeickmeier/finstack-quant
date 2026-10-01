@@ -65,43 +65,25 @@ fn forward_curve_projection_grid_and_rate_between() {
 
 #[wasm_bindgen_test]
 fn discount_curve_negative_rate_validation_mode_is_explicit() {
-    assert!(JsDiscountCurve::new(
-        "CHF-OIS",
-        "2025-01-01",
-        &[0.0, 1.0, 1.0, 1.002],
-        None,
-        None,
-        None,
-        None,
-        None,
-    )
-    .is_err());
+    let options =
+        js_sys::JSON::parse(r#"{"id":"CHF-OIS","baseDate":"2025-01-01","knots":[0,1,1,1.002]}"#)
+            .expect("valid options");
+    assert!(JsDiscountCurve::new(options.clone()).is_err());
 
-    let curve = JsDiscountCurve::new(
-        "CHF-OIS",
-        "2025-01-01",
-        &[0.0, 1.0, 1.0, 1.002],
-        None,
-        None,
-        None,
-        Some("negative_rate_friendly".to_string()),
-        Some(-0.01),
+    js_sys::Reflect::set(
+        &options,
+        &"validationMode".into(),
+        &"negative_rate_friendly".into(),
     )
-    .expect("negative-rate-friendly curve");
+    .expect("validation policy");
+    js_sys::Reflect::set(&options, &"forwardFloor".into(), &(-0.01).into()).expect("forward floor");
+    let curve = JsDiscountCurve::new(options.clone()).expect("negative-rate-friendly curve");
     assert!(curve.forward(0.0, 1.0).expect("negative forward") < 0.0);
 
     for floor in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
-        assert!(JsDiscountCurve::new(
-            "CHF-OIS",
-            "2025-01-01",
-            &[0.0, 1.0, 1.0, 1.002],
-            None,
-            None,
-            None,
-            Some("negative_rate_friendly".to_string()),
-            Some(floor),
-        )
-        .is_err());
+        js_sys::Reflect::set(&options, &"forwardFloor".into(), &floor.into())
+            .expect("invalid forward floor input");
+        assert!(JsDiscountCurve::new(options.clone()).is_err());
     }
 }
 
@@ -145,7 +127,7 @@ fn fx_delta_vol_surface_basic_accessors_and_implied_vol() {
     assert_eq!(surface.num_expiries(), 3);
     assert_eq!(surface.expiries().as_ref(), [0.25, 0.5, 1.0]);
 
-    let pillar = get_fx_delta_pillar_vols(&surface, 0).unwrap();
+    let pillar = get_fx_delta_pillar_vols(&surface, 0.0).unwrap();
     assert!((pillar[0] - 0.08).abs() < 1e-12);
 
     // ATM-DNS strike at expiry 1.0 should recover the 0.09 ATM vol.
@@ -215,8 +197,8 @@ fn normal_sabr_requires_positive_shifted_levels_when_beta_is_positive() {
 
 #[wasm_bindgen_test]
 fn day_count_context_supports_context_dependent_conventions() {
-    let start = create_date(2024, 1, 1).unwrap();
-    let end = create_date(2024, 7, 1).unwrap();
+    let start = f64::from(create_date(2024.0, 1.0, 1.0).unwrap());
+    let end = f64::from(create_date(2024.0, 7.0, 1.0).unwrap());
 
     assert!(JsDayCount::act_act_isma()
         .year_fraction(start, end)
@@ -237,18 +219,41 @@ fn day_count_context_supports_context_dependent_conventions() {
 
 #[wasm_bindgen_test]
 fn day_count_exposes_act365l_and_signed_fraction() {
-    let start = create_date(2024, 1, 1).unwrap();
-    let end = create_date(2025, 1, 1).unwrap();
+    let start = f64::from(create_date(2024.0, 1.0, 1.0).unwrap());
+    let end = f64::from(create_date(2025.0, 1.0, 1.0).unwrap());
+    let ctx = JsDayCountContext::new()
+        .with_frequency(&JsTenor::annual())
+        .with_coupon_period(start, end)
+        .unwrap();
     assert_eq!(
         JsDayCount::act365l()
-            .signed_year_fraction(start, end)
+            .year_fraction_with_context(start, end, &ctx)
             .unwrap(),
         1.0
     );
+    assert!(JsDayCount::act365l().year_fraction(start, end).is_err());
+    assert!(JsDayCount::act365l()
+        .signed_year_fraction(start, end)
+        .is_err());
     assert_eq!(
-        JsDayCount::act365l()
+        JsDayCount::act_act()
             .signed_year_fraction(end, start)
             .unwrap(),
         -1.0
     );
+}
+
+#[wasm_bindgen_test]
+fn act365l_partial_fraction_uses_enclosing_coupon_year() {
+    let start = f64::from(create_date(2023.0, 10.0, 15.0).unwrap());
+    let query = f64::from(create_date(2023.0, 12.0, 15.0).unwrap());
+    let end = f64::from(create_date(2024.0, 4.0, 15.0).unwrap());
+    let ctx = JsDayCountContext::new()
+        .with_frequency(&JsTenor::semi_annual())
+        .with_coupon_period(start, end)
+        .unwrap();
+    let accrued = JsDayCount::act365l()
+        .year_fraction_with_context(start, query, &ctx)
+        .unwrap();
+    assert!((accrued - 61.0 / 366.0).abs() < 1e-14);
 }

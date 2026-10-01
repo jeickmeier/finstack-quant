@@ -45,6 +45,7 @@ mod serialization;
 mod svi_surface;
 mod swaption_vol;
 mod validation;
+mod xccy_basis;
 
 mod term_structures;
 

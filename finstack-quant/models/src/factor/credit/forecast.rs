@@ -1,6 +1,6 @@
 //! Credit factor covariance and idiosyncratic-volatility forecasts.
 //!
-//! The [`FactorVolModel::Sample`] and [`FactorVolModel::Ewma`] variants are supported. `OneStep` and
+//! Sample and EWMA variance models are supported. `OneStep` and
 //! `Unconditional` map to the calibrated annualized variance unchanged;
 //! `NSteps(n)` means `n` annualized model periods and multiplies variance by
 //! `n`; fractional calendar horizons use `Years(y)` or parser input
@@ -10,14 +10,14 @@
 //!
 //! # Reuse
 //!
-//! - Σ(t, h) = D · ρ_static · D, with D = diag(σ_factor) and ρ_static taken
-//!   straight from [`CreditFactorModel::static_correlation`].
+//! - Σ(t, h) is the calibrated [`CreditFactorModel::config`] covariance
+//!   multiplied by the horizon in years, preserving its ridge or shrinkage estimator.
 //! - Per-issuer idiosyncratic vol is sourced from
-//!   [`VolState::idiosyncratic`].
+//!   [`super::hierarchy::VolState::idiosyncratic`].
 //! - The factor universe is taken straight from
 //!   [`CreditFactorModel::config.factors`] in canonical order.
 
-use crate::factor::credit::hierarchy::{CreditFactorModel, FactorVolModel, IdiosyncraticVolModel};
+use crate::factor::credit::hierarchy::{CreditFactorModel, IdiosyncraticVolModel};
 use crate::factor::{FactorCovarianceMatrix, FactorModelConfig, RiskMeasure};
 use finstack_quant_core::types::IssuerId;
 
@@ -39,8 +39,8 @@ pub enum VolHorizon {
     /// Fractional-year horizon. For example, 10 trading days from annualized
     /// variances should use `Years(10.0 / 252.0)` rather than `NSteps(10)`.
     Years(f64),
-    /// Long-run / unconditional horizon. For both [`FactorVolModel::Sample`]
-    /// and [`FactorVolModel::Ewma`] (a martingale variance forecast) the
+    /// Long-run / unconditional horizon. For both sample variance
+    /// and EWMA (a martingale variance forecast) the
     /// long-run variance equals the calibrated variance, so this is
     /// numerically identical to [`Self::OneStep`]. The variant is kept
     /// distinct so future mean-reverting estimators can override the
@@ -62,10 +62,16 @@ impl VolHorizon {
     /// - a JSON object string `'{"n_steps": N, "periods_per_year": P}'`
     ///   → [`VolHorizon::Years`] with `Y = N / P` (MO-20)
     ///
+    /// # Arguments
+    ///
+    /// * `s` - Horizon keyword or JSON descriptor. `N` counts non-negative whole
+    ///   periods; `Y` is a finite non-negative year fraction; `P` is the finite,
+    ///   positive number of observation periods per year used to convert `N`.
+    ///
     /// # Errors
     ///
-    /// Returns a human-readable error message string if `s` is neither a
-    /// recognized keyword nor a valid `{"n_steps": N}` JSON object.
+    /// Returns a human-readable error message for an unrecognized descriptor
+    /// or an invalid year fraction, period count, or periods-per-year value.
     pub fn parse(s: &str) -> Result<VolHorizon, String> {
         match s.trim() {
             "one_step" => Ok(VolHorizon::OneStep),
@@ -111,18 +117,23 @@ impl VolHorizon {
         }
     }
 
-    /// Apply this horizon's scaling rule to an annualized variance under the
-    /// `Sample` vol model.
-    fn scale_sample_variance(self, variance: f64) -> f64 {
-        match self {
-            Self::OneStep | Self::Unconditional => variance,
+    /// Validated multiplier for annualized variances and covariances.
+    fn variance_scale(self) -> finstack_quant_core::Result<f64> {
+        let scale = match self {
+            Self::OneStep | Self::Unconditional => 1.0,
             // `n as f64` is exact for the small `n` we expect here. Casting
             // is intentional and lossless within usize values that fit in
             // f64 mantissa precision (53 bits ≈ 9e15).
             #[allow(clippy::cast_precision_loss)]
-            Self::NSteps(n) => variance * (n as f64),
-            Self::Years(years) => variance * years,
+            Self::NSteps(n) => n as f64,
+            Self::Years(years) => years,
+        };
+        if !scale.is_finite() || scale < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "Forecast horizon must be finite and non-negative".into(),
+            ));
         }
+        Ok(scale)
     }
 }
 
@@ -137,29 +148,35 @@ pub struct FactorCovarianceForecast<'a> {
 
 impl<'a> FactorCovarianceForecast<'a> {
     /// Wrap a calibrated credit factor model for vol forecasting.
+    ///
+    /// # Arguments
+    ///
+    /// * `model` - Calibrated artifact whose systematic covariance estimator
+    ///   and issuer variance estimates are preserved when scaling horizons.
     #[must_use]
     pub fn new(model: &'a CreditFactorModel) -> Self {
         Self { model }
     }
 
-    /// Build the factor covariance matrix `Σ(t, h) = D · ρ_static · D`.
+    /// Scale the calibrated factor covariance matrix to the requested horizon.
     ///
-    /// `D = diag(σ_factor)` where `σ_factor` is the square root of the
-    /// horizon-scaled variance for each factor, in the same order as
-    /// `CreditFactorModel::config::factors`.
+    /// Sample and EWMA forecasts have flat variance term structures. Every
+    /// calibrated covariance entry is multiplied by the horizon in years,
+    /// preserving ridge regularization and Ledoit-Wolf shrinkage. `OneStep`
+    /// and `Unconditional` return the calibrated annualized covariance unchanged.
     ///
     /// # Errors
     ///
     /// Returns a validation error when:
-    /// - a factor in `config.factors` has no entry in `vol_state.factors`,
-    /// - the static correlation matrix axes do not match `config.factors`,
-    /// - any computed σ² is negative (data error in the artifact),
+    /// - the calibrated covariance axes do not match `config.factors`,
+    /// - the horizon is negative or non-finite,
     /// - the resulting matrix fails PSD validation in
     ///   [`FactorCovarianceMatrix::new`].
     ///
     /// # Arguments
     ///
-    /// * `horizon` - Horizon used by the algorithm, subject to the enclosing type invariants and documented units.
+    /// * `horizon` - Non-negative variance horizon; `Years(y)` uses calendar
+    ///   years and `NSteps(n)` uses whole annualized periods, not panel observations.
     pub fn covariance_at(
         &self,
         horizon: VolHorizon,
@@ -171,53 +188,21 @@ impl<'a> FactorCovarianceForecast<'a> {
             .iter()
             .map(|f| f.id.clone())
             .collect();
-        let n = factor_ids.len();
-
-        let rho_ids = &self.model.static_correlation.factor_ids;
-        if rho_ids.as_slice() != factor_ids.as_slice() {
+        let scale = horizon.variance_scale()?;
+        let covariance = &self.model.config.covariance;
+        if covariance.factor_ids() != factor_ids.as_slice() {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "FactorCovarianceForecast: static_correlation factor axes do not match \
-                     config.factors (got {} ρ ids, {} config factors)",
-                rho_ids.len(),
-                n
+                "FactorCovarianceForecast: calibrated covariance factor axes do not match \
+                     config.factors (got {} covariance ids, {} config factors)",
+                covariance.n_factors(),
+                factor_ids.len()
             )));
         }
-
-        let mut sigma = Vec::with_capacity(n);
-        for fid in &factor_ids {
-            let vol_model = self.model.vol_state.factors.get(fid).ok_or_else(|| {
-                finstack_quant_core::Error::Validation(format!(
-                    "FactorCovarianceForecast: vol_state.factors is missing factor {fid}"
-                ))
-            })?;
-            let variance = match vol_model {
-                // Both Sample and Ewma (martingale variance forecast with flat
-                // horizon term structure) use the same horizon scaling
-                // (Longerstaey & Spencer 1996, §5.3).
-                FactorVolModel::Sample { variance } | FactorVolModel::Ewma { variance, .. } => {
-                    horizon.scale_sample_variance(*variance)
-                }
-            };
-            if !variance.is_finite() || variance < 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "FactorCovarianceForecast: invalid variance {variance} for factor {fid}"
-                )));
-            }
-            sigma.push(variance.sqrt());
-        }
-
-        // Σ[i][j] = σ_i · ρ[i][j] · σ_j (row-major flat).
-        let mut data = vec![0.0_f64; n * n];
-        for i in 0..n {
-            // Hoist the correlation row out of the inner loop so the nested
-            // `Vec<Vec<f64>>` is dereferenced once per row, not once per element.
-            let rho_row = &self.model.static_correlation.data[i];
-            let sigma_i = sigma[i];
-            for j in 0..n {
-                data[i * n + j] = sigma_i * rho_row[j] * sigma[j];
-            }
-        }
-
+        let data = covariance
+            .as_slice()
+            .iter()
+            .map(|entry| entry * scale)
+            .collect();
         FactorCovarianceMatrix::new(factor_ids, data)
     }
 
@@ -227,7 +212,15 @@ impl<'a> FactorCovarianceForecast<'a> {
     /// # Errors
     ///
     /// Returns a validation error when the issuer is not present in
-    /// `VolState::idiosyncratic` or the calibrated variance is negative.
+    /// `VolState::idiosyncratic`, the horizon is negative or non-finite, or the
+    /// scaled variance is negative or non-finite.
+    ///
+    /// # Arguments
+    ///
+    /// * `issuer_id` - Calibrated issuer identifier to look up; missing issuers
+    ///   return a validation error rather than zero risk.
+    /// * `horizon` - Non-negative horizon scaling annualized bp-squared
+    ///   variance; the returned standard deviation is in spread basis points.
     pub fn idiosyncratic_vol(
         &self,
         issuer_id: &IssuerId,
@@ -244,13 +237,12 @@ impl<'a> FactorCovarianceForecast<'a> {
                     issuer_id.as_str()
                 ))
             })?;
+        let scale = horizon.variance_scale()?;
         let variance = match model {
             // Both Sample and Ewma use the same horizon scaling
             // (see covariance_at for rationale).
             IdiosyncraticVolModel::Sample { variance }
-            | IdiosyncraticVolModel::Ewma { variance, .. } => {
-                horizon.scale_sample_variance(*variance)
-            }
+            | IdiosyncraticVolModel::Ewma { variance, .. } => scale * variance,
         };
         if !variance.is_finite() || variance < 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -264,6 +256,14 @@ impl<'a> FactorCovarianceForecast<'a> {
 
     /// Build a factor-model config using `Σ(t, h)` at the given
     /// horizon and requested risk measure.
+    ///
+    /// # Arguments
+    ///
+    /// * `horizon` - Non-negative covariance horizon. `Years(y)` scales the
+    ///   annualized covariance by `y`; `NSteps(n)` represents `n` whole years.
+    /// * `risk_measure` - Variance, volatility, VaR, or expected-shortfall
+    ///   measure to store in the returned configuration. The measure is applied
+    ///   by downstream decomposition and does not change covariance scaling.
     ///
     /// # Errors
     ///
@@ -287,8 +287,8 @@ mod tests {
     use crate::factor::credit::calibration::{BucketWeighting, PanelFrequency, PanelSpace};
     use crate::factor::credit::hierarchy::{
         CalibrationDiagnostics, CreditFactorModelSchema, CreditHierarchySpec, DateRange,
-        FactorCorrelationMatrix, GenericFactorSpec, HierarchyDimension, IssuerBetaPolicy,
-        LevelsAtAnchor, VolState,
+        FactorCorrelationMatrix, FactorVolModel, GenericFactorSpec, HierarchyDimension,
+        IssuerBetaPolicy, LevelsAtAnchor, VolState,
     };
     use crate::factor::{
         FactorDefinition, FactorId, FactorType, MarketMapping, MatchingConfig, PricingMode,
@@ -329,7 +329,7 @@ mod tests {
         .expect("valid correlation fixture");
         let covariance = FactorCovarianceMatrix::new(
             vec![rates.clone(), credit.clone()],
-            vec![1.0, 0.0, 0.0, 1.0],
+            vec![0.04, 0.02, 0.02, 0.04],
         )
         .expect("valid covariance fixture");
         let mut factor_vols = BTreeMap::new();
@@ -401,6 +401,90 @@ mod tests {
         assert!(one.as_slice()[0] * one.as_slice()[3] - one.as_slice()[1].powi(2) >= 0.0);
         for (one_value, four_value) in one.as_slice().iter().zip(four.as_slice()) {
             assert!((four_value - 4.0 * one_value).abs() < 1e-12);
+        }
+    }
+
+    #[test]
+    fn covariance_forecast_preserves_calibrated_ridge_and_ledoit_wolf(
+    ) -> finstack_quant_core::Result<()> {
+        use crate::factor::credit::calibration::{
+            CovarianceStrategy, CreditCalibrationConfig, CreditCalibrationInputs, CreditCalibrator,
+            GenericFactorSeries, HistoryPanel, IssuerTagPanel,
+        };
+        use crate::factor::credit::hierarchy::IssuerTags;
+
+        let dates = vec![
+            create_date(2024, Month::January, 28)?,
+            create_date(2024, Month::February, 28)?,
+            create_date(2024, Month::March, 28)?,
+            create_date(2024, Month::April, 28)?,
+        ];
+        let issuer = IssuerId::new("A");
+        for (strategy, values, expected) in [
+            (CovarianceStrategy::Ridge { alpha: 4.0 }, vec![0.01; 4], 4.0),
+            (
+                CovarianceStrategy::LedoitWolf,
+                vec![0.01, 0.011, 0.013, 0.013],
+                800.0,
+            ),
+        ] {
+            let model = CreditCalibrator::new(CreditCalibrationConfig {
+                covariance_strategy: strategy,
+                bucket_weighting: BucketWeighting::Equal,
+                ..Default::default()
+            })
+            .calibrate(CreditCalibrationInputs {
+                history_panel: HistoryPanel {
+                    dates: dates.clone(),
+                    spreads: BTreeMap::from([(
+                        issuer.clone(),
+                        values.iter().copied().map(Some).collect(),
+                    )]),
+                },
+                issuer_tags: IssuerTagPanel {
+                    tags: BTreeMap::from([(issuer.clone(), IssuerTags(BTreeMap::new()))]),
+                },
+                generic_factor: GenericFactorSeries {
+                    spec: GenericFactorSpec {
+                        name: "PC".into(),
+                        series_id: "PC".into(),
+                    },
+                    values: values.clone(),
+                },
+                as_of: dates[3],
+                as_of_spreads: BTreeMap::from([(issuer.clone(), values[3])]),
+                idiosyncratic_overrides: BTreeMap::new(),
+                spread_durations: BTreeMap::new(),
+            })?;
+            let forecast = FactorCovarianceForecast::new(&model);
+            assert!((model.config.covariance.variance_at(0) - expected).abs() < 1e-10);
+            for (horizon, scale) in [
+                (VolHorizon::OneStep, 1.0),
+                (VolHorizon::Unconditional, 1.0),
+                (VolHorizon::Years(0.25), 0.25),
+                (VolHorizon::NSteps(2), 2.0),
+            ] {
+                assert!(
+                    (forecast.covariance_at(horizon)?.variance_at(0) - scale * expected).abs()
+                        < 1e-10
+                );
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn zero_covariance_does_not_mask_an_invalid_horizon() {
+        let mut model = fixture_model();
+        model.config.covariance = FactorCovarianceMatrix::new(
+            model.config.covariance.factor_ids().to_vec(),
+            vec![0.0; 4],
+        )
+        .unwrap();
+        for years in [-1.0, f64::NAN, f64::INFINITY] {
+            assert!(FactorCovarianceForecast::new(&model)
+                .covariance_at(VolHorizon::Years(years))
+                .is_err());
         }
     }
 

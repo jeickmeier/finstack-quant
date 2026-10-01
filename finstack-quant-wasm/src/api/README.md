@@ -65,7 +65,7 @@ re-export their children.
 
 Shared conversion helpers are one level up in [`../utils/`](../utils): `to_js_value`,
 `to_js_err`, `to_js_error`, `structured_js_error`, `contract_to_js_error`,
-`materialization_to_js_error`, `check_js_safe_count`, `MAX_SAFE_JS_INTEGER`, and the
+`materialization_to_js_error`, and the
 date helpers `parse_iso_date`, `parse_iso_dates`, `date_to_iso`.
 
 ## Reaching JavaScript
@@ -146,10 +146,12 @@ export that is not in it is invisible to TypeScript users, and
 - **`unwrap`, `expect`, and `panic` are denied at the crate root** (`../lib.rs`)
   outside `#[cfg(test)]`, alongside `#![forbid(unsafe_code)]`.
 
-- **Integer widths.** `u64`/`i64` cross as `BigInt`. `usize` marshals as an f64, so
-  any count that can plausibly grow must be guarded with
-  `utils::check_js_safe_count` rather than silently rounding past
-  `Number.MAX_SAFE_INTEGER`. `attribution/mod.rs` documents why it is exempt.
+- **Integer widths.** `u64`/`i64` cross as `BigInt`. Numeric `usize` inputs use
+  the wasm32 integer ABI, which truncates fractions and wraps overflow. Accept
+  JavaScript counts as `f64`, validate finite integral values in `0..=u32::MAX`,
+  then convert and apply canonical Rust domain limits. The models namespace
+  shares this conversion through `models::parse_usize`. JSON output counts must
+  stay within `Number.MAX_SAFE_INTEGER` to remain exactly representable.
   For LSMC valuations, `standard_error` measures pricing-path sampling uncertainty
   under the frozen fitted exercise policy and excludes regression approximation,
   time-grid discretization, and model error. Structured valuation results follow

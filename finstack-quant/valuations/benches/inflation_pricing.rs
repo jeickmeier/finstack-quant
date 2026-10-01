@@ -75,7 +75,7 @@ fn bench_inflation_index() -> InflationIndex {
     let monthly_rate = 0.002_f64;
     let observations: Vec<(Date, f64)> = (0..364)
         .map(|i| {
-            let date = start.add_months(i);
+            let date = start.add_months(i).expect("valid date shift");
             let value = start_value * (1.0 + monthly_rate).powi(i);
             (date, value)
         })

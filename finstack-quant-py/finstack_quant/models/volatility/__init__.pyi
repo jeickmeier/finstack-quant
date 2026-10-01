@@ -19,7 +19,7 @@ from typing import Any, Literal, Optional, TypedDict
 
 import pandas as pd
 
-from finstack_quant.core.market_data import FxDeltaVolSurface, VolCube, VolSurface
+from finstack_quant.core.market_data import FxDeltaVolSurface, VolCube, VolCubeExpirySlice, VolSurface
 
 __all__ = [
     "ArbitrageReport",
@@ -35,6 +35,8 @@ __all__ = [
     "check_surface_grid",
     "convert_atm_volatility",
     "delta_to_strike",
+    "get_cube_expiry_slice_vol",
+    "get_cube_expiry_slice_vol_clamped",
     "get_cube_normal_vol",
     "get_cube_normal_vol_clamped",
     "get_cube_vol",
@@ -463,7 +465,7 @@ class SabrSmile:
         Parameters
         ----------
         strikes : list[float]
-            Strike grid to test.
+            Finite, strictly ascending strike grid with arbitrary spacing.
         r : float, default 0.0
             Risk-free rate (decimal).
         q : float, default 0.0
@@ -478,8 +480,9 @@ class SabrSmile:
         Raises
         ------
         ValueError
-            If the stored forward, a strike, or expiry is outside the model's
-            valid domain, or smile generation produces an invalid volatility.
+            If the strike grid is not finite and strictly ascending, either
+            rate is non-finite, the stored forward, strike or expiry is outside
+            the model's domain, or generated volatility or price is non-finite.
         """
         ...
 
@@ -995,7 +998,7 @@ def materialize_cube_tenor_slice_normal(cube: VolCube, tenor: float, strikes: li
     """
     ...
 
-def materialize_cube_expiry_slice(cube: VolCube, expiry: float, strikes: list[float]) -> VolSurface:
+def materialize_cube_expiry_slice(cube: VolCube, expiry: float, strikes: list[float]) -> VolCubeExpirySlice:
     """Materialize a lognormal cube expiry slice.
 
     Parameters
@@ -1009,8 +1012,9 @@ def materialize_cube_expiry_slice(cube: VolCube, expiry: float, strikes: list[fl
 
     Returns
     -------
-    VolSurface
-        Data-only tenor-axis Black surface.
+    VolCubeExpirySlice
+        Data-only tenor-by-strike grid retaining the fixed option expiry and,
+        for shifted Black quotes, one displacement per tenor.
 
     Raises
     ------
@@ -1022,12 +1026,12 @@ def materialize_cube_expiry_slice(cube: VolCube, expiry: float, strikes: list[fl
     >>> from finstack_quant.core.market_data import VolCube
     >>> from finstack_quant.models.volatility import materialize_cube_expiry_slice
     >>> c = VolCube("C", [1.0], [5.0], [{"alpha": 0.03, "beta": 0.5, "rho": -0.2, "nu": 0.4}], [0.03])
-    >>> materialize_cube_expiry_slice(c, 1.0, [0.02, 0.03]).grid_shape
+    >>> materialize_cube_expiry_slice(c, 1.0, [0.02, 0.03]).get_grid_shape()
     (1, 2)
     """
     ...
 
-def materialize_cube_expiry_slice_normal(cube: VolCube, expiry: float, strikes: list[float]) -> VolSurface:
+def materialize_cube_expiry_slice_normal(cube: VolCube, expiry: float, strikes: list[float]) -> VolCubeExpirySlice:
     """Materialize a normal-volatility cube expiry slice.
 
     Parameters
@@ -1041,8 +1045,9 @@ def materialize_cube_expiry_slice_normal(cube: VolCube, expiry: float, strikes: 
 
     Returns
     -------
-    VolSurface
-        Data-only tenor-axis normal surface.
+    VolCubeExpirySlice
+        Data-only tenor-by-strike normal-volatility grid retaining the fixed
+        option expiry separately from the underlying tenors.
 
     Raises
     ------
@@ -1054,8 +1059,71 @@ def materialize_cube_expiry_slice_normal(cube: VolCube, expiry: float, strikes: 
     >>> from finstack_quant.core.market_data import VolCube
     >>> from finstack_quant.models.volatility import materialize_cube_expiry_slice_normal
     >>> c = VolCube("C", [1.0], [5.0], [{"alpha": 0.03, "beta": 0.5, "rho": -0.2, "nu": 0.4}], [0.03])
-    >>> materialize_cube_expiry_slice_normal(c, 1.0, [0.02, 0.03]).quote_type
+    >>> materialize_cube_expiry_slice_normal(c, 1.0, [0.02, 0.03]).get_quote_type()
     'normal'
+    """
+    ...
+
+def get_cube_expiry_slice_vol(slice: VolCubeExpirySlice, tenor: float, strike: float) -> float:
+    """Evaluate a fixed-expiry volatility grid by underlying tenor and strike.
+
+    Parameters
+    ----------
+    slice : VolCubeExpirySlice
+        Validated grid whose option expiry and quote convention stay fixed.
+    tenor : float
+        Underlying tenor in years; must lie within the stored range.
+    strike : float
+        Strike in forward-rate units; must lie within the stored range.
+
+    Returns
+    -------
+    float
+        Volatility in the grid's quote convention. Coordinates interpolate only across tenor and strike.
+
+    Raises
+    ------
+    ValueError
+        If a coordinate is non-finite, outside the grid, or interpolation fails.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import VolCubeExpirySlice
+    >>> from finstack_quant.models.volatility import get_cube_expiry_slice_vol
+    >>> grid = VolCubeExpirySlice("S", 1.0, [5.0], [0.03], [0.2])
+    >>> get_cube_expiry_slice_vol(grid, 5.0, 0.03)
+    0.2
+    """
+    ...
+
+def get_cube_expiry_slice_vol_clamped(slice: VolCubeExpirySlice, tenor: float, strike: float) -> float:
+    """Evaluate a fixed-expiry volatility grid by underlying tenor and strike.
+
+    Parameters
+    ----------
+    slice : VolCubeExpirySlice
+        Validated grid whose option expiry and quote convention stay fixed.
+    tenor : float
+        Underlying tenor in years; clamped to the stored range.
+    strike : float
+        Strike in forward-rate units; clamped to the stored range.
+
+    Returns
+    -------
+    float
+        Volatility in the grid's quote convention. Invalid non-finite inputs return NaN.
+
+    Notes
+    -----
+    This function does not raise; invalid numeric inputs return NaN.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import VolCubeExpirySlice
+    >>> from finstack_quant.models.volatility import get_cube_expiry_slice_vol_clamped
+    >>> grid = VolCubeExpirySlice("S", 1.0, [5.0], [0.03], [0.2])
+    >>> get_cube_expiry_slice_vol_clamped(grid, 5.0, 0.03)
+    0.2
     """
     ...
 

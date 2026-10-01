@@ -6,6 +6,32 @@
 use nalgebra::DMatrix;
 use serde::{Deserialize, Serialize};
 
+/// Check the shared positive, finite, strictly ascending tenor-grid invariant.
+///
+/// # Arguments
+///
+/// * `tenors` - Nonempty maturity coordinates in years, in their serialized or input order.
+pub(super) fn validate_tenors(tenors: &[f64]) -> finstack_quant_core::Result<()> {
+    if tenors.is_empty() {
+        return Err(finstack_quant_core::Error::Validation(
+            "Tenor grid must not be empty".into(),
+        ));
+    }
+    for (i, &tenor) in tenors.iter().enumerate() {
+        if !tenor.is_finite() || tenor <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Tenor at index {i} must be positive and finite, got {tenor}"
+            )));
+        }
+        if i > 0 && tenor <= tenors[i - 1] {
+            return Err(finstack_quant_core::Error::Validation(
+                "Tenor grid must be strictly ascending".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn rows_to_dmatrix(rows: &[Vec<f64>], label: &str) -> finstack_quant_core::Result<DMatrix<f64>> {
     if rows.is_empty() {
         return Err(finstack_quant_core::Error::Validation(format!(
@@ -37,6 +63,7 @@ fn rows_to_dmatrix(rows: &[Vec<f64>], label: &str) -> finstack_quant_core::Resul
 ///
 /// Yields are continuously compounded zero rates.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(try_from = "RawYieldPanel")]
 pub struct YieldPanel {
     /// Yield matrix: T rows (dates) x N columns (tenors).
     /// Entry (t, i) is the zero rate at observation t for tenor i.
@@ -45,6 +72,22 @@ pub struct YieldPanel {
     pub tenors: Vec<f64>,
     /// Observation dates (optional, for labeling). Length T if provided.
     pub dates: Option<Vec<finstack_quant_core::dates::Date>>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawYieldPanel {
+    yields: DMatrix<f64>,
+    tenors: Vec<f64>,
+    dates: Option<Vec<finstack_quant_core::dates::Date>>,
+}
+
+impl TryFrom<RawYieldPanel> for YieldPanel {
+    type Error = finstack_quant_core::Error;
+
+    fn try_from(raw: RawYieldPanel) -> finstack_quant_core::Result<Self> {
+        Self::new(raw.yields, raw.tenors, raw.dates)
+    }
 }
 
 impl YieldPanel {
@@ -114,27 +157,7 @@ impl YieldPanel {
         tenors: Vec<f64>,
         dates: Option<Vec<finstack_quant_core::dates::Date>>,
     ) -> finstack_quant_core::Result<Self> {
-        if tenors.is_empty() {
-            return Err(finstack_quant_core::Error::Validation(
-                "Tenor grid must not be empty".into(),
-            ));
-        }
-        for (i, tau) in tenors.iter().enumerate() {
-            if !tau.is_finite() || *tau <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "Tenor at index {i} must be positive and finite, got {tau}"
-                )));
-            }
-            if i > 0 && tenors[i] <= tenors[i - 1] {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "Tenor grid must be strictly ascending: tenor[{}]={} <= tenor[{}]={}",
-                    i,
-                    tenors[i],
-                    i - 1,
-                    tenors[i - 1]
-                )));
-            }
-        }
+        validate_tenors(&tenors)?;
 
         if yields.ncols() != tenors.len() {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -205,6 +228,7 @@ impl YieldPanel {
 
 /// Time series of extracted Nelson-Siegel factors.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(try_from = "RawFactorTimeSeries")]
 pub struct FactorTimeSeries {
     /// Observation dates copied from the source [`YieldPanel`] (length T)
     /// when the panel carried them; `None` for unlabeled panels.
@@ -220,7 +244,64 @@ pub struct FactorTimeSeries {
     pub r_squared_avg: f64,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawFactorTimeSeries {
+    dates: Option<Vec<finstack_quant_core::dates::Date>>,
+    factors: DMatrix<f64>,
+    residuals: DMatrix<f64>,
+    r_squared: Vec<f64>,
+    r_squared_avg: f64,
+}
+
+impl TryFrom<RawFactorTimeSeries> for FactorTimeSeries {
+    type Error = finstack_quant_core::Error;
+
+    fn try_from(raw: RawFactorTimeSeries) -> finstack_quant_core::Result<Self> {
+        let value = Self {
+            dates: raw.dates,
+            factors: raw.factors,
+            residuals: raw.residuals,
+            r_squared: raw.r_squared,
+            r_squared_avg: raw.r_squared_avg,
+        };
+        value.validate()?;
+        Ok(value)
+    }
+}
+
 impl FactorTimeSeries {
+    pub(super) fn validate(&self) -> finstack_quant_core::Result<()> {
+        let observations = self.factors.nrows();
+        if observations < 2
+            || self.factors.ncols() != 3
+            || self.residuals.nrows() != observations
+            || self.residuals.ncols() < 3
+            || self.r_squared.len() != self.residuals.ncols()
+            || self
+                .dates
+                .as_ref()
+                .is_some_and(|dates| dates.len() != observations)
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "FactorTimeSeries must have at least two aligned observations, three factor columns, and one residual/R-squared column per tenor".into(),
+            ));
+        }
+        if self
+            .factors
+            .iter()
+            .chain(self.residuals.iter())
+            .chain(self.r_squared.iter())
+            .any(|v| !v.is_finite())
+            || !self.r_squared_avg.is_finite()
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "FactorTimeSeries values must be finite".into(),
+            ));
+        }
+        Ok(())
+    }
+
     /// The factor matrix as one `Vec` per factor column (`level`, `slope`,
     /// `curvature` for Diebold–Li), each with one entry per observation date.
     #[must_use]
@@ -255,6 +336,7 @@ impl FactorTimeSeries {
 
 /// h-step ahead yield curve forecast with confidence bands.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(try_from = "RawYieldForecast")]
 pub struct YieldForecast {
     /// Forecast horizon in periods.
     pub horizon: usize,
@@ -268,6 +350,60 @@ pub struct YieldForecast {
     pub lower_95: Vec<f64>,
     /// 95% confidence band upper bound per tenor (length N).
     pub upper_95: Vec<f64>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawYieldForecast {
+    horizon: usize,
+    yields: Vec<f64>,
+    tenors: Vec<f64>,
+    factors: [f64; 3],
+    lower_95: Vec<f64>,
+    upper_95: Vec<f64>,
+}
+
+impl TryFrom<RawYieldForecast> for YieldForecast {
+    type Error = finstack_quant_core::Error;
+
+    fn try_from(raw: RawYieldForecast) -> finstack_quant_core::Result<Self> {
+        validate_tenors(&raw.tenors)?;
+        let n = raw.tenors.len();
+        if raw.horizon == 0
+            || raw.yields.len() != n
+            || raw.lower_95.len() != n
+            || raw.upper_95.len() != n
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "YieldForecast requires a positive horizon and aligned yields, tenors, and confidence bands".into(),
+            ));
+        }
+        if raw
+            .yields
+            .iter()
+            .chain(raw.factors.iter())
+            .chain(raw.lower_95.iter())
+            .chain(raw.upper_95.iter())
+            .any(|v| !v.is_finite())
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "YieldForecast values must be finite".into(),
+            ));
+        }
+        if (0..n).any(|i| raw.lower_95[i] > raw.yields[i] || raw.yields[i] > raw.upper_95[i]) {
+            return Err(finstack_quant_core::Error::Validation(
+                "YieldForecast confidence bands must contain the point forecasts".into(),
+            ));
+        }
+        Ok(Self {
+            horizon: raw.horizon,
+            yields: raw.yields,
+            tenors: raw.tenors,
+            factors: raw.factors,
+            lower_95: raw.lower_95,
+            upper_95: raw.upper_95,
+        })
+    }
 }
 
 #[cfg(test)]

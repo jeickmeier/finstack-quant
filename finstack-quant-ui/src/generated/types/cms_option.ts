@@ -351,7 +351,7 @@ export interface DFbedd428Be4C61592Ca2 {
  */
 export interface D_95A946Bb2F055985D90A {
   /**
-   * Accrual fractions for each period
+   * Finite nonnegative accrual fractions for each period; zero gives a zero coupon.
    */
   accrual_fractions: number[];
   attributes?: Attributes;
@@ -369,7 +369,7 @@ export interface D_95A946Bb2F055985D90A {
    *
    * When set, provides default values for `swap_fixed_frequency`, `swap_float_frequency`,
    * `swap_fixed_day_count`, and `swap_float_day_count`. Individual fields still
-   * override the convention when explicitly set.
+   * override the convention when explicitly set. Required for USD CMS.
    */
   index_id?: Id3 | null;
   instrument_pricing_overrides?: InstrumentPricingOverrides;

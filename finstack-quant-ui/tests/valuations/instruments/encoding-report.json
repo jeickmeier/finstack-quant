@@ -4259,10 +4259,6 @@
           "#/$defs/BermudanSchedule/properties/exercise_dates",
           "#/$defs/CmsSwap/properties/accrual_fractions",
           "#/$defs/CmsSwap/properties/fixing_dates",
-          "#/$defs/FundingLeg/oneOf/0/properties/accrual_fractions",
-          "#/$defs/FundingLeg/oneOf/0/properties/payment_dates",
-          "#/$defs/FundingLeg/oneOf/1/properties/accrual_fractions",
-          "#/$defs/FundingLeg/oneOf/1/properties/payment_dates",
           "#/$defs/CmsSwap/properties/payment_dates",
           "#/$defs/CmsOption/properties/accrual_fractions",
           "#/$defs/CmsOption/properties/fixing_dates",
@@ -4666,8 +4662,6 @@
           "#/$defs/MaturityConstraints/properties/min_remaining_years",
           "#/$defs/InflationSwap/properties/base_cpi",
           "#/$defs/YoYInflationSwap/properties/base_cpi",
-          "#/$defs/InflationCapFloor/properties/inflation_nominal_correlation",
-          "#/$defs/InflationCapFloor/properties/nominal_rate_volatility",
           "#/$defs/ForwardRateAgreement/properties/observed_fixing",
           "#/$defs/PositiveF64Wire",
           "#/$defs/ClosedUnitIntervalF64Wire",
@@ -4694,8 +4688,7 @@
           "#/$defs/CmsSwap/properties/accrual_fractions/items",
           "#/$defs/CmsSwap/properties/cms_cap",
           "#/$defs/CmsSwap/properties/cms_floor",
-          "#/$defs/FundingLeg/oneOf/0/properties/accrual_fractions/items",
-          "#/$defs/FundingLeg/oneOf/1/properties/accrual_fractions/items",
+          "#/$defs/FundingPeriod/properties/accrual_year_fraction",
           "#/$defs/CmsOption/properties/accrual_fractions/items",
           "#/$defs/CollateralType/oneOf/1/properties/special/properties/rate_adjustment_bp",
           "#/$defs/CollateralSpec/properties/quantity",
@@ -5463,8 +5456,6 @@
           "#/$defs/MaturityConstraints/properties/min_remaining_years",
           "#/$defs/InflationSwap/properties/base_cpi",
           "#/$defs/YoYInflationSwap/properties/base_cpi",
-          "#/$defs/InflationCapFloor/properties/inflation_nominal_correlation",
-          "#/$defs/InflationCapFloor/properties/nominal_rate_volatility",
           "#/$defs/ForwardRateAgreement/properties/observed_fixing",
           "#/$defs/FutureContractSpecs/properties/convexity_adjustment",
           "#/$defs/ListedFutureTerms/properties/quoted_price",
@@ -6775,6 +6766,8 @@
           "#/$defs/RevolvingCredit/properties/scheduled_fees",
           "#/$defs/CmoWaterfall/properties/tranches",
           "#/$defs/EligibleCollateralSchedule/properties/eligible",
+          "#/$defs/FundingLeg/oneOf/0/properties/periods",
+          "#/$defs/FundingLeg/oneOf/1/properties/periods",
           "#/$defs/CdsIndex/properties/constituents",
           "#/$defs/PrivateMarketsFund/properties/events",
           "#/$defs/RealEstateAsset/properties/acquisition_costs",
@@ -7034,6 +7027,10 @@
           { "pointer": "#/$defs/ResettingSide", "keyword": "oneOf" },
           { "pointer": "#/$defs/InflationInterpolation", "keyword": "oneOf" },
           { "pointer": "#/$defs/RateOptionType", "keyword": "oneOf" },
+          {
+            "pointer": "#/$defs/InflationVolatilityExpiry",
+            "keyword": "oneOf"
+          },
           { "pointer": "#/$defs/CashSettlementMethod", "keyword": "oneOf" },
           { "pointer": "#/$defs/ExerciseStyle", "keyword": "oneOf" },
           { "pointer": "#/$defs/OptionType", "keyword": "oneOf" },
@@ -12405,10 +12402,6 @@
           "#/$defs/d_3dbd4a1aab74e98eef06/properties/accrual_fractions",
           "#/$defs/d_2c88e4d1e2e4f7c22e02/properties/tags",
           "#/$defs/d_3dbd4a1aab74e98eef06/properties/fixing_dates",
-          "#/$defs/d_55de605ffd705a3d4f33/oneOf/0/properties/accrual_fractions",
-          "#/$defs/d_55de605ffd705a3d4f33/oneOf/0/properties/payment_dates",
-          "#/$defs/d_55de605ffd705a3d4f33/oneOf/1/properties/accrual_fractions",
-          "#/$defs/d_55de605ffd705a3d4f33/oneOf/1/properties/payment_dates",
           "#/$defs/d_cdb8fddc0106047270c4/properties/times",
           "#/$defs/d_cdb8fddc0106047270c4/properties/values",
           "#/$defs/d_3dbd4a1aab74e98eef06/properties/payment_dates"
@@ -12439,8 +12432,7 @@
           "#/$defs/d_3dbd4a1aab74e98eef06/properties/accrual_fractions/items",
           "#/$defs/d_3dbd4a1aab74e98eef06/properties/cms_cap",
           "#/$defs/d_3dbd4a1aab74e98eef06/properties/cms_floor",
-          "#/$defs/d_55de605ffd705a3d4f33/oneOf/0/properties/accrual_fractions/items",
-          "#/$defs/d_55de605ffd705a3d4f33/oneOf/1/properties/accrual_fractions/items",
+          "#/$defs/d_d1c6696e73834b17d83f/properties/accrual_year_fraction",
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
           "#/$defs/d_b0a5fc543381da6a5722/properties/implied_volatility",
           "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_asw_market",
@@ -12761,6 +12753,10 @@
             "pointer": "#/$defs/d_3dbd4a1aab74e98eef06/properties/swap_float_frequency",
             "keyword": "anyOf"
           }
+        ],
+        "object-array": [
+          "#/$defs/d_55de605ffd705a3d4f33/oneOf/0/properties/periods",
+          "#/$defs/d_55de605ffd705a3d4f33/oneOf/1/properties/periods"
         ],
         "optional-property-record": [
           "#/$defs/d_2c88e4d1e2e4f7c22e02",
@@ -15836,10 +15832,6 @@
           "#/$defs/BermudanSchedule/properties/exercise_dates",
           "#/$defs/CmsSwap/properties/accrual_fractions",
           "#/$defs/CmsSwap/properties/fixing_dates",
-          "#/$defs/FundingLeg/oneOf/0/properties/accrual_fractions",
-          "#/$defs/FundingLeg/oneOf/0/properties/payment_dates",
-          "#/$defs/FundingLeg/oneOf/1/properties/accrual_fractions",
-          "#/$defs/FundingLeg/oneOf/1/properties/payment_dates",
           "#/$defs/CmsSwap/properties/payment_dates",
           "#/$defs/CmsOption/properties/accrual_fractions",
           "#/$defs/CmsOption/properties/fixing_dates",
@@ -16243,8 +16235,6 @@
           "#/$defs/MaturityConstraints/properties/min_remaining_years",
           "#/$defs/InflationSwap/properties/base_cpi",
           "#/$defs/YoYInflationSwap/properties/base_cpi",
-          "#/$defs/InflationCapFloor/properties/inflation_nominal_correlation",
-          "#/$defs/InflationCapFloor/properties/nominal_rate_volatility",
           "#/$defs/ForwardRateAgreement/properties/observed_fixing",
           "#/$defs/PositiveF64Wire",
           "#/$defs/ClosedUnitIntervalF64Wire",
@@ -16271,8 +16261,7 @@
           "#/$defs/CmsSwap/properties/accrual_fractions/items",
           "#/$defs/CmsSwap/properties/cms_cap",
           "#/$defs/CmsSwap/properties/cms_floor",
-          "#/$defs/FundingLeg/oneOf/0/properties/accrual_fractions/items",
-          "#/$defs/FundingLeg/oneOf/1/properties/accrual_fractions/items",
+          "#/$defs/FundingPeriod/properties/accrual_year_fraction",
           "#/$defs/CmsOption/properties/accrual_fractions/items",
           "#/$defs/CollateralType/oneOf/1/properties/special/properties/rate_adjustment_bp",
           "#/$defs/CollateralSpec/properties/quantity",
@@ -17040,8 +17029,6 @@
           "#/$defs/MaturityConstraints/properties/min_remaining_years",
           "#/$defs/InflationSwap/properties/base_cpi",
           "#/$defs/YoYInflationSwap/properties/base_cpi",
-          "#/$defs/InflationCapFloor/properties/inflation_nominal_correlation",
-          "#/$defs/InflationCapFloor/properties/nominal_rate_volatility",
           "#/$defs/ForwardRateAgreement/properties/observed_fixing",
           "#/$defs/FutureContractSpecs/properties/convexity_adjustment",
           "#/$defs/ListedFutureTerms/properties/quoted_price",
@@ -18352,6 +18339,8 @@
           "#/$defs/RevolvingCredit/properties/scheduled_fees",
           "#/$defs/CmoWaterfall/properties/tranches",
           "#/$defs/EligibleCollateralSchedule/properties/eligible",
+          "#/$defs/FundingLeg/oneOf/0/properties/periods",
+          "#/$defs/FundingLeg/oneOf/1/properties/periods",
           "#/$defs/CdsIndex/properties/constituents",
           "#/$defs/Basket/properties/constituents",
           "#/$defs/PrivateMarketsFund/properties/events",
@@ -18611,6 +18600,10 @@
           { "pointer": "#/$defs/ResettingSide", "keyword": "oneOf" },
           { "pointer": "#/$defs/InflationInterpolation", "keyword": "oneOf" },
           { "pointer": "#/$defs/RateOptionType", "keyword": "oneOf" },
+          {
+            "pointer": "#/$defs/InflationVolatilityExpiry",
+            "keyword": "oneOf"
+          },
           { "pointer": "#/$defs/CashSettlementMethod", "keyword": "oneOf" },
           { "pointer": "#/$defs/ExerciseStyle", "keyword": "oneOf" },
           { "pointer": "#/$defs/OptionType", "keyword": "oneOf" },
@@ -28256,7 +28249,6 @@
           "#/$defs/d_18f3ba1ec18ab2be13b2"
         ],
         "double": [
-          "#/$defs/d_2572320f93343dabe361/properties/inflation_nominal_correlation",
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
           "#/$defs/d_b0a5fc543381da6a5722/properties/implied_volatility",
           "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_asw_market",
@@ -28287,7 +28279,6 @@
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/vol_bump_decimal",
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/ytm_bump_bp",
           "#/$defs/d_7e19cc4df9954b864180",
-          "#/$defs/d_2572320f93343dabe361/properties/nominal_rate_volatility",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_decimal",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp"
         ],
@@ -28468,7 +28459,6 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps"
         ],
         "nullable-number": [
-          "#/$defs/d_2572320f93343dabe361/properties/inflation_nominal_correlation",
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
           "#/$defs/d_b0a5fc543381da6a5722/properties/implied_volatility",
           "#/$defs/d_b0a5fc543381da6a5722/properties/quoted_asw_market",
@@ -28496,7 +28486,6 @@
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/spot_bump_decimal",
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/vol_bump_decimal",
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/ytm_bump_bp",
-          "#/$defs/d_2572320f93343dabe361/properties/nominal_rate_volatility",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_decimal",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp"
         ],
@@ -28613,7 +28602,8 @@
           { "pointer": "#/$defs/d_b556bbeb1ecf96c44c5a", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_9bbbe0cc70b45831cb71", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_718a5e1e08f778996072", "keyword": "oneOf" },
-          { "pointer": "#/$defs/d_3f2fd7d843a1500a9a0b", "keyword": "oneOf" }
+          { "pointer": "#/$defs/d_3f2fd7d843a1500a9a0b", "keyword": "oneOf" },
+          { "pointer": "#/$defs/d_8299c717c823ee1759e5", "keyword": "oneOf" }
         ]
       }
     },

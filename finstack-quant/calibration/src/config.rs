@@ -264,8 +264,9 @@ impl Default for VolSurfaceSolveConfig {
 /// bootstrapping or global solve process.
 ///
 /// # Invariants
-/// - `df_hard_min` > 0
+/// - `0 < df_hard_min < df_hard_max`, with finite bounds
 /// - `scan_grid_points` > 0
+/// - Scan and finite-difference step sizes are finite and strictly positive
 ///
 /// # Examples
 /// ```
@@ -287,11 +288,11 @@ pub struct DiscountCurveSolveConfig {
     pub scan_grid_points: usize,
     /// Minimum required success points in scan before attempting polish.
     pub min_scan_grid_points: usize,
-    /// Initial step size for geometric scan grid.
+    /// Finite, strictly positive initial step size for the geometric scan grid.
     pub scan_grid_step: f64,
-    /// Absolute minimum allowed discount factor (prevents singularity).
+    /// Finite, strictly positive lower discount-factor bound, below `df_hard_max`.
     pub df_hard_min: f64,
-    /// Absolute maximum allowed discount factor (prevents divergence).
+    /// Finite upper discount-factor bound, strictly above `df_hard_min`.
     pub df_hard_max: f64,
     /// Minimum time threshold for considering a knot at spot (t=0).
     pub min_t_spot: f64,
@@ -312,8 +313,8 @@ pub struct DiscountCurveSolveConfig {
     /// Weighting scheme for global solve residuals.
     #[serde(default)]
     pub weighting_scheme: ResidualWeightingScheme,
-    /// Step size (h) for finite-difference Jacobian calculation.
-    #[serde(default)]
+    /// Finite, strictly positive relative step for finite-difference Jacobians.
+    /// The parameter bump is `max(h, abs(parameter) * h)`.
     pub jacobian_step_size: f64,
     /// Tolerance for determining calibration *success* (applied to residuals).
     ///
@@ -735,9 +736,10 @@ impl CalibrationConfig {
     ///
     /// # Errors
     ///
-    /// Returns an error when nested validation/rate-bound settings are invalid or
+    /// Returns an error when nested bounds or numerical controls are invalid, or
     /// when solver tolerance is looser than residual success tolerances.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        self.solver.validate()?;
         self.validation.validate()?;
         self.rate_bounds.validate()?;
         self.market_freshness.validate()?;
@@ -761,6 +763,7 @@ impl CalibrationConfig {
             "vol_surface.validation_tolerance",
             self.vol_surface.validation_tolerance,
         )?;
+        self.validate_discount_controls()?;
         self.validate_hazard_bounds()?;
         self.validate_inflation_bounds()
     }
@@ -780,6 +783,55 @@ impl CalibrationConfig {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "CalibrationConfig invalid: solver tolerance ({solver_tolerance}) must be <= {label} ({validation_tolerance})"
             )));
+        }
+        Ok(())
+    }
+
+    fn validate_discount_controls(&self) -> finstack_quant_core::Result<()> {
+        let config = &self.discount_curve;
+        if !config.df_hard_min.is_finite()
+            || !config.df_hard_max.is_finite()
+            || config.df_hard_min <= 0.0
+            || config.df_hard_min >= config.df_hard_max
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CalibrationConfig invalid: discount-factor bounds must satisfy finite 0 < df_hard_min < df_hard_max; got ({}, {})",
+                config.df_hard_min, config.df_hard_max
+            )));
+        }
+        for (label, value) in [
+            ("discount_curve.scan_grid_step", config.scan_grid_step),
+            (
+                "discount_curve.jacobian_step_size",
+                config.jacobian_step_size,
+            ),
+            ("discount_curve.min_t_spot", config.min_t_spot),
+        ] {
+            if !value.is_finite() || value <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CalibrationConfig invalid: {label} must be finite and positive, got {value}"
+                )));
+            }
+        }
+        for (label, count) in [
+            ("discount_curve.scan_grid_points", config.scan_grid_points),
+            (
+                "discount_curve.min_scan_grid_points",
+                config.min_scan_grid_points,
+            ),
+        ] {
+            // The geometric scan allocates two values per point plus the
+            // center. Reject counts whose allocation size would overflow.
+            let valid_size = count
+                .checked_mul(2)
+                .and_then(|points| points.checked_add(1))
+                .and_then(|points| points.checked_mul(std::mem::size_of::<f64>()))
+                .is_some_and(|bytes| bytes <= isize::MAX as usize);
+            if count == 0 || !valid_size {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CalibrationConfig invalid: {label} must be positive and fit a scan-grid allocation, got {count}"
+                )));
+            }
         }
         Ok(())
     }
@@ -910,14 +962,21 @@ impl CalibrationConfig {
     /// Create a Levenberg-Marquardt solver with current config settings.
     ///
     /// Returns the concrete solver for multi-dimensional optimization.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if the solver stopping settings are invalid.
     pub fn create_lm_solver(
         &self,
-    ) -> finstack_quant_core::math::solver_multi::LevenbergMarquardtSolver {
+    ) -> finstack_quant_core::Result<
+        finstack_quant_core::math::solver_multi::LevenbergMarquardtSolver,
+    > {
         use finstack_quant_core::math::solver_multi::LevenbergMarquardtSolver;
 
-        LevenbergMarquardtSolver::new()
+        self.solver.validate()?;
+        Ok(LevenbergMarquardtSolver::new()
             .with_tolerance(self.solver.tolerance())
-            .with_max_iterations(self.solver.max_iterations())
+            .with_max_iterations(self.solver.max_iterations()))
     }
 }
 
@@ -1082,5 +1141,17 @@ mod fx_and_hierarchy_settings_tests {
             .validate()
             .expect_err("inverted hazard bounds should be rejected");
         assert!(err.to_string().to_lowercase().contains("hazard"));
+    }
+
+    #[test]
+    fn solver_settings_are_checked_before_configuration_or_solver_use() {
+        for tolerance in [0.0, -1e-8, f64::NAN, f64::INFINITY] {
+            let config = CalibrationConfig::default().with_tolerance(tolerance);
+            assert!(config.validate().is_err());
+            assert!(config.create_lm_solver().is_err());
+        }
+        let config = CalibrationConfig::default().with_max_iterations(0);
+        assert!(config.validate().is_err());
+        assert!(config.create_lm_solver().is_err());
     }
 }

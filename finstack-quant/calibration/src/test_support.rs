@@ -115,6 +115,6 @@ fn parse_snapshot_currency(value: &str, field: &str) -> Result<Currency> {
 pub(crate) fn split_market_context(
     ctx: &MarketContext,
 ) -> (Vec<PriorMarketObject>, Vec<MarketDatum>) {
-    split_market_context_state(MarketContextState::from(ctx))
+    split_market_context_state(MarketContextState::try_from(ctx).expect("coherent market snapshot"))
         .expect("valid market context snapshot")
 }

@@ -8,6 +8,7 @@
 //! - **principal_events**: Principal event date validation
 
 mod amortization;
+mod compiler_regressions;
 mod conventions;
 mod credit_models;
 mod curve_shapes;
@@ -16,3 +17,4 @@ mod overnight_replay;
 mod principal_events;
 mod roll_rule;
 mod schedule;
+mod sofr_calendar;

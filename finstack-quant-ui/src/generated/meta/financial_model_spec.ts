@@ -460,7 +460,7 @@ export default [
   {
     "path": "#/$defs/d_0e3d1d10849038bb6f70",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DynamicRecoverySpec",
-    "description": "Specification for dynamic (notional-dependent) recovery rate.\n\nModels the relationship between the accreted notional and the recovery\nrate in default. As PIK accrual increases the notional relative to the\noriginal base, recovery declines according to the chosen [`RecoveryModel`]."
+    "description": "Specification for dynamic (notional-dependent) recovery rate.\n\nModels the relationship between the accreted notional and the recovery\nrate in default. As PIK accrual increases the notional relative to the\noriginal base, recovery declines according to the chosen [`RecoveryModel`].\nDeserialization enforces the same parameter invariants as the constructors."
   },
   {
     "path": "#/$defs/d_0e3d1d10849038bb6f70/properties/base_notional",
@@ -1102,7 +1102,7 @@ export default [
     "path": "#/$defs/d_210ab4b44ffb533f1266/properties/end_of_month",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatingCouponSpec/properties/end_of_month",
     "default": false,
-    "description": "Whether end-of-month rolling should be preserved when generating the\nschedule."
+    "description": "Whether end-of-month rolling should be preserved when generating the\nschedule.\n\nIncompatible with explicit IMM roll rules. With ACT/ACT ICMA, the\nregular grid anchor must be month-end: maturity for front stubs, or\nstart for back stubs and schedules without stubs. An irregular opposite\nendpoint remains supported."
   },
   {
     "path": "#/$defs/d_210ab4b44ffb533f1266/properties/frequency",
@@ -1449,7 +1449,7 @@ export default [
   {
     "path": "#/$defs/d_321bf35b4a9ae99f3cf3/properties/target_instrument_ids",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PikToggleSpec/properties/target_instrument_ids",
-    "description": "Target instrument IDs (if None, applies to all instruments with PIK capability)"
+    "description": "Required nonempty list of borrowing debt IDs whose cash coupons may capitalize.\n`None` and empty lists are rejected; swaps and options cannot be PIK targets."
   },
   {
     "path": "#/$defs/d_321bf35b4a9ae99f3cf3/properties/target_instrument_ids/items",
@@ -3221,7 +3221,7 @@ export default [
   {
     "path": "#/$defs/d_4910c56c185343dd68e0/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/AmortizationSpec/oneOf/2",
-    "description": "Explicit schedule of remaining principal amounts after given dates.\nEach pair stores `(date, remaining_principal_after_date)`."
+    "description": "Explicit schedule of remaining principal amounts after given economic dates.\nTargets include PIK capitalized and principal events effective on that date.\nA target may exceed initial or earlier remaining principal when funded by\nintervening draws or PIK, but must not exceed the live balance on its date.\nEach pair stores `(date, remaining_principal_after_date)`."
   },
   {
     "path": "#/$defs/d_4910c56c185343dd68e0/oneOf/2/properties/step_remaining",
@@ -3281,7 +3281,7 @@ export default [
   {
     "path": "#/$defs/d_4910c56c185343dd68e0/oneOf/5",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/AmortizationSpec/oneOf/5",
-    "description": "Equal principal installments on every payment date in `(start, end]`,\nrepaying the outstanding principal in full by `end`."
+    "description": "Equal principal installments on coupon accrual boundaries in `(start, end]`.\nThe installment is fixed from outstanding after all start-date movements,\nincluding PIK and explicit principal events. The final installment pays\nthe live remaining balance, including subsequent PIK or principal changes.\nPrincipal changes economically on each accrual boundary; cash settles on\nthat coupon's adjusted, lagged payment date."
   },
   {
     "path": "#/$defs/d_4910c56c185343dd68e0/oneOf/5/properties/linear_between",
@@ -3290,21 +3290,21 @@ export default [
   {
     "path": "#/$defs/d_4910c56c185343dd68e0/oneOf/5/properties/linear_between/properties/end",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/AmortizationSpec/oneOf/5/properties/linear_between/properties/end",
-    "description": "Amortization end (full repayment), on or before maturity.",
+    "description": "Economic end of amortization (full repayment), which must be an\nactual coupon accrual boundary on or before the effective terminal\naccrual date. Cash settlement may follow this date due to payment lag.",
     "ref": "#/$defs/DateWire",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DateWire"
   },
   {
     "path": "#/$defs/d_4910c56c185343dd68e0/oneOf/5/properties/linear_between/properties/start",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/AmortizationSpec/oneOf/5/properties/linear_between/properties/start",
-    "description": "Amortization start; installments fall on payment dates strictly\nafter it.",
+    "description": "Economic amortization start, on or after issue; installments fall\non coupon accrual boundaries strictly after it.",
     "ref": "#/$defs/DateWire",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DateWire"
   },
   {
     "path": "#/$defs/d_4910c56c185343dd68e0/oneOf/6",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/AmortizationSpec/oneOf/6",
-    "description": "Custom principal exchanges on specific dates (absolute cash amounts).\nPositive amounts reduce outstanding (i.e., principal paid by issuer)."
+    "description": "Custom principal exchanges on specific dates (absolute cash amounts).\nPositive amounts reduce outstanding (i.e., principal paid by issuer).\nEach payment must be covered by the live balance, including prior draws\nand PIK. Lifetime repayments may therefore exceed initial principal."
   },
   {
     "path": "#/$defs/d_4910c56c185343dd68e0/oneOf/6/properties/custom_principal",
@@ -3526,7 +3526,7 @@ export default [
     "path": "#/$defs/d_5ac0f2a8c82a3daab691/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/AccrualMethod/oneOf/1",
     "const": "compounded",
-    "description": "Compounded accrual.\n\n`Accrued = N × expm1(f × ln1p(r))`\n\nwhich is the numerically stable form of\n`N × [(1 + r)^f − 1]`, where `r = coupon_amount / notional`\nand `f = elapsed / period` (time fraction within the current\ncoupon period).\n\n**Note:** ICMA Rule 251.1 prescribes *linear* accrual for bond\nAI calculations. This variant uses true exponential compounding\nand should not be cited as ICMA-style. It is intended for\ninstruments that genuinely compound within a coupon period\n(e.g. some leveraged loans).\n\n**Ex-coupon window convention:** inside an ex-coupon window the\naccrued interest is the negative rebate of the *remaining* stub,\ncompounded on the same basis:\n\n`Accrued = −N × expm1((1 − f) × ln1p(r))`\n\nwhere `f = elapsed / period`. ICMA Rule 251.1 (and the UK DMO\ngilt convention) prescribe a *linear* ex-coupon rebate\n(`−C × (1 − f)`); use [`AccrualMethod::Linear`] for those markets."
+    "description": "Compounded accrual.\n\n`Accrued = N × expm1(f × ln1p(r))`\n\nwhich is the numerically stable form of\n`N × [(1 + r)^f − 1]`, where `r = coupon_amount / notional`\nand `f = elapsed / period` (time fraction within the current\ncoupon period).\n\nThe period rate must be finite and greater than `-1`; valid negative\nrates in `(-1, 0)` remain supported.\n\n**Note:** ICMA Rule 251.1 prescribes *linear* accrual for bond\nAI calculations. This variant uses true exponential compounding\nand should not be cited as ICMA-style. It is intended for\ninstruments that genuinely compound within a coupon period\n(e.g. some leveraged loans).\n\n**Ex-coupon window convention:** inside an ex-coupon window the\naccrued interest is the negative rebate of the *remaining* stub,\ncompounded on the same basis:\n\n`Accrued = −N × expm1((1 − f) × ln1p(r))`\n\nwhere `f = elapsed / period`. ICMA Rule 251.1 (and the UK DMO\ngilt convention) prescribe a *linear* ex-coupon rebate\n(`−C × (1 − f)`); use [`AccrualMethod::Linear`] for those markets."
   },
   {
     "path": "#/$defs/d_5f61e81833a10831eadd",
@@ -3605,7 +3605,7 @@ export default [
   {
     "path": "#/$defs/d_63aec3d47748d9f3d86a/properties/coupon_period",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CashFlowAccrual/properties/coupon_period",
-    "description": "Regular reference coupon period for ACT/ACT ICMA, including stub accrual.\n`None` leaves reference-period selection to the schedule accrual caller."
+    "description": "Unadjusted regular reference coupon period for ACT/ACT ICMA, or the\nactual full contractual coupon period for ACT/365L, including when\nthis flow represents only a rate or balance subinterval.\nACT/365L metadata must retain these boundaries to select the original\ncoupon's denominator; other conventions may leave this field `None`."
   },
   {
     "path": "#/$defs/d_63aec3d47748d9f3d86a/properties/coupon_period/prefixItems/0",
@@ -3642,7 +3642,7 @@ export default [
   {
     "path": "#/$defs/d_63aec3d47748d9f3d86a/properties/projected_index_rate",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CashFlowAccrual/properties/projected_index_rate",
-    "description": "Projected index rate before spread, gearing, caps, or floors.",
+    "description": "Projected index rate before spread, gearing, caps, or floors.\nSerialization rejects non-finite rates instead of encoding them as absent.",
     "format": "double"
   },
   {
@@ -3873,7 +3873,7 @@ export default [
   {
     "path": "#/$defs/d_66cec9e6c4e451f96890",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RollRule",
-    "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode. The IMM modes\nforce a quarterly grid: the schedule frequency and stub rule configured on\n[`ScheduleParams`] are overridden with quarterly / short-back, matching\n`ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates\n  for rate, currency, and equity index futures).\n- **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll\n  dates). When the start date is not itself a roll date, the first period\n  accrues from the roll date immediately **preceding** the start (standard\n  front accrual per the ISDA Big Bang Protocol, April 2009).\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::specs::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)"
+    "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode. The IMM modes\nforce a quarterly grid: the schedule frequency and stub rule configured on\n[`ScheduleParams`] are overridden with quarterly / short-back, matching\n`ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates\n  for rate, currency, and equity index futures). Cashflow schedules retain\n  the contractual maturity as a short final stub when it is off-grid.\n- **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll\n  dates). When the start date is not itself a roll date, the first period\n  accrues from the roll date immediately **preceding** the start (standard\n  front accrual per the ISDA Big Bang Protocol, April 2009).\n  Interior coupon or payment-program windows start at their declared\n  boundary; front accrual is applied only once at the instrument start.\n\nExplicit roll grids cannot be combined with `end_of_month`. ACT/ACT ICMA\nsupports the CDS twentieth grid; third-Wednesday IMM with ACT/ACT ICMA is\nrejected because the available ICMA reference calculation requires nominal\nmonth-grid coupons.\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::specs::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)"
   },
   {
     "path": "#/$defs/d_66cec9e6c4e451f96890/oneOf/0",
@@ -3914,7 +3914,7 @@ export default [
     "path": "#/$defs/d_686a28cd91db32d9583d/oneOf/10",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DayCount/oneOf/10",
     "const": "act_act_isma",
-    "description": "Actual/Actual (ICMA) day count convention.\n\nUses actual days in numerator and actual days in the coupon period\nas denominator, requiring knowledge of payment frequency.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251 - \"Actual/Actual (ICMA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ICMA\" (A007)\n- **Also known as**: Act/Act (ICMA), Act/Act (ISMA), ISMA-99\n\n# Algorithm\n\n1. Determine quasi-coupon periods based on payment frequency\n2. For each period: (actual days) / (actual days in coupon period)\n3. Sum fractions across periods\n\n# Usage\n\nStandard for:\n- International bonds with regular coupons\n- Eurobonds with semi-annual or annual payments\n- ICMA-governed securities\n\n# Requirements\n\nRequires `frequency` in [`DayCountContext`] to determine regular coupon periods.\nFor irregular first/last coupons, use\n[`act_act_isma_year_fraction_with_reference_period`].\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 15).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::July, 15).expect(\"Valid date\");\nlet frequency = Tenor::semi_annual(); // Semi-annual\n\nlet yf = DayCount::ActActIsma.year_fraction(\n    start,\n    end,\n    DayCountContext { frequency: Some(frequency), ..Default::default() }\n).expect(\"Year fraction calculation should succeed\");\n\n// Full semi-annual period = 0.5 year fraction (6 months / 12 months)\nassert!((yf - 0.5).abs() < 1e-6);\n```\n\n# References\n\n- ICMA (2010). \"ICMA Rule Book.\" Rule 251. `docs/REFERENCES.md#icma-rule-book`\n- ISMA (1999). \"Recommendations for Accrued Interest Calculations.\""
+    "description": "Actual/Actual (ICMA) day count convention.\n\nUses actual days in numerator and actual days in the coupon period\nas denominator, requiring knowledge of payment frequency.\nExplicit reference coupon boundaries must be unadjusted regular dates\nfrom the contractual nominal month grid, rather than payment dates.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251 - \"Actual/Actual (ICMA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ICMA\" (A007)\n- **Also known as**: Act/Act (ICMA), Act/Act (ISMA), ISMA-99\n\n# Algorithm\n\n1. Determine quasi-coupon periods based on payment frequency\n2. For each period: (actual days) / (actual days in coupon period)\n3. Sum fractions across periods\n\n# Usage\n\nStandard for:\n- International bonds with regular coupons\n- Eurobonds with semi-annual or annual payments\n- ICMA-governed securities\n\n# Requirements\n\nRequires `frequency` in [`DayCountContext`] to determine regular coupon periods.\nFor irregular first/last coupons, use\n[`act_act_isma_year_fraction_with_reference_period`].\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 15).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::July, 15).expect(\"Valid date\");\nlet frequency = Tenor::semi_annual(); // Semi-annual\n\nlet yf = DayCount::ActActIsma.year_fraction(\n    start,\n    end,\n    DayCountContext { frequency: Some(frequency), ..Default::default() }\n).expect(\"Year fraction calculation should succeed\");\n\n// Full semi-annual period = 0.5 year fraction (6 months / 12 months)\nassert!((yf - 0.5).abs() < 1e-6);\n```\n\n# References\n\n- ICMA (2010). \"ICMA Rule Book.\" Rule 251. `docs/REFERENCES.md#icma-rule-book`\n- ISMA (1999). \"Recommendations for Accrued Interest Calculations.\""
   },
   {
     "path": "#/$defs/d_686a28cd91db32d9583d/oneOf/11",
@@ -3938,7 +3938,7 @@ export default [
     "path": "#/$defs/d_686a28cd91db32d9583d/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DayCount/oneOf/3",
     "const": "act_365l",
-    "description": "Actual/365 Leap day count convention (Actual/365L) per ICMA Rule 251.\n\nYear fraction = (actual days) / (365 or 366), where the denominator\nrule depends on the coupon frequency supplied via [`DayCountContext`]:\n\n- **Annual** (or no frequency supplied): 366 if February 29 falls in\n  the interval `(start, end]` (exclusive of start, inclusive of end),\n  else 365.\n- **Non-annual**: 366 if the period END date falls in a leap year,\n  else 365.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251.1(i)(c)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365L\" (A008)\n- **Also known as**: Act/365L, ISMA-Year\n\nNote: this is **not** ACT/ACT AFB (Association Française des Banques),\nwhich uses a different (sub-period splitting) algorithm. The former\n`act_365afb` parse alias was removed because it conflated the two\nconventions. Use [`DayCount::ActActAfb`] for AFB / Actual/Actual Euro.\n\n# Usage\n\nUsed in:\n- GBP floating-rate notes\n- Some European bond markets\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\n// Period containing Feb 29, 2024 (leap year)\nlet start = Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2024, Month::March, 1).expect(\"Valid date\");\n\nlet yf = DayCount::Act365L.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n// 29 days / 366 (leap year denominator)\nassert_eq!(yf, 29.0 / 366.0);\n```"
+    "description": "Actual/365 Leap day count convention (Actual/365L) per ICMA Rule 251.\n\nYear fraction = (actual days) / (365 or 366), where the denominator\nrule depends on the coupon frequency and enclosing `coupon_period`\nsupplied via [`DayCountContext`]. Both are required:\n\n- **Annual**: 366 if February 29 falls in\n  `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),\n  else 365.\n- **Non-annual**: 366 if the next coupon date falls in a leap year,\n  else 365.\n\nPartial accrual keeps the enclosing coupon's denominator. Accrual\ndates outside that coupon are rejected; sum separate coupon slices\nfor calculations spanning multiple coupon periods.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251.1(i)(c)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365L\" (A008)\n- **Also known as**: Act/365L, ISMA-Year\n\nNote: this is **not** ACT/ACT AFB (Association Française des Banques),\nwhich uses a different (sub-period splitting) algorithm. The former\n`act_365afb` parse alias was removed because it conflated the two\nconventions. Use [`DayCount::ActActAfb`] for AFB / Actual/Actual Euro.\n\n# Usage\n\nUsed in:\n- GBP floating-rate notes\n- Some European bond markets\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};\nuse time::Month;\n\n// Period containing Feb 29, 2024 (leap year)\nlet start = Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2024, Month::March, 1).expect(\"Valid date\");\n\nlet ctx = DayCountContext {\n    frequency: Some(Tenor::annual()),\n    coupon_period: Some((start, end)),\n    ..DayCountContext::default()\n};\nlet yf = DayCount::Act365L.year_fraction(start, end, ctx).expect(\"Year fraction calculation should succeed\");\n// 29 days / 366 (leap year denominator)\nassert_eq!(yf, 29.0 / 366.0);\n```"
   },
   {
     "path": "#/$defs/d_686a28cd91db32d9583d/oneOf/4",
@@ -3968,7 +3968,7 @@ export default [
     "path": "#/$defs/d_686a28cd91db32d9583d/oneOf/8",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DayCount/oneOf/8",
     "const": "nl_365",
-    "description": "NL/365 (Actual/365 No Leap) day count convention.\n\nYear fraction = (actual days excluding any February 29) / 365\n\n# Standards Reference\n\n- **Also known as**: Act/365 No Leap, NL365, Actual/365NL\n- Counts the actual calendar days in `[start, end)` and removes every\n  February 29 that falls in the period, so a full leap year still\n  yields exactly 1.0.\n\n# Usage\n\nUsed in:\n- Some Canadian money-market and mortgage instruments\n- Legacy systems that ignore leap days for accrual\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\n// Full leap year 2024: 366 actual days, Feb 29 excluded → 365/365 = 1.0\nlet start = Date::from_calendar_date(2024, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\n\nlet yf = DayCount::Nl365.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\nassert_eq!(yf, 1.0);\n```"
+    "description": "NL/365 (Actual/365 No Leap) day count convention.\n\nYear fraction = (actual days excluding any February 29) / 365\n\n# Standards Reference\n\n- **Also known as**: Act/365 No Leap, NL365, Actual/365NL\n- Counts the actual calendar days in `(start, end]` and removes every\n  February 29 that falls in the period, so a full leap year still\n  yields exactly 1.0.\n\n# Usage\n\nUsed in:\n- Some Canadian money-market and mortgage instruments\n- Legacy systems that ignore leap days for accrual\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\n// Full leap year 2024: 366 actual days, Feb 29 excluded → 365/365 = 1.0\nlet start = Date::from_calendar_date(2024, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\n\nlet yf = DayCount::Nl365.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\nassert_eq!(yf, 1.0);\n```"
   },
   {
     "path": "#/$defs/d_686a28cd91db32d9583d/oneOf/9",
@@ -4202,7 +4202,7 @@ export default [
   {
     "path": "#/$defs/d_72a697cad9ad7609eaf5",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EndogenousHazardSpec",
-    "description": "Specification for endogenous (leverage-dependent) hazard rate.\n\nModels the relationship between a firm's leverage and its instantaneous\nhazard rate, enabling a feedback loop where PIK accrual increases the\nnotional (and hence leverage), which drives the hazard rate higher."
+    "description": "Specification for endogenous (leverage-dependent) hazard rate.\n\nModels the relationship between a firm's leverage and its instantaneous\nhazard rate, enabling a feedback loop where PIK accrual increases the\nnotional (and hence leverage), which drives the hazard rate higher.\nDeserialization validates the parameters and rejects incomplete or\ninconsistent tabular calibrations before they can be evaluated."
   },
   {
     "path": "#/$defs/d_72a697cad9ad7609eaf5/properties/base_hazard_rate",
@@ -4693,7 +4693,7 @@ export default [
     "path": "#/$defs/d_78d4b16242febe84f62b/properties/end_of_month",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/StepUpCouponSpec/properties/end_of_month",
     "default": false,
-    "description": "Whether end-of-month rolling should be preserved when generating the\nschedule."
+    "description": "Whether end-of-month rolling should be preserved when generating the\nschedule.\n\nIncompatible with explicit IMM roll rules. With ACT/ACT ICMA, the\nregular grid anchor must be month-end: maturity for front stubs, or\nstart for back stubs and schedules without stubs. An irregular opposite\nendpoint remains supported."
   },
   {
     "path": "#/$defs/d_78d4b16242febe84f62b/properties/frequency",
@@ -4841,7 +4841,7 @@ export default [
   {
     "path": "#/$defs/d_7a9d5ee9143003a0618a",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfSweepSpec",
-    "description": "Excess Cash Flow (ECF) sweep specification.\n\nDefines how to calculate ECF and what percentage to sweep to pay down debt.\n\n# ECF Calculation\n\nThe standard ECF formula deducts cash interest from EBITDA. Fees and\nscheduled principal are also deducted when those payment categories rank\nahead of the prepayment priority:\n\n```text\nECF = EBITDA - Taxes - CapEx - ΔWC - Cash Interest Paid\n      - Fees Paid Ahead of Prepayment\n      - Scheduled Principal Paid Ahead of Prepayment\n  ```\n\nSet `cash_interest_node` to override the cash-interest input. If omitted,\ncontractual cash interest is deducted automatically using the period's\ndebt-service magnitude.\n\n# References\n\n- Fixed-income and leverage context: `docs/REFERENCES.md#tuckman-serrat-fixed-income`"
+    "description": "Excess Cash Flow (ECF) sweep specification.\n\nDefines how to calculate ECF and what percentage to sweep to pay down debt.\n\n# ECF Calculation\n\nThe ECF formula deducts cash interest, fees and scheduled principal paid\nby payment categories ahead of the `Sweep` priority, including carried\narrears. Unpaid claims, PIK and later payment priorities are not deducted:\n\n```text\nECF = EBITDA - Taxes - CapEx - ΔWC - Cash Interest Paid\n      - Fees Paid Ahead of Prepayment\n      - Scheduled Principal Paid Ahead of Prepayment\n  ```\n\nSet `cash_interest_node` to override the cash-interest input. If omitted,\nthe interest actually paid ahead of `Sweep` is deducted automatically.\n\n# References\n\n- Fixed-income and leverage context: `docs/REFERENCES.md#tuckman-serrat-fixed-income`"
   },
   {
     "path": "#/$defs/d_7a9d5ee9143003a0618a/properties/capex_node",
@@ -4851,7 +4851,7 @@ export default [
   {
     "path": "#/$defs/d_7a9d5ee9143003a0618a/properties/cash_interest_node",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfSweepSpec/properties/cash_interest_node",
-    "description": "Formula or node reference for cash interest paid (e.g., \"cs.interest_expense_cash.total\").\n\nPer S&P LCD / standard LPA definitions, ECF should deduct cash interest paid.\nIf omitted, contractual cash interest is deducted automatically."
+    "description": "Formula or node reference for cash interest paid (e.g., \"cs.interest_expense_cash.total\").\n\nIf omitted, deducts cash interest actually paid by the `Interest` priority\nahead of `Sweep`, including carried coupon arrears. If `Interest` follows\n`Sweep`, this automatic deduction is zero. An explicit node overrides\nthat amount in the model's cash currency units."
   },
   {
     "path": "#/$defs/d_7a9d5ee9143003a0618a/properties/ebitda_node",
@@ -4882,7 +4882,7 @@ export default [
   {
     "path": "#/$defs/d_7af15f20a258d1def9dd",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatingRateSpec",
-    "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `forward_curve_id` curve for the accrual period\n2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread\n3. Add `spread_bp` to get base rate\n4. Multiply by `gearing` (typically 1.0)\n5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing\n\nFormula: `cap(gearing * (floor(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see\n`finstack_quant_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the forward curve base\ndate then resolve from that series instead of the curve:\n\n- **Overnight observations** (compounded/averaged paths) use LOCF lookup\n  (last observation carried forward), matching RFR publication\n  conventions where a fixing carries over non-publication days\n  (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 §7.1(g)). A partially\n  seasoned compounding window seamlessly mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date — a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the curve base date prefers a published\nsame-day fixing when the series has one, otherwise projects from `t = 0`.\n\nThe [`FloatingRateFallback`] policy applies only when **no** fixing\nseries is provided: `Error` (the default) fails the build with a\ndescriptive message naming the date, index, and expected series id;\n`FixedRate(r)` uses `r` as the index rate for the affected coupon;\n`SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    forward_curve_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: OvernightIndexConstraintApplication::Daily,\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```"
+    "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `forward_curve_id` curve for the accrual period\n2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread\n3. Add `spread_bp` to get base rate\n4. Multiply by `gearing` (typically 1.0)\n5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing\n\nFormula: `cap(gearing * (floor(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see\n`finstack_quant_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the forward curve base\ndate then resolve from that series instead of the curve:\n\n- **Overnight observations** (compounded/averaged paths) use exact-date\n  lookup on the index's fixing business days. Weekend and holiday carry\n  comes from each observation's accrual-day weight, so a missing required\n  business-day fixing is an error rather than reuse of an older fixing.\n  A partially seasoned compounding window mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date — a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the curve base date prefers a published\nsame-day fixing when the series has one, otherwise projects from `t = 0`.\n\nThe [`FloatingRateFallback`] policy applies only when **no** fixing\nseries is provided: `Error` (the default) fails the build with a\ndescriptive message naming the date, index, and expected series id;\n`FixedRate(r)` uses `r` as the index rate for the affected coupon;\n`SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    forward_curve_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: OvernightIndexConstraintApplication::Daily,\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```"
   },
   {
     "path": "#/$defs/d_7af15f20a258d1def9dd/properties/all_in_cap_bp",
@@ -5010,7 +5010,7 @@ export default [
   {
     "path": "#/$defs/d_7af15f20a258d1def9dd/properties/index_tenor",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatingRateSpec/properties/index_tenor",
-    "description": "Diagnostic tenor for term-index projection error context.\n\nThe named forward curve is already the term index (for example a 3M\nEURIBOR curve). Projection is `fwd.rate(reset_date)`, not a FRA-style\naverage over `[reset, reset + tenor]`. This field (or\n[`Self::reset_frequency`] when `None`) is used only to compute\n`index_maturity` for error messages. Ignored for overnight-compounded\nlegs. When set, the builder warns at build time if it disagrees with\nthe resolved curve's tenor by more than 10% — the curve remains\nauthoritative."
+    "description": "Explicit term-index tenor when no forward curve resolves.\n\nThe named forward curve is already the term index (for example a 3M\nEURIBOR curve). Projection is `fwd.rate(reset_date)`, not a FRA-style\naverage over `[reset, reset + tenor]`. This field (or\n[`Self::reset_frequency`] when `None`) supplies the compiled term tenor\nwhen no forward curve resolves. Ignored for overnight-compounded\nlegs. When set, the builder warns at build time if it disagrees with\nthe resolved curve's tenor by more than 10% — the curve remains\nauthoritative."
   },
   {
     "path": "#/$defs/d_7af15f20a258d1def9dd/properties/index_tenor/anyOf/0",
@@ -5040,14 +5040,14 @@ export default [
   {
     "path": "#/$defs/d_7af15f20a258d1def9dd/properties/overnight_index_constraints",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatingRateSpec/properties/overnight_index_constraints",
-    "description": "Index floor/cap application policy for overnight-compounded coupons.",
+    "description": "Index floor/cap application policy for overnight-compounded coupons.\n\nWith changing principal, the builder retains daily compounded-rate\nincrements. Any bound applied to the final period index or all-in\nrate contributes a uniform annual-rate adjustment over the coupon's\ncontractual accrual time; interim cumulative prefixes are not bounded.",
     "ref": "#/$defs/OvernightIndexConstraintApplication",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/OvernightIndexConstraintApplication"
   },
   {
     "path": "#/$defs/d_7af15f20a258d1def9dd/properties/reset_frequency",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatingRateSpec/properties/reset_frequency",
-    "description": "Reset frequency for rate fixings.\n\nThis is the cadence at which the rate refixes. When\n[`Self::index_tenor`] is `None`, it is also the tenor used only to\nbuild the diagnostic index-maturity date in projection error context.",
+    "description": "Fallback term-index tenor when [`Self::index_tenor`] is absent.\n\nThe bare cashflow builder observes one term fixing at each coupon\nperiod's accrual start, with the configured reset lag. This field does\nnot create additional resets inside a payment period. The resolved\nforward curve owns the quoted index tenor; overnight methods observe\ntheir compiled daily fixing schedule independently of this field.",
     "ref": "#/$defs/Tenor",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Tenor"
   },
@@ -5237,7 +5237,7 @@ export default [
   {
     "path": "#/$defs/d_7d9f94bbd332b01035f6/properties/ecf_sweep",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/WaterfallSpec/properties/ecf_sweep",
-    "description": "Excess Cash Flow (ECF) sweep specification"
+    "description": "Excess Cash Flow (ECF) sweep specification.\nA positive sweep percentage requires the `Sweep` payment priority."
   },
   {
     "path": "#/$defs/d_7d9f94bbd332b01035f6/properties/ecf_sweep/anyOf/0",
@@ -5252,7 +5252,7 @@ export default [
   {
     "path": "#/$defs/d_7d9f94bbd332b01035f6/properties/mandatory_prepay_node",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/WaterfallSpec/properties/mandatory_prepay_node",
-    "description": "Formula or node for the `MandatoryPrepayment` rung.\n\nRequired when `MandatoryPrepayment` appears in `priority_of_payments`.\nSized independently of the ECF sweep and voluntary prepay buckets."
+    "description": "Formula or node for the `MandatoryPrepayment` rung.\n\nRequired when `MandatoryPrepayment` appears in `priority_of_payments`.\nWhen configured, that priority must be present so payment consumes cash.\nSized independently of the ECF sweep and voluntary prepay buckets."
   },
   {
     "path": "#/$defs/d_7d9f94bbd332b01035f6/properties/payment_classes",
@@ -5301,7 +5301,7 @@ export default [
   {
     "path": "#/$defs/d_7d9f94bbd332b01035f6/properties/voluntary_prepay_node",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/WaterfallSpec/properties/voluntary_prepay_node",
-    "description": "Formula or node for the `VoluntaryPrepayment` rung.\n\nRequired when `VoluntaryPrepayment` appears in `priority_of_payments`.\nSized independently of the ECF sweep and mandatory prepay buckets."
+    "description": "Formula or node for the `VoluntaryPrepayment` rung.\n\nRequired when `VoluntaryPrepayment` appears in `priority_of_payments`.\nWhen configured, that priority must be present so payment consumes cash.\nSized independently of the ECF sweep and mandatory prepay buckets."
   },
   {
     "path": "#/$defs/d_82d2bec48bc64b37bcef",
@@ -6188,7 +6188,7 @@ export default [
   {
     "path": "#/$defs/d_91709081651bb45619b0",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Compounding",
-    "description": "Compounding convention for interest rates.\n\nUsed to specify how interest rates should be quoted or converted.\nAll variants produce mathematically equivalent discount factors when\napplied consistently.\n\n# Relationship Between Conventions\n\nFor a given discount factor DF at time t, the rates under different\nconventions are related by:\n\n```text\nDF = e^(-r_cc × t)                    [Continuous]\n   = (1 + r_ann)^(-t)                 [Annual]\n   = (1 + r_per/n)^(-n×t)             [Periodic(n)]\n   = 1 / (1 + r_simple × t)           [Simple]\n```\n\n# Ordering of Rates\n\nFor positive rates and t > 0: `r_simple > r_annual > r_continuous`\n(less frequent compounding requires a higher quoted rate for the same DF)."
+    "description": "Compounding convention for interest rates.\n\nUsed to specify how interest rates should be quoted or converted.\nAll variants produce mathematically equivalent discount factors when\napplied consistently.\n\n# Relationship Between Conventions\n\nFor a given discount factor DF at time t, the rates under different\nconventions are related by:\n\n```text\nDF = e^(-r_cc × t)                    [Continuous]\n   = (1 + r_ann)^(-t)                 [Annual]\n   = (1 + r_per/n)^(-n×t)             [Periodic(n)]\n   = 1 / (1 + r_simple × t)           [Simple]\n```\n\n# Ordering of Rates\n\nFor a common discount factor below one, annual and simple rates both exceed\nthe continuous rate. Their ordering depends on the maturity `t` in years:\n`r_annual > r_simple` for `0 < t < 1`, they agree at `t = 1`, and\n`r_simple > r_annual` for `t > 1`."
   },
   {
     "path": "#/$defs/d_91709081651bb45619b0/oneOf/0",
@@ -6357,7 +6357,7 @@ export default [
   {
     "path": "#/$defs/d_9bafa017148b87bfdedd/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ConversionPolicy/oneOf/1",
-    "description": "Bond will mandatorily convert on the specified date.\n\n**Modeling scope**: the tree pricer models conversion only at the\nsingle step mapped from this date; early voluntary conversion before\nthe mandatory date is not modeled."
+    "description": "Bond will mandatorily convert on the specified date.\n\n**Modeling scope**: the tree pricer models conversion only at the\nsingle step mapped from this date; early voluntary conversion before\nthe mandatory date is not modeled. Forced conversion takes precedence\nover coincident call/put rights, and the scheduled coupon remains payable."
   },
   {
     "path": "#/$defs/d_9bafa017148b87bfdedd/oneOf/1/properties/mandatory_on",
@@ -6402,7 +6402,7 @@ export default [
   {
     "path": "#/$defs/d_9bafa017148b87bfdedd/oneOf/4",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ConversionPolicy/oneOf/4",
-    "description": "Mandatory conversion with variable delivery ratio (PERCS / DECS / ACES).\n\nAt `conversion_date`, the delivery ratio depends on the stock price:\n- If `spot <= lower_conversion_price`: ratio = face / lower_price (max shares, loss)\n- If `lower < spot <= upper`: ratio = face / spot (variable, delivers face value)\n- If `spot > upper_conversion_price`: ratio = face / upper_price (min shares, capped)\n\n# Industry Practice\n\nPERCS (Preference Equity Redemption Cumulative Stock) cap the upside.\nDECS (Dividend Enhanced Convertible Stock) have a dead zone between prices.\nACES (Automatically Convertible Equity Securities) are similar to DECS.\n\n**Modeling scope**: the tree pricer models conversion only at the\nsingle step mapped from `conversion_date`; early voluntary conversion\nbefore that date (offered by some mandatory structures) is not modeled."
+    "description": "Mandatory conversion with variable delivery ratio (PERCS / DECS / ACES).\n\nAt `conversion_date`, the delivery ratio depends on the stock price:\n- If `spot <= lower_conversion_price`: ratio = face / lower_price (max shares, loss)\n- If `lower < spot <= upper`: ratio = face / spot (variable, delivers face value)\n- If `spot > upper_conversion_price`: ratio = face / upper_price (min shares, capped)\n\n# Industry Practice\n\nPERCS (Preference Equity Redemption Cumulative Stock) cap the upside.\nDECS (Dividend Enhanced Convertible Stock) have a dead zone between prices.\nACES (Automatically Convertible Equity Securities) are similar to DECS.\n\n**Modeling scope**: the tree pricer models conversion only at the\nsingle step mapped from `conversion_date`; early voluntary conversion\nbefore that date (offered by some mandatory structures) is not modeled.\nForced conversion takes precedence over coincident call/put rights,\nand the scheduled coupon remains payable."
   },
   {
     "path": "#/$defs/d_9bafa017148b87bfdedd/oneOf/4/properties/mandatory_variable",
@@ -6447,7 +6447,7 @@ export default [
   {
     "path": "#/$defs/d_9c329cd1343617d285e8/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/LoanCallType/oneOf/2",
-    "description": "Make-whole call: borrower pays PV of remaining cashflows at the\nreference curve plus spread of the shared [`MakeWholeSpec`] (the same\ntype bonds use). The term-loan tree pricer and yield-to-call metrics\nnever exercise it: paying at least the make-whole amount leaves the\nlender indifferent, so the loan is not economically callable."
+    "description": "Make-whole call: borrower pays PV of remaining cashflows at the\nreference curve plus spread of the shared [`MakeWholeSpec`] (the same\ntype bonds use), floored at the contractual clean call price. Tree\npricing supports a deterministic reference curve with zero rate\nvolatility; stochastic-rate make-whole pricing is rejected explicitly.\nYield-to-call metrics use the same dated reference-curve redemption."
   },
   {
     "path": "#/$defs/d_9c329cd1343617d285e8/oneOf/2/properties/make_whole",
@@ -7596,7 +7596,7 @@ export default [
     "path": "#/$defs/d_cdca3f67b974113083de/properties/end_of_month",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FixedCouponSpec/properties/end_of_month",
     "default": false,
-    "description": "Whether end-of-month rolling should be preserved when generating the\nschedule."
+    "description": "Whether end-of-month rolling should be preserved when generating the\nschedule.\n\nIncompatible with explicit IMM roll rules. With ACT/ACT ICMA, the\nregular grid anchor must be month-end: maturity for front stubs, or\nstart for back stubs and schedules without stubs. An irregular opposite\nendpoint remains supported."
   },
   {
     "path": "#/$defs/d_cdca3f67b974113083de/properties/frequency",
@@ -7741,7 +7741,7 @@ export default [
   {
     "path": "#/$defs/d_ce740ebb40b6a9a3bc22/properties/rate",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CashFlow/properties/rate",
-    "description": "Effective rate used to calculate this cashflow (None if not rate-based or unknown).\n\nFor interest/fees: the annual rate used in the calculation\nFor notional/amortization/PIK: typically None\n\nThis is stored at cashflow creation time when available.\nFor instruments with intra-period events (e.g., revolving credit with draws/repays),\nthis may represent a time-weighted average rate across sub-periods.",
+    "description": "Effective rate used to calculate this cashflow (None if not rate-based or unknown).\n\nFor interest/fees: the annual rate used in the calculation\nFor notional/amortization/PIK: typically None\n\nThis is stored at cashflow creation time when available.\nFor instruments with intra-period events (e.g., revolving credit with draws/repays),\nthis may represent a time-weighted average rate across sub-periods.\nSerialization rejects non-finite rates instead of encoding them as absent.",
     "format": "double"
   },
   {
@@ -8087,7 +8087,7 @@ export default [
     "path": "#/$defs/d_e2eda29a60f5dc6bf382/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/VarMethod/oneOf/1",
     "const": "taylor_approximation",
-    "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options)."
+    "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options).\nEquity Greeks are associated with their actual market-scalar identifier.\nInstruments with multiple underlying spots or ambiguous scalar ownership\nrequire full revaluation; aggregate gamma is not a multi-asset Hessian."
   },
   {
     "path": "#/$defs/d_e5a9e3252f11bc2a9d20",

@@ -23,7 +23,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 use crate::api::errors::EnvelopeError;
-use crate::api::schema::{CalibrationEnvelope, CalibrationStep, CALIBRATION_CONTRACT};
+use crate::api::market_datum::MarketDatum;
+use crate::api::prior_market::PriorMarketObject;
+use crate::api::schema::{CalibrationEnvelope, StepParams, CALIBRATION_CONTRACT};
 use crate::quotes::market_quote::MarketQuote;
 #[cfg(test)]
 use crate::quotes::{cds::CdsQuote, rates::RateQuote};
@@ -32,6 +34,7 @@ use finstack_quant_core::contract::ContractError;
 use finstack_quant_core::contract::{
     Diagnostic, LoadLimits, LoadPhase, Severity, ValidationReport as ContractValidationReport,
 };
+use finstack_quant_valuations::market::conventions::ConventionRegistry;
 
 /// Result of [`validate`]. Always contains the dependency graph; `errors` is
 /// empty when the envelope is structurally valid.
@@ -46,7 +49,7 @@ pub struct CalibrationValidationReport {
 /// Static dependency graph derived from a [`CalibrationEnvelope`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DependencyGraph {
-    /// Curve / surface IDs available at the start of execution, contributed
+    /// Market-object IDs available at the start of execution, contributed
     /// by `market_data` and `prior_market`.
     pub initial_ids: Vec<String>,
     /// Per-step inputs and outputs in declared order.
@@ -62,10 +65,11 @@ pub struct DependencyNode {
     pub step_id: String,
     /// Step kind (`"discount"`, `"forward"`, ...).
     pub kind: String,
-    /// Curve / surface IDs the step depends on. Each must be either in
+    /// Market-object IDs the step depends on, including quote-derived curve
+    /// roles and selected spot/carry inputs. Each must be either in
     /// `initial_ids` or produced by an earlier step.
     pub reads: Vec<String>,
-    /// Curve / surface ID(s) the step produces.
+    /// Market-object IDs the step produces, including scalar and series outputs.
     pub writes: Vec<String>,
 }
 
@@ -82,7 +86,7 @@ pub struct DependencyNode {
 pub fn validate(envelope: &CalibrationEnvelope) -> CalibrationValidationReport {
     let mut errors = Vec::new();
     let initial_ids = collect_initial_ids(envelope);
-    let nodes = build_nodes(&envelope.plan.steps);
+    let nodes = build_nodes(envelope, &mut errors);
 
     check_step_id_uniqueness(envelope, &mut errors);
     check_quote_sets(envelope, &mut errors);
@@ -248,21 +252,156 @@ fn collect_initial_ids(envelope: &CalibrationEnvelope) -> HashSet<String> {
     ids
 }
 
-fn build_nodes(steps: &[CalibrationStep]) -> Vec<DependencyNode> {
-    steps
+fn build_nodes(
+    envelope: &CalibrationEnvelope,
+    errors: &mut Vec<EnvelopeError>,
+) -> Vec<DependencyNode> {
+    let quote_by_id: HashMap<&str, &MarketDatum> = envelope
+        .market_data
         .iter()
-        .enumerate()
-        .map(|(idx, step)| {
-            let io = step.params.io();
-            DependencyNode {
-                step_index: idx,
-                step_id: step.id.clone(),
-                kind: io.kind.to_string(),
-                reads: io.reads,
-                writes: io.writes,
-            }
+        .filter(|datum| datum.is_quote())
+        .map(|datum| (datum.id(), datum))
+        .collect();
+    let credit_indices: HashMap<_, _> = envelope
+        .market_data
+        .iter()
+        .filter_map(|datum| match datum {
+            MarketDatum::CreditIndex(index) => Some((index.id.as_str(), index)),
+            _ => None,
         })
-        .collect()
+        .collect();
+    let mut discount_ids: BTreeSet<String> = envelope
+        .prior_market
+        .iter()
+        .filter(|object| matches!(object, PriorMarketObject::DiscountCurve(_)))
+        .map(|object| object.id().to_string())
+        .collect();
+    let mut nodes = Vec::with_capacity(envelope.plan.steps.len());
+
+    for (step_index, step) in envelope.plan.steps.iter().enumerate() {
+        let mut io = step.params.io();
+        let mut index_ids = Vec::new();
+        match &step.params {
+            StepParams::VolSurface(params) if params.dividend_yield_override.is_none() => {
+                add_equity_carry_reads(envelope, &params.underlying_ticker, true, &mut io.reads);
+            }
+            StepParams::SviSurface(params) if params.dividend_yield_override.is_none() => {
+                add_equity_carry_reads(
+                    envelope,
+                    &params.underlying_ticker,
+                    params.discount_curve_id.is_some(),
+                    &mut io.reads,
+                );
+            }
+            _ => {}
+        }
+        if let StepParams::BaseCorrelation(params) = &step.params {
+            index_ids.push(params.index_id.clone());
+        }
+        if let StepParams::StudentT(params) = &step.params {
+            if params.discount_curve_id.is_none() {
+                // Preflight requires exactly one discount curve. Track all
+                // candidates here so an earlier writer cannot be bypassed by
+                // an already available curve in the initial snapshot.
+                io.reads.extend(discount_ids.iter().cloned());
+            }
+        }
+        if let Some(quote_ids) = envelope.plan.quote_sets.get(&step.quote_set) {
+            for quote_id in quote_ids {
+                match (&step.params, quote_by_id.get(quote_id.as_str()).copied()) {
+                    (StepParams::XccyBasis(_), Some(MarketDatum::XccyQuote(quote))) => {
+                        match ConventionRegistry::try_global()
+                            .and_then(|registry| registry.require_xccy(&quote.convention))
+                        {
+                            Ok(convention) => {
+                                io.reads.push(convention.base_index_id.to_string());
+                                io.reads.push(convention.quote_index_id.to_string());
+                            }
+                            Err(error) => errors.push(EnvelopeError::QuoteDataInvalid {
+                                step_id: step.id.clone(),
+                                quote_id: quote_id.to_string(),
+                                reason: error.to_string(),
+                            }),
+                        }
+                    }
+                    (StepParams::StudentT(params), Some(MarketDatum::CdsTrancheQuote(quote)))
+                        if quote.id().as_str() == params.tranche_instrument_id =>
+                    {
+                        io.reads.push(quote.index.clone());
+                        index_ids.push(quote.index.clone());
+                    }
+                    _ => {}
+                }
+            }
+        }
+        for index_id in index_ids {
+            if let Some(index) = credit_indices.get(index_id.as_str()) {
+                io.reads.push(index.index_credit_curve_id.clone());
+                if let Some(issuer_curves) = &index.issuer_credit_curve_ids {
+                    io.reads.extend(issuer_curves.values().cloned());
+                }
+            }
+        }
+        io.reads.sort();
+        io.reads.dedup();
+        io.writes.sort();
+        io.writes.dedup();
+        match &step.params {
+            StepParams::Discount(params) => {
+                discount_ids.insert(params.curve_id.to_string());
+            }
+            StepParams::XccyBasis(params) => {
+                discount_ids.insert(params.curve_id.to_string());
+            }
+            _ => {}
+        }
+        nodes.push(DependencyNode {
+            step_index,
+            step_id: step.id.clone(),
+            kind: io.kind.to_string(),
+            reads: io.reads,
+            writes: io.writes,
+        });
+    }
+    nodes
+}
+
+fn add_equity_carry_reads(
+    envelope: &CalibrationEnvelope,
+    ticker: &str,
+    accepts_schedule: bool,
+    reads: &mut Vec<String>,
+) {
+    let scalar_id = format!("{ticker}-DIVYIELD");
+    if !accepts_schedule
+        || envelope
+            .market_data
+            .iter()
+            .any(|datum| matches!(datum, MarketDatum::Price(price) if price.id == scalar_id))
+    {
+        reads.push(scalar_id);
+        return;
+    }
+    let fallback_id = format!("{ticker}-DIVS");
+    let schedules: Vec<String> = envelope
+        .market_data
+        .iter()
+        .filter_map(|datum| match datum {
+            MarketDatum::DividendSchedule(datum)
+                if datum.schedule.get_underlying() == Some(ticker)
+                    || datum.schedule.get_id().as_str() == ticker
+                    || datum.schedule.get_id().as_str() == fallback_id =>
+            {
+                Some(datum.schedule.get_id().to_string())
+            }
+            _ => None,
+        })
+        .collect();
+    if schedules.is_empty() {
+        reads.push(scalar_id);
+    } else {
+        reads.extend(schedules);
+    }
 }
 
 fn check_step_id_uniqueness(envelope: &CalibrationEnvelope, errors: &mut Vec<EnvelopeError>) {

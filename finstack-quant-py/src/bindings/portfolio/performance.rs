@@ -238,17 +238,24 @@ fn twrr_linked_json(
 ///     terminal value / distributions positive. Accepts ``(date, amount)``
 ///     pairs (dates as ``datetime.date`` or ISO strings), JSON-shaped dicts
 ///     with ``date`` and ``amount`` keys, a DataFrame with those columns, or
-///     the canonical JSON array string.
+///     the canonical JSON array string. Dates are sorted and equal-date
+///     flows netted; the remaining nonzero flows must change sign exactly once.
 ///
 /// Returns
 /// -------
 /// float
-///     Annualised internal rate of return as a decimal fraction.
+///     Unique annualised internal rate of return as a finite decimal greater
+///     than -1, using Act/365F year fractions.
 ///
 /// Raises
 /// ------
 /// ValueError
-///     If the flows are malformed, all one sign, or no root is found.
+///     If the flows are malformed, have fewer than two nonzero net dates,
+///     do not have exactly one net sign change, or no sufficiently accurate
+///     finite return greater than -1 can be found. Nonconventional cashflows
+///     are rejected even when a numerical solver could find one of their roots.
+/// RuntimeError
+///     If the numerical solver fails to converge within the valid return bracket.
 #[pyfunction]
 #[pyo3(text_signature = "(cashflows)")]
 fn mwr_xirr(py: Python<'_>, cashflows: &Bound<'_, PyAny>) -> PyResult<f64> {

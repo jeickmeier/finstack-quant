@@ -253,7 +253,7 @@ pub(super) fn factor_stress_pnl(
 
     let affected_indices = changed_factor_keys
         .as_ref()
-        .and_then(|changed_factor_keys| {
+        .map(|changed_factor_keys| -> Result<Option<Vec<usize>>> {
             if changed_factor_keys
                 .iter()
                 .any(|key| matches!(key, crate::MarketFactorKey::Fx { .. }))
@@ -262,15 +262,16 @@ pub(super) fn factor_stress_pnl(
                 // position, including instruments that do not declare an FX
                 // dependency. Reprice the whole book so convert_to_base sees the
                 // bumped matrix.
-                None
+                Ok(None)
             } else {
-                Some(
-                    portfolio
-                        .dependency_index()
-                        .affected_positions(changed_factor_keys),
-                )
+                Ok(Some(portfolio.dependency_index().affected_positions(
+                    changed_factor_keys,
+                    &stressed_market,
+                )?))
             }
-        });
+        })
+        .transpose()?
+        .flatten();
     let stressed_valuation = if let Some(affected_indices) = &affected_indices {
         evaluate_raw_portfolio(RawEvaluationInput {
             portfolio,
@@ -858,7 +859,7 @@ mod tests {
                 pricing_mode: PricingMode::DeltaBased,
                 risk_measure: RiskMeasure::Variance,
                 bump_config: None,
-                unmatched_policy: Some(UnmatchedPolicy::Residual),
+                unmatched_policy: Some(UnmatchedPolicy::Warn),
             })
             .with_custom_sensitivity_engine(FixedSensitivityEngine)
             .build()
@@ -1026,7 +1027,7 @@ mod tests {
                 pricing_mode: PricingMode::DeltaBased,
                 risk_measure: RiskMeasure::Variance,
                 bump_config: None,
-                unmatched_policy: Some(UnmatchedPolicy::Residual),
+                unmatched_policy: Some(UnmatchedPolicy::Warn),
             })
             .with_custom_sensitivity_engine(FixedSensitivityEngine)
             .build();

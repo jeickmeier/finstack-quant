@@ -197,7 +197,7 @@ pub(crate) fn build_initial_context(
         }
         let data = builder.build()?;
 
-        ctx.insert_credit_index_mut(&credit_state.id, data);
+        ctx.insert_credit_index_mut(&credit_state.id, data)?;
     }
 
     // 5. Attach hierarchy if configured.

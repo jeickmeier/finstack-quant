@@ -69,6 +69,25 @@ fn sample_report() -> CheckReport {
     }
 }
 
+#[test]
+fn render_html_escapes_every_report_text_field() {
+    let mut report = sample_report();
+    let finding = &mut report.results[0].findings[0];
+    finding.check_id = "<b>identifier & text</b>".into();
+    finding.message = "<script>unsafe()</script>".into();
+    finding.materiality.as_mut().unwrap().reference_label = "<em>reference</em>".into();
+    finding.nodes = vec![NodeId::new("<img>node")];
+    let html = CheckReportRenderer::render_html(&report);
+    assert!(html.contains("&lt;b&gt;identifier &amp; text&lt;/b&gt;"));
+    assert!(html.contains("&lt;script&gt;unsafe()&lt;/script&gt;"));
+    assert!(html.contains("&lt;em&gt;reference&lt;/em&gt;"));
+    assert!(html.contains("&lt;img&gt;node"));
+    for tag in ["<script>", "<img>", "<em>reference", "<b>identifier"] {
+        assert!(!html.contains(tag));
+    }
+    assert!(CheckReportRenderer::render_text(&report).contains("<script>unsafe()</script>"));
+}
+
 // Text renderer
 
 #[test]

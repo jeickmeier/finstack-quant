@@ -61,6 +61,14 @@ pub enum MigrationError {
     #[error("generator extraction failed: matrix has complex eigenvalues (no real Schur form)")]
     ComplexEigenvalues,
 
+    /// Matrix logarithm failed to reach its bounded convergence criterion.
+    #[error("matrix logarithm failed to converge within numerical limits")]
+    MatrixLogConvergence,
+
+    /// Round-trip tolerance must be finite and non-negative.
+    #[error("round-trip tolerance must be finite and non-negative, got {0}")]
+    InvalidTolerance(f64),
+
     /// Round-trip validation failed: exp(Q) is too far from P.
     #[error("round-trip error ||exp(Q)-P||_inf = {error} exceeds tolerance {tolerance}")]
     RoundTripError {
@@ -111,6 +119,10 @@ pub enum MigrationError {
     /// A simulation batch requires at least one path per state.
     #[error("paths per state must be positive")]
     InvalidPathCount,
+
+    /// A serialized rating path violates its time or transition invariants.
+    #[error("invalid rating path: {0}")]
+    InvalidPath(String),
 
     /// Label could not be resolved to a Moody's WARF factor.
     #[error("no WARF factor for label '{label}'")]

@@ -1,9 +1,13 @@
 //! Portfolio adapter from instrument dependencies to factor-model dependencies.
 
+use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_models::factor::{CurveType, MarketDependency};
 use finstack_quant_valuations::instruments::MarketDependencies;
 
-pub(super) fn flatten(deps: &MarketDependencies) -> Vec<MarketDependency> {
+pub(super) fn flatten(
+    deps: &MarketDependencies,
+    market: &MarketContext,
+) -> finstack_quant_core::Result<Vec<MarketDependency>> {
     let mut result = Vec::new();
 
     for id in &deps.curves.discount_curves {
@@ -22,7 +26,19 @@ pub(super) fn flatten(deps: &MarketDependencies) -> Vec<MarketDependency> {
         result.push(MarketDependency::CreditCurve { id: id.clone() });
     }
     for id in &deps.credit_index_ids {
-        result.push(MarketDependency::CreditIndex { id: id.clone() });
+        for key in crate::dependencies::credit_index_keys(market, id)? {
+            let dependency = match key {
+                crate::MarketFactorKey::Curve { id, .. } => MarketDependency::CreditCurve { id },
+                crate::MarketFactorKey::BaseCorrelation(id) => MarketDependency::Curve {
+                    id,
+                    curve_type: CurveType::BaseCorrelation,
+                },
+                _ => continue,
+            };
+            if !result.contains(&dependency) {
+                result.push(dependency);
+            }
+        }
     }
     for id in &deps.curves.inflation_curves {
         result.push(MarketDependency::Curve {
@@ -48,7 +64,7 @@ pub(super) fn flatten(deps: &MarketDependencies) -> Vec<MarketDependency> {
         result.push(MarketDependency::Series { id: id.clone() });
     }
 
-    result
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -56,15 +72,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn preserves_credit_index_identity() {
+    fn missing_credit_index_fails_assignment_resolution() {
         let mut deps = MarketDependencies::new();
         deps.add_credit_index("CDX.NA.IG.42");
 
-        assert_eq!(
-            flatten(&deps),
-            vec![MarketDependency::CreditIndex {
-                id: "CDX.NA.IG.42".into(),
-            }]
-        );
+        assert!(flatten(&deps, &MarketContext::new()).is_err());
     }
 }

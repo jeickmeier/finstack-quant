@@ -28,11 +28,12 @@ use wasm_bindgen::prelude::*;
 /// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%; must be positive.
 /// @param expiry - Time to option expiry in years.
 /// @param is_call - Whether to value a call (`true`) or put (`false`).
-/// @param n_terms - Optional positive number of COS expansion terms; omit to use the pricer default.
+/// @param n_terms - Optional positive integer number of COS expansion terms, at most 4294967295; omit to use the pricer default.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `vol` is not positive, the model produces a degenerate or invalid
+/// Throws a JavaScript exception if spot, strike, expiry, or volatility is not finite and positive,
+/// rates/carry are non-finite, the term count is zero, fractional, non-finite, negative, or exceeds 4294967295, or the model produces a degenerate or invalid
 /// COS truncation range, a non-finite characteristic-function value or forward
 /// moment, or a non-finite option price.
 #[wasm_bindgen(js_name = bsCosPrice)]
@@ -45,8 +46,11 @@ pub fn bs_cos_price(
     vol: f64,
     expiry: f64,
     is_call: bool,
-    n_terms: Option<usize>,
+    n_terms: Option<f64>,
 ) -> Result<f64, JsValue> {
+    let n_terms = n_terms
+        .map(|value| super::parse_usize(value, "nTerms"))
+        .transpose()?;
     rust_bs_cos_price(BlackScholesCosParams {
         spot,
         strike,
@@ -68,16 +72,18 @@ pub fn bs_cos_price(
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
 /// @param div_yield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
-/// @param sigma - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
-/// @param theta - Variance-Gamma drift parameter controlling skew in log returns.
-/// @param nu - Variance-Gamma variance-rate parameter; larger values increase tail thickness.
+/// @param sigma - Positive finite volatility of the subordinated Brownian motion, as a decimal.
+/// @param theta - Finite annual log-return drift of the subordinated Brownian motion; its sign controls skew.
+/// @param nu - Positive finite variance rate of the Gamma time change, in years; larger values increase tail thickness.
 /// @param expiry - Time to option expiry in years.
 /// @param is_call - Whether to value a call (`true`) or put (`false`).
-/// @param n_terms - Optional positive number of COS expansion terms; omit to use the pricer default.
+/// @param n_terms - Optional positive integer number of COS expansion terms, at most 4294967295; omit to use the pricer default.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if the model produces a degenerate or invalid
+/// Throws a JavaScript exception if spot, strike, expiry, sigma, or nu is not finite and positive,
+/// rates/carry/theta are non-finite, the VG martingale condition fails, the term count is zero, fractional, non-finite, negative, or exceeds 4294967295,
+/// or the model produces a degenerate or invalid
 /// COS truncation range, a non-finite characteristic-function value or forward
 /// moment, or a non-finite option price.
 #[wasm_bindgen(js_name = vgCosPrice)]
@@ -92,8 +98,11 @@ pub fn vg_cos_price(
     nu: f64,
     expiry: f64,
     is_call: bool,
-    n_terms: Option<usize>,
+    n_terms: Option<f64>,
 ) -> Result<f64, JsValue> {
+    let n_terms = n_terms
+        .map(|value| super::parse_usize(value, "nTerms"))
+        .transpose()?;
     rust_vg_cos_price(VarianceGammaCosParams {
         spot,
         strike,
@@ -123,11 +132,13 @@ pub fn vg_cos_price(
 /// @param lambda - Annual jump-arrival intensity in the Merton jump-diffusion model.
 /// @param expiry - Time to option expiry in years.
 /// @param is_call - Whether to value a call (`true`) or put (`false`).
-/// @param n_terms - Optional positive number of COS expansion terms; omit to use the pricer default.
+/// @param n_terms - Optional positive integer number of COS expansion terms, at most 4294967295; omit to use the pricer default.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if the model produces a degenerate or invalid
+/// Throws a JavaScript exception if spot, strike, or expiry is not finite and positive,
+/// rates/carry or log-jump mean are non-finite, volatility/intensity is negative or non-finite,
+/// the jump compensator overflows, the term count is zero, fractional, non-finite, negative, or exceeds 4294967295, or the model produces a degenerate or invalid
 /// COS truncation range, a non-finite characteristic-function value or forward
 /// moment, or a non-finite option price.
 #[wasm_bindgen(js_name = mertonJumpCosPrice)]
@@ -143,8 +154,11 @@ pub fn merton_jump_cos_price(
     lambda: f64,
     expiry: f64,
     is_call: bool,
-    n_terms: Option<usize>,
+    n_terms: Option<f64>,
 ) -> Result<f64, JsValue> {
+    let n_terms = n_terms
+        .map(|value| super::parse_usize(value, "nTerms"))
+        .transpose()?;
     rust_merton_jump_cos_price(MertonJumpCosParams {
         spot,
         strike,

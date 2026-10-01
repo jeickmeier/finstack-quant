@@ -483,7 +483,7 @@ impl ValidatedSimulation {
     ) -> Result<f64> {
         let mut rng = PhiloxRng::with_stream(seed, path_index as u64);
         let mixing = if self.is_student_t {
-            self.copula.sample_mixing(rng.next_u01())
+            self.copula.sample_mixing(rng.next_u01())?
         } else {
             1.0
         };
@@ -517,6 +517,11 @@ impl ValidatedSimulation {
             let latent =
                 self.copula
                     .latent_variable(systematic, rng.next_std_normal(), mixing, rho);
+            if !latent.is_finite() {
+                return Err(validation_error(
+                    "portfolio copula produced a non-finite latent default variable",
+                ));
+            }
             if latent <= *threshold {
                 let lgd = recovery
                     .map(|model| model.conditional_lgd(factors[0]))

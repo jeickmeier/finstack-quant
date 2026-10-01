@@ -216,7 +216,7 @@ pub fn compute_pnl_profiles_with_market(
 /// `measure` uses the canonical serde form (`"variance"`, `"volatility"`, or
 /// an object for `var` / `expected_shortfall`); the Python binding's
 /// `measure` getter reports the same snake_case tag.
-/// @param sensitivities_json - Canonical factor-sensitivity result JSON; `JSON.stringify` the structured matrix returned by `computeFactorSensitivities`.
+/// @param sensitivities_json - Canonical factor-sensitivity JSON with required `base_currency`, ordered `position_ids`/`factor_ids`, and nested `data[position][factor]` rows; `JSON.stringify` the result of `computeFactorSensitivities`. Python `SensitivityMatrix.to_json()` uses the same contract. Unknown fields, inconsistent dimensions, and non-finite entries are rejected.
 /// @param covariance_json - Factor covariance-matrix JSON aligned with the supplied sensitivities.
 /// @param risk_measure_json - Risk-measure configuration JSON selecting the decomposition metric.
 ///
@@ -232,33 +232,8 @@ pub fn decompose_factor_risk(
     covariance_json: &str,
     risk_measure_json: Option<String>,
 ) -> Result<JsValue, JsValue> {
-    #[derive(serde::Deserialize)]
-    struct SensInput {
-        position_ids: Vec<String>,
-        factor_ids: Vec<String>,
-        data: Vec<Vec<f64>>,
-    }
-
-    let input: SensInput = serde_json::from_str(sensitivities_json).map_err(to_js_err)?;
-    let factor_ids: Vec<finstack_quant_models::factor::FactorId> = input
-        .factor_ids
-        .iter()
-        .map(finstack_quant_models::factor::FactorId::new)
-        .collect();
-
-    let n_positions = input.position_ids.len();
-    let n_factors = factor_ids.len();
-    validate_sensitivity_data(&input.data, n_positions, n_factors).map_err(to_js_err)?;
-
-    let mut matrix = finstack_quant_portfolio::sensitivity::SensitivityMatrix::zeros(
-        input.position_ids,
-        factor_ids,
-    );
-    for (pi, row) in input.data.iter().enumerate() {
-        for (fi, &val) in row.iter().enumerate() {
-            matrix.set_delta(pi, fi, val);
-        }
-    }
+    let input: finstack_quant_portfolio::sensitivity::SensitivityMatrixJson =
+        serde_json::from_str(sensitivities_json).map_err(to_js_err)?;
 
     let covariance: finstack_quant_models::factor::FactorCovarianceMatrix =
         serde_json::from_str(covariance_json).map_err(to_js_err)?;
@@ -270,137 +245,8 @@ pub fn decompose_factor_risk(
 
     let decomposer = finstack_quant_models::factor::risk::ParametricDecomposer;
     let result = decomposer
-        .decompose(&matrix, &covariance, &measure)
+        .decompose(&input.matrix, &covariance, &measure)
         .map_err(to_js_err)?;
 
-    let output = serde_json::json!({
-        "total_risk": result.total_risk,
-        "measure": serde_json::to_value(result.measure).map_err(to_js_err)?,
-        "residual_risk": result.residual_risk,
-        "factor_contributions": result.factor_contributions.iter().map(|c| {
-            serde_json::json!({
-                "factor_id": c.factor_id.to_string(),
-                "absolute_risk": c.absolute_risk,
-                "relative_risk": c.relative_risk,
-                "marginal_risk": c.marginal_risk,
-            })
-        }).collect::<Vec<_>>(),
-        "position_factor_contributions": result.position_factor_contributions.iter().map(|c| {
-            serde_json::json!({
-                "position_id": c.position_id.to_string(),
-                "factor_id": c.factor_id.to_string(),
-                "risk_contribution": c.risk_contribution,
-            })
-        }).collect::<Vec<_>>(),
-        "position_residual_contributions": serde_json::to_value(&result.position_residual_contributions)
-            .map_err(to_js_err)?,
-    });
-    to_js_value(&output)
-}
-
-/// Validate that `data` has exactly `n_positions` rows and that every row has
-/// exactly `n_factors` columns.
-///
-/// This must be called before populating a `SensitivityMatrix` from JSON
-/// input.  `SensitivityMatrix::set_delta` is only guarded by a
-/// `debug_assert!`, which is compiled out in release WASM builds, so
-/// out-of-bounds access in production would be an out-of-bounds Vec index —
-/// an abort across the WASM boundary rather than a catchable JS error.
-fn validate_sensitivity_data(
-    data: &[Vec<f64>],
-    n_positions: usize,
-    n_factors: usize,
-) -> Result<(), String> {
-    if data.len() != n_positions {
-        return Err(format!(
-            "sensitivity data has {} row(s) but position_ids declares {} position(s)",
-            data.len(),
-            n_positions,
-        ));
-    }
-    for (pi, row) in data.iter().enumerate() {
-        if row.len() != n_factors {
-            return Err(format!(
-                "sensitivity data row {} has {} element(s) but factor_ids declares {} factor(s)",
-                pi,
-                row.len(),
-                n_factors,
-            ));
-        }
-    }
-    Ok(())
-}
-
-/// Host-target unit tests.
-///
-/// `decompose_factor_risk` now returns a structured `JsValue`, which cannot be
-/// built off `wasm32`; its behavioural coverage lives in
-/// `tests/wasm_portfolio.rs`.
-#[cfg(test)]
-mod tests {
-    use super::validate_sensitivity_data;
-
-    #[test]
-    fn validate_rejects_too_many_rows() {
-        // 3 data rows but only 2 positions declared — must error
-        let data = vec![vec![1.0, 2.0], vec![3.0, 4.0], vec![5.0, 6.0]];
-        let result = validate_sensitivity_data(&data, 2, 2);
-        assert!(result.is_err());
-        let msg = result.unwrap_err();
-        assert!(
-            msg.contains("3"),
-            "error should mention actual row count: {msg}"
-        );
-        assert!(
-            msg.contains("2"),
-            "error should mention declared positions: {msg}"
-        );
-    }
-
-    #[test]
-    fn validate_rejects_row_wider_than_factor_count() {
-        // Row 1 has 3 elements but only 2 factors declared — must error
-        let data = vec![vec![1.0, 2.0], vec![3.0, 4.0, 5.0]];
-        let result = validate_sensitivity_data(&data, 2, 2);
-        assert!(result.is_err());
-        let msg = result.unwrap_err();
-        assert!(
-            msg.contains("row 1"),
-            "error should name the offending row: {msg}"
-        );
-        assert!(
-            msg.contains("3"),
-            "error should mention actual column count: {msg}"
-        );
-        assert!(
-            msg.contains("2"),
-            "error should mention declared factor count: {msg}"
-        );
-    }
-
-    #[test]
-    fn validate_rejects_row_narrower_than_factor_count() {
-        // Row 0 has 1 element but 2 factors declared — must error
-        let data = vec![vec![1.0]];
-        let result = validate_sensitivity_data(&data, 1, 2);
-        assert!(result.is_err());
-        let msg = result.unwrap_err();
-        assert!(
-            msg.contains("row 0"),
-            "error should name the offending row: {msg}"
-        );
-    }
-
-    #[test]
-    fn validate_accepts_well_formed_data() {
-        let data = vec![vec![1.0, 2.0], vec![3.0, 4.0]];
-        assert!(validate_sensitivity_data(&data, 2, 2).is_ok());
-    }
-
-    #[test]
-    fn validate_accepts_empty_matrix() {
-        // Zero positions, zero factors, zero data rows — valid degenerate case
-        let data: Vec<Vec<f64>> = vec![];
-        assert!(validate_sensitivity_data(&data, 0, 0).is_ok());
-    }
+    to_js_value(&result)
 }

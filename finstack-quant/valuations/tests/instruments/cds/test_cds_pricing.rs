@@ -12,8 +12,6 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCur
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
-use finstack_quant_valuations::pricer::PricingError;
-use finstack_quant_valuations::Error as ValuationError;
 use rust_decimal::Decimal;
 use time::macros::date;
 
@@ -179,10 +177,10 @@ fn test_par_spread_increases_with_hazard() {
 }
 
 #[test]
-fn test_par_spread_errors_when_expired() {
+fn test_par_spread_distinguishes_pending_coupon_from_fully_settled_cds() {
     let as_of = date!(2029 - 01 - 01);
     let start = date!(2024 - 01 - 01);
-    let end = as_of; // expired on valuation date
+    let end = as_of; // Protection expires on the New Year holiday.
     let disc = build_discount_curve(0.03, start, "USD_OIS");
     let hazard = build_hazard_curve(0.02, 0.40, start, "CORP");
     let market = MarketContext::new().insert(disc).insert(hazard);
@@ -198,22 +196,47 @@ fn test_par_spread_errors_when_expired() {
     )
     .expect("CDS construction should succeed");
 
-    let err = cds
+    // Protection has ended, but the final coupon pays on the next business
+    // day. A zero coupon is therefore the unique par spread while that
+    // premium annuity remains positive; the existing 100bp coupon still has PV.
+    let result = cds
         .price_with_metrics(
             &market,
             as_of,
             &[MetricId::ParSpread],
             finstack_quant_valuations::instruments::PricingOptions::default(),
         )
-        .expect_err("expired CDS should error");
-    match err {
-        ValuationError::Pricing(PricingError::ModelFailure { message, context }) => {
-            assert!(message.contains("expired"));
-            assert!(message.contains(&end.to_string()));
-            assert_eq!(context.instrument_id.as_deref(), Some("EXPIRED_PAR"));
-        }
-        other => panic!("unexpected error type: {other}"),
-    }
+        .expect("pending premium remains priceable after protection expires");
+    assert_eq!(result.measures[&MetricId::ParSpread], 0.0);
+    let payment_date = date!(2029 - 01 - 02);
+    assert_eq!(
+        cds.isda_coupon_schedule().expect("schedule").last(),
+        Some(&payment_date)
+    );
+    let df = market
+        .get_discount("USD_OIS")
+        .expect("discount")
+        .df_between_dates(as_of, payment_date)
+        .expect("discount factor");
+    // December 20 through January 1 inclusive: 13 actual days.
+    let expected_coupon_pv = 10_000_000.0 * 0.01 * 13.0 / 360.0 * df;
+    assert!((result.value.amount() + expected_coupon_pv).abs() < 1e-8);
+
+    // The same-day settled policy drops that coupon on its payment date.
+    // NPV is then zero, but par spread is undefined because its annuity is zero.
+    assert_eq!(
+        cds.value(&market, payment_date)
+            .expect("settled value")
+            .amount(),
+        0.0
+    );
+    let err = cds
+        .par_spread(&market, payment_date)
+        .expect_err("a fully settled CDS has no premium annuity");
+    assert!(
+        matches!(err, finstack_quant_core::Error::Validation(ref message)
+        if message.contains("denominator is non-positive or too small"))
+    );
 }
 
 #[test]

@@ -56,7 +56,7 @@ fn factor_model_envelope_has_golden_canonical_bytes_hash_and_order_invariance() 
 }
 
 fn eom_months_before(end: Date, steps: i32) -> Date {
-    let stepped = end.add_months(-steps);
+    let stepped = end.add_months(-steps).expect("valid date shift");
     stepped.end_of_month()
 }
 

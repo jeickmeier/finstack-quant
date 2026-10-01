@@ -37,6 +37,7 @@ export const core = {
   covariance: wasm.covariance,
   quantile: wasm.quantile,
   normCdf: wasm.normCdf,
+  logNormCdf: wasm.logNormCdf,
   normPdf: wasm.normPdf,
   standardNormalInvCdf: wasm.standardNormalInvCdf,
   erf: wasm.erf,

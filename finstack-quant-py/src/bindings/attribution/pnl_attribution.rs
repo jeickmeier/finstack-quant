@@ -121,12 +121,12 @@ impl PyPnlAttribution {
     /// Raw mark-to-market P&L: ``val_t1 − val_t0`` with no intra-period
     /// cashflow adjustment.
     ///
-    /// When the attribution method added coupon income to ``total_pnl``
-    /// (the standard total-return convention used by parallel/waterfall/Taylor),
+    /// When the attribution method added economic cash, including principal
+    /// receipts, to ``total_pnl`` (the total-return convention used by
+    /// parallel/waterfall/Taylor),
     /// this field still reports the raw mark-to-market change so a downstream
     /// consumer can reconcile against their own computation. Returns ``None``
-    /// for attributions deserialized from a pre-audit JSON payload that did
-    /// not carry the field.
+    /// when the attribution path or input payload does not supply the field.
     #[getter]
     fn mark_to_market_pnl(&self) -> Option<f64> {
         self.inner.mark_to_market_pnl.map(|m| m.amount())
@@ -441,7 +441,7 @@ impl PyPnlAttribution {
         )
     }
 
-    /// Validate that every factor's currency matches ``total_pnl.currency``.
+    /// Validate that every monetary value matches ``total_pnl.currency``.
     ///
     /// Useful before building a DataFrame or summing across instruments — a
     /// silent currency mismatch would otherwise be visible only in the raw
@@ -462,7 +462,7 @@ impl PyPnlAttribution {
 
     /// Export attribution as a single-row pandas ``DataFrame``.
     ///
-    /// Raises ``ValueError`` if any factor is denominated in a currency other
+    /// Raises ``ValueError`` if any headline, factor, residual, detail, or diagnostic amount uses a currency other
     /// than ``total_pnl``'s. The row carries ONE ``currency`` label beside every
     /// factor amount, so a mixed-currency attribution would make
     /// ``df[factor_cols].sum(axis=1)`` add unlike units — this is the same check
@@ -471,9 +471,9 @@ impl PyPnlAttribution {
     /// has no such restriction.
     ///
     /// Columns: ``instrument_id``, ``method``, ``t0``, ``t1``, ``currency``,
-    /// ``total_pnl``, ``mark_to_market_pnl`` (``None`` for payloads predating
-    /// the field — note the column dtype is then ``object``, not ``float64``;
-    /// coerce with ``pd.to_numeric`` before concatenating mixed vintages),
+    /// ``total_pnl``, ``mark_to_market_pnl`` (``None`` when unavailable;
+    /// the column dtype is then ``object``, so coerce with ``pd.to_numeric``
+    /// before concatenating frames with different value availability),
     /// ``carry``,
     /// ``rates_curves_pnl``, ``credit_curves_pnl``, ``inflation_curves_pnl``,
     /// ``correlations_pnl``, ``fx_pnl``, ``fx_translation_pnl``, ``vol_pnl``,

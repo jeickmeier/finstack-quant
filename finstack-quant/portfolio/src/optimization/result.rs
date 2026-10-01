@@ -56,11 +56,11 @@ impl OptimizationStatus {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum TradeDirection {
-    /// Buy more of the instrument (increase exposure).
+    /// Increase the signed instrument quantity, including covering a short.
     Buy,
-    /// Sell the instrument (decrease exposure).
+    /// Decrease the signed instrument quantity, including increasing a short.
     Sell,
-    /// No change in exposure.
+    /// No change in instrument quantity.
     Hold,
 }
 
@@ -94,7 +94,7 @@ pub struct TradeSpec {
     pub target_quantity: f64,
     /// Quantity change (`target - current`).
     pub delta_quantity: f64,
-    /// Buy / Sell / Hold classification.
+    /// Buy / Sell / Hold classification from the sign of `delta_quantity`.
     pub direction: TradeDirection,
     /// Pre‑trade weight.
     pub current_weight: f64,
@@ -134,6 +134,9 @@ pub struct PortfolioOptimizationResult {
     ///   `|instrument.notional().amount()|` and map scale back to quantity
     /// - `UnitScaling`: treat the optimized weight as a quantity multiplier for
     ///   existing positions, or as the direct target quantity for new candidates
+    ///
+    /// Held existing positions retain their exact current quantity under every
+    /// scheme, including positions with zero or negligible present value.
     pub implied_quantities: IndexMap<PositionId, f64>,
 
     /// Objective value at the solution.
@@ -267,9 +270,10 @@ impl PortfolioOptimizationResult {
                     })
                     .unwrap_or_default();
 
-                let direction = if delta_weight > 0.0 {
+                let delta_quantity = target_qty - current_qty;
+                let direction = if delta_quantity > 0.0 {
                     TradeDirection::Buy
-                } else if delta_weight < 0.0 {
+                } else if delta_quantity < 0.0 {
                     TradeDirection::Sell
                 } else {
                     TradeDirection::Hold
@@ -281,7 +285,7 @@ impl PortfolioOptimizationResult {
                     trade_type,
                     current_quantity: current_qty,
                     target_quantity: target_qty,
-                    delta_quantity: target_qty - current_qty,
+                    delta_quantity,
                     direction,
                     current_weight,
                     target_weight,

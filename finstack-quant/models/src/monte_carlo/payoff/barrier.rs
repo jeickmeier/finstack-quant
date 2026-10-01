@@ -227,6 +227,12 @@ impl BarrierOptionPayoff {
 }
 
 impl Payoff for BarrierOptionPayoff {
+    fn supports_lrm_greeks(&self) -> bool {
+        self.maturity_step > 0
+            && matches!(self.monitoring, BarrierMonitoring::Discrete { .. })
+            && !self.monitoring.observes(0)
+    }
+
     fn needs_uniform_random(&self) -> bool {
         matches!(self.monitoring, BarrierMonitoring::Continuous { .. })
     }

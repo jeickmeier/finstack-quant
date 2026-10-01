@@ -650,7 +650,9 @@ impl PyPerformance {
     /// Returns
     /// -------
     /// pandas.Series
-    ///     Calmar ratio indexed by ticker name.
+    ///     CAGR divided by absolute maximum drawdown, indexed by ticker name.
+    ///     With zero drawdown, nonzero CAGR gives signed infinity and zero
+    ///     CAGR gives ``0.0``.
     fn calmar<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let values = self.inner.calmar().map_err(core_to_py)?;
         values_to_series(py, values, self.inner.ticker_names(), "calmar")
@@ -843,6 +845,10 @@ impl PyPerformance {
 
     /// Treynor ratio for each ticker.
     ///
+    /// A non-finite risk-free rate gives NaN. With absolute beta below
+    /// ``1e-10``, nonzero finite excess return gives signed infinity and zero
+    /// excess return gives ``0``.
+    ///
     /// Returns
     /// -------
     /// pandas.Series
@@ -875,12 +881,14 @@ impl PyPerformance {
         values_to_series(py, values, self.inner.ticker_names(), "ulcer_index")
     }
 
-    /// Martin ratio for each ticker.
+    /// Martin ratio (CAGR divided by Ulcer Index) for each ticker.
     ///
     /// Returns
     /// -------
     /// pandas.Series
-    ///     Martin ratio indexed by ticker name.
+    ///     CAGR divided by Ulcer Index, indexed by ticker name. With zero
+    ///     Ulcer Index, nonzero CAGR gives signed infinity and zero CAGR
+    ///     gives ``0.0``.
     fn martin_ratio<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let values = self.inner.martin_ratio().map_err(core_to_py)?;
         values_to_series(py, values, self.inner.ticker_names(), "martin_ratio")
@@ -913,7 +921,9 @@ impl PyPerformance {
     /// Returns
     /// -------
     /// pandas.Series
-    ///     Pain ratio indexed by ticker name.
+    ///     CAGR minus the annualized risk-free rate, divided by the pain
+    ///     index and indexed by ticker name. Non-finite risk-free rates
+    ///     give ``NaN``, including when the pain index is zero.
     #[pyo3(signature = (risk_free_rate = 0.0))]
     fn pain_ratio<'py>(&self, py: Python<'py>, risk_free_rate: f64) -> PyResult<Bound<'py, PyAny>> {
         let values = self.inner.pain_ratio(risk_free_rate).map_err(core_to_py)?;
@@ -1055,7 +1065,8 @@ impl PyPerformance {
     /// Returns
     /// -------
     /// pandas.Series
-    ///     Sterling ratio indexed by ticker name.
+    ///     Sterling ratio indexed by ticker name. Non-finite risk-free
+    ///     rates give ``NaN``, including when no drawdowns are observed.
     #[pyo3(signature = (risk_free_rate = 0.0, n = 5))]
     fn sterling_ratio<'py>(
         &self,
@@ -1075,7 +1086,8 @@ impl PyPerformance {
     /// Returns
     /// -------
     /// pandas.Series
-    ///     Burke ratio indexed by ticker name.
+    ///     Burke ratio indexed by ticker name. Non-finite risk-free rates
+    ///     give ``NaN``, including when no drawdowns are observed.
     #[pyo3(signature = (risk_free_rate = 0.0, n = 5))]
     fn burke_ratio<'py>(
         &self,
@@ -1300,6 +1312,11 @@ impl PyPerformance {
     /// ticker series unchanged. ``return_kind="total"`` subtracts the
     /// geometrically decompounded period risk-free rate from the ticker
     /// series only.
+    ///
+    /// Raises AnalyticsError if the inputs are invalid or numerically singular,
+    /// or a fitted coefficient, annualized intercept, or residual volatility
+    /// cannot be represented as a finite value. Constant responses retain
+    /// undefined NaN R-squared statistics.
     #[pyo3(signature = (ticker_idx, factor_returns, return_kind = "excess", risk_free_rate = 0.0))]
     fn multi_factor_greeks(
         &self,

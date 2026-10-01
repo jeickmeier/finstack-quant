@@ -122,9 +122,9 @@ pub fn generate_three_factor_paths(
 
     let disc_curve = market.get_discount(facility.discount_curve_id.as_str())?;
     // `obs_forward_rates` is `Some` in deterministic-forward mode: the index
-    // forward read on the curve's own clock at each observation date, recorded
-    // verbatim as the path's short rate so the stochastic engine projects the
-    // same fixing the deterministic engine does.
+    // forward read on the curve's own clock and annualization basis at each
+    // observation date. The cashflow engine replaces this raw baseline with
+    // its contractual-coupon annualization, preserving additive path shocks.
     let (interest_rate_spec, obs_forward_rates, rate_time_offset): (
         InterestRateSpec,
         Option<Vec<f64>>,

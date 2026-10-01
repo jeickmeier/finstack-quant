@@ -117,7 +117,7 @@
 //! [`BusinessDayConvention`]: super::BusinessDayConvention
 
 use smallvec::SmallVec;
-use time::{Date, Duration};
+use time::Date;
 
 use super::{adjust, next_imm, prev_cds_date, BusinessDayConvention, DateExt, HolidayCalendar};
 use crate::error::InputError;

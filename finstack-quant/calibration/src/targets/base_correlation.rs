@@ -1,6 +1,7 @@
 //! Bootstrapper for base correlation curves built from tranche quotes.
 
 use crate::api::schema::BaseCorrelationParams;
+use crate::build::cds::resolve_cds_tenor_maturity;
 use crate::build::cds_tranche::{build_cds_tranche_instrument, CdsTrancheBuildOverrides};
 use crate::build::context::BuildCtx;
 use crate::build::prepared::PreparedQuote;
@@ -13,10 +14,9 @@ use crate::solver::traits::BootstrapTarget;
 use crate::targets::util::ContextScratch;
 use crate::CalibrationReport;
 use finstack_quant_cashflows::builder::specs::RollRule;
-use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
+use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext, Tenor, TenorUnit};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::BaseCorrelationCurve;
-use finstack_quant_core::money::Money;
 use finstack_quant_core::HashMap;
 use finstack_quant_core::Result;
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranchePricer;
@@ -59,24 +59,38 @@ fn validate_detachment_in_expected(detachment_pct: f64, expected: &[f64]) -> Res
     Ok(())
 }
 
-/// Validate that a quote's maturity is within tolerance of the expected maturity.
-fn validate_maturity_tolerance(
+/// Validate the contractual maturity against the requested whole-month tenor.
+fn validate_maturity(
     maturity: Date,
     base_date: Date,
     maturity_years: f64,
-    tol_days: i64,
+    roll_rule: RollRule,
 ) -> Result<()> {
-    if maturity_years <= 0.0 {
-        return Ok(());
-    }
-    // `maturity_years` is a *tenor-like* input (e.g. 5Y), not a day-count year
-    // fraction. Comparing via `year_fraction` breaks for conventions like ACT/360.
-    let months = (maturity_years * 12.0).round() as i32;
-    let expected = base_date.add_months(months);
-    let diff_days = (maturity - expected).whole_days().abs();
-    if diff_days > tol_days {
+    let months = maturity_years * 12.0;
+    if !months.is_finite()
+        || months < 1.0
+        || months > f64::from(i32::MAX)
+        || (months - months.round()).abs() > 1e-8
+    {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "Tranche maturity {maturity} differs from base_date+{months}M={expected} by {diff_days} days (tol {tol_days} days)"
+            "maturity_years must be positive and represent a whole number of months, got {maturity_years}"
+        )));
+    }
+    let months = months.round() as i32;
+    let expected = match roll_rule {
+        RollRule::CdsImm => {
+            resolve_cds_tenor_maturity(base_date, &Tenor::new(months as u32, TenorUnit::Months)?)?
+        }
+        RollRule::None => base_date.add_months(months)?,
+        other => {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CDS tranche roll_rule must be cds_imm or none, got {other:?}"
+            )));
+        }
+    };
+    if maturity != expected {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "Tranche maturity {maturity} does not match the {months}M contractual maturity {expected} for {roll_rule:?}"
         )));
     }
     Ok(())
@@ -92,30 +106,6 @@ fn validate_all_detachments_seen(expected: &[f64], seen: &[f64]) -> Result<()> {
         }
     }
     Ok(())
-}
-
-/// Create a pricing quote with zero upfront (for model-implied upfront calculation).
-fn create_pricing_quote(quote: &CdsTrancheQuote) -> CdsTrancheQuote {
-    let mut pricing = quote.clone();
-    pricing.upfront_pct = 0.0;
-    pricing
-}
-
-/// Compute the upfront money amount from quote fields.
-///
-/// `upfront_pct` is a decimal fraction of tranche notional.
-fn compute_upfront_money(
-    attachment: f64,
-    detachment: f64,
-    upfront_pct: f64,
-    notional: f64,
-    currency: finstack_quant_core::currency::Currency,
-) -> finstack_quant_core::Result<Money> {
-    let attachment_pct = normalize_pct(attachment);
-    let detachment_pct = normalize_pct(detachment);
-    let width_frac = ((detachment_pct - attachment_pct) / 100.0).max(0.0);
-    let tranche_notional = notional * width_frac;
-    Money::new(upfront_pct * tranche_notional, currency)
 }
 
 /// Normalize a value to percentage (0-100 scale).
@@ -207,10 +197,10 @@ impl BaseCorrelationTarget {
         overrides: &CdsTrancheBuildOverrides,
         time_day_count: DayCount,
     ) -> Result<CalibrationQuote> {
-        // Build pricing instrument without embedded upfront
-        let pricing_quote = create_pricing_quote(quote);
-        let instrument = build_cds_tranche_instrument(&pricing_quote, build_ctx, overrides)
-            .map_err(|e| {
+        // Retain the contractual upfront so pricing discounts it to settlement
+        // using the same cashflow rules as the instrument exposed to callers.
+        let instrument =
+            build_cds_tranche_instrument(quote, build_ctx, overrides).map_err(|e| {
                 finstack_quant_core::Error::Validation(format!(
                     "Failed to build tranche instrument: {e}"
                 ))
@@ -230,17 +220,8 @@ impl BaseCorrelationTarget {
         );
 
         let detachment_pct = normalize_pct(quote.detachment);
-        let upfront_money = compute_upfront_money(
-            quote.attachment,
-            quote.detachment,
-            quote.upfront_pct,
-            self.params.notional,
-            self.params.currency,
-        )?;
-
         Ok(CalibrationQuote::CdsTranche(CdsTrancheCalibrationQuote {
             prepared: prepared_quote,
-            upfront: Some(upfront_money),
             detachment_pct,
         }))
     }
@@ -251,11 +232,6 @@ impl BaseCorrelationTarget {
         }
 
         let expected_detachments = self.normalized_expected_detachments();
-        let maturity_tol_days: i64 = if self.params.roll_rule == RollRule::CdsImm {
-            40
-        } else {
-            7
-        };
         let time_day_count = self.params.day_count.unwrap_or(DayCount::Act365F);
         let build_ctx = self.build_ctx();
         let overrides = self.build_overrides();
@@ -275,11 +251,11 @@ impl BaseCorrelationTarget {
 
             let detachment_pct = normalize_pct(q.detachment);
             validate_detachment_in_expected(detachment_pct, &expected_detachments)?;
-            validate_maturity_tolerance(
+            validate_maturity(
                 q.maturity,
                 self.params.base_date,
                 self.params.maturity_years,
-                maturity_tol_days,
+                self.params.roll_rule,
             )?;
 
             let calib_quote =
@@ -319,7 +295,8 @@ impl BaseCorrelationTarget {
         // numerical-integration error, and a market upfront need not correspond exactly
         // to any correlation in the model-admissible range. Holding it to the
         // discount-curve machine-precision tolerance is unrealistic; use a
-        // tranche-appropriate validation tolerance. ~10 bp of upfront — generous
+        // tranche-appropriate validation tolerance. ~10 bp of discounted upfront
+        // per unit of tranche notional — generous
         // relative to tranche-pricing precision, but still rejects a materially
         // miscalibrated knot.
         const BASE_CORRELATION_VALIDATION_TOLERANCE: f64 = 1e-3;
@@ -333,13 +310,14 @@ impl BaseCorrelationTarget {
             success_tolerance,
         )?;
 
+        report = report.with_metadata("residual_units", "discounted_upfront_fraction");
         report.update_solver_config(global_config.solver.clone());
 
         let mut new_context = context.clone().insert(curve.clone());
         if let Ok(idx) = new_context.get_credit_index(params.index_id.as_str()) {
             let mut updated = idx.as_ref().clone();
             updated.base_correlation_curve = Arc::new(curve);
-            new_context = new_context.insert_credit_index(params.index_id.as_str(), updated);
+            new_context = new_context.insert_credit_index(params.index_id.as_str(), updated)?;
         }
 
         Ok((new_context, report))
@@ -412,10 +390,10 @@ impl BootstrapTarget for BaseCorrelationTarget {
 
     fn build_curve_final(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
         let curve = self.build_curve(knots)?;
-        let validation = curve.validate_arbitrage_free();
-        if !validation.is_arbitrage_free {
+        let validation = curve.validate_shape();
+        if !validation.is_monotonic {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "Base correlation curve is not arbitrage-free: {:?}",
+                "Base correlation curve violates the calibration monotonicity policy: {:?}",
                 validation.violations
             )));
         }
@@ -423,8 +401,8 @@ impl BootstrapTarget for BaseCorrelationTarget {
     }
 
     fn calculate_residual(&self, curve: &Self::Curve, quote: &Self::Quote) -> Result<f64> {
-        let (pq, upfront) = match quote {
-            CalibrationQuote::CdsTranche(pq) => (&pq.prepared, &pq.upfront),
+        let pq = match quote {
+            CalibrationQuote::CdsTranche(pq) => &pq.prepared,
             _ => {
                 return Err(finstack_quant_core::Error::Input(
                     finstack_quant_core::InputError::Invalid,
@@ -448,16 +426,18 @@ impl BootstrapTarget for BaseCorrelationTarget {
                 if let Ok(idx) = ctx.get_credit_index(index_id) {
                     let mut updated = idx.as_ref().clone();
                     updated.base_correlation_curve = Arc::new(curve.clone());
-                    ctx.insert_credit_index_mut(index_id, updated);
+                    ctx.insert_credit_index_mut(index_id, updated)?;
                 }
+                Ok(())
             },
             |ctx| {
-                // Fit to the market upfront quote directly (vendor-style).
-                let model_upfront =
-                    self.pricer
-                        .calculate_model_upfront(tranche, ctx, self.params.base_date)?;
-                let market_upfront = upfront.as_ref().map(|m| m.amount()).unwrap_or(0.0);
-                Ok((model_upfront - market_upfront) / self.params.notional)
+                // Residuals are discounted upfront fractions of tranche notional.
+                // Portfolio-notional scaling would understate a thin tranche's
+                // mispricing by the reciprocal of its attachment/detachment width.
+                let npv = self
+                    .pricer
+                    .price_tranche(tranche, ctx, self.params.base_date)?;
+                Ok(npv.amount() / tranche.notional.amount())
             },
         )
     }
@@ -559,41 +539,57 @@ mod tests {
     }
 
     #[test]
-    fn normalize_pct_and_upfront_money_follow_tranche_width() {
+    fn detachment_and_maturity_validators_cover_boundary_cases() {
         assert_eq!(normalize_pct(0.03), 3.0);
         assert_eq!(normalize_pct(7.0), 7.0);
-
-        // upfront_pct is a decimal fraction of tranche notional: -0.02 = -2%.
-        // Tranche notional = 1_000_000 * (7% - 3%) = 40_000; upfront = -800.
-        let upfront = compute_upfront_money(0.03, 0.07, -0.02, 1_000_000.0, Currency::USD)
-            .expect("valid upfront amount fixture");
-        assert_eq!(upfront.currency(), Currency::USD);
-        assert!((upfront.amount() - (-800.0)).abs() < 1e-12);
-    }
-
-    #[test]
-    fn detachment_and_maturity_validators_cover_boundary_cases() {
         assert!(validate_detachment_points(&[3.0, 7.0, 10.0]).is_ok());
         assert!(validate_detachment_points(&[0.0]).is_err());
         assert!(validate_detachment_points(&[101.0]).is_err());
 
         let base_date = Date::from_calendar_date(2025, Month::January, 2).expect("base date");
-        let expected = base_date.add_months(60);
-        let within_tol = expected + time::Duration::days(7);
-        let beyond_tol = expected + time::Duration::days(8);
+        let expected = base_date.add_months(60).expect("valid date shift");
+        assert!(validate_maturity(expected, base_date, 5.0, RollRule::None).is_ok());
+        assert!(validate_maturity(
+            expected + time::Duration::days(1),
+            base_date,
+            5.0,
+            RollRule::None
+        )
+        .is_err());
+        for years in [0.0, -1.0, f64::NAN, f64::INFINITY, 5.1] {
+            assert!(validate_maturity(expected, base_date, years, RollRule::None).is_err());
+        }
+        assert!(validate_maturity(
+            base_date.add_months(6).expect("six months"),
+            base_date,
+            0.5,
+            RollRule::None
+        )
+        .is_ok());
+    }
 
-        assert!(validate_maturity_tolerance(within_tol, base_date, 5.0, 7).is_ok());
-        assert!(validate_maturity_tolerance(beyond_tol, base_date, 5.0, 7).is_err());
-        assert!(
-            validate_maturity_tolerance(
-                Date::from_calendar_date(2035, Month::January, 2).expect("date"),
-                base_date,
-                0.0,
-                7
+    #[test]
+    fn maturity_follows_semiannual_rolls_on_both_sides_of_the_roll_date() {
+        for (month, day, maturity_year, maturity_month) in [
+            (Month::March, 19, 2029, Month::December),
+            (Month::March, 20, 2030, Month::June),
+            (Month::March, 21, 2030, Month::June),
+            (Month::September, 19, 2030, Month::June),
+            (Month::September, 20, 2030, Month::December),
+            (Month::September, 21, 2030, Month::December),
+        ] {
+            let trade = Date::from_calendar_date(2025, month, day).expect("trade date");
+            let maturity = Date::from_calendar_date(maturity_year, maturity_month, 20)
+                .expect("standard maturity");
+            assert!(validate_maturity(maturity, trade, 5.0, RollRule::CdsImm).is_ok());
+            assert!(validate_maturity(
+                trade.add_months(60).expect("anniversary"),
+                trade,
+                5.0,
+                RollRule::CdsImm
             )
-            .is_ok(),
-            "non-positive maturity_years should bypass date validation"
-        );
+            .is_err());
+        }
     }
 
     #[test]
@@ -638,7 +634,7 @@ mod tests {
         let err = test_target()
             .build_curve_final(&[(3.0, 0.7), (7.0, 0.4)])
             .expect_err("decreasing base correlation should fail final validation");
-        assert!(err.to_string().contains("not arbitrage-free"));
+        assert!(err.to_string().contains("monotonicity policy"));
     }
 
     #[test]

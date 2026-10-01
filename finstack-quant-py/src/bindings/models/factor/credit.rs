@@ -1412,7 +1412,8 @@ impl PyFactorModelConfig {
             .transpose()
     }
 
-    /// Policy for unmatched dependencies, or ``None`` when the default applies.
+    /// Policy for unmatched dependencies: ``strict`` or ``warn``, or ``None``
+    /// for the strict default. Calibrated artifacts may explicitly select ``warn``.
     #[getter]
     fn unmatched_policy(&self) -> Option<String> {
         self.inner.unmatched_policy.map(|policy| policy.to_string())
@@ -1492,7 +1493,8 @@ impl PyFactorCovarianceForecast {
         }
     }
 
-    /// Build the factor covariance matrix ``Σ(t, h) = D · ρ_static · D``.
+    /// Scale the calibrated factor covariance to the requested horizon,
+    /// preserving its shrinkage or ridge estimator.
     ///
     /// Args:
     ///     horizon: ``VolHorizon`` or descriptor string (see the class doc).

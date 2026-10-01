@@ -51,8 +51,22 @@ impl crate::metrics::MetricCalculator for AbsExcessSpreadCalculator {
             if tranche.seniority == TrancheSeniority::Equity {
                 continue;
             }
+            // The static annual coupon uses the next configured coupon interval
+            // to express a projected curve quote on the tranche's accrual basis.
+            let end = tranche.frequency.add_to_date(
+                context.as_of,
+                None,
+                finstack_quant_core::dates::BusinessDayConvention::Unadjusted,
+            )?;
+            let accrual = tranche.day_count.year_fraction(
+                context.as_of,
+                end,
+                finstack_quant_core::dates::DayCountContext::default(),
+            )?;
             let rate = tranche.coupon.try_rate_for_period(
                 context.as_of,
+                end,
+                accrual,
                 context.as_of,
                 &context.curves,
             )?;

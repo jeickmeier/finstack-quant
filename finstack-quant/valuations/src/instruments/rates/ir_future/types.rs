@@ -33,8 +33,9 @@ use crate::impl_instrument_base;
 use crate::instruments::common_impl::dependencies::MarketDependencies;
 use crate::instruments::common_impl::listed::ListedFutureTerms;
 use crate::instruments::common_impl::traits::Attributes;
-use finstack_quant_core::dates::{Date, DateExt, DayCount};
+use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurfaceAxis};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, IndexId, InstrumentId, Rate};
 use time::macros::date;
@@ -340,7 +341,7 @@ impl InterestRateFuture {
         let period_end = if let Some(end) = self.period_end {
             end
         } else {
-            period_start.add_months(self.contract_specs.delivery_months as i32)
+            period_start.add_months(self.contract_specs.delivery_months as i32)?
         };
         if period_end <= period_start {
             return Err(finstack_quant_core::error::InputError::InvalidDateRange.into());
@@ -465,6 +466,11 @@ impl InterestRateFuture {
                                 fwd.as_ref(),
                                 period_start,
                                 period_end,
+                                self.day_count.year_fraction(
+                                    period_start,
+                                    period_end,
+                                    DayCountContext::default(),
+                                )?,
                             )?,
                         parallel_forward_sensitivity: 1.0,
                     })
@@ -507,6 +513,7 @@ impl InterestRateFuture {
                     accrual_end: period_end,
                     day_count: self.day_count,
                     coupon_frequency: None,
+                    coupon_period: (period_start, period_end),
                     compounding: &compounding,
                     fixing_calendar: calendar,
                     compounded_spread: 0.0,
@@ -732,6 +739,8 @@ impl InterestRateFuture {
     /// decimal rate units per √year — e.g. `0.012` for 120 bp/yr. Feeding a
     /// lognormal (Black) vol such as `0.20` inflates the adjustment by
     /// `(σ_LN/σ_N)² ≈ (σ_LN/(σ_N))²` — typically hundreds×. A sanity bound
+    /// supplements the required Normal quote metadata and Strike axis; it
+    /// does not infer the convention from the volatility's magnitude. The bound
     /// rejects vols above `MAX_NORMAL_RATE_VOL` (5% absolute, ≈500 bp/yr):
     /// genuine normal rate vols sit far below it while lognormal quotes sit
     /// far above it.
@@ -753,6 +762,8 @@ impl InterestRateFuture {
 
         let vol_estimate = if let Some(vol_id) = &self.vol_surface_id {
             let surface = context.get_surface(vol_id)?;
+            surface.require_quote_type(VolQuoteType::Normal)?;
+            surface.require_secondary_axis(VolSurfaceAxis::Strike)?;
             // Vol-axis consistency: sample at `T_start` (the time over which the
             // convexity variance accumulates), NOT at the fixing date — the
             // latter mis-pairs the `(T_start, T_end)` formula for SOFR-style
@@ -894,6 +905,46 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
     use time::macros::date;
+
+    #[test]
+    fn convexity_requires_normal_quote_metadata_even_below_sanity_bound() {
+        use finstack_quant_core::market_data::surfaces::VolSurface;
+        let mut future = InterestRateFuture::example().expect("future");
+        future.vol_surface_id = Some(CurveId::new("VOL"));
+        let base = VolSurface::builder("VOL")
+            .expiries(&[1.0])
+            .strikes(&[0.04])
+            .row(&[0.01])
+            .build()
+            .unwrap();
+        for surface in [
+            base.clone(),
+            base.clone().with_displacements(&[0.02]).unwrap(),
+            base.clone()
+                .with_quote_type(VolQuoteType::Normal)
+                .unwrap()
+                .with_secondary_axis(VolSurfaceAxis::Tenor),
+        ] {
+            assert!(future
+                .calculate_convexity_adjusted_rate(
+                    &MarketContext::new().insert_surface(surface),
+                    0.04,
+                    1.0,
+                    1.25
+                )
+                .is_err());
+        }
+        let normal = base.with_quote_type(VolQuoteType::Normal).unwrap();
+        let adjusted = future
+            .calculate_convexity_adjusted_rate(
+                &MarketContext::new().insert_surface(normal),
+                0.04,
+                1.0,
+                1.25,
+            )
+            .unwrap();
+        assert!((adjusted - (0.04 + 0.5 * 0.01 * 0.01 * 1.25)).abs() < 1e-14);
+    }
 
     /// One CME SR3-style contract ($2,500 per point) whose last trading day is
     /// also its settlement date.
@@ -1106,6 +1157,7 @@ mod tests {
             )
             .insert_surface(
                 VolSurface::builder("USD-SR3-NORMAL-VOL")
+                    .quote_type(VolQuoteType::Normal)
                     .expiries(&[0.1, 0.25, 0.5, 1.0])
                     .strikes(&[0.0, 0.04, 0.10])
                     .row(&[normal_vol; 3])

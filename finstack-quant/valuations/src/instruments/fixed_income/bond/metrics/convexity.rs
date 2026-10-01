@@ -96,37 +96,25 @@ impl MetricCalculator for ConvexityCalculator {
             };
 
         // Calculate price from flows using quote_date to ensure consistency with YTM
-        let price =
-            crate::instruments::fixed_income::bond::pricing::quote_conversions::price_from_ytm(
+        let timed =
+            crate::instruments::fixed_income::bond::pricing::quote_conversions::bond_flow_times(
                 bond,
                 risk_flows.as_ref(),
                 quote_date,
-                yield_rate,
             )?;
+        let price = crate::instruments::fixed_income::bond::pricing::quote_conversions::price_from_ytm_timed(
+            &timed, frequency, yield_rate, comp,
+        )?;
         if price.abs() < ZERO_TOLERANCE {
             return Ok(0.0);
         }
 
-        // One ICMA reference period for the whole leg; the day-count context
-        // does not depend on the individual flow.
-        let day_count = bond.cashflow_spec.day_count();
-        let dc_ctx = finstack_quant_core::dates::DayCountContext {
-            frequency: Some(bond.cashflow_spec.frequency()),
-            coupon_period: crate::instruments::fixed_income::bond::pricing::quote_conversions::icma_reference_period(
-                day_count,
-                bond.cashflow_spec.frequency(),
-                risk_flows.iter().map(|(d, _)| *d),
-                quote_date,
-            ),
-            ..Default::default()
-        };
         // Calculate convexity using quote_date as time origin
         let mut d2_price = finstack_quant_core::math::summation::NeumaierAccumulator::new();
-        for &(date, amount) in risk_flows.as_ref() {
-            if date <= quote_date {
+        for &(_, t, amount) in &timed {
+            if t <= 0.0 {
                 continue;
             }
-            let t = day_count.year_fraction(quote_date, date, dc_ctx)?.max(0.0);
             let df_second = df_second_derivative(yield_rate, t, comp, frequency)?;
             d2_price.add(amount.amount() * df_second);
         }

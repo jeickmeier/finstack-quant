@@ -8,7 +8,7 @@
 //! retain wall time. Other date-like objects use ``isoformat()``, else ``str()``.
 //! Mixed aware/naive datetime keys fail; opaque strings retain caller ordering.
 
-use crate::bindings::module_utils::{py_to_json_value, register_submodule, ParentNameSource};
+use crate::bindings::module_utils::py_to_json_value;
 use crate::errors::core_to_py;
 use finstack_quant_features::{
     CrossSectionalOp, PairwiseOp, PanelTransformResult, PanelTransformSpec, TimeSeriesOp,
@@ -1094,7 +1094,7 @@ fn transform_panel_json(py: Python<'_>, spec_json: String) -> PyResult<String> {
 
 /// Register the features submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "features")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "features")?;
     m.setattr("__doc__", "Vectorized panel feature transforms.")?;
     m.add_class::<PyCrossSectionalOp>()?;
     m.add_class::<PyPairwiseOp>()?;
@@ -1134,12 +1134,9 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "features",
-        crate::bindings::module_utils::ROOT_PACKAGE,
-        ParentNameSource::Name,
+        crate::bindings::module_utils::Exposure::Python,
     )
 }

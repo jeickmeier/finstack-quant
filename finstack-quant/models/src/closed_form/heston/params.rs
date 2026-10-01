@@ -20,14 +20,13 @@ pub mod heston_defaults {
     pub const V0: f64 = 0.04;
 }
 
-/// Truncated-tail mass (on the probability scale) above which the Gil-Pelaez
-/// integral is considered mis-truncated and a diagnostic is surfaced.
-///
-/// A well-resolved Heston Fourier integral has a tail far below this; the
-/// `[0, 1]` probability clamp would otherwise silently hide truncation error
-/// from too small a `u_max` (audit item 4). `1e-4` ≈ 1bp on the probability,
-/// which feeds into a price error worth flagging for risk use.
-pub(super) const HESTON_TAIL_DIAGNOSTIC_THRESHOLD: f64 = 1e-4;
+/// Relative price tolerance for residual integration mass and no-arbitrage bounds.
+pub(super) const HESTON_TAIL_DIAGNOSTIC_THRESHOLD: f64 = 1e-9;
+
+/// Maximum quadrature nodes in one attempt; fail explicitly beyond this work budget.
+pub(super) const HESTON_MAX_NODES: usize = 1_048_576;
+/// Target characteristic-function magnitude used to initialize the integration limit.
+pub(super) const HESTON_TAIL_LOG_TARGET: f64 = 27.631_021_115_928_547;
 
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 /// Market inputs for closed-form Heston pricing.
@@ -114,7 +113,7 @@ pub struct HestonFourierSettings {
     pub panels: usize,
     /// Gauss-Legendre order per panel (default: 16)
     pub gl_order: usize,
-    /// Small epsilon to avoid singularity at φ=0 (default: 1e-8)
+    /// Non-negative origin tolerance below the first quadrature node (default: 1e-8)
     pub phi_eps: f64,
 }
 
@@ -139,13 +138,20 @@ pub(super) const SUPPORTED_GL_ORDERS: [usize; 4] = [2, 4, 8, 16];
 impl HestonFourierSettings {
     /// Construct validated Fourier integration settings.
     ///
+    /// # Arguments
+    ///
+    /// * `u_max` - Positive finite upper integration frequency.
+    /// * `panels` - Positive composite panel count within the shared node budget.
+    /// * `gl_order` - Gauss-Legendre nodes per panel: 2, 4, 8, or 16.
+    /// * `phi_eps` - Finite non-negative origin tolerance below every grid node.
+    ///
     /// # Errors
     ///
     /// Returns a [`finstack_quant_core::Error::Validation`] if `gl_order` is not one
     /// of the supported composite Gauss-Legendre orders ({2, 4, 8, 16}), if
     /// `panels == 0`, or if `u_max` is not a positive finite number. An
-    /// unsupported `gl_order` would otherwise cause silent degradation to the
-    /// slower per-strike pricing path.
+    /// invalid origin tolerance or a grid beyond the quadrature node budget
+    /// is also rejected.
     pub fn new(
         u_max: f64,
         panels: usize,
@@ -167,7 +173,8 @@ impl HestonFourierSettings {
     /// # Errors
     ///
     /// Returns a [`finstack_quant_core::Error::Validation`] if `gl_order` is not in
-    /// {2, 4, 8, 16}, if `panels == 0`, or if `u_max` is not positive finite.
+    /// {2, 4, 8, 16}, if the grid exceeds its node budget, if `panels == 0`,
+    /// if `u_max` is not positive finite, or if `phi_eps` could omit a grid node.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         if !SUPPORTED_GL_ORDERS.contains(&self.gl_order) {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -186,96 +193,68 @@ impl HestonFourierSettings {
                 self.u_max
             )));
         }
+        if self
+            .panels
+            .checked_mul(self.gl_order)
+            .is_none_or(|nodes| nodes > HESTON_MAX_NODES)
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "HestonFourierSettings exceeds the quadrature node budget".to_string(),
+            ));
+        }
+        // The smallest supported normalized Gauss-Legendre node is >0.005
+        // panel widths. No validated grid may silently discard origin nodes.
+        let first_node_lower_bound = 0.005 * self.u_max / self.panels as f64;
+        if !self.phi_eps.is_finite() || self.phi_eps < 0.0 || self.phi_eps >= first_node_lower_bound
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "HestonFourierSettings.phi_eps must be finite, non-negative, and below the first integration node".to_string(),
+            ));
+        }
         Ok(())
     }
 
-    /// Create settings adapted to the option's time to maturity.
+    /// Create settings adapted continuously to time to maturity at 20% initial volatility.
     ///
-    /// Short-dated options require finer integration grids because
-    /// the characteristic function oscillates more rapidly.
-    ///
-    /// | Maturity | u_max | panels | gl_order |
-    /// |----------|-------|--------|----------|
-    /// | T < 0.05 | 200   | 200    | 16       |
-    /// | T < 0.25 | 150   | 150    | 16       |
-    /// | T < 1.0  | 100   | 100    | 16       |
-    /// | T >= 1.0 | 80    | 80     | 16       |
-    ///
-    /// The buckets are tuned for a typical initial variance v0 ≈ 0.04
-    /// (20% vol). For low-variance regimes prefer
-    /// [`HestonFourierSettings::for_maturity_with_variance`], which widens
-    /// `u_max` when `v0` is small.
+    /// The integration limit grows as `1/sqrt(time)` for short-dated options.
+    /// Pricing also accounts for the model's stochastic-variance tail and checks
+    /// numerical convergence before returning a value.
     ///
     /// # Arguments
     ///
-    /// * `time` - Evaluation time in years from the model origin.
+    /// * `time` - Positive remaining time to expiry in years.
     #[must_use]
     pub fn for_maturity(time: f64) -> Self {
-        Self::for_maturity_with_variance(time, HESTON_REFERENCE_V0)
+        Self::for_maturity_with_variance(time, 0.04)
     }
 
-    /// Create settings adapted to both maturity and initial variance.
+    /// Create settings adapted continuously to maturity and initial variance.
     ///
-    /// The Heston characteristic function decays on a `u`-scale proportional
-    /// to `1/√(v0·T)`. The [`HestonFourierSettings::for_maturity`] buckets
-    /// already widen the grid for small `T` assuming v0 ≈ 0.04 (20% vol);
-    /// when `v0` itself is small the integrand tail extends past the bucket
-    /// `u_max` and the truncated Gil-Pelaez integral loses mass. This variant
-    /// scales `u_max` (and `panels`, to preserve node density) by
-    /// `√(v0_ref / v0)`, capped to keep the grid bounded; the existing tail
-    /// diagnostic remains as a safety net.
+    /// Uses the Gaussian short-time decay `exp(-v0*time*u²/2)` with a target
+    /// magnitude of `1e-12`. The integration limit has a minimum of 80, with
+    /// at most one frequency unit per 16-node panel. The pricing driver adds
+    /// a stochastic-variance tail bound and refines this initial grid.
+    /// Extreme inputs that exceed the finite work budget are rejected by
+    /// [`Self::validate`] and the checked pricing functions.
     ///
     /// # Arguments
     ///
-    /// * `time` - Evaluation time in years from the model origin.
-    /// * `v0` - Initial variance level for the stochastic volatility process at time zero
+    /// * `time` - Positive remaining time to expiry in years.
+    /// * `v0` - Positive initial instantaneous variance, in annual decimal-volatility squared.
     #[must_use]
     pub fn for_maturity_with_variance(time: f64, v0: f64) -> Self {
-        let mut settings = if time < 0.05 {
-            Self {
-                u_max: 200.0,
-                panels: 200,
-                gl_order: 16,
-                phi_eps: 1e-8,
-            }
-        } else if time < 0.25 {
-            Self {
-                u_max: 150.0,
-                panels: 150,
-                gl_order: 16,
-                phi_eps: 1e-8,
-            }
-        } else if time < 1.0 {
-            Self::default()
-        } else {
-            Self {
-                u_max: 80.0,
-                panels: 80,
-                gl_order: 16,
-                phi_eps: 1e-8,
-            }
-        };
-
-        if v0.is_finite() && v0 > 0.0 && v0 < HESTON_REFERENCE_V0 {
-            let scale = (HESTON_REFERENCE_V0 / v0)
+        let u_max = if time.is_finite() && time > 0.0 && v0.is_finite() && v0 > 0.0 {
+            (2.0 * HESTON_TAIL_LOG_TARGET / (v0 * time))
                 .sqrt()
-                .min(HESTON_UMAX_MAX_VARIANCE_SCALE);
-            settings.u_max *= scale;
-            // Keep the per-unit-u node density unchanged so the wider grid
-            // does not get coarser.
-            settings.panels = ((settings.panels as f64) * scale).ceil() as usize;
+                .max(80.0)
+        } else {
+            f64::NAN
+        };
+        Self {
+            u_max,
+            panels: u_max.ceil() as usize,
+            gl_order: 16,
+            phi_eps: 0.0,
         }
-        settings
     }
 }
-
-/// Reference initial variance the [`HestonFourierSettings::for_maturity`]
-/// buckets are tuned for (20% vol).
-const HESTON_REFERENCE_V0: f64 = 0.04;
-
-/// Cap on the variance-driven `u_max` scale factor in
-/// [`HestonFourierSettings::for_maturity_with_variance`]. A factor of 8
-/// covers initial variances down to `0.04 / 64 = 6.25e-4` (2.5% vol) at full
-/// fidelity; below that the tail diagnostic still flags any residual
-/// mis-truncation.
-const HESTON_UMAX_MAX_VARIANCE_SCALE: f64 = 8.0;

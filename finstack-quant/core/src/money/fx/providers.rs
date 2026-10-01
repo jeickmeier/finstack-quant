@@ -8,6 +8,7 @@ use crate::collections::HashMap;
 use crate::currency::Currency;
 use crate::dates::Date;
 use crate::error::InputError;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 
 fn recover<T>(res: Result<T, std::sync::PoisonError<T>>) -> T {
@@ -20,6 +21,7 @@ fn recover<T>(res: Result<T, std::sync::PoisonError<T>>) -> T {
 /// - Direct quote lookup
 /// - Automatic reciprocal calculation
 /// - Thread-safe mutable quote insertion
+/// - Revision tracking so attached matrices refresh observations after updates
 ///
 /// # Examples
 /// ```rust
@@ -43,6 +45,8 @@ fn recover<T>(res: Result<T, std::sync::PoisonError<T>>) -> T {
 #[derive(Default)]
 pub struct SimpleFxProvider {
     quotes: RwLock<HashMap<(Currency, Currency), f64>>,
+    pinned_quotes: RwLock<HashMap<(Currency, Currency, Date, FxConversionPolicy), f64>>,
+    revision: AtomicU64,
 }
 
 impl SimpleFxProvider {
@@ -57,6 +61,8 @@ impl SimpleFxProvider {
     pub fn new() -> Self {
         Self {
             quotes: RwLock::new(HashMap::default()),
+            pinned_quotes: RwLock::new(HashMap::default()),
+            revision: AtomicU64::new(0),
         }
     }
 
@@ -70,7 +76,9 @@ impl SimpleFxProvider {
     ///
     /// Replaces any existing direct quote for the same ordered pair. It does
     /// not insert the reciprocal pair; reciprocal lookup is performed by the
-    /// [`FxProvider`] implementation at read time.
+    /// [`FxProvider`] implementation at read time. Successful updates advance
+    /// the provider revision, invalidating observations in attached matrices
+    /// without removing their explicit quotes or pinned fixings.
     ///
     /// # Errors
     ///
@@ -87,7 +95,9 @@ impl SimpleFxProvider {
     /// ```
     pub fn set_quote(&self, from: Currency, to: Currency, rate: f64) -> crate::Result<()> {
         let rate = super::validate_fx_rate(from, to, rate)?;
-        recover(self.quotes.write()).insert((from, to), rate);
+        let mut quotes = recover(self.quotes.write());
+        quotes.insert((from, to), rate);
+        self.advance_revision();
         Ok(())
     }
 
@@ -129,6 +139,7 @@ impl SimpleFxProvider {
         for (pair, rate) in validated {
             guard.insert(pair, rate);
         }
+        self.advance_revision();
         Ok(())
     }
 
@@ -150,9 +161,44 @@ impl SimpleFxProvider {
     pub fn get_direct(&self, from: Currency, to: Currency) -> Option<f64> {
         recover(self.quotes.read()).get(&(from, to)).copied()
     }
+
+    /// Load date/policy-scoped provider state without promoting its authority
+    /// to the containing matrix's explicit pinned quote store.
+    pub(crate) fn set_snapshot_pinned_quotes(
+        &self,
+        quotes: &[(Currency, Currency, Date, FxConversionPolicy, f64)],
+    ) -> crate::Result<()> {
+        let mut validated = HashMap::default();
+        for &(from, to, on, policy, rate) in quotes {
+            let rate = super::validate_fx_rate(from, to, rate)?;
+            if validated.insert((from, to, on, policy), rate).is_some() {
+                return Err(crate::Error::Validation(format!(
+                    "duplicate scoped provider quote for {from}->{to} on {on}/{policy}"
+                )));
+            }
+        }
+        let mut quotes = recover(self.pinned_quotes.write());
+        quotes.extend(validated);
+        self.advance_revision();
+        Ok(())
+    }
+
+    fn advance_revision(&self) {
+        // Exhaustion disables caching instead of reusing an older revision.
+        let _ = self
+            .revision
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |value| {
+                value.checked_add(1)
+            });
+    }
 }
 
 impl FxProvider for SimpleFxProvider {
+    fn get_revision(&self) -> Option<u64> {
+        let revision = self.revision.load(Ordering::Acquire);
+        (revision != u64::MAX).then_some(revision)
+    }
+
     /// Return an FX rate with automatic reciprocal fallback.
     ///
     /// The provider:
@@ -161,15 +207,14 @@ impl FxProvider for SimpleFxProvider {
     /// 3. Falls back to reciprocal if available
     /// 4. Returns `NotFound` error otherwise
     ///
-    /// # Date and Policy Are Ignored
+    /// # Snapshot Date and Policy
     ///
-    /// `SimpleFxProvider` is a snapshot store: it does **not** honor the `on`
-    /// observation date or the `policy` (cashflow date / settlement date /
-    /// closing rate / average rate). All quotes are treated as the current
-    /// snapshot regardless of the query parameters. Callers who need
-    /// date-aware or policy-aware FX should compose this provider with a
-    /// time-series store at a higher layer, or implement a custom
-    /// [`FxProvider`].
+    /// Quotes inserted through `set_quote` and `set_quotes` are constant across
+    /// observation dates and policies. A restored market-context snapshot can
+    /// also contain scoped provider quotes; those are checked first for their
+    /// exact `on` date and `policy`. The store does not fetch or interpolate
+    /// additional observations. Callers who need live date-aware FX should
+    /// implement a custom [`FxProvider`].
     ///
     /// # Errors
     ///
@@ -205,11 +250,20 @@ impl FxProvider for SimpleFxProvider {
         &self,
         from: Currency,
         to: Currency,
-        _on: Date,
-        _policy: FxConversionPolicy,
+        on: Date,
+        policy: FxConversionPolicy,
     ) -> crate::Result<f64> {
         if from == to {
             return Ok(1.0);
+        }
+        {
+            let pinned = recover(self.pinned_quotes.read());
+            if let Some(&rate) = pinned.get(&(from, to, on, policy)) {
+                return Ok(rate);
+            }
+            if let Some(&rate) = pinned.get(&(to, from, on, policy)) {
+                return super::reciprocal_rate_or_err(rate, to, from);
+            }
         }
         if let Some(rate) = self.get_direct(from, to) {
             return Ok(rate);
@@ -227,6 +281,13 @@ impl FxProvider for SimpleFxProvider {
         recover(self.quotes.read())
             .iter()
             .map(|(&(from, to), &rate)| (from, to, rate))
+            .collect()
+    }
+
+    fn snapshot_pinned_quotes(&self) -> Vec<(Currency, Currency, Date, FxConversionPolicy, f64)> {
+        recover(self.pinned_quotes.read())
+            .iter()
+            .map(|(&(from, to, on, policy), &rate)| (from, to, on, policy, rate))
             .collect()
     }
 }
@@ -256,39 +317,59 @@ pub struct BumpedFxProvider {
 impl BumpedFxProvider {
     /// Create a new bumped provider that relatively bumps one pair.
     ///
-    /// # Parameters
-    /// - `original`: Original FX provider to delegate to
-    /// - `from`: Base currency of the bumped pair
-    /// - `to`: Quote currency of the bumped pair
-    /// - `bump_pct`: Relative bump size (e.g., `0.01` for a 1% increase)
+    /// # Arguments
+    ///
+    /// * `original` - Provider supplying per-date rates and any stored snapshot quotes; its live rates are not fetched during construction.
+    /// * `from` - Base currency of the bumped pair; must differ from `to`.
+    /// * `to` - Quote currency, whose units are paid per unit of `from`.
+    /// * `bump_pct` - Relative decimal shock (for example, `0.01` increases the rate by 1%); must be finite and greater than -1.
     ///
     /// # Errors
     ///
-    /// Returns `Err(Error::Validation)` when `bump_pct` is non-finite or the
-    /// resulting multiplier `1 + bump_pct` is not strictly positive (such a
-    /// bump would produce zero/negative FX rates).
+    /// Returns an error when `from == to`, the bump multiplier is invalid, or
+    /// any statically known shocked snapshot quote (including another date or
+    /// policy scope) is outside the finite, positive FX range.
     pub fn new(
         original: Arc<dyn FxProvider>,
         from: Currency,
         to: Currency,
         bump_pct: f64,
     ) -> crate::Result<Self> {
+        if from == to {
+            return Err(crate::Error::Validation(
+                "cannot bump an identity FX pair".into(),
+            ));
+        }
         let bump_multiplier = 1.0 + bump_pct;
         if !bump_pct.is_finite() || bump_multiplier <= 0.0 {
             return Err(crate::Error::Validation(format!(
                 "BumpedFxProvider bump_pct must be finite with 1 + bump_pct > 0 (got {bump_pct})"
             )));
         }
-        Ok(Self {
+        let bumped = Self {
             original,
             override_from: from,
             override_to: to,
             bump_multiplier,
-        })
+        };
+        // Validate every statically known shocked scope, not just a caller's
+        // reference-date lookup. A snapshot must not turn an overflowing
+        // scoped cross into an invalid serialized quote or an unshocked rate.
+        for (base, quote, rate) in bumped.snapshot_quotes() {
+            super::validate_fx_rate(base, quote, rate)?;
+        }
+        for (base, quote, _, _, rate) in bumped.snapshot_pinned_quotes() {
+            super::validate_fx_rate(base, quote, rate)?;
+        }
+        Ok(bumped)
     }
 }
 
 impl FxProvider for BumpedFxProvider {
+    fn get_revision(&self) -> Option<u64> {
+        self.original.get_revision()
+    }
+
     /// Return an FX rate, relatively bumping the overridden pair.
     ///
     /// The provider:
@@ -328,6 +409,55 @@ impl FxProvider for BumpedFxProvider {
 
         // Delegate to original provider for all other pairs
         self.original.rate(from, to, on, policy)
+    }
+
+    fn snapshot_quotes(&self) -> Vec<(Currency, Currency, f64)> {
+        let mut quotes = self.original.snapshot_quotes();
+        let from = self.override_from;
+        let to = self.override_to;
+        let rate = quotes
+            .iter()
+            .find(|&&(base, quote, _)| base == from && quote == to)
+            .map(|&(_, _, rate)| rate)
+            .or_else(|| {
+                quotes
+                    .iter()
+                    .find(|&&(base, quote, _)| base == to && quote == from)
+                    .map(|&(_, _, rate)| 1.0 / rate)
+            });
+        if let Some(rate) = rate {
+            quotes.retain(|&(base, quote, _)| {
+                !((base == from && quote == to) || (base == to && quote == from))
+            });
+            quotes.push((from, to, rate * self.bump_multiplier));
+        }
+        quotes
+    }
+
+    fn snapshot_pinned_quotes(&self) -> Vec<(Currency, Currency, Date, FxConversionPolicy, f64)> {
+        let mut quotes = self.original.snapshot_pinned_quotes();
+        let from = self.override_from;
+        let to = self.override_to;
+        let mut rates = HashMap::default();
+        for &(base, quote, on, policy, rate) in &quotes {
+            if base == from && quote == to {
+                rates.insert((on, policy), rate);
+            }
+        }
+        for &(base, quote, on, policy, rate) in &quotes {
+            if base == to && quote == from {
+                rates.entry((on, policy)).or_insert(1.0 / rate);
+            }
+        }
+        quotes.retain(|&(base, quote, _, _, _)| {
+            !((base == from && quote == to) || (base == to && quote == from))
+        });
+        quotes.extend(
+            rates
+                .into_iter()
+                .map(|((on, policy), rate)| (from, to, on, policy, rate * self.bump_multiplier)),
+        );
+        quotes
     }
 }
 
@@ -475,6 +605,10 @@ mod tests {
     #[test]
     fn bumped_provider_rejects_invalid_bumps() {
         let original: Arc<dyn FxProvider> = Arc::new(SimpleFxProvider::new());
+        assert!(
+            BumpedFxProvider::new(Arc::clone(&original), Currency::USD, Currency::USD, 0.1)
+                .is_err()
+        );
         for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -1.0, -1.5] {
             assert!(
                 BumpedFxProvider::new(Arc::clone(&original), Currency::EUR, Currency::USD, bad)
@@ -482,5 +616,44 @@ mod tests {
                 "bump_pct {bad} must be rejected"
             );
         }
+    }
+
+    #[test]
+    fn scoped_snapshot_loader_validates_atomically_and_rejects_duplicate_keys() {
+        let provider = SimpleFxProvider::new();
+        let on = test_date();
+        let policy = FxConversionPolicy::CashflowDate;
+        provider
+            .set_snapshot_pinned_quotes(&[(Currency::EUR, Currency::USD, on, policy, 1.2)])
+            .expect("initial scoped quote");
+        for invalid in [f64::NAN, f64::INFINITY, 0.0, -1.0] {
+            assert!(provider
+                .set_snapshot_pinned_quotes(&[
+                    (Currency::EUR, Currency::USD, on, policy, 1.5),
+                    (Currency::USD, Currency::GBP, on, policy, invalid),
+                ])
+                .is_err());
+            assert_eq!(
+                provider
+                    .rate(Currency::EUR, Currency::USD, on, policy)
+                    .expect("original"),
+                1.2
+            );
+            assert!(provider
+                .rate(Currency::USD, Currency::GBP, on, policy)
+                .is_err());
+        }
+        assert!(provider
+            .set_snapshot_pinned_quotes(&[
+                (Currency::EUR, Currency::USD, on, policy, 1.5),
+                (Currency::EUR, Currency::USD, on, policy, 1.6),
+            ])
+            .is_err());
+        assert_eq!(
+            provider
+                .rate(Currency::EUR, Currency::USD, on, policy)
+                .expect("original"),
+            1.2
+        );
     }
 }

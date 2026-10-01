@@ -5,10 +5,11 @@
 //! unit discount factor; callers multiply by the relevant annuity, discount
 //! factor, notional, or PV01 outside this module.
 //!
-//! Degenerate inputs with `t <= 0` or `sigma_n <= 0` return intrinsic value for
+//! Boundary inputs with `t == 0` or `sigma_n == 0` return intrinsic value for
 //! prices and zero or digital-limit values for Greeks. Unlike Black-76, the
 //! forward and strike may be negative because the normal model supports
-//! negative rates and prices.
+//! negative rates and prices. Non-finite inputs, negative volatility, or
+//! negative expiry return `NaN`; checked entrypoints return validation errors.
 //!
 //! # References
 //!
@@ -23,6 +24,11 @@ use finstack_quant_core::math::{norm_cdf, norm_pdf};
 struct BachelierState {
     st: f64,
     d: f64,
+}
+
+#[inline]
+fn valid_bachelier_inputs(forward: f64, strike: f64, sigma_n: f64, t: f64) -> bool {
+    [forward, strike, sigma_n, t].iter().all(|x| x.is_finite()) && sigma_n >= 0.0 && t >= 0.0
 }
 
 #[inline]
@@ -50,8 +56,8 @@ fn bachelier_state(forward: f64, strike: f64, sigma_n: f64, t: f64) -> Option<Ba
 /// # Returns
 ///
 /// Returns `(F - K) N(d) + sigma_n sqrt(T) n(d)` before multiplying by any
-/// annuity, discount factor, or notional. If `t <= 0` or `sigma_n <= 0`, returns
-/// intrinsic value `(forward - strike).max(0.0)`.
+/// annuity, discount factor, or notional. At zero expiry or volatility returns
+/// intrinsic value `(forward - strike).max(0.0)`. Invalid inputs return `NaN`.
 ///
 /// # Examples
 ///
@@ -63,6 +69,9 @@ fn bachelier_state(forward: f64, strike: f64, sigma_n: f64, t: f64) -> Option<Ba
 /// assert!((call - put - 0.005).abs() < 1e-12);
 /// ```
 pub fn bachelier_call(forward: f64, strike: f64, sigma_n: f64, t: f64) -> f64 {
+    if !valid_bachelier_inputs(forward, strike, sigma_n, t) {
+        return f64::NAN;
+    }
     match bachelier_state(forward, strike, sigma_n, t) {
         Some(state) => (forward - strike) * norm_cdf(state.d) + state.st * norm_pdf(state.d),
         None => (forward - strike).max(0.0),
@@ -81,9 +90,12 @@ pub fn bachelier_call(forward: f64, strike: f64, sigma_n: f64, t: f64) -> f64 {
 /// # Returns
 ///
 /// Returns `(K - F) N(-d) + sigma_n sqrt(T) n(d)` before multiplying by any
-/// annuity, discount factor, or notional. If `t <= 0` or `sigma_n <= 0`, returns
-/// intrinsic value `(strike - forward).max(0.0)`.
+/// annuity, discount factor, or notional. At zero expiry or volatility returns
+/// intrinsic value `(strike - forward).max(0.0)`. Invalid inputs return `NaN`.
 pub fn bachelier_put(forward: f64, strike: f64, sigma_n: f64, t: f64) -> f64 {
+    if !valid_bachelier_inputs(forward, strike, sigma_n, t) {
+        return f64::NAN;
+    }
     match bachelier_state(forward, strike, sigma_n, t) {
         Some(state) => (strike - forward) * norm_cdf(-state.d) + state.st * norm_pdf(state.d),
         None => (strike - forward).max(0.0),
@@ -103,8 +115,12 @@ pub fn bachelier_put(forward: f64, strike: f64, sigma_n: f64, t: f64) -> f64 {
 /// # Returns
 ///
 /// Returns `sqrt(T) n(d)` on the same unit-annuity scale as
-/// [`bachelier_call`]. Returns `0.0` for degenerate expiry or volatility.
+/// [`bachelier_call`]. Returns `0.0` at zero expiry or volatility and `NaN`
+/// for invalid inputs.
 pub fn bachelier_vega(forward: f64, strike: f64, sigma_n: f64, t: f64) -> f64 {
+    if !valid_bachelier_inputs(forward, strike, sigma_n, t) {
+        return f64::NAN;
+    }
     match bachelier_state(forward, strike, sigma_n, t) {
         Some(state) => t.sqrt() * norm_pdf(state.d),
         None => 0.0,
@@ -117,7 +133,7 @@ pub fn bachelier_vega(forward: f64, strike: f64, sigma_n: f64, t: f64) -> f64 {
 ///
 /// Returns `N(d)` in the valid normal-model domain. At zero expiry or zero
 /// normal volatility, returns the intrinsic digital limit: `1.0` when
-/// `forward >= strike`, otherwise `0.0`.
+/// `forward >= strike`, otherwise `0.0`. Invalid inputs return `NaN`.
 ///
 /// # Arguments
 ///
@@ -128,6 +144,9 @@ pub fn bachelier_vega(forward: f64, strike: f64, sigma_n: f64, t: f64) -> f64 {
 ///   lognormal percentage volatility.
 /// * `t` - Time to expiry in years.
 pub fn bachelier_delta_call(forward: f64, strike: f64, sigma_n: f64, t: f64) -> f64 {
+    if !valid_bachelier_inputs(forward, strike, sigma_n, t) {
+        return f64::NAN;
+    }
     match bachelier_state(forward, strike, sigma_n, t) {
         Some(state) => norm_cdf(state.d),
         None => {
@@ -156,7 +175,13 @@ pub fn bachelier_delta_call(forward: f64, strike: f64, sigma_n: f64, t: f64) -> 
 ///   lognormal percentage volatility.
 /// * `t` - Time to expiry in years.
 pub fn bachelier_delta_put(forward: f64, strike: f64, sigma_n: f64, t: f64) -> f64 {
-    bachelier_delta_call(forward, strike, sigma_n, t) - 1.0
+    if !valid_bachelier_inputs(forward, strike, sigma_n, t) {
+        return f64::NAN;
+    }
+    match bachelier_state(forward, strike, sigma_n, t) {
+        Some(state) => -norm_cdf(-state.d),
+        None => bachelier_delta_call(forward, strike, sigma_n, t) - 1.0,
+    }
 }
 
 /// Bachelier gamma with respect to the forward.
@@ -164,7 +189,7 @@ pub fn bachelier_delta_put(forward: f64, strike: f64, sigma_n: f64, t: f64) -> f
 /// # Returns
 ///
 /// Returns `n(d) / (sigma_n sqrt(T))` in the valid normal-model domain and
-/// `0.0` for degenerate expiry or volatility.
+/// `0.0` at zero expiry or volatility. Invalid inputs return `NaN`.
 ///
 /// # Arguments
 ///
@@ -175,6 +200,9 @@ pub fn bachelier_delta_put(forward: f64, strike: f64, sigma_n: f64, t: f64) -> f
 ///   lognormal percentage volatility.
 /// * `t` - Time to expiry in years.
 pub fn bachelier_gamma(forward: f64, strike: f64, sigma_n: f64, t: f64) -> f64 {
+    if !valid_bachelier_inputs(forward, strike, sigma_n, t) {
+        return f64::NAN;
+    }
     match bachelier_state(forward, strike, sigma_n, t) {
         Some(state) => norm_pdf(state.d) / state.st,
         None => 0.0,

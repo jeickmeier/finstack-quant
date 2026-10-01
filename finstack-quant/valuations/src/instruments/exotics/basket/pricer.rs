@@ -427,7 +427,6 @@ mod tests {
             scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
             pricing_config: BasketPricingConfig::default(),
-            boxed_constituents: Default::default(),
         }
     }
 

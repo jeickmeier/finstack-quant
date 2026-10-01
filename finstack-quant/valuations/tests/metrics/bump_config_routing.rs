@@ -580,7 +580,8 @@ fn quanto_defaults_are_bit_identical() {
     assert_pins(&[
         ("delta", m(MetricId::Delta), 0x402d387eb9b2e2f9),
         ("gamma", m(MetricId::Gamma), 0x3f5998b5a0d6ce52),
-        ("vega", m(MetricId::Vega), 0x41181e8d0fc216ea),
+        // Currency per volatility percentage point (0.01), rather than per decimal sigma.
+        ("vega", m(MetricId::Vega), 0x40aedf6ce0f86f40),
         ("rho", m(MetricId::Rho), 0xc01e1b66ed300000),
         ("foreign_rho", m(MetricId::ForeignRho), 0x4049b76ea7a3c800),
         ("fx_delta", m(MetricId::FxDelta), 0x0000000000000000),

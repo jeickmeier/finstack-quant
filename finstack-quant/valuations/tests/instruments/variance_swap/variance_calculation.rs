@@ -11,6 +11,74 @@ use finstack_quant_valuations::instruments::equity::variance_swap::{PayReceive, 
 use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::Instrument;
 
+#[test]
+fn first_ohlc_bar_contributes_to_realized_and_seasoned_variance() {
+    use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+
+    let as_of = date(2025, 1, 6);
+    let mut swap = VarianceSwap::example().unwrap();
+    swap.start_date = as_of;
+    swap.maturity = date(2025, 1, 13);
+    swap.open_series_id = Some("O".into());
+    swap.high_series_id = Some("H".into());
+    swap.low_series_id = Some("L".into());
+    swap.close_series_id = Some("C".into());
+    swap.instrument_pricing_overrides = swap
+        .instrument_pricing_overrides
+        .with_implied_volatility(0.2);
+
+    let curve = finstack_quant_core::market_data::term_structures::DiscountCurve::builder(
+        swap.discount_curve_id.clone(),
+    )
+    .base_date(as_of)
+    .knots([(0.0, 1.0), (1.0, (-0.05_f64).exp())])
+    .build()
+    .unwrap();
+    let df = curve
+        .df_between_dates(as_of, swap.effective_settlement_date().unwrap())
+        .unwrap();
+    let mut market = MarketContext::new().insert(curve);
+    for (id, value) in [("O", 100.0), ("H", 101.0), ("L", 99.0), ("C", 100.0)] {
+        market =
+            market.insert_series(ScalarTimeSeries::new(id, vec![(as_of, value)], None).unwrap());
+    }
+    let high_log = 1.01_f64.ln();
+    let low_log = 0.99_f64.ln();
+    let range_log = (101.0_f64 / 99.0).ln();
+    for (method, bar_variance) in [
+        (
+            RealizedVarMethod::Parkinson,
+            range_log.powi(2) / (4.0 * 2.0_f64.ln()),
+        ),
+        (RealizedVarMethod::GarmanKlass, 0.5 * range_log.powi(2)),
+        (
+            RealizedVarMethod::RogersSatchell,
+            high_log.powi(2) + low_log.powi(2),
+        ),
+    ] {
+        swap.realized_var_method = method;
+        let expected_realized = swap.annualization_factor() * bar_variance;
+        let realized = swap.partial_realized_variance(&market, as_of).unwrap();
+        assert!((realized - expected_realized).abs() < 1e-12);
+        let weight = swap.realized_fraction_by_observations(as_of).unwrap();
+        assert!((weight - 1.0 / 6.0).abs() < 1e-12);
+        let expected = weight * expected_realized + (1.0 - weight) * 0.04;
+        let actual = swap.seasoned_expected_variance(&market, as_of).unwrap();
+        assert!((actual - expected).abs() < 1e-12);
+        let expected_pv = swap.notional.amount() * (expected - swap.strike_variance) * df;
+        let pv = swap.value(&market, as_of).unwrap().amount();
+        assert!((pv - expected_pv).abs() < 1e-8);
+        assert_eq!(
+            swap.partial_realized_variance(&MarketContext::new(), as_of - time::Duration::days(1))
+                .unwrap(),
+            0.0
+        );
+        assert!(swap
+            .partial_realized_variance(&MarketContext::new(), as_of)
+            .is_err());
+    }
+}
+
 // Historical Prices Tests
 
 #[test]

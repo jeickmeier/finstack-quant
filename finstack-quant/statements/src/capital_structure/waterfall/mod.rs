@@ -33,11 +33,11 @@
 //!   Sweep = max(0, ECF × sweep_percentage)
 //!   ```
 //!
-//! The `cash_interest_node` is optional. Per S&P LCD / standard LPA definitions,
-//! ECF should include a cash interest deduction. Set it to include this deduction.
-//! Fees and scheduled amortization paid ahead of the sweep are likewise
-//! deducted so the sweep cannot double-spend cash already consumed by payment
-//! categories that rank ahead of debt prepayment.
+//! The optional `cash_interest_node` overrides the cash-interest deduction.
+//! Otherwise, ECF deducts actual cash interest, fees and scheduled amortization
+//! paid by priorities ahead of Sweep, including arrears. PIK coupons and unpaid
+//! claims are not cash deductions. Later priorities reserve neither cash nor
+//! principal capacity from an earlier prepayment rung.
 //!
 //! The sweep is floored at zero (cannot sweep negative cash flow) and then
 //! applied as additional principal prepayment to the target instrument.
@@ -72,10 +72,12 @@ use finstack_quant_core::money::Money;
 use indexmap::IndexMap;
 use std::collections::HashSet;
 
-use cash_distribution::{allocate_by_class, apply_cash_cap_to_category, StagedInstrumentFlow};
-use excess_cash_flow::calculate_ecf_sweep;
+use cash_distribution::{
+    allocate_by_class, apply_cash_cap_to_category, apply_prepayment, StagedInstrumentFlow,
+};
+use excess_cash_flow::{calculate_ecf_sweep, EcfDeductions};
 use payment_in_kind::{apply_pik_transitions, evaluate_pik_toggle, is_pik_enabled};
-use payment_stack::{extra_principal_priority, priority_index, waterfall_currency};
+use payment_stack::waterfall_currency;
 use period_close::update_cumulative_metrics;
 
 /// Money comparison tolerance for waterfall allocation, in currency units.
@@ -196,33 +198,20 @@ fn class_rank_for(spec: &WaterfallSpec, instrument_id: &str) -> Result<u32> {
     }
 }
 
-/// Size a named mandatory/voluntary prepay bucket from a node or formula.
-fn size_named_prepay(
+/// Apply a named mandatory/voluntary prepayment at its priority rung.
+fn apply_named_prepay(
     context: &EvaluationContext,
     node: Option<&str>,
     staged: &mut [StagedInstrumentFlow],
-    currency: finstack_quant_core::currency::Currency,
-    mut field: impl FnMut(&mut StagedInstrumentFlow) -> &mut Money,
+    remaining_cash: &mut Money,
     warnings: &mut Vec<EvalWarning>,
 ) -> Result<()> {
     let Some(expr) = node.filter(|n| !n.trim().is_empty()) else {
         return Ok(());
     };
     let amount = eval_value_or_formula(context, expr, warnings)?.max(0.0);
-    let mut remaining = money_from_expr(amount, currency, expr)?;
-    let allocations = allocate_by_class(staged, &mut remaining, |s| {
-        let already = s.sweep_principal.amount()
-            + s.mandatory_principal.amount()
-            + s.voluntary_principal.amount();
-        (s.opening_balance.amount() + s.net_new_funding.amount()
-            - s.scheduled_principal.amount()
-            - already)
-            .max(0.0)
-    })?;
-    for (s, allocated) in staged.iter_mut().zip(allocations) {
-        *field(s) = Money::new(allocated, currency)?;
-    }
-    Ok(())
+    let requested = money_from_expr(amount, remaining_cash.currency(), expr)?;
+    apply_prepayment(staged, remaining_cash, requested, None)
 }
 
 /// Execute waterfall logic for a single period.
@@ -230,8 +219,8 @@ fn size_named_prepay(
 /// This function:
 /// 1. Checks PIK toggle conditions and updates interest mode
 /// 2. Calculates contractual flows (interest, amortization)
-/// 3. Calculates ECF and applies sweep if configured
-/// 4. Allocates available cash according to priority stack
+/// 3. Allocates available cash according to the priority stack
+/// 4. Sizes ECF at its sweep rung using debt service already paid
 ///
 /// # Arguments
 ///
@@ -334,18 +323,6 @@ pub fn execute_waterfall(
     let mut warnings: Vec<EvalWarning> = Vec::new();
     let cash_currency = waterfall_currency(contractual_flows)?;
 
-    // --- resolve priority positions ---
-    let fees_priority = priority_index(&waterfall_spec.priority_of_payments, PaymentPriority::Fees);
-    let amortization_priority = priority_index(
-        &waterfall_spec.priority_of_payments,
-        PaymentPriority::Amortization,
-    );
-    let extra_principal_priority = extra_principal_priority(&waterfall_spec.priority_of_payments);
-    let equity_priority = priority_index(
-        &waterfall_spec.priority_of_payments,
-        PaymentPriority::Equity,
-    );
-
     // --- Step 1: PIK toggle ---
     //
     // Evaluate PIK mode BEFORE ECF so that ECF cash-interest deduction
@@ -381,29 +358,7 @@ pub fn execute_waterfall(
         );
     }
 
-    // --- Step 2: ECF / sweep ---
-    //
-    // ECF is PIK-aware: when `cash_interest_node` is omitted, the fallback
-    // deducts contractual cash interest only for instruments NOT in PIK mode
-    // this period.
-    let sweep_amount = if let Some(ecf_spec) = &waterfall_spec.ecf_sweep {
-        // Scheduled amortization that ranks ahead of the prepayment priority
-        // consumes cash before the sweep, so it is deducted from ECF (per
-        // standard LPA ECF definitions) to avoid double-spending that cash.
-        let deduct_scheduled_principal = amortization_priority < extra_principal_priority;
-        let deduct_fees = fees_priority < extra_principal_priority;
-        calculate_ecf_sweep(
-            context,
-            ecf_spec,
-            contractual_flows,
-            state,
-            deduct_scheduled_principal,
-            deduct_fees,
-            &mut warnings,
-        )?
-    } else {
-        Money::from((0_i64, cash_currency))
-    };
+    // --- Step 2: Available cash ---
     let available_cash = {
         let available_cash_node = &waterfall_spec.available_cash_node;
         let cash = eval_value_or_formula(context, available_cash_node, &mut warnings)?;
@@ -432,21 +387,12 @@ pub fn execute_waterfall(
 
     // --- Step 3: Build staged per-instrument state ---
     //
-    // Execution order per standard loan documentation:
-    //   1. Determine sweep amount (already computed above)
-    //   2. Apply sweep as additional principal prepayment
-    //   3. Update balance after sweep + scheduled amortization
-    //   4. Capitalize PIK interest into the closing balance when appropriate
+    // Claims are collected before allocation. Principal capacity is consumed
+    // only when its payment priority executes, never reserved for a later rung.
     let mut staged: Vec<StagedInstrumentFlow> = Vec::with_capacity(contractual_flows.len());
     for (instrument_id, breakdown) in contractual_flows {
         let currency = breakdown.interest_expense_cash.currency();
-        let opening_balance = state.get_opening_balance(instrument_id, currency);
-        let net_new_funding = state.get_period_new_funding(instrument_id, currency);
-        // The balance available to repay principal this period is the opening
-        // balance plus any in-period draws (a revolver can repay against cash it
-        // just drew). Used to cap principal so the available-cash pool is never
-        // over-deducted (see Step 5/6).
-        let payable_balance = (opening_balance.amount() + net_new_funding.amount()).max(0.0);
+        let principal = state.stage_principal(instrument_id, breakdown)?;
 
         let mut staged_breakdown = breakdown.clone();
         // Carry forward any unpaid interest/fee shortfall from the prior
@@ -471,21 +417,6 @@ pub fn execute_waterfall(
                     .checked_add(shortfall)?;
             }
         }
-        if let Some(shortfall) = state
-            .principal_shortfall
-            .shift_remove(instrument_id.as_str())
-        {
-            if shortfall.amount() > 0.0 {
-                if shortfall.currency() != currency {
-                    return Err(crate::error::Error::currency_mismatch(
-                        currency,
-                        shortfall.currency(),
-                    ));
-                }
-                staged_breakdown.principal_payment =
-                    staged_breakdown.principal_payment.checked_add(shortfall)?;
-            }
-        }
         if let Some(shortfall) = state.fee_shortfall.shift_remove(instrument_id.as_str()) {
             if shortfall.amount() > 0.0 {
                 if shortfall.currency() != currency {
@@ -497,91 +428,20 @@ pub fn execute_waterfall(
                 staged_breakdown.fees = staged_breakdown.fees.checked_add(shortfall)?;
             }
         }
-        // Clamp scheduled principal to the payable balance so Step 5 never
-        // deducts more cash than can actually be applied (over-amortization or
-        // carried principal shortfalls can push the claim above the balance;
-        // paying more principal than is owed would destroy cash that should
-        // have flowed to equity).
-        let scheduled_principal = Money::new(
-            staged_breakdown
-                .principal_payment
-                .amount()
-                .clamp(0.0, payable_balance),
-            currency,
-        )?;
-        staged_breakdown.principal_payment = scheduled_principal;
+        let scheduled_principal = principal.get_scheduled_capacity()?;
+        staged_breakdown.principal_payment = Money::from((0_i64, currency));
         let class_rank = class_rank_for(waterfall_spec, instrument_id)?;
         staged.push(StagedInstrumentFlow {
             instrument_id: instrument_id.clone(),
             breakdown: staged_breakdown,
-            opening_balance,
-            net_new_funding,
-            sweep_principal: Money::from((0_i64, currency)),
-            mandatory_principal: Money::from((0_i64, currency)),
-            voluntary_principal: Money::from((0_i64, currency)),
+            principal,
             class_rank,
             scheduled_principal,
             toggled_pik_moved: Money::from((0_i64, currency)),
         });
     }
 
-    // --- Step 4: Size extra-principal buckets ---
-    //
-    // Note: no separate fee, interest-priority, or amortization deduction from
-    // the ECF sweep here. When an ECF sweep is configured, `calculate_ecf_sweep`
-    // already deducts cash interest plus any fees and scheduled principal that
-    // rank ahead of the Sweep rung. When no ECF sweep is configured,
-    // `sweep_amount` is zero.
-    let mut remaining_sweep = if equity_priority < extra_principal_priority {
-        Money::from((0_i64, sweep_amount.currency()))
-    } else {
-        sweep_amount
-    };
-    let target_instrument_id = waterfall_spec
-        .ecf_sweep
-        .as_ref()
-        .and_then(|spec| spec.target_instrument_id.as_deref());
-    let sweep_allocations = allocate_by_class(&staged, &mut remaining_sweep, |s| {
-        if extra_principal_priority == usize::MAX {
-            return 0.0;
-        }
-        if let Some(target_id) = target_instrument_id {
-            if target_id != s.instrument_id {
-                return 0.0;
-            }
-        }
-        (s.opening_balance.amount() - s.scheduled_principal.amount()).max(0.0)
-    })?;
-    for (s, allocated) in staged.iter_mut().zip(sweep_allocations) {
-        let currency = s.breakdown.interest_expense_cash.currency();
-        s.sweep_principal = Money::new(allocated, currency)?;
-    }
-
-    size_named_prepay(
-        context,
-        waterfall_spec.mandatory_prepay_node.as_deref(),
-        &mut staged,
-        cash_currency,
-        |s| &mut s.mandatory_principal,
-        &mut warnings,
-    )?;
-    size_named_prepay(
-        context,
-        waterfall_spec.voluntary_prepay_node.as_deref(),
-        &mut staged,
-        cash_currency,
-        |s| &mut s.voluntary_principal,
-        &mut warnings,
-    )?;
-    for s in &mut staged {
-        s.breakdown.principal_payment = s
-            .scheduled_principal
-            .checked_add(s.sweep_principal)?
-            .checked_add(s.mandatory_principal)?
-            .checked_add(s.voluntary_principal)?;
-    }
-
-    // --- Step 4b: Apply PIK mode (pre-cap) ---
+    // --- Step 4: Apply PIK mode (pre-cap) ---
     // When the PIK toggle is active, the full contractual coupon is moved
     // into the PIK bucket unconditionally BEFORE the available-cash caps in
     // Step 5. PIK'd coupons must never consume cash, and the full contractual
@@ -600,10 +460,11 @@ pub fn execute_waterfall(
 
     // --- Step 5: Available cash caps ---
     //
-    // Mandatory / Sweep / Voluntary each have their own principal bucket,
-    // sized in Step 4 and capped independently here so later rungs are not
-    // silent no-ops.
-    let mut shortfalls: IndexMap<String, Money> = IndexMap::new();
+    // Each principal rung sees the balance and cash left by earlier rungs.
+    // Separate maps keep caller-supplied instrument ids from colliding with
+    // synthetic category prefixes such as `fees::` or `principal::`.
+    let mut interest_shortfalls: IndexMap<String, Money> = IndexMap::new();
+    let mut fee_shortfalls: IndexMap<String, Money> = IndexMap::new();
     let equity_distribution: Option<Money>;
     {
         let mut remaining_cash = available_cash;
@@ -617,10 +478,7 @@ pub fn execute_waterfall(
             .iter()
             .map(|s| s.breakdown.fees.amount().max(0.0))
             .collect();
-        let planned_scheduled_principal: Vec<f64> = staged
-            .iter()
-            .map(|s| s.scheduled_principal.amount().max(0.0))
-            .collect();
+        let mut paid = EcfDeductions::default();
         for priority in &waterfall_spec.priority_of_payments {
             match priority {
                 PaymentPriority::Fees => {
@@ -632,6 +490,7 @@ pub fn execute_waterfall(
                         &mut warnings,
                         |s| &mut s.breakdown.fees,
                     )?;
+                    paid.fees = staged.iter().map(|s| s.breakdown.fees.amount()).sum();
                 }
                 PaymentPriority::Interest => {
                     apply_cash_cap_to_category(
@@ -642,41 +501,67 @@ pub fn execute_waterfall(
                         &mut warnings,
                         |s| &mut s.breakdown.interest_expense_cash,
                     )?;
+                    paid.cash_interest = staged
+                        .iter()
+                        .map(|s| s.breakdown.interest_expense_cash.amount())
+                        .sum();
                 }
                 PaymentPriority::Amortization => {
+                    // Earlier prepayments extinguish the same principal as
+                    // this scheduled claim. Only a remaining, unpaid claim
+                    // may become arrears.
+                    for s in &mut staged {
+                        s.scheduled_principal = s.principal.get_scheduled_capacity()?;
+                    }
                     let allocations = allocate_by_class(&staged, &mut remaining_cash, |s| {
                         s.scheduled_principal.amount().max(0.0)
                     })?;
                     for (s, allocated) in staged.iter_mut().zip(allocations) {
                         s.scheduled_principal =
                             Money::new(allocated, s.scheduled_principal.currency())?;
+                        s.principal.pay_scheduled(s.scheduled_principal)?;
+                        s.breakdown.principal_payment = s
+                            .breakdown
+                            .principal_payment
+                            .checked_add(s.scheduled_principal)?;
                     }
+                    paid.scheduled_principal =
+                        staged.iter().map(|s| s.scheduled_principal.amount()).sum();
                 }
                 PaymentPriority::MandatoryPrepayment => {
-                    let allocations = allocate_by_class(&staged, &mut remaining_cash, |s| {
-                        s.mandatory_principal.amount().max(0.0)
-                    })?;
-                    for (s, allocated) in staged.iter_mut().zip(allocations) {
-                        s.mandatory_principal =
-                            Money::new(allocated, s.mandatory_principal.currency())?;
-                    }
+                    apply_named_prepay(
+                        context,
+                        waterfall_spec.mandatory_prepay_node.as_deref(),
+                        &mut staged,
+                        &mut remaining_cash,
+                        &mut warnings,
+                    )?;
                 }
                 PaymentPriority::Sweep => {
-                    let allocations = allocate_by_class(&staged, &mut remaining_cash, |s| {
-                        s.sweep_principal.amount().max(0.0)
-                    })?;
-                    for (s, allocated) in staged.iter_mut().zip(allocations) {
-                        s.sweep_principal = Money::new(allocated, s.sweep_principal.currency())?;
+                    if let Some(spec) = &waterfall_spec.ecf_sweep {
+                        let sweep = calculate_ecf_sweep(
+                            context,
+                            spec,
+                            &paid,
+                            cash_currency,
+                            &mut warnings,
+                        )?;
+                        apply_prepayment(
+                            &mut staged,
+                            &mut remaining_cash,
+                            sweep,
+                            spec.target_instrument_id.as_deref(),
+                        )?;
                     }
                 }
                 PaymentPriority::VoluntaryPrepayment => {
-                    let allocations = allocate_by_class(&staged, &mut remaining_cash, |s| {
-                        s.voluntary_principal.amount().max(0.0)
-                    })?;
-                    for (s, allocated) in staged.iter_mut().zip(allocations) {
-                        s.voluntary_principal =
-                            Money::new(allocated, s.voluntary_principal.currency())?;
-                    }
+                    apply_named_prepay(
+                        context,
+                        waterfall_spec.voluntary_prepay_node.as_deref(),
+                        &mut staged,
+                        &mut remaining_cash,
+                        &mut warnings,
+                    )?;
                 }
                 PaymentPriority::Equity => {}
             }
@@ -692,7 +577,7 @@ pub fn execute_waterfall(
                 planned_interest[idx] - s.breakdown.interest_expense_cash.amount().max(0.0);
             if unpaid_interest > MONEY_TOLERANCE {
                 let currency = s.breakdown.interest_expense_cash.currency();
-                shortfalls.insert(
+                interest_shortfalls.insert(
                     s.instrument_id.clone(),
                     Money::new(unpaid_interest, currency)?,
                 );
@@ -715,10 +600,7 @@ pub fn execute_waterfall(
             let unpaid_fees = planned_fees[idx] - s.breakdown.fees.amount().max(0.0);
             if unpaid_fees > MONEY_TOLERANCE {
                 let currency = s.breakdown.fees.currency();
-                shortfalls.insert(
-                    format!("fees::{}", s.instrument_id),
-                    Money::new(unpaid_fees, currency)?,
-                );
+                fee_shortfalls.insert(s.instrument_id.clone(), Money::new(unpaid_fees, currency)?);
                 warnings.push(EvalWarning::CapitalStructure {
                     period: *_period_id,
                     warning: CapitalStructureWarning::FeeShortfall {
@@ -735,14 +617,8 @@ pub fn execute_waterfall(
                 );
             }
 
-            let unpaid_principal =
-                planned_scheduled_principal[idx] - s.scheduled_principal.amount().max(0.0);
+            let unpaid_principal = s.principal.get_scheduled_capacity()?.amount();
             if unpaid_principal > MONEY_TOLERANCE {
-                let currency = s.scheduled_principal.currency();
-                shortfalls.insert(
-                    format!("principal::{}", s.instrument_id),
-                    Money::new(unpaid_principal, currency)?,
-                );
                 warnings.push(EvalWarning::CapitalStructure {
                     period: *_period_id,
                     warning: CapitalStructureWarning::PrincipalShortfall {
@@ -767,69 +643,39 @@ pub fn execute_waterfall(
     // --- Step 6: Period close ---
     //
     // For each instrument:
-    // (a) principal_payment = scheduled + mandatory + sweep + voluntary,
-    // capped at the payable balance (opening + in-period draws). If the
-    // cap truncates the sum, reduce extra principal first (discretionary
-    // prepays are netted before scheduled amortization) so downstream
-    // accounting stays consistent.
-    // (b) post_sweep_balance = opening + draws - principal_payment (with a
-    // small dust floor to avoid micro-residuals). The draw term keeps a
-    // revolver's in-period funding from being wiped at close.
+    // (a) principal_payment is the sum actually allocated by the payment
+    // priorities, each bounded by the principal remaining at that rung.
+    // (b) Dated principal accounting keeps economic balance changes separate
+    // from settlement cash, including unpaid and early-settled installments.
     // (c) PIK capitalization bookkeeping: the coupon was already moved into
-    // the PIK bucket in Step 4b when the toggle is active. The moved
+    // the PIK bucket in Step 4 when the toggle is active. The moved
     // amount is accumulated into `state.cumulative_toggled_pik` so the
     // period-flow scale clamp can exclude toggle-driven compounding.
-    // PIK interest accrues on the pre-waterfall opening balance and
-    // capitalizes at period close even when the principal was fully
-    // paid down during the period: the coupon still economically
-    // exists and gets rolled into the closing balance.
-    // (d) closing_balance = post_sweep_balance + PIK capitalized.
-    // (e) accrued_interest: cleared to zero when PIK capitalization
-    // absorbed the contractual coupon into principal, or when the
-    // debt was paid off and no further contractual accrual applies.
-    // Otherwise the field retains the contractual pre-waterfall
-    // accrual. Any cash shortfall from Step 5 is then added on top
-    // and carried into the next period's interest claim.
+    // Toggle PIK capitalizes at period close even when principal was fully
+    // paid down during the period; contractual PIK is already dated principal.
+    // (d) closing_balance = post_sweep_balance + toggle PIK.
+    // (e) accrued_interest retains interest earned but not yet due. Paying
+    // principal or toggling a coupon does not extinguish that separate claim.
+    // Any cash shortfall from Step 5 is added and carried into the next period.
     for s in staged {
         let StagedInstrumentFlow {
             instrument_id,
             mut breakdown,
-            opening_balance,
-            net_new_funding,
-            sweep_principal,
-            mandatory_principal,
-            voluntary_principal,
+            principal,
             class_rank: _,
-            scheduled_principal,
+            scheduled_principal: _,
             toggled_pik_moved,
         } = s;
         let currency = breakdown.interest_expense_cash.currency();
 
-        // (a) Principal cap. The payable balance is the opening balance plus
-        // any in-period draws (a revolver can repay against cash it just drew).
-        // Extra principal (mandatory + sweep + voluntary) is netted against
-        // any overshoot before scheduled amortization is reduced, so the
-        // aggregate `principal_payment` is never > payable_balance.
-        let payable_balance = (opening_balance.amount() + net_new_funding.amount()).max(0.0);
-        let extra_principal = mandatory_principal
-            .checked_add(sweep_principal)?
-            .checked_add(voluntary_principal)?;
-        let desired = scheduled_principal.checked_add(extra_principal)?;
-        let principal_payment = if desired.amount() > payable_balance {
-            Money::new(payable_balance, currency)?
-        } else {
-            desired
-        };
-        breakdown.principal_payment = principal_payment;
-
-        // (b) Post-payment balance = opening + draws - principal. Including the
-        // draw term is what preserves in-period funding: recomputing closing as
-        // `opening - principal` would silently wipe a revolver's new draws.
-        let post_pay_amount =
-            opening_balance.amount() + net_new_funding.amount() - principal_payment.amount();
+        // Each cash payment was capped by its dated principal account before
+        // consuming cash. Settle that account without deducting cash whose
+        // principal movement already occurred in a prior reporting period.
+        let (principal_closing, principal_shortfalls, principal_advances) = principal.finish()?;
+        let post_pay_amount = principal_closing.amount();
         // A materially negative balance means principal exceeded the payable
         // balance — an upstream accounting bug the dust floor must not mask.
-        // The cap in (a) makes this unreachable today; keep it as a loud
+        // The per-rung caps make this unreachable; keep it as a loud
         // invariant guard rather than letting the floor absorb it.
         if post_pay_amount < -0.005 {
             return Err(crate::error::Error::capital_structure(format!(
@@ -845,13 +691,10 @@ pub fn execute_waterfall(
         } else {
             Money::new(post_pay_amount, currency)?
         };
-        let fully_paid = post_sweep_balance.amount() == 0.0;
-
         // (c) PIK bookkeeping at close. The coupon was already moved into the
-        // PIK bucket in Step 4b whenever the toggle is active; here the moved
+        // PIK bucket in Step 4 whenever the toggle is active; here the moved
         // amount is accumulated into state so the period-flow scale clamp can
         // exclude toggle-driven compounding from its basis.
-        let pik_capitalized_this_step = is_pik_enabled(state, &instrument_id);
         if toggled_pik_moved.amount() != 0.0 {
             let current = state
                 .cumulative_toggled_pik
@@ -864,36 +707,33 @@ pub fn execute_waterfall(
             );
         }
 
-        // (d) Closing balance. PIK capitalizes into the post-sweep balance.
-        let closing_balance = post_sweep_balance.checked_add(breakdown.interest_expense_pik)?;
+        // (d) Contractual PIK is already in payable principal. Only the
+        // coupon moved by the toggle still capitalizes at period close.
+        let closing_balance = post_sweep_balance.checked_add(toggled_pik_moved)?;
         state.set_closing_balance(instrument_id.to_string(), closing_balance);
         breakdown.debt_balance = closing_balance;
 
-        // (e) Accrued interest bookkeeping after waterfall mutation.
-        // The pre-waterfall `accrued_interest` was the contractual schedule's
-        // accrual. It is cleared when the coupon was moved into PIK (the
-        // accrual has been capitalized into principal) or when the debt was
-        // fully paid off and there is no remaining balance to accrue on.
-        if fully_paid || pik_capitalized_this_step {
-            breakdown.accrued_interest = Money::from((0_i64, currency));
-        }
-
         // Unpaid interest from the available-cash cap accrues and is carried as
         // a claim in the next period's interest category.
-        if let Some(shortfall) = shortfalls.get(instrument_id.as_str()) {
+        if let Some(shortfall) = interest_shortfalls.get(instrument_id.as_str()) {
             breakdown.accrued_interest = breakdown.accrued_interest.checked_add(*shortfall)?;
             state
                 .interest_shortfall
                 .insert(instrument_id.clone(), *shortfall);
         }
-        if let Some(shortfall) = shortfalls.get(format!("principal::{instrument_id}").as_str()) {
+        if !principal_shortfalls.is_empty() {
             state
                 .principal_shortfall
-                .insert(instrument_id.clone(), *shortfall);
+                .insert(instrument_id.clone(), principal_shortfalls);
+        }
+        if !principal_advances.is_empty() {
+            state
+                .principal_advance_payments
+                .insert(instrument_id.clone(), principal_advances);
         }
         // Unpaid fees are carried in their own bucket so they re-enter the fee
         // category next period rather than being demoted into interest.
-        if let Some(shortfall) = shortfalls.get(format!("fees::{instrument_id}").as_str()) {
+        if let Some(shortfall) = fee_shortfalls.get(instrument_id.as_str()) {
             state
                 .fee_shortfall
                 .insert(instrument_id.clone(), *shortfall);
@@ -2404,7 +2244,9 @@ mod tests {
                 .principal_shortfall
                 .get("TL-1")
                 .expect("principal shortfall recorded")
-                .amount(),
+                .iter()
+                .map(|claim| claim.amount.amount())
+                .sum::<f64>(),
             40.0
         );
         assert!(

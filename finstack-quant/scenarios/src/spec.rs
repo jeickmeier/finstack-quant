@@ -671,7 +671,8 @@ pub enum OperationSpec {
     StmtForecastAssign {
         /// Statement node identifier.
         node_id: NodeId,
-        /// Absolute value to assign.
+        /// Finite absolute value in the node's units; monetary nodes retain
+        /// their currency and interpret this as major currency units.
         value: f64,
     },
 
@@ -1086,7 +1087,8 @@ pub enum TimeRollMode {
 /// The extracted rate is written into the statement model as a decimal scalar
 /// (for example `0.0525` for 5.25%). `compounding` controls the output quote
 /// convention, while `day_count` optionally overrides the curve's native day
-/// count when converting `tenor` into a year fraction.
+/// count when converting `tenor` into a year fraction. Monetary target nodes
+/// are rejected during application because a rate is dimensionless.
 ///
 /// Persisted `day_count` override values are the canonical snake_case
 /// [`DayCount`] labels: `act_360`, `act_365f`, `act_365l`, `nl_365`, `30_360`,

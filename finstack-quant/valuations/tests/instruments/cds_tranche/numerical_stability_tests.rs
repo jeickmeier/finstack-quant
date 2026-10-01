@@ -34,7 +34,10 @@ fn flat_correlation_market(level: f64) -> finstack_quant_core::market_data::cont
         .base_correlation_curve(std::sync::Arc::new(corr_curve))
         .build()
         .unwrap();
-    standard_market_context().insert_credit_index("CDX.NA.IG.42", index)
+    standard_market_context()
+        .insert(std::sync::Arc::clone(&index.base_correlation_curve))
+        .insert_credit_index("CDX.NA.IG.42", index)
+        .expect("flat-correlation credit index dependencies should exist")
 }
 
 /// Undiscounted maturity EL (currency) of a tranche at a flat correlation.
@@ -176,7 +179,10 @@ fn test_extreme_low_correlation_pricing() {
         .build()
         .unwrap();
 
-    let market = base_market.insert_credit_index("CDX.NA.IG.42", test_index);
+    let market = base_market
+        .insert(std::sync::Arc::clone(&test_index.base_correlation_curve))
+        .insert_credit_index("CDX.NA.IG.42", test_index)
+        .expect("low-correlation credit index dependencies should exist");
 
     let tranche = mezzanine_tranche();
     let as_of = base_date();
@@ -214,7 +220,10 @@ fn test_extreme_high_correlation_pricing() {
         .build()
         .unwrap();
 
-    let market = base_market.insert_credit_index("CDX.NA.IG.42", test_index);
+    let market = base_market
+        .insert(std::sync::Arc::clone(&test_index.base_correlation_curve))
+        .insert_credit_index("CDX.NA.IG.42", test_index)
+        .expect("high-correlation credit index dependencies should exist");
 
     let tranche = mezzanine_tranche();
     let as_of = base_date();
@@ -247,7 +256,9 @@ fn test_pricing_with_zero_recovery_rate() {
             .build()
             .unwrap();
 
-    let market = base_market.insert_credit_index("CDX.NA.IG.42", zero_recovery_index);
+    let market = base_market
+        .insert_credit_index("CDX.NA.IG.42", zero_recovery_index)
+        .expect("zero-recovery credit index dependencies should exist");
 
     let tranche = mezzanine_tranche();
     let as_of = base_date();
@@ -281,7 +292,9 @@ fn test_pricing_with_high_recovery_rate() {
             .build()
             .unwrap();
 
-    let market = base_market.insert_credit_index("CDX.NA.IG.42", high_recovery_index);
+    let market = base_market
+        .insert_credit_index("CDX.NA.IG.42", high_recovery_index)
+        .expect("high-recovery credit index dependencies should exist");
 
     let tranche = mezzanine_tranche();
     let as_of = base_date();
@@ -325,7 +338,10 @@ fn test_pricing_with_near_zero_default_probability() {
             .build()
             .unwrap();
 
-    let market = base_market.insert_credit_index("CDX.NA.IG.42", low_hazard_index);
+    let market = base_market
+        .insert(std::sync::Arc::clone(&low_hazard_index.index_credit_curve))
+        .insert_credit_index("CDX.NA.IG.42", low_hazard_index)
+        .expect("low-hazard credit index dependencies should exist");
 
     let tranche = mezzanine_tranche();
     let as_of = base_date();
@@ -363,7 +379,9 @@ fn test_very_small_portfolio() {
         .build()
         .unwrap();
 
-    let market = base_market.insert_credit_index("CDX.NA.IG.42", small_index);
+    let market = base_market
+        .insert_credit_index("CDX.NA.IG.42", small_index)
+        .expect("small credit index dependencies should exist");
 
     let tranche = mezzanine_tranche();
     let as_of = base_date();
@@ -393,7 +411,9 @@ fn test_very_large_portfolio() {
         .build()
         .unwrap();
 
-    let market = base_market.insert_credit_index("CDX.NA.IG.42", large_index);
+    let market = base_market
+        .insert_credit_index("CDX.NA.IG.42", large_index)
+        .expect("large credit index dependencies should exist");
 
     let tranche = mezzanine_tranche();
     let as_of = base_date();

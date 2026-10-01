@@ -374,7 +374,7 @@ impl Default for RatesCreditConfig {
 #[derive(Debug, Clone)]
 pub struct RatesCreditTree {
     /// Rates-credit tree configuration
-    pub config: RatesCreditConfig,
+    config: RatesCreditConfig,
     /// Calibrated short-rate affine rows. Populated by `calibrate()`.
     calibrated_rates: Vec<FactorRow>,
     /// Calibrated hazard-rate affine rows. Populated by `calibrate()`.
@@ -685,6 +685,27 @@ impl RatesCreditTree {
             hazard_variance_retention: VarianceRetention::default(),
             calibration_times: Vec::new(),
         }
+    }
+
+    /// Return the immutable configuration used to construct and calibrate the tree.
+    ///
+    /// Construct and calibrate a new tree to change model parameters. Keeping
+    /// this configuration fixed ensures pricing and sampling use the same
+    /// transition law that fitted the discount and survival curves.
+    ///
+    /// ```compile_fail
+    /// use finstack_quant_models::trees::{RatesCreditConfig, RatesCreditTree};
+    /// let mut tree = RatesCreditTree::new(RatesCreditConfig::default());
+    /// tree.config.rate_mean_reversion = 0.15;
+    /// ```
+    ///
+    /// ```compile_fail
+    /// use finstack_quant_models::trees::{RatesCreditConfig, RatesCreditTree};
+    /// let tree = RatesCreditTree::new(RatesCreditConfig::default());
+    /// tree.get_config().correlation = 1.0;
+    /// ```
+    pub fn get_config(&self) -> &RatesCreditConfig {
+        &self.config
     }
 
     /// Hazard floor-saturation diagnostic from the most recent `calibrate()`.

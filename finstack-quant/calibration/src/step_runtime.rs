@@ -1,12 +1,16 @@
 //! Shared runtime types and solver contracts for market calibration.
 //!
-use crate::api::schema::{CalibrationStep, HullWhiteVolatilityMode, StepParams};
+use crate::api::schema::{
+    CalibrationStep, CapFloorHullWhiteStepParams, HullWhiteVolatilityMode, StepParams,
+};
 use crate::config::CalibrationConfig;
 use crate::hull_white::{
-    bootstrap_hull_white_sigma_schedule_to_cap_floors, calibrate_hull_white_to_cap_floors,
-    calibrate_hull_white_to_swaptions, capfloor_hw1f_scalar_keys, capfloor_hw1f_sigma_schedule_key,
-    hw1f_scalar_keys, CapFloorCalibrationConfig, CapFloorQuote, PiecewiseSigmaCalibrationConfig,
-    SwapFrequency, SwaptionQuote, SwaptionSchedule,
+    bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn,
+    calibrate_hull_white_to_cap_floors_with_fn, calibrate_hull_white_to_swaptions_with_fn,
+    capfloor_hw1f_scalar_keys, capfloor_hw1f_sigma_schedule_key, hw1f_scalar_keys,
+    CapFloorCalibrationConfig, CapFloorQuote, CapFloorSchedule, CapletSchedule,
+    PiecewiseSigmaCalibrationConfig, SwapFrequency, SwaptionFloatingPeriod, SwaptionQuote,
+    SwaptionSchedule,
 };
 use crate::quotes::market_quote::MarketQuote;
 use crate::quotes::vol::VolQuote;
@@ -77,6 +81,18 @@ fn attach_validation_result(
     }
 }
 
+/// Hull-White quote structs carry a normal/Black flag but no displacement.
+/// Reject shifted coordinates before a quote can be reinterpreted as Black.
+fn hw_quote_is_normal(quote_type: VolQuoteType) -> Result<bool> {
+    match quote_type {
+        VolQuoteType::Normal => Ok(true),
+        VolQuoteType::BlackLognormal => Ok(false),
+        VolQuoteType::ShiftedBlackLognormal => Err(finstack_quant_core::Error::Validation(
+            "Hull-White calibration does not accept shifted Black quotes: its quote contract has no displacement; supply normal or unshifted Black quotes".to_string(),
+        )),
+    }
+}
+
 fn prepare_hw_swaption_input(
     vol_quote: &VolQuote,
     disc_curve: &DiscountCurve,
@@ -97,6 +113,7 @@ fn prepare_hw_swaption_input(
         ));
     };
     vol_quote.validate()?;
+    let is_normal_vol = hw_quote_is_normal(*quote_type)?;
     let conventions = SwaptionVolTarget::resolve_quote_leg_conventions(vol_quote)?;
     if conventions.currency != expected_currency {
         return Err(finstack_quant_core::Error::Validation(format!(
@@ -108,6 +125,20 @@ fn prepare_hw_swaption_input(
     let (swap_start, swap_end) =
         SwaptionVolTarget::resolve_underlying_dates(vol_quote, &conventions)?;
     let periods = SwaptionVolTarget::build_fixed_leg_periods(swap_start, swap_end, &conventions)?;
+    let floating_periods =
+        SwaptionVolTarget::build_float_leg_periods(swap_start, swap_end, &conventions)?;
+    use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
+    let floating_is_compounded = match conventions.float_compounding {
+        FloatingLegCompounding::Simple => false,
+        FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
+        | FloatingLegCompounding::CompoundedWithObservationShift { shift_days: 0 }
+        | FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 0 } => true,
+        _ => {
+            return Err(finstack_quant_core::Error::Validation(
+                "Hull-White swaption calibration requires simple coupons or unshifted compounded overnight coupons".into(),
+            ));
+        }
+    };
     if periods.is_empty() {
         return Err(finstack_quant_core::Error::Validation(format!(
             "swaption quote {expiry} to {maturity} produced an empty fixed-leg schedule"
@@ -116,7 +147,7 @@ fn prepare_hw_swaption_input(
 
     let model_curve =
         finstack_quant_models::rates::clock::ModelDiscountCurve::new(disc_curve, base_date)?;
-    let time_from_base = |date| {
+    let time_from_base = |date| -> Result<f64> {
         Ok(finstack_quant_models::rates::clock::model_time(
             base_date, date,
         ))
@@ -139,14 +170,41 @@ fn prepare_hw_swaption_input(
         .iter()
         .map(|period| period.accrual_year_fraction)
         .collect();
+    let floating_periods = floating_periods
+        .iter()
+        .map(|period| {
+            Ok(SwaptionFloatingPeriod {
+                fixing_time: time_from_base(if floating_is_compounded {
+                    period.accrual_start
+                } else {
+                    period.reset_date.unwrap_or(period.accrual_start)
+                })?,
+                start_time: time_from_base(period.accrual_start)?,
+                end_time: time_from_base(period.accrual_end)?,
+                payment_time: time_from_base(period.payment_date)?,
+                accrual: period.accrual_year_fraction,
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
 
     let annuity: f64 = payment_times
         .iter()
         .zip(&accruals)
         .map(|(time, accrual)| model_curve.get_df(*time).unwrap_or(f64::NAN) * accrual)
         .sum();
-    let forward =
-        (model_curve.get_df(swap_start_time)? - model_curve.get_df(maturity_time)?) / annuity;
+    let floating_pv = floating_periods
+        .iter()
+        .map(|period| {
+            Ok(
+                (model_curve.get_df(period.start_time)? / model_curve.get_df(period.end_time)?
+                    - 1.0)
+                    * model_curve.get_df(period.payment_time)?,
+            )
+        })
+        .collect::<Result<Vec<_>>>()?
+        .into_iter()
+        .sum::<f64>();
+    let forward = floating_pv / annuity;
     // SwaptionQuote is an ATM-only contract. Never reinterpret an explicit
     // off-ATM strike as the forward rate. Tolerance is 0.0001 basis points.
     if !forward.is_finite() || (*strike - forward).abs() > 1e-8 {
@@ -160,15 +218,80 @@ fn prepare_hw_swaption_input(
             expiry: expiry_time,
             tenor,
             volatility: *vol,
-            is_normal_vol: *quote_type == VolQuoteType::Normal,
+            is_normal_vol,
         },
         SwaptionSchedule {
             swap_start_time,
             payment_times,
             accruals,
             maturity_time,
+            floating_periods,
+            floating_is_compounded,
         },
     ))
+}
+
+fn prepare_hw_cap_schedule(
+    params: &CapFloorHullWhiteStepParams,
+    maturity: finstack_quant_core::dates::Date,
+) -> Result<CapFloorSchedule> {
+    use finstack_quant_cashflows::builder::periods::{build_periods, BuildPeriodsParams};
+    use finstack_quant_core::dates::{adjust, DateExt, StubKind};
+    use finstack_quant_models::rates::clock::model_time;
+    use finstack_quant_valuations::market::conventions::{ConventionRegistry, RateIndexKind};
+    let convention = ConventionRegistry::try_global()?.require_rate_index(&params.index_id)?;
+    if convention.currency != params.currency {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "cap/floor HW currency {} conflicts with index '{}' currency {}",
+            params.currency, params.index_id, convention.currency
+        )));
+    }
+    if convention.kind != RateIndexKind::Term {
+        return Err(finstack_quant_core::Error::Validation(
+            "cap/floor HW calibration requires a term index; compounded overnight quote calibration is not supported".into(),
+        ));
+    }
+    let calendar = finstack_quant_cashflows::builder::calendar::resolve_calendar_strict(
+        &convention.market_calendar_id,
+    )?;
+    let start = adjust(
+        params
+            .base_date
+            .add_business_days(convention.market_settlement_days, calendar)?,
+        convention.market_business_day_convention,
+        calendar,
+    )?;
+    let periods = build_periods(BuildPeriodsParams {
+        start,
+        end: maturity,
+        frequency: convention.default_payment_frequency,
+        stub: StubKind::ShortBack,
+        business_day_convention: convention.market_business_day_convention,
+        calendar_id: &convention.market_calendar_id,
+        end_of_month: false,
+        day_count: convention.day_count,
+        payment_lag_days: convention.default_payment_lag_days,
+        reset_lag_days: Some(convention.default_reset_lag_days),
+        adjust_accrual_dates: false,
+        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+    })?;
+    Ok(CapFloorSchedule {
+        periods: periods
+            .iter()
+            // Standard term cap quotes exclude the first spot-start coupon.
+            .skip(1)
+            .map(|period| CapletSchedule {
+                fixing_time: model_time(
+                    params.base_date,
+                    period.reset_date.unwrap_or(period.accrual_start),
+                ),
+                start_time: model_time(params.base_date, period.accrual_start),
+                end_time: model_time(params.base_date, period.accrual_end),
+                payment_time: model_time(params.base_date, period.payment_date),
+                accrual: period.accrual_year_fraction,
+            })
+            .collect(),
+    })
 }
 
 /// Apply a normalized step output into the mutable market context.
@@ -176,7 +299,7 @@ pub(crate) fn apply_output(
     context: &mut MarketContext,
     output: StepOutput,
     credit_index_update: Option<(String, CreditIndexData)>,
-) {
+) -> Result<()> {
     match output {
         StepOutput::Curve(curve) => {
             *context = std::mem::take(context).insert(curve);
@@ -211,8 +334,9 @@ pub(crate) fn apply_output(
     }
 
     if let Some((id, data)) = credit_index_update {
-        *context = std::mem::take(context).insert_credit_index(id, data);
+        context.insert_credit_index_mut(id, data)?;
     }
+    Ok(())
 }
 
 /// Execute calibration logic for the provided [`StepParams`].
@@ -398,7 +522,7 @@ pub(crate) fn execute_params(
                     ))
                 }
             };
-            let (hw_params, report) = calibrate_hull_white_to_swaptions(
+            let (hw_params, report) = calibrate_hull_white_to_swaptions_with_fn(
                 &df,
                 &hw_quotes,
                 SwapFrequency::Annual,
@@ -461,6 +585,7 @@ pub(crate) fn execute_params(
             let day_count = DayCount::Act365F;
 
             let mut cap_floor_quotes = Vec::new();
+            let mut cap_floor_schedules = Vec::new();
             for quote in quotes {
                 let MarketQuote::Vol(VolQuote::CapFloorVol {
                     expiry,
@@ -473,7 +598,7 @@ pub(crate) fn execute_params(
                 else {
                     continue;
                 };
-
+                let is_normal_vol = hw_quote_is_normal(*quote_type)?;
                 let maturity =
                     day_count.year_fraction(p.base_date, *expiry, DayCountContext::default())?;
                 if maturity <= 0.0 {
@@ -484,8 +609,9 @@ pub(crate) fn execute_params(
                     strike: *strike,
                     volatility: *vol,
                     is_cap: *is_cap,
-                    is_normal_vol: *quote_type == VolQuoteType::Normal,
+                    is_normal_vol,
                 });
+                cap_floor_schedules.push(prepare_hw_cap_schedule(p, *expiry)?);
             }
 
             let initial_guess = match (p.initial_kappa, p.initial_sigma) {
@@ -501,13 +627,14 @@ pub(crate) fn execute_params(
             let (kappa_key, sigma_key) = capfloor_hw1f_scalar_keys(p.discount_curve_id.as_str());
             match p.volatility_mode {
                 HullWhiteVolatilityMode::Scalar => {
-                    let (hw_params, report) = calibrate_hull_white_to_cap_floors(
+                    let (hw_params, report) = calibrate_hull_white_to_cap_floors_with_fn(
                         &discount_df,
                         &forward_df,
                         &cap_floor_quotes,
+                        Some(&cap_floor_schedules),
                         CapFloorCalibrationConfig {
                             fit_tolerance: p.fit_tolerance,
-                            frequency: p.payment_frequency,
+                            frequency: SwapFrequency::Annual,
                             fixed_kappa: p.fixed_kappa,
                             initial_guess,
                         },
@@ -527,18 +654,20 @@ pub(crate) fn execute_params(
                             "piecewise cap/floor HW1F calibration requires fixed_kappa".into(),
                         )
                     })?;
-                    let (model, report) = bootstrap_hull_white_sigma_schedule_to_cap_floors(
-                        &discount_df,
-                        &forward_df,
-                        &cap_floor_quotes,
-                        PiecewiseSigmaCalibrationConfig {
-                            fit_tolerance: p.fit_tolerance,
-                            fixed_kappa,
-                            sigma_min: 1.0e-5,
-                            sigma_max: 2.0,
-                            frequency: p.payment_frequency,
-                        },
-                    )?;
+                    let (model, report) =
+                        bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn(
+                            &discount_df,
+                            &forward_df,
+                            &cap_floor_quotes,
+                            Some(&cap_floor_schedules),
+                            PiecewiseSigmaCalibrationConfig {
+                                fit_tolerance: p.fit_tolerance,
+                                fixed_kappa,
+                                sigma_min: 1.0e-5,
+                                sigma_max: 2.0,
+                                frequency: SwapFrequency::Annual,
+                            },
+                        )?;
                     let observations = model
                         .volatility
                         .times()
@@ -642,7 +771,7 @@ pub(crate) fn execute_params_and_apply(
     } = outcome;
 
     let mut new_context = context.clone();
-    apply_output(&mut new_context, output, credit_index_update);
+    apply_output(&mut new_context, output, credit_index_update)?;
     Ok((new_context, report))
 }
 
@@ -652,7 +781,10 @@ mod tests {
     use crate::api::schema::{
         CapFloorHullWhiteStepParams, HullWhiteStepParams, StudentTParams, SviSurfaceParams,
     };
-    use crate::hull_white::SwapFrequency;
+    use crate::hull_white::{
+        contractual_swaption_price, scheduled_cap_floor_implied_normal_vol,
+        scheduled_cap_floor_price, HullWhiteParams,
+    };
     use crate::quotes::cds_tranche::CdsTrancheQuote;
     use crate::quotes::ids::QuoteId;
     use finstack_quant_core::currency::Currency;
@@ -718,14 +850,16 @@ mod tests {
             .insert(hazard)
             .insert(base_corr)
             .insert_credit_index("CDX.NA.IG", credit_index)
+            .expect("credit index dependencies")
     }
 
     /// Synthetic 5Y [3,7] CDX mezzanine upfront at ν = 6, ρ = 0.3 under the
     /// default Student-t pricer (product Gauss over the exact conditional
-    /// binomial). The step recovers ν near 6 without manufacturing the quote
-    /// from a live price. Re-pinned 2026-09-18 when the homogeneous pool path
-    /// stopped routing index-sized pools to the large-homogeneous-pool limit.
-    const STUDENT_T_FIXTURE_UPFRONT_PCT: f64 = -0.215_317_595_022;
+    /// binomial). Quoted cash settles on 2025-03-25: the no-upfront trade PV
+    /// -0.215368524909 per unit tranche notional is divided by its settlement
+    /// discount factor exp(-0.03 * 5/365). The step recovers ν near 6 without
+    /// manufacturing the quote from a live price.
+    const STUDENT_T_FIXTURE_UPFRONT_PCT: f64 = -0.215_457_050_711;
 
     fn build_student_t_quote(upfront_pct: f64) -> CdsTrancheQuote {
         let maturity = Date::from_calendar_date(2030, Month::March, 20).expect("valid maturity");
@@ -752,6 +886,8 @@ mod tests {
             SwaptionVolTarget::resolve_underlying_dates(quote, &conventions).expect("dates");
         let periods =
             SwaptionVolTarget::build_fixed_leg_periods(start, end, &conventions).expect("schedule");
+        let floating_periods = SwaptionVolTarget::build_float_leg_periods(start, end, &conventions)
+            .expect("floating schedule");
         let annuity: f64 = periods
             .iter()
             .map(|period| {
@@ -761,11 +897,39 @@ mod tests {
                         .expect("payment DF")
             })
             .sum();
+        let floating_pv: f64 = floating_periods
+            .iter()
+            .map(|period| {
+                (discount
+                    .df_on_date_curve(period.accrual_start)
+                    .expect("start DF")
+                    / discount
+                        .df_on_date_curve(period.accrual_end)
+                        .expect("end DF")
+                    - 1.0)
+                    * discount
+                        .df_on_date_curve(period.payment_date)
+                        .expect("payment DF")
+            })
+            .sum();
         if let VolQuote::SwaptionVol { strike, .. } = quote {
-            *strike = (discount.df_on_date_curve(start).expect("start DF")
-                - discount.df_on_date_curve(end).expect("end DF"))
-                / annuity;
+            *strike = floating_pv / annuity;
         }
+    }
+
+    fn cap_quote_vol(params: &StepParams, maturity: Date, strike: f64, sigma: f64) -> f64 {
+        let StepParams::CapFloorHullWhite(params) = params else {
+            unreachable!("cap quote helper requires cap calibration parameters");
+        };
+        let schedule =
+            prepare_hw_cap_schedule(params, maturity).expect("contractual term schedule");
+        let model = HullWhiteParams::constant(params.fixed_kappa.expect("fixed kappa"), sigma)
+            .expect("fixture model");
+        let df = |time: f64| (-0.03 * time).exp();
+        let price = scheduled_cap_floor_price(&model, &df, &df, &schedule, strike, true)
+            .expect("contractual cap price");
+        scheduled_cap_floor_implied_normal_vol(price, &df, &df, &schedule, strike, true)
+            .expect("contractual normal cap quote")
     }
 
     #[test]
@@ -806,7 +970,7 @@ mod tests {
     fn student_t_fixture_upfront_matches_default_pricer() {
         let base_date = Date::from_calendar_date(2025, Month::March, 20).expect("valid date");
         let market = build_student_t_market(base_date, 0.3);
-        let quote = build_student_t_quote(0.0);
+        let quote = build_student_t_quote(STUDENT_T_FIXTURE_UPFRONT_PCT);
         let mut curve_ids = finstack_quant_core::HashMap::default();
         curve_ids.insert("discount".to_string(), "USD-OIS".to_string());
         curve_ids.insert("credit".to_string(), "CDX.NA.IG".to_string());
@@ -821,6 +985,18 @@ mod tests {
             .as_any()
             .downcast_ref::<CdsTranche>()
             .expect("CdsTranche");
+        let (settlement, _) = tranche.upfront.expect("settlement-dated upfront");
+        assert_eq!(
+            settlement,
+            Date::from_calendar_date(2025, Month::March, 25).expect("cash settlement date")
+        );
+        let settlement_df = market
+            .get_discount("USD-OIS")
+            .expect("discount curve")
+            .df_between_dates(base_date, settlement)
+            .expect("cash settlement discount factor");
+        let mut without_upfront = tranche.clone();
+        without_upfront.upfront = None;
         let pricer = CdsTranchePricer::with_config(
             CdsTranchePricerConfig::default()
                 .with_student_t_copula(6.0)
@@ -828,13 +1004,66 @@ mod tests {
         )
         .expect("valid pricer");
         let live = pricer
-            .calculate_model_upfront(tranche, &market, base_date)
-            .expect("upfront")
-            / tranche.notional.amount();
+            .price_tranche(&without_upfront, &market, base_date)
+            .expect("premium/protection leg PV")
+            .amount()
+            / (tranche.notional.amount() * settlement_df);
         assert!(
-            (live - STUDENT_T_FIXTURE_UPFRONT_PCT).abs() < 1e-6,
+            (live - STUDENT_T_FIXTURE_UPFRONT_PCT).abs() < 1e-10,
             "update STUDENT_T_FIXTURE_UPFRONT_PCT to {live:.12}"
         );
+        let full_trade_residual = pricer
+            .price_tranche(tranche, &market, base_date)
+            .expect("complete settled quote")
+            .amount()
+            / tranche.notional.amount();
+        assert!(full_trade_residual.abs() < 1e-10);
+    }
+
+    #[test]
+    fn hull_white_quote_inputs_reject_shifted_black_without_a_displacement() {
+        let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("base date");
+        let expiry = Date::from_calendar_date(2026, Month::January, 1).expect("expiry");
+        let maturity = Date::from_calendar_date(2031, Month::January, 1).expect("maturity");
+        let discount = build_flat_discount_curve(0.03, base_date, "USD-OIS");
+        let swaption = VolQuote::SwaptionVol {
+            id: QuoteId::new("SHIFTED-SWAPTION"),
+            expiry,
+            maturity,
+            strike: 0.03,
+            vol: 0.2,
+            quote_type: VolQuoteType::ShiftedBlackLognormal,
+            convention: SwaptionConventionId::new("USD"),
+        };
+        let error = prepare_hw_swaption_input(&swaption, &discount, Currency::USD, base_date)
+            .expect_err("shifted swaption must be rejected before premium conversion");
+        assert!(error.to_string().contains("no displacement"));
+
+        let params = StepParams::CapFloorHullWhite(CapFloorHullWhiteStepParams {
+            fit_tolerance: 1e-6,
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "USD-OIS".into(),
+            currency: Currency::USD,
+            base_date,
+            fixed_kappa: Some(0.0342),
+            initial_kappa: None,
+            initial_sigma: None,
+            index_id: "USD-SOFR-3M".into(),
+            volatility_mode: HullWhiteVolatilityMode::Scalar,
+        });
+        let quotes = vec![MarketQuote::Vol(VolQuote::CapFloorVol {
+            id: QuoteId::new("SHIFTED-CAP"),
+            expiry: maturity,
+            strike: 0.03,
+            vol: 0.2,
+            quote_type: VolQuoteType::ShiftedBlackLognormal,
+            is_cap: true,
+        })];
+        let context = MarketContext::new().insert(discount);
+        let error = execute_params(&params, &quotes, &context, &CalibrationConfig::default())
+            .err()
+            .expect("shifted cap must be rejected before premium conversion");
+        assert!(error.to_string().contains("no displacement"));
     }
 
     #[test]
@@ -933,18 +1162,9 @@ mod tests {
             initial_sigma: Some(0.008),
         });
 
-        // Build quotes by back-solving Bachelier vols from HW1F prices at
-        // κ* = 0.05, σ* = 0.01 on a flat 3% curve.
+        // Convert model premiums on the actual convention-driven schedules
+        // to the flat normal quotes consumed by the engine.
         let df_fn = |t: f64| (-0.03 * t).exp();
-        let ppy = SwapFrequency::SemiAnnual.periods_per_year();
-        let synthesise = |expiry_y: f64, tenor_y: f64| -> f64 {
-            let (annuity, fwd) =
-                crate::hull_white::compute_swap_annuity_and_rate(&df_fn, expiry_y, tenor_y, ppy);
-            let price = crate::hull_white::hw1f_swaption_price(
-                0.05, 0.01, &df_fn, expiry_y, tenor_y, fwd, ppy,
-            );
-            (price / (annuity * (expiry_y / (2.0 * std::f64::consts::PI)).sqrt())).max(1e-6)
-        };
 
         let mut quotes = vec![
             MarketQuote::Vol(VolQuote::SwaptionVol {
@@ -952,7 +1172,7 @@ mod tests {
                 expiry: Date::from_calendar_date(2026, Month::January, 1).expect("expiry"),
                 maturity: Date::from_calendar_date(2031, Month::January, 1).expect("maturity"),
                 strike: 0.03,
-                vol: synthesise(1.0, 5.0),
+                vol: 0.01,
                 quote_type: VolQuoteType::Normal,
                 convention: SwaptionConventionId::new("USD"),
             }),
@@ -961,7 +1181,7 @@ mod tests {
                 expiry: Date::from_calendar_date(2027, Month::January, 1).expect("expiry"),
                 maturity: Date::from_calendar_date(2032, Month::January, 1).expect("maturity"),
                 strike: 0.03,
-                vol: synthesise(2.0, 5.0),
+                vol: 0.01,
                 quote_type: VolQuoteType::Normal,
                 convention: SwaptionConventionId::new("USD"),
             }),
@@ -970,7 +1190,7 @@ mod tests {
                 expiry: Date::from_calendar_date(2030, Month::January, 1).expect("expiry"),
                 maturity: Date::from_calendar_date(2035, Month::January, 1).expect("maturity"),
                 strike: 0.03,
-                vol: synthesise(5.0, 5.0),
+                vol: 0.01,
                 quote_type: VolQuoteType::Normal,
                 convention: SwaptionConventionId::new("USD"),
             }),
@@ -980,10 +1200,35 @@ mod tests {
 
         for quote in &mut quotes {
             if let MarketQuote::Vol(vol) = quote {
-                set_atm_strike(
-                    vol,
-                    context.get_discount("USD-OIS").expect("curve").as_ref(),
-                );
+                let discount = context.get_discount("USD-OIS").expect("curve");
+                set_atm_strike(vol, discount.as_ref());
+                let (prepared, schedule) =
+                    prepare_hw_swaption_input(vol, discount.as_ref(), Currency::USD, base_date)
+                        .expect("contractual swaption input");
+                let VolQuote::SwaptionVol {
+                    strike,
+                    vol: quoted_vol,
+                    ..
+                } = vol
+                else {
+                    unreachable!("swaption fixture");
+                };
+                let premium = contractual_swaption_price(
+                    HullWhiteCalibrationParams::new(0.05, 0.01).expect("fixture parameters"),
+                    &df_fn,
+                    prepared.expiry,
+                    *strike,
+                    &schedule,
+                )
+                .expect("contractual swaption premium");
+                let annuity: f64 = schedule
+                    .payment_times
+                    .iter()
+                    .zip(&schedule.accruals)
+                    .map(|(payment, accrual)| df_fn(*payment) * accrual)
+                    .sum();
+                *quoted_vol =
+                    premium / (annuity * (prepared.expiry / (2.0 * std::f64::consts::PI)).sqrt());
             }
         }
 
@@ -1019,19 +1264,12 @@ mod tests {
             fixed_kappa: Some(0.0342),
             initial_kappa: None,
             initial_sigma: None,
-            payment_frequency: SwapFrequency::Quarterly,
+            index_id: "USD-SOFR-3M".into(),
             volatility_mode: HullWhiteVolatilityMode::Scalar,
         });
 
-        let df_fn = |t: f64| (-0.03 * t).exp();
-        let vol = crate::hull_white::hw1f_cap_floor_implied_normal_vol(
-            0.0342,
-            0.0095,
-            &df_fn,
-            &df_fn,
-            crate::hull_white::CapFloorPriceSpec::new(5.0, 0.0365, true, SwapFrequency::Quarterly),
-        )
-        .expect("implied normal quote");
+        let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("expiry");
+        let vol = cap_quote_vol(&params, maturity, 0.0365, 0.0095);
         let quotes = vec![MarketQuote::Vol(VolQuote::CapFloorVol {
             id: QuoteId::new("USD-CAP-VOL-20300101-0.0365"),
             expiry: Date::from_calendar_date(2030, Month::January, 1).expect("expiry"),
@@ -1045,6 +1283,10 @@ mod tests {
 
         let outcome = execute_params(&params, &quotes, &context, &CalibrationConfig::default())
             .expect("cap/floor Hull-White step should calibrate");
+        assert_eq!(
+            outcome.report.metadata.get("frequency").map(String::as_str),
+            Some("contractual")
+        );
 
         let StepOutput::Scalars(values) = outcome.output else {
             unreachable!("cap/floor Hull-White calibration should return scalar outputs");
@@ -1061,6 +1303,79 @@ mod tests {
                 .any(|(key, _)| key == "USD-OIS_CAPFLOOR_HW1F_SIGMA"),
             "expected calibrated cap/floor sigma scalar output"
         );
+        let (_, MarketScalar::Unitless(sigma)) = values
+            .iter()
+            .find(|(key, _)| key == "USD-OIS_CAPFLOOR_HW1F_SIGMA")
+            .expect("sigma scalar")
+        else {
+            unreachable!("sigma must be unitless");
+        };
+        assert!((sigma - 0.0095).abs() < 1e-9);
+    }
+
+    #[test]
+    fn cap_floor_hull_white_preserves_modified_following_month_end_payment() {
+        // T+2 starts this term cap on 31 January. Its final 31 January 2026
+        // accrual end is a Saturday, so modified following pays on 30 January.
+        let base_date = Date::from_calendar_date(2025, Month::January, 29).expect("base date");
+        let maturity = Date::from_calendar_date(2026, Month::January, 31).expect("maturity");
+        let cap_params = CapFloorHullWhiteStepParams {
+            fit_tolerance: 1e-6,
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "USD-OIS".into(),
+            currency: Currency::USD,
+            base_date,
+            fixed_kappa: Some(0.0342),
+            initial_kappa: None,
+            initial_sigma: None,
+            index_id: "USD-SOFR-3M".into(),
+            volatility_mode: HullWhiteVolatilityMode::Scalar,
+        };
+        let schedule = prepare_hw_cap_schedule(&cap_params, maturity).expect("calendar schedule");
+        let final_period = schedule.periods.last().expect("live final caplet");
+        let expected_payment = finstack_quant_models::rates::clock::model_time(
+            base_date,
+            Date::from_calendar_date(2026, Month::January, 30).expect("payment"),
+        );
+        assert_eq!(final_period.payment_time, expected_payment);
+        assert!(final_period.payment_time < final_period.end_time);
+        let params = StepParams::CapFloorHullWhite(cap_params);
+        let quotes = [MarketQuote::Vol(VolQuote::CapFloorVol {
+            id: QuoteId::new("USD-CAP-EARLY-PAYMENT"),
+            expiry: maturity,
+            strike: 0.03,
+            vol: cap_quote_vol(&params, maturity, 0.03, 0.0095),
+            quote_type: VolQuoteType::Normal,
+            is_cap: true,
+        })];
+        let context =
+            MarketContext::new().insert(build_flat_discount_curve(0.03, base_date, "USD-OIS"));
+        let outcome = execute_params(&params, &quotes, &context, &CalibrationConfig::default())
+            .expect("valid term cap with an earlier adjusted payment");
+        assert!(outcome.report.success);
+    }
+
+    #[test]
+    fn cap_floor_hull_white_rejects_compounded_overnight_index() {
+        let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("base date");
+        let params = CapFloorHullWhiteStepParams {
+            fit_tolerance: 1e-6,
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "USD-OIS".into(),
+            currency: Currency::USD,
+            base_date,
+            fixed_kappa: Some(0.0342),
+            initial_kappa: None,
+            initial_sigma: None,
+            index_id: "USD-SOFR-OIS".into(),
+            volatility_mode: HullWhiteVolatilityMode::Scalar,
+        };
+        let error = prepare_hw_cap_schedule(
+            &params,
+            Date::from_calendar_date(2030, Month::January, 1).expect("maturity"),
+        )
+        .expect_err("overnight coupons cannot be reinterpreted as term coupons");
+        assert!(error.to_string().contains("requires a term index"));
     }
 
     #[test]
@@ -1075,18 +1390,11 @@ mod tests {
             fixed_kappa: Some(0.0342),
             initial_kappa: None,
             initial_sigma: None,
-            payment_frequency: SwapFrequency::Quarterly,
+            index_id: "USD-SOFR-3M".into(),
             volatility_mode: HullWhiteVolatilityMode::Piecewise,
         });
-        let df_fn = |t: f64| (-0.03 * t).exp();
-        let vol = crate::hull_white::hw1f_cap_floor_implied_normal_vol(
-            0.0342,
-            0.0095,
-            &df_fn,
-            &df_fn,
-            crate::hull_white::CapFloorPriceSpec::new(5.0, 0.0365, true, SwapFrequency::Quarterly),
-        )
-        .expect("implied normal quote");
+        let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("expiry");
+        let vol = cap_quote_vol(&params, maturity, 0.0365, 0.0095);
         let quotes = vec![MarketQuote::Vol(VolQuote::CapFloorVol {
             id: QuoteId::new("USD-CAP-VOL-20300101-0.0365"),
             expiry: Date::from_calendar_date(2030, Month::January, 1).expect("expiry"),

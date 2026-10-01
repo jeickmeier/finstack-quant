@@ -69,6 +69,10 @@ export type DA33B682660A7Dfa1Ea09 =
        * Exact typed calibration replay recipe.
        */
       rate_calibration?: D_17Ffcd7842A3F40268B1 | null;
+      /**
+       * Canonical source interpolation and accumulated continuous transformations.
+       */
+      transform?: D_7Bf68715545Bd3D2B581 | null;
       type: "discount";
     }
   | {
@@ -131,6 +135,10 @@ export type DA33B682660A7Dfa1Ea09 =
        * Index tenor in years
        */
       tenor: number;
+      /**
+       * Canonical source interpolation and cumulative continuous transformations.
+       */
+      transform?: DF401C4E712E4F497Feef | null;
       type: "forward";
     }
   | {
@@ -1276,6 +1284,78 @@ export interface D_061B61Ce4Cbde8C30057 {
   unit: "days" | "weeks" | "months" | "years";
 }
 /**
+ * Source interpolation and a single accumulated transformation, never a chain
+ * of nested curves. The adjustment is stored as its piecewise-linear derivative
+ * so evaluating beyond a completed triangular shock does not subtract large
+ * quadratic polynomials.
+ */
+export interface D_7Bf68715545Bd3D2B581 {
+  adjustment: D_2A71F59Be0C75Aa6F427;
+  /**
+   * Current origin in the source interpolation's year-fraction coordinates.
+   */
+  offset: number;
+  /**
+   * Original, untransformed interpolation pillars.
+   */
+  source_points: [number, number][];
+}
+/**
+ * Cumulative derivative of the additive log-discount adjustment.
+ */
+export interface D_2A71F59Be0C75Aa6F427 {
+  /**
+   * Constant value before the first breakpoint.
+   */
+  initial_value: number;
+  /**
+   * Sorted, merged linear segments.
+   */
+  segments: D_683Ec38B8D36Db5534Bc[];
+}
+export interface D_683Ec38B8D36Db5534Bc {
+  /**
+   * Function slope on this segment.
+   */
+  slope: number;
+  /**
+   * Segment origin in the source curve's time coordinates.
+   */
+  start: number;
+  /**
+   * Right-hand function value at the segment origin.
+   */
+  value: number;
+}
+export interface DF401C4E712E4F497Feef {
+  adjustment: D_2A71F59Be0C75Aa6F4271;
+  /**
+   * Current curve origin in the source curve's year-fraction coordinates.
+   */
+  offset: number;
+  /**
+   * Accumulated parallel multiplicative factor on the source interpolation.
+   */
+  scale: number;
+  /**
+   * Original interpolation pillars, independent of current curve samples.
+   */
+  source_points: [number, number][];
+}
+/**
+ * Cumulative additive rate adjustment in source time coordinates.
+ */
+export interface D_2A71F59Be0C75Aa6F4271 {
+  /**
+   * Constant value before the first breakpoint.
+   */
+  initial_value: number;
+  /**
+   * Sorted, merged linear segments.
+   */
+  segments: D_683Ec38B8D36Db5534Bc[];
+}
+/**
  * Exact valuation-layer inputs required to replay a hazard-curve calibration.
  *
  * The core market-data crate stores these payloads without interpreting them;
@@ -1636,6 +1716,9 @@ export interface DD99050870612E8Bfc3D3 {
 /**
  * Serializable state of an FxMatrix.
  * Contains the configuration and cached quotes that can be persisted and restored.
+ * Serialization fails with an ordinary serializer error if any captured
+ * explicit or provider rate is non-finite or non-positive, including rates
+ * that overflow after a mutable underlying provider changes under a shock.
  */
 export interface DFcf72B7D10Aedbfe8482 {
   config: D_7Fbd5A62C7C39Ad98666;
@@ -1646,6 +1729,12 @@ export interface DFcf72B7D10Aedbfe8482 {
    * dates from the provider instead of restoring the pinned fixings.
    */
   pinned_quotes: [DB6A74Bd737Ef1567B144, DB6A74Bd737Ef1567B144, string, D_1Ec33Fbdab11Dd6751Bf, number][];
+  /**
+   * Captured date/policy-scoped provider quotes. These override captured
+   * pair-global provider quotes for their scope while remaining below
+   * explicit matrix quotes in either direction. Required even when empty.
+   */
+  provider_pinned_quotes: [DB6A74Bd737Ef1567B144, DB6A74Bd737Ef1567B144, string, D_1Ec33Fbdab11Dd6751Bf, number][];
   /**
    * Captured provider quotes, below explicit global and date/policy-pinned
    * quotes in lookup priority. Market-context restoration uses these to
@@ -1981,9 +2070,10 @@ export interface D_467E0D727Ff2Ae92C819 {
  *
  * # Components
  *
- * - **Observations**: Historical index levels by publication date
+ * - **Observations**: Index levels labelled by reference date/month
  * - **Interpolation**: Daily interpolation between monthly observations
- * - **Lag**: Publication lag (typically 3 months for TIPS)
+ * - **Lag**: Contractual observation lag (typically 3 months for TIPS)
+ * - **Publication dates**: Optional explicit availability dates by reference month
  * - **Seasonality**: Optional monthly adjustment factors
  *
  * # Interpolation Methods
@@ -2240,12 +2330,26 @@ export interface DE771E792357014C84Cb9 {
    */
   observations: [D_42Ed66Bb80D77E9Fa456, number][];
   /**
+   * Explicit monthly observation availability; no release dates are inferred.
+   */
+  publication_dates?: D_952D2539685Fe1Adf99E[];
+  /**
    * Optional seasonality factors
    *
    * @minItems 12
    * @maxItems 12
    */
   seasonality?: [number, number, number, number, number, number, number, number, number, number, number, number] | null;
+}
+export interface D_952D2539685Fe1Adf99E {
+  /**
+   * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
+   */
+  publication_date: string;
+  /**
+   * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
+   */
+  reference_month: string;
 }
 /**
  * Date-indexed time series with flexible interpolation.
@@ -2321,6 +2425,10 @@ export interface D_7631522C7759Bd704Ba6 {
  */
 export interface D_9D04Eee9F565B9C40882 {
   /**
+   * Additive displacements in forward/strike units, one per expiry for shifted Black quotes.
+   */
+  displacements?: number[] | null;
+  /**
    * Expiry times in years
    */
   expiries: number[];
@@ -2335,7 +2443,7 @@ export interface D_9D04Eee9F565B9C40882 {
   /**
    * Quote convention.
    */
-  quote_type: "black_lognormal" | "normal";
+  quote_type: "black_lognormal" | "shifted_black_lognormal" | "normal";
   /**
    * Semantic meaning of the secondary axis.
    */

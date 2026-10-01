@@ -9,19 +9,29 @@ use wasm_bindgen::prelude::*;
 ///
 /// Accepts a `Float64Array`/`number[]` containing `n * n` row-major entries
 /// and returns a flat lower-triangular factor.
-/// @param matrix - Flat row-major `n * n` entries of a symmetric
-///   positive-definite matrix.
-/// @param n - Positive square-matrix dimension; `matrix` must contain exactly
-///   `n * n` entries.
-/// @returns Lower-triangular factor L as a flat row-major `Float64Array`.
+/// Rust normalizes the matrix before factorization and restores the factor's
+/// scale afterwards. Numerical singularity is measured relative to the square
+/// root of the largest input diagonal magnitude. Uniformly scaling the matrix
+/// by a positive constant scales the factor by its square root.
+///
+/// # Arguments
+///
+/// * `matrix` - Flat row-major finite entries of a symmetric positive-definite matrix.
+/// * `n` - Positive integral dimension in `1..=4294967295`; the input must have exactly `n * n` entries.
+///
+/// # Returns
+///
+/// Lower-triangular factor L as a flat row-major `Float64Array`.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `n * n` overflows, `matrix` does not contain
+/// Throws a JavaScript exception if `n` is non-finite, fractional, non-positive,
+/// or outside the wasm32 integer range, `n * n` overflows, `matrix` does not contain
 /// exactly `n * n` entries, or the matrix contains a non-finite value, is
-/// singular, or is not positive definite.
+/// numerically singular under that relative criterion, or is not positive definite.
 #[wasm_bindgen(js_name = choleskyDecomposition)]
-pub fn cholesky_decomposition(matrix: &[f64], n: usize) -> Result<Box<[f64]>, JsValue> {
+pub fn cholesky_decomposition(matrix: &[f64], n: f64) -> Result<Box<[f64]>, JsValue> {
+    let n = parse_dimension(n)?;
     validate_flat_matrix_len(matrix, n)?;
     linalg::cholesky_decomposition(matrix, n)
         .map(Vec::into_boxed_slice)
@@ -29,17 +39,28 @@ pub fn cholesky_decomposition(matrix: &[f64], n: usize) -> Result<Box<[f64]>, Js
 }
 
 /// Solve a symmetric positive-definite linear system from a flat Cholesky factor.
-/// @param chol - Lower-triangular Cholesky factor as a flat row-major `n * n` array.
-/// @param b - Right-hand-side vector of a linear system, aligned with the Cholesky factor dimension.
-/// @param n - Positive square-matrix dimension; flat arrays must contain n × n entries.
+///
+/// A factor diagonal is numerically singular when its magnitude is below
+/// `1e-10` times the largest factor diagonal magnitude. Uniformly scaling the
+/// matrix and right-hand side preserves the solution.
+///
+/// # Arguments
+///
+/// * `chol` - Cholesky factor stored as `n * n` row-major entries; consumed lower-triangular entries must be finite, and the upper triangle is ignored.
+/// * `b` - Finite right-hand-side vector containing exactly `n` entries.
+/// * `n` - Positive integral dimension in `1..=4294967295`, shared by the factor and right-hand side.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `n * n` overflows, `chol` does not contain
-/// exactly `n * n` entries, `b` does not contain `n` entries, or a diagonal
-/// factor is singular.
+/// Throws a JavaScript exception if `n` is non-finite, fractional, non-positive,
+/// or outside the wasm32 integer range, `n * n` overflows, `chol` does not contain
+/// exactly `n * n` entries, `b` does not contain `n` entries, a consumed lower-triangular
+/// or right-hand-side entry is non-finite, a diagonal factor is numerically
+/// singular under that relative criterion, or the
+/// solution overflows to a non-finite value.
 #[wasm_bindgen(js_name = choleskySolve)]
-pub fn cholesky_solve(chol: &[f64], b: &[f64], n: usize) -> Result<Box<[f64]>, JsValue> {
+pub fn cholesky_solve(chol: &[f64], b: &[f64], n: f64) -> Result<Box<[f64]>, JsValue> {
+    let n = parse_dimension(n)?;
     validate_flat_matrix_len(chol, n)?;
     if b.len() != n {
         return Err(to_js_err(format!(
@@ -58,16 +79,21 @@ pub fn cholesky_solve(chol: &[f64], b: &[f64], n: usize) -> Result<Box<[f64]>, J
 /// into correlated normals: if `A = L L^T` and `z ~ N(0, I)`, then
 /// `L z ~ N(0, A)`. Accepts L as `n * n` row-major entries; only the lower
 /// triangle is read and the upper triangle is assumed zero.
-/// @param l - Lower-triangular Cholesky factor as a flat row-major array of n × n entries.
-/// @param n - Positive square-matrix dimension; flat arrays must contain n × n entries.
-/// @param z - Vector of length n to transform, typically independent standard-normal draws.
+///
+/// # Arguments
+///
+/// * `l` - Lower-triangular factor stored as `n * n` row-major entries; the upper triangle is ignored.
+/// * `n` - Positive integral dimension in `1..=4294967295`, shared by the factor and vector.
+/// * `z` - Vector of exactly `n` observations to transform, typically independent standard normals.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `n * n` overflows, `l` does not contain
+/// Throws a JavaScript exception if `n` is non-finite, fractional, non-positive,
+/// or outside the wasm32 integer range, `n * n` overflows, `l` does not contain
 /// exactly `n * n` entries, or `z` does not contain exactly `n` entries.
 #[wasm_bindgen(js_name = applyLowerTriangular)]
-pub fn apply_lower_triangular(l: &[f64], n: usize, z: &[f64]) -> Result<Box<[f64]>, JsValue> {
+pub fn apply_lower_triangular(l: &[f64], n: f64, z: &[f64]) -> Result<Box<[f64]>, JsValue> {
+    let n = parse_dimension(n)?;
     validate_flat_matrix_len(l, n)?;
     linalg::apply_lower_triangular(l, n, z)
         .map(Vec::into_boxed_slice)
@@ -101,7 +127,7 @@ pub fn population_variance(data: &[f64]) -> f64 {
 /// Pearson correlation over typed numeric arrays.
 /// @param x - First numeric series; must have the same length as `y`.
 /// @param y - Second numeric series, aligned one-for-one with `x`.
-/// @returns Sample correlation in `[-1, 1]`, or NaN when a series has fewer than two points.
+/// @returns Sample correlation in `[-1, 1]`; fewer than two paired points or a constant series yield 0.0. Unequal lengths yield NaN.
 #[wasm_bindgen(js_name = correlation)]
 pub fn correlation(x: &[f64], y: &[f64]) -> f64 {
     stats::correlation(x, y)
@@ -132,6 +158,19 @@ pub fn quantile(data: &[f64], q: f64) -> f64 {
 #[wasm_bindgen(js_name = normCdf)]
 pub fn norm_cdf(x: f64) -> f64 {
     special_functions::norm_cdf(x)
+}
+
+/// Natural logarithm of the standard normal CDF, stable in the negative tail.
+///
+/// # Arguments
+/// - `x`: Standard-normal threshold in standard-deviation units; accepts infinities and propagates NaN.
+///
+/// @param x - Standard-normal threshold in standard-deviation units; infinities are accepted.
+/// @returns Natural log probability; negative infinity at negative infinity, zero at positive infinity, and NaN for NaN.
+/// @throws Does not throw; special floating-point inputs follow the documented limits.
+#[wasm_bindgen(js_name = logNormCdf)]
+pub fn log_norm_cdf(x: f64) -> f64 {
+    special_functions::log_norm_cdf(x)
 }
 
 /// Standard normal PDF φ(x).
@@ -190,6 +229,15 @@ pub fn longest_positive_run(values: &[f64]) -> usize {
     math::longest_positive_run(values)
 }
 
+fn parse_dimension(n: f64) -> Result<usize, JsValue> {
+    if !n.is_finite() || n.fract() != 0.0 || n <= 0.0 || n > f64::from(u32::MAX) {
+        return Err(to_js_err(
+            "n must be a finite positive integer no greater than 4294967295",
+        ));
+    }
+    Ok(n as usize)
+}
+
 fn validate_flat_matrix_len(matrix: &[f64], n: usize) -> Result<(), JsValue> {
     let expected = n
         .checked_mul(n)
@@ -208,6 +256,21 @@ mod tests {
     use super::*;
 
     const TOL: f64 = 1e-4;
+
+    #[test]
+    fn matrix_dimensions_reject_lossy_conversion() {
+        for n in [0.0, -1.0, 1.9, f64::NAN, f64::INFINITY, 4_294_967_297.0] {
+            assert!(cholesky_decomposition(&[4.0], n).is_err());
+            assert!(cholesky_solve(&[2.0], &[4.0], n).is_err());
+            assert!(apply_lower_triangular(&[2.0], n, &[4.0]).is_err());
+        }
+        assert_eq!(
+            cholesky_decomposition(&[4.0], 1.0)
+                .expect("valid matrix")
+                .as_ref(),
+            &[2.0]
+        );
+    }
 
     #[test]
     fn norm_cdf_reference_values() {

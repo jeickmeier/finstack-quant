@@ -6,7 +6,7 @@ use crate::cashflow::builder::CashFlowSchedule;
 use crate::cashflow::primitives::CFKind;
 use crate::instruments::fixed_income::bond::pricing::engine::tree::BondValuator;
 use crate::instruments::fixed_income::bond::pricing::settlement::QuoteDateContext;
-use crate::instruments::fixed_income::bond::pricing::ytm_solver::{solve_ytm, YtmPricingSpec};
+use crate::instruments::fixed_income::bond::pricing::ytm_solver::{solve_bond_ytm, YtmPricingSpec};
 use crate::instruments::fixed_income::bond::Bond;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -344,13 +344,145 @@ pub(crate) fn icma_reference_period(
         return None;
     }
     let next = dates.into_iter().find(|d| *d > as_of)?;
-    let mut prev = next.add_months(-months);
+    let mut prev = next.add_months(-months).ok()?;
     // Preserve the end-of-month roll so the quasi-coupon grid matches an
     // EOM schedule (mirrors the traversal's own EOM handling).
     if next == next.end_of_month() {
         prev = prev.end_of_month();
     }
     (prev < next).then_some((prev, next))
+}
+
+/// Measure raw dated cashflows using the context their dates can establish.
+///
+/// # Arguments
+///
+/// * `day_count` - Convention for elapsed yield time; ACT/365L requires unavailable coupon metadata.
+/// * `frequency` - Contractual coupon tenor for ICMA reference-period inference.
+/// * `flows` - Dated signed cashflows in payment order.
+/// * `as_of` - Yield settlement date; earlier or equal payments receive zero time.
+pub(crate) fn flow_times(
+    day_count: finstack_quant_core::dates::DayCount,
+    frequency: finstack_quant_core::dates::Tenor,
+    flows: &[(Date, Money)],
+    as_of: Date,
+) -> finstack_quant_core::Result<Vec<(Date, f64, Money)>> {
+    let ctx = DayCountContext {
+        frequency: Some(frequency),
+        coupon_period: icma_reference_period(
+            day_count,
+            frequency,
+            flows.iter().map(|(date, _)| *date),
+            as_of,
+        ),
+        ..DayCountContext::default()
+    };
+    flows
+        .iter()
+        .map(|&(date, amount)| {
+            let time = if date <= as_of {
+                0.0
+            } else {
+                day_count.year_fraction(as_of, date, ctx)?
+            };
+            Ok((date, time, amount))
+        })
+        .collect()
+}
+
+/// Measure ACT/365L bond flows on contractual coupon dates for quoted yield.
+///
+/// Operational payment adjustment or lag does not extend the coupon clock.
+/// Actual payment dates remain on each flow for cashflow entitlement and curve
+/// discounting. Custom flows sharing one payment date must identify one
+/// contractual coupon end; aggregated distinct coupon ends are ambiguous.
+///
+/// # Arguments
+///
+/// * `bond` - Bond supplying coupon convention, tenor, and actual contractual periods.
+/// * `flows` - Dated signed cashflows in payment order.
+/// * `as_of` - Yield settlement date; earlier or equal payments receive zero time.
+///
+/// # References
+///
+/// - [OpenGamma Bond Pricing, section 7](https://quant.opengamma.io/Bond-Pricing-OpenGamma.pdf):
+///   quoted yield uses contractual coupon timing independently of exact payment dates.
+pub(crate) fn bond_flow_times(
+    bond: &Bond,
+    flows: &[(Date, Money)],
+    as_of: Date,
+) -> finstack_quant_core::Result<Vec<(Date, f64, Money)>> {
+    if bond.cashflow_spec.day_count() != finstack_quant_core::dates::DayCount::Act365L {
+        return flow_times(
+            bond.cashflow_spec.day_count(),
+            bond.cashflow_spec.frequency(),
+            flows,
+            as_of,
+        );
+    }
+    let coupons =
+        crate::instruments::fixed_income::bond::pricing::time_basis::bond_coupon_dates(bond)?;
+    act365l_flow_times(bond.cashflow_spec.frequency(), &coupons, flows, as_of)
+}
+
+/// Measure ACT/365L quoted flows using explicit contractual coupon metadata.
+///
+/// Payment adjustment does not extend the contractual yield clock. Multiple
+/// distinct coupon ends on one aggregated payment date cannot identify that
+/// clock uniquely and are rejected.
+///
+/// # Arguments
+///
+/// * `frequency` - Contractual coupon tenor selecting the ACT/365L denominator.
+/// * `coupons` - Payment dates and full accrual boundaries as `(payment, start, end)`.
+/// * `flows` - Dated signed coupon and principal amounts in payment order.
+/// * `as_of` - Settlement date; earlier or equal payments receive zero time.
+pub(crate) fn act365l_flow_times(
+    frequency: finstack_quant_core::dates::Tenor,
+    coupons: &[(Date, Date, Date)],
+    flows: &[(Date, Money)],
+    as_of: Date,
+) -> finstack_quant_core::Result<Vec<(Date, f64, Money)>> {
+    use crate::instruments::fixed_income::bond::pricing::time_basis::act365l_year_fraction;
+    let mut periods: Vec<_> = coupons
+        .iter()
+        .map(|&(_, start, end)| (start, end))
+        .collect();
+    periods.sort_unstable();
+    periods.dedup();
+    flows
+        .iter()
+        .map(|&(date, amount)| {
+            let time = if date <= as_of {
+                0.0
+            } else {
+                let mut contractual_end = None;
+                for &(_, _, end) in coupons.iter().filter(|&&(payment, _, _)| payment == date) {
+                    if contractual_end.is_some_and(|previous| previous != end) {
+                        return Err(finstack_quant_core::Error::Validation(
+                            "ACT/365L quoted yield cannot time aggregated coupons with different \
+                             contractual ends on one payment date"
+                                .into(),
+                        ));
+                    }
+                    contractual_end = Some(end);
+                }
+                // Workout dates inside a coupon retain the actual coupon's
+                // denominator; ordinary coupon and redemption payments use
+                // their contractual coupon end even when payment is delayed.
+                let end = contractual_end.unwrap_or(date);
+                if end <= as_of {
+                    return Err(finstack_quant_core::Error::Validation(
+                        "ACT/365L quoted yield requires settlement before the contractual end \
+                         of an unpaid coupon"
+                            .into(),
+                    ));
+                }
+                act365l_year_fraction(frequency, &periods, as_of, end)?
+            };
+            Ok((date, time, amount))
+        })
+        .collect()
 }
 
 /// Price from yield using explicit day count and frequency (no `Bond` borrow required).
@@ -366,6 +498,8 @@ pub(crate) fn icma_reference_period(
 /// cashflow schedule (via the internal `icma_reference_period` helper) is supplied to the
 /// day-count context so mid-coupon settlement dates and stub spans resolve on
 /// the quasi-coupon grid instead of erroring.
+/// ACT/365L requires contractual coupon boundaries that raw dated flows do
+/// not carry; use [`price_from_ytm`] with a bond supplying its schedule instead.
 ///
 /// # Arguments
 ///
@@ -388,21 +522,24 @@ pub fn price_from_ytm_compounded_params(
     ytm: f64,
     comp: YieldCompounding,
 ) -> finstack_quant_core::Result<f64> {
-    // ACT/ACT (ICMA) requires the coupon frequency in the day-count context;
-    // the default context hard-errors for that convention. The schedule-derived
-    // reference coupon period additionally lets ISMA resolve mid-coupon
-    // settlement and stub spans that are not whole coupon multiples.
-    let dc_ctx = DayCountContext {
-        frequency: Some(frequency),
-        coupon_period: icma_reference_period(
-            day_count,
-            frequency,
-            flows.iter().map(|(d, _)| *d),
-            as_of,
-        ),
-        ..DayCountContext::default()
-    };
+    let timed = flow_times(day_count, frequency, flows, as_of)?;
+    price_from_ytm_timed(&timed, frequency, ytm, comp)
+}
 
+/// Discount already measured bond cashflows under the selected yield convention.
+///
+/// # Arguments
+///
+/// * `flows` - Payment dates, elapsed year fractions, and signed currency amounts.
+/// * `frequency` - Contractual coupon tenor used by Street, Treasury, and Moosmüller yields.
+/// * `ytm` - Annual yield expressed as a decimal under `comp`.
+/// * `comp` - Convention converting elapsed time and yield into discount factors.
+pub(crate) fn price_from_ytm_timed(
+    flows: &[(Date, f64, Money)],
+    frequency: finstack_quant_core::dates::Tenor,
+    ytm: f64,
+    comp: YieldCompounding,
+) -> finstack_quant_core::Result<f64> {
     // Schedule-aware first-period length for TreasuryActual / Moosmüller:
     // the year-fraction from `as_of` to the first cashflow strictly after `as_of`.
     let schedule_first_period = if matches!(
@@ -410,11 +547,10 @@ pub fn price_from_ytm_compounded_params(
         YieldCompounding::TreasuryActual | YieldCompounding::Moosmuller
     ) {
         let mut first: Option<f64> = None;
-        for &(date, _) in flows {
-            if date <= as_of {
+        for &(_, yf, _) in flows {
+            if yf <= 0.0 {
                 continue;
             }
-            let yf = day_count.year_fraction(as_of, date, dc_ctx)?;
             if yf > 0.0 {
                 first = Some(yf);
                 break;
@@ -428,11 +564,7 @@ pub fn price_from_ytm_compounded_params(
     let mut pv = NeumaierAccumulator::new();
     let mut moosmuller_k: u32 = 0;
     let mut moosmuller_date: Option<Date> = None;
-    for &(date, amount) in flows {
-        if date <= as_of {
-            continue;
-        }
-        let t = day_count.year_fraction(as_of, date, dc_ctx)?;
+    for &(date, t, amount) in flows {
         if t > 0.0 {
             let df = match (comp, schedule_first_period) {
                 (YieldCompounding::TreasuryActual, Some(first_period_len)) => {
@@ -491,11 +623,10 @@ pub fn price_from_ytm(
     as_of: Date,
     ytm: f64,
 ) -> finstack_quant_core::Result<f64> {
-    price_from_ytm_compounded_params(
-        bond.cashflow_spec.day_count(),
+    let timed = bond_flow_times(bond, flows, as_of)?;
+    price_from_ytm_timed(
+        &timed,
         bond.cashflow_spec.frequency(),
-        flows,
-        as_of,
         ytm,
         YieldCompounding::Street,
     )
@@ -928,7 +1059,8 @@ fn solve_workout_path_yield(
     }
 
     let coupon_rate = bond.cashflow_spec.plain_fixed_rate()?.unwrap_or(0.0);
-    solve_ytm(
+    solve_bond_ytm(
+        bond,
         &future_flows,
         quote_date,
         Money::new(residual_target, dirty_price_target.currency())?,

@@ -16,6 +16,9 @@ use finstack_quant_valuations::recalibration::{
 use std::sync::Arc;
 
 /// Batch-local quote-recalibration provider with concurrent result caches.
+///
+/// Rate cache keys include source market and recipe content, so opening and
+/// closing snapshots in the same pricing batch cannot share stale results.
 #[derive(Default)]
 pub struct CachedRecalibrationProvider {
     rate: RateRecalibrationCache,

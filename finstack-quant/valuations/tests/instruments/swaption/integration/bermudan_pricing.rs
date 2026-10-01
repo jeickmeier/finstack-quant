@@ -845,23 +845,60 @@ fn test_registry_default_prices_with_instrument_hw1f_overrides() {
     assert!(result.value.amount().is_finite());
 }
 
-/// `num_paths` counts independent estimators (RNG streams). The default LSMC
-/// configuration was halved when it stopped counting antithetic mirrors, so it
-/// must replay exactly the same streams: the default PV is pinned bit-for-bit
-/// to the value captured before the change.
+/// Defaults must replay the original 50,000 RNG streams (100,000 antithetic
+/// paths) exactly as an explicit configuration. The historical PV remains a
+/// separate numerical anchor: pairing observations before Welford aggregation
+/// changes floating-point reduction order, while preserving the sample mean
+/// mathematically. That reduction need not reproduce the former unpaired mean
+/// bit-for-bit; the allowance below is only floating-point rounding, not MC error.
 #[test]
 fn lsmc_default_mc_pv_unchanged() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
     let swap_end = Date::from_calendar_date(2030, Month::January, 1).expect("Valid date");
     let first_exercise = Date::from_calendar_date(2027, Month::January, 1).expect("Valid date");
     let swaption = test_bermudan_swaption(as_of, swap_end, first_exercise, 0.03, OptionType::Call);
+    let market = build_market_context();
     let result = BermudanSwaptionPricer::lsmc()
-        .price_dyn(&swaption, &build_market_context(), as_of)
+        .price_dyn(&swaption, &market, as_of)
         .expect("default LSMC price");
+    let explicit = BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
+        mc: RateExoticMcConfig {
+            num_paths: 50_000,
+            seed: 42,
+            antithetic: true,
+            min_steps_between_events: 2,
+            basis_degree: 3,
+            oos_lsmc: false,
+        },
+        ..Default::default()
+    })
+    .price_dyn(&swaption, &market, as_of)
+    .expect("explicit LSMC price");
+
     assert_eq!(
         result.value.amount().to_bits(),
-        0x414581642ecba44e_u64,
-        "pv={}",
-        result.value.amount()
+        explicit.value.amount().to_bits(),
+        "default and explicit configurations must replay identical streams"
+    );
+    for key in ["mc_stderr", "lsmc_ci95_low", "lsmc_ci95_high"] {
+        assert_eq!(
+            result.measures[key].to_bits(),
+            explicit.measures[key].to_bits(),
+            "{key}"
+        );
+    }
+    assert_eq!(result.measures["lsmc_num_paths"], 50_000.0);
+    assert_eq!(result.measures["lsmc_seed"], 42.0);
+
+    // Retain the pre-pairing value instead of replacing it with today's result.
+    // At this price 32 ULPs is less than USD 0.00000002; the observed paired
+    // versus unpaired reduction differs by 6 ULPs (about USD 0.000000003).
+    let legacy_bits = 0x414581642ecba44e_u64;
+    let rounding_ulps = result.value.amount().to_bits().abs_diff(legacy_bits);
+    assert!(
+        rounding_ulps <= 32,
+        "pv={} differs from legacy PV={} by {rounding_ulps} ULPs",
+        result.value.amount(),
+        f64::from_bits(legacy_bits),
     );
 }

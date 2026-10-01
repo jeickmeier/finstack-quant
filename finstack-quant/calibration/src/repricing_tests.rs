@@ -1193,7 +1193,6 @@ fn inflation_curve_swap_repricing() {
                     notional: 1.0,
                     method: CalibrationMethod::Bootstrap,
                     interpolation: Default::default(),
-                    seasonal_factors: None,
                 }),
             },
         ],

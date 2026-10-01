@@ -54,7 +54,8 @@ fn test_clo_default_payment_frequency() {
         Date::from_calendar_date(2024, Month::January, 1).unwrap(),
         maturity_date(),
         "USD-OIS",
-    );
+    )
+    .expect("valid structured-credit dates");
 
     // Assert: CLO should default to quarterly payments
     assert_eq!(clo.frequency, Tenor::quarterly());
@@ -70,7 +71,8 @@ fn test_clo_default_prepayment_model() {
         Date::from_calendar_date(2024, Month::January, 1).unwrap(),
         maturity_date(),
         "USD-OIS",
-    );
+    )
+    .expect("valid structured-credit dates");
 
     // Assert: CLO should use constant CPR
     assert_eq!(clo.credit_model.prepayment_spec.cpr, 0.20); // 20% CPR standard
@@ -93,7 +95,8 @@ fn test_clo_default_assumptions() {
         Date::from_calendar_date(2024, Month::January, 1).unwrap(),
         maturity_date(),
         "USD-OIS",
-    );
+    )
+    .expect("valid structured-credit dates");
 
     // Assert: CLO standard assumptions
     assert_eq!(clo.credit_model.default_spec.cdr, 0.02); // 2% CDR
@@ -113,7 +116,8 @@ fn test_abs_default_payment_frequency() {
         Date::from_calendar_date(2024, Month::January, 1).unwrap(),
         maturity_date(),
         "USD-OIS",
-    );
+    )
+    .expect("valid structured-credit dates");
 
     // Assert: ABS should default to monthly payments
     assert_eq!(abs.frequency, Tenor::monthly());
@@ -129,7 +133,8 @@ fn test_abs_default_assumptions() {
         Date::from_calendar_date(2024, Month::January, 1).unwrap(),
         maturity_date(),
         "USD-OIS",
-    );
+    )
+    .expect("valid structured-credit dates");
 
     // Assert: Auto ABS standard assumptions
     assert_eq!(abs.credit_model.default_spec.cdr, 0.02); // 2% CDR
@@ -157,7 +162,8 @@ fn test_rmbs_default_payment_frequency() {
         Date::from_calendar_date(2024, Month::January, 1).unwrap(),
         maturity_date(),
         "USD-OIS",
-    );
+    )
+    .expect("valid structured-credit dates");
 
     // Assert: RMBS should default to monthly payments
     assert_eq!(rmbs.frequency, Tenor::monthly());
@@ -173,7 +179,8 @@ fn test_rmbs_default_prepayment_model() {
         Date::from_calendar_date(2024, Month::January, 1).unwrap(),
         maturity_date(),
         "USD-OIS",
-    );
+    )
+    .expect("valid structured-credit dates");
 
     // Assert: RMBS should use PSA model
     assert_eq!(rmbs.credit_model.prepayment_spec.cpr, 0.06); // 100% PSA terminal = 6% CPR
@@ -195,7 +202,8 @@ fn test_rmbs_default_assumptions() {
         Date::from_calendar_date(2024, Month::January, 1).unwrap(),
         maturity_date(),
         "USD-OIS",
-    );
+    )
+    .expect("valid structured-credit dates");
 
     // Assert: RMBS standard assumptions
     assert_eq!(rmbs.credit_model.default_spec.cdr, 0.006); // 0.6% CDR
@@ -218,7 +226,8 @@ fn test_cmbs_default_payment_frequency() {
         Date::from_calendar_date(2024, Month::January, 1).unwrap(),
         maturity_date(),
         "USD-OIS",
-    );
+    )
+    .expect("valid structured-credit dates");
 
     // Assert: CMBS should default to monthly payments
     assert_eq!(cmbs.frequency, Tenor::monthly());
@@ -234,7 +243,8 @@ fn test_cmbs_default_assumptions() {
         Date::from_calendar_date(2024, Month::January, 1).unwrap(),
         maturity_date(),
         "USD-OIS",
-    );
+    )
+    .expect("valid structured-credit dates");
 
     // Assert: CMBS standard assumptions
     assert_eq!(cmbs.credit_model.default_spec.cdr, 0.005); // 0.5% CDR
@@ -254,7 +264,8 @@ fn test_all_deal_types_have_correct_classification() {
         Date::from_calendar_date(2024, Month::January, 1).unwrap(),
         maturity_date(),
         "USD-OIS",
-    );
+    )
+    .expect("valid structured-credit dates");
 
     let abs = StructuredCredit::new_abs(
         "ABS",
@@ -263,7 +274,8 @@ fn test_all_deal_types_have_correct_classification() {
         Date::from_calendar_date(2024, Month::January, 1).unwrap(),
         maturity_date(),
         "USD-OIS",
-    );
+    )
+    .expect("valid structured-credit dates");
 
     let rmbs = StructuredCredit::new_rmbs(
         "RMBS",
@@ -272,7 +284,8 @@ fn test_all_deal_types_have_correct_classification() {
         Date::from_calendar_date(2024, Month::January, 1).unwrap(),
         maturity_date(),
         "USD-OIS",
-    );
+    )
+    .expect("valid structured-credit dates");
 
     let cmbs = StructuredCredit::new_cmbs(
         "CMBS",
@@ -281,7 +294,8 @@ fn test_all_deal_types_have_correct_classification() {
         Date::from_calendar_date(2024, Month::January, 1).unwrap(),
         maturity_date(),
         "USD-OIS",
-    );
+    )
+    .expect("valid structured-credit dates");
 
     // Assert
     assert_eq!(clo.deal_type, DealType::Clo);

@@ -25,7 +25,10 @@ use primitives::{extract_cf_kind, PyCashFlow};
 /// spec_json : str
 ///     JSON-encoded `CashflowScheduleBuildSpec`.
 /// market_json : str, optional
-///     JSON-encoded market context for floating-rate lookups.
+///     JSON-encoded market context for floating-rate lookups. Complete supplied
+///     observations can build without a forward curve. Explicit fallback covers
+///     missing curves or absent fixing series; supplied historical gaps before
+///     a resolved curve's base date always fail.
 ///
 /// Returns
 /// -------
@@ -35,9 +38,11 @@ use primitives::{extract_cf_kind, PyCashFlow};
 /// Raises
 /// ------
 /// ValueError
-///     If either JSON document is malformed or the schedule fails to build.
+///     If either JSON document is malformed or the schedule fails to build,
+///     including unsupported roll-grid/ICMA anchors, negative lags, supplied
+///     historical fixing gaps, or curve/date/day-count/arithmetic failures.
 /// KeyError
-///     If a floating leg references a curve missing from ``market_json``.
+///     If required market data is unavailable and no eligible fallback resolves it.
 #[pyfunction]
 #[pyo3(
     signature = (spec_json, market_json = None),
@@ -66,7 +71,10 @@ fn build_cashflow_schedule_json(
 ///     ``principal_events``, ``principal_exchange``).
 /// market : MarketContext or str, optional
 ///     Market context (or its JSON) for floating-rate projection; fixed
-///     coupons and deterministic fees do not need one.
+///     coupons and deterministic fees do not need one. Complete supplied
+///     observations need no forward curve. Explicit fallback covers missing
+///     curves or absent fixing series, never supplied historical gaps before
+///     a resolved curve's base date or genuine projection errors.
 ///
 /// Returns
 /// -------
@@ -76,18 +84,22 @@ fn build_cashflow_schedule_json(
 /// Raises
 /// ------
 /// ValueError
-///     If the spec is malformed or the schedule fails validation.
+///     If the spec is malformed or the schedule fails validation, including
+///     unsupported roll-grid/ICMA anchors, negative lags, supplied historical
+///     fixing gaps, or curve/date/day-count/arithmetic failures.
 /// KeyError
-///     If a floating leg references a curve missing from ``market``.
+///     If required market data is unavailable and no eligible fallback resolves it.
 ///
 /// Examples
 /// --------
 /// >>> from finstack_quant.cashflows import build_cashflow_schedule
 /// >>> spec = {
-/// ...     "notional": {"initial": {"amount": 1000000.0, "currency": "USD"}, "amort": "none"},
+/// ...     "notional": {"initial": {"amount": "1000000", "currency": "USD"}, "amort": "none"},
 /// ...     "issue_date": "2025-01-15", "maturity": "2026-01-15",
-/// ...     "coupon_program": [{"kind": "fixed", "rate": "0.05", "coupon_type": "cash",
-/// ...         "frequency": "6M", "day_count": "30/360", "calendar_id": "weekends_only"}],
+/// ...     "coupon_program": [{"kind": "fixed", "spec": {
+/// ...         "rate": "0.05", "coupon_type": "cash",
+/// ...         "frequency": {"count": 6, "unit": "months"},
+/// ...         "day_count": "30_360", "calendar_id": "weekends_only"}}],
 /// ... }
 /// >>> build_cashflow_schedule(spec).get_flows()[0].kind.name
 /// 'notional'
@@ -144,12 +156,17 @@ fn validate_cashflow_schedule_json(py: Python<'_>, schedule_json: &str) -> PyRes
 /// -------
 /// str
 ///     JSON array of settlement cash entries. Non-cash PIK and default-write-down
-///     rows are omitted; parse the full schedule JSON when classifications are needed.
+///     rows and zero-cash principal markers are omitted. Native currencies are
+///     retained without conversion or netting; parse the full schedule JSON
+///     when classifications are needed.
 ///
 /// Raises
 /// ------
 /// ValueError
-///     If the schedule JSON is malformed.
+///     If the schedule JSON, amounts, accrual metadata, row currencies, or
+///     dates are invalid, or a single-currency principal path fails balance
+///     reconciliation. Composite principal paths in multiple currencies
+///     receive structural validation without scalar balance reconciliation.
 #[pyfunction]
 #[pyo3(text_signature = "(schedule_json)")]
 fn dated_flows_json(py: Python<'_>, schedule_json: &str) -> PyResult<String> {
@@ -170,12 +187,17 @@ fn dated_flows_json(py: Python<'_>, schedule_json: &str) -> PyResult<String> {
 /// -------
 /// list[tuple[datetime.date, Money]]
 ///     Cash-settling rows in schedule order; PIK capitalizations and
-///     default write-downs are omitted.
+///     default write-downs are omitted, as are zero-cash principal markers.
+///     Native currencies are retained without conversion or netting.
 ///
 /// Raises
 /// ------
 /// ValueError
-///     If ``schedule`` is a malformed JSON string.
+///     If ``schedule`` is malformed or its amounts, accrual metadata, row
+///     currencies, or dates are invalid. Single-currency principal paths
+///     must reconcile with the opening notional. Composite principal paths
+///     in multiple currencies receive structural validation without scalar
+///     balance reconciliation.
 /// TypeError
 ///     If ``schedule`` is neither a ``CashFlowSchedule`` nor a string.
 ///
@@ -195,11 +217,10 @@ fn dated_flows<'py>(
     schedule: &Bound<'py, PyAny>,
 ) -> PyResult<Vec<(Bound<'py, PyAny>, PyMoney)>> {
     let schedule = extract_schedule(schedule)?;
-    schedule
-        .get_flows()
-        .iter()
-        .filter(|flow| finstack_quant_cashflows::primitives::is_cash_settlement_kind(flow.kind))
-        .map(|flow| Ok((date_to_py(py, flow.date)?, PyMoney::from_inner(flow.amount))))
+    finstack_quant_cashflows::dated_flows(&schedule)
+        .map_err(crate::errors::core_to_py)?
+        .into_iter()
+        .map(|(date, amount)| Ok((date_to_py(py, date)?, PyMoney::from_inner(amount))))
         .collect()
 }
 
@@ -227,7 +248,11 @@ fn dated_flows<'py>(
 /// Raises
 /// ------
 /// ValueError
-///     If either JSON document is malformed or the schedule fails validation.
+///     If either JSON document is malformed, the schedule fails validation,
+///     compounded accrual has a non-finite period rate or a rate at or below
+///     -100%, or the resulting accrued interest is non-finite.
+/// KeyError
+///     If a configured ex-coupon calendar id cannot be resolved.
 #[pyfunction]
 #[pyo3(
     signature = (schedule_json, as_of, config_json = None),
@@ -422,12 +447,11 @@ fn schedule_from_classified_flows(
 
 /// Register the `finstack_quant.cashflows` Python namespace.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "cashflows")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "cashflows")?;
     m.setattr(
         "__doc__",
         "Cashflow schedule construction (typed and JSON), validation, and dated-flow extraction.",
     )?;
-    m.setattr("__package__", "finstack_quant.cashflows")?;
 
     primitives::register(py, &m)?;
     builder::register(py, &m)?;
@@ -454,24 +478,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(builder::mdr_to_cdr, &m)?)?;
     m.add_function(wrap_pyfunction!(builder::smm_to_cpr, &m)?)?;
 
-    for name in [
-        "accrued_interest",
-        "build_cashflow_schedule",
-        "build_cashflow_schedule_json",
-        "cdr_to_mdr",
-        "cpr_to_smm",
-        "dated_flows",
-        "dated_flows_json",
-        "mdr_to_cdr",
-        "schedule_from_classified_flows",
-        "schedule_from_dated_flows",
-        "smm_to_cpr",
-        "validate_cashflow_schedule_json",
-    ] {
-        m.getattr(name)?
-            .setattr("__module__", "finstack_quant.cashflows")?;
-    }
-
     let all = PyList::new(
         py,
         [
@@ -497,13 +503,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "cashflows",
-        crate::bindings::module_utils::ROOT_PACKAGE,
-        crate::bindings::module_utils::ParentNameSource::Name,
+        crate::bindings::module_utils::Exposure::Python,
     )?;
 
     Ok(())

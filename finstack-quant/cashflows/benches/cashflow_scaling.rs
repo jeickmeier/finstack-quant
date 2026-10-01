@@ -17,7 +17,7 @@ mod fixtures;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use finstack_quant_cashflows::aggregation::DateContext;
 use finstack_quant_cashflows::builder::{
-    CashFlowSchedule, CouponType, FixedCouponSpec, PvDiscountSource, ScheduleParams,
+    AmortizationSpec, CashFlowSchedule, CouponType, FixedCouponSpec, ScheduleParams,
 };
 use finstack_quant_cashflows::{AccrualConfig, AccrualIndex};
 use finstack_quant_core::currency::Currency;
@@ -131,6 +131,50 @@ fn bench_build_scaling(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(n), &years, |b, &y| {
             b.iter(|| build_monthly(black_box(base), black_box(y)));
         });
+    }
+    group.finish();
+}
+
+/// Construction with amortization must avoid scanning all boundaries per period.
+fn bench_amortizing_build_scaling(c: &mut Criterion) {
+    let mut group = c.benchmark_group("scaling_build_amortizing_monthly");
+    let base = base_date();
+    for years in [5i32, 10, 20, 40, 80] {
+        let coupons = (years * 12) as u64;
+        let maturity = Date::from_calendar_date(2025 + years, Month::January, 15).unwrap();
+        let mut builder = CashFlowSchedule::builder();
+        let _ = builder
+            .principal(
+                Money::new(1_000_000.0, Currency::USD).unwrap(),
+                base,
+                maturity,
+            )
+            .amortization(AmortizationSpec::LinearTo {
+                final_notional: Money::new(0.0, Currency::USD).unwrap(),
+            })
+            .fixed_cf(FixedCouponSpec {
+                coupon_type: CouponType::Cash,
+                rate: dec!(0.06),
+                schedule: ScheduleParams {
+                    frequency: Tenor::monthly(),
+                    business_day_convention: BusinessDayConvention::Unadjusted,
+                    calendar_id: "weekends_only".into(),
+                    day_count: DayCount::Act365F,
+                    stub: StubKind::None,
+                    end_of_month: false,
+                    payment_lag_days: 0,
+                    adjust_accrual_dates: false,
+                    roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+                },
+            });
+        group.throughput(Throughput::Elements(coupons));
+        group.bench_with_input(
+            BenchmarkId::from_parameter(coupons),
+            &builder,
+            |b, builder| {
+                b.iter(|| black_box(builder).build(None).unwrap());
+            },
+        );
     }
     group.finish();
 }
@@ -260,10 +304,8 @@ fn bench_pv_by_period_scaling(c: &mut Criterion) {
                 black_box(&schedule)
                     .pv_by_period_with_discounting(
                         black_box(&periods),
-                        PvDiscountSource::Discount {
-                            disc: black_box(disc.as_ref()),
-                            credit: None,
-                        },
+                        black_box(disc.as_ref()),
+                        None,
                         DateContext::new(base, DayCount::Act365F, DayCountContext::default()),
                     )
                     .unwrap()
@@ -290,6 +332,7 @@ fn bench_outstanding_scaling(c: &mut Criterion) {
 criterion_group!(
     benches,
     bench_build_scaling,
+    bench_amortizing_build_scaling,
     bench_adjustment_axes,
     bench_build_overnight_scaling,
     bench_floating_term_scaling,

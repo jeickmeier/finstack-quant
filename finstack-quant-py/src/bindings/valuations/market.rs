@@ -912,9 +912,5 @@ pub(crate) fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()>
     m.add_class::<PyInflationSwapConventions>()?;
     m.add_class::<PyXccyConventions>()?;
     m.add_class::<PyIrFutureConventions>()?;
-    for name in EXPORTS {
-        m.getattr(*name)?
-            .setattr("__module__", "finstack_quant.valuations.market")?;
-    }
     Ok(())
 }

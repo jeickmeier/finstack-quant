@@ -340,9 +340,14 @@ fn discount_curve_dts_exposes_canonical_validation_and_forward_names() {
         "forward(t1: number, t2: number): number;"
     ));
     assert!(!curve.contains("forwardRate"));
-    assert!(constructor.contains("validationMode?: DiscountCurveValidationMode"));
-    assert!(constructor.contains("forwardFloor?: number | null"));
-    assert!(contains_ignoring_ws(constructor, "knots: NumericArray"));
+    let options = interface_block(&dts, "DiscountCurveOptions");
+    assert!(options.contains("validationMode?: DiscountCurveValidationMode"));
+    assert!(options.contains("forwardFloor?: number | null"));
+    assert!(contains_ignoring_ws(options, "knots: NumericArray"));
+    assert!(contains_signature(
+        constructor,
+        "new (options: DiscountCurveOptions): DiscountCurve;"
+    ));
     assert!(contains_signature(
         constructor,
         "flat(id: string, baseDate: string, continuousRate: number): DiscountCurve;"
@@ -421,7 +426,17 @@ fn valuations_dts_exposes_direct_fx_instruments() {
     assert!(dts.contains("FxBarrierOption: FxInstrumentConstructor<FxBarrierOptionInstrument>;"));
     assert!(dts.contains("FxDigitalOption: FxInstrumentConstructor<FxDigitalOptionInstrument>;"));
     assert!(dts.contains("FxTouchOption: FxInstrumentConstructor<FxTouchOptionInstrument>;"));
-    assert!(dts.contains("QuantoOption: FxInstrumentConstructor<FxOptionInstrument>;"));
+    assert!(dts.contains("QuantoOption: FxInstrumentConstructor<QuantoOptionInstrument>;"));
+    assert!(dts.contains("export interface QuantoOptionInstrument extends FxOptionInstrument"));
+    let quanto = interface_block(&dts, "QuantoOptionInstrument");
+    assert!(contains_signature(
+        quanto,
+        "theta(marketJson: string, asOf: string, model?: string | null): number;"
+    ));
+    assert!(contains_signature(
+        quanto,
+        "greeks(marketJson: string, asOf: string, model?: string | null): Record<string, number>;"
+    ));
     assert!(dts.contains("fx: FxNamespace;"));
     assert!(dts
         .contains("foreignRho(marketJson: string, asOf: string, model?: string | null): number;"));
@@ -632,10 +647,16 @@ fn scenarios_dts_matches_structured_surface() {
     assert!(dts.contains("export interface ScenarioSpec"));
     assert!(dts.contains("export interface TemplateMetadata"));
     assert!(dts.contains("export interface ScenarioWarning"));
+    assert!(dts.contains("export interface HorizonResult"));
+    assert!(contains_ignoring_ws(&dts, "total_return: number | null;"));
+    assert!(contains_ignoring_ws(
+        &dts,
+        "annualized_return: number | null;"
+    ));
     assert!(contains_ignoring_ws(&dts, "warnings: ScenarioWarning[];"));
     assert!(contains_ignoring_ws(
         &dts,
-        "computeHorizonReturn(instrumentJson: string, marketJson: string, asOf: string, scenarioJson: string, method?: string, configJson?: string, calendarId?: string): Record<string, unknown>;",
+        "computeHorizonReturn(instrumentJson: string, marketJson: string, asOf: string, scenarioJson: string, method?: string, configJson?: string, calendarId?: string): HorizonResult;",
     ));
     // `priority` mirrors the Rust serde default (0) and the Python keyword
     // default, so it must stay optional.

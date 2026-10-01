@@ -102,11 +102,11 @@ class AccrualMethod:
 
 class ExCouponRule:
     """
-    Ex-coupon convention applied to coupon flows.
+    Coupon record-date convention applied to coupon flows.
 
-    From the ex-coupon date (inclusive) until the coupon payment date
-    (exclusive), the instrument trades ex-coupon: the seller keeps the
-    coupon and accrued interest is negative.
+    Settlement on the record date retains the coupon. Settlement strictly
+    after it and before payment trades ex-coupon: the seller keeps the coupon
+    and accrued interest is the rebate of the remaining accrual period.
 
     Examples
     --------
@@ -115,6 +115,10 @@ class ExCouponRule:
     >>> rule = ExCouponRule(days_before_coupon=7)
     >>> rule.ex_date(datetime.date(2025, 7, 15))
     datetime.date(2025, 7, 8)
+    >>> rule.is_ex_coupon(datetime.date(2025, 7, 15), datetime.date(2025, 7, 8))
+    False
+    >>> rule.is_ex_coupon(datetime.date(2025, 7, 15), datetime.date(2025, 7, 9))
+    True
     """
 
     def __init__(
@@ -128,8 +132,8 @@ class ExCouponRule:
         Parameters
         ----------
         days_before_coupon : int
-            Number of days before the coupon payment date that go ex (max
-            366; larger values are rejected by :meth:`ex_date`).
+            Number of days from the coupon record date to payment (max 366;
+            larger values are rejected when calculating entitlement).
         calendar_id : str, optional
             Business-day calendar identifier; when omitted, calendar days
             are used instead of business days.
@@ -153,7 +157,7 @@ class ExCouponRule:
     @property
     def days_before_coupon(self) -> int:
         """
-        Days before the coupon payment date that go ex.
+        Days from the coupon record date to payment.
 
         Returns
         -------
@@ -185,7 +189,7 @@ class ExCouponRule:
 
     def ex_date(self, payment_date: datetime.date) -> datetime.date:
         """
-        Compute the ex-coupon date for a coupon paid on *payment_date*.
+        Compute the coupon record date for a coupon paid on *payment_date*.
 
         Parameters
         ----------
@@ -195,15 +199,43 @@ class ExCouponRule:
         Returns
         -------
         datetime.date
-            The ex-coupon date; from this date (inclusive) until
-            *payment_date* (exclusive), the instrument trades ex-coupon.
+            Record date; settlement on this date retains the coupon. Settlement
+            strictly after it and before *payment_date* trades ex-coupon.
 
         Raises
         ------
         ValueError
-            If ``days_before_coupon`` exceeds 366.
+            If ``days_before_coupon`` exceeds 366, the date cannot be parsed,
+            or the record date is outside the supported date range.
         KeyError
             If the configured calendar id cannot be resolved.
+        """
+        ...
+
+    def is_ex_coupon(self, payment_date: datetime.date, settlement_date: datetime.date) -> bool:
+        """
+        Return whether settlement forfeits the imminent coupon.
+
+        Parameters
+        ----------
+        payment_date : datetime.date
+            Coupon payment date used to calculate its record date.
+        settlement_date : datetime.date
+            Ownership-transfer date; convert trade dates to settlement first.
+
+        Returns
+        -------
+        bool
+            True strictly after the record date and before payment; False on
+            the record date, when the buyer retains the coupon.
+
+        Raises
+        ------
+        ValueError
+            If either date is invalid, the offset exceeds 366, or the record
+            date is outside the supported date range.
+        KeyError
+            If the configured calendar identifier cannot be resolved.
         """
         ...
 
@@ -558,6 +590,10 @@ class AccrualIndex:
 
         Raises
         ------
+        ValueError
+            If the date cannot be parsed, the period accrual fraction is
+            invalid, compounded accrual has a non-finite period rate or a rate
+            at or below -100%, or the resulting accrued interest is non-finite.
         KeyError
             If a configured ex-coupon calendar id cannot be resolved.
         """
@@ -593,7 +629,9 @@ def accrued_interest_amount(
     ------
     ValueError
         If the schedule fails validation, mixes currencies across coupon
-        flows, or carries a non-finite accrual factor.
+        flows, carries a non-finite accrual factor, compounded accrual has
+        a non-finite period rate or a rate at or below -100%, or the resulting
+        accrued interest is non-finite.
     KeyError
         If a configured ex-coupon calendar id cannot be resolved.
 

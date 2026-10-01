@@ -461,6 +461,8 @@ impl JsPerformance {
 
     /// Calmar ratio (CAGR / |max drawdown|) over the active window, not
     /// Young's 36-month CTA definition.
+    /// With zero drawdown, nonzero CAGR gives signed infinity and zero
+    /// CAGR gives `0`.
     ///
     /// # Errors
     ///
@@ -593,6 +595,9 @@ impl JsPerformance {
     }
 
     /// Treynor ratio per asset for the given risk-free rate.
+    /// A non-finite risk-free rate gives `NaN`. With absolute beta below
+    /// `1e-10`, nonzero finite excess return gives signed infinity and zero
+    /// excess return gives `0`.
     /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
     pub fn treynor(&self, risk_free_rate: Option<f64>) -> JsValue {
@@ -613,7 +618,9 @@ impl JsPerformance {
         vec_f64_to_js(&self.inner.ulcer_index())
     }
 
-    /// Martin ratio (excess return over ulcer index) per asset.
+    /// Martin ratio (CAGR divided by Ulcer Index) per asset.
+    /// With zero Ulcer Index, nonzero CAGR gives signed infinity and zero
+    /// CAGR gives `0`.
     ///
     /// # Errors
     ///
@@ -639,7 +646,9 @@ impl JsPerformance {
         vec_f64_to_js(&self.inner.pain_index())
     }
 
-    /// Pain ratio (excess return over pain index) per asset.
+    /// Pain ratio ((CAGR - annual risk-free rate) / pain index) per asset.
+    /// Non-finite risk-free rates give `NaN`, including when the pain index
+    /// is zero.
     ///
     /// # Errors
     ///
@@ -762,6 +771,8 @@ impl JsPerformance {
     }
 
     /// Sterling ratio over the `n` largest drawdowns per asset.
+    /// Non-finite risk-free rates give `NaN`, including when no drawdowns
+    /// are observed.
     ///
     /// # Errors
     ///
@@ -784,6 +795,8 @@ impl JsPerformance {
     }
 
     /// Burke ratio over the `n` largest drawdowns per asset.
+    /// Non-finite risk-free rates give `NaN`, including when no drawdowns
+    /// are observed.
     ///
     /// # Errors
     ///
@@ -1173,7 +1186,10 @@ impl JsPerformance {
     /// Rejects a non-numeric `factor_returns` matrix, an unknown
     /// `returnKind`, an out-of-range `ticker_idx`, no factors, too few
     /// observations, non-finite or length-mismatched inputs, a singular
-    /// factor design, or a result that cannot be serialized to JavaScript.
+    /// factor design, a fitted coefficient, annualized intercept, or residual
+    /// volatility that cannot be represented as a finite value, or a result
+    /// that cannot be serialized to JavaScript. Constant responses retain
+    /// undefined `NaN` R-squared statistics.
     /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
     /// @param factor_returns - Matrix of aligned already-excess decimal factor-return series, one row per factor.
     /// @param return_kind - `"excess"` or `"total"`; defaults to `"excess"`.

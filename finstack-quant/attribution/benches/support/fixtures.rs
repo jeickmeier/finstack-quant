@@ -309,8 +309,10 @@ pub fn return_contribution_spec(n: usize, brinson: bool) -> ReturnContributionSp
 pub fn parallel_spec_envelope(shift_bp: f64) -> AttributionEnvelope {
     let markets = BondMarkets::new(shift_bp);
     let bond = sample_bond("BENCH-BOND-SPEC", 5);
-    let market_t0 = MarketContextState::from(&markets.market_t0);
-    let market_t1 = MarketContextState::from(&markets.market_t1);
+    let market_t0 =
+        MarketContextState::try_from(&markets.market_t0).expect("coherent market snapshot");
+    let market_t1 =
+        MarketContextState::try_from(&markets.market_t1).expect("coherent market snapshot");
     AttributionEnvelope::new(AttributionSpec {
         instrument: InstrumentJson::Bond(bond),
         market_t0,

@@ -161,14 +161,74 @@ fn certify_root_by_local_sign_change(
     false
 }
 
-/// Minimum scan-grid size enforced in debug builds.
+/// Search the feasible side of each sampled validity boundary for a zero crossing.
+///
+/// A coarse grid can jump from a valid value over a root into an infeasible
+/// region (for example, a base correlation that implies negative tranche loss).
+/// Bisect only the sampled interval, retaining the valid endpoint. Invalid
+/// values delimit the search; they never supply a residual sign or secant slope.
+fn refine_domain_boundaries(
+    objective: &dyn Fn(f64) -> f64,
+    valid_points: &mut Vec<(f64, f64)>,
+    invalid_points: &[f64],
+    diag: &mut BracketDiagnostics,
+    initial: f64,
+    tol: f64,
+    max_iters: usize,
+) {
+    let mut observations: Vec<(f64, Option<f64>)> = valid_points
+        .iter()
+        .map(|&(x, value)| (x, Some(value)))
+        .chain(invalid_points.iter().map(|&x| (x, None)))
+        .collect();
+    observations.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let mut boundaries: Vec<(f64, f64, f64)> = observations
+        .windows(2)
+        .filter_map(|pair| match (pair[0], pair[1]) {
+            ((valid_x, Some(value)), (invalid_x, None))
+            | ((invalid_x, None), (valid_x, Some(value))) => Some((valid_x, value, invalid_x)),
+            _ => None,
+        })
+        .collect();
+    boundaries.sort_by(|a, b| {
+        let distance =
+            |boundary: &(f64, f64, f64)| (0.5 * boundary.0 + 0.5 * boundary.2 - initial).abs();
+        distance(a).total_cmp(&distance(b))
+    });
+
+    for (mut valid_x, mut valid_value, mut invalid_x) in boundaries {
+        // At most 64 halvings resolve a sampled interval to floating-point
+        // precision without an unbounded search near a pricing-domain edge.
+        for _ in 0..max_iters.clamp(50, 64) {
+            let midpoint = 0.5 * valid_x + 0.5 * invalid_x;
+            if midpoint == valid_x || midpoint == invalid_x {
+                break;
+            }
+            let value = objective(midpoint);
+            diag.update(midpoint, value);
+            if value.is_finite() && value.abs() < OBJECTIVE_VALID_ABS_MAX {
+                valid_points.push((midpoint, value));
+                if value.abs() < tol || opposite_signs(valid_value, value) {
+                    return;
+                }
+                valid_x = midpoint;
+                valid_value = value;
+            } else {
+                invalid_x = midpoint;
+            }
+        }
+    }
+}
+
+/// Minimum scan-grid size required by the bracket solver.
 ///
 /// The geometric bracket-expansion fallback was removed in favour of letting
 /// callers own the scan grid (each `BootstrapTarget` builds a maturity- or
 /// rate-aware grid that beats a one-size-fits-all expansion). A grid smaller
-/// than this almost certainly indicates a caller bug, not a deliberate choice.
-#[cfg(debug_assertions)]
-const MIN_DEBUG_SCAN_GRID_LEN: usize = 8;
+/// than this is rejected before any objective evaluations. A bounded domain
+/// may contain fewer distinct floating-point values, so this must be a checked
+/// error rather than a debug assertion.
+const MIN_SCAN_GRID_LEN: usize = 8;
 
 /// Like `bracket_solve_1d` but also returns diagnostics for error reporting.
 pub(crate) fn bracket_solve_1d_with_diagnostics(
@@ -226,21 +286,20 @@ fn bracket_solve_1d_impl(
     scan_strategy: ScanStrategy,
 ) -> Result<(Option<f64>, BracketDiagnostics)> {
     // The adaptive geometric expansion previously embedded here was removed;
-    // callers must now provide a grid dense enough to bracket the root. Catch
-    // sparse grids early in debug builds so the regression surfaces in tests
-    // rather than as a silent "no bracket found" at the validation step.
-    #[cfg(debug_assertions)]
-    debug_assert!(
-        scan_points.len() >= MIN_DEBUG_SCAN_GRID_LEN,
-        "bracket_solve_1d_with_diagnostics: scan grid has {} points (< {}); \
-         the adaptive bracket-expansion fallback was removed, so callers must \
-         supply a grid that spans the feasible region",
-        scan_points.len(),
-        MIN_DEBUG_SCAN_GRID_LEN
-    );
+    // callers must now provide a grid dense enough to bracket the root. Return
+    // a checked error when a narrow floating-point domain cannot supply it.
+    if scan_points.len() < MIN_SCAN_GRID_LEN {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "bracket_solve_1d_with_diagnostics: scan grid has {} points (< {}); \
+             supply a grid that spans the feasible region",
+            scan_points.len(),
+            MIN_SCAN_GRID_LEN
+        )));
+    }
 
     let mut diag = BracketDiagnostics::new(scan_points);
     let mut valid_points: Vec<(f64, f64)> = Vec::with_capacity(scan_points.len() + 8);
+    let mut invalid_points = Vec::new();
 
     let v0 = objective(initial);
     diag.update(initial, v0);
@@ -253,6 +312,8 @@ fn bracket_solve_1d_impl(
     }
     if v0.is_finite() && v0.abs() < OBJECTIVE_VALID_ABS_MAX {
         valid_points.push((initial, v0));
+    } else {
+        invalid_points.push(initial);
     }
 
     let mut nearest_first_points = Vec::new();
@@ -282,6 +343,7 @@ fn bracket_solve_1d_impl(
         diag.update(point, value);
 
         if !value.is_finite() || value.abs() >= OBJECTIVE_VALID_ABS_MAX {
+            invalid_points.push(point);
             continue;
         }
         valid_points.push((point, value));
@@ -305,6 +367,24 @@ fn bracket_solve_1d_impl(
 
     if valid_points.is_empty() {
         return Ok((None, diag));
+    }
+
+    valid_points.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let needs_domain_refinement = !invalid_points.is_empty()
+        && !valid_points.iter().any(|(_, value)| value.abs() < tol)
+        && !valid_points
+            .windows(2)
+            .any(|pair| opposite_signs(pair[0].1, pair[1].1));
+    if needs_domain_refinement {
+        refine_domain_boundaries(
+            objective,
+            &mut valid_points,
+            &invalid_points,
+            &mut diag,
+            initial,
+            tol,
+            max_iters,
+        );
     }
 
     // Robust bracket selection:
@@ -698,10 +778,8 @@ mod tests {
         // not silently return a wrong answer via the Newton fallback. Either
         // we converge near the true root (good) or return None (good); we must
         // never return a value far from the actual root.
-        // Note: the test is run in release-mode CI where the debug_assert is
-        // inactive; in debug builds the sparse grid will trip the assertion.
-        // We use exactly MIN_DEBUG_SCAN_GRID_LEN points so debug builds still
-        // exercise the path under test.
+        // Use the minimum accepted grid size to exercise the sparsest
+        // supported search in both debug and release builds.
         let f = |x: f64| x.powi(3) - 2.0 * x + 1.0; // roots at 1, ~0.618, ~-1.618
                                                     // Points that bracket the root at x=1 only via Newton-fallback secant.
         let scan: Vec<f64> = (0..8).map(|i| -2.0 + 0.5 * (i as f64)).collect();
@@ -749,6 +827,54 @@ mod tests {
             initial_evals, 1,
             "f(initial) must be evaluated exactly once, not re-priced as a scan point"
         );
+    }
+
+    #[test]
+    fn bracket_solver_refines_feasible_side_before_an_invalid_scan_node() {
+        // The root lies in a narrow valid interval beyond the only feasible
+        // scan node. A secant from x=0.25 overshoots into the invalid region.
+        let scan = [0.25, 0.375, 0.5, 0.6, 0.7, 0.8, 0.9, 0.999];
+        for mirrored in [false, true] {
+            let objective = |x: f64| {
+                let coordinate = if mirrored { 1.0 - x } else { x };
+                if !(0.25..=0.351).contains(&coordinate) {
+                    PENALTY
+                } else {
+                    (coordinate - 0.35) * (1.0 + coordinate)
+                }
+            };
+            let scan: Vec<f64> = scan
+                .iter()
+                .map(|&x| if mirrored { 1.0 - x } else { x })
+                .collect();
+            let initial = if mirrored { 0.75 } else { 0.25 };
+            for strategy in [ScanStrategy::Exhaustive, ScanStrategy::NearestFirst] {
+                let (root, diagnostics) =
+                    bracket_solve_1d_impl(&objective, initial, &scan, 1e-12, 100, strategy)
+                        .expect("bounded domain refinement");
+                let expected = if mirrored { 0.65 } else { 0.35 };
+                assert!((root.expect("reachable root") - expected).abs() < 1e-10);
+                assert!(diagnostics.is_sign_change_bracket);
+            }
+        }
+    }
+
+    #[test]
+    fn bracket_solver_does_not_treat_an_invalid_boundary_as_a_zero_crossing() {
+        let scan = [0.25, 0.375, 0.5, 0.6, 0.7, 0.8, 0.9, 0.999];
+        let objective = |x: f64| {
+            if (0.25..=0.351).contains(&x) {
+                0.4 - x
+            } else {
+                PENALTY
+            }
+        };
+        let (root, diagnostics) =
+            bracket_solve_1d_nearest_first_with_diagnostics(&objective, 0.25, &scan, 1e-12, 100)
+                .expect("bounded search");
+        assert!(root.is_none());
+        assert!(!diagnostics.is_sign_change_bracket);
+        assert!(diagnostics.best_value.expect("valid observations") >= 0.049 - 1e-15);
     }
 
     #[test]
@@ -923,16 +1049,17 @@ mod tests {
     }
 
     #[test]
-    #[cfg(debug_assertions)]
-    #[should_panic(expected = "bracket_solve_1d_with_diagnostics: scan grid has")]
-    fn debug_assert_rejects_sparse_scan_grid() {
-        // C4: callers that supply a too-sparse scan grid trip the debug
-        // assertion. This ensures the contract "callers own a dense grid"
-        // is enforced at test time, not silently when calibration regresses.
-        let f = |x: f64| x - 0.5;
+    fn sparse_scan_grid_returns_error_before_pricing() {
+        let calls = std::cell::Cell::new(0);
+        let f = |x: f64| {
+            calls.set(calls.get() + 1);
+            x - 0.5
+        };
         let scan = [0.0, 1.0]; // only 2 points
-        let _ =
-            bracket_solve_1d_with_diagnostics(&f, 0.5, &scan, 1e-12, 100).expect("solver error");
+        let error = bracket_solve_1d_with_diagnostics(&f, 0.5, &scan, 1e-12, 100)
+            .expect_err("insufficient scan grid must return a checked error");
+        assert!(error.to_string().contains("scan grid has 2 points"));
+        assert_eq!(calls.get(), 0);
     }
 }
 

@@ -23,7 +23,9 @@
 
 use std::sync::Arc;
 
-use crate::bindings::core::market_data::curves::{PyFxDeltaVolSurface, PyVolCube, PyVolSurface};
+use crate::bindings::core::market_data::curves::{
+    PyFxDeltaVolSurface, PyVolCube, PyVolCubeExpirySlice, PyVolSurface,
+};
 use crate::bindings::module_utils::py_to_serde;
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::bindings::pandas_utils::serde_to_py;
@@ -294,8 +296,8 @@ impl PySabrSmile {
     /// Parameters
     /// ----------
     /// strikes : list[float]
-    ///     Strike grid to evaluate. Must be sorted in ascending order for
-    ///     monotonicity checks to be meaningful.
+    ///     Finite strikes in strictly ascending order. Spacing may vary;
+    ///     convexity checks use the actual distances between strikes.
     /// r : float, optional
     ///     Risk-free rate (default ``0.0``).
     /// q : float, optional
@@ -307,6 +309,12 @@ impl PySabrSmile {
     ///     ``{"arbitrage_free": bool, "butterfly_violations": [...],
     ///     "monotonicity_violations": [...]}``. Violation lists contain dicts
     ///     with strike, price, and severity fields.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If strikes are non-finite or not strictly ascending, rates are
+    ///     non-finite, or smile generation or call-price evaluation is invalid.
     #[pyo3(signature = (strikes, r=0.0, q=0.0))]
     fn arbitrage_diagnostics<'py>(
         &self,
@@ -666,28 +674,44 @@ fn materialize_cube_tenor_slice_normal(
         .map_err(core_to_py)
 }
 
-/// Materialize a cube expiry slice as a lognormal tenor-axis surface artifact.
+/// Materialize a cube expiry slice as a lognormal grid with an explicit fixed expiry and tenor axis.
 #[pyfunction]
 fn materialize_cube_expiry_slice(
     cube: &PyVolCube,
     expiry: f64,
     strikes: Vec<f64>,
-) -> PyResult<PyVolSurface> {
+) -> PyResult<PyVolCubeExpirySlice> {
     vol::materialize_cube_expiry_slice(&cube.inner, expiry, &strikes)
-        .map(|surface| PyVolSurface::from_inner(Arc::new(surface)))
+        .map(|surface| PyVolCubeExpirySlice::from_inner(Arc::new(surface)))
         .map_err(core_to_py)
 }
 
-/// Materialize a cube expiry slice as a normal-volatility tenor-axis surface artifact.
+/// Materialize a cube expiry slice as a normal-volatility grid with an explicit fixed expiry and tenor axis.
 #[pyfunction]
 fn materialize_cube_expiry_slice_normal(
     cube: &PyVolCube,
     expiry: f64,
     strikes: Vec<f64>,
-) -> PyResult<PyVolSurface> {
+) -> PyResult<PyVolCubeExpirySlice> {
     vol::materialize_cube_expiry_slice_normal(&cube.inner, expiry, &strikes)
-        .map(|surface| PyVolSurface::from_inner(Arc::new(surface)))
+        .map(|surface| PyVolCubeExpirySlice::from_inner(Arc::new(surface)))
         .map_err(core_to_py)
+}
+
+/// Evaluate a fixed-expiry cube slice at an underlying tenor and strike.
+#[pyfunction]
+fn get_cube_expiry_slice_vol(
+    slice: &PyVolCubeExpirySlice,
+    tenor: f64,
+    strike: f64,
+) -> PyResult<f64> {
+    vol::get_cube_expiry_slice_vol(&slice.inner, tenor, strike).map_err(core_to_py)
+}
+
+/// Evaluate a fixed-expiry cube slice with coordinates clamped to its stored axes.
+#[pyfunction]
+fn get_cube_expiry_slice_vol_clamped(slice: &PyVolCubeExpirySlice, tenor: f64, strike: f64) -> f64 {
+    vol::get_cube_expiry_slice_vol_clamped(&slice.inner, tenor, strike)
 }
 
 /// Return ATM, 25-delta put, and 25-delta call vols at a stored FX expiry.
@@ -1085,7 +1109,7 @@ fn calibrate_svi(
 
 /// Register the volatility submodule under `finstack_quant.models`.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "volatility")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "volatility")?;
     m.setattr(
         "__doc__",
         "Product-independent volatility models, evaluators, fitting, and convention conversion.",
@@ -1100,6 +1124,8 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(surface_to_dataframe, &m)?)?;
     m.add_function(wrap_pyfunction!(get_surface_vol, &m)?)?;
     m.add_function(wrap_pyfunction!(get_surface_vol_clamped, &m)?)?;
+    m.add_function(wrap_pyfunction!(get_cube_expiry_slice_vol, &m)?)?;
+    m.add_function(wrap_pyfunction!(get_cube_expiry_slice_vol_clamped, &m)?)?;
     m.add_function(wrap_pyfunction!(get_cube_vol, &m)?)?;
     m.add_function(wrap_pyfunction!(get_cube_vol_clamped, &m)?)?;
     m.add_function(wrap_pyfunction!(get_cube_normal_vol, &m)?)?;
@@ -1132,6 +1158,8 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
                 "check_surface_grid",
                 "convert_atm_volatility",
                 "delta_to_strike",
+                "get_cube_expiry_slice_vol",
+                "get_cube_expiry_slice_vol_clamped",
                 "get_cube_normal_vol",
                 "get_cube_normal_vol_clamped",
                 "get_cube_vol",
@@ -1150,13 +1178,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             ],
         )?,
     )?;
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "volatility",
-        "finstack_quant.models",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Python,
     )?;
     Ok(())
 }

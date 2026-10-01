@@ -11,8 +11,8 @@
 //!
 //! # Boundary Conditions
 //!
-//! - **x-lower** (deep OTM): Dirichlet(0) for calls, Linear for puts
-//! - **x-upper** (deep ITM): Linear for calls, Dirichlet(0) for puts
+//! - **x-lower** (deep OTM): Dirichlet(0) for calls, LinearInExp for puts
+//! - **x-upper** (deep ITM): LinearInExp for calls, Dirichlet(0) for puts
 //! - **v-lower** (v → 0): reduces to 1D PDE `du/dt = (r-q)·du/dx + κθ·du/dv - r·u`;
 //!   handled via Linear extrapolation
 //! - **v-upper** (v → ∞): Linear extrapolation (option value becomes insensitive)
@@ -96,13 +96,13 @@ impl PdeProblem2D for HestonPde {
         if self.is_call {
             BoundaryCondition::Dirichlet(0.0) // Deep OTM call
         } else {
-            BoundaryCondition::Linear // Deep ITM put
+            BoundaryCondition::LinearInExp // Vanishing spot gamma in log coordinates
         }
     }
 
     fn boundary_x_upper(&self, _y: f64, _t: f64) -> BoundaryCondition {
         if self.is_call {
-            BoundaryCondition::Linear // Deep ITM call
+            BoundaryCondition::LinearInExp // Vanishing spot gamma in log coordinates
         } else {
             BoundaryCondition::Dirichlet(0.0) // Deep OTM put
         }
@@ -190,7 +190,7 @@ mod tests {
         let gy = Grid1D::sinh_concentrated(v_min, v_max, 81, theta_v, 0.15).expect("valid v-grid");
         let grid = Grid2D::new(gx, gy);
 
-        let solver = Solver2D::new(grid, CraigSneydStepper::with_rannacher(4, 400));
+        let solver = Solver2D::new(grid, CraigSneydStepper::with_damping(4, 400));
 
         let solution = solver
             .solve(&pde, maturity)
@@ -253,7 +253,7 @@ mod tests {
                 Grid1D::sinh_concentrated(v_min, v_max, 61, theta_v, 0.15).expect("valid v-grid");
             let grid = Grid2D::new(gx, gy);
 
-            let solver = Solver2D::new(grid, CraigSneydStepper::with_rannacher(4, 150));
+            let solver = Solver2D::new(grid, CraigSneydStepper::with_damping(4, 150));
 
             let solution = solver
                 .solve(&pde, maturity)
@@ -310,7 +310,7 @@ mod tests {
         let gy = Grid1D::sinh_concentrated(0.001, 1.5, 61, theta_v, 0.15).expect("valid v-grid");
         let grid = Grid2D::new(gx, gy);
 
-        let solver = Solver2D::new(grid, CraigSneydStepper::with_rannacher(4, 150));
+        let solver = Solver2D::new(grid, CraigSneydStepper::with_damping(4, 150));
 
         let solution = solver
             .solve(&pde, maturity)
@@ -322,6 +322,54 @@ mod tests {
             rel_error < 0.025,
             "high-kappa Heston vs Fourier: computed={computed:.6}, exact={exact:.6}, \
              rel_err={rel_error:.4e}"
+        );
+    }
+
+    /// Near the attainable zero-variance boundary, spatial refinement is
+    /// material even when the ADI time scheme is stable. This tests convergence
+    /// against Fourier, not a claim that the coarse production mesh delivers
+    /// a tight price tolerance in this difficult Feller-violating regime.
+    #[test]
+    #[ignore = "slow: covered by mise rust-test-slow"]
+    fn heston_pde_feller_violation_converges_with_variance_refinement() {
+        let problem = HestonPde {
+            r: 0.03,
+            q: 0.0,
+            kappa: 0.1,
+            theta_v: 0.04,
+            sigma_v: 1.0,
+            rho: -0.7,
+            strike: 100.0,
+            is_call: true,
+        };
+        let exact = heston_call_reference(100.0, 100.0, 1.0, 0.03, 0.0, 0.1, 0.04, 1.0, -0.7, 0.04);
+        let x_grid =
+            Grid1D::sinh_concentrated(5.0_f64.ln(), 1000.0_f64.ln(), 201, 100.0_f64.ln(), 0.1)
+                .expect("log-spot grid");
+        let mut errors = Vec::new();
+        for variance_nodes in [41, 81, 161] {
+            let v_grid = Grid1D::sinh_concentrated(0.0, 1.5, variance_nodes, 0.04, 0.15)
+                .expect("variance grid");
+            let solution = Solver2D::new(
+                Grid2D::new(x_grid.clone(), v_grid),
+                CraigSneydStepper::with_damping(4, 400),
+            )
+            .solve(&problem, 1.0)
+            .expect("Feller-violating solve");
+            let value = solution.interpolate(100.0_f64.ln(), 0.04);
+            assert!(
+                value.is_finite() && value >= 0.0,
+                "invalid Heston value {value}"
+            );
+            errors.push((value - exact).abs());
+        }
+        assert!(
+            errors.windows(2).all(|pair| pair[1] < pair[0]),
+            "Fourier errors {errors:?}"
+        );
+        assert!(
+            errors[2] < 0.5 * errors[0],
+            "variance refinement did not reduce error: {errors:?}"
         );
     }
 
@@ -456,19 +504,19 @@ mod tests {
     /// `theta = 1/3` admissible and second-order accurate. The corrector does
     /// not "stabilize the mixed term": it lowers the admissible `theta` bound.
     ///
-    /// This test makes three checks on one shared grid (so differences isolate
-    /// the time-stepping scheme):
+    /// This test makes four checks on one shared spatial grid:
     ///
     /// 1. **Correctness anchor.** MCS (`theta = 1/3`, with corrector) matches
     ///    the Heston Fourier reference to a tight tolerance at rho = -0.9.
     /// 2. **Admissibility.** Bare Douglas at `theta = 1/3` (no corrector)
     ///    diverges by orders of magnitude — demonstrating that `theta = 1/3`
     ///    *requires* the MCS corrector to be a valid scheme.
-    /// 3. **Honest benefit.** Bare Douglas at `theta = 1/2` is a legitimate,
-    ///    stable scheme; MCS `theta = 1/3` achieves comparable-or-better
-    ///    accuracy against the Fourier reference. Comparing against a valid
-    ///    Douglas baseline isolates the order/admissibility gain rather than a
-    ///    spurious stability cliff.
+    /// 3. **Stable baseline.** Bare Douglas at `theta = 1/2` is a legitimate,
+    ///    stable scheme and remains within its Fourier pricing tolerance.
+    /// 4. **Time accuracy.** Successive MCS time refinements converge at
+    ///    second order. Their differences cancel the common spatial bias;
+    ///    ranking absolute Fourier errors between schemes would instead
+    ///    reward accidental cancellation of time and spatial errors.
     #[test]
     #[ignore = "slow: covered by mise rust-test-slow"]
     fn heston_pde_mcs_vs_douglas_high_correlation() {
@@ -498,8 +546,8 @@ mod tests {
             is_call: true,
         };
 
-        // One grid shared by all schemes so the comparison isolates the
-        // time-stepping scheme.
+        // Use one spatial grid throughout. Differences between time
+        // refinements then isolate temporal error from the spatial bias.
         let x_min = (spot * 0.05).ln();
         let x_max = (spot * 10.0).ln();
         let v_min = 0.001;
@@ -507,25 +555,28 @@ mod tests {
         let gx =
             Grid1D::sinh_concentrated(x_min, x_max, 201, spot.ln(), 0.1).expect("valid x-grid");
         let gy = Grid1D::sinh_concentrated(v_min, v_max, 81, theta_v, 0.15).expect("valid v-grid");
+        let grid = Grid2D::new(gx, gy);
 
         let n_steps = 200;
 
-        // Full Modified Craig-Sneyd scheme (theta = 1/3) with Rannacher
-        // smoothing.
-        let mcs_price = solve_heston_call(
-            &CraigSneydStepper::with_rannacher(4, n_steps),
-            &pde,
-            &Grid2D::new(gx.clone(), gy.clone()),
-            spot,
-            v0,
-            maturity,
-        );
+        // Full Modified Craig-Sneyd scheme (theta = 1/3) with implicit
+        // split start-up damping, at three successive time resolutions.
+        let [mcs_coarse, mcs_price, mcs_fine] = [n_steps / 2, n_steps, n_steps * 2].map(|steps| {
+            solve_heston_call(
+                &CraigSneydStepper::with_damping(4, steps),
+                &pde,
+                &grid,
+                spot,
+                v0,
+                maturity,
+            )
+        });
 
         // Bare Douglas at theta = 1/3 (no MCS corrector): inadmissible scheme.
         let douglas_theta13 = solve_heston_call(
             &CraigSneydStepper::douglas_for_test(1.0 / 3.0, n_steps),
             &pde,
-            &Grid2D::new(gx.clone(), gy.clone()),
+            &grid,
             spot,
             v0,
             maturity,
@@ -536,7 +587,7 @@ mod tests {
         let douglas_theta12 = solve_heston_call(
             &CraigSneydStepper::douglas_for_test(0.5, n_steps),
             &pde,
-            &Grid2D::new(gx, gy),
+            &grid,
             spot,
             v0,
             maturity,
@@ -568,22 +619,31 @@ mod tests {
              rel_err={douglas13_err:.4e}"
         );
 
-        // (3) Honest benefit: bare Douglas at theta = 1/2 is a legitimate,
-        // stable scheme and is itself reasonably accurate here. MCS at
-        // theta = 1/3 (second-order) matches the Fourier reference at least as
-        // well as the valid Douglas baseline does — isolating the
-        // order/admissibility gain rather than a spurious stability cliff.
+        // (3) Bare Douglas at theta = 1/2 remains a valid, stable baseline.
         assert!(
             douglas_theta12.is_finite() && douglas12_err < 0.02,
             "expected bare Douglas at theta=1/2 to be stable and reasonably \
              accurate: douglas={douglas_theta12:.6}, exact={exact:.6}, \
              rel_err={douglas12_err:.4e}"
         );
+        // (4) A second-order time method has successive refinement
+        // differences tending to a factor of four. Compare those differences,
+        // not absolute Fourier errors: the latter contain the common spatial
+        // bias, which can cancel the time error of either scheme. In this
+        // fixture the converged spatial bias is about -2.38e-5 relative.
+        for price in [mcs_coarse, mcs_fine] {
+            assert!(
+                (price - exact).abs() / exact < 1e-3,
+                "MCS refinement violated the existing Fourier pricing bound: {price}"
+            );
+        }
+        let coarse_difference = (mcs_coarse - mcs_price).abs();
+        let fine_difference = (mcs_price - mcs_fine).abs();
+        let refinement_ratio = coarse_difference / fine_difference;
         assert!(
-            mcs_err <= douglas12_err + 1e-9,
-            "expected MCS (theta=1/3, second-order) to match the Fourier reference \
-             at least as well as the valid Douglas theta=1/2 baseline: \
-             mcs_err={mcs_err:.4e}, douglas_theta12_err={douglas12_err:.4e}"
+            (3.5..4.5).contains(&refinement_ratio),
+            "expected second-order MCS time convergence: prices=\
+             [{mcs_coarse}, {mcs_price}, {mcs_fine}], ratio={refinement_ratio}"
         );
     }
 
@@ -634,7 +694,7 @@ mod tests {
         let gy = Grid1D::sinh_concentrated(v_min, v_max, 81, theta_v, 0.15).expect("valid v-grid");
 
         let mcs_price = solve_heston_call(
-            &CraigSneydStepper::with_rannacher(4, 200),
+            &CraigSneydStepper::with_damping(4, 200),
             &pde,
             &Grid2D::new(gx, gy),
             spot,

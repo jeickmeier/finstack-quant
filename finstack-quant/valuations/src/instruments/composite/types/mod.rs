@@ -235,7 +235,7 @@ mod tests {
                     .insert_price("B", MarketScalar::Unitless(b));
                 CompositeMarketObservation::new(date, &market)
             })
-            .collect::<Vec<_>>();
+            .collect::<Result<Vec<_>>>()?;
         let market = observations
             .last()
             .ok_or_else(|| Error::Internal("test history is empty".to_string()))?
@@ -600,7 +600,7 @@ mod tests {
                 let market = MarketContext::new()
                     .insert_price("A", MarketScalar::Unitless(*price))
                     .insert_price("B", MarketScalar::Unitless(*price));
-                CompositeMarketObservation::new(date, &market)
+                CompositeMarketObservation::new(date, &market).expect("coherent market snapshot")
             })
             .collect()
     }

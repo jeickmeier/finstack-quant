@@ -16,9 +16,8 @@ use pyo3::types::PyList;
 
 /// Register the `core` submodule on the parent module.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "core")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "core")?;
     m.setattr("__doc__", "Bindings for the finstack-quant-core crate.")?;
-    m.setattr("__package__", "finstack_quant.core")?;
 
     config::register(py, &m)?;
     types::register(py, &m)?;
@@ -58,18 +57,13 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    // `Name`, not `Package`: every other domain registers the compiled module
-    // under the extension's own path so the pure-Python shim package owns
-    // `finstack_quant.core`. Deriving from `__package__` here claimed the
-    // public key first, leaving `finstack_quant/core/__init__.py` — its
-    // docstring, doctest and sorted `__all__` — permanently unreachable.
-    crate::bindings::module_utils::register_submodule(
-        py,
+    // `Exposure::Python`: the pure-Python package `finstack_quant/core/__init__.py`
+    // owns `finstack_quant.core`; registering the compiled module there would
+    // leave that package (its docstring, doctest and sorted `__all__`) unreachable.
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "core",
-        crate::bindings::module_utils::ROOT_PACKAGE,
-        crate::bindings::module_utils::ParentNameSource::Name,
+        crate::bindings::module_utils::Exposure::Python,
     )?;
     Ok(())
 }

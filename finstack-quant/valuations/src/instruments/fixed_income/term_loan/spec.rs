@@ -353,9 +353,10 @@ pub enum LoanCallType {
     Soft,
     /// Make-whole call: borrower pays PV of remaining cashflows at the
     /// reference curve plus spread of the shared [`MakeWholeSpec`] (the same
-    /// type bonds use). The term-loan tree pricer and yield-to-call metrics
-    /// never exercise it: paying at least the make-whole amount leaves the
-    /// lender indifferent, so the loan is not economically callable.
+    /// type bonds use), floored at the contractual clean call price. Tree
+    /// pricing supports a deterministic reference curve with zero rate
+    /// volatility; stochastic-rate make-whole pricing is rejected explicitly.
+    /// Yield-to-call metrics use the same dated reference-curve redemption.
     MakeWhole(MakeWholeSpec),
 }
 

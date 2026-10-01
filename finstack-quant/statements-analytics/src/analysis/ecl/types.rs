@@ -386,8 +386,9 @@ pub trait PdTermStructure: Send + Sync {
     ///
     /// * `rating` - Rating label on this source's scale. Must match a
     ///   curve the implementation can resolve.
-    /// * `t` - Horizon in years from the reporting date; must be finite
-    ///   and typically non-negative.
+    /// * `t` - Horizon in years from this source's snapshot date; must be finite
+    ///   and non-negative. Current-risk curves are anchored at reporting,
+    ///   while retained origination curves are anchored at initial recognition.
     fn cumulative_pd(&self, rating: &str, t: f64) -> Result<f64>;
 
     /// Returns `true` when this source has a curve for `rating`.
@@ -565,8 +566,8 @@ impl PdTermStructure for RawPdCurve {
 ///
 /// Implements [`PdTermStructure`] by looking up [`Self::curves`] with the
 /// requested rating label. Use this when SICR and ECL need distinct
-/// origination and current rating curves. A rating absent from the map
-/// is a missing curve: staging skips PD-delta; ECL lookup still errors.
+/// origination and current rating curves. A supplied rating absent from the
+/// map is an error for both staging and ECL lookup.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RatingPdMap {

@@ -2098,6 +2098,8 @@ class Performance:
         -------
         pd.Series
             CAGR divided by absolute max drawdown indexed by ticker name.
+            With zero drawdown, nonzero CAGR gives signed infinity and zero
+            CAGR gives ``0.0``.
 
         Raises
         ------
@@ -2381,6 +2383,10 @@ class Performance:
         """
         Treynor ratio for each ticker.
 
+        A non-finite risk-free rate gives ``NaN``. With absolute beta below
+        ``1e-10``, nonzero finite excess return gives signed infinity and
+        zero excess return gives ``0``.
+
         Parameters
         ----------
         risk_free_rate : float, default 0.0
@@ -2439,12 +2445,14 @@ class Performance:
 
     def martin_ratio(self) -> pd.Series:
         """
-        Martin ratio for each ticker.
+        Martin ratio (CAGR divided by Ulcer Index) for each ticker.
 
         Returns
         -------
         pd.Series
-            Excess return per unit of ulcer index indexed by ticker name.
+            CAGR divided by Ulcer Index indexed by ticker name. With zero
+            Ulcer Index, nonzero CAGR gives signed infinity and zero CAGR
+            gives ``0.0``.
 
         Raises
         ------
@@ -2500,7 +2508,9 @@ class Performance:
         Returns
         -------
         pd.Series
-            Excess return per unit of pain index indexed by ticker name.
+            CAGR minus the annualized risk-free rate, divided by the pain
+            index and indexed by ticker name. Non-finite risk-free rates
+            give ``NaN``, including when the pain index is zero.
 
         Raises
         ------
@@ -2732,7 +2742,8 @@ class Performance:
         Returns
         -------
         pd.Series
-            Sterling ratio indexed by ticker name.
+            Sterling ratio indexed by ticker name. Non-finite risk-free
+            rates give ``NaN``, including when no drawdowns are observed.
 
         Raises
         ------
@@ -2758,7 +2769,8 @@ class Performance:
         Returns
         -------
         pd.Series
-            Burke ratio indexed by ticker name.
+            Burke ratio indexed by ticker name. Non-finite risk-free rates
+            give ``NaN``, including when no drawdowns are observed.
 
         Raises
         ------
@@ -3200,7 +3212,10 @@ class Performance:
             If ``ticker_idx`` is out of range, no factors are supplied, factor
             lengths differ from the ticker return series, returns are
             non-finite, observations are insufficient, or the regression is
-            numerically singular.
+            numerically singular; also if a fitted coefficient, annualized
+            intercept, or residual volatility cannot be represented as a
+            finite value. Constant responses retain undefined ``NaN``
+            R-squared statistics.
         """
 
     def lookback_returns(

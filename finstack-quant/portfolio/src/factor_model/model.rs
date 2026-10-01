@@ -207,6 +207,8 @@ impl FactorModel {
     ///
     /// * `portfolio` - Portfolio whose instrument dependencies should be mapped
     ///   into the configured factor space.
+    /// * `market` - Request market used to resolve credit-index aggregates into
+    ///   their hazard, issuer-hazard, and base-correlation curve dependencies.
     ///
     /// # Returns
     ///
@@ -215,14 +217,20 @@ impl FactorModel {
     ///
     /// # Errors
     ///
-    /// Returns an error when a position cannot report dependencies or when the
-    /// unmatched policy is strict and at least one dependency cannot be mapped.
-    pub fn assign_factors(&self, portfolio: &Portfolio) -> Result<FactorAssignmentReport> {
+    /// Returns an error when a position cannot report dependencies, a referenced
+    /// credit index is absent from `market`, or the unmatched policy is strict
+    /// and at least one dependency cannot be mapped.
+    pub fn assign_factors(
+        &self,
+        portfolio: &Portfolio,
+        market: &MarketContext,
+    ) -> Result<FactorAssignmentReport> {
         let mut assignments = Vec::with_capacity(portfolio.positions.len());
         let mut unmatched = Vec::new();
 
         for position in &portfolio.positions {
-            let dependencies = flatten_dependencies(&position.instrument.market_dependencies()?);
+            let dependencies =
+                flatten_dependencies(&position.instrument.market_dependencies()?, market)?;
             let (assignment, position_unmatched) = assign_position_factors(
                 &position.position_id,
                 &dependencies,
@@ -304,7 +312,7 @@ impl FactorModel {
         as_of: Date,
         credit_exposures: &mut CreditExposureMatrix<'_>,
     ) -> Result<SensitivityMatrix> {
-        let assignment_report = self.assign_factors(portfolio)?;
+        let assignment_report = self.assign_factors(portfolio, market)?;
         let positions: Vec<(String, &dyn Instrument, f64)> = portfolio
             .positions
             .iter()
@@ -364,7 +372,7 @@ impl FactorModel {
                     // whose tags name a bucket outside the calibrated
                     // universe). Dropping it loses real credit exposure,
                     // so the unmatched policy decides: Strict fails,
-                    // Warn surfaces the drop, Residual continues.
+                    // Warn surfaces the drop.
                     match self.unmatched_policy {
                         UnmatchedPolicy::Strict => {
                             return Err(Error::invalid_input(format!(
@@ -409,7 +417,14 @@ impl FactorModel {
                 // would overstate risk for defensive names (β < 1) and
                 // understate it for levered ones (β > 1).
                 let current = sensitivities.delta(position_idx, factor_idx);
-                sensitivities.set_delta(position_idx, factor_idx, current + *beta * delta);
+                let weighted_delta = current + *beta * delta;
+                if !weighted_delta.is_finite() {
+                    return Err(Error::invalid_input(format!(
+                        "non-finite assignment-weighted credit sensitivity for position '{}' on factor '{}' (beta = {beta}, exposure = {delta})",
+                        position.position_id, factor_id
+                    )));
+                }
+                sensitivities.set_delta(position_idx, factor_idx, weighted_delta);
             }
         }
         Ok(())
@@ -556,7 +571,10 @@ impl FactorModel {
             if idio_variance <= 0.0 {
                 continue;
             }
-            let dependencies = flatten_dependencies(&position.instrument.market_dependencies()?);
+            let dependencies = flatten_dependencies(
+                &position.instrument.market_dependencies()?,
+                credit_exposures.bump_contexts.base,
+            )?;
             let mut exposure = 0.0;
             for dependency in &dependencies {
                 if let Some(curve_id) =
@@ -807,7 +825,8 @@ impl FactorModel {
     ) -> Result<Vec<(finstack_quant_core::types::CurveId, f64)>> {
         let mut curve_betas: BTreeMap<finstack_quant_core::types::CurveId, f64> = BTreeMap::new();
         for position in &portfolio.positions {
-            let dependencies = flatten_dependencies(&position.instrument.market_dependencies()?);
+            let dependencies =
+                flatten_dependencies(&position.instrument.market_dependencies()?, market)?;
             for dependency in &dependencies {
                 let Some(curve_id) = credit_curve_id(dependency, market)? else {
                     continue;
@@ -930,9 +949,14 @@ impl<'a> CreditExposureMatrix<'a> {
         curve_id: &finstack_quant_core::types::CurveId,
         bump_size: f64,
     ) -> Result<f64> {
-        if bump_size.abs() < f64::EPSILON {
+        if !quantity.is_finite() {
+            return Err(Error::invalid_input(format!(
+                "credit sensitivity quantity must be finite for position {position_index}, got {quantity}"
+            )));
+        }
+        if !bump_size.is_finite() || bump_size.abs() < f64::EPSILON {
             return Err(Error::invalid_input(
-                "credit factor bump size must be non-zero for sensitivity computation",
+                "credit factor bump size must be finite and non-zero for sensitivity computation",
             ));
         }
         let key = CreditExposureKey {
@@ -948,7 +972,17 @@ impl<'a> CreditExposureMatrix<'a> {
         let pv_up = crate::sensitivity::raw_pv_in_base(instrument, up, as_of, self.base_currency)?;
         let pv_down =
             crate::sensitivity::raw_pv_in_base(instrument, down, as_of, self.base_currency)?;
+        if !pv_up.is_finite() || !pv_down.is_finite() {
+            return Err(Error::invalid_input(format!(
+                "non-finite bumped credit PV for position {position_index} on curve '{curve_id}' (up = {pv_up}, down = {pv_down})"
+            )));
+        }
         let exposure = (pv_up - pv_down) / (2.0 * bump_size) * quantity;
+        if !exposure.is_finite() {
+            return Err(Error::invalid_input(format!(
+                "non-finite weighted credit sensitivity for position {position_index} on curve '{curve_id}' ({exposure}); check the position quantity and bumped PV difference"
+            )));
+        }
         self.exposures.insert(key, exposure);
         Ok(exposure)
     }
@@ -1107,7 +1141,7 @@ pub(super) mod tests {
             pricing_mode: PricingMode::DeltaBased,
             risk_measure: RiskMeasure::Variance,
             bump_config: Some(BumpSizeConfig::default()),
-            unmatched_policy: Some(UnmatchedPolicy::Residual),
+            unmatched_policy: Some(UnmatchedPolicy::Warn),
         }
     }
 
@@ -1180,7 +1214,7 @@ pub(super) mod tests {
                 pricing_mode: PricingMode::DeltaBased,
                 risk_measure: RiskMeasure::Variance,
                 bump_config: None,
-                unmatched_policy: Some(UnmatchedPolicy::Residual),
+                unmatched_policy: Some(UnmatchedPolicy::Warn),
             })
             .build();
 
@@ -1234,7 +1268,7 @@ pub(super) mod tests {
             .build()
             .expect("test should succeed");
 
-        let report_result = model.assign_factors(&portfolio);
+        let report_result = model.assign_factors(&portfolio, &MarketContext::new());
         assert!(report_result.is_ok());
         let Ok(report) = report_result else {
             return;
@@ -1274,7 +1308,7 @@ pub(super) mod tests {
                 pricing_mode: PricingMode::DeltaBased,
                 risk_measure: RiskMeasure::Variance,
                 bump_config: None,
-                unmatched_policy: Some(UnmatchedPolicy::Residual),
+                unmatched_policy: Some(UnmatchedPolicy::Warn),
             })
             .with_custom_sensitivity_engine(CountingSensitivityEngine {
                 calls: Arc::clone(&sensitivity_calls),
@@ -1617,7 +1651,7 @@ pub(super) mod tests {
                 pricing_mode: PricingMode::DeltaBased,
                 risk_measure: RiskMeasure::Variance,
                 bump_config: None,
-                unmatched_policy: Some(UnmatchedPolicy::Residual),
+                unmatched_policy: Some(UnmatchedPolicy::Warn),
             })
             .with_custom_sensitivity_engine(KnownDeltaEngine { deltas: vec![10.0] })
             .build();
@@ -1708,7 +1742,7 @@ pub(super) mod tests {
                 pricing_mode: PricingMode::DeltaBased,
                 risk_measure: RiskMeasure::Variance,
                 bump_config: None,
-                unmatched_policy: Some(UnmatchedPolicy::Residual),
+                unmatched_policy: Some(UnmatchedPolicy::Warn),
             })
             .with_custom_sensitivity_engine(KnownDeltaEngine {
                 deltas: vec![10.0, 5.0],
@@ -2034,7 +2068,7 @@ pub(super) mod tests {
                 pricing_mode: PricingMode::DeltaBased,
                 risk_measure: RiskMeasure::Variance,
                 bump_config: None,
-                unmatched_policy: Some(UnmatchedPolicy::Residual),
+                unmatched_policy: Some(UnmatchedPolicy::Warn),
             })
             .build()
             .unwrap();
@@ -2207,12 +2241,10 @@ pub(super) mod tests {
             "error must name the dropped factor id: {err}"
         );
 
-        // Residual/Warn continue (Warn surfaces a tracing warning).
-        for policy in [UnmatchedPolicy::Residual, UnmatchedPolicy::Warn] {
-            build(policy)
-                .compute_sensitivities(&portfolio, &market, as_of)
-                .expect("non-strict policies must continue");
-        }
+        // Warn explicitly permits unmatched risk and surfaces a tracing warning.
+        build(UnmatchedPolicy::Warn)
+            .compute_sensitivities(&portfolio, &market, as_of)
+            .expect("warn policy must continue");
     }
 
     #[test]
@@ -2284,7 +2316,7 @@ pub(super) mod tests {
                 pricing_mode: PricingMode::DeltaBased,
                 risk_measure: RiskMeasure::Variance,
                 bump_config: None,
-                unmatched_policy: Some(UnmatchedPolicy::Residual),
+                unmatched_policy: Some(UnmatchedPolicy::Warn),
             })
             .build()
             .unwrap();
@@ -2401,7 +2433,7 @@ pub(super) mod tests {
                 pricing_mode: PricingMode::DeltaBased,
                 risk_measure: RiskMeasure::Variance,
                 bump_config: None,
-                unmatched_policy: Some(UnmatchedPolicy::Residual),
+                unmatched_policy: Some(UnmatchedPolicy::Warn),
             })
             .build()
             .unwrap()
@@ -2431,6 +2463,56 @@ pub(super) mod tests {
             );
         }
         builder.build().unwrap()
+    }
+
+    #[test]
+    fn credit_hierarchy_sensitivities_reject_finite_quantity_and_beta_overflow() {
+        let as_of = date!(2024 - 01 - 01);
+        let curve_id = CurveId::new("ISSUER-B-HAZ");
+        let market = credit_market(as_of, curve_id.clone());
+        let model = credit_hierarchy_model();
+        let unit_portfolio = credit_bond_portfolio(as_of, &curve_id, &[("credit", 1.0)]);
+        let unit_matrix = model
+            .compute_sensitivities(&unit_portfolio, &market, as_of)
+            .expect("ordinary quote-space credit sensitivities remain finite");
+        assert!(unit_matrix.delta(0, 0).is_finite());
+        assert!(unit_matrix.delta(0, 0).abs() > 1.0);
+
+        let huge_portfolio = credit_bond_portfolio(as_of, &curve_id, &[("credit", 1e308)]);
+        let error = model
+            .compute_sensitivities(&huge_portfolio, &market, as_of)
+            .expect_err("finite endpoints and finite quantity must not return infinite risk");
+        assert!(error
+            .to_string()
+            .contains("non-finite weighted credit sensitivity"));
+
+        let mut assignments = model
+            .assign_factors(&unit_portfolio, &market)
+            .expect("unit credit assignment");
+        for (_, _, beta) in &mut assignments.assignments[0].mappings {
+            *beta = 1e308;
+        }
+        let mut matrix = SensitivityMatrix::zeros(
+            vec!["credit".into()],
+            model
+                .factors
+                .iter()
+                .map(|factor| factor.id.clone())
+                .collect(),
+        );
+        let mut exposures = CreditExposureMatrix::new(&market, Currency::USD);
+        let error = model
+            .overlay_assignment_driven_credit_sensitivities(
+                &unit_portfolio,
+                as_of,
+                &assignments,
+                &mut matrix,
+                &mut exposures,
+            )
+            .expect_err("finite cached exposure times finite beta must not overflow the matrix");
+        assert!(error
+            .to_string()
+            .contains("non-finite assignment-weighted credit sensitivity"));
     }
 
     #[test]
@@ -2512,5 +2594,154 @@ pub(super) mod tests {
                 contribution.position_id
             );
         }
+    }
+
+    #[test]
+    fn credit_index_factor_routing_matches_full_hazard_and_correlation_repricing() {
+        use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+        let (tranche, market, as_of) = crate::dependencies::tests::credit_index_fixture();
+        let factors: Vec<_> = [
+            ("discount", "USD-OIS", FactorType::Rates),
+            ("hazard", "INDEX-HZ", FactorType::Credit),
+            (
+                "correlation",
+                "INDEX-BC",
+                FactorType::Custom("correlation".into()),
+            ),
+        ]
+        .into_iter()
+        .map(|(id, curve_id, factor_type)| FactorDefinition {
+            id: FactorId::new(id),
+            factor_type,
+            market_mapping: MarketMapping::CurveParallel {
+                curve_ids: vec![CurveId::new(curve_id)],
+                units: BumpUnits::RateBp,
+            },
+            description: None,
+        })
+        .collect();
+        let model = FactorModel::builder()
+            .config(FactorModelConfig {
+                covariance: FactorCovarianceMatrix::new(
+                    factors.iter().map(|factor| factor.id.clone()).collect(),
+                    vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+                )
+                .expect("covariance"),
+                matching: MatchingConfig::MappingTable(
+                    [
+                        ("discount", "USD-OIS"),
+                        ("hazard", "INDEX-HZ"),
+                        ("correlation", "INDEX-BC"),
+                    ]
+                    .into_iter()
+                    .map(|(factor, curve)| MappingRule {
+                        dependency_filter: DependencyFilter {
+                            id: Some(curve.into()),
+                            ..Default::default()
+                        },
+                        attribute_filter: Default::default(),
+                        factor_id: FactorId::new(factor),
+                    })
+                    .collect(),
+                ),
+                factors: factors.clone(),
+                pricing_mode: PricingMode::DeltaBased,
+                risk_measure: RiskMeasure::Variance,
+                bump_config: None,
+                unmatched_policy: None,
+            })
+            .build()
+            .expect("factor model");
+        let portfolio = Portfolio::builder("tranche-book")
+            .base_currency(Currency::USD)
+            .as_of(as_of)
+            .position(
+                Position::new(
+                    "tranche",
+                    DUMMY_ENTITY_ID,
+                    "tranche",
+                    Arc::new(tranche.clone()),
+                    1.0,
+                    PositionUnit::Units,
+                )
+                .expect("position"),
+            )
+            .build()
+            .expect("portfolio");
+        let assignments = model
+            .assign_factors(&portfolio, &market)
+            .expect("assignment");
+        assert!(assignments.unmatched.is_empty());
+        assert_eq!(assignments.assignments[0].mappings.len(), 3);
+        let matrix = model
+            .compute_sensitivities(&portfolio, &market, as_of)
+            .expect("sensitivities");
+        let engine = FullRepricingEngine::new(BumpSizeConfig::default(), 5).expect("engine");
+        let positions = [("tranche".into(), &tranche as &dyn Instrument, 1.0)];
+        let full_matrix = engine
+            .compute_sensitivities(&positions, &factors, &market, as_of, Currency::USD)
+            .expect("full matrix");
+        for (factor_idx, curve_id) in [(1, "INDEX-HZ"), (2, "INDEX-BC")] {
+            let up = market
+                .bump(vec![MarketBump::Curve {
+                    id: curve_id.into(),
+                    spec: BumpSpec::parallel_bp(1.0),
+                }])
+                .expect("up market");
+            let down = market
+                .bump(vec![MarketBump::Curve {
+                    id: curve_id.into(),
+                    spec: BumpSpec::parallel_bp(-1.0),
+                }])
+                .expect("down market");
+            let manual = (tranche.value_raw(&up, as_of).expect("up PV")
+                - tranche.value_raw(&down, as_of).expect("down PV"))
+                / 2.0;
+            assert!(manual.abs() > 1.0);
+            assert!((matrix.delta(0, factor_idx) - manual).abs() < 1e-8);
+            assert!((full_matrix.delta(0, factor_idx) - manual).abs() < 1e-8);
+            let pnl = model
+                .factor_stress_pnl(
+                    &portfolio,
+                    &market,
+                    as_of,
+                    &[(factors[factor_idx].id.clone(), 1.0)],
+                )
+                .expect("stress");
+            let expected = tranche.value_raw(&up, as_of).expect("up PV")
+                - tranche.value_raw(&market, as_of).expect("base PV");
+            assert!((pnl.total_pnl - expected).abs() < 1e-8);
+        }
+    }
+
+    #[test]
+    fn default_unmatched_policy_rejects_unmapped_risk() {
+        let portfolio = Portfolio::builder("unmapped-book")
+            .base_currency(Currency::USD)
+            .as_of(date!(2025 - 01 - 01))
+            .position(
+                Position::new(
+                    "unmapped",
+                    DUMMY_ENTITY_ID,
+                    "unmapped",
+                    Arc::new(MockInstrument::new("unmapped", "USD-OTHER", vec![])),
+                    1.0,
+                    PositionUnit::Units,
+                )
+                .expect("position"),
+            )
+            .build()
+            .expect("portfolio");
+        let mut config = simple_config();
+        config.unmatched_policy = None;
+        config.matching = MatchingConfig::MappingTable(vec![]);
+        let model = FactorModel::builder()
+            .config(config)
+            .build()
+            .expect("strict model");
+        let error = model
+            .analyze(&portfolio, &MarketContext::new(), date!(2025 - 01 - 01))
+            .expect_err("unmapped risk must not be returned as zero risk");
+        assert!(error.to_string().contains("No factor matched"));
     }
 }

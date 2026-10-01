@@ -37,7 +37,7 @@
 //! ```
 
 use crate::book::{Book, BookId};
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::portfolio::Portfolio;
 use crate::position::Position;
 use crate::types::{Entity, EntityId, PositionId, DUMMY_ENTITY_ID};
@@ -330,7 +330,8 @@ impl PortfolioBuilder {
     /// This method performs several checks before returning a portfolio:
     /// 1. Ensures the base currency and valuation date are configured.
     /// 2. Injects a dummy entity when positions reference [`DUMMY_ENTITY_ID`].
-    /// 3. Delegates to [`Portfolio::validate`](crate::portfolio::Portfolio::validate) to confirm
+    /// 3. Adds each position's book membership when supplied via `Position::with_book`.
+    /// 4. Delegates to [`Portfolio::validate`](crate::portfolio::Portfolio::validate) to confirm
     ///    entity references and portfolio structure.
     ///
     /// # Returns
@@ -339,7 +340,7 @@ impl PortfolioBuilder {
     ///
     /// # Errors
     ///
-    /// Returns [`Error`](crate::error::Error) when the configuration is incomplete
+    /// Returns [`Error`] when the configuration is incomplete
     /// or validation fails.
     pub fn build(mut self) -> Result<Portfolio> {
         let base_currency = self.base_currency.ok_or_else(|| {
@@ -359,6 +360,29 @@ impl PortfolioBuilder {
             tracing::debug!("Auto-creating dummy entity for standalone instruments");
             let dummy = Entity::dummy();
             self.entities.insert(dummy.id.clone(), dummy);
+        }
+
+        let mut memberships: finstack_quant_core::HashMap<_, finstack_quant_core::HashSet<_>> =
+            self.books
+                .iter()
+                .map(|(id, book)| (id.clone(), book.position_ids.iter().cloned().collect()))
+                .collect();
+        for position in &self.positions {
+            if let Some(book_id) = &position.book_id {
+                let book = self.books.get_mut(book_id).ok_or_else(|| {
+                    Error::validation(format!(
+                        "Position '{}' references non-existent book '{}'",
+                        position.position_id, book_id
+                    ))
+                })?;
+                if memberships
+                    .entry(book_id.clone())
+                    .or_default()
+                    .insert(position.position_id.clone())
+                {
+                    book.position_ids.push(position.position_id.clone());
+                }
+            }
         }
 
         let mut portfolio = Portfolio {

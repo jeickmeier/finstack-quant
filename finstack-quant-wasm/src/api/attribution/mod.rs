@@ -8,9 +8,9 @@
 //! above `Number.MAX_SAFE_INTEGER` (2^53 − 1) would silently round in the
 //! consumer. Today every count in the attribution surface is bounded by a
 //! handful of factors (≤ 12) and a handful of repricings (≤ ~30), well under
-//! the safe-integer ceiling. The [`crate::utils::check_js_safe_count`] guard
-//! is therefore not wired in here; if a future getter exposes a raw `usize`
-//! across the boundary, route it through that guard first.
+//! the safe-integer ceiling. Future JavaScript numeric input counts must be
+//! validated before conversion to the wasm32 `usize` range, since integer ABI
+//! conversion truncates fractions and wraps overflow.
 
 use crate::utils::{structured_js_error, to_js_err};
 use wasm_bindgen::prelude::*;

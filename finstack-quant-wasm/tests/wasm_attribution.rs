@@ -47,7 +47,8 @@ fn market_json(as_of: time::Date, rate: f64) -> String {
         .build()
         .expect("discount curve");
     let market = MarketContext::new().insert(curve);
-    serde_json::to_string(&MarketContextState::from(&market)).expect("market JSON")
+    serde_json::to_string(&MarketContextState::try_from(&market).expect("coherent market snapshot"))
+        .expect("market JSON")
 }
 
 fn params(method_json: &str) -> JsAttributionParams {
@@ -76,6 +77,109 @@ fn default_attribution_metrics_non_empty() {
     let metrics: Vec<String> =
         serde_wasm_bindgen::from_value(default_attribution_metrics().unwrap()).unwrap();
     assert!(metrics.iter().any(|m| m == "theta"));
+    assert!(metrics.iter().any(|m| m == "bucketed_dv01"));
+}
+
+#[wasm_bindgen_test]
+fn principal_redemption_preserves_total_return_without_coupon_income() {
+    use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
+    use finstack_quant_valuations::instruments::Bond;
+    use time::macros::date;
+
+    let bond = Bond::fixed(
+        "WASM-PRINCIPAL",
+        Money::from((1_000_000_i64, Currency::USD)),
+        Rate::from_decimal(0.0).expect("zero coupon"),
+        date!(2024 - 01 - 15),
+        date!(2025 - 01 - 15),
+        finstack_quant_core::dates::StubKind::ShortFront,
+        "USD-OIS",
+    )
+    .expect("bond");
+    let instrument = serde_json::to_string(&InstrumentEnvelope::new(InstrumentJson::Bond(bond)))
+        .expect("instrument JSON");
+    let market = market_json(date!(2025 - 01 - 14), 0.04);
+    let inputs = JsAttributionParams::new(
+        instrument,
+        market.clone(),
+        market,
+        "2025-01-14".into(),
+        "2025-01-16".into(),
+        "\"parallel\"".into(),
+        None,
+        None,
+    );
+    let result: serde_json::Value =
+        serde_json::from_str(&attribute_pnl_json(&inputs).expect("attribution")).expect("result");
+    let amount = |value: &serde_json::Value| {
+        value["amount"]
+            .as_str()
+            .expect("money")
+            .parse::<f64>()
+            .expect("amount")
+    };
+    assert_eq!(
+        amount(&result["carry_detail"]["coupon_income"]["total"]),
+        0.0
+    );
+    assert!(
+        (amount(&result["mark_to_market_pnl"]) + 1_000_000.0 - amount(&result["total_pnl"])).abs()
+            < 1e-8
+    );
+    assert!(amount(&result["total_pnl"]) > 0.0 && amount(&result["total_pnl"]) < 1_000.0);
+    assert!(amount(&result["residual"]).abs() < 0.01);
+}
+
+#[wasm_bindgen_test]
+fn deposit_principal_redemption_preserves_total_return_after_maturity() {
+    use finstack_quant_core::dates::DayCount;
+    use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
+    use finstack_quant_valuations::instruments::Deposit;
+    use time::macros::date;
+
+    let deposit = Deposit::builder()
+        .id("WASM-ZERO-RATE-DEPOSIT".into())
+        .notional(Money::from((1_000_000_i64, Currency::USD)))
+        .start_date(date!(2024 - 01 - 15))
+        .maturity(date!(2025 - 01 - 15))
+        .day_count(DayCount::Act360)
+        .fixed_rate_opt(Some(Default::default()))
+        .discount_curve_id("USD-OIS".into())
+        .build()
+        .expect("deposit");
+    let instrument =
+        serde_json::to_string(&InstrumentEnvelope::new(InstrumentJson::Deposit(deposit)))
+            .expect("instrument JSON");
+    let market = market_json(date!(2025 - 01 - 14), 0.04);
+    let inputs = JsAttributionParams::new(
+        instrument,
+        market.clone(),
+        market,
+        "2025-01-14".into(),
+        "2025-01-16".into(),
+        "\"parallel\"".into(),
+        None,
+        None,
+    );
+    let result: serde_json::Value =
+        serde_json::from_str(&attribute_pnl_json(&inputs).expect("attribution")).expect("result");
+    let amount = |value: &serde_json::Value| {
+        value["amount"]
+            .as_str()
+            .expect("money")
+            .parse::<f64>()
+            .expect("amount")
+    };
+    assert_eq!(
+        amount(&result["carry_detail"]["coupon_income"]["total"]),
+        0.0
+    );
+    assert!(
+        (amount(&result["mark_to_market_pnl"]) + 1_000_000.0 - amount(&result["total_pnl"])).abs()
+            < 1e-8
+    );
+    assert!(amount(&result["total_pnl"]) > 0.0 && amount(&result["total_pnl"]) < 1_000.0);
+    assert!(amount(&result["residual"]).abs() < 0.01);
 }
 
 #[wasm_bindgen_test]
@@ -162,7 +266,10 @@ fn validate_attribution_json_rejects_wrong_schema() {
 
 #[wasm_bindgen_test]
 fn attribute_pnl_missing_market_data_yields_structured_error() {
-    let empty = serde_json::to_string(&MarketContextState::from(&MarketContext::new())).unwrap();
+    let empty = serde_json::to_string(
+        &MarketContextState::try_from(&MarketContext::new()).expect("coherent market snapshot"),
+    )
+    .unwrap();
     let p = JsAttributionParams::new(
         bond_json(),
         empty.clone(),

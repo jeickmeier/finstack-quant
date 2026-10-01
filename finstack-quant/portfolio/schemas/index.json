@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_materialization.schema.json",
-      "bytes": 42108,
+      "bytes": 42203,
       "kind": "input",
       "path": "schemas/portfolio/1/portfolio_materialization.schema.json",
       "summary": "Positions, books and their instruments as one content-addressed bundle.",
@@ -10,7 +10,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_optimization_result.schema.json",
-      "bytes": 9121,
+      "bytes": 9217,
       "kind": "output",
       "path": "schemas/portfolio/1/portfolio_optimization_result.schema.json",
       "summary": "Optimizer weights and diagnostics.",

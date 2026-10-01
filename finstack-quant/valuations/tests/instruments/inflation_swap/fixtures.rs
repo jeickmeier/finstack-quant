@@ -119,7 +119,7 @@ pub fn simple_index(
     let observations = (0..=24)
         .rev()
         .map(|months_back| {
-            let date = base.add_months(-months_back);
+            let date = base.add_months(-months_back).expect("valid date shift");
             let value = base_cpi / monthly_growth.powf(months_back as f64);
             (date, value)
         })

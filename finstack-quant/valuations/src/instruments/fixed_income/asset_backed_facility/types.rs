@@ -253,8 +253,8 @@ impl AssetBackedFacility {
             .rate(RateSpec::Fixed { rate: 0.06 })
             .commitment_fee_bp(Decimal::from(50))
             .closing_date(closing)
-            .revolving_end(closing.add_months(24))
-            .maturity(closing.add_months(72))
+            .revolving_end(closing.add_months(24)?)
+            .maturity(closing.add_months(72)?)
             .frequency(Tenor::quarterly())
             .calendar_id("nyse".into())
             .term_out(TermOutSpec { months: 24 })
@@ -295,14 +295,22 @@ impl AssetBackedFacility {
     /// Final repayment date: `maturity`, or the effective revolving end plus
     /// the term-out window when that is earlier (the collateral is then
     /// liquidated on the first payment date at or after it).
-    pub fn repayment_date(&self) -> Date {
-        match self.term_out {
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if the term-out window exceeds the supported date range.
+    pub fn repayment_date(&self) -> finstack_quant_core::Result<Date> {
+        Ok(match self.term_out {
             Some(term_out) => self
                 .effective_revolving_end()
-                .add_months(i32::try_from(term_out.months).unwrap_or(i32::MAX))
+                .add_months(i32::try_from(term_out.months).map_err(|_| {
+                    finstack_quant_core::Error::Validation(
+                        "term-out months exceed supported range".into(),
+                    )
+                })?)?
                 .min(self.maturity),
             None => self.maturity,
-        }
+        })
     }
 
     /// Validate amounts, rates, dates and the borrowing-base rules.

@@ -559,6 +559,8 @@ pub(crate) fn market_history_json(
 ///     ``breakeven_config`` (``{"target": "z_spread", "mode": "linear"}``),
 ///     ``bump_config``, ``bond_risk_basis``, ``theta_day_basis``, ``var_config``,
 ///     ``None`` keeps the instrument's own overrides.
+///     Dict and JSON patches retain omitted fields, including individual
+///     ``bump_config`` fields; explicit ``None``/``null`` clears optional fields.
 /// market_history : MarketHistory | dict | str | None
 ///     Historical scenarios required by the ``hvar`` and
 ///     ``expected_shortfall`` metrics.

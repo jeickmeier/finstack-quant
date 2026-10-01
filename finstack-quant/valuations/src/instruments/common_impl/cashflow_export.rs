@@ -27,7 +27,7 @@
 //! engine does not yet expose a stable per-tranche balance hook for this path.
 //! Consumers should not treat `null` as missing data for non-CMO instruments.
 
-use finstack_quant_cashflows::aggregation::credit_adjusted_cashflow_pv;
+use finstack_quant_cashflows::aggregation::{credit_adjusted_cashflow_pvs, DateContext};
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCountContext};
@@ -377,8 +377,43 @@ fn build_envelope(
     let mut rows = Vec::with_capacity(schedule.get_flows().len());
     let mut envelope_currency = reporting_currency;
     let mut prev_sp = 1.0_f64;
+    let row_discounts: Vec<_> = schedule
+        .get_flows()
+        .iter()
+        .map(|flow| {
+            let id = currency_discount_curves
+                .get(&flow.amount.currency())
+                .unwrap_or(&discount_curve_id);
+            if id == &discount_curve_id {
+                Ok(std::sync::Arc::clone(&primary_discount))
+            } else {
+                market.get_discount(id.as_str())
+            }
+        })
+        .collect::<Result<_>>()?;
+    let discount_factors: Vec<_> = schedule
+        .get_flows()
+        .iter()
+        .zip(&row_discounts)
+        .map(|(flow, discount)| {
+            if flow.date <= as_of_date {
+                Ok(1.0)
+            } else {
+                discount.df_between_dates(as_of_date, flow.date)
+            }
+        })
+        .collect::<Result<_>>()?;
+    let native_pvs = credit_adjusted_cashflow_pvs(
+        schedule.get_flows(),
+        &discount_factors,
+        hazard_arc
+            .as_deref()
+            .map(|hazard| hazard as &dyn finstack_quant_core::market_data::traits::Survival),
+        recovery_rate,
+        DateContext::new(as_of_date, primary_discount.day_count(), dc_ctx),
+    )?;
 
-    for flow in schedule.get_flows() {
+    for (row_index, flow) in schedule.get_flows().iter().enumerate() {
         let ccy = flow.amount.currency();
         if envelope_currency.is_none() {
             envelope_currency = Some(ccy);
@@ -387,11 +422,7 @@ fn build_envelope(
         let row_discount_curve_id = currency_discount_curves
             .get(&ccy)
             .unwrap_or(&discount_curve_id);
-        let row_discount = if row_discount_curve_id == &discount_curve_id {
-            std::sync::Arc::clone(&primary_discount)
-        } else {
-            market.get_discount(row_discount_curve_id.as_str())?
-        };
+        let row_discount = &row_discounts[row_index];
         let curve_day_count = row_discount.day_count();
         let year_fraction = curve_day_count.signed_year_fraction(as_of_date, flow.date, dc_ctx)?;
 
@@ -421,7 +452,7 @@ fn build_envelope(
             // year fraction into `df` lands on the wrong time origin and
             // breaks reconciliation with `Instrument::value`, which uses
             // `df_between_dates`. Use the same date-based helper here.
-            let df = row_discount.df_between_dates(as_of_date, flow.date)?;
+            let df = discount_factors[row_index];
             let (sp, cond_pd) = match (hazard_arc.as_ref(), survival_at_as_of) {
                 (Some(h), Some(s0)) => {
                     // Conditional survival Q(as_of, T) = S(T) / S(as_of).
@@ -436,13 +467,7 @@ fn build_envelope(
             (df, sp, cond_pd)
         };
 
-        let native_pv = credit_adjusted_cashflow_pv(
-            flow,
-            discount_factor,
-            survival_probability.unwrap_or(1.0),
-            recovery_rate,
-            as_of_date,
-        )?;
+        let native_pv = native_pvs[row_index];
         let base_pv = market
             .convert_money(
                 Money::new(native_pv, ccy)?,
@@ -954,27 +979,6 @@ mod tests {
         let total = sum_pvs([1.0e16, 1.0, -1.0e16]);
 
         assert_eq!(total, 1.0);
-    }
-
-    #[test]
-    fn row_pv_rejects_survival_probability_outside_unit_interval() {
-        let date = Date::from_calendar_date(2026, Month::January, 15).expect("date");
-        let flow = finstack_quant_cashflows::primitives::CashFlow::new(
-            date,
-            None,
-            Money::from((100_i64, Currency::USD)),
-            CFKind::Notional,
-            0.0,
-            None,
-        );
-        let err = credit_adjusted_cashflow_pv(&flow, 0.95, -0.01, Some(0.4), date)
-            .expect_err("negative survival probability should be rejected");
-
-        let msg = err.to_string();
-        assert!(
-            msg.contains("survival probability") && msg.contains("[0, 1]"),
-            "error should explain invalid survival probability: {msg}"
-        );
     }
 
     // NOTE: A hazard_rate reconciliation test would require an instrument that

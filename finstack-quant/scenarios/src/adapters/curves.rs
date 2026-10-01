@@ -399,6 +399,7 @@ fn rebuild_price_curve(
     spot: f64,
 ) -> Result<PriceCurve> {
     Ok(PriceCurve::builder(base.id().as_str())
+        .kind(base.kind())
         .base_date(base.base_date())
         .day_count(base.day_count())
         .spot_price(spot)
@@ -417,6 +418,22 @@ fn preview_commodity_price(base: &PriceCurve, deltas_pct: &[f64], t: f64) -> Res
         .map(|((&tk, &px), &pct)| (tk, px * (1.0 + pct / 100.0)))
         .collect();
     let spot = if knots.first().is_some_and(|k| k.abs() < 1e-12) {
+        bumped[0].1
+    } else {
+        base.spot_price()
+    };
+    Ok(rebuild_price_curve(base, bumped, spot)?.price(t))
+}
+
+fn preview_vol_index_level(base: &PriceCurve, deltas_pts: &[f64], t: f64) -> Result<f64> {
+    let bumped: Vec<(f64, f64)> = base
+        .knots()
+        .iter()
+        .zip(base.prices())
+        .zip(deltas_pts)
+        .map(|((&knot, &level), &points)| (knot, level + points))
+        .collect();
+    let spot = if base.knots().first().is_some_and(|k| k.abs() < 1e-12) {
         bumped[0].1
     } else {
         base.spot_price()
@@ -1048,7 +1065,7 @@ pub(crate) fn vol_index_node_effects(
         .map_err(|_| missing_market_err(curve_id.as_str()))?;
 
     let knots: Vec<f64> = base_curve.knots().to_vec();
-    let result = resolve_bump_targets(
+    let mut result = resolve_bump_targets(
         curve_id.as_str(),
         nodes,
         &knots,
@@ -1056,6 +1073,14 @@ pub(crate) fn vol_index_node_effects(
         as_of,
         base_curve.day_count(),
         BumpDelivery::Direct,
+    )?;
+
+    calibrate_native_interpolant(
+        &mut result,
+        &knots,
+        curve_id.as_str(),
+        |deltas, t| preview_vol_index_level(&base_curve, deltas, t),
+        |t, points| Ok(base_curve.price(t) + points),
     )?;
 
     let mut levels: Vec<f64> = base_curve.prices().to_vec();

@@ -50,8 +50,8 @@ fn spec_with_config(config: Option<AttributionConfig>) -> AttributionSpec {
 
     AttributionSpec {
         instrument: InstrumentJson::Bond(bond),
-        market_t0: (&market_t0).into(),
-        market_t1: (&market_t1).into(),
+        market_t0: (&market_t0).try_into().expect("coherent market snapshot"),
+        market_t1: (&market_t1).try_into().expect("coherent market snapshot"),
         as_of_t0: t0,
         as_of_t1: t1,
         method: AttributionMethod::MetricsBased,

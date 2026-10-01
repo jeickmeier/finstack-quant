@@ -643,12 +643,10 @@ fn long_dated_high_kappa_theta_does_not_fall_back_to_bs() {
     );
 }
 
-/// M-heston-cf: the BS fallback must use the deterministic average
-/// variance v̄(T), not v₀. With v0=0.01, θ=0.09, κ=2, T=1 the two differ
-/// by a factor ~5.5 in variance; forcing the σᵥ→0 BS branch must
-/// reproduce BS at √v̄(T).
+/// The sigma_v -> 0 Fourier limit uses the time-averaged variance, not v0.
+/// With v0=0.01, theta=0.09, kappa=2, T=1 these differ materially.
 #[test]
-fn bs_fallback_uses_deterministic_avg_variance_not_v0() {
+fn small_vol_of_vol_uses_deterministic_avg_variance_not_v0() {
     let params = HestonPricingParams::new(0.05, 0.0, 2.0, 0.09, 1e-12, -0.5, 0.01).expect("valid");
     let spot = 100.0;
     let strike = 100.0;
@@ -663,18 +661,18 @@ fn bs_fallback_uses_deterministic_avg_variance_not_v0() {
         "v_bar(T) mismatch: got {vbar}, expected {expected_vbar}"
     );
 
-    // σᵥ < 1e-10 forces the BS branch; it must price at √v̄, not √v₀.
+    // The stable CF must approach BS at sqrt(v_bar), without substituting a proxy.
     let price = heston_call_price_fourier(spot, strike, time, &params, None)
         .expect("Heston Fourier call price");
     let bs_vbar = black_scholes_call(spot, strike, time, params.r, params.q, vbar.sqrt());
     let bs_v0 = black_scholes_call(spot, strike, time, params.r, params.q, params.v0.sqrt());
     assert!(
         (price - bs_vbar).abs() < 1e-12,
-        "BS fallback must use v_bar: got {price}, expected {bs_vbar}"
+        "Heston limit must use v_bar: got {price}, expected {bs_vbar}"
     );
     assert!(
         (price - bs_v0).abs() > 1e-3,
-        "BS fallback must NOT use v0 ({bs_v0}); got {price}"
+        "Heston limit must not use v0 ({bs_v0}); got {price}"
     );
 }
 
@@ -712,8 +710,7 @@ fn canonical_heston_params_validate_correlation() {
     assert_eq!(params.kappa, 2.0);
 }
 
-/// Scalar Fourier integration retries adaptively and then reports convergence
-/// failure instead of substituting a Black-Scholes proxy.
+/// Scalar Fourier integration reports convergence failure after bounded refinement.
 #[test]
 fn scalar_fourier_rejects_corrupted_nodes_after_retry() {
     let params = HestonPricingParams::new(0.05, 0.0, 10.0, 100.0, 90.0, 0.99, 90.0).expect("valid");
@@ -814,7 +811,7 @@ fn low_variance_settings_match_high_umax_reference() {
     );
 
     let reference = HestonFourierSettings::new(2000.0, 2000, 16, 1e-8).expect("valid");
-    let price = heston_call_price_fourier(spot, strike, time, &params, Some(&settings))
+    let price = heston_call_price_fourier(spot, strike, time, &params, None)
         .expect("Heston Fourier call price");
     let ref_price = heston_call_price_fourier(spot, strike, time, &params, Some(&reference))
         .expect("Heston Fourier call price");
@@ -826,10 +823,67 @@ fn low_variance_settings_match_high_umax_reference() {
     );
 
     // The widened grid must also leave a negligible truncation tail.
-    let diag = heston_pj_with_diagnostics(1, spot, strike, time, &params, &settings);
+    let diag = heston_pj_with_diagnostics(1, spot, strike, time, &params, &reference);
     assert!(
         diag.tail_estimate < HESTON_TAIL_DIAGNOSTIC_THRESHOLD,
         "variance-aware settings must not trip the tail diagnostic, got {}",
         diag.tail_estimate
     );
+}
+
+#[test]
+fn heston_short_expiry_defaults_match_converged_reference_prices() {
+    let params = HestonPricingParams::new(0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid");
+    // References from a 20,000-frequency, 320,000-node integration. The old
+    // fixed u_max=200 underpriced these by 20% and 69%, respectively.
+    for (time, expected) in [(0.001, 0.254803543342), (0.0001, 0.080038149868)] {
+        let call = heston_call_price_fourier(100.0, 100.0, time, &params, None)
+            .expect("converged short-expiry call");
+        let strip = heston_call_prices_fourier(100.0, &[100.0], time, &params, None)
+            .expect("converged short-expiry strip");
+        assert!((call - expected).abs() < 1e-9, "time={time}, price={call}");
+        assert!((strip[0] - call).abs() < 1e-12);
+    }
+}
+
+#[test]
+fn heston_small_vol_of_vol_is_continuous_to_deterministic_variance() {
+    for (v0, theta) in [(0.04, 0.04), (0.01, 0.09)] {
+        for sigma_v in [1e-5, 1e-7, 1e-8, 1e-9, 1e-10, 1e-11, 1e-12] {
+            let params =
+                HestonPricingParams::new(0.05, 0.0, 2.0, theta, sigma_v, -0.7, v0).expect("valid");
+            let expected = black_scholes_call(
+                100.0,
+                100.0,
+                1.0,
+                params.r,
+                params.q,
+                params.deterministic_avg_variance(1.0).sqrt(),
+            );
+            let actual = heston_call_price_fourier(100.0, 100.0, 1.0, &params, None)
+                .expect("converged near-deterministic Heston price");
+            // Correlation produces a genuine O(sigma_v) correction; the
+            // numerical error must not grow as sigma_v tends to zero.
+            assert!(
+                (actual - expected).abs() < 20.0 * sigma_v + 1e-9,
+                "sigma_v={sigma_v}, actual={actual}, expected={expected}"
+            );
+        }
+    }
+}
+
+#[test]
+fn heston_rejects_unresolved_grids_and_invalid_origin_tolerances() {
+    let params = HestonPricingParams::new(0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid");
+    let coarse = HestonFourierSettings::new(8.0, 40, 16, 1e-8).expect("valid grid");
+    let cached = HestonStripPricer::new(100.0, 0.0001, &params, &coarse).expect("valid cache");
+    assert!(cached.price_call(100.0).is_err());
+    assert!(heston_call_price_fourier(100.0, 100.0, 0.0001, &params, Some(&coarse)).is_err());
+    for phi_eps in [f64::NAN, f64::INFINITY, -1.0, 100.0] {
+        assert!(HestonFourierSettings::new(100.0, 100, 16, phi_eps).is_err());
+    }
+    for bad in [f64::NAN, f64::INFINITY, -100.0, 0.0] {
+        assert!(heston_call_price_fourier(bad, 100.0, 0.0, &params, None).is_err());
+        assert!(heston_call_price_fourier(100.0, bad, 1.0, &params, None).is_err());
+    }
 }

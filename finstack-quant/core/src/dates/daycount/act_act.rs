@@ -9,16 +9,19 @@ use crate::dates::tenor::TenorUnit;
 use crate::dates::Tenor;
 use crate::error::InputError;
 
-const MAX_ACT_ACT_ISMA_RECURSION_DEPTH: usize = 512;
+const MAX_ACT_ACT_ISMA_PERIODS: usize = 512;
 
 /// Calculate ACT/ACT (ICMA/ISMA) year fraction using explicit reference coupon boundaries.
 ///
 /// This helper is intended for irregular first/last coupons where the regular
 /// coupon period cannot be inferred from `start`, `end`, and `frequency` alone.
-/// The `reference_start`/`reference_end` pair must describe one regular coupon
-/// period from the underlying schedule. Its nominal month length is inferred
-/// by rounding `12 * reference_days / 365`, so February clamping and ordinary
-/// business-day adjustments do not shorten the coupon tenor.
+/// The `reference_start`/`reference_end` pair must describe one unadjusted regular
+/// coupon period from the contractual schedule. Its nominal month length is
+/// inferred by rounding `12 * reference_days / 365`, so February clamping does
+/// not shorten the coupon tenor. The endpoints must reproduce the same nominal
+/// month grid; business-day-adjusted payment dates are not reference boundaries.
+/// Nominal boundaries outside that reference are generated from the original
+/// unclamped endpoint; if both endpoints are month-end, the grid retains EOM.
 ///
 /// Use this helper when you already know the surrounding regular coupon period
 /// from the bond schedule. For regular coupons, prefer
@@ -29,8 +32,8 @@ const MAX_ACT_ACT_ISMA_RECURSION_DEPTH: usize = 512;
 ///
 /// * `start` - Accrual start date of the coupon being measured
 /// * `end` - Accrual end date of the coupon being measured
-/// * `reference_start` - Start of the corresponding regular coupon period
-/// * `reference_end` - End of the corresponding regular coupon period
+/// * `reference_start` - Unadjusted start of the corresponding regular coupon period.
+/// * `reference_end` - Unadjusted end of that regular coupon period on the same nominal month grid.
 ///
 /// # Returns
 ///
@@ -39,8 +42,8 @@ const MAX_ACT_ACT_ISMA_RECURSION_DEPTH: usize = 512;
 /// # Errors
 ///
 /// Returns an error if the accrual dates are reversed, the reference period is
-/// invalid, or the algorithm would need an implausibly deep recursion to align
-/// the supplied reference period.
+/// invalid, its endpoints do not reproduce one nominal month grid, or alignment
+/// exceeds the supported number of nominal periods.
 ///
 /// # References
 ///
@@ -69,118 +72,67 @@ pub fn act_act_isma_year_fraction_with_reference_period(
     let coupon_length_years = period_months as f64 / 12.0;
     let preserve_eom = reference_start == reference_start.end_of_month()
         && reference_end == reference_end.end_of_month();
-    #[derive(Clone, Copy)]
-    struct Traversal {
-        period_months: u32,
-        coupon_length_years: f64,
-        preserve_eom: bool,
-    }
-    let traversal = Traversal {
-        period_months,
-        coupon_length_years,
-        preserve_eom,
+    // The larger day identifies the unclamped roll anchor: Jan 30 / Feb 28
+    // and Feb 28 / Mar 30 both describe a roll on the 30th. Generate every
+    // nominal date from that original anchor, never from a February clamp.
+    let (anchor, anchor_index) = if reference_start.day() >= reference_end.day() {
+        (reference_start, 0)
+    } else {
+        (reference_end, 1)
     };
+    let period_months = i32::try_from(period_months).map_err(|_| InputError::Invalid)?;
+    let boundary = |index: i32| -> crate::Result<Date> {
+        if index.unsigned_abs() as usize >= MAX_ACT_ACT_ISMA_PERIODS {
+            return Err(crate::Error::Validation(
+                "ACT/ACT ISMA reference-period traversal exceeded its supported range".into(),
+            ));
+        }
+        let months = (index - anchor_index)
+            .checked_mul(period_months)
+            .ok_or(InputError::Invalid)?;
+        let shifted = anchor.add_months(months)?;
+        Ok(if preserve_eom {
+            shifted.end_of_month()
+        } else {
+            shifted
+        })
+    };
+    if boundary(0)? != reference_start || boundary(1)? != reference_end {
+        return Err(crate::Error::Validation(
+            "ACT/ACT ISMA reference endpoints must share an unadjusted nominal month grid".into(),
+        ));
+    }
+    let mut index = 0;
+    let mut period_start = reference_start;
+    let mut period_end = reference_end;
+    while start < period_start {
+        index -= 1;
+        period_end = period_start;
+        period_start = boundary(index)?;
+    }
+    while start >= period_end {
+        index += 1;
+        period_start = period_end;
+        period_end = boundary(index + 1)?;
+    }
 
-    fn recurse(
-        start: Date,
-        end: Date,
-        reference_start: Date,
-        reference_end: Date,
-        traversal: Traversal,
-        depth: usize,
-    ) -> crate::Result<f64> {
-        if start == end {
-            return Ok(0.0);
-        }
-        if depth >= MAX_ACT_ACT_ISMA_RECURSION_DEPTH {
-            tracing::warn!(
-                "ACT/ACT ISMA reference-period traversal exceeded maximum depth of {MAX_ACT_ACT_ISMA_RECURSION_DEPTH}"
-            );
-            return Err(InputError::Invalid.into());
-        }
-        if reference_start >= reference_end {
+    let mut total = 0.0;
+    loop {
+        if period_start >= period_end {
             return Err(InputError::InvalidDateRange.into());
         }
-
-        if start >= reference_start && end <= reference_end {
-            let accrual_days = (end - start).whole_days() as f64;
-            let reference_days = (reference_end - reference_start).whole_days() as f64;
-            if reference_days <= 0.0 {
-                return Err(InputError::Invalid.into());
-            }
-            return Ok((accrual_days / reference_days) * traversal.coupon_length_years);
+        let overlap_start = start.max(period_start);
+        let overlap_end = end.min(period_end);
+        let overlap_days = (overlap_end - overlap_start).whole_days() as f64;
+        let coupon_days = (period_end - period_start).whole_days() as f64;
+        total += overlap_days / coupon_days * coupon_length_years;
+        if end <= period_end {
+            return Ok(total);
         }
-
-        let period_months_i32 =
-            i32::try_from(traversal.period_months).map_err(|_| InputError::Invalid)?;
-        let shift = |date: Date, months: i32| {
-            let shifted = date.add_months(months);
-            if traversal.preserve_eom {
-                shifted.end_of_month()
-            } else {
-                shifted
-            }
-        };
-
-        if end <= reference_start {
-            let previous_start = shift(reference_start, -period_months_i32);
-            return recurse(
-                start,
-                end,
-                previous_start,
-                reference_start,
-                traversal,
-                depth + 1,
-            );
-        }
-
-        if start >= reference_end {
-            let next_end = shift(reference_end, period_months_i32);
-            return recurse(start, end, reference_end, next_end, traversal, depth + 1);
-        }
-
-        if start < reference_start {
-            let previous_start = shift(reference_start, -period_months_i32);
-            return Ok(recurse(
-                start,
-                reference_start,
-                previous_start,
-                reference_start,
-                traversal,
-                depth + 1,
-            )? + recurse(
-                reference_start,
-                end,
-                reference_start,
-                reference_end,
-                traversal,
-                depth + 1,
-            )?);
-        }
-
-        if end > reference_end {
-            let next_end = shift(reference_end, period_months_i32);
-            return Ok(recurse(
-                start,
-                reference_end,
-                reference_start,
-                reference_end,
-                traversal,
-                depth + 1,
-            )? + recurse(
-                reference_end,
-                end,
-                reference_end,
-                next_end,
-                traversal,
-                depth + 1,
-            )?);
-        }
-
-        Err(InputError::Invalid.into())
+        index += 1;
+        period_start = period_end;
+        period_end = boundary(index + 1)?;
     }
-
-    recurse(start, end, reference_start, reference_end, traversal, 0)
 }
 // ACT/ACT (ISDA) helper
 pub(super) fn year_fraction_act_act_isda(start: Date, end: Date) -> crate::Result<f64> {
@@ -272,11 +224,13 @@ fn is_regular_frequency_period(start: Date, end: Date, frequency: Tenor) -> bool
         return false;
     }
     let mut k: i32 = 1;
-    while k <= MAX_ACT_ACT_ISMA_RECURSION_DEPTH as i32 {
+    while k <= MAX_ACT_ACT_ISMA_PERIODS as i32 {
         let Some(step) = k.checked_mul(months) else {
             break;
         };
-        let boundary = start.add_months(step);
+        let Ok(boundary) = start.add_months(step) else {
+            break;
+        };
         if boundary == end {
             return true;
         }
@@ -346,7 +300,7 @@ fn year_fraction_act_act_isma(start: Date, end: Date, frequency: Tenor) -> crate
     periods.push(start);
     let mut k: i32 = 1;
     loop {
-        let boundary = start.add_months(k * months_per_period);
+        let boundary = start.add_months(k * months_per_period)?;
         periods.push(boundary);
         if boundary >= end {
             break;
@@ -402,8 +356,7 @@ pub(super) fn year_fraction_act_act_afb(start: Date, end: Date) -> f64 {
     let mut residual_end = end;
     let mut whole_years = 0.0;
 
-    loop {
-        let mut candidate = residual_end.add_months(-12);
+    while let Ok(mut candidate) = residual_end.add_months(-12) {
         // QuantLib leap-day alignment: a year-step that lands on 28 February
         // of a leap year is bumped to 29 February.
         if candidate.month() == Month::February

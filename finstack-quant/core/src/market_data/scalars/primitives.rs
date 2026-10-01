@@ -549,7 +549,9 @@ impl TryFrom<ScalarTimeSeriesWire> for ScalarTimeSeries {
 }
 
 impl Bumpable for MarketScalar {
+    /// Apply a scalar shock with checked monetary arithmetic and finite results.
     fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
+        spec.validate_parallel("MarketScalar")?;
         let (raw_val, is_multiplicative) = spec.resolve_standard_values_or_error(
             "MarketScalar",
             "only supports Additive/{RateBp,Percent,Fraction} or Multiplicative/Factor",
@@ -562,6 +564,11 @@ impl Bumpable for MarketScalar {
                 } else {
                     v + raw_val
                 };
+                if !new_val.is_finite() {
+                    return Err(crate::Error::Validation(
+                        "market scalar bump must produce a finite value".into(),
+                    ));
+                }
                 Ok(MarketScalar::Unitless(new_val))
             }
             MarketScalar::Price(m) => match (spec.mode, spec.units) {
@@ -570,10 +577,11 @@ impl Bumpable for MarketScalar {
                     m.checked_add(bump).map(MarketScalar::Price)
                 }
                 (BumpMode::Additive, BumpUnits::Percent) => {
-                    Ok(MarketScalar::Price(*m * (1.0 + spec.value / 100.0)))
+                    m.checked_mul_f64(1.0 + spec.value / 100.0)
+                        .map(MarketScalar::Price)
                 }
                 (BumpMode::Multiplicative, BumpUnits::Factor) => {
-                    Ok(MarketScalar::Price(*m * spec.value))
+                    m.checked_mul_f64(spec.value).map(MarketScalar::Price)
                 }
                 _ => Err(crate::error::InputError::UnsupportedBump {
                     reason: format!(
@@ -621,6 +629,40 @@ mod tests {
         assert!(MarketScalar::try_from(MarketScalarWire::Unitless(f64::NAN)).is_err());
         assert!(MarketScalar::try_from(MarketScalarWire::Unitless(f64::INFINITY)).is_err());
         assert!(crate::money::Money::new(f64::NEG_INFINITY, Currency::USD).is_err());
+    }
+
+    #[test]
+    fn scalar_bumps_report_overflow_without_panicking_or_returning_infinity() {
+        let money = MarketScalar::Price(
+            crate::money::Money::from_decimal_str("10000000000000000000000000000", Currency::USD)
+                .expect("representable money"),
+        );
+        for spec in [
+            BumpSpec::multiplier(10.0),
+            BumpSpec::inflation_shift_pct(900.0),
+        ] {
+            assert!(money.apply_bump(spec).is_err());
+        }
+        for spec in [
+            BumpSpec::multiplier(10.0),
+            BumpSpec {
+                value: f64::MAX,
+                units: BumpUnits::Fraction,
+                ..BumpSpec::inflation_shift_pct(900.0)
+            },
+        ] {
+            assert!(MarketScalar::Unitless(f64::MAX).apply_bump(spec).is_err());
+        }
+        assert!(MarketScalar::Unitless(1.0)
+            .apply_bump(BumpSpec::multiplier(f64::NAN))
+            .is_err());
+    }
+
+    #[test]
+    fn scalar_bumps_reject_bucket_coordinates_without_a_time_axis() {
+        assert!(MarketScalar::Unitless(1.0)
+            .apply_bump(BumpSpec::triangular_key_rate_bp(0.0, 1.0, 2.0, 1.0))
+            .is_err());
     }
 
     #[test]

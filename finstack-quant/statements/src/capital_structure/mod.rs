@@ -89,15 +89,18 @@ mod builder;
 mod cashflows;
 pub(crate) mod integration;
 pub(crate) mod period_flows;
+mod principal;
 pub(crate) mod residual_schedule;
 mod state;
 pub mod waterfall;
 mod waterfall_spec;
 
-// Curated public facade — preserves the same public type set as the old `types.rs`.
+// Curated public facade for capital-structure types and builder inputs.
+pub use builder::{BondConventionParams, SwapConventions, SwapParams};
 pub use cashflows::{CapitalStructureCashflows, CashflowBreakdown};
 pub use integration::build_instrument_from_spec;
 pub use period_flows::calculate_period_flows;
+pub use principal::PrincipalClaim;
 pub use state::CapitalStructureState;
 pub use waterfall::{execute_waterfall, WaterfallPeriodResult};
 pub(crate) use waterfall_spec::reject_available_cash_debt_service;

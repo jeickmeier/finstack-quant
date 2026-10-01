@@ -5,6 +5,7 @@
 //! [`finstack_quant_models::correlation`]. The JS facade nests these exports
 //! under `models.correlation`.
 
+use super::parse_usize;
 use crate::utils::to_js_err;
 use finstack_quant_models::correlation::{self as corr, Copula, CopulaSpec, RecoveryModel};
 use wasm_bindgen::prelude::*;
@@ -61,7 +62,8 @@ impl JsCopulaSpec {
     /// # Errors
     ///
     /// Throws a JavaScript exception if a Student-t specification contains
-    /// non-finite degrees of freedom or a value at most two.
+    /// non-finite degrees of freedom or a value at most two, or random-loading
+    /// volatility is non-finite or outside `[0, 0.5]`.
     #[wasm_bindgen(js_name = build)]
     pub fn build(&self) -> Result<JsCopula, JsValue> {
         self.inner
@@ -140,9 +142,9 @@ impl JsCopula {
     /// Strict lower-tail dependence coefficient `λ_L` at the given
     /// correlation.
     ///
-    /// Returns `NaN` when the model has no closed-form `λ_L` (Random Factor
-    /// Loading); check `Number.isNaN()` before using the result. For the
-    /// RFL heuristic stress gauge use `stressCorrelationProxy` instead.
+    /// Random Factor Loading returns the mass at unit loading under its
+    /// calibrated clipped-normal loading distribution. Gaussian models have
+    /// zero tail dependence except at perfect correlation.
     /// @param correlation - Dependence correlation from -1 through 1 under the selected copula or recovery model.
     #[wasm_bindgen(js_name = tailDependence)]
     pub fn tail_dependence(&self, correlation: f64) -> f64 {
@@ -153,8 +155,7 @@ impl JsCopula {
     /// copula.
     ///
     /// This is **not** the strict copula lower-tail-dependence coefficient
-    /// `λ_L` (which has no closed form for RFL — `tailDependence` returns
-    /// `NaN`). It gauges the extra correlation mass in the high-loading
+    /// `λ_L` returned by `tailDependence`. It gauges the extra correlation mass in the high-loading
     /// tail and vanishes in the Gaussian (`loadingVol = 0`) limit.
     /// @param correlation - Dependence correlation from -1 through 1 under the selected copula or recovery model.
     ///
@@ -337,16 +338,25 @@ pub fn joint_probabilities(p1: f64, p2: f64, correlation: f64) -> Result<Box<[f6
 /// checks unit diagonal, off-diagonal in `[-1, 1]`, symmetry, and positive
 /// semi-definiteness. Returns nothing on success; raises a descriptive error
 /// (including the failing dimension or constraint) otherwise.
-/// @param matrix - Flat row-major `n * n` correlation coefficients; unit diagonal, off-diagonals in `[-1, 1]`.
-/// @param n - Positive square-matrix dimension; `matrix` must contain exactly `n * n` entries.
+///
+/// # Arguments
+///
+/// * `matrix` - Flat row-major `n * n` correlation coefficients; unit
+///   diagonal, off-diagonals in `[-1, 1]`.
+/// * `n` - Finite non-negative integer square-matrix dimension no greater
+///   than `4294967295`; `matrix` must contain exactly `n * n` entries, and
+///   an empty matrix uses zero.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if the flat length is not `n * n`, a diagonal
-/// entry is not one, an entry is outside the correlation bounds, the matrix is
-/// not symmetric, or the matrix is not positive semidefinite.
+/// Throws a JavaScript exception if `n` is non-finite, fractional, negative,
+/// or exceeds the WebAssembly `usize` range; if `n * n` overflows or the flat
+/// length is not `n * n`; if a diagonal entry is not one, an entry is outside
+/// the correlation bounds, the matrix is not symmetric, or the matrix is not
+/// positive semidefinite.
 #[wasm_bindgen(js_name = validateCorrelationMatrix)]
-pub fn validate_correlation_matrix(matrix: &[f64], n: usize) -> Result<(), JsValue> {
+pub fn validate_correlation_matrix(matrix: &[f64], n: f64) -> Result<(), JsValue> {
+    let n = parse_usize(n, "n")?;
     corr::validate_correlation_matrix(matrix, n).map_err(to_js_err)
 }
 
@@ -356,23 +366,38 @@ pub fn validate_correlation_matrix(matrix: &[f64], n: usize) -> Result<(), JsVal
 /// matrix but fails Cholesky by a small margin, returns the nearest valid
 /// correlation matrix (symmetric, unit diagonal, PSD) in Frobenius norm.
 /// Gross input violations raise rather than being silently reshaped.
-/// @param matrix - Flat row-major `n * n` near-correlation matrix to project onto the correlation set.
-/// @param n - Positive square-matrix dimension; `matrix` must contain exactly `n * n` entries.
-/// @param max_iter - Maximum number of Higham nearest-correlation projection iterations.
-/// @param tol - Positive convergence tolerance for the nearest-correlation projection.
+///
+/// # Arguments
+///
+/// * `matrix` - Flat row-major `n * n` near-correlation matrix to project
+///   onto the correlation set.
+/// * `n` - Finite non-negative integer square-matrix dimension no greater
+///   than `4294967295`; `matrix` must contain exactly `n * n` entries, and
+///   an empty matrix uses zero.
+/// * `max_iter` - Optional finite non-negative integer limit on Higham
+///   projection iterations, no greater than `4294967295`; defaults to the
+///   canonical Rust setting of 200.
+/// * `tol` - Optional positive convergence tolerance for the projection;
+///   defaults to the canonical Rust setting of `1e-10`.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if the flat length is not `n * n`, the input
-/// has a gross diagonal or symmetry violation, or the projection does not
+/// Throws a JavaScript exception if `n` or `maxIter` is non-finite,
+/// fractional, negative, or exceeds the WebAssembly `usize` range; if
+/// `n * n` overflows or the flat length is not `n * n`; if the input has a
+/// gross diagonal or symmetry violation; or if the projection does not
 /// converge within `maxIter` iterations at `tol`.
 #[wasm_bindgen(js_name = nearestCorrelation)]
 pub fn nearest_correlation(
     matrix: Vec<f64>,
-    n: usize,
-    max_iter: Option<usize>,
+    n: f64,
+    max_iter: Option<f64>,
     tol: Option<f64>,
 ) -> Result<Box<[f64]>, JsValue> {
+    let n = parse_usize(n, "n")?;
+    let max_iter = max_iter
+        .map(|value| parse_usize(value, "maxIter"))
+        .transpose()?;
     // Single source of truth for the defaults: the Rust
     // `NearestCorrelationOpts::default()` (max_iter = 200, tol = 1e-10).
     let defaults = corr::NearestCorrelationOpts::default();
@@ -465,8 +490,9 @@ mod tests {
         let rfl = JsCopulaSpec::random_factor_loading(0.2)
             .build()
             .expect("RFL copula should build");
-        // RFL has no closed-form λ_L: NaN per the tail-dependence contract.
-        assert!(rfl.tail_dependence(0.3).is_nan());
+        // The clipped loading distribution has an exact unit-loading tail mass.
+        let tail_dependence = rfl.tail_dependence(0.3);
+        assert!(tail_dependence > 0.0 && tail_dependence < 1.0);
         let proxy = rfl
             .stress_correlation_proxy(0.3)
             .expect("proxy defined for RFL");
@@ -586,7 +612,7 @@ mod tests {
             0.5, 1.0, 0.4,
             0.3, 0.4, 1.0,
         ];
-        assert!(validate_correlation_matrix(&good, 3).is_ok());
+        assert!(validate_correlation_matrix(&good, 3.0).is_ok());
 
         // Off-diagonal outside [-1, 1] must be rejected.
         #[rustfmt::skip]
@@ -594,10 +620,10 @@ mod tests {
             1.0, 1.5,
             1.5, 1.0,
         ];
-        assert!(validate_correlation_matrix(&bad, 2).is_err());
+        assert!(validate_correlation_matrix(&bad, 2.0).is_err());
 
         // Length / dimension mismatch must be rejected, not panic.
-        assert!(validate_correlation_matrix(&good, 2).is_err());
+        assert!(validate_correlation_matrix(&good, 2.0).is_err());
     }
 
     #[test]
@@ -609,7 +635,7 @@ mod tests {
             0.5, 1.0, 0.4,
             0.3, 0.4, 1.0,
         ];
-        let out = nearest_correlation(good, 3, None, None).expect("good matrix should project");
+        let out = nearest_correlation(good, 3.0, None, None).expect("good matrix should project");
         assert_eq!(out.len(), 9);
         for i in 0..3 {
             assert!((out[i * 3 + i] - 1.0).abs() < 1e-9);

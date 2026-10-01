@@ -9,7 +9,7 @@ use crate::builder::{
     CashFlowSchedule, CouponType, FeeSpec, FixedCouponSpec, FloatingCouponSpec, Notional,
     PrincipalExchange, StepUpCouponSpec,
 };
-use crate::primitives::{is_cash_settlement_kind, CFKind};
+use crate::primitives::CFKind;
 use finstack_quant_core::dates::{parse_iso_date, Date};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -234,7 +234,9 @@ pub struct PrincipalEventSpec {
     pub payment_date: Date,
     /// Outstanding balance delta. Positive increases outstanding, negative repays.
     pub delta: Money,
-    /// Optional cash leg. When omitted, the cash leg equals `delta`.
+    /// Optional settlement amount before classification-dependent sign handling.
+    /// When omitted, amortization repayments use `-delta` and draws use `delta`.
+    /// Amortization emits this amount as a receipt; other kinds negate it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cash: Option<Money>,
     /// Cashflow classification to emit.
@@ -547,15 +549,9 @@ pub fn validate_cashflow_schedule_json(schedule_json: &str) -> Result<String> {
 /// ```
 pub fn dated_flows_json(schedule_json: &str) -> Result<String> {
     let schedule = parse_schedule(schedule_json)?;
-    schedule.validate()?;
-    let flows: Vec<DatedFlowJson> = schedule
-        .flows
-        .iter()
-        .filter(|flow| is_cash_settlement_kind(flow.kind))
-        .map(|flow| DatedFlowJson {
-            date: flow.date,
-            amount: flow.amount,
-        })
+    let flows: Vec<DatedFlowJson> = crate::dated_flows(&schedule)?
+        .into_iter()
+        .map(|(date, amount)| DatedFlowJson { date, amount })
         .collect();
     serialize_json(&flows, "dated flows")
 }
@@ -574,12 +570,15 @@ pub fn dated_flows_json(schedule_json: &str) -> Result<String> {
 ///
 /// # Returns
 ///
-/// Scalar accrued-interest amount in the schedule's currency space.
+/// Finite scalar accrued-interest amount in the schedule's currency space.
 ///
 /// # Errors
 ///
 /// Returns an error if the schedule, as-of date, or optional accrual config JSON
-/// cannot be parsed.
+/// cannot be parsed or validated, a day-count or ex-coupon calculation fails,
+/// a compounded coupon-period rate is non-finite or at or below `-1`, or the
+/// accrued-interest formula or accumulated result is non-finite. Valid negative
+/// compounded period rates in `(-1, 0)` remain supported.
 ///
 /// # Examples
 ///

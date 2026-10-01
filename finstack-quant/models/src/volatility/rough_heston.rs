@@ -2,8 +2,8 @@
 //!
 //! Implements the rough Heston model of El Euch & Rosenbaum (2019) for
 //! European option pricing using the characteristic function obtained by
-//! solving a fractional Riccati equation with the Adams predictor-corrector
-//! method of Diethelm, Ford & Freed (2004).
+//! solving a fractional Riccati equation with the implicit fractional Adams-Moulton
+//! method, using step refinement to check numerical convergence.
 //!
 //! # Mathematical Foundation
 //!
@@ -58,10 +58,12 @@ use finstack_quant_core::math::special_functions::ln_gamma;
 /// Maximum real part of exponents to avoid overflow in `exp()`.
 const EXPONENT_REAL_LIMIT: f64 = 700.0;
 
-/// Solves the fractional Riccati ODE via the Adams predictor-corrector method.
+/// Solves the fractional Riccati ODE with implicit fractional Adams-Moulton steps.
 ///
-/// Uses the fractional Adams-Bashforth-Moulton scheme (Diethelm et al. 2004)
-/// on a uniform time grid. The fractional ODE for D(u, t):
+/// Product integration on a uniform time grid gives a quadratic equation for
+/// each new value. Solving that equation, rather than applying one explicit
+/// predictor correction, prevents the mean-reversion stiffness from causing
+/// the divergent trajectories of the explicit scheme. The fractional ODE for D(u, t):
 ///
 /// ```text
 /// D^α_t D(t) = F(D(t))
@@ -77,6 +79,12 @@ pub struct FractionalRiccatiSolver {
     num_steps: usize,
     /// Uniform step size h = T / num_steps.
     step_size: f64,
+    /// Product-integration weights for prior values, indexed by lag.
+    history_weights: Vec<f64>,
+    /// Special product-integration weight on the initial value at each step.
+    initial_weights: Vec<f64>,
+    /// Coefficient of the implicit endpoint contribution.
+    endpoint_weight: f64,
 }
 
 impl FractionalRiccatiSolver {
@@ -90,10 +98,29 @@ impl FractionalRiccatiSolver {
     pub fn new(hurst: f64, maturity: f64, num_steps: usize) -> Self {
         let alpha = hurst + 0.5;
         let step_size = maturity / num_steps as f64;
+        let endpoint_weight = step_size.powf(alpha) / ln_gamma(alpha + 2.0).exp();
+        let history_weights = (0..num_steps)
+            .map(|lag| {
+                let lag = lag as f64;
+                ((lag + 2.0).powf(alpha + 1.0) + lag.powf(alpha + 1.0)
+                    - 2.0 * (lag + 1.0).powf(alpha + 1.0))
+                    * endpoint_weight
+            })
+            .collect();
+        let initial_weights = (0..num_steps)
+            .map(|step| {
+                let step = step as f64;
+                (step.powf(alpha + 1.0) - (step - alpha) * (step + 1.0).powf(alpha))
+                    * endpoint_weight
+            })
+            .collect();
         Self {
             alpha,
             num_steps,
             step_size,
+            history_weights,
+            initial_weights,
+            endpoint_weight,
         }
     }
 
@@ -114,8 +141,6 @@ impl FractionalRiccatiSolver {
     /// * `rho` - Instantaneous correlation between Brownian drivers, in `[-1, 1]`
     pub fn solve_d(&self, u: Complex64, kappa: f64, sigma: f64, rho: f64) -> Vec<Complex64> {
         let n = self.num_steps;
-        let h = self.step_size;
-        let alpha = self.alpha;
 
         // Riccati coefficients: F(D) = a + b*D + c*D^2
         // El Euch & Rosenbaum (2019): F(u, x) = −½u(u + i) + (iuρσ − κ)x + ½σ²x²
@@ -133,45 +158,25 @@ impl FractionalRiccatiSolver {
         let mut f_vals = vec![Complex64::new(0.0, 0.0); n + 1];
         f_vals[0] = f(d[0]); // f(D(0)) = f(0) = a
 
-        let h_alpha = h.powf(alpha);
-        let gamma_alpha_p1 = ln_gamma(alpha + 1.0).exp(); // Γ(α+1)
-        let gamma_alpha_p2 = ln_gamma(alpha + 2.0).exp(); // Γ(α+2)
-
+        // The endpoint solves x = history + weight * (a + b*x + c*x²).
+        // Re(-b) is positive on the pricing contour. The principal square
+        // root selects the solution continuous from weight=0. Rationalizing
+        // the quadratic formula avoids cancellation as vol-of-vol tends to 0.
+        let minus_linear = Complex64::new(1.0, 0.0) - b * self.endpoint_weight;
+        let quadratic = c * self.endpoint_weight;
         for step in 0..n {
-            // Predictor (fractional Adams-Bashforth)
-            // y^P_{n+1} = y_0 + (h^α / Γ(α+1)) * Σ_{j=0}^{n} b_{j} * f(y_j)
-            // where b_j = (n+1-j)^α - (n-j)^α
-            let mut predictor = Complex64::new(0.0, 0.0);
-            for (j, f_j) in f_vals[..=step].iter().enumerate() {
-                let b_weight =
-                    ((step + 1 - j) as f64).powf(alpha) - ((step - j) as f64).powf(alpha);
-                predictor += Complex64::new(b_weight, 0.0) * f_j;
+            let mut history = f_vals[0] * self.initial_weights[step];
+            for (j, f_j) in f_vals[1..=step].iter().enumerate() {
+                history += f_j * self.history_weights[step - j - 1];
             }
-            let d_pred = predictor * h_alpha / gamma_alpha_p1;
-
-            // Corrector (fractional Adams-Moulton, single iteration)
-            // y_{n+1} = y_0 + (h^α / Γ(α+2)) * [Σ_{j=0}^{n} a_j * f(y_j) + f(y^P)]
-            // Corrector weights a_{j,n+1}:
-            //   j=0: n^{α+1} - (n-α)(n+1)^α
-            //   1 ≤ j ≤ n: (n-j+2)^{α+1} + (n-j)^{α+1} - 2(n-j+1)^{α+1}
-            //   j=n+1: 1 (the predictor term)
-            let mut corrector = Complex64::new(0.0, 0.0);
-            for (j, f_j) in f_vals[..=step].iter().enumerate() {
-                let a_weight = if j == 0 {
-                    (step as f64).powf(alpha + 1.0)
-                        - ((step as f64) - alpha) * ((step + 1) as f64).powf(alpha)
-                } else {
-                    ((step - j + 2) as f64).powf(alpha + 1.0)
-                        + ((step - j) as f64).powf(alpha + 1.0)
-                        - 2.0 * ((step - j + 1) as f64).powf(alpha + 1.0)
-                };
-                corrector += Complex64::new(a_weight, 0.0) * f_j;
-            }
-            // Add the predictor contribution (j = step+1 term, weight = 1)
-            corrector += f(d_pred);
-
-            d[step + 1] = corrector * h_alpha / gamma_alpha_p2;
+            let constant = history + a * self.endpoint_weight;
+            let discriminant = minus_linear * minus_linear - 4.0 * quadratic * constant;
+            d[step + 1] = 2.0 * constant / (minus_linear + discriminant.sqrt());
             f_vals[step + 1] = f(d[step + 1]);
+            if !d[step + 1].is_finite() || !f_vals[step + 1].is_finite() {
+                d[step + 1..].fill(Complex64::new(f64::NAN, f64::NAN));
+                break;
+            }
         }
 
         d
@@ -321,8 +326,18 @@ impl TryFrom<RawRoughHestonFourierParams> for RoughHestonFourierParams {
     }
 }
 
-/// Default number of time steps for the fractional Riccati solver.
-const DEFAULT_RICCATI_STEPS: usize = 200;
+/// Initial resolution used before checking convergence by step doubling.
+const INITIAL_RICCATI_STEPS: usize = 200;
+/// Maximum resolution; unresolved calculations return NaN rather than a price.
+const MAX_RICCATI_STEPS: usize = 1600;
+/// Single-frequency queries can afford one more refinement than an entire
+/// pricing integral. At u=10 the ordinary H=0.1 case needs 3,200 steps to
+/// meet the same absolute characteristic-function tolerance.
+const MAX_CHARACTERISTIC_STEPS: usize = 3200;
+/// Absolute tolerance after normalizing the premium by its spot/strike scale.
+const PRICE_SCALE_TOLERANCE: f64 = 1e-6;
+/// Absolute tolerance for characteristic-function convergence.
+const CHARACTERISTIC_TOLERANCE: f64 = 1e-6;
 
 /// Default upper integration limit for Fourier inversion.
 const DEFAULT_UPPER_LIMIT: f64 = 200.0;
@@ -410,25 +425,53 @@ impl RoughHestonFourierParams {
     /// * `u` - Fourier frequency (complex)
     /// * `r` - Risk-free rate
     /// * `q` - Dividend yield
-    /// * `t` - Time to expiry
+    /// * `t` - Finite non-negative time to expiry in years.
+    ///
+    /// # Returns
+    ///
+    /// The characteristic function, or complex NaN when inputs are invalid,
+    /// any solver value is non-finite, or step refinement does not converge
+    /// within 3,200 steps at absolute tolerance `1e-6`.
     pub fn char_func(&self, u: Complex64, r: f64, q: f64, t: f64) -> Complex64 {
-        let solver = FractionalRiccatiSolver::new(self.hurst, t, DEFAULT_RICCATI_STEPS);
-        let d_traj = solver.solve_d(u, self.kappa, self.sigma, self.rho);
-        let c_val = solver.solve_c(&d_traj, self.kappa, self.theta);
-        let i_d_val = solver.fractional_integral_d(&d_traj);
+        if !u.is_finite() || !r.is_finite() || !q.is_finite() || !t.is_finite() || t < 0.0 {
+            return Complex64::new(f64::NAN, f64::NAN);
+        }
+        if t == 0.0 {
+            return Complex64::new(1.0, 0.0);
+        }
+        let drift = Complex64::i() * u * (r - q) * t;
+        let mut previous: Option<Complex64> = None;
+        let mut steps = INITIAL_RICCATI_STEPS;
+        while steps <= MAX_CHARACTERISTIC_STEPS {
+            let solver = FractionalRiccatiSolver::new(self.hurst, t, steps);
+            let value = self
+                .demeaned_char_func(&solver, u)
+                .map(|value| value * drift.exp());
+            if let (Some(current), Some(prior)) = (value, previous) {
+                if (current - prior).norm() <= CHARACTERISTIC_TOLERANCE {
+                    return current;
+                }
+            }
+            previous = value;
+            steps *= 2;
+        }
+        Complex64::new(f64::NAN, f64::NAN)
+    }
 
-        let exponent = Complex64::i() * u * (r - q) * t + c_val + i_d_val * self.v0;
-
+    /// Evaluate the demeaned characteristic function without concealing solver failure.
+    fn demeaned_char_func(
+        &self,
+        solver: &FractionalRiccatiSolver,
+        u: Complex64,
+    ) -> Option<Complex64> {
+        let trajectory = solver.solve_d(u, self.kappa, self.sigma, self.rho);
+        let exponent = solver.solve_c(&trajectory, self.kappa, self.theta)
+            + solver.fractional_integral_d(&trajectory) * self.v0;
         if !exponent.is_finite() || exponent.re > EXPONENT_REAL_LIMIT {
-            return Complex64::new(0.0, 0.0);
+            return None;
         }
-
-        let result = exponent.exp();
-        if result.is_finite() {
-            result
-        } else {
-            Complex64::new(0.0, 0.0)
-        }
+        let value = exponent.exp();
+        value.is_finite().then_some(value)
     }
 
     /// Price a European option using the Lewis (2000) single-integral formula.
@@ -456,9 +499,12 @@ impl RoughHestonFourierParams {
     ///
     /// # Returns
     ///
-    /// Option price. The value is not clamped at zero: tiny negative values
-    /// can arise from quadrature noise on far-OTM options, and materially
-    /// negative values indicate a pricing failure that must stay visible.
+    /// Option price after convergence of the fractional time discretization.
+    /// Returns NaN for invalid inputs, failed Fourier nodes, unresolved time
+    /// refinement, or material violations of the call-price bounds. Prices
+    /// are not clamped: tiny quadrature noise remains visible. Time refinement
+    /// uses a tolerance of `1e-6` times the larger discounted spot/strike and
+    /// at most 1,600 steps; Fourier integration uses the fixed documented grid.
     ///
     /// # References
     ///
@@ -501,58 +547,69 @@ impl RoughHestonFourierParams {
         let forward = spot * ((r - q) * t).exp();
         let x = (forward / strike).ln(); // log-forward-moneyness ln(F/K)
 
-        let solver = FractionalRiccatiSolver::new(self.hurst, t, DEFAULT_RICCATI_STEPS);
-
-        // Lewis integrand at quadrature point u:
-        // Re[e^{iwx} · ψ(w)] / (u² + 1/4), w = u − i/2
-        //
-        // where ψ(w) = exp(C(w) + I^{1−α}D(w)·v₀). The phase i·w·x carries
-        // the real contour factor e^{x/2} (B1); the v₀ coefficient is the
-        // fractional integral I^{1−α}D, not D(T) (M7). The risk-neutral
-        // drift cancels analytically when converting from φ (char func of
-        // log-return) to ψ (char func of demeaned log-return).
-        let integrand = |u_real: f64| -> f64 {
-            let w = Complex64::new(u_real, -0.5);
-            let d_traj = solver.solve_d(w, self.kappa, self.sigma, self.rho);
-            let c_val = solver.solve_c(&d_traj, self.kappa, self.theta);
-            let i_d_val = solver.fractional_integral_d(&d_traj);
-
-            // i·w·x = i·(u − i/2)·x = x/2 + i·u·x
-            let exponent = Complex64::new(0.5 * x, u_real * x) + c_val + i_d_val * self.v0;
-            if !exponent.is_finite() || exponent.re > EXPONENT_REAL_LIMIT {
-                return 0.0;
-            }
-
-            let denom = u_real * u_real + 0.25;
-            let val = (exponent.exp() / denom).re;
-            if val.is_finite() {
-                val
-            } else {
-                0.0
-            }
-        };
-
-        let integral = finstack_quant_core::math::integration::gauss_legendre_integrate_composite(
-            integrand,
-            1e-8,
-            DEFAULT_UPPER_LIMIT,
-            GL_ORDER,
-            GL_PANELS,
-        )
-        .unwrap_or(0.0);
-
-        // No `.max(0.0)` clamp: a materially negative value signals a pricer
-        // defect and must stay visible rather than be silently truncated
-        // (the old clamp returned exactly 0 for deep-OTM calls; B1). Small
-        // negative quadrature noise is possible for far-OTM options.
-        let call = spot * (-q * t).exp() - strike * (-r * t).exp() * integral / PI;
-
-        if is_call {
-            call
-        } else {
-            // Put-call parity: P = C - S·e^{-qT} + K·e^{-rT}
-            call - spot * (-q * t).exp() + strike * (-r * t).exp()
+        let spot_pv = spot * (-q * t).exp();
+        let strike_pv = strike * (-r * t).exp();
+        if !spot_pv.is_finite() || !strike_pv.is_finite() || !x.is_finite() {
+            return f64::NAN;
         }
+        let price_tolerance = PRICE_SCALE_TOLERANCE * spot_pv.max(strike_pv);
+        let lower_bound = (spot_pv - strike_pv).max(0.0);
+        let mut previous: Option<f64> = None;
+        let mut steps = INITIAL_RICCATI_STEPS;
+        while steps <= MAX_RICCATI_STEPS {
+            let current = self
+                .lewis_integral(t, x, steps)
+                .map(|integral| spot_pv - strike_pv * integral / PI);
+            if let (Some(call), Some(prior)) = (current, previous) {
+                if (call - prior).abs() <= price_tolerance
+                    && call >= lower_bound - price_tolerance
+                    && call <= spot_pv + price_tolerance
+                {
+                    return if is_call {
+                        call
+                    } else {
+                        call - spot_pv + strike_pv
+                    };
+                }
+            }
+            previous = current;
+            steps *= 2;
+        }
+        // A failed node, lack of convergence, or a material no-arbitrage
+        // violation is a pricing failure, never a zero Fourier contribution.
+        f64::NAN
+    }
+
+    /// Integrate the Lewis contour at one time resolution, propagating failed nodes.
+    fn lewis_integral(&self, t: f64, x: f64, steps: usize) -> Option<f64> {
+        let solver = FractionalRiccatiSolver::new(self.hurst, t, steps);
+        // The Lewis denominator has poles at ±i/2. Resolve the origin on
+        // short panels: a uniform 12.5-wide first panel leaves a persistent
+        // premium bias even when the Riccati time grid has converged.
+        let mut grid =
+            finstack_quant_core::math::gauss_legendre_grid(1e-8, 1.0, GL_ORDER, 1).ok()?;
+        grid.extend(finstack_quant_core::math::gauss_legendre_grid(1.0, 5.0, GL_ORDER, 1).ok()?);
+        grid.extend(
+            finstack_quant_core::math::gauss_legendre_grid(
+                5.0,
+                DEFAULT_UPPER_LIMIT,
+                GL_ORDER,
+                GL_PANELS,
+            )
+            .ok()?,
+        );
+        let mut integral = 0.0;
+        for (frequency, weight) in grid {
+            let u = Complex64::new(frequency, -0.5);
+            let characteristic = self.demeaned_char_func(&solver, u)?;
+            let phase = Complex64::new(0.5 * x, frequency * x).exp();
+            let value = (phase * characteristic).re / (frequency * frequency + 0.25);
+            if !value.is_finite() {
+                return None;
+            }
+            integral += weight * value;
+        }
+        integral.is_finite().then_some(integral)
     }
 
     /// Extract the Black-76 implied volatility from the rough Heston price.
@@ -592,6 +649,68 @@ impl RoughHestonFourierParams {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn implicit_riccati_is_finite_across_stiff_lewis_contour() {
+        let solver = FractionalRiccatiSolver::new(0.1, 10.0, 200);
+        for frequency in [0.1, 1.0, 10.0, 50.0, 100.0, 200.0] {
+            let trajectory = solver.solve_d(Complex64::new(frequency, -0.5), 10.0, 0.3, -0.7);
+            assert!(trajectory.iter().all(|value| value.is_finite()));
+        }
+    }
+
+    #[test]
+    fn stiff_rough_heston_price_matches_refined_native_solver() {
+        let params = RoughHestonFourierParams::new(0.04, 10.0, 0.04, 0.3, -0.7, 0.1)
+            .expect("valid stiff parameters");
+        let price = params.price_european(100.0, 100.0, 0.0, 0.0, 10.0, true);
+        let refined = 100.0
+            - 100.0
+                * params
+                    .lewis_integral(10.0, 0.0, 1600)
+                    .expect("all refined Fourier nodes converge")
+                / PI;
+        assert!(price > 20.0 && price < 30.0, "stiff ATM call: {price}");
+        assert!(
+            (price - refined).abs() < 1e-4,
+            "price={price}, refined={refined}"
+        );
+    }
+
+    #[test]
+    fn deterministic_variance_limit_matches_gaussian_characteristic_and_black_price() {
+        let params = RoughHestonFourierParams::new(0.04, 10.0, 0.04, 1e-8, 0.0, 0.1)
+            .expect("valid deterministic limit");
+        let frequency = Complex64::new(1.0, 0.0);
+        let actual = params.char_func(frequency, 0.0, 0.0, 10.0);
+        let gaussian =
+            (-0.5 * 0.04 * 10.0 * (frequency * frequency + Complex64::i() * frequency)).exp();
+        assert!(
+            (actual - gaussian).norm() < 2e-6,
+            "actual={actual}, gaussian={gaussian}"
+        );
+        let price = params.price_european(100.0, 100.0, 0.0, 0.0, 10.0, true);
+        let black = crate::closed_form::black_call(100.0, 100.0, 0.2, 10.0);
+        assert!((price - black).abs() < 1e-4, "rough={price}, Black={black}");
+    }
+
+    #[test]
+    fn failed_rough_heston_nodes_remain_visible() {
+        let params = RoughHestonFourierParams {
+            sigma: f64::INFINITY,
+            ..RoughHestonFourierParams::new(0.04, 2.0, 0.04, 0.3, -0.7, 0.1)
+                .expect("valid base parameters")
+        };
+        assert!(params
+            .price_european(100.0, 100.0, 0.0, 0.0, 1.0, true)
+            .is_nan());
+        assert!(!params
+            .char_func(Complex64::new(1.0, 0.0), 0.0, 0.0, 1.0)
+            .is_finite());
+        assert!(params
+            .implied_vol(100.0, 100.0, 0.0, 0.0, 1.0, true)
+            .is_none());
+    }
 
     #[test]
     fn valid_params() {
@@ -741,6 +860,24 @@ mod tests {
     }
 
     #[test]
+    fn char_func_real_frequency_converges_to_refined_solution() {
+        let params = RoughHestonFourierParams::new(0.04, 2.0, 0.04, 0.3, -0.7, 0.1)
+            .expect("valid ordinary parameters");
+        let frequency = Complex64::new(10.0, 0.0);
+        let actual = params.char_func(frequency, 0.05, 0.0, 1.0);
+        let solver = FractionalRiccatiSolver::new(0.1, 1.0, 6400);
+        let refined = params
+            .demeaned_char_func(&solver, frequency)
+            .expect("refined characteristic function")
+            * (Complex64::i() * frequency * 0.05).exp();
+        assert!(actual.is_finite());
+        assert!(
+            (actual - refined).norm() < CHARACTERISTIC_TOLERANCE,
+            "actual={actual}, refined={refined}"
+        );
+    }
+
+    #[test]
     fn char_func_bounded() {
         let params = RoughHestonFourierParams::new(0.04, 2.0, 0.04, 0.3, -0.7, 0.1).expect("valid");
         for u_re in [0.1, 1.0, 5.0, 10.0, 20.0] {
@@ -866,10 +1003,9 @@ mod tests {
         let forward = spot * ((r - q) * t).exp();
         let df = (-r * t).exp();
 
-        // The 200-step fractional Adams scheme leaves ~0.005 absolute bias
-        // (D(t) ~ t^α has a singular derivative at 0); bound both the
-        // absolute error (~0.5 bp of spot) and the relative error. The
-        // pre-fix pricer was off by 10-40% here.
+        // Bound both absolute and relative error in the deterministic-variance
+        // limit. The pre-fix pricer was off by 10-40% here; the implicit time
+        // solver and origin-resolved Fourier grid also remove its later bias.
         for &strike in &[80.0, 100.0, 120.0] {
             let rough = params.price_european(spot, strike, r, q, t, true);
             let bs = df * crate::closed_form::black_call(forward, strike, vol, t);

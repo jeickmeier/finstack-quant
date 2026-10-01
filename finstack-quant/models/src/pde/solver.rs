@@ -5,7 +5,7 @@
 //! [`PdeSolution`] with the solution values, interpolation, and finite-difference
 //! Greeks (delta, gamma) read directly from the grid.
 
-use super::exercise::{ExerciseType, PenaltyExercise};
+use super::exercise::{ExerciseError, ExerciseType, PenaltyExercise};
 use super::grid::{find_nearest, Grid1D};
 use super::problem::PdeProblem1D;
 use super::stepper::{RannacherStepper, StepperError, ThetaStepper, TimeStepper};
@@ -97,6 +97,9 @@ impl Solver1DBuilder {
     pub fn build(self) -> Result<Solver1D, PdeSolverError> {
         let grid = self.grid.ok_or(PdeSolverError::MissingGrid)?;
         let stepper = self.stepper.ok_or(PdeSolverError::MissingStepper)?;
+        if let Some(exercise) = &self.exercise {
+            exercise.validate(grid.n_interior())?;
+        }
         Ok(Solver1D {
             grid,
             stepper,
@@ -195,33 +198,18 @@ impl Solver1D {
             self.stepper
                 .step(problem, &self.grid, &mut u, t_from, t_to, i)?;
 
-            // The penalty method uses λ = penalty_factor/dt = 1e8/dt, so
-            // λ·dt = 1e8 >> 1.  This effectively hard-clamps u to the payoff
-            // at every violated node after each step (both implicit Rannacher
-            // start-up steps and subsequent CN steps).  The kink re-introduced
-            // at the exercise boundary is thus identical whether the previous
-            // step was implicit or CN — the heavy λ damps any CN oscillation
-            // that would otherwise arise from propagating a fresh kink.
-            //
-            // Forsyth-Vetzal (2002) recommend an additional implicit
-            // "post-exercise smoothing" step after CN steps that immediately
-            // follow the Rannacher start-up period.  With λ = 1e8/dt that
-            // smoothing is already baked in: the penalty constraint fully
-            // overwrites the kinked nodes, leaving no high-frequency residual
-            // for CN to amplify.  Verified empirically: Rannacher+penalty and
-            // Implicit+penalty prices agree to < 0.5% on a 101-point grid
-            // (see `w08_rannacher_american_put_price_matches_implicit_*` test).
+            // Apply the obstacle on eligible time levels. American exercise
+            // is approximated by exercising at every time level; the penalty
+            // projection does not replace a time-grid convergence check or
+            // the smoothing of a kink introduced by exercise.
             let Some(ref exercise) = self.exercise else {
                 continue;
             };
             if !exercise.is_exercise_time(t_to) {
                 continue;
             }
-            let Some(boundary_idx) = exercise.apply(&mut u, dt) else {
-                continue;
-            };
-            let grid_idx = boundary_idx + 1; // interior index → grid index
-            if grid_idx < self.grid.n() {
+            for boundary_idx in exercise.apply(&mut u, dt)? {
+                let grid_idx = boundary_idx + 1; // interior index → grid index
                 exercise_boundary.push((t_to, self.grid.points()[grid_idx]));
             }
         }
@@ -268,16 +256,19 @@ fn boundary_value(
                 u[u.len() - 1] + h * g
             }
         }
-        BoundaryCondition::Linear => {
-            // d²u/dx² = 0: u_boundary = 2*u_1 - u_2
+        BoundaryCondition::Linear | BoundaryCondition::LinearInExp => {
             let n = u.len();
             if n < 2 {
                 return u[0];
             }
             if is_lower {
-                2.0 * u[0] - u[1]
+                let ratio = bc.extrapolation_ratio(grid.h_left(1), grid.h_right(1), true);
+                u[0] + ratio * (u[0] - u[1])
             } else {
-                2.0 * u[n - 1] - u[n - 2]
+                let interior = grid.n() - 2;
+                let ratio =
+                    bc.extrapolation_ratio(grid.h_right(interior), grid.h_left(interior), false);
+                u[n - 1] + ratio * (u[n - 1] - u[n - 2])
             }
         }
     }
@@ -293,7 +284,12 @@ pub struct PdeSolution {
     pub grid: Grid1D,
     /// Solution values at `t = 0` at every grid node (including boundaries).
     pub values: Vec<f64>,
-    /// Early exercise boundary `(time, spot_level)` pairs, if applicable.
+    /// Exercise/continuation transitions `(time, grid_coordinate)` in backward
+    /// time order, with multiple entries per time when there are multiple
+    /// exercise regions. Coordinates are in the grid's units (for a log-spot
+    /// grid, exponentiate to obtain spot). Each coordinate is the higher node
+    /// of the adjacent pair crossing the boundary. `None` means no interior
+    /// transition was present, including fully exercised/continuing grids.
     pub exercise_boundary: Option<Vec<(f64, f64)>>,
     /// Number of time steps used.
     pub n_time_steps: usize,
@@ -394,6 +390,9 @@ pub enum PdeSolverError {
     /// No time stepper was specified in the builder.
     #[error("PDE solver requires a time stepper")]
     MissingStepper,
+    /// Invalid payoff shape, exercise configuration, or continuation values.
+    #[error(transparent)]
+    Exercise(#[from] ExerciseError),
     /// The maturity passed to `solve` was not strictly positive.
     #[error("PDE solve requires a strictly positive maturity, got {maturity:e}")]
     NonPositiveMaturity {
@@ -423,6 +422,61 @@ mod tests {
     use super::super::boundary::BoundaryCondition;
     use super::super::problem::PdeProblem1D;
     use super::*;
+
+    struct LinearBoundaryDiffusion;
+
+    impl PdeProblem1D for LinearBoundaryDiffusion {
+        fn diffusion(&self, _x: f64, _t: f64) -> f64 {
+            1.0
+        }
+        fn convection(&self, _x: f64, _t: f64) -> f64 {
+            0.0
+        }
+        fn reaction(&self, _x: f64, _t: f64) -> f64 {
+            0.0
+        }
+        fn terminal_condition(&self, x: f64) -> f64 {
+            2.0 + 3.0 * x
+        }
+        fn lower_boundary(&self, _t: f64) -> BoundaryCondition {
+            BoundaryCondition::Linear
+        }
+        fn upper_boundary(&self, _t: f64) -> BoundaryCondition {
+            BoundaryCondition::Linear
+        }
+    }
+
+    #[test]
+    fn linear_boundaries_preserve_affine_profile_on_nonuniform_grid() {
+        let grid = Grid1D::from_points(vec![0.0, 0.1, 0.4, 0.65, 1.0]).expect("valid grid");
+        let solver = Solver1D::builder()
+            .grid(grid.clone())
+            .implicit(100)
+            .build()
+            .expect("solver");
+        let solution = solver.solve(&LinearBoundaryDiffusion, 0.1).expect("solve");
+        for (&x, &actual) in grid.points().iter().zip(&solution.values) {
+            let expected = 2.0 + 3.0 * x;
+            assert!(
+                (actual - expected).abs() < 1e-10,
+                "x={x}, actual={actual}, expected={expected}"
+            );
+        }
+    }
+
+    #[test]
+    fn linear_boundaries_preserve_constant_with_one_interior_node() {
+        let grid = Grid1D::from_points(vec![0.0, 0.3, 1.0]).expect("valid grid");
+        let solver = Solver1D::builder()
+            .grid(grid)
+            .implicit(10)
+            .build()
+            .expect("solver");
+        let solution = solver.solve(&LinearBoundaryDiffusion, 0.1).expect("solve");
+        for actual in solution.values {
+            assert!((actual - 2.9).abs() < 1e-10);
+        }
+    }
 
     /// Heat equation: u_t = u_xx on [0, pi]
     /// Terminal: u(x, T) = sin(x)
@@ -480,6 +534,67 @@ mod tests {
             .grid(Grid1D::uniform(0.0, 1.0, 5).expect("valid"))
             .build()
             .is_err());
+    }
+
+    #[test]
+    fn solver_builder_rejects_invalid_exercise_payoff_shape_and_values() {
+        for payoff in [vec![], vec![1.0], vec![1.0; 4]] {
+            let result = Solver1D::builder()
+                .grid(Grid1D::uniform(0.0, 1.0, 5).expect("grid"))
+                .implicit(10)
+                .american(payoff)
+                .build();
+            assert!(matches!(
+                result,
+                Err(PdeSolverError::Exercise(ExerciseError::PayoffLength { .. }))
+            ));
+        }
+        let result = Solver1D::builder()
+            .grid(Grid1D::uniform(0.0, 1.0, 5).expect("grid"))
+            .implicit(10)
+            .bermudan(vec![0.0, f64::NAN, 1.0], vec![0.5])
+            .build();
+        assert!(matches!(
+            result,
+            Err(PdeSolverError::Exercise(
+                ExerciseError::NonFiniteValue { .. }
+            ))
+        ));
+    }
+
+    #[test]
+    fn american_call_exercise_boundary_is_above_strike() {
+        use super::super::bridge::BlackScholesPde;
+
+        let grid = Grid1D::uniform(10.0_f64.ln(), 500.0_f64.ln(), 401).expect("grid");
+        let payoff = grid.points()[1..grid.n() - 1]
+            .iter()
+            .map(|&x| (x.exp() - 100.0).max(0.0))
+            .collect();
+        let problem = BlackScholesPde {
+            sigma: 0.2,
+            rate: 0.05,
+            dividend: 0.1,
+            strike: 100.0,
+            maturity: 1.0,
+            is_call: true,
+        };
+        let solution = Solver1D::builder()
+            .grid(grid)
+            .rannacher(4, 200)
+            .american(payoff)
+            .build()
+            .expect("solver")
+            .solve(&problem, 1.0)
+            .expect("American call");
+        let boundaries = solution.exercise_boundary.expect("exercise region");
+        let at_zero: Vec<_> = boundaries.iter().filter(|(t, _)| t.abs() < 1e-12).collect();
+        assert_eq!(at_zero.len(), 1, "one upper exercise region at t=0");
+        let exercise_spot = at_zero[0].1.exp();
+        assert!(
+            (110.0..140.0).contains(&exercise_spot),
+            "call exercise boundary S={exercise_spot}"
+        );
     }
 
     /// W-08: American put with Rannacher + penalty — pricing must agree closely

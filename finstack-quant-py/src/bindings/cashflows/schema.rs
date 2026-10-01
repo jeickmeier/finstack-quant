@@ -78,34 +78,24 @@ fn resources<'py>(py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
     Ok(mapping)
 }
 
-schema_registry_functions!(
-    finstack_quant_cashflows::schema::ARTIFACTS,
-    "finstack_quant.cashflows.schema"
-);
+schema_registry_functions!(finstack_quant_cashflows::schema::ARTIFACTS);
 
 /// Register the `finstack_quant.cashflows.schema` Python namespace.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "schema")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "schema")?;
     m.setattr("__doc__", MODULE_DOC)?;
     add_registry_functions(&m)?;
 
     m.add_function(wrap_pyfunction!(resources, &m)?)?;
 
     let exports = ["get", "index", "resources", "validate"];
-    for name in exports {
-        m.getattr(name)?
-            .setattr("__module__", "finstack_quant.cashflows.schema")?;
-    }
 
     let all = PyList::new(py, exports)?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "schema",
-        "finstack_quant.cashflows",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
 
     Ok(())

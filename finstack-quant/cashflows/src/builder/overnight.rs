@@ -7,6 +7,7 @@
 
 use finstack_quant_core::dates::{Date, DateExt, HolidayCalendar};
 use finstack_quant_core::{Error, Result};
+use std::sync::Arc;
 
 use super::specs::{FloatingLegCompounding, OvernightIndexConstraintApplication};
 
@@ -16,7 +17,7 @@ use super::specs::{FloatingLegCompounding, OvernightIndexConstraintApplication};
 /// `weight_start..weight_end` identifies the half-open interval over which that
 /// fixing accrues. These differ under lookback, and both weight dates move
 /// under observation shift. `rate_tenor_days` preserves the tenor used when a
-/// projected overnight rate is sampled; it is normally one day even when a
+/// projected overnight rate is sampled; it is one day even when a
 /// Friday fixing carries a three-day weekend weight.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OvernightObservationSlice {
@@ -29,8 +30,8 @@ pub struct OvernightObservationSlice {
     /// Number of calendar days in `weight_start..weight_end`.
     pub weight_days: u32,
     /// Calendar-day tenor used to project the observation rate from a curve.
-    /// This can differ from `weight_days` when a business-day fixing carries
-    /// through a weekend or holiday.
+    /// Always one day for compiled schedules, independently of `weight_days`
+    /// when a business-day fixing carries through a weekend or holiday.
     pub rate_tenor_days: u32,
 }
 
@@ -72,6 +73,7 @@ pub struct OvernightRateReplay {
 /// semantics of [`OvernightObservationSchedule::replay`].
 #[derive(Debug, Clone)]
 pub struct OvernightRateAccumulator {
+    observations: Arc<[OvernightObservationSlice]>,
     accrual_start: Date,
     contractual_end: Date,
     observation_start: Date,
@@ -105,8 +107,7 @@ pub struct OvernightObservationSchedule {
     accrual_start: Date,
     accrual_end: Date,
     observation_start: Date,
-    observations: Vec<OvernightObservationSlice>,
-    tenor_tracks_weight: Vec<bool>,
+    observations: Arc<[OvernightObservationSlice]>,
     observation_cutoffs: Vec<Date>,
 }
 
@@ -135,8 +136,12 @@ impl OvernightObservationSchedule {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Validation`] for reversed dates or convention day
-    /// counts larger than `i32::MAX`, and propagates calendar date errors.
+    /// Returns [`Error::Validation`] for reversed dates, convention day counts
+    /// larger than `i32::MAX`, or a positive accrual period whose shifted
+    /// observation endpoints coincide. The latter can occur when both accrual
+    /// endpoints fall in the same weekend or holiday closure; no annualized
+    /// rate is defined for that empty observation window. Calendar date errors
+    /// propagate unchanged.
     pub fn compile(
         accrual_start: Date,
         accrual_end: Date,
@@ -168,16 +173,23 @@ impl OvernightObservationSchedule {
         };
         let observation_start = shift_back(accrual_start, observation_shift, calendar)?;
         let observation_end = shift_back(accrual_end, observation_shift, calendar)?;
+        if accrual_end > accrual_start && observation_end <= observation_start {
+            return Err(Error::Validation(format!(
+                "positive overnight accrual period [{accrual_start}, {accrual_end}) has an empty \
+                 shifted observation window [{observation_start}, {observation_end}); use \
+                 accrual endpoints with a positive observation interval"
+            )));
+        }
 
         let lookback_days = match method {
             FloatingLegCompounding::CompoundedInArrears { lookback_days } => lookback_days,
             _ => 0,
         };
-        let (mut observations, mut tenor_tracks_weight) =
+        let mut observations =
             compile_window(observation_start, observation_end, lookback_days, calendar)?;
 
         if let FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days } = method {
-            apply_lockout(&mut observations, &mut tenor_tracks_weight, cutoff_days)?;
+            apply_lockout(&mut observations, cutoff_days)?;
         }
 
         let accrual_days = non_negative_days(accrual_start, accrual_end, "accrual period")?;
@@ -199,8 +211,7 @@ impl OvernightObservationSchedule {
             accrual_start,
             accrual_end,
             observation_start,
-            observations,
-            tenor_tracks_weight,
+            observations: observations.into(),
             observation_cutoffs,
         })
     }
@@ -209,10 +220,15 @@ impl OvernightObservationSchedule {
     ///
     /// # Returns
     ///
-    /// The compiled observations. An accrual window containing no fixing
-    /// business day returns an empty slice and will fail a non-zero replay.
+    /// The compiled observations. A positive observation window containing no fixing
+    /// business day carries the preceding business-day fixing. A zero-length
+    /// accrual window returns an empty slice.
     pub fn observations(&self) -> &[OvernightObservationSlice] {
         &self.observations
+    }
+
+    pub(crate) fn accrual_period(&self) -> (Date, Date) {
+        (self.accrual_start, self.accrual_end)
     }
 
     /// Start a cloneable incremental replay at the contractual accrual start.
@@ -245,6 +261,7 @@ impl OvernightObservationSchedule {
         }
         validate_constraints(constraints)?;
         Ok(OvernightRateAccumulator {
+            observations: Arc::clone(&self.observations),
             accrual_start: self.accrual_start,
             contractual_end: self.accrual_end,
             observation_start: self.observation_start,
@@ -272,10 +289,9 @@ impl OvernightObservationSchedule {
     /// Advance a partial replay without revisiting completed observations.
     ///
     /// The update is transactional: if the callback or validation fails,
-    /// `accumulator` retains its prior state. The callback may be invoked again
-    /// for the currently clipped leading slice when its rate tenor grows with
-    /// the clipped weight; this is required for exact equivalence with a fresh
-    /// prefix replay.
+    /// `accumulator` retains its prior state. A clipped carry slice reuses its
+    /// observed one-day fixing as its calendar weight grows; the callback is
+    /// not invoked again for that slice.
     ///
     /// # Arguments
     ///
@@ -294,8 +310,8 @@ impl OvernightObservationSchedule {
     /// # Errors
     ///
     /// Returns [`Error::Validation`] for a mismatched accumulator, a reversed
-    /// or out-of-period endpoint, or a non-empty replay with no observations.
-    /// Callback errors propagate unchanged.
+    /// or out-of-period endpoint, or a positive accrued interval whose shifted
+    /// observation window is empty. Callback errors propagate unchanged.
     pub fn advance<F>(
         &self,
         accumulator: &mut OvernightRateAccumulator,
@@ -341,7 +357,8 @@ impl OvernightObservationSchedule {
     ///
     /// Returns [`Error::Validation`] when the partial end lies outside the
     /// compiled period, the basis or bounds are non-finite, or a non-empty
-    /// replay has no compiled observations. Callback errors propagate unchanged.
+    /// replay has no compiled observations or a zero-length shifted observation
+    /// window. Callback errors propagate unchanged.
     pub fn replay<F>(
         &self,
         accrual_end: Date,
@@ -367,6 +384,7 @@ impl OvernightObservationSchedule {
     {
         if accumulator.accrual_start != self.accrual_start
             || accumulator.contractual_end != self.accrual_end
+            || !Arc::ptr_eq(&accumulator.observations, &self.observations)
         {
             return Err(Error::Validation(
                 "overnight accumulator belongs to a different observation schedule".to_string(),
@@ -396,13 +414,22 @@ impl OvernightObservationSchedule {
                     "overnight replay end {accrual_end} is outside the compiled cutoff grid"
                 ))
             })?;
+        if accrual_end > self.accrual_start && new_weight_end <= self.observation_start {
+            return Err(Error::Validation(format!(
+                "positive overnight accrual through {accrual_end} has an empty shifted \
+                 observation window; no annualized rate is defined"
+            )));
+        }
         let old_weight_end = accumulator.weight_end;
         let daily_constraints = accumulator.constraints.application
             == OvernightIndexConstraintApplication::Daily
             && (accumulator.constraints.index_floor_bp.is_some()
                 || accumulator.constraints.index_cap_bp.is_some());
 
-        for (index, full_slice) in self.observations.iter().enumerate() {
+        let first = self
+            .observations
+            .partition_point(|slice| slice.weight_end <= old_weight_end);
+        for (index, full_slice) in self.observations.iter().enumerate().skip(first) {
             if full_slice.weight_start >= new_weight_end {
                 break;
             }
@@ -410,11 +437,6 @@ impl OvernightObservationSchedule {
             if clipped_end <= old_weight_end.max(full_slice.weight_start) {
                 continue;
             }
-            let tracks_weight_tenor = self
-                .tenor_tracks_weight
-                .get(index)
-                .copied()
-                .unwrap_or(false);
             let continuing = accumulator
                 .active_slice
                 .filter(|active| active.index == index);
@@ -424,21 +446,13 @@ impl OvernightObservationSchedule {
             }
             let weight_start = full_slice.weight_start;
             let weight_days = positive_days(weight_start, clipped_end, "observation slice")?;
-            let (rate, constrained) = if !tracks_weight_tenor {
-                continuing
-                    .map(|active| (active.projected_rate, active.constrained_rate))
-                    .unwrap_or_else(|| (f64::NAN, f64::NAN))
+            let (rate, constrained) = if let Some(active) = continuing {
+                (active.projected_rate, active.constrained_rate)
             } else {
-                (f64::NAN, f64::NAN)
-            };
-            let (rate, constrained) = if rate.is_nan() {
                 let mut slice = *full_slice;
                 slice.weight_start = weight_start;
                 slice.weight_end = clipped_end;
                 slice.weight_days = weight_days;
-                if tracks_weight_tenor {
-                    slice.rate_tenor_days = weight_days;
-                }
                 let rate = observation_rate(&slice)?;
                 let constrained = if daily_constraints {
                     constrain_rate(rate, accumulator.constraints)
@@ -451,8 +465,6 @@ impl OvernightObservationSchedule {
                         slice.observation_date
                     )));
                 }
-                (rate, constrained)
-            } else {
                 (rate, constrained)
             };
             accumulator.add(rate, constrained, weight_days)?;
@@ -472,6 +484,14 @@ impl OvernightObservationSchedule {
 }
 
 impl OvernightRateAccumulator {
+    pub(crate) fn accrued_through(&self) -> Date {
+        self.accrued_through
+    }
+
+    pub(crate) fn is_complete(&self) -> bool {
+        self.accrued_through == self.contractual_end
+    }
+
     fn add(&mut self, projected_rate: f64, constrained_rate: f64, weight_days: u32) -> Result<()> {
         let weight = f64::from(weight_days);
         if self.is_simple {
@@ -562,6 +582,11 @@ impl OvernightRateAccumulator {
                 constrain_rate(projected_rate, self.constraints)
             }
         };
+        if !projected_rate.is_finite() || !constrained_rate.is_finite() {
+            return Err(Error::Validation(
+                "overnight aggregation produced a non-finite period rate".into(),
+            ));
+        }
         Ok(OvernightRateReplay {
             projected_rate,
             constrained_rate,
@@ -619,37 +644,44 @@ fn compile_window(
     window_end: Date,
     lookback_days: u32,
     calendar: &dyn HolidayCalendar,
-) -> Result<(Vec<OvernightObservationSlice>, Vec<bool>)> {
+) -> Result<Vec<OvernightObservationSlice>> {
     let lead_days = lookback_days.saturating_add(1);
     let business_days =
         OvernightBusinessDays::build(window_start, window_end, lead_days, calendar)?;
     let mut ordinal = business_days.cursor_at_or_after(window_start);
     let lookback = usize::try_from(lookback_days).unwrap_or(usize::MAX);
     let mut observations = Vec::new();
-    let mut tenor_tracks_weight = Vec::new();
     let mut current = window_start;
+
+    if window_start < window_end && !window_start.is_business_day(calendar) {
+        let preceding = business_days
+            .step_back(ordinal, lookback.saturating_add(1))
+            .ok_or_else(|| {
+                insufficient_lookback_window(lookback.saturating_add(1), window_start)
+            })?;
+        let first_business = business_days
+            .days
+            .get(ordinal)
+            .copied()
+            .unwrap_or(window_end);
+        let weight_end = first_business.min(window_end);
+        observations.push(OvernightObservationSlice {
+            observation_date: preceding,
+            weight_start: window_start,
+            weight_end,
+            weight_days: positive_days(
+                window_start,
+                weight_end,
+                "leading overnight observation slice",
+            )?,
+            rate_tenor_days: 1,
+        });
+        current = weight_end;
+    }
 
     while current < window_end {
         let next = (current + time::Duration::days(1)).min(window_end);
         if business_days.days.get(ordinal).copied() == Some(current) {
-            if observations.is_empty() && current > window_start {
-                let observation_date = business_days
-                    .step_back(ordinal, lookback.saturating_add(1))
-                    .ok_or_else(|| {
-                        insufficient_lookback_window(lookback.saturating_add(1), current)
-                    })?;
-                let weight_days =
-                    positive_days(window_start, current, "leading overnight observation slice")?;
-                observations.push(OvernightObservationSlice {
-                    observation_date,
-                    weight_start: window_start,
-                    weight_end: current,
-                    weight_days,
-                    rate_tenor_days: weight_days,
-                });
-                tenor_tracks_weight.push(true);
-            }
-
             let observation_date = business_days
                 .step_back(ordinal, lookback)
                 .ok_or_else(|| insufficient_lookback_window(lookback, current))?;
@@ -659,9 +691,8 @@ fn compile_window(
                 weight_start: current,
                 weight_end: next,
                 weight_days,
-                rate_tenor_days: weight_days,
+                rate_tenor_days: 1,
             });
-            tenor_tracks_weight.push(false);
             ordinal += 1;
         } else if let Some(last) = observations.last_mut() {
             last.weight_end = next;
@@ -671,14 +702,10 @@ fn compile_window(
         current = next;
     }
 
-    Ok((observations, tenor_tracks_weight))
+    Ok(observations)
 }
 
-fn apply_lockout(
-    observations: &mut [OvernightObservationSlice],
-    tenor_tracks_weight: &mut [bool],
-    lockout_days: u32,
-) -> Result<()> {
+fn apply_lockout(observations: &mut [OvernightObservationSlice], lockout_days: u32) -> Result<()> {
     if lockout_days == 0 {
         return Ok(());
     }
@@ -690,10 +717,9 @@ fn apply_lockout(
     }
     let lockout_start = observations.len() - lockout;
     let source = observations[lockout_start - 1];
-    for (offset, observation) in observations[lockout_start..].iter_mut().enumerate() {
+    for observation in &mut observations[lockout_start..] {
         observation.observation_date = source.observation_date;
         observation.rate_tenor_days = source.rate_tenor_days;
-        tenor_tracks_weight[lockout_start + offset] = false;
     }
     Ok(())
 }

@@ -164,7 +164,9 @@ impl Portfolio {
     /// # Errors
     ///
     /// Returns [`finstack_quant_core::Error::Validation`] if a position with the same
-    /// `position_id` is already present. Silently appending would leave a
+    /// `position_id` is already present, or the position names an unknown book.
+    /// A successful append also updates the book's position membership.
+    /// Silently appending a duplicate would leave a
     /// duplicate row in the internal `positions` vector that all
     /// iteration-based aggregators would double-count, while the
     /// `position_index` map and [`Self::get_position`] would only see the
@@ -175,6 +177,15 @@ impl Portfolio {
                 "Duplicate position ID: {}",
                 position.position_id
             )));
+        }
+        if let Some(book_id) = &position.book_id {
+            let book = self.books.get_mut(book_id).ok_or_else(|| {
+                Error::validation(format!(
+                    "Position '{}' references non-existent book '{}'",
+                    position.position_id, book_id
+                ))
+            })?;
+            book.add_position(position.position_id.clone());
         }
         let idx = self.positions.len();
         self.position_index
@@ -194,7 +205,8 @@ impl Portfolio {
     /// # Errors
     ///
     /// Returns [`finstack_quant_core::Error::Validation`] if the replacement vector contains
-    /// duplicate position IDs. The portfolio is left unchanged on error.
+    /// duplicate position IDs or references an unknown book. Book memberships
+    /// are rebuilt from the replacement positions. The portfolio is left unchanged on error.
     pub fn set_positions(&mut self, positions: Vec<Position>) -> Result<()> {
         use finstack_quant_core::HashSet;
 
@@ -208,6 +220,26 @@ impl Portfolio {
             }
         }
 
+        for position in &positions {
+            if let Some(book_id) = &position.book_id {
+                if !self.books.contains_key(book_id) {
+                    return Err(Error::validation(format!(
+                        "Position '{}' references non-existent book '{}'",
+                        position.position_id, book_id
+                    )));
+                }
+            }
+        }
+        for book in self.books.values_mut() {
+            book.position_ids.clear();
+        }
+        for position in &positions {
+            if let Some(book_id) = &position.book_id {
+                if let Some(book) = self.books.get_mut(book_id) {
+                    book.position_ids.push(position.position_id.clone());
+                }
+            }
+        }
         self.positions = positions;
         self.rebuild_index();
         Ok(())
@@ -245,7 +277,9 @@ impl Portfolio {
     /// - Dummy entity exists if needed
     /// - Position book references point to existing books
     /// - Book position references point to existing positions
-    /// - Book hierarchy contains no cycles
+    /// - Book memberships and parent/child references agree in both directions
+    /// - Each position and child book has at most one membership
+    /// - Book hierarchy contains no cycles and stays within resource limits
     ///
     /// # Returns
     ///
@@ -289,66 +323,24 @@ impl Portfolio {
                 }
             }
         }
-        for (book_id, book) in &self.books {
-            for position_id in &book.position_ids {
-                if !seen_ids.contains(position_id) {
-                    return Err(Error::validation(format!(
-                        "Book '{}' references non-existent position '{}'",
-                        book_id, position_id
-                    )));
-                }
+        let mut first_issue = None;
+        let memberships = crate::book::validate_books(&self.books, &seen_ids, |issue| {
+            if first_issue.is_none() {
+                first_issue = Some(issue.message);
+            }
+        });
+        if let Some(message) = first_issue {
+            return Err(Error::validation(message));
+        }
+        for position in &self.positions {
+            let membership = memberships.get(&position.position_id).copied();
+            if membership != position.book_id.as_ref() {
+                return Err(Error::validation(format!(
+                    "Position '{}' book_id {:?} disagrees with book membership {:?}",
+                    position.position_id, position.book_id, membership
+                )));
             }
         }
-
-        self.validate_book_hierarchy()?;
-
-        Ok(())
-    }
-
-    /// Validate the book hierarchy for cycles and referential integrity.
-    ///
-    /// Checks performed:
-    /// 1. No cycles in parent_id chains (iterative walk with visited set).
-    /// 2. Every `child_book_ids` entry refers to an existing book.
-    /// 3. Parent/child consistency: if B is in A's `child_book_ids`,
-    ///    then B's `parent_id` must be A.
-    fn validate_book_hierarchy(&self) -> Result<()> {
-        use finstack_quant_core::HashSet;
-
-        for (book_id, book) in &self.books {
-            let mut visited = HashSet::default();
-            visited.insert(book_id.clone());
-
-            let mut current = book.parent_id.clone();
-            while let Some(ref pid) = current {
-                if !visited.insert(pid.clone()) {
-                    return Err(Error::validation(format!(
-                        "Cycle detected in book hierarchy at book '{}'",
-                        pid
-                    )));
-                }
-                current = self.books.get(pid).and_then(|b| b.parent_id.clone());
-            }
-        }
-
-        for (parent_id, parent_book) in &self.books {
-            for child_id in &parent_book.child_book_ids {
-                let child = self.books.get(child_id).ok_or_else(|| {
-                    Error::validation(format!(
-                        "Book '{}' references non-existent child book '{}'",
-                        parent_id, child_id
-                    ))
-                })?;
-
-                if child.parent_id.as_ref() != Some(parent_id) {
-                    return Err(Error::validation(format!(
-                        "Book '{}' lists '{}' as child, but child's parent_id is {:?}",
-                        parent_id, child_id, child.parent_id
-                    )));
-                }
-            }
-        }
-
         Ok(())
     }
 
@@ -517,5 +509,127 @@ mod tests {
             portfolio.to_string().contains("non-existent position"),
             "minor 3: unexpected validation error: {portfolio}"
         );
+    }
+    fn book_portfolio() -> Portfolio {
+        Portfolio::builder("BOOK_TEST")
+            .base_currency(Currency::USD)
+            .as_of(date!(2024 - 01 - 01))
+            .entity(Entity::new("ACME"))
+            .book(Book::new("ROOT", None))
+            .book(Book::new("CHILD", None).with_parent("ROOT"))
+            .position(test_position_with_book("CHILD"))
+            .build()
+            .expect("valid book portfolio")
+    }
+
+    #[test]
+    fn with_book_and_position_mutations_keep_reciprocal_memberships() {
+        let mut portfolio = book_portfolio();
+        let valuation = crate::valuation::value_portfolio(
+            &portfolio,
+            &crate::test_utils::build_test_market(),
+            &finstack_quant_core::config::FinstackConfig::default(),
+            &crate::valuation::PortfolioValuationOptions {
+                strict_risk: true,
+                metrics: crate::valuation::RequestedMetrics::Only(Vec::new()),
+            },
+        )
+        .expect("price the constructed book");
+        let totals = crate::grouping::aggregate_by_book(
+            &valuation,
+            &portfolio.books,
+            portfolio.base_currency,
+        )
+        .expect("roll up the constructed book");
+        assert!(valuation.total_base_currency.amount() > 0.0);
+        assert_eq!(totals["ROOT"], valuation.total_base_currency);
+        assert_eq!(totals["CHILD"], valuation.total_base_currency);
+        assert_eq!(
+            portfolio.books["CHILD"].position_ids,
+            vec![PositionId::new("POS_BOOK_TEST")]
+        );
+        let mut extra = test_position_with_book("ROOT");
+        extra.position_id = PositionId::new("EXTRA");
+        portfolio
+            .add_position(extra.clone())
+            .expect("append position");
+        assert_eq!(
+            portfolio.books["ROOT"].position_ids,
+            vec![PositionId::new("EXTRA")]
+        );
+        portfolio.validate().expect("consistent append");
+        portfolio
+            .set_positions(vec![extra])
+            .expect("replace positions");
+        assert!(portfolio.books["CHILD"].position_ids.is_empty());
+        portfolio.validate().expect("consistent replacement");
+        let snapshot = portfolio.to_spec();
+        assert!(portfolio
+            .set_positions(vec![test_position_with_book("MISSING")])
+            .is_err());
+        assert_eq!(
+            portfolio.to_spec().positions.len(),
+            snapshot.positions.len()
+        );
+        portfolio
+            .validate()
+            .expect("failed replacement leaves valid state");
+    }
+
+    #[test]
+    fn native_books_reject_duplicate_membership_and_dangling_parent() {
+        let mut portfolio = book_portfolio();
+        portfolio
+            .books
+            .get_mut("ROOT")
+            .expect("root")
+            .position_ids
+            .push(PositionId::new("POS_BOOK_TEST"));
+        assert!(portfolio
+            .validate()
+            .expect_err("duplicate membership")
+            .to_string()
+            .contains("more than once"));
+        let mut portfolio = book_portfolio();
+        portfolio
+            .books
+            .get_mut("ROOT")
+            .expect("root")
+            .child_book_ids
+            .clear();
+        portfolio.books.get_mut("CHILD").expect("child").parent_id = Some("MISSING".into());
+        assert!(portfolio
+            .validate()
+            .expect_err("dangling parent")
+            .to_string()
+            .contains("missing parent"));
+    }
+
+    #[test]
+    fn native_books_reject_nonreciprocal_memberships_and_parent_edges() {
+        let mut portfolio = book_portfolio();
+        portfolio
+            .books
+            .get_mut("CHILD")
+            .expect("child")
+            .position_ids
+            .clear();
+        assert!(portfolio
+            .validate()
+            .expect_err("missing reciprocal membership")
+            .to_string()
+            .contains("disagrees"));
+        let mut portfolio = book_portfolio();
+        portfolio
+            .books
+            .get_mut("ROOT")
+            .expect("root")
+            .child_book_ids
+            .clear();
+        assert!(portfolio
+            .validate()
+            .expect_err("missing reciprocal child")
+            .to_string()
+            .contains("does not list"));
     }
 }

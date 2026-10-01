@@ -38,13 +38,32 @@ use crate::{Error, Result};
 /// - H = 0.5 — standard Brownian motion
 /// - H > 0.5 — smooth (persistent increments)
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(try_from = "RawHurstExponent")]
 pub struct HurstExponent {
     /// The Hurst parameter value.
     h: f64,
 }
 
+#[derive(serde::Deserialize)]
+struct RawHurstExponent {
+    h: f64,
+}
+
+impl TryFrom<RawHurstExponent> for HurstExponent {
+    type Error = Error;
+
+    fn try_from(raw: RawHurstExponent) -> Result<Self> {
+        Self::new(raw.h)
+    }
+}
+
 impl HurstExponent {
     /// Create a new Hurst exponent, validating that H ∈ (0, 1) and is finite.
+    ///
+    /// # Arguments
+    ///
+    /// * `h` - Dimensionless Hurst exponent, strictly between zero and one;
+    ///   values below one half describe rough, anti-persistent increments.
     ///
     /// # Errors
     ///
@@ -172,6 +191,36 @@ mod tests {
     #[test]
     fn hurst_reject_infinity() {
         assert!(HurstExponent::new(f64::INFINITY).is_err());
+    }
+
+    #[test]
+    fn hurst_serde_rejects_values_outside_constructor_domain() {
+        use serde::Deserialize;
+
+        for h in [-0.5, 0.0, 1.0, 1.5] {
+            let json = format!("{{\"h\":{h}}}");
+            assert!(serde_json::from_str::<HurstExponent>(&json).is_err());
+        }
+        for json in [r#"{"h":null}"#, r#"{"h":1e999}"#] {
+            assert!(serde_json::from_str::<HurstExponent>(json).is_err());
+        }
+        // Formats other than JSON can carry IEEE non-finite numbers directly.
+        for h in [f64::NAN, f64::NEG_INFINITY, f64::INFINITY] {
+            let deserializer = serde::de::value::MapDeserializer::<_, serde::de::value::Error>::new(
+                [("h", h)].into_iter(),
+            );
+            assert!(HurstExponent::deserialize(deserializer).is_err());
+        }
+    }
+
+    #[test]
+    fn hurst_serde_round_trip_preserves_valid_exponents() {
+        for h in [0.1, 0.5, 0.9] {
+            let exponent = HurstExponent::new(h).expect("valid exponent");
+            let json = serde_json::to_string(&exponent).expect("serialize exponent");
+            let restored: HurstExponent = serde_json::from_str(&json).expect("validated exponent");
+            assert_eq!(restored, exponent);
+        }
     }
 
     // -- fBM covariance ----------------------------------------------------

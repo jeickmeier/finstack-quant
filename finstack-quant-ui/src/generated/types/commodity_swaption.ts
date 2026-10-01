@@ -514,6 +514,11 @@ export interface D_630447734299C7A44378 {
  *   over the swap period
  * - Annuity factor captures the present value of a unit payment stream
  *
+ * Analytical delta measures currency per unit change in the annuity-weighted
+ * forward price, holding rates and volatility fixed. At zero volatility or
+ * expiry, delta uses the intrinsic-payoff derivative and is defined as zero
+ * exactly at the strike, where that derivative does not exist.
+ *
  * # Examples
  *
  * ```rust

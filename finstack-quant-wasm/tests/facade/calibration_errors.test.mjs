@@ -54,6 +54,62 @@ function assertStructuredError(error) {
   assert.deepEqual(error.cause, JSON.parse(error.details));
 }
 
+function swapEnvelope(spread) {
+  return {
+    schema: 'finstack_quant.calibration/1',
+    plan: {
+      id: 'swap-spread',
+      quote_sets: { quotes: ['USD-SWAP-2Y'] },
+      settings: {},
+      steps: [
+        {
+          id: 'USD-OIS',
+          kind: 'discount',
+          curve_id: 'USD-OIS',
+          currency: 'USD',
+          base_date: '2026-09-30',
+          quote_set: 'quotes',
+        },
+      ],
+    },
+    market_data: [
+      {
+        kind: 'rate_quote',
+        type: 'swap',
+        id: 'USD-SWAP-2Y',
+        index: 'USD-SOFR-OIS',
+        pillar: { tenor: { count: 2, unit: 'years' } },
+        rate: 0.04,
+        spread_decimal: spread,
+      },
+    ],
+  };
+}
+
+test('object calibration inputs reject non-finite optional spreads before JSON conversion', () => {
+  for (const spread of [NaN, Infinity, -Infinity]) {
+    for (const operation of [
+      calibration.calibrate,
+      calibration.validateCalibrationJson,
+      calibration.dryRun,
+    ]) {
+      assert.throws(() => operation(swapEnvelope(spread)), {
+        name: 'TypeError',
+        message: 'Calibration input cannot contain non-finite numbers',
+      });
+    }
+  }
+});
+
+test('object calibration inputs preserve finite and absent optional spreads', () => {
+  for (const spread of [null, 0, 0.001, -0.001]) {
+    const envelope = swapEnvelope(spread);
+    const canonical = JSON.parse(calibration.validateCalibrationJson(envelope));
+    assert.equal(canonical.market_data[0].spread_decimal, spread);
+    assert.equal(calibration.calibrate(envelope).result.report.success, true);
+  }
+});
+
 test('calibration is owned only by the calibration namespace', () => {
   for (const name of [
     'calibrate',
@@ -64,6 +120,30 @@ test('calibration is owned only by the calibration namespace', () => {
     assert.equal(typeof calibration[name], 'function');
     assert.equal(valuations[name], undefined);
   }
+});
+
+test('calibrated final market restores through the reusable market handle', () => {
+  const result = calibration.calibrate({
+    schema: 'finstack_quant.calibration/1',
+    plan: { id: 'market-round-trip', quote_sets: {}, steps: [], settings: {} },
+  });
+  const state = result.result.final_market;
+  const market = new valuations.Market(JSON.stringify(state));
+  assert.deepEqual(JSON.parse(market.toJson()), state);
+});
+
+test('market re-ingestion rejects hierarchy nesting beyond canonical limits', () => {
+  const result = calibration.calibrate({
+    schema: 'finstack_quant.calibration/1',
+    plan: { id: 'market-depth', quote_sets: {}, steps: [], settings: {} },
+  });
+  const state = result.result.final_market;
+  let node = {};
+  for (let level = 0; level < 50; level += 1) {
+    node = { children: { [`Level${level}`]: node } };
+  }
+  state.hierarchy = { roots: { Rates: node } };
+  assert.throws(() => new valuations.Market(JSON.stringify(state)), /JSON depth.*96/);
 });
 
 test('malformed calibration input exposes canonical ingestion details', () => {
@@ -100,6 +180,41 @@ test('Hull-White calibration requires an explicit quoted-volatility fit budget',
   assertStructuredError(error);
   assert.equal(error.stage, 'ingestion');
   assert.match(error.message, /fit_tolerance/);
+});
+
+test('cap/floor Hull-White inputs require index conventions and reject frequency overrides', () => {
+  const envelope = {
+    schema: 'finstack_quant.calibration/1',
+    plan: {
+      id: 'cap-conventions',
+      quote_sets: { caps: [] },
+      settings: {},
+      steps: [
+        {
+          id: 'HW-CAPS',
+          quote_set: 'caps',
+          kind: 'cap_floor_hull_white',
+          discount_curve_id: 'EUR-OIS',
+          forward_curve_id: 'EUR-EURIBOR-3M',
+          currency: 'EUR',
+          base_date: '2026-09-30',
+          fit_tolerance: 1e-4,
+        },
+      ],
+    },
+  };
+  const missingIndex = captureError(() => calibration.dryRun(envelope));
+  assertStructuredError(missingIndex);
+  assert.match(missingIndex.message, /index_id/);
+
+  envelope.plan.steps[0].index_id = 'EUR-EURIBOR-3M';
+  const report = JSON.parse(calibration.dryRun(envelope));
+  assert.ok(Array.isArray(report.errors));
+
+  envelope.plan.steps[0].payment_frequency = 'quarterly';
+  const override = captureError(() => calibration.dryRun(envelope));
+  assertStructuredError(override);
+  assert.match(override.message, /payment_frequency/);
 });
 
 test('step-scoped validation error keeps kind distinct from step id', () => {

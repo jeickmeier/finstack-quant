@@ -349,6 +349,7 @@ fn clo_with_closing_default(valuation: DefaultedValuation) -> (StructuredCredit,
         maturity(),
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse")
     .with_coverage_triggers(vec![CoverageTestSpec::oc("A", 1.54)])
     .expect("coverage test");

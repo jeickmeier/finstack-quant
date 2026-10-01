@@ -1602,11 +1602,10 @@ fn test_overnight_compounding_weekend_start_no_lost_days() {
     );
 }
 
-/// An accrual period containing no business-day fixings (Unadjusted BDC, stub
-/// entirely on a weekend) must be a validation error, not a silent 0% index
-/// with spread-only accrual.
+/// A weekend-only stub requires the preceding business-day fixing and carries
+/// that rate over its calendar weight instead of accruing at a zero index.
 #[test]
-fn test_overnight_empty_fixing_window_errors() {
+fn test_weekend_only_stub_requires_and_carries_preceding_fixing() {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
 
@@ -1660,11 +1659,29 @@ fn test_overnight_empty_fixing_window_errors() {
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
     let err = b
         .build(Some(&market))
-        .expect_err("empty fixing window must not silently accrue at 0% index");
+        .expect_err("preceding historical fixing must be supplied");
     assert!(
-        err.to_string().contains("no business-day fixings"),
-        "error should describe the empty fixing window: {err}"
+        err.to_string().contains("2025-01-03")
+            && err.to_string().contains("historical fixings are missing"),
+        "error should identify the required Friday fixing: {err}"
     );
+
+    let friday = Date::from_calendar_date(2025, Month::January, 3).unwrap();
+    let fwd = ForwardCurve::builder("USD-SOFR-ON", 1.0 / 360.0)
+        .base_date(friday)
+        .day_count(DayCount::Act360)
+        .knots([(0.0, 0.05), (1.0, 0.05)])
+        .build()
+        .unwrap();
+    let projected = b
+        .build(Some(&MarketContext::new().insert(fwd)))
+        .expect("Friday fixing can be projected from its base date");
+    let coupon = projected
+        .get_flows()
+        .iter()
+        .find(|flow| flow.kind == CFKind::FloatReset)
+        .expect("one weekend coupon");
+    assert!((coupon.amount.amount() - 1_000_000.0 * 0.06 / 360.0).abs() < 1e-7);
 }
 
 /// With the default `Error` fallback, a coupon whose projection start is
@@ -2014,7 +2031,8 @@ fn test_fully_seasoned_overnight_coupon_from_fixings_only() {
 
 /// A missing historical business-day fixing is rejected. Weekend and holiday
 /// carry is encoded by observation weights, not by carrying across publication
-/// gaps on dates where the benchmark should have fixed.
+/// gaps on dates where the benchmark should have fixed. An explicitly
+/// configured projection fallback must not replace supplied historical data.
 #[test]
 fn test_seasoned_overnight_coupon_rejects_missing_business_day_fixing() {
     let issue = Date::from_calendar_date(2025, Month::June, 2).unwrap();
@@ -2062,17 +2080,33 @@ fn test_seasoned_overnight_coupon_rejects_missing_business_day_fixing() {
     ];
     let market = make_market_with_fixings(curve_base, 0.09, &fixings);
 
-    let err = build_single_overnight_coupon(
-        FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
-        issue,
-        maturity,
-        &market,
-    )
-    .expect_err("missing historical business-day fixing must fail");
-    assert!(
-        err.to_string().contains("2025-06-11"),
-        "error should identify the missing fixing date: {err}"
-    );
+    for fallback in [
+        FloatingRateFallback::Error,
+        FloatingRateFallback::SpreadOnly,
+        FloatingRateFallback::FixedRate(dec!(0.01)),
+    ] {
+        let mut spec = make_overnight_float_spec(
+            FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
+            fallback,
+            dec!(0.0),
+        );
+        spec.schedule.stub = StubKind::ShortBack;
+        let mut builder = CashFlowSchedule::builder();
+        let _ = builder
+            .principal(
+                Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+                issue,
+                maturity,
+            )
+            .floating_cf(spec);
+        let err = builder
+            .build(Some(&market))
+            .expect_err("supplied history must remain complete under every fallback policy");
+        assert!(
+            err.to_string().contains("2025-06-11"),
+            "error should identify the missing fixing date: {err}"
+        );
+    }
 }
 
 /// An observation exactly on the curve base date prefers a published fixing
@@ -2402,7 +2436,8 @@ fn test_term_reset_on_curve_base_projects_without_same_day_fixing() {
 }
 
 /// A seasoned term-rate reset with a fixing series that lacks the exact reset
-/// date fails with a descriptive error (term resets do not carry forward).
+/// date fails under every projection fallback policy (term resets do not
+/// carry forward or replace supplied historical data).
 #[test]
 fn test_seasoned_term_reset_missing_exact_fixing_errors() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
@@ -2417,18 +2452,82 @@ fn test_seasoned_term_reset_missing_exact_fixing_errors() {
     )];
     let market = make_market_with_fixings(curve_base, 0.03, &fixings);
 
-    let spec = make_float_spec(FloatingRateFallback::Error, dec!(0.0));
-    let mut b = CashFlowSchedule::builder();
-    let _ = b.principal(init, issue, maturity).floating_cf(spec);
+    for fallback in [
+        FloatingRateFallback::Error,
+        FloatingRateFallback::SpreadOnly,
+        FloatingRateFallback::FixedRate(dec!(0.01)),
+    ] {
+        let spec = make_float_spec(fallback, dec!(0.0));
+        let mut b = CashFlowSchedule::builder();
+        let _ = b.principal(init, issue, maturity).floating_cf(spec);
 
-    let err = b
-        .build(Some(&market))
-        .expect_err("missing exact-date term fixing must fail");
-    let msg = err.to_string();
-    assert!(
-        msg.contains("USD-SOFR-3M") && msg.contains("2025-04-15"),
-        "error should name the index and the missing fixing date: {msg}"
-    );
+        let err = b
+            .build(Some(&market))
+            .expect_err("supplied history must remain complete under every fallback policy");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("USD-SOFR-3M") && msg.contains("2025-04-15"),
+            "error should name the index and the missing fixing date: {msg}"
+        );
+    }
+}
+
+/// Equivalent curve-clock representations preserve a dated overnight quote,
+/// the coupon rate, and cash paid on the index's separate ACT/360 basis.
+/// Raw curve rates and knot times must both change to preserve dated growth.
+#[test]
+fn overnight_projection_is_invariant_to_the_curve_day_count_clock() {
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::ForwardCurve;
+
+    let issue = Date::from_calendar_date(2025, Month::January, 6).unwrap();
+    let maturity = Date::from_calendar_date(2025, Month::January, 7).unwrap();
+    for (curve_day_count, next_day_time) in [
+        (DayCount::Act360, 1.0 / 360.0),
+        (DayCount::Act365F, 1.0 / 365.0),
+    ] {
+        // The same ACT/360 quotes have raw curve-basis values r * alpha_index / alpha_curve.
+        let quote_scale = (1.0 / 360.0) / next_day_time;
+        let curve = ForwardCurve::builder("USD-SOFR-3M", next_day_time)
+            .base_date(issue)
+            .day_count(curve_day_count)
+            .knots([
+                (0.0, 0.04 * quote_scale),
+                (next_day_time, 0.05 * quote_scale),
+            ])
+            .build()
+            .expect("same dated curve in either clock");
+        let market = MarketContext::new().insert(curve);
+        let mut spec = make_overnight_float_spec(
+            FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
+            FloatingRateFallback::Error,
+            dec!(0.0),
+        );
+        spec.rate_spec.overnight_basis = Some(DayCount::Act360);
+        spec.schedule.stub = StubKind::ShortBack;
+        let mut builder = CashFlowSchedule::builder();
+        let _ = builder
+            .principal(
+                Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
+                issue,
+                maturity,
+            )
+            .floating_cf(spec);
+        let schedule = builder.build(Some(&market)).expect("overnight coupon");
+        let coupon = schedule
+            .get_flows()
+            .iter()
+            .find(|cf| cf.kind == CFKind::FloatReset)
+            .expect("one floating coupon");
+        assert!(
+            (coupon.rate.expect("coupon rate") - 0.045).abs() < RATE_TOLERANCE,
+            "curve clock {curve_day_count:?} changed the calendar-day projection"
+        );
+        assert!(
+            (coupon.amount.amount() - 12_500.0).abs() < 1e-7,
+            "curve clock {curve_day_count:?} changed the ACT/360 coupon cash amount"
+        );
+    }
 }
 
 fn make_overnight_spec_with_day_count(

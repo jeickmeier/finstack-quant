@@ -526,7 +526,7 @@ impl CdsTranchePricer {
         if let Some(cal) = calendar {
             as_of.add_business_days(settlement_lag, cal)
         } else {
-            Ok(as_of.add_weekdays(settlement_lag))
+            as_of.add_weekdays(settlement_lag)
         }
     }
 

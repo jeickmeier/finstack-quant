@@ -426,7 +426,7 @@ fn allocate_recovery(
 
 /// Build the `finstack_quant.models.credit.recovery_waterfall` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "recovery_waterfall")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "recovery_waterfall")?;
     m.setattr(
         "__doc__",
         "Absolute-priority recovery allocation with estate-inclusive collateral.",
@@ -447,13 +447,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "recovery_waterfall",
-        "finstack_quant.models.credit",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
     Ok(())
 }

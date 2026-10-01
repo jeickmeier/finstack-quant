@@ -7,7 +7,7 @@ use super::helpers::{
 };
 use crate::constants::{credit, numerical, BASIS_POINTS_PER_UNIT};
 use crate::instruments::common_impl::helpers::year_fraction;
-use crate::instruments::credit_derivatives::cds::{CdsValuationConvention, CreditDefaultSwap};
+use crate::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use finstack_quant_core::dates::{Date, HolidayCalendar};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::money::Money;
@@ -25,10 +25,10 @@ pub(super) struct AodInputs<'a> {
     pub(super) cds: &'a CreditDefaultSwap,
     pub(super) spread: f64,
     /// Date from which premium accrual is measured for the AoD integral.
-    /// For spot CDS pricing this is the coupon period start. For forward
-    /// CDS pricing this is clamped to the forward protection start, because
-    /// defaults before the forward start cancel the forward CDS rather than
-    /// accruing premium.
+    /// Premium accrues from the contractual coupon start, including when
+    /// protection begins later. Protection effective dates do not alter the
+    /// premium obligation represented by `premium_leg`. Clean presentation
+    /// subtracts accrued separately; it never resets this cashflow origin.
     pub(super) accrual_start_date: Date,
     /// Lower bound of the default-time integration interval. Always
     /// `>= as_of` (defaults strictly before `as_of` are not integrated).
@@ -147,12 +147,11 @@ impl CdsPricer {
         let protection_start = step_in.max(cds.protection_start());
         let protection_end = cds.premium_leg.end;
 
-        // Expired contract: protection ended on or before the valuation date.
+        // Protection can expire before the last rolled premium payment.
+        // An exhausted protection interval contributes zero, leaving the
+        // pending premium receivable available to the rest of the pricer.
         if protection_end <= as_of {
-            return Err(Error::Validation(format!(
-                "CDS '{}' is expired: protection end {} is on or before valuation date {}",
-                cds.id, protection_end, as_of
-            )));
+            return Ok(0.0);
         }
 
         // Step-in at/after the protection end (e.g. valuing a 1-day CDS where
@@ -236,8 +235,8 @@ impl CdsPricer {
             let end_date = period.accrual_end;
             let payment_date = period.payment_date;
 
-            // Skip periods that have already ended before as_of
-            if end_date <= as_of {
+            // Payments on as_of are treated as settled throughout CDS pricing.
+            if payment_date <= as_of {
                 continue;
             }
 
@@ -245,7 +244,12 @@ impl CdsPricer {
             let df = disc.df_between_dates(as_of, payment_date)?;
 
             // Survival uses hazard curve's day-count and conditional probability
-            let sp = sp_cond_to(surv, as_of, end_date)?;
+            let sp = if end_date <= as_of {
+                // This receivable is no longer contingent on reference default.
+                1.0
+            } else {
+                sp_cond_to(surv, as_of, end_date)?
+            };
 
             let accrual = self.coupon_accrual(cds, &period)?;
             let scheduled_coupon = cds.notional.amount() * spread * accrual;
@@ -259,14 +263,7 @@ impl CdsPricer {
                     * self.accrual_on_default_isda_standard_model_cond(AodInputs {
                         cds,
                         spread: spread.abs(),
-                        accrual_start_date: if matches!(
-                            cds.valuation_convention,
-                            CdsValuationConvention::BloombergCdswClean
-                        ) {
-                            start_date.max(as_of)
-                        } else {
-                            start_date
-                        },
+                        accrual_start_date: start_date,
                         start_date: start_date.max(as_of),
                         end_date,
                         settlement_delay: cds.protection_leg.settlement_delay,
@@ -474,7 +471,7 @@ impl CdsHazardRepriceCache {
         let periods_raw = pricer.coupon_periods(cds, as_of)?;
         let mut periods = Vec::with_capacity(periods_raw.len());
         for period in periods_raw {
-            if period.accrual_end <= as_of {
+            if period.payment_date <= as_of {
                 continue;
             }
             let accrual = pricer.coupon_accrual(cds, &period)?;
@@ -533,7 +530,11 @@ impl CdsHazardRepriceCache {
             .and_then(finstack_quant_core::dates::calendar::calendar_by_id);
         let mut premium_pv = 0.0;
         for &(period, accrual, df) in &self.periods {
-            let sp = sp_cond_to(surv, self.as_of, period.accrual_end)?;
+            let sp = if period.accrual_end <= self.as_of {
+                1.0
+            } else {
+                sp_cond_to(surv, self.as_of, period.accrual_end)?
+            };
             premium_pv += self.cds.notional.amount() * self.spread * accrual * sp * df;
             if self.pricer.config.include_accrual_on_default {
                 let spread_sign = self.spread.signum();
@@ -544,14 +545,7 @@ impl CdsHazardRepriceCache {
                         .accrual_on_default_isda_standard_model_cond(AodInputs {
                             cds: &self.cds,
                             spread: self.spread.abs(),
-                            accrual_start_date: if matches!(
-                                self.cds.valuation_convention,
-                                crate::instruments::credit_derivatives::cds::CdsValuationConvention::BloombergCdswClean
-                            ) {
-                                period.accrual_start.max(self.as_of)
-                            } else {
-                                period.accrual_start
-                            },
+                            accrual_start_date: period.accrual_start,
                             start_date: period.accrual_start.max(self.as_of),
                             end_date: period.accrual_end,
                             settlement_delay: self.cds.protection_leg.settlement_delay,
@@ -706,6 +700,273 @@ mod cds_hazard_reprice_cache_tests {
             cache.clean_accrued.abs() > 1.0e-8,
             "current-coupon Bloomberg clean fixture should have non-zero accrued premium"
         );
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod cds_review_regression_tests {
+    use super::{CdsHazardRepriceCache, CdsPricer};
+    use crate::instruments::credit_derivatives::cds::pricing::{
+        AccrualDayCountPolicy, CdsPricerConfig,
+    };
+    use crate::instruments::credit_derivatives::cds::{
+        CdsConvention, CdsValuationConvention, CreditDefaultSwap, PayReceive,
+    };
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::{Date, DayCount};
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+    use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::{CurveId, InstrumentId};
+    use rust_decimal::Decimal;
+    use time::macros::date;
+
+    fn contract(
+        start: Date,
+        end: Date,
+        convention: CdsValuationConvention,
+    ) -> finstack_quant_core::Result<CreditDefaultSwap> {
+        let mut cds = CreditDefaultSwap::new_isda(
+            InstrumentId::new("CDS-REVIEW"),
+            Money::from((10_000_000_i64, Currency::USD)),
+            PayReceive::Pay,
+            CdsConvention::IsdaNa,
+            Decimal::from(100),
+            start,
+            end,
+            0.4,
+            CurveId::new("USD-OIS"),
+            CurveId::new("CREDIT"),
+        )?;
+        cds.valuation_convention = convention;
+        cds.protection_leg.settlement_delay = 0;
+        Ok(cds)
+    }
+
+    fn flat_market(
+        as_of: Date,
+        hazard_rate: f64,
+    ) -> finstack_quant_core::Result<(DiscountCurve, HazardCurve)> {
+        let discount = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (10.0, 1.0)])
+            .build()?;
+        let hazard = HazardCurve::builder("CREDIT")
+            .base_date(as_of)
+            .recovery_rate(0.4)
+            .knots([(0.0, hazard_rate), (10.0, hazard_rate)])
+            .build()?;
+        Ok((discount, hazard))
+    }
+
+    fn close(actual: f64, expected: f64) {
+        assert!(
+            (actual - expected).abs() < 1e-7,
+            "actual {actual}, expected {expected}, difference {}",
+            actual - expected
+        );
+    }
+
+    #[test]
+    fn cds_final_coupon_uses_unadjusted_inclusive_maturity() -> finstack_quant_core::Result<()> {
+        // Weekday, Sunday, Saturday and a holiday: payment may roll by
+        // different amounts but contractual accrual always adds exactly one day.
+        for (start, end) in [
+            (date!(2025 - 03 - 20), date!(2025 - 06 - 20)),
+            (date!(2026 - 06 - 20), date!(2026 - 09 - 20)),
+            (date!(2025 - 06 - 20), date!(2025 - 09 - 20)),
+            (date!(2025 - 12 - 20), date!(2026 - 06 - 19)),
+        ] {
+            let cds = contract(start, end, CdsValuationConvention::BloombergCdswClean)?;
+            let pricer = CdsPricer::new();
+            let periods = pricer.coupon_periods(&cds, start)?;
+            let final_period = periods.last().expect("coupon period");
+            assert_eq!(final_period.accrual_end, end);
+            assert!(final_period.payment_date >= end);
+            let expected =
+                (DayCount::calendar_days(final_period.accrual_start, end) + 1) as f64 / 360.0;
+            close(pricer.coupon_accrual(&cds, final_period)?, expected);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn cds_unpaid_final_coupon_survives_protection_expiry_and_cache(
+    ) -> finstack_quant_core::Result<()> {
+        let start = date!(2025 - 06 - 20);
+        let end = date!(2025 - 09 - 20); // Saturday; payment is Monday September 22.
+        for convention in [
+            CdsValuationConvention::IsdaDirty,
+            CdsValuationConvention::BloombergCdswClean,
+        ] {
+            let cds = contract(start, end, convention)?;
+            let pricer = CdsPricer::with_config(CdsPricerConfig::from_cds(&cds));
+            let expected_days =
+                DayCount::calendar_days(start, end) + i64::from(convention.uses_clean_price());
+            let expected_coupon = 10_000_000.0 * 0.01 * expected_days as f64 / 360.0;
+            for as_of in [
+                end,
+                date!(2025 - 09 - 21),
+                date!(2025 - 09 - 22),
+                date!(2025 - 09 - 23),
+            ] {
+                for hazard_rate in [0.0, 0.2] {
+                    let (disc, surv) = flat_market(as_of, hazard_rate)?;
+                    let expected = if as_of < date!(2025 - 09 - 22) {
+                        expected_coupon
+                    } else {
+                        0.0
+                    };
+                    close(
+                        pricer.pv_protection_leg_raw(&cds, &disc, &surv, as_of)?,
+                        0.0,
+                    );
+                    close(
+                        pricer.pv_premium_leg_raw(&cds, &disc, &surv, as_of)?,
+                        expected,
+                    );
+                    close(
+                        pricer.premium_leg_pv_per_bp(&cds, &disc, &surv, as_of)?
+                            * 100.0
+                            * 10_000_000.0,
+                        expected,
+                    );
+                    close(
+                        pricer.risky_annuity(&cds, &disc, &surv, as_of)? * 0.01 * 10_000_000.0,
+                        expected,
+                    );
+                    let market = MarketContext::new()
+                        .insert(disc.clone())
+                        .insert(surv.clone());
+                    let cached =
+                        CdsHazardRepriceCache::try_new(&cds, &market, as_of)?.npv(&surv)?;
+                    close(cached, -expected);
+                    close(cached, pricer.npv_full(&cds, &disc, &surv, as_of)?);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn cds_completed_coupon_is_certain_below_historical_survival_floor(
+    ) -> finstack_quant_core::Result<()> {
+        let start = date!(2025 - 06 - 20);
+        let end = date!(2025 - 09 - 20);
+        let hazard_base = date!(2020 - 09 - 20);
+        let surv = HazardCurve::builder("CREDIT")
+            .base_date(hazard_base)
+            .recovery_rate(0.4)
+            .knots([(0.0, 10.0), (10.0, 10.0)])
+            .build()?;
+        assert!(surv.sp(5.0) < crate::constants::credit::SURVIVAL_PROBABILITY_FLOOR);
+        for convention in [
+            CdsValuationConvention::IsdaDirty,
+            CdsValuationConvention::BloombergCdswClean,
+            CdsValuationConvention::BloombergCdswCleanFullPremium,
+        ] {
+            let cds = contract(start, end, convention)?;
+            let pricer = CdsPricer::with_config(CdsPricerConfig::from_cds(&cds));
+            let accrual = (DayCount::calendar_days(start, end)
+                + i64::from(convention.uses_clean_price())) as f64
+                / 360.0;
+            for as_of in [end, date!(2025 - 09 - 21), date!(2025 - 09 - 22)] {
+                let (disc, _) = flat_market(as_of, 0.0)?;
+                let expected_annuity = if as_of < date!(2025 - 09 - 22) {
+                    accrual
+                } else {
+                    0.0
+                };
+                let expected_premium = expected_annuity * 10_000_000.0 * 0.01;
+                close(
+                    pricer.pv_premium_leg_raw(&cds, &disc, &surv, as_of)?,
+                    expected_premium,
+                );
+                close(
+                    pricer.premium_leg_pv_per_bp(&cds, &disc, &surv, as_of)? * 10_000_000.0 * 100.0,
+                    expected_premium,
+                );
+                close(
+                    pricer.risky_annuity(&cds, &disc, &surv, as_of)?,
+                    expected_annuity,
+                );
+                close(
+                    pricer.par_spread_denominator(&cds, &disc, &surv, as_of)?,
+                    expected_annuity,
+                );
+                close(
+                    pricer.npv_full(&cds, &disc, &surv, as_of)?,
+                    -expected_premium,
+                );
+                let market = MarketContext::new().insert(disc).insert(surv.clone());
+                close(
+                    CdsHazardRepriceCache::try_new(&cds, &market, as_of)?.npv(&surv)?,
+                    -expected_premium,
+                );
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn cds_aod_cashflows_match_independent_integral_for_both_clean_denominators(
+    ) -> finstack_quant_core::Result<()> {
+        let as_of = date!(2025 - 01 - 15);
+        let end = date!(2025 - 03 - 20);
+        let lambda: f64 = 0.2;
+        let (disc, surv) = flat_market(as_of, lambda)?;
+        // Include a seasoned standard coupon, a front stub and a new coupon.
+        for start in [date!(2024 - 12 - 20), date!(2025 - 01 - 01), as_of] {
+            let mut values = Vec::new();
+            let mut denominators = Vec::new();
+            for convention in [
+                CdsValuationConvention::BloombergCdswClean,
+                CdsValuationConvention::BloombergCdswCleanFullPremium,
+            ] {
+                let cds = contract(start, end, convention)?;
+                let pricer = CdsPricer::with_config(CdsPricerConfig::from_cds(&cds));
+                let t = DayCount::calendar_days(as_of, end) as f64 / 365.0;
+                let elapsed = DayCount::calendar_days(start, as_of) as f64 / 360.0;
+                let coupon = (DayCount::calendar_days(start, end) + 1) as f64 / 360.0;
+                // Independent integral of [elapsed + 365/360*t] times the
+                // conditional exponential default density lambda*exp(-lambda*t).
+                // Clean accrued settlement is a separate deterministic cashflow.
+                let i0 = -(-lambda * t).exp_m1() / lambda;
+                let i1 = (1.0 - (-lambda * t).exp() * (1.0 + lambda * t)) / lambda.powi(2);
+                let default_accrual = lambda * (elapsed * i0 + 365.0 / 360.0 * i1);
+                let expected_premium =
+                    10_000_000.0 * 0.01 * (coupon * (-lambda * t).exp() + default_accrual);
+                let premium = pricer.pv_premium_leg_raw(&cds, &disc, &surv, as_of)?;
+                close(premium, expected_premium);
+                close(
+                    pricer.premium_leg_pv_per_bp(&cds, &disc, &surv, as_of)? * 100.0 * 10_000_000.0,
+                    expected_premium,
+                );
+                let accrued = pricer.coupon_accrued_fraction(
+                    &cds,
+                    as_of,
+                    AccrualDayCountPolicy::CdswInclusive,
+                )? * 10_000_000.0
+                    * 0.01;
+                let expected_protection = 10_000_000.0 * 0.6 * (1.0 - (-lambda * t).exp());
+                let npv = pricer.npv_full(&cds, &disc, &surv, as_of)?;
+                close(npv, expected_protection - expected_premium + accrued);
+                let market = MarketContext::new()
+                    .insert(disc.clone())
+                    .insert(surv.clone());
+                close(
+                    CdsHazardRepriceCache::try_new(&cds, &market, as_of)?.npv(&surv)?,
+                    npv,
+                );
+                values.push(npv);
+                denominators.push(pricer.par_spread_denominator(&cds, &disc, &surv, as_of)?);
+            }
+            close(values[0], values[1]);
+            if start < as_of {
+                assert!(denominators[1] > denominators[0]);
+            }
+        }
         Ok(())
     }
 }

@@ -261,7 +261,7 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
     let cpi_history = InflationIndex::new(
         "USD-CPI",
         (-3..=0)
-            .map(|months| (base.add_months(months), 100.0))
+            .map(|months| (base.add_months(months).expect("valid date shift"), 100.0))
             .collect(),
         Currency::USD,
     )
@@ -426,6 +426,7 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
             ),
         )
         .insert_credit_index("CORP-HAZARD", credit_index)
+        .expect("credit index dependencies")
 }
 
 // Portfolio fixture
@@ -1038,6 +1039,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             maturity_5y(),
             "USD-OIS",
         )
+        .expect("valid structured-credit dates")
         .with_calendar_id("nyse");
         // Spread metrics require an external quote; using model dirty price
         // as its own Z-spread target would force a circular zero spread.

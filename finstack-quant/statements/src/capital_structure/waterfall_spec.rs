@@ -47,7 +47,8 @@ pub struct WaterfallSpec {
     /// raised, so the structure cannot report insolvency.
     pub available_cash_node: String,
 
-    /// Excess Cash Flow (ECF) sweep specification
+    /// Excess Cash Flow (ECF) sweep specification.
+    /// A positive sweep percentage requires the `Sweep` payment priority.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ecf_sweep: Option<EcfSweepSpec>,
 
@@ -66,6 +67,7 @@ pub struct WaterfallSpec {
     /// Formula or node for the `MandatoryPrepayment` rung.
     ///
     /// Required when `MandatoryPrepayment` appears in `priority_of_payments`.
+    /// When configured, that priority must be present so payment consumes cash.
     /// Sized independently of the ECF sweep and voluntary prepay buckets.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mandatory_prepay_node: Option<String>,
@@ -73,6 +75,7 @@ pub struct WaterfallSpec {
     /// Formula or node for the `VoluntaryPrepayment` rung.
     ///
     /// Required when `VoluntaryPrepayment` appears in `priority_of_payments`.
+    /// When configured, that priority must be present so payment consumes cash.
     /// Sized independently of the ECF sweep and mandatory prepay buckets.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub voluntary_prepay_node: Option<String>,
@@ -126,15 +129,13 @@ impl WaterfallSpec {
     /// - PIK toggles explicitly identify target instruments.
     /// - `ecf_sweep.sweep_percentage` (when configured) lies in `[0.0, 1.0]`.
     /// - When an ECF sweep with a positive `sweep_percentage` is configured,
-    ///   at least one prepayment priority (`Sweep`, `MandatoryPrepayment`, or
-    ///   `VoluntaryPrepayment`) must be present. Any configured `Equity` entry
-    ///   is terminal, so every such prepayment priority necessarily precedes
-    ///   equity. Otherwise the waterfall engine silently zeros or never applies
-    ///   the configured sweep.
+    ///   `Sweep` must be present. Mandatory and voluntary prepayments have
+    ///   independent sizing nodes and do not execute the ECF sweep.
     /// - `payment_classes` ids and ranks are unique, each class lists at least
     ///   one instrument, and no instrument appears in more than one class.
     /// - `MandatoryPrepayment` / `VoluntaryPrepayment` require the matching
-    ///   `mandatory_prepay_node` / `voluntary_prepay_node`.
+    ///   `mandatory_prepay_node` / `voluntary_prepay_node`, and configured sizing
+    ///   nodes require their matching priority so every payment consumes cash.
     ///
     /// When `available_cash_node` is set, the fees, interest, and amortization
     /// priorities must all be listed so every cash-consuming category is capped
@@ -146,10 +147,10 @@ impl WaterfallSpec {
     /// Returns a build error for duplicate priorities, a non-terminal equity
     /// entry, incomplete cash-capping priorities, an empty PIK-toggle target
     /// set, a sweep percentage outside `[0, 1]`, a positive ECF sweep with
-    /// no prepayment priority, invalid payment classes, or a prepayment rung
-    /// without its sizing node. Validation does not confirm that referenced
-    /// model nodes or instruments exist; that requires the enclosing model and
-    /// evaluation context.
+    /// no `Sweep` priority, invalid payment classes, or a prepayment priority
+    /// and sizing node configured without one another. Validation does not
+    /// confirm that referenced model nodes or instruments exist; that requires
+    /// the enclosing model and evaluation context.
     pub fn validate(&self) -> Result<()> {
         for (idx, priority) in self.priority_of_payments.iter().enumerate() {
             if self.priority_of_payments[..idx].contains(priority) {
@@ -188,31 +189,31 @@ impl WaterfallSpec {
         }
         reject_available_cash_debt_service(&self.available_cash_node)?;
         validate_payment_classes(&self.payment_classes)?;
-        if self
-            .priority_of_payments
-            .contains(&PaymentPriority::MandatoryPrepayment)
-            && self
-                .mandatory_prepay_node
-                .as_ref()
-                .is_none_or(|n| n.trim().is_empty())
-        {
-            return Err(Error::build(
-                "WaterfallSpec: `MandatoryPrepayment` in `priority_of_payments` requires \
-                 `mandatory_prepay_node`.",
-            ));
-        }
-        if self
-            .priority_of_payments
-            .contains(&PaymentPriority::VoluntaryPrepayment)
-            && self
-                .voluntary_prepay_node
-                .as_ref()
-                .is_none_or(|n| n.trim().is_empty())
-        {
-            return Err(Error::build(
-                "WaterfallSpec: `VoluntaryPrepayment` in `priority_of_payments` requires \
-                 `voluntary_prepay_node`.",
-            ));
+        for (priority, node_name, node) in [
+            (
+                PaymentPriority::MandatoryPrepayment,
+                "mandatory_prepay_node",
+                &self.mandatory_prepay_node,
+            ),
+            (
+                PaymentPriority::VoluntaryPrepayment,
+                "voluntary_prepay_node",
+                &self.voluntary_prepay_node,
+            ),
+        ] {
+            let has_priority = self.priority_of_payments.contains(&priority);
+            if has_priority && node.as_ref().is_none_or(|n| n.trim().is_empty()) {
+                return Err(Error::build(format!(
+                    "WaterfallSpec: `{priority:?}` in `priority_of_payments` requires \
+                     `{node_name}`."
+                )));
+            }
+            if node.is_some() && !has_priority {
+                return Err(Error::build(format!(
+                    "WaterfallSpec: `{node_name}` requires `{priority:?}` in \
+                     `priority_of_payments` so its payment consumes available cash."
+                )));
+            }
         }
 
         // Equity, if present, must rank last: the engine distributes the
@@ -261,20 +262,11 @@ impl WaterfallSpec {
         if ecf.sweep_percentage <= 0.0 {
             return Ok(());
         }
-        let has_prepayment_priority = self.priority_of_payments.iter().any(|p| {
-            matches!(
-                p,
-                PaymentPriority::Sweep
-                    | PaymentPriority::MandatoryPrepayment
-                    | PaymentPriority::VoluntaryPrepayment
-            )
-        });
-        if !has_prepayment_priority {
+        if !self.priority_of_payments.contains(&PaymentPriority::Sweep) {
             return Err(Error::build(
-                "WaterfallSpec: `ecf_sweep.sweep_percentage > 0` requires at least one \
-                 prepayment priority (`Sweep`, `MandatoryPrepayment`, or \
-                 `VoluntaryPrepayment`) in `priority_of_payments`; otherwise the sweep \
-                 can never be applied.",
+                "WaterfallSpec: `ecf_sweep.sweep_percentage > 0` requires the `Sweep` \
+                 priority in `priority_of_payments`; mandatory and voluntary \
+                 prepayment priorities do not execute the ECF sweep.",
             ));
         }
         Ok(())
@@ -391,9 +383,9 @@ pub enum PaymentPriority {
 ///
 /// # ECF Calculation
 ///
-/// The standard ECF formula deducts cash interest from EBITDA. Fees and
-/// scheduled principal are also deducted when those payment categories rank
-/// ahead of the prepayment priority:
+/// The ECF formula deducts cash interest, fees and scheduled principal paid
+/// by payment categories ahead of the `Sweep` priority, including carried
+/// arrears. Unpaid claims, PIK and later payment priorities are not deducted:
 ///
 /// ```text
 /// ECF = EBITDA - Taxes - CapEx - ΔWC - Cash Interest Paid
@@ -402,8 +394,7 @@ pub enum PaymentPriority {
 ///   ```
 ///
 /// Set `cash_interest_node` to override the cash-interest input. If omitted,
-/// contractual cash interest is deducted automatically using the period's
-/// debt-service magnitude.
+/// the interest actually paid ahead of `Sweep` is deducted automatically.
 ///
 /// # References
 ///
@@ -429,8 +420,10 @@ pub struct EcfSweepSpec {
 
     /// Formula or node reference for cash interest paid (e.g., "cs.interest_expense_cash.total").
     ///
-    /// Per S&P LCD / standard LPA definitions, ECF should deduct cash interest paid.
-    /// If omitted, contractual cash interest is deducted automatically.
+    /// If omitted, deducts cash interest actually paid by the `Interest` priority
+    /// ahead of `Sweep`, including carried coupon arrears. If `Interest` follows
+    /// `Sweep`, this automatic deduction is zero. An explicit node overrides
+    /// that amount in the model's cash currency units.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cash_interest_node: Option<String>,
 
@@ -463,7 +456,8 @@ pub struct PikToggleSpec {
     /// Threshold value: if metric < threshold, enable PIK; otherwise use cash
     pub threshold: f64,
 
-    /// Target instrument IDs (if None, applies to all instruments with PIK capability)
+    /// Required nonempty list of borrowing debt IDs whose cash coupons may capitalize.
+    /// `None` and empty lists are rejected; swaps and options cannot be PIK targets.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target_instrument_ids: Option<Vec<String>>,
 
@@ -532,7 +526,7 @@ mod tests {
     }
 
     #[test]
-    fn validate_requires_prepayment_priority_for_positive_sweep() {
+    fn validate_requires_sweep_priority_for_positive_sweep() {
         let spec = spec_with_sweep(
             vec![
                 PaymentPriority::Fees,
@@ -544,8 +538,8 @@ mod tests {
         );
         let err = spec
             .validate()
-            .expect_err("positive sweep without a prepayment priority must be rejected");
-        assert!(err.to_string().contains("prepayment priority"));
+            .expect_err("positive sweep without the Sweep priority must be rejected");
+        assert!(err.to_string().contains("requires the `Sweep`"));
     }
 
     #[test]

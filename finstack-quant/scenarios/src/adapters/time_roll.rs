@@ -8,7 +8,9 @@ use crate::engine::{ExecutionContext, RollForwardReport};
 use crate::error::Result;
 use crate::TimeRollMode;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{BusinessDayConvention, HolidayCalendar, Tenor, WEEKENDS_ONLY};
+use finstack_quant_core::dates::{
+    BusinessDayConvention, Date, DateExt, HolidayCalendar, Tenor, WEEKENDS_ONLY,
+};
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::Instrument;
 use indexmap::IndexMap;
@@ -22,9 +24,13 @@ use indexmap::IndexMap;
 /// [`MarketContext::roll_forward`](finstack_quant_core::market_data::context::MarketContext::roll_forward)
 /// (curves realize their forwards). It is not a frozen-knot lookup of the
 /// unrolled market at a shifted `as_of`. Before rolling curves, raw coupon
-/// observations crossed in `(t0, t1]` are materialized from the canonical
+/// observations crossed in `[t0, t1]` on advancing rolls are materialized from the canonical
 /// pre-roll schedules. Existing exact-date observations retain priority. A
 /// missing or conflicting required projection returns an error atomically.
+/// A nonzero roll of a calibrated hazard curve requires an engine with a
+/// recalibration provider to preserve its replay recipe; this standalone
+/// helper returns the provider-missing error before changing the context.
+/// A business-day adjustment that returns the starting date is a no-op.
 ///
 /// # Arguments
 /// - `ctx`: Execution context providing the mutable valuation date, market data,
@@ -39,6 +45,9 @@ use indexmap::IndexMap;
 /// - [`Error::InvalidPeriod`](crate::error::Error::InvalidPeriod) if the period
 ///   string cannot be parsed.
 /// - Propagates any errors encountered while revaluing instruments.
+/// - Returns a core validation error if the target exceeds the supported date range.
+/// - Returns a provider-missing core error for a nonzero calibrated-hazard roll;
+///   use [`ScenarioEngine`](crate::ScenarioEngine) with a recalibration provider.
 ///
 /// # References
 ///
@@ -82,24 +91,20 @@ pub fn apply_time_roll_forward(
     apply_time_roll_forward_with_credit(ctx, period_str, mode, &[], None)
 }
 
-pub(crate) fn apply_time_roll_forward_with_credit(
-    ctx: &mut ExecutionContext,
+/// Resolve the canonical forward-roll target before projecting fixings.
+pub(crate) fn resolve_roll_dates(
+    old_date: Date,
     period_str: &str,
     mode: TimeRollMode,
-    hazard_rolls: &[(
-        finstack_quant_core::types::CurveId,
-        finstack_quant_core::types::CurveId,
-    )],
-    provider: Option<&dyn finstack_quant_valuations::recalibration::RecalibrationProvider>,
-) -> Result<RollForwardReport> {
+    calendar: Option<&dyn HolidayCalendar>,
+) -> Result<(Date, i64)> {
     use crate::error::Error;
 
-    let old_date = ctx.as_of;
     let tenor = Tenor::parse(period_str).map_err(|e| Error::InvalidPeriod(e.to_string()))?;
     let (new_date, day_shift) = match mode {
         TimeRollMode::Approximate => {
             let days = tenor.to_days_approx();
-            let new_date = old_date + time::Duration::days(days);
+            let new_date = old_date.add_days(days)?;
             (new_date, days)
         }
         TimeRollMode::CalendarDays => {
@@ -114,8 +119,8 @@ pub(crate) fn apply_time_roll_forward_with_credit(
             // weekends. Fall back to core's `WEEKENDS_ONLY`, the documented
             // calendar for APIs whose calendar identifier is optional, so the
             // mode always performs a real adjustment. Callers wanting holiday
-            // awareness supply `ctx.calendar`.
-            let calendar: &dyn HolidayCalendar = ctx.calendar.unwrap_or(&WEEKENDS_ONLY);
+            // awareness supply `calendar`.
+            let calendar: &dyn HolidayCalendar = calendar.unwrap_or(&WEEKENDS_ONLY);
             let target = tenor.add_to_date(
                 old_date,
                 Some(calendar),
@@ -136,6 +141,68 @@ pub(crate) fn apply_time_roll_forward_with_credit(
              only forward rolls are supported"
         )));
     }
+    Ok((new_date, day_shift))
+}
+
+pub(crate) fn apply_time_roll_forward_with_credit(
+    ctx: &mut ExecutionContext,
+    period_str: &str,
+    mode: TimeRollMode,
+    hazard_rolls: &[(
+        finstack_quant_core::types::CurveId,
+        finstack_quant_core::types::CurveId,
+    )],
+    provider: Option<&dyn finstack_quant_valuations::recalibration::RecalibrationProvider>,
+) -> Result<RollForwardReport> {
+    use crate::error::Error;
+
+    let old_date = ctx.as_of;
+    let (new_date, day_shift) = resolve_roll_dates(old_date, period_str, mode, ctx.calendar)?;
+    if day_shift == 0 {
+        return Ok(RollForwardReport {
+            old_date,
+            new_date,
+            days: 0,
+            instrument_carry: Vec::new(),
+            total_carry: IndexMap::new(),
+            failed_instruments: Vec::new(),
+        });
+    }
+
+    let mut hazard_rolls = hazard_rolls.to_vec();
+    for (id, storage) in ctx.market.iter_curves() {
+        let finstack_quant_core::market_data::context::CurveStorage::Hazard(hazard) = storage
+        else {
+            continue;
+        };
+        let Some(recipe) = hazard.hazard_calibration() else {
+            continue;
+        };
+        if hazard_rolls.iter().any(|(existing, _)| existing == id) {
+            continue;
+        }
+        let discount_id = recipe.hazard_params["discount_curve_id"]
+            .as_str()
+            .ok_or_else(|| {
+                Error::Validation(format!(
+                    "Hazard calibration recipe for '{id}' has no discount_curve_id"
+                ))
+            })?;
+        ctx.market.get_discount(discount_id)?;
+        hazard_rolls.push((
+            id.clone(),
+            finstack_quant_core::types::CurveId::from(discount_id),
+        ));
+    }
+    let credit_provider = if hazard_rolls.is_empty() {
+        None
+    } else {
+        Some(provider.ok_or_else(|| {
+            Error::Core(finstack_quant_valuations::recalibration::provider_missing(
+                "hazard_horizon_replay",
+            ))
+        })?)
+    };
 
     // Roll all curves forward (adjusts base dates, shifts knots, filters expired).
     // Realized-forward semantics: every curve realizes its forwards as the
@@ -165,26 +232,23 @@ pub(crate) fn apply_time_roll_forward_with_credit(
         ctx.market, &schedules, old_date, new_date,
     )?;
     let mut rolled_market = projected_market.roll_forward(day_shift)?;
-    for (hazard_id, discount_id) in hazard_rolls {
-        use finstack_quant_valuations::recalibration::{
-            HazardRecalibrationAction, HazardRecalibrationRequest,
-        };
-        let provider = provider.ok_or_else(|| {
-            Error::Core(finstack_quant_valuations::recalibration::provider_missing(
-                "hazard_horizon_replay",
-            ))
-        })?;
-        let rebuilt = provider.rebuild_hazard_curve(&HazardRecalibrationRequest {
-            hazard: ctx.market.get_hazard(hazard_id)?,
-            source_market: std::sync::Arc::new(ctx.market.clone()),
-            target_market: std::sync::Arc::new(rolled_market.clone()),
-            discount_curve_id: discount_id.clone(),
-            doc_clause: None,
-            cds_valuation_convention: None,
-            deal_quote_override: None,
-            action: HazardRecalibrationAction::TimeRollReplay,
-        })?;
-        rolled_market = rolled_market.insert(rebuilt.as_ref().clone());
+    if let Some(provider) = credit_provider {
+        for (hazard_id, discount_id) in &hazard_rolls {
+            use finstack_quant_valuations::recalibration::{
+                HazardRecalibrationAction, HazardRecalibrationRequest,
+            };
+            let rebuilt = provider.rebuild_hazard_curve(&HazardRecalibrationRequest {
+                hazard: ctx.market.get_hazard(hazard_id)?,
+                source_market: std::sync::Arc::new(ctx.market.clone()),
+                target_market: std::sync::Arc::new(rolled_market.clone()),
+                discount_curve_id: discount_id.clone(),
+                doc_clause: None,
+                cds_valuation_convention: None,
+                deal_quote_override: None,
+                action: HazardRecalibrationAction::TimeRollReplay,
+            })?;
+            rolled_market = rolled_market.insert(rebuilt.as_ref().clone());
+        }
     }
 
     // Carry uses PV(t0) and cashflows on the pre-roll market, and PV(t1) on
@@ -497,7 +561,10 @@ mod tests {
             )
             .unwrap(),
         );
-        let before = serde_json::to_value(MarketContextState::from(&market)).unwrap();
+        let before = serde_json::to_value(
+            MarketContextState::try_from(&market).expect("coherent market snapshot"),
+        )
+        .unwrap();
         let mut instruments: Vec<Box<dyn Instrument>> =
             vec![Box::new(MissingCashflows(Attributes::new()))];
         let mut ctx = ExecutionContext {
@@ -521,7 +588,10 @@ mod tests {
         }
         assert_eq!(ctx.as_of, origin);
         assert_eq!(
-            serde_json::to_value(MarketContextState::from(&*ctx.market)).unwrap(),
+            serde_json::to_value(
+                MarketContextState::try_from(&*ctx.market).expect("coherent market snapshot")
+            )
+            .unwrap(),
             before
         );
     }
@@ -754,6 +824,43 @@ mod tests {
         };
         let report = apply_time_roll_forward(&mut ctx, period, mode).expect("time roll succeeds");
         (report.new_date, report.days)
+    }
+
+    #[test]
+    fn time_roll_rejects_out_of_range_dates_without_mutating_context() {
+        use finstack_quant_core::market_data::context::MarketContextState;
+
+        for mode in [
+            TimeRollMode::Approximate,
+            TimeRollMode::CalendarDays,
+            TimeRollMode::BusinessDays,
+        ] {
+            let mut market = MarketContext::new();
+            let before = serde_json::to_value(
+                MarketContextState::try_from(&market).expect("coherent market snapshot"),
+            )
+            .expect("market snapshot");
+            let mut ctx = ExecutionContext {
+                market: &mut market,
+                model: None,
+                instruments: None,
+                rate_bindings: None,
+                calendar: None,
+                as_of: Date::MAX,
+            };
+
+            let error = apply_time_roll_forward(&mut ctx, "1D", mode)
+                .expect_err("out-of-range roll returns an error");
+            assert!(matches!(error, crate::error::Error::Core(_)), "{error}");
+            assert_eq!(ctx.as_of, Date::MAX);
+            assert_eq!(
+                serde_json::to_value(
+                    MarketContextState::try_from(&*ctx.market).expect("coherent market snapshot")
+                )
+                .expect("unchanged market snapshot"),
+                before
+            );
+        }
     }
 
     #[test]

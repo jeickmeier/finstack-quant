@@ -74,6 +74,12 @@ pub enum Error {
         /// The offending degrees-of-freedom value.
         value: f64,
     },
+    /// Random-factor-loading volatility is non-finite or outside its range.
+    #[error("Invalid RFL loading volatility {value}: must be finite and in [0, 0.5]")]
+    InvalidLoadingVolatility {
+        /// The offending loading standard deviation.
+        value: f64,
+    },
 }
 
 impl From<Error> for finstack_quant_core::Error {

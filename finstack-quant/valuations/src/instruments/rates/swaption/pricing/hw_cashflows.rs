@@ -9,7 +9,9 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::Result;
 use finstack_quant_models::rates::clock::model_time;
-use finstack_quant_models::rates::hull_white::hw_b;
+use finstack_quant_models::rates::hull_white::{
+    hw1f_delayed_coupon_adjustment, HullWhiteCalibrationParams,
+};
 use finstack_quant_models::trees::HullWhiteTree;
 
 pub(crate) struct HwSwaptionCashflows {
@@ -157,20 +159,15 @@ impl HwSwaptionCashflows {
             .float
             .iter()
             .map(|&(start, end, pay, tau, reset)| {
-                let adjustment = if self.compounded {
-                    // Gaussian covariance of the accrued short-rate integral
-                    // with discounting between accrual end and payment.
-                    let b = hw_b(kappa, start, end);
-                    let state_variance = sigma * sigma * hw_b(2.0 * kappa, t, start);
-                    let covariance = b * (-kappa * (end - start)).exp() * state_variance
-                        + 0.5 * sigma * sigma * b * b;
-                    (-hw_b(kappa, end, pay) * covariance).exp()
-                } else {
-                    // Deferred simple-rate payment under the payment measure.
-                    let variance = sigma * sigma * hw_b(2.0 * kappa, t, reset);
-                    let loading = hw_b(kappa, reset, end) - hw_b(kappa, reset, start);
-                    (variance * loading * (hw_b(kappa, reset, end) - hw_b(kappa, reset, pay))).exp()
-                };
+                let adjustment = hw1f_delayed_coupon_adjustment(
+                    HullWhiteCalibrationParams { kappa, sigma },
+                    t,
+                    start,
+                    end,
+                    pay,
+                    reset,
+                    self.compounded,
+                );
                 (bond(start) / bond(end) * adjustment - 1.0 + self.spread * tau) * bond(pay)
             })
             .sum();

@@ -96,7 +96,7 @@ mod shifts;
 mod volatility;
 
 pub use attribute::attribute_pnl_metrics_based;
-pub(crate) use shifts::extract_keyrate_per_curve;
+pub(crate) use shifts::{extract_credit_keyrates, CreditKeyRateBucket};
 
 #[cfg(test)]
 mod tests;

@@ -1,8 +1,8 @@
 //! Discount-curve bumping and roll-forward transformations.
 
-use super::super::common::roll_knots;
+use super::super::common::{roll_knots, year_fraction_to};
 use super::DiscountCurve;
-use crate::dates::DayCountContext;
+use crate::dates::DateExt;
 use crate::market_data::bumps::{BumpMode, BumpSpec, BumpType, BumpUnits, Bumpable};
 
 impl DiscountCurve {
@@ -20,17 +20,16 @@ impl DiscountCurve {
         Ok(bumped)
     }
 
-    /// Apply a bump specification in-place, mutating values and rebuilding the interpolator.
+    /// Apply a bump specification in-place, retaining the original interpolation.
     ///
     /// Additive bumps are **continuously compounded zero-space** shocks
-    /// (`DF *= exp(−δr · t)`), not quote re-bootstraps. This avoids allocating
-    /// intermediate `Vec<(f64, f64)>`, skips ID generation, and avoids
-    /// sorting unchanged knots while rechecking discount-factor validation.
+    /// (`DF *= exp(−δr · t)`), not quote re-bootstraps. Triangular shocks act
+    /// continuously in maturity, including between and beyond stored pillars.
     ///
     /// # Performance
     ///
-    /// Clones the value array and the interpolator's consumed knot/value inputs,
-    /// but avoids cloning the full curve and its calibration recipe.
+    /// Merges shocks into a flat piecewise-quadratic log-DF adjustment. Repeated
+    /// shocks on the same grid do not create nested curves or extra breakpoints.
     pub(crate) fn bump_in_place(&mut self, spec: &BumpSpec) -> crate::Result<()> {
         spec.validate_finite()?;
         let (val, is_multiplicative) = spec.resolve_standard_values().ok_or_else(|| {
@@ -47,59 +46,48 @@ impl DiscountCurve {
             }
             .into());
         }
-        let bump_rate = val;
-
-        // Continuously compounded zero-space shock: DF *= exp(-δr t).
-        // Clone only values; assign after the fallible interpolator build to
-        // preserve failure atomicity.
-        let mut dfs = self.dfs.clone();
-        match spec.bump_type {
-            BumpType::Parallel => {
-                for (df, &t) in dfs.iter_mut().zip(self.knots.iter()) {
-                    *df *= (-bump_rate * t).exp();
-                }
-            }
-            BumpType::TriangularKeyRate {
+        if let BumpType::TriangularKeyRate {
+            prev_bucket,
+            target_bucket,
+            next_bucket,
+        } = spec.bump_type
+        {
+            super::super::common::validate_triangular_bucket_grid(
                 prev_bucket,
                 target_bucket,
                 next_bucket,
-            } => {
-                // Reject malformed bucket grids (e.g. infinite sentinels)
-                // before mutating: a non-finite neighbour yields NaN weights
-                // and corrupts the curve.
-                super::super::common::validate_triangular_bucket_grid(
-                    prev_bucket,
-                    target_bucket,
-                    next_bucket,
-                )?;
-                for (df, &t) in dfs.iter_mut().zip(self.knots.iter()) {
-                    let weight = super::super::common::triangular_weight(
-                        t,
-                        prev_bucket,
-                        target_bucket,
-                        next_bucket,
-                    );
-                    *df *= (-bump_rate * weight * t).exp();
-                }
-            }
+            )?;
         }
-        if dfs.iter().any(|df| !df.is_finite()) {
+        if val == 0.0 {
+            return Ok(());
+        }
+        let mut transform = self
+            .transform
+            .clone()
+            .unwrap_or_else(|| super::evaluation::CurveTransform::from_curve(self));
+        transform.bump(val, spec.bump_type)?;
+        let dfs: Box<[f64]> = self
+            .knots
+            .iter()
+            .map(|&time| transform.df(&self.interp, time))
+            .collect();
+        if dfs.iter().any(|df| !df.is_finite() || *df <= 0.0) {
             return Err(crate::Error::Validation(
-                "discount-curve shock produced non-finite discount factors".into(),
+                "discount-curve shock produced invalid discount factors".into(),
             ));
         }
-        if dfs.iter().any(|df| *df <= 0.0) {
-            return Err(crate::error::InputError::NonPositiveValue.into());
+        // A sparse curve may have no pillar inside the shock support. Validate
+        // its peak too, so an overflowing key-rate shock cannot hide between nodes.
+        if let BumpType::TriangularKeyRate { target_bucket, .. } = spec.bump_type {
+            let peak_df = transform.df(&self.interp, target_bucket);
+            if !peak_df.is_finite() || peak_df <= 0.0 {
+                return Err(crate::Error::Validation(
+                    "discount-curve shock produced an invalid peak discount factor".into(),
+                ));
+            }
         }
-        let interp = super::super::common::build_interp_input_error(
-            self.style,
-            self.knots.clone(),
-            dfs.clone(),
-            self.extrapolation,
-            true,
-        )?;
         self.dfs = dfs;
-        self.interp = interp;
+        self.transform = Some(transform);
         // Stress curves retain mathematical validation on JSON round-trips.
         // The original construction policy remains unchanged on `self`'s
         // source curve when using the public cloning bump methods.
@@ -242,7 +230,7 @@ impl DiscountCurve {
     /// and price/vol-index curve rolls, which already realize forwards.
     ///
     /// # Arguments
-    /// * `days` - Number of days to roll forward
+    /// * `days` - Signed calendar-day shift; negative values move the base date backward.
     ///
     /// # Returns
     /// A new discount curve with updated base date and renormalized knots.
@@ -272,11 +260,13 @@ impl DiscountCurve {
     /// # Ok(())
     /// # }
     /// ```
+    /// Returns a validation error if the rolled base date exceeds the supported calendar range.
     pub fn roll_forward(&self, days: i64) -> crate::Result<Self> {
-        let new_base = self.base + time::Duration::days(days);
-        let dt_years =
-            self.day_count
-                .year_fraction(self.base, new_base, DayCountContext::default())?;
+        if days == 0 {
+            return Ok(self.clone());
+        }
+        let new_base = self.base.add_days(days)?;
+        let dt_years = year_fraction_to(self.base, new_base, self.day_count)?;
 
         // Realized-forward renormalization: divide every rolled DF by the
         // old curve's DF at the roll horizon, interpolated in the curve's own
@@ -298,12 +288,39 @@ impl DiscountCurve {
         if rolled_points.is_empty() {
             return Err(crate::error::InputError::TooFewPoints.into());
         }
+        if rolled_points
+            .iter()
+            .any(|&(_, df)| !df.is_finite() || df <= 0.0)
+        {
+            return Err(crate::Error::Validation(
+                "discount-curve roll produced invalid discount factors".into(),
+            ));
+        }
 
-        // Thread the full metadata (including fx_policy) and override the base.
-        self.metadata_builder(self.id.clone())
-            .base_date(new_base)
-            .knots(rolled_points)
-            .build()
+        // Preserve the source interpolation and shift its evaluation origin.
+        // Reconstructing a smooth interpolator from the remaining pillars
+        // changes its boundary derivative and introduces artificial roll P&L.
+        let mut rolled = self.clone();
+        let mut transform = self
+            .transform
+            .clone()
+            .unwrap_or_else(|| super::evaluation::CurveTransform::from_curve(self));
+        transform.roll(&self.interp, dt_years)?;
+        let mut points = Vec::with_capacity(rolled_points.len() + 1);
+        points.push((0.0, 1.0));
+        points.extend(rolled_points);
+        let (knots, dfs) = super::super::common::split_points(points);
+        if !self.allow_non_monotonic {
+            super::validation::validate_monotonic_df(&knots, &dfs)?;
+        }
+        if let Some(floor) = self.min_forward_rate {
+            super::validation::validate_forward_rates(&knots, &dfs, floor)?;
+        }
+        rolled.base = new_base;
+        rolled.knots = knots.into_boxed_slice();
+        rolled.dfs = dfs.into_boxed_slice();
+        rolled.transform = Some(transform);
+        Ok(rolled)
     }
 }
 

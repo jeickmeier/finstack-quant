@@ -99,7 +99,7 @@ fn generate_tornado_entries_returns_structured_array() {
         serde_wasm_bindgen::from_value(entries).unwrap();
 
     assert_eq!(entries.len(), 1);
-    assert_eq!(entries[0].parameter_id, "revenue");
+    assert_eq!(entries[0].parameter_id, "revenue@2024Q1");
 }
 
 #[wasm_bindgen_test]
@@ -124,9 +124,11 @@ fn scoring_accepts_one_optional_predictor_and_rejects_vectors() {
     let mut subject = CompanyMetrics::new("subject");
     subject.oas_bp = Some(250.0);
     subject.leverage = Some(2.0);
-    let peers = [1.0, 2.0, 3.0].map(|x| {
+    // Regression scoring requires positive peer residual dispersion, so the
+    // middle spread deliberately differs from a perfect leverage/spread line.
+    let peers = [(1.0, 100.0), (2.0, 210.0), (3.0, 300.0)].map(|(x, spread)| {
         let mut peer = CompanyMetrics::new(format!("peer-{x}"));
-        peer.oas_bp = Some(x * 100.0);
+        peer.oas_bp = Some(spread);
         peer.leverage = Some(x);
         peer
     });

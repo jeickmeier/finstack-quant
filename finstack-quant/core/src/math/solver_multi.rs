@@ -342,7 +342,9 @@ impl LevenbergMarquardtSolver {
     /// # Arguments
     /// * `objective` - Function to minimize, takes a parameter vector and returns a scalar.
     /// * `initial` - Finite initial parameter guess, within every supplied inclusive bound.
-    /// * `bounds` - Optional ordered, non-NaN lower/upper pair for each parameter; infinities leave a side unbounded.
+    /// * `bounds` - Optional ordered, non-NaN inclusive lower/upper pair for each
+    ///   parameter; infinities leave a side unbounded. Finite-difference probes
+    ///   stay within these bounds, and equal endpoints fix a parameter.
     ///
     /// # Returns
     /// Optimal parameter vector that minimizes the objective.
@@ -377,6 +379,7 @@ impl LevenbergMarquardtSolver {
             self.compute_jacobian_into(
                 &objective,
                 p,
+                bounds,
                 &mut jac_params_plus,
                 &mut jac_params_minus,
                 out,
@@ -385,9 +388,9 @@ impl LevenbergMarquardtSolver {
 
         // Convergence check: Gradient Norm (jac is flat 1×n = gradient)
         let convergence_check =
-            |_p: &[f64], _r: &[f64], jac: &[f64]| -> Option<LmTerminationReason> {
-                let grad_norm: f64 = jac.iter().map(|g| g * g).sum::<f64>().sqrt();
-                if grad_norm < self.tolerance {
+            |p: &[f64], r: &[f64], jac: &[f64]| -> Option<LmTerminationReason> {
+                let grad_norm = projected_gradient_norm(jac, p, bounds);
+                if r[0].is_finite() && grad_norm < self.tolerance {
                     Some(LmTerminationReason::ConvergedGradient)
                 } else {
                     None
@@ -402,7 +405,11 @@ impl LevenbergMarquardtSolver {
             1, // n_residuals
             bounds,
         )?;
-        self.scalar_solution_to_result(solution, |p| self.compute_jacobian(&objective, p), bounds)
+        self.scalar_solution_to_result(
+            solution,
+            |p| self.compute_jacobian(&objective, p, bounds),
+            bounds,
+        )
     }
 
     /// Map a scalar-objective [`LmSolution`] to either the parameter vector or
@@ -427,18 +434,20 @@ impl LevenbergMarquardtSolver {
         G: FnOnce(&[f64]) -> Vec<f64>,
     {
         use LmTerminationReason as Reason;
-        let converged = match solution.stats.termination_reason {
-            Reason::ConvergedResidualNorm
-            | Reason::ConvergedRelativeReduction
-            | Reason::ConvergedGradient => true,
-            Reason::NumericalFailure => false,
-            Reason::MaxIterations | Reason::StepTooSmall => {
-                solution.stats.final_residual_norm.abs() <= self.tolerance || {
-                    let gradient = gradient_at(&solution.params);
-                    projected_gradient_norm(&gradient, &solution.params, bounds) < self.tolerance
+        let converged = solution.stats.final_residual_norm.is_finite()
+            && match solution.stats.termination_reason {
+                Reason::ConvergedResidualNorm
+                | Reason::ConvergedRelativeReduction
+                | Reason::ConvergedGradient => true,
+                Reason::NumericalFailure => false,
+                Reason::MaxIterations | Reason::StepTooSmall => {
+                    solution.stats.final_residual_norm.abs() <= self.tolerance || {
+                        let gradient = gradient_at(&solution.params);
+                        projected_gradient_norm(&gradient, &solution.params, bounds)
+                            < self.tolerance
+                    }
                 }
-            }
-        };
+            };
         if converged {
             Ok(solution.params)
         } else {
@@ -460,7 +469,12 @@ impl LevenbergMarquardtSolver {
     ///
     /// Returns a flat `Vec<f64>` in row-major layout: `jacobian[i * n_params + j]`
     /// where i = residual index, j = param index. For scalar objective, Jacobian is 1×n.
-    fn compute_jacobian<Obj>(&self, objective: &Obj, params: &[f64]) -> Vec<f64>
+    fn compute_jacobian<Obj>(
+        &self,
+        objective: &Obj,
+        params: &[f64],
+        bounds: Option<&[(f64, f64)]>,
+    ) -> Vec<f64>
     where
         Obj: Fn(&[f64]) -> f64,
     {
@@ -471,6 +485,7 @@ impl LevenbergMarquardtSolver {
         self.compute_jacobian_into(
             objective,
             params,
+            bounds,
             &mut params_plus,
             &mut params_minus,
             &mut jacobian,
@@ -479,8 +494,8 @@ impl LevenbergMarquardtSolver {
     }
 
     /// Compute the scalar-objective gradient (1×n Jacobian) into `out` using
-    /// central finite differences, reusing caller-provided scratch buffers to
-    /// avoid per-iteration heap allocation on the LM hot path.
+    /// central finite differences, or a feasible one-sided stencil near a box
+    /// bound. Reuses scratch buffers without per-iteration heap allocation.
     ///
     /// `params_plus`, `params_minus`, and `out` must each have the same length
     /// as `params`. On return, `params_plus`/`params_minus` are restored to
@@ -489,6 +504,7 @@ impl LevenbergMarquardtSolver {
         &self,
         objective: &Obj,
         params: &[f64],
+        bounds: Option<&[(f64, f64)]>,
         params_plus: &mut [f64],
         params_minus: &mut [f64],
         out: &mut [f64],
@@ -497,14 +513,52 @@ impl LevenbergMarquardtSolver {
     {
         params_plus.copy_from_slice(params);
         params_minus.copy_from_slice(params);
+        let mut base_value = None;
 
         for (j, &p_j) in params.iter().enumerate() {
+            let (lo, hi) = bounds.map_or((f64::NEG_INFINITY, f64::INFINITY), |b| b[j]);
+            if lo >= hi {
+                out[j] = 0.0;
+                continue;
+            }
             let h = (p_j.abs() * self.fd_step).max(self.fd_step);
-            params_plus[j] = p_j + h;
-            params_minus[j] = p_j - h;
-            let f_plus = objective(params_plus);
-            let f_minus = objective(params_minus);
-            out[j] = (f_plus - f_minus) / (2.0 * h);
+            if p_j + h <= hi && p_j - h >= lo {
+                params_plus[j] = p_j + h;
+                params_minus[j] = p_j - h;
+                let f_plus = objective(params_plus);
+                let f_minus = objective(params_minus);
+                out[j] = (f_plus - f_minus) / (params_plus[j] - params_minus[j]);
+            } else {
+                // Keep the usual second-order accuracy at a boundary by
+                // taking two probes on the side with more feasible room.
+                let forward = hi - p_j >= p_j - lo;
+                let room = if forward { hi - p_j } else { p_j - lo };
+                let step = h.min(0.5 * room) * if forward { 1.0 } else { -1.0 };
+                params_plus[j] = (p_j + step).clamp(lo, hi);
+                params_minus[j] = if step.abs() > 0.0 {
+                    (p_j + 2.0 * step).clamp(lo, hi)
+                } else if forward {
+                    hi
+                } else {
+                    lo
+                };
+                let d1 = params_plus[j] - p_j;
+                let d2 = params_minus[j] - p_j;
+                let f0 = *base_value.get_or_insert_with(|| objective(params));
+                let f2 = objective(params_minus);
+                out[j] = if d1.abs() > 0.0 && (d2 - d1).abs() > 0.0 {
+                    let f1 = objective(params_plus);
+                    // Nonuniform second-order stencil also accounts for
+                    // rounding of the two representable probe coordinates.
+                    d2 / (d2 - d1) * ((f1 - f0) / d1) - d1 / (d2 - d1) * ((f2 - f0) / d2)
+                } else if d2.abs() > 0.0 {
+                    // An interval with only two representable points cannot
+                    // support a three-point stencil; use its feasible secant.
+                    (f2 - f0) / d2
+                } else {
+                    0.0
+                };
+            }
             params_plus[j] = p_j;
             params_minus[j] = p_j;
         }
@@ -516,51 +570,22 @@ impl LevenbergMarquardtSolver {
         objective: &Obj,
         params: &[f64],
         derivatives: Option<&D>,
+        bounds: Option<&[(f64, f64)]>,
     ) -> Vec<f64>
     where
         Obj: Fn(&[f64]) -> f64,
         D: AnalyticalDerivatives,
     {
-        let mut gradient = vec![0.0; params.len()];
-        let mut params_plus = params.to_vec();
-        let mut params_minus = params.to_vec();
-        self.compute_gradient_with_analytical_into(
-            objective,
-            params,
-            derivatives,
-            &mut params_plus,
-            &mut params_minus,
-            &mut gradient,
-        );
-        gradient
-    }
-
-    /// Compute the gradient into `out`, using analytical derivatives when
-    /// available and otherwise central finite differences. Reuses
-    /// caller-provided scratch buffers to avoid per-iteration allocation on the
-    /// LM hot path. `params_plus`/`params_minus`/`out` must match `params` in
-    /// length.
-    fn compute_gradient_with_analytical_into<Obj, D>(
-        &self,
-        objective: &Obj,
-        params: &[f64],
-        derivatives: Option<&D>,
-        params_plus: &mut [f64],
-        params_minus: &mut [f64],
-        out: &mut [f64],
-    ) where
-        Obj: Fn(&[f64]) -> f64,
-        D: AnalyticalDerivatives,
-    {
         if let Some(deriv) = derivatives {
             if deriv.has_gradient() {
-                deriv.gradient(params, out);
-                return;
+                let mut gradient = vec![0.0; params.len()];
+                deriv.gradient(params, &mut gradient);
+                return gradient;
             }
         }
 
         // Fall back to finite differences (Jacobian is 1×n, flat row)
-        self.compute_jacobian_into(objective, params, params_plus, params_minus, out);
+        self.compute_jacobian(objective, params, bounds)
     }
 
     /// Compute Jacobian for a system of residuals into a pre-allocated buffer.
@@ -886,7 +911,9 @@ impl LevenbergMarquardtSolver {
     /// * `objective` - Function to minimize
     /// * `derivatives` - Provider of analytical derivatives
     /// * `initial` - Finite initial parameter guess, within every supplied inclusive bound.
-    /// * `bounds` - Optional ordered, non-NaN lower/upper pair for each parameter; infinities leave a side unbounded.
+    /// * `bounds` - Optional ordered, non-NaN inclusive lower/upper pair for each
+    ///   parameter; infinities leave a side unbounded. Finite-difference probes
+    ///   stay within these bounds, and equal endpoints fix a parameter.
     ///
     /// # Returns
     /// Optimal parameter vector
@@ -916,21 +943,25 @@ impl LevenbergMarquardtSolver {
         let mut jac_params_plus = initial.to_vec();
         let mut jac_params_minus = initial.to_vec();
         let jacobian_func = |p: &[f64], _r: &[f64], _eval_counter: &mut usize, out: &mut [f64]| {
-            self.compute_gradient_with_analytical_into(
-                &objective,
-                p,
-                Some(derivatives),
-                &mut jac_params_plus,
-                &mut jac_params_minus,
-                out,
-            );
+            if derivatives.has_gradient() {
+                derivatives.gradient(p, out);
+            } else {
+                self.compute_jacobian_into(
+                    &objective,
+                    p,
+                    bounds,
+                    &mut jac_params_plus,
+                    &mut jac_params_minus,
+                    out,
+                );
+            }
         };
 
         // Convergence check: Gradient Norm (jac is flat 1×n = gradient)
         let convergence_check =
-            |_p: &[f64], _r: &[f64], jac: &[f64]| -> Option<LmTerminationReason> {
-                let grad_norm: f64 = jac.iter().map(|g| g * g).sum::<f64>().sqrt();
-                if grad_norm < self.tolerance {
+            |p: &[f64], r: &[f64], jac: &[f64]| -> Option<LmTerminationReason> {
+                let grad_norm = projected_gradient_norm(jac, p, bounds);
+                if r[0].is_finite() && grad_norm < self.tolerance {
                     Some(LmTerminationReason::ConvergedGradient)
                 } else {
                     None
@@ -947,7 +978,7 @@ impl LevenbergMarquardtSolver {
         )?;
         self.scalar_solution_to_result(
             solution,
-            |p| self.compute_gradient_with_analytical(&objective, p, Some(derivatives)),
+            |p| self.compute_gradient_with_analytical(&objective, p, Some(derivatives), bounds),
             bounds,
         )
     }
@@ -1171,6 +1202,91 @@ mod tests {
                 assert!(result.is_err(), "{result:?}");
                 assert_eq!(evaluations.get(), 0);
             }
+        }
+    }
+
+    #[test]
+    fn test_minimize_bounded_finite_differences_stay_feasible() {
+        struct FiniteDifferences;
+        impl AnalyticalDerivatives for FiniteDifferences {
+            fn gradient(&self, _params: &[f64], _gradient: &mut [f64]) {
+                panic!("finite-difference fallback must not request an analytical gradient");
+            }
+
+            fn has_gradient(&self) -> bool {
+                false
+            }
+        }
+
+        let solver = LevenbergMarquardtSolver::new();
+        for (lo, hi) in [(0.0, 1.0), (0.0, 1e-7)] {
+            let width = hi - lo;
+            let target = lo + 0.5 * width;
+            let bounds = [(lo, hi), (2.0, 2.0)];
+            for initial in [lo, hi, lo + 0.1 * width] {
+                let objective = |p: &[f64]| {
+                    assert!((lo..=hi).contains(&p[0]), "infeasible probe: {p:?}");
+                    assert_eq!(p[1], 2.0, "fixed parameter was perturbed");
+                    ((p[0] - target) / width).powi(2)
+                };
+                for derivative_fallback in [false, true] {
+                    let result = if derivative_fallback {
+                        solver.minimize_with_derivatives(
+                            objective,
+                            &FiniteDifferences,
+                            &[initial, 2.0],
+                            Some(&bounds),
+                        )
+                    } else {
+                        solver.minimize(objective, &[initial, 2.0], Some(&bounds))
+                    }
+                    .expect("feasible bounded quadratic should converge");
+                    assert!(((result[0] - target) / width).abs() < 1e-4);
+                    assert_eq!(result[1], 2.0);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_minimize_accepts_fully_fixed_parameters_without_probing() {
+        let calls = std::cell::Cell::new(0);
+        let result = LevenbergMarquardtSolver::new()
+            .minimize(
+                |p| {
+                    calls.set(calls.get() + 1);
+                    assert_eq!(p, &[2.0]);
+                    1.0
+                },
+                &[2.0],
+                Some(&[(2.0, 2.0)]),
+            )
+            .expect("the only feasible point is the constrained minimum");
+        assert_eq!(result, [2.0]);
+        assert_eq!(calls.get(), 1);
+        for value in [f64::NAN, f64::INFINITY] {
+            assert!(LevenbergMarquardtSolver::new()
+                .minimize(|_| value, &[2.0], Some(&[(2.0, 2.0)]))
+                .is_err());
+        }
+    }
+
+    #[test]
+    fn test_lm_solution_is_invariant_to_uniform_residual_scale() {
+        for scale in [1e-12, 1.0, 1e12] {
+            let solution = LevenbergMarquardtSolver::new()
+                .with_tolerance(scale * 1e-10)
+                .solve_system_with_dim_stats(
+                    |p, residuals| residuals[0] = scale * (p[0] - 2.0),
+                    &[0.0],
+                    1,
+                )
+                .expect("linear least squares should converge at every residual scale");
+            assert_eq!(
+                solution.stats.termination_reason,
+                LmTerminationReason::ConvergedResidualNorm
+            );
+            assert!((solution.params[0] - 2.0).abs() < 1e-9, "scale={scale}");
         }
     }
 

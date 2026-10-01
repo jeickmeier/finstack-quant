@@ -14,8 +14,9 @@
 //!   and interpolation are `lag` / `interpolation`.
 //!
 //! Each retired spelling is rejected by `deny_unknown_fields`, and the PV of
-//! every migrated JSON example is pinned to the reference value recorded
-//! before the migration.
+//! every migrated JSON example is pinned to its reviewed reference value.
+//! The CMS and inflation references include subsequent pricing corrections
+//! independently reconciled in the September 2026 valuation audit evidence.
 
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations::instruments::PricingOptions;
@@ -69,17 +70,18 @@ fn set_path(root: &mut Value, path: &[Value], value: Value) {
     *cur = value;
 }
 
-/// Native PV of each pricing case, captured on the pre-migration source.
+/// Native PV of each pricing case, including independently checked CMS and
+/// inflation pricing corrections after the wire migration.
 const PINNED_PV: &[(&str, &str)] = &[
     ("asset_backed_facility", "77045997.819227106393914245443"),
     ("cap_floor", "515716.67931458101"),
-    ("cms_option", "153240.2421427181"),
-    ("cms_spread_option", "14788.25095109598"),
-    ("cms_swap", "-105219.6877460222"),
+    ("cms_option", "153012.6165752798"),
+    ("cms_spread_option", "14733.78977571792"),
+    ("cms_swap", "-104987.5208795478"),
     ("commodity_swap", "57241.779109393"),
     ("deposit", "725.2194690658727500000"),
     ("forward_rate_agreement", "12414.05804431126"),
-    ("inflation_cap_floor", "155100.9801517787"),
+    ("inflation_cap_floor", "3742.853205610149"),
     ("inflation_linked_bond", "3359979.7227661326209574555315"),
     ("inflation_swap", "-4080.8031999999000000"),
     ("quanto_option", "257243.9712687773"),
@@ -148,10 +150,8 @@ fn pricing_cases() -> Value {
 }
 
 /// Every instrument this slice migrates reprices, from the UI pricing-case
-/// catalogue inputs, to the PV captured natively on the pre-migration source
-/// (`PINNED_PV`). The reference is the exact `Money` amount string, so the
-/// check is bit-for-bit: a renamed or retyped input that changed any number
-/// would fail here.
+/// catalogue inputs, to the reviewed native PV (`PINNED_PV`). The reference is
+/// the exact `Money` amount string, so any unreviewed pricing change fails here.
 #[test]
 fn migrated_examples_reprice_to_recorded_reference() {
     let cases = pricing_cases();
@@ -170,12 +170,12 @@ fn migrated_examples_reprice_to_recorded_reference() {
 }
 
 /// A pricing case, the instrument patches that set a non-zero input, and the
-/// PV that input gave before the migration.
+/// independently reviewed PV for that economic input.
 type RescaleCheck = (&'static str, Vec<(Value, Value)>, &'static str);
 
 /// Inputs whose unit changed (a decimal margin or floor now quoted in basis
-/// points) reprice to the PV the same economic input gave before the
-/// migration, when the example's zero default is replaced by a non-zero value.
+/// points) reprice to the reviewed PV for the same economic input, when the
+/// example's zero default is replaced by a non-zero value.
 #[test]
 fn rescaled_inputs_reprice_to_recorded_reference() {
     use serde_json::json;
@@ -199,14 +199,18 @@ fn rescaled_inputs_reprice_to_recorded_reference() {
                     json!({
                         "type": "floating",
                         "spread_bp": "10",
-                        "payment_dates": ["2025-06-20", "2025-09-22", "2025-12-22", "2026-03-20"],
-                        "accrual_fractions": [0.25, 0.25, 0.25, 0.25],
+                        "periods": [
+                            {"accrual_start": "2025-03-20", "accrual_end": "2025-06-20", "payment_date": "2025-06-20", "reset_date": "2025-03-20", "accrual_year_fraction": 0.25},
+                            {"accrual_start": "2025-06-20", "accrual_end": "2025-09-20", "payment_date": "2025-09-22", "reset_date": "2025-06-20", "accrual_year_fraction": 0.25},
+                            {"accrual_start": "2025-09-20", "accrual_end": "2025-12-20", "payment_date": "2025-12-22", "reset_date": "2025-09-20", "accrual_year_fraction": 0.25},
+                            {"accrual_start": "2025-12-20", "accrual_end": "2026-03-20", "payment_date": "2026-03-20", "reset_date": "2025-12-20", "accrual_year_fraction": 0.25}
+                        ],
                         "day_count": "act_360",
                         "forward_curve_id": "USD-SOFR-3M"
                     }),
                 ),
             ],
-            "-24866.17658060609",
+            "-24634.80936387088",
         ),
         (
             // A floating pool asset at SOFR + 450bp with a 5000bp index floor

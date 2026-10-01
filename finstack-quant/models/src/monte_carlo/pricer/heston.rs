@@ -54,7 +54,8 @@ use finstack_quant_core::Result;
 /// * `rho` - Spot/variance correlation in `[-1, 1]`
 /// * `v0` - Initial instantaneous variance
 /// * `expiry` - Time to expiry in years
-/// * `num_paths` - Simulated paths; `None` uses the registry binding default
+/// * `num_paths` - Independent path estimators in `2..=10_000_000`; each
+///   antithetic pair counts once. `None` uses the registry binding default.
 /// * `seed` - RNG seed; `None` uses the registry binding default
 /// * `num_steps` - Time steps per path; `None` uses the registry binding default
 /// * `currency` - Currency stamped on the result; `None` uses the registry
@@ -123,7 +124,8 @@ pub fn price_heston_call(
 /// * `rho` - Spot/variance correlation in `[-1, 1]`
 /// * `v0` - Initial instantaneous variance
 /// * `expiry` - Time to expiry in years
-/// * `num_paths` - Simulated paths; `None` uses the registry binding default
+/// * `num_paths` - Independent path estimators in `2..=10_000_000`; each
+///   antithetic pair counts once. `None` uses the registry binding default.
 /// * `seed` - RNG seed; `None` uses the registry binding default
 /// * `num_steps` - Time steps per path; `None` uses the registry binding default
 /// * `currency` - Currency stamped on the result; `None` uses the registry

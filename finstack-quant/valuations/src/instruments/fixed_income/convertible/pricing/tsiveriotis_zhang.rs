@@ -7,6 +7,44 @@ use finstack_quant_models::EvolutionParams;
 use super::engine::ConvertibleTreeType;
 use super::valuator::ConvertibleBondValuator;
 
+/// Resolve the terminal exercise choice and its cash component.
+///
+/// The represented contract always retains the scheduled coupon on conversion.
+/// Forced conversion takes precedence over cash redemption and holder puts.
+/// For optional conversion, a positive `log_spacing` smooths only the cash/equity
+/// split over a terminal lattice cell; exact-date valuation passes zero.
+pub(super) fn terminal_payoff(
+    conversion_value: f64,
+    cash_level: f64,
+    coupon: f64,
+    can_convert: bool,
+    mandatory: bool,
+    log_spacing: f64,
+) -> (f64, f64) {
+    let (total, cash) = if can_convert && mandatory {
+        (conversion_value, 0.0)
+    } else if can_convert {
+        // The cash/equity split jumps where conversion equals redemption.
+        // Smooth the split over the node's log-spot cell to avoid spurious
+        // finite-difference Greeks when a node lies exactly on that boundary.
+        let equity_weight = if log_spacing > 0.0 && conversion_value > 0.0 {
+            let log_distance = (conversion_value / cash_level).ln();
+            (0.5 + log_distance / log_spacing).clamp(0.0, 1.0)
+        } else if conversion_value > cash_level {
+            1.0
+        } else {
+            0.0
+        };
+        (
+            conversion_value.max(cash_level),
+            (1.0 - equity_weight) * cash_level,
+        )
+    } else {
+        (cash_level, cash_level)
+    };
+    (total + coupon, cash + coupon)
+}
+
 /// Implementation of Tsiveriotis-Zhang tree pricing logic.
 ///
 /// Uses per-step discount factors from the full term structure instead of
@@ -182,57 +220,18 @@ impl<'a> TsiveriotisZhangEngine<'a> {
                 .valuator
                 .conversion_value(node_spot, terminal_accretion);
 
-            let coupon = terminal_coupon;
-            // Cash redemption available at maturity: face, or an accreting put
-            // price above it. The holder maximizes over conversion and cash.
-            let cash_level = match terminal_put {
-                Some(put_price) => self.valuator.face_value.max(put_price),
-                None => self.valuator.face_value,
-            };
-
-            let can_convert = self.valuator.conversion_allowed(self.steps, node_spot);
-
-            let (ex_coupon_total, ex_coupon_cash) = if can_convert && mandatory {
-                // Mandatory conversion: holder must convert regardless of optimality.
-                // For PERCS/DECS below the lower strike, this correctly reflects
-                // the holder bearing equity downside risk. Forced conversion
-                // overrides any put right.
-                (conversion_val, 0.0)
-            } else if can_convert {
-                // Optional conversion: total = max(conversion, cash). The
-                // Tsiveriotis-Zhang cash/equity split is a step function of
-                // spot at `conversion == cash_level`, and a terminal node that
-                // sits on that boundary (spot == conversion price with an even
-                // step count) flips from all-cash (risky discounting) to
-                // all-equity (risk-free discounting), producing a PV jump in
-                // the initial spot and spurious finite-difference deltas.
-                //
-                // Smooth the split over the node's log-spot cell
-                // `[ln S_i - Δ/2, ln S_i + Δ/2]`: the equity weight `w` is the
-                // fraction of the cell where conversion (proportional to spot
-                // for optional policies) exceeds `cash_level`. Nodes whose cell
-                // lies fully on one side keep w ∈ {0, 1} exactly as before.
-                let total = conversion_val.max(cash_level);
-                let equity_weight = if terminal_log_spacing > 0.0 && conversion_val > 0.0 {
-                    let log_distance = (conversion_val / cash_level).ln();
-                    (0.5 + log_distance / terminal_log_spacing).clamp(0.0, 1.0)
-                } else if conversion_val > cash_level {
-                    1.0
-                } else {
-                    0.0
-                };
-                (total, (1.0 - equity_weight) * cash_level)
-            } else {
-                // No conversion right at maturity: redeem at face or put
-                // (an issuer call at maturity cannot undercut face).
-                (cash_level, cash_level)
-            };
-
-            // Coupon entitlement is independent of the exercise choice under
-            // the public contract (there is no coupon-forfeiture flag). Make
-            // the exercise decision ex-coupon, then add the date's coupon as
-            // a cash component.
-            values.push((ex_coupon_total + coupon, ex_coupon_cash + coupon));
+            let cash_level = self
+                .valuator
+                .face_value
+                .max(terminal_put.unwrap_or(self.valuator.face_value));
+            values.push(terminal_payoff(
+                conversion_val,
+                cash_level,
+                terminal_coupon,
+                self.valuator.conversion_allowed(self.steps, node_spot),
+                mandatory,
+                terminal_log_spacing,
+            ));
         }
 
         // 2. Backward Induction. Double-buffer the value layers so each per-step
@@ -300,9 +299,17 @@ impl<'a> TsiveriotisZhangEngine<'a> {
                 let mut final_cash = continuation_cash;
 
                 if can_convert && mandatory {
-                    // Mandatory conversion: forced regardless of optimality.
-                    final_total = conversion_val;
-                    final_cash = 0.0;
+                    // A forced delivery extinguishes the bond. Ordinary
+                    // call/put alternatives must not overwrite that event.
+                    next_values.push(terminal_payoff(
+                        conversion_val,
+                        self.valuator.face_value,
+                        coupon,
+                        true,
+                        true,
+                        0.0,
+                    ));
+                    continue;
                 } else if can_convert && conversion_val > final_total {
                     final_total = conversion_val;
                     final_cash = 0.0;

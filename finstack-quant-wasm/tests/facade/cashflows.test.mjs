@@ -73,6 +73,72 @@ const EXPORTED_KEYS = [
   'validateCashflowScheduleJson',
 ];
 
+test('cashflows CDS roll conserves interest across an unchanged payment election', () => {
+  const spec = JSON.parse(cashflowSpec);
+  spec.issue_date = '2024-03-20';
+  spec.maturity = '2024-12-20';
+  Object.assign(spec.coupon_program[0].spec, {
+    rate: '0.05',
+    frequency: { count: 3, unit: 'months' },
+    day_count: 'act_360',
+    business_day_convention: 'unadjusted',
+    stub: 'short_back',
+    roll_rule: 'cds_imm',
+  });
+  const couponTotal = (value) =>
+    JSON.parse(cashflows.buildCashflowScheduleJson(JSON.stringify(value), null))
+      .flows.filter((flow) => flow.kind === 'fixed' || flow.kind === 'stub')
+      .reduce((total, flow) => total + Number(flow.amount.amount), 0);
+  const before = couponTotal(spec);
+  spec.payment_program = [
+    { kind: 'window', start: '2024-06-10', end: spec.maturity, split: 'cash' },
+  ];
+  assert.ok(Math.abs(before - (1000000 * 0.05 * 275) / 360) < 1e-8);
+  assert.ok(Math.abs(couponTotal(spec) - before) < 1e-8);
+});
+
+test('cashflows IMM coupons cover the contractual off-roll maturity', () => {
+  const spec = JSON.parse(cashflowSpec);
+  spec.issue_date = '2025-01-15';
+  spec.maturity = '2025-12-31';
+  Object.assign(spec.coupon_program[0].spec, {
+    rate: '0.05',
+    frequency: { count: 3, unit: 'months' },
+    day_count: 'act_360',
+    business_day_convention: 'unadjusted',
+    stub: 'short_back',
+    roll_rule: 'imm',
+  });
+  const schedule = JSON.parse(cashflows.buildCashflowScheduleJson(JSON.stringify(spec), null));
+  const coupons = schedule.flows.filter((flow) => flow.kind === 'fixed' || flow.kind === 'stub');
+  assert.equal(coupons.at(-1).accrual.end, spec.maturity);
+  const total = coupons.reduce((amount, flow) => amount + Number(flow.amount.amount), 0);
+  assert.ok(Math.abs(total - (1000000 * 0.05 * 350) / 360) < 1e-8);
+});
+
+test('cashflows conserves exact decimal custom repayments through the JSON bridge', () => {
+  const spec = JSON.parse(cashflowSpec);
+  spec.issue_date = '2025-01-01';
+  spec.maturity = '2025-07-01';
+  spec.coupon_program = [];
+  spec.notional = {
+    initial: { amount: '0.30', currency: 'USD' },
+    amort: {
+      custom_principal: {
+        items: [
+          ['2025-04-01', { amount: '0.10', currency: 'USD' }],
+          ['2025-07-01', { amount: '0.20', currency: 'USD' }],
+        ],
+      },
+    },
+  };
+  const scheduleJson = cashflows.buildCashflowScheduleJson(JSON.stringify(spec), null);
+  cashflows.validateCashflowScheduleJson(scheduleJson);
+  const settlements = JSON.parse(cashflows.datedFlowsJson(scheduleJson));
+  const total = settlements.reduce((amount, flow) => amount + Number(flow.amount.amount), 0);
+  assert.ok(Math.abs(total) < 1e-15);
+});
+
 test('cashflows namespace exposes exactly the contract surface as functions', () => {
   for (const key of EXPORTED_KEYS) {
     assert.equal(
@@ -180,8 +246,192 @@ test('cashflows facade builds fixed-to-float and preserves Rust window errors', 
   );
 });
 
+test('cashflows step-up rates use contractual starts with adjusted accrual dates', () => {
+  for (const [issueDate, maturity, convention, expectedRate] of [
+    ['2025-01-05', '2025-07-05', 'following', 0.04],
+    ['2025-01-06', '2025-07-06', 'preceding', 0.08],
+  ]) {
+    const spec = JSON.parse(cashflowSpec);
+    Object.assign(spec, { issue_date: issueDate, maturity });
+    spec.coupon_program[0].kind = 'step_up';
+    const coupon = spec.coupon_program[0].spec;
+    delete coupon.rate;
+    Object.assign(coupon, {
+      initial_rate: '0.04',
+      step_schedule: [['2025-04-06', '0.08']],
+      frequency: { count: 3, unit: 'months' },
+      day_count: 'act_360',
+      business_day_convention: convention,
+      adjust_accrual_dates: true,
+      stub: 'short_back',
+    });
+    const built = JSON.parse(
+      cashflows.validateCashflowScheduleJson(
+        cashflows.buildCashflowScheduleJson(JSON.stringify(spec), null)
+      )
+    );
+    const lastCoupon = built.flows
+      .filter((flow) => flow.kind === 'fixed' || flow.kind === 'stub')
+      .at(-1);
+    assert.equal(lastCoupon.rate, expectedRate);
+    assert.ok(
+      Math.abs(
+        Number(lastCoupon.amount.amount) - 1000000 * lastCoupon.accrual_factor * expectedRate
+      ) < 1e-8
+    );
+  }
+});
+
+test('cashflows rejects principal events after the adjusted terminal accrual date', () => {
+  for (const [kind, amount] of [
+    ['notional', '100000'],
+    ['amortization', '-100000'],
+  ]) {
+    const spec = JSON.parse(cashflowSpec);
+    Object.assign(spec, { issue_date: '2024-12-31', maturity: '2025-03-30' });
+    Object.assign(spec.coupon_program[0].spec, {
+      frequency: { count: 3, unit: 'months' },
+      day_count: 'act_360',
+      business_day_convention: 'preceding',
+      adjust_accrual_dates: true,
+      stub: 'short_back',
+    });
+    spec.principal_events = [
+      {
+        date: '2025-03-30',
+        payment_date: '2025-03-30',
+        kind,
+        delta: { amount, currency: 'USD' },
+      },
+    ];
+    assert.throws(
+      () => cashflows.buildCashflowScheduleJson(JSON.stringify(spec), null),
+      (error) => {
+        assert.equal(error.kind, 'validation');
+        assert.match(error.message, /effective terminal accrual date 2025-03-28/);
+        return true;
+      }
+    );
+    spec.coupon_program[0].spec.adjust_accrual_dates = false;
+    cashflows.validateCashflowScheduleJson(
+      cashflows.buildCashflowScheduleJson(JSON.stringify(spec), null)
+    );
+  }
+});
+
+test('cashflows nonbinding overnight period cap preserves changing-balance interest', () => {
+  const spec = JSON.parse(cashflowSpec);
+  Object.assign(spec, { issue_date: '2025-01-06', maturity: '2025-01-08' });
+  spec.coupon_program[0].kind = 'floating';
+  const coupon = spec.coupon_program[0].spec;
+  delete coupon.rate;
+  Object.assign(coupon, {
+    frequency: { count: 3, unit: 'months' },
+    day_count: 'act_360',
+    business_day_convention: 'unadjusted',
+    stub: 'short_back',
+    rate_spec: {
+      forward_curve_id: 'RFR',
+      spread_bp: '0',
+      reset_frequency: { count: 3, unit: 'months' },
+      reset_lag_days: 0,
+      compounding: { compounded_in_arrears: { lookback_days: 0 } },
+      overnight_index_constraints: 'period',
+    },
+  });
+  spec.principal_events = [
+    {
+      date: '2025-01-07',
+      payment_date: '2025-01-07',
+      kind: 'amortization',
+      delta: { amount: '-500000', currency: 'USD' },
+    },
+  ];
+  const market = JSON.stringify({
+    schema_version: 1,
+    curves: [
+      {
+        type: 'forward',
+        id: 'RFR',
+        base: '2025-01-06',
+        reset_lag: 0,
+        day_count: 'act_360',
+        tenor: 1 / 360,
+        knot_points: [
+          [0, 0.2],
+          [1 / 360, 0],
+          [1, 0],
+        ],
+        projection_grid: null,
+        interp_style: 'linear',
+        extrapolation: 'flat_forward',
+        rate_calibration: null,
+        fx_policy: null,
+      },
+    ],
+    fx: null,
+    surfaces: [],
+    prices: {},
+    series: [],
+    inflation_indices: [],
+    dividends: [],
+    credit_indices: [],
+    fx_delta_vol_surfaces: [],
+    vol_cubes: [],
+    collateral: {},
+    hierarchy: null,
+  });
+  const unbounded = JSON.parse(cashflows.buildCashflowScheduleJson(JSON.stringify(spec), market));
+  coupon.rate_spec.index_cap_bp = '600';
+  const capped = JSON.parse(
+    cashflows.validateCashflowScheduleJson(
+      cashflows.buildCashflowScheduleJson(JSON.stringify(spec), market)
+    )
+  );
+  const interest = (schedule) =>
+    schedule.flows
+      .filter((flow) => flow.kind === 'float_reset')
+      .reduce((sum, flow) => sum + Number(flow.amount.amount), 0);
+  assert.ok(Math.abs(interest(unbounded) - (1000000 * 0.1) / 360) < 1e-8);
+  assert.ok(Math.abs(interest(capped) - interest(unbounded)) < 1e-8);
+});
+
 test('cashflows rejects malformed schedule JSON', () => {
   assert.throws(() => cashflows.validateCashflowScheduleJson('{not json'), /invalid/);
+});
+
+test('cashflows rejects invalid compounded rates and supports valid negative rates', () => {
+  const spec = JSON.parse(cashflowSpec);
+  spec.issue_date = '2025-01-01';
+  spec.maturity = '2025-07-01';
+  Object.assign(spec.coupon_program[0].spec, {
+    frequency: { count: 6, unit: 'months' },
+    business_day_convention: 'unadjusted',
+  });
+  const config = JSON.stringify({
+    method: 'compounded',
+    ex_coupon: null,
+    include_pik: true,
+    frequency: { count: 6, unit: 'months' },
+  });
+  for (const rate of ['-2', '-4']) {
+    spec.coupon_program[0].spec.rate = rate;
+    const schedule = cashflows.buildCashflowScheduleJson(JSON.stringify(spec), null);
+    assert.throws(
+      () => cashflows.accruedInterest(schedule, '2025-04-01', config),
+      (error) => {
+        assert.ok(error instanceof Error);
+        assert.equal(error.name, 'FinstackError');
+        assert.equal(error.kind, 'validation');
+        assert.match(error.message, /period rate.*greater than -1/);
+        return true;
+      }
+    );
+  }
+  spec.coupon_program[0].spec.rate = '-0.4';
+  const schedule = cashflows.buildCashflowScheduleJson(JSON.stringify(spec), null);
+  const accrued = cashflows.accruedInterest(schedule, '2025-04-01', config);
+  assert.ok(Math.abs(accrued - 1000000 * (Math.sqrt(0.8) - 1)) < 1e-8);
 });
 
 test('cashflows preserves principal deltas and accrual calendars through JSON', () => {

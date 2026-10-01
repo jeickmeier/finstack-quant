@@ -40,7 +40,11 @@ use crate::instruments::fixed_income::loan_terms::RateSpec;
 pub struct ThreeFactorPathData {
     /// Utilization trajectory at each payment date [0, 1]
     pub utilization_path: Vec<f64>,
-    /// Short rate trajectory (for floating rates)
+    /// Rate trajectory for floating coupons. Deterministic-forward paths
+    /// store raw curve-basis index rates; their baseline is annualized on each
+    /// contractual coupon before spread, gearing and bounds are applied.
+    /// Stochastic-rate paths store the ACT/365F model short rate, while explicit
+    /// zero-volatility constant-rate paths store contractual rates.
     pub short_rate_path: Vec<f64>,
     /// Credit spread trajectory (for survival probability)
     pub credit_spread_path: Vec<f64>,
@@ -320,6 +324,15 @@ impl<'a> CashflowEngine<'a> {
         for (i, period) in self.payment_periods.iter().enumerate() {
             let period_start = period.accrual_start;
             let period_end = period.accrual_end;
+            let accrual_context = if self.day_count == DayCount::Act365L {
+                DayCountContext {
+                    frequency: Some(self.facility.frequency),
+                    coupon_period: Some((period_start, period_end)),
+                    ..Default::default()
+                }
+            } else {
+                DayCountContext::default()
+            };
             let payment_date = period.payment_date;
 
             // Apply as_of filtering for non-principal cashflows
@@ -392,9 +405,9 @@ impl<'a> CashflowEngine<'a> {
                 let sub_start = window[0];
                 let sub_end = window[1];
 
-                let dt =
-                    self.day_count
-                        .year_fraction(sub_start, sub_end, DayCountContext::default())?;
+                let dt = self
+                    .day_count
+                    .year_fraction(sub_start, sub_end, accrual_context)?;
                 total_accrual += dt;
 
                 let commitment = self.facility.commitment_at(sub_start);
@@ -480,6 +493,7 @@ impl<'a> CashflowEngine<'a> {
                                     fwd: fwd.as_ref(),
                                     day_count: self.day_count,
                                     coupon_frequency: self.facility.frequency,
+                                    coupon_period: (period_start, period_end),
                                     currency: ccy,
                                     calendar_id: self.facility.calendar_id.as_deref(),
                                     margin_delta_bp: self.facility.margin_delta_bp_at(sub_start),
@@ -514,6 +528,9 @@ impl<'a> CashflowEngine<'a> {
                                 crate::cashflow::builder::rate_helpers::project_index_rate(
                                     reset_effective,
                                     fwd.as_ref(),
+                                    period_start,
+                                    period_end,
+                                    period.accrual_year_fraction,
                                 )?;
                             projected_fixings.push(crate::cashflow::fixings::ProjectedFixing {
                                 series_id: format!("FIXING:{}", spec.forward_curve_id),
@@ -833,6 +850,24 @@ impl<'a> CashflowEngine<'a> {
             }
             RateSpec::Fixed { .. } => (None, None),
         };
+        let deterministic_forward_mode = !path.stochastic_rates
+            && matches!(
+                &self.facility.draw_repay_spec,
+                DrawRepaySpec::Stochastic(spec)
+                    if spec.mc_config.as_ref().and_then(|config| config.interest_rate_process.as_ref()).is_none()
+            );
+        let deterministic_fwd = match (&self.facility.rate, deterministic_forward_mode) {
+            (RateSpec::Floating(spec), true) if overnight_fwd.is_none() => {
+                let market = self.market.ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(
+                        "Market context required for a deterministic-forward revolving-credit path"
+                            .into(),
+                    )
+                })?;
+                Some(market.get_forward(spec.forward_curve_id.as_str())?)
+            }
+            _ => None,
+        };
 
         // Add initial draw at issue_date (from lender perspective: negative cashflow)
         if self.facility.issue_date > self.as_of
@@ -871,6 +906,15 @@ impl<'a> CashflowEngine<'a> {
         for period in self.payment_periods.iter() {
             let period_start = period.accrual_start;
             let period_end = period.accrual_end;
+            let accrual_context = if self.day_count == DayCount::Act365L {
+                DayCountContext {
+                    frequency: Some(self.facility.frequency),
+                    coupon_period: Some((period_start, period_end)),
+                    ..Default::default()
+                }
+            } else {
+                DayCountContext::default()
+            };
             let payment_date = period.payment_date;
             let idx_start = observation_index(period_start)?;
             let idx_end = observation_index(period_end)?;
@@ -900,9 +944,9 @@ impl<'a> CashflowEngine<'a> {
             for k in idx_start..idx_end {
                 let sub_start = path.payment_dates[k];
                 let sub_end = path.payment_dates[k + 1];
-                let sub_dt =
-                    self.day_count
-                        .year_fraction(sub_start, sub_end, DayCountContext::default())?;
+                let sub_dt = self
+                    .day_count
+                    .year_fraction(sub_start, sub_end, accrual_context)?;
                 let utilization_start = path.utilization_path[k].clamp(0.0, 1.0);
                 let utilization_end = path.utilization_path[k + 1].clamp(0.0, 1.0);
                 let commitment_change = self.facility.commitment_at(sub_end).amount()
@@ -978,6 +1022,7 @@ impl<'a> CashflowEngine<'a> {
                                             fwd: fwd.as_ref(),
                                             day_count: self.day_count,
                                             coupon_frequency: self.facility.frequency,
+                                            coupon_period: (period_start, period_end),
                                             currency: ccy,
                                             calendar_id: self.facility.calendar_id.as_deref(),
                                             margin_delta_bp,
@@ -1010,9 +1055,29 @@ impl<'a> CashflowEngine<'a> {
                                                 anchor,
                                                 fwd.as_ref(),
                                                 disc.as_ref(),
+                                                period_start,
+                                                period_end,
+                                                period.accrual_year_fraction,
                                             )?
                                     }
-                                    None => simulated,
+                                    None => match deterministic_fwd.as_ref() {
+                                        Some(fwd) => {
+                                            let contractual_index = crate::cashflow::builder::rate_helpers::project_index_rate(
+                                                reset_effective,
+                                                fwd.as_ref(),
+                                                period_start,
+                                                period_end,
+                                                period.accrual_year_fraction,
+                                            )?;
+                                            let reset_time = crate::instruments::common_impl::pricing::time::curve_time(
+                                                fwd.as_ref(), reset_effective,
+                                            )?;
+                                            // Replace the raw curve baseline while preserving
+                                            // any additive contractual-rate shock on the path.
+                                            simulated + contractual_index - fwd.rate(reset_time)
+                                        }
+                                        None => simulated,
+                                    },
                                 }
                             };
                             crate::cashflow::builder::rate_helpers::calculate_floating_rate(
@@ -1235,7 +1300,279 @@ mod tests {
     use crate::instruments::fixed_income::revolving_credit::RevolvingCreditFees;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, Tenor};
+    use time::macros::date;
     use time::Month;
+
+    #[test]
+    fn term_projection_converts_curve_basis_and_preserves_fixings_and_path_shocks() {
+        use crate::cashflow::builder::FloatingRateSpec;
+        use crate::instruments::fixed_income::loan_terms::MarginStep;
+        use crate::instruments::fixed_income::revolving_credit::{
+            StochasticUtilizationSpec, UtilizationProcess,
+        };
+        use finstack_quant_core::dates::BusinessDayConvention;
+        use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
+        use rust_decimal::Decimal;
+
+        let start = date!(2025 - 01 - 02);
+        let step = date!(2025 - 02 - 14);
+        let end = date!(2025 - 04 - 02);
+        let spec: FloatingRateSpec = serde_json::from_value(serde_json::json!({
+            "forward_curve_id":"TERM", "spread_bp":"0",
+            "reset_frequency":{"count":3,"unit":"months"}, "reset_lag_days":0
+        }))
+        .expect("term specification");
+        let facility = RevolvingCredit::builder()
+            .id("RC-TERM-BASIS".into())
+            .commitment(Money::from((1_000_000_i64, Currency::USD)))
+            .drawn(Money::from((1_000_000_i64, Currency::USD)))
+            .issue_date(start)
+            .maturity(end)
+            .rate(RateSpec::Floating(spec))
+            .margin_steps(vec![MarginStep {
+                date: step,
+                delta_bp: Decimal::from(100),
+            }])
+            .day_count(DayCount::Act360)
+            .frequency(Tenor::quarterly())
+            .business_day_convention(BusinessDayConvention::Unadjusted)
+            .fees(RevolvingCreditFees::default())
+            .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
+            .discount_curve_id("USD-OIS".into())
+            .recovery_rate(0.0)
+            .build()
+            .expect("facility");
+        let market = MarketContext::new()
+            .insert(
+                ForwardCurve::builder("TERM", 0.25)
+                    .base_date(start)
+                    .day_count(DayCount::Act365F)
+                    .knots([(0.0, 0.04), (1.0, 0.04)])
+                    .build()
+                    .expect("forward curve"),
+            )
+            .insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(start)
+                    .day_count(DayCount::Act365F)
+                    .knots([(0.0, 1.0), (1.0, (-0.04_f64).exp())])
+                    .build()
+                    .expect("discount curve"),
+            );
+        let fixings = ScalarTimeSeries::new("FIXING:TERM", vec![(start, 0.07)], None)
+            .expect("observed index");
+        let total_accrual = (end - start).whole_days() as f64 / 360.0;
+        let stepped_accrual = (end - step).whole_days() as f64 / 360.0;
+        for observed in [false, true] {
+            let as_of = if observed {
+                date!(2025 - 01 - 03)
+            } else {
+                start
+            };
+            let fixing_series = observed.then_some(&fixings);
+            let contractual_index = if observed { 0.07 } else { 0.04 * 360.0 / 365.0 };
+            let expected =
+                1_000_000.0 * (contractual_index * total_accrual + 0.01 * stepped_accrual);
+            let schedule = CashflowEngine::new(&facility, Some(&market), as_of, fixing_series)
+                .expect("deterministic engine")
+                .generate_deterministic()
+                .expect("deterministic coupons")
+                .schedule;
+            let coupon = schedule
+                .get_flows()
+                .iter()
+                .find(|flow| flow.kind == CFKind::FloatReset)
+                .expect("floating coupon");
+            assert!((coupon.amount.amount() - expected).abs() < 1e-7);
+            assert!(schedule.get_meta().projected_fixings.iter().all(|fixing| {
+                (fixing.value.expect("recorded index") - contractual_index).abs() < 1e-14
+            }));
+
+            for stochastic_rates in [false, true] {
+                let mut path_facility = facility.clone();
+                path_facility.draw_repay_spec =
+                    DrawRepaySpec::Stochastic(StochasticUtilizationSpec {
+                        utilization_process: UtilizationProcess::MeanReverting {
+                            theta: 1.0,
+                            kappa: 0.1,
+                            sigma: 0.0,
+                            spread_sensitivity: 0.0,
+                        },
+                        use_sobol_qmc: false,
+                        mc_config: None,
+                    });
+                let engine =
+                    CashflowEngine::new(&path_facility, Some(&market), as_of, fixing_series)
+                        .expect("path engine");
+                let dates = vec![start, step, end];
+                for shock in [0.0, 0.007] {
+                    let path = ThreeFactorPathData {
+                        utilization_path: vec![1.0; dates.len()],
+                        short_rate_path: vec![0.04 + shock; dates.len()],
+                        credit_spread_path: vec![0.0; dates.len()],
+                        time_points: dates
+                            .iter()
+                            .map(|date| (*date - start).whole_days() as f64 / 365.0)
+                            .collect(),
+                        payment_dates: dates.clone(),
+                        stochastic_rates,
+                    };
+                    let schedule = engine.generate_stochastic_path(path).expect("path coupon");
+                    let coupon = schedule
+                        .schedule
+                        .get_flows()
+                        .iter()
+                        .find(|flow| flow.kind == CFKind::FloatReset)
+                        .expect("floating path coupon");
+                    let expected = expected
+                        + if observed {
+                            0.0
+                        } else {
+                            1_000_000.0 * shock * total_accrual
+                        };
+                    assert!(
+                        (coupon.amount.amount() - expected).abs() < 1e-5,
+                        "observed={observed}, stochastic_rates={stochastic_rates}, shock={shock}: {} vs {expected}",
+                        coupon.amount.amount()
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn act365l_slices_preserve_actual_coupon_denominators_in_both_engines() {
+        use crate::cashflow::builder::FloatingRateSpec;
+        use crate::instruments::fixed_income::loan_terms::MarginStep;
+        use finstack_quant_core::dates::{BusinessDayConvention, StubKind};
+        use finstack_quant_core::market_data::term_structures::ForwardCurve;
+        use rust_decimal::Decimal;
+
+        for (start, end, step, frequency, stub, denominator) in [
+            (
+                date!(2023 - 03 - 01),
+                date!(2024 - 03 - 01),
+                date!(2023 - 06 - 01),
+                Tenor::annual(),
+                StubKind::ShortFront,
+                366.0,
+            ),
+            (
+                date!(2023 - 12 - 01),
+                date!(2024 - 03 - 01),
+                date!(2023 - 12 - 15),
+                Tenor::quarterly(),
+                StubKind::ShortFront,
+                366.0,
+            ),
+            (
+                date!(2024 - 03 - 01),
+                date!(2025 - 01 - 01),
+                date!(2024 - 06 - 01),
+                Tenor::annual(),
+                StubKind::ShortFront,
+                365.0,
+            ),
+            (
+                date!(2023 - 12 - 01),
+                date!(2025 - 01 - 01),
+                date!(2024 - 01 - 15),
+                Tenor::annual(),
+                StubKind::LongFront,
+                366.0,
+            ),
+        ] {
+            for floating in [false, true] {
+                let rate = if floating {
+                    RateSpec::Floating(
+                        serde_json::from_value::<FloatingRateSpec>(serde_json::json!({
+                            "forward_curve_id":"TERM", "spread_bp":"0",
+                            "reset_frequency":{"count":1,"unit":"months"}, "reset_lag_days":0
+                        }))
+                        .expect("term rate specification"),
+                    )
+                } else {
+                    RateSpec::Fixed { rate: 0.05 }
+                };
+                let facility = RevolvingCredit::builder()
+                    .id("RC-ACT365L-SLICES".into())
+                    .commitment(Money::from((1_000_000_i64, Currency::USD)))
+                    .drawn(Money::from((1_000_000_i64, Currency::USD)))
+                    .issue_date(start)
+                    .maturity(end)
+                    .rate(rate)
+                    .margin_steps(vec![MarginStep {
+                        date: step,
+                        delta_bp: Decimal::from(100),
+                    }])
+                    .day_count(DayCount::Act365L)
+                    .frequency(frequency)
+                    .stub(stub)
+                    .business_day_convention(BusinessDayConvention::Unadjusted)
+                    .fees(RevolvingCreditFees::default())
+                    .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
+                    .discount_curve_id("USD-OIS".into())
+                    .recovery_rate(0.0)
+                    .build()
+                    .expect("facility");
+                let market = MarketContext::new().insert(
+                    ForwardCurve::builder("TERM", 1.0 / 12.0)
+                        .base_date(start)
+                        .day_count(DayCount::Act365F)
+                        // Represent a 5% contractual ACT/365L fixing on
+                        // the forward curve's ACT/365F clock.
+                        .knots([
+                            (0.0, 0.05 * 365.0 / denominator),
+                            (3.0, 0.05 * 365.0 / denominator),
+                        ])
+                        .build()
+                        .expect("flat term curve"),
+                );
+                let engine =
+                    CashflowEngine::new(&facility, Some(&market), start, None).expect("engine");
+                let deterministic = engine
+                    .generate_deterministic()
+                    .expect("deterministic schedule");
+                let observations = super::super::utils::build_observation_dates(&facility)
+                    .expect("observation dates");
+                let n = observations.len();
+                let time_points = observations
+                    .iter()
+                    .map(|day| (*day - start).whole_days() as f64 / 365.0)
+                    .collect();
+                let stochastic = engine
+                    .generate_stochastic_path(ThreeFactorPathData {
+                        utilization_path: vec![1.0; n],
+                        short_rate_path: vec![0.05; n],
+                        credit_spread_path: vec![0.0; n],
+                        time_points,
+                        payment_dates: observations,
+                        stochastic_rates: false,
+                    })
+                    .expect("constant path schedule");
+                let first_days = (step - start).whole_days() as f64;
+                let last_days = (end - step).whole_days() as f64;
+                let expected = 1_000_000.0 * (0.05 * first_days + 0.06 * last_days) / denominator;
+                for schedule in [&deterministic.schedule, &stochastic.schedule] {
+                    let coupons: Vec<_> = schedule
+                        .get_flows()
+                        .iter()
+                        .filter(|flow| matches!(flow.kind, CFKind::Fixed | CFKind::FloatReset))
+                        .collect();
+                    assert_eq!(coupons.len(), 1);
+                    assert!(
+                        (coupons[0].accrual_factor - (first_days + last_days) / denominator).abs()
+                            < 1e-14
+                    );
+                    assert!(
+                        (coupons[0].amount.amount() - expected).abs() < 1e-7,
+                        "floating={floating}, {start} -> {end}: expected {expected}, got {}",
+                        coupons[0].amount.amount()
+                    );
+                }
+            }
+        }
+    }
 
     #[test]
     fn terminal_principal_uses_adjusted_payment_date_without_extra_accrual() {

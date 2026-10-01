@@ -131,11 +131,11 @@ class PnlAttribution:
     @property
     def total_pnl(self) -> float:
         """
-        Total P&L amount (val_t1 − val_t0 + intra-period coupon income).
+        Total P&L amount (val_t1 − val_t0 + intra-period economic cash).
 
         For methods that follow the total-return convention (parallel,
-        waterfall, Taylor), ``total_pnl`` includes coupon income received in
-        the period. Use :attr:`mark_to_market_pnl` for the raw price change.
+        waterfall, Taylor), ``total_pnl`` includes income and principal
+        received in the period. Use :attr:`mark_to_market_pnl` for the raw price change.
 
         Returns
         -------
@@ -153,11 +153,11 @@ class PnlAttribution:
         """
         Raw mark-to-market P&L: ``val_t1 − val_t0`` with no cashflow adjustment.
 
-        When the attribution method added coupon income to ``total_pnl`` (the
+        When the attribution method added period economic cash to ``total_pnl`` (the
         standard total-return convention), this field still reports the raw
         mark-to-market change so a downstream consumer can reconcile against
-        their own computation. ``None`` for attributions deserialized from a
-        pre-audit JSON payload that did not carry the field.
+        their own computation. ``None`` when the attribution path did not
+        supply the raw mark-to-market change.
 
         Returns
         -------
@@ -465,7 +465,7 @@ class PnlAttribution:
         -------
         list[str]
             Canonical snake-case metric ids (``theta``, ``dv01``, ``cs01``,
-            ``bucketed_cs01``, ``vega``, ... plus second-order terms) for
+            ``bucketed_dv01``, ``bucketed_cs01``, ``vega``, ... plus second-order terms) for
             ``metrics_based``; an empty list for the repricing methods, which
             use no pre-computed metrics.
 
@@ -862,14 +862,15 @@ class PnlAttribution:
 
     def validate_currencies(self) -> None:
         """
-        Validate that every factor's currency matches ``total_pnl.currency``.
+        Validate that every monetary value matches ``total_pnl.currency``.
 
         Useful before building a DataFrame or summing across instruments.
 
         Raises
         ------
         ValueError
-            When any factor's currency differs from ``total_pnl.currency``.
+            When any headline, factor, residual, detail, or diagnostic amount
+            differs from ``total_pnl.currency``.
 
         """
         ...
@@ -921,7 +922,9 @@ class PnlAttribution:
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If any headline, factor, residual, detail, or diagnostic amount
+            uses a currency different from ``total_pnl.currency``, or the
+            result cannot be serialized into a pandas object.
         """
         ...
 
@@ -1396,8 +1399,8 @@ def attribute_pnl(
     ------
     ValueError
         If ``method`` or ``config`` cannot be serialized, an input JSON or ISO
-        date is malformed, or attribution validation, pricing, or result
-        serialization fails.
+        date is malformed, the FX provider cannot supply a coherent market
+        snapshot, or attribution validation, pricing, or result serialization fails.
     KeyError
         If a required curve, market item, calendar, or FX triangulation leg is
         unavailable.
@@ -1463,7 +1466,8 @@ def attribute_pnl_many(
     ------
     ValueError
         If any input cannot be parsed, an instrument's attribution fails
-        validation / pricing, or a result mixes currencies across factors.
+        validation / pricing, the FX provider cannot supply a coherent market
+        snapshot, or a result mixes currencies across factors.
     KeyError
         If a required curve, market item, calendar, or FX leg is missing.
     RuntimeError
@@ -1639,7 +1643,8 @@ def attribute_return_contribution(
     ValueError
         If the spec is malformed; ``as_of`` is missing for a DataFrame;
         required identifiers or positions are empty; numeric inputs are
-        non-finite; position weighting modes are mixed or incomplete; factor
+        non-finite, or a derived weight, contribution, or aggregate overflows;
+        position weighting modes are mixed or incomplete; factor
         or benchmark inputs are incomplete; or benchmark-relative weights do
         not sum to one; or a Brinson group has zero net weight but nonzero
         return contribution. Split offsetting long/short positions into distinct groups.
@@ -1716,7 +1721,8 @@ def validate_return_contribution_json(spec_json: str) -> str:
     ------
     ValueError
         If ``spec_json`` is malformed; required identifiers or positions are
-        empty; numeric inputs are non-finite; position weighting modes are
+        empty; numeric inputs are non-finite or derived weights, contributions,
+        or aggregates overflow; position weighting modes are
         mixed or incomplete; factor or benchmark inputs are incomplete; or
         benchmark-relative weights do not sum to one.
     RuntimeError
@@ -1757,7 +1763,7 @@ def default_attribution_metrics() -> list[str]:
     -------
     list[str]
         Canonical snake-case metric ids (``theta``, ``dv01``, ``cs01``,
-        ``bucketed_cs01``, ``vega``, ...) — the tokens accepted by
+        ``bucketed_dv01``, ``bucketed_cs01``, ``vega``, ...) — the tokens accepted by
         ``config={"metrics": [...]}`` and returned by
         :meth:`PnlAttribution.required_metrics`.
 

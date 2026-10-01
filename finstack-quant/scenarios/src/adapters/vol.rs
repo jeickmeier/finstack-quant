@@ -228,11 +228,10 @@ pub(crate) fn vol_parallel_effects(
         effects.push(ScenarioEffect::Warning(w));
     }
 
-    let bump = MarketBump::Curve {
+    effects.push(ScenarioEffect::SurfaceBump {
         id: vol_surface_id.clone(),
         spec: parallel_spec,
-    };
-    effects.push(ScenarioEffect::MarketBump(bump));
+    });
 
     Ok(effects)
 }

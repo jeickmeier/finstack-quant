@@ -302,7 +302,8 @@ pub enum ConversionPolicy {
     ///
     /// **Modeling scope**: the tree pricer models conversion only at the
     /// single step mapped from this date; early voluntary conversion before
-    /// the mandatory date is not modeled.
+    /// the mandatory date is not modeled. Forced conversion takes precedence
+    /// over coincident call/put rights, and the scheduled coupon remains payable.
     MandatoryOn(
         #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
@@ -346,6 +347,8 @@ pub enum ConversionPolicy {
     /// **Modeling scope**: the tree pricer models conversion only at the
     /// single step mapped from `conversion_date`; early voluntary conversion
     /// before that date (offered by some mandatory structures) is not modeled.
+    /// Forced conversion takes precedence over coincident call/put rights,
+    /// and the scheduled coupon remains payable.
     MandatoryVariable {
         /// Date of mandatory conversion.
         #[serde(with = "finstack_quant_core::wire::date")]

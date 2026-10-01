@@ -7,17 +7,11 @@
 //!
 //! # Date Interval Convention
 //!
-//! **All day-count calculations use start-inclusive, end-exclusive intervals `[start, end)`.**
-//!
-//! This means:
-//! - The start date **is** counted in the accrual period
-//! - The end date **is not** counted in the accrual period
-//! - A period from Jan 1 to Jan 2 contains 1 day (Jan 1 only)
-//! - A period from Jan 1 to Jan 1 contains 0 days
-//!
-//! This convention is consistent with how payment dates work in financial instruments:
-//! the accrual period ends the day before the payment date, and you don't accrue
-//! interest on the payment date itself.
+//! Endpoint treatment follows each named convention. Actual elapsed-day counts
+//! equal `end - start`, while ACT/ACT ISDA and business-day counts allocate days
+//! over `[start, end)`. NL/365 removes February 29 in `(start, end]`, and
+//! ACT/365L tests its coupon-period leap day in `(coupon_start, coupon_end]`.
+//! A date equal to itself always has zero year fraction.
 //!
 //! # Industry Standards
 //!
@@ -255,13 +249,18 @@ pub enum DayCount {
     /// Actual/365 Leap day count convention (Actual/365L) per ICMA Rule 251.
     ///
     /// Year fraction = (actual days) / (365 or 366), where the denominator
-    /// rule depends on the coupon frequency supplied via [`DayCountContext`]:
+    /// rule depends on the coupon frequency and enclosing `coupon_period`
+    /// supplied via [`DayCountContext`]. Both are required:
     ///
-    /// - **Annual** (or no frequency supplied): 366 if February 29 falls in
-    ///   the interval `(start, end]` (exclusive of start, inclusive of end),
+    /// - **Annual**: 366 if February 29 falls in
+    ///   `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),
     ///   else 365.
-    /// - **Non-annual**: 366 if the period END date falls in a leap year,
+    /// - **Non-annual**: 366 if the next coupon date falls in a leap year,
     ///   else 365.
+    ///
+    /// Partial accrual keeps the enclosing coupon's denominator. Accrual
+    /// dates outside that coupon are rejected; sum separate coupon slices
+    /// for calculations spanning multiple coupon periods.
     ///
     /// # Standards Reference
     ///
@@ -283,14 +282,19 @@ pub enum DayCount {
     /// # Examples
     ///
     /// ```rust
-    /// use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
+    /// use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
     /// use time::Month;
     ///
     /// // Period containing Feb 29, 2024 (leap year)
     /// let start = Date::from_calendar_date(2024, Month::February, 1).expect("Valid date");
     /// let end = Date::from_calendar_date(2024, Month::March, 1).expect("Valid date");
     ///
-    /// let yf = DayCount::Act365L.year_fraction(start, end, DayCountContext::default()).expect("Year fraction calculation should succeed");
+    /// let ctx = DayCountContext {
+    ///     frequency: Some(Tenor::annual()),
+    ///     coupon_period: Some((start, end)),
+    ///     ..DayCountContext::default()
+    /// };
+    /// let yf = DayCount::Act365L.year_fraction(start, end, ctx).expect("Year fraction calculation should succeed");
     /// // 29 days / 366 (leap year denominator)
     /// assert_eq!(yf, 29.0 / 366.0);
     /// ```
@@ -482,7 +486,7 @@ pub enum DayCount {
     /// # Standards Reference
     ///
     /// - **Also known as**: Act/365 No Leap, NL365, Actual/365NL
-    /// - Counts the actual calendar days in `[start, end)` and removes every
+    /// - Counts the actual calendar days in `(start, end]` and removes every
     ///   February 29 that falls in the period, so a full leap year still
     ///   yields exactly 1.0.
     ///
@@ -558,6 +562,8 @@ pub enum DayCount {
     ///
     /// Uses actual days in numerator and actual days in the coupon period
     /// as denominator, requiring knowledge of payment frequency.
+    /// Explicit reference coupon boundaries must be unadjusted regular dates
+    /// from the contractual nominal month grid, rather than payment dates.
     ///
     /// # Standards Reference
     ///
@@ -687,6 +693,7 @@ impl DayCount {
     /// Provide any required context via [`DayCountContext`]:
     /// - `Bus/252` requires a holiday calendar
     /// - `Act/Act (ISMA)` requires a coupon frequency
+    /// - `Act/365L` requires frequency and enclosing coupon boundaries
     ///
     /// # Arguments
     ///
@@ -714,6 +721,10 @@ impl DayCount {
     ///   Using `ActActIsma` on an irregular coupon without `ctx.coupon_period`
     /// - [`InputError::ActActIsmaUnsupportedFrequency`](crate::error::InputError::ActActIsmaUnsupportedFrequency):
     ///   Using `ActActIsma` with a Day or Week frequency
+    /// - `Error::Validation`: using `Act365L` without frequency or an enclosing
+    ///   `coupon_period`, or supplying accrual dates outside that coupon
+    /// - `Error::Validation`: supplying ICMA reference endpoints that do not
+    ///   reproduce one unadjusted nominal month grid
     ///
     /// # Examples
     ///
@@ -761,7 +772,7 @@ impl DayCount {
             DayCount::OneOne => Ok(1.0),
             DayCount::Act360 => Ok(days / 360.0),
             DayCount::Act365F => Ok(days / 365.0),
-            DayCount::Act365L => Ok(year_fraction_act_365l(start, end, ctx)),
+            DayCount::Act365L => year_fraction_act_365l(start, end, ctx),
             DayCount::Thirty360 => {
                 Ok(days_30_360(start, end, Thirty360Convention::UsSia) as f64 / 360.0)
             }
@@ -1179,13 +1190,21 @@ mod tests {
 
     #[test]
     fn act365l_period_ending_on_feb29_uses_366() {
-        use super::{DayCount, DayCountContext};
+        use super::{DayCount, DayCountContext, Tenor};
 
         // (2024-02-01, 2024-02-29]: end date Feb 29 is included → denom 366.
         let start = date!(2024 - 02 - 01);
         let end = date!(2024 - 02 - 29);
         let yf = DayCount::Act365L
-            .year_fraction(start, end, DayCountContext::default())
+            .year_fraction(
+                start,
+                end,
+                DayCountContext {
+                    frequency: Some(Tenor::annual()),
+                    coupon_period: Some((start, end)),
+                    ..Default::default()
+                },
+            )
             .expect("should succeed");
 
         let days = (end - start).whole_days() as f64;
@@ -1198,13 +1217,21 @@ mod tests {
 
     #[test]
     fn act365l_period_starting_on_feb29_uses_365() {
-        use super::{DayCount, DayCountContext};
+        use super::{DayCount, DayCountContext, Tenor};
 
         // (2024-02-29, 2024-03-15]: Feb 29 is the start, excluded → denom 365.
         let start = date!(2024 - 02 - 29);
         let end = date!(2024 - 03 - 15);
         let yf = DayCount::Act365L
-            .year_fraction(start, end, DayCountContext::default())
+            .year_fraction(
+                start,
+                end,
+                DayCountContext {
+                    frequency: Some(Tenor::annual()),
+                    coupon_period: Some((start, end)),
+                    ..Default::default()
+                },
+            )
             .expect("should succeed");
 
         let days = (end - start).whole_days() as f64;
@@ -1217,13 +1244,21 @@ mod tests {
 
     #[test]
     fn act365l_period_containing_feb29_uses_366() {
-        use super::{DayCount, DayCountContext};
+        use super::{DayCount, DayCountContext, Tenor};
 
         // (2024-02-01, 2024-03-01]: Feb 29 is strictly inside → denominator 366.
         let start = date!(2024 - 02 - 01);
         let end = date!(2024 - 03 - 01);
         let yf = DayCount::Act365L
-            .year_fraction(start, end, DayCountContext::default())
+            .year_fraction(
+                start,
+                end,
+                DayCountContext {
+                    frequency: Some(Tenor::annual()),
+                    coupon_period: Some((start, end)),
+                    ..Default::default()
+                },
+            )
             .expect("should succeed");
 
         let days = (end - start).whole_days() as f64;
@@ -1249,7 +1284,14 @@ mod tests {
         let start = date!(2024 - 06 - 01);
         let end = date!(2024 - 12 - 01);
         let yf = DayCount::Act365L
-            .year_fraction(start, end, semi)
+            .year_fraction(
+                start,
+                end,
+                DayCountContext {
+                    coupon_period: Some((start, end)),
+                    ..semi
+                },
+            )
             .expect("should succeed");
         let days = (end - start).whole_days() as f64;
         assert_eq!(yf, days / 366.0, "semi-annual, end in leap year → 366");
@@ -1260,7 +1302,14 @@ mod tests {
         let start = date!(2024 - 09 - 01);
         let end = date!(2025 - 03 - 01);
         let yf = DayCount::Act365L
-            .year_fraction(start, end, semi)
+            .year_fraction(
+                start,
+                end,
+                DayCountContext {
+                    coupon_period: Some((start, end)),
+                    ..semi
+                },
+            )
             .expect("should succeed");
         let days = (end - start).whole_days() as f64;
         assert_eq!(yf, days / 365.0, "semi-annual, end in non-leap year → 365");
@@ -1274,7 +1323,14 @@ mod tests {
         let start = date!(2024 - 06 - 01);
         let end = date!(2024 - 12 - 01);
         let yf = DayCount::Act365L
-            .year_fraction(start, end, annual)
+            .year_fraction(
+                start,
+                end,
+                DayCountContext {
+                    coupon_period: Some((start, end)),
+                    ..annual
+                },
+            )
             .expect("should succeed");
         let days = (end - start).whole_days() as f64;
         assert_eq!(yf, days / 365.0, "annual, no Feb 29 in (start,end] → 365");
@@ -1362,6 +1418,31 @@ mod tests {
     }
 
     // NL/365
+
+    #[test]
+    fn nl365_excludes_end_leap_day_but_includes_start_leap_day() {
+        use super::{DayCount, DayCountContext};
+
+        let year_fraction = |start, end| {
+            DayCount::Nl365
+                .year_fraction(start, end, DayCountContext::default())
+                .expect("valid interval")
+        };
+        assert_eq!(
+            year_fraction(date!(2024 - 02 - 28), date!(2024 - 02 - 29)),
+            0.0
+        );
+        assert_eq!(
+            year_fraction(date!(2024 - 02 - 29), date!(2024 - 03 - 01)),
+            1.0 / 365.0
+        );
+        // Adjacent subperiods must sum to the unsplit accrual.
+        assert_eq!(
+            year_fraction(date!(2024 - 02 - 28), date!(2024 - 02 - 29))
+                + year_fraction(date!(2024 - 02 - 29), date!(2024 - 03 - 01)),
+            year_fraction(date!(2024 - 02 - 28), date!(2024 - 03 - 01))
+        );
+    }
 
     #[test]
     fn nl365_excludes_feb_29() {

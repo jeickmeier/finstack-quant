@@ -553,7 +553,8 @@ class TestCompsBindings:
             "subject": _company("SUBJ", leverage=2.0, oas_bp=250.0),
             "peers": [
                 _company("P1", leverage=1.0, oas_bp=100.0),
-                _company("P2", leverage=2.0, oas_bp=200.0),
+                # Regression scoring requires nonzero peer residual dispersion.
+                _company("P2", leverage=2.0, oas_bp=210.0),
                 _company("P3", leverage=3.0, oas_bp=300.0),
             ],
             "period_basis": "ltm",

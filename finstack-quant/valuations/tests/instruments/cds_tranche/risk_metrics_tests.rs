@@ -150,7 +150,9 @@ fn test_direct_and_registered_cs01_share_quote_replay_convention() {
         .base_correlation_curve(Arc::clone(&original.base_correlation_curve))
         .build()
         .expect("comparison index should build");
-    market = market.insert_credit_index(&tranche.credit_index_id, index);
+    market = market
+        .insert_credit_index(&tranche.credit_index_id, index)
+        .expect("comparison credit index dependencies should exist");
 
     let bump_bp = 2.0;
     let pricer = CdsTranchePricer::new();

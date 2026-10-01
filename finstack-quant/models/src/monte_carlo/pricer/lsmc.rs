@@ -31,13 +31,17 @@
 //! Early exercise is evaluated on the discrete simulation steps listed in
 //! [`LsmcConfig::exercise_dates`] (the GBM convenience constructors use every
 //! step `0..=num_steps`). That is a **Bermudan** option on the time grid, not a
-//! continuous American. When index `0` is included, immediate exercise is applied
-//! as a floor on the reported price so the estimate cannot print below
+//! continuous American. In the in-sample [`LsmcPricer::price`] method, when index
+//! `0` is included, immediate exercise is applied as a floor so the estimate cannot print below
 //! intrinsic. When that floor binds, the reported mean is the intrinsic
 //! value while stderr and sample standard deviation stay those of the
 //! unfloored path present values. The 95% CI is the unfloored interval
 //! with its lower bound clamped to intrinsic so the published interval
 //! still contains the reported mean.
+//! The two-pass methods instead choose immediate exercise on the training
+//! paths and freeze that decision with the other exercise dates. Their pricing
+//! estimates can fall below intrinsic and are unbiased for the fitted policy,
+//! whose value can be below the optimal Bermudan value.
 
 use super::super::results::MoneyEstimate;
 use super::lsq::{regression_coefficients_with_basis, regression_with_basis};
@@ -52,6 +56,41 @@ use crate::monte_carlo::TimeGrid;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::Result;
 
+// Bound retained path storage to 512 MB of f64 values and the time/exercise
+// grids to 100,000 intervals. Streaming MC limits do not protect this pricer,
+// which retains every simulated spot for backward induction.
+const MAX_LSMC_PATH_VALUES: usize = 64_000_000;
+const MAX_LSMC_STEPS: usize = 100_000;
+
+fn checked_path_values(num_paths: usize, num_steps: usize, antithetic: bool) -> Result<usize> {
+    if !(2..=crate::monte_carlo::engine::MAX_NUM_PATHS).contains(&num_paths) {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "LSMC num_paths must be in 2..={} independent estimators, got {num_paths}",
+            crate::monte_carlo::engine::MAX_NUM_PATHS
+        )));
+    }
+    if num_steps == 0 || num_steps > MAX_LSMC_STEPS {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "LSMC num_steps must be in 1..={MAX_LSMC_STEPS}, got {num_steps}"
+        )));
+    }
+    let values = num_paths
+        .checked_mul(if antithetic { 2 } else { 1 })
+        .and_then(|rows| {
+            num_steps
+                .checked_add(1)
+                .and_then(|stride| rows.checked_mul(stride))
+        })
+        .filter(|&values| values <= MAX_LSMC_PATH_VALUES)
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "LSMC retained path storage exceeds {MAX_LSMC_PATH_VALUES} values \
+             (num_paths={num_paths}, num_steps={num_steps}, antithetic={antithetic})"
+            ))
+        })?;
+    Ok(values)
+}
+
 /// A frozen LSMC exercise policy fit on one path set, applicable to another.
 ///
 /// Captures the per-exercise-date least-squares regression coefficients used to
@@ -62,6 +101,10 @@ use finstack_quant_core::Result;
 /// Build one with [`LsmcPricer::fit_exercise_policy`].
 #[derive(Debug, Clone)]
 pub struct ExercisePolicy {
+    /// Whether the training paths selected immediate exercise at time zero.
+    /// Pricing paths replay this decision without comparing their sample mean
+    /// with intrinsic value, preserving independence from policy fitting.
+    pub exercise_at_start: bool,
     /// Per-exercise-step regression coefficients in (step, coefficients) pairs,
     /// sorted by ascending step for forward replay. Only dates strictly inside
     /// `(0, num_steps)` are stored; terminal exercise is always applied.
@@ -197,7 +240,8 @@ impl ImmediateExercise for AmericanCall {
 /// LSMC configuration.
 #[derive(Debug, Clone)]
 pub struct LsmcConfig {
-    /// Number of paths
+    /// Independent path estimators; at least two are required for sampling
+    /// uncertainty. Each estimator averages two physical paths when antithetic.
     pub num_paths: usize,
     /// Random seed
     pub seed: u64,
@@ -212,7 +256,7 @@ pub struct LsmcConfig {
 impl LsmcConfig {
     /// Create a validated LSMC configuration.
     ///
-    /// Verifies that `num_paths > 0`, `exercise_dates` is non-empty with
+    /// Verifies that `num_paths >= 2`, `exercise_dates` is non-empty with
     /// non-negative step indices, `num_steps > 0`, and every date satisfies
     /// `0 <= date <= num_steps`. Dates are sorted and de-duplicated: a
     /// duplicate exercise date would run the same-step regression twice with
@@ -224,21 +268,26 @@ impl LsmcConfig {
     /// Bermudan whose last exercise right ends strictly before maturity is
     /// not representable; set `num_steps` to the last exercise step instead.
     /// Immediate exercise at valuation is permitted only when `exercise_dates`
-    /// contains `0`; only then is intrinsic value a floor on the reported price.
+    /// contains `0`. In-sample pricing then floors at intrinsic; two-pass
+    /// pricing freezes the time-zero decision using the training paths.
     ///
     /// Antithetic pairing (`Z` and `-Z` from the same draws) is taken from the
     /// registry default unless overridden with [`Self::with_antithetic`].
     ///
     /// # Errors
     ///
-    /// Returns an error if `num_paths` is zero, no exercise date is supplied,
-    /// `num_steps` is zero, or any date exceeds `num_steps`. Duplicate dates are
+    /// Returns an error if `num_paths` is outside `2..=10_000_000`, no exercise
+    /// date is supplied, `num_steps` is outside `1..=100_000`, any date exceeds
+    /// `num_steps`, or retained paths exceed 64 million spot values (including
+    /// time zero). Pricing revalidates this limit with the selected antithetic
+    /// partners included. Duplicate dates are
     /// accepted but removed after sorting, and the registry supplies the
     /// default seed, parallel-execution, and antithetic settings.
     ///
     /// # Arguments
     ///
-    /// * `num_paths` - Positive number of independent Monte Carlo estimators.
+    /// * `num_paths` - Number of independent Monte Carlo estimators; at least
+    ///   two are required to estimate sampling uncertainty.
     /// * `exercise_dates` - Non-empty exercise step indices in `0..=num_steps`;
     ///   include `0` to permit valuation-date exercise. Terminal payoff at
     ///   maturity remains the boundary condition even when omitted here.
@@ -248,9 +297,9 @@ impl LsmcConfig {
         exercise_dates: Vec<usize>,
         num_steps: usize,
     ) -> finstack_quant_core::Result<Self> {
-        if num_paths == 0 {
+        if num_paths < 2 {
             return Err(finstack_quant_core::Error::Validation(
-                "num_paths must be positive".to_string(),
+                "num_paths must provide at least two independent estimators".to_string(),
             ));
         }
         if exercise_dates.is_empty() {
@@ -274,6 +323,7 @@ impl LsmcConfig {
         exercise_dates.dedup();
 
         let defaults = &crate::monte_carlo::registry::embedded_defaults()?.rust.lsmc;
+        checked_path_values(num_paths, num_steps, false)?;
         Ok(Self {
             num_paths,
             seed: defaults.seed,
@@ -292,14 +342,16 @@ impl LsmcConfig {
     ///
     /// # Arguments
     ///
-    /// * `num_paths` - Simulated paths; must be positive.
+    /// * `num_paths` - Independent path estimators; must be at least two.
     /// * `num_steps` - Time-grid steps between `0` and expiry; the returned
     ///   dates are `0..=num_steps`.
     ///
     /// # Errors
     ///
-    /// Returns an error if `num_paths` or `num_steps` is zero.
+    /// Returns an error for the path, step, or retained-storage limits documented
+    /// by [`Self::new`], before allocating the exercise schedule.
     pub fn every_step(num_paths: usize, num_steps: usize) -> finstack_quant_core::Result<Self> {
+        checked_path_values(num_paths, num_steps, false)?;
         Self::new(num_paths, (0..=num_steps).collect(), num_steps)
     }
 
@@ -415,12 +467,13 @@ impl LsmcPricer {
     /// Convenience constructor for GBM American host bindings.
     ///
     /// Uses [`LsmcConfig::every_step`] so exercise occurs at each simulated
-    /// step `1..=num_steps` (Bermudan on the grid). Immediate exercise at
-    /// `t = 0` is applied as a floor on the reported price.
+    /// step `0..=num_steps` (Bermudan on the grid). In-sample pricing applies
+    /// immediate exercise as an intrinsic floor; two-pass pricing freezes
+    /// the time-zero decision using training paths.
     ///
     /// # Arguments
     ///
-    /// * `num_paths` - Independent path estimators; must be positive.
+    /// * `num_paths` - Independent path estimators; must be at least two.
     /// * `num_steps` - Time-grid steps; also the last exercise date.
     /// * `seed` - Root RNG seed for path generation.
     /// * `use_parallel` - Whether path generation uses the rayon pool.
@@ -428,7 +481,8 @@ impl LsmcPricer {
     ///
     /// # Errors
     ///
-    /// Returns an error if `num_paths` or `num_steps` is zero.
+    /// Returns an error if `num_paths` is less than two, `num_steps` is zero,
+    /// or the path, step, or retained-storage limits in [`LsmcConfig::new`] fail.
     pub fn gbm_american(
         num_paths: usize,
         num_steps: usize,
@@ -495,7 +549,12 @@ impl LsmcPricer {
             num_steps,
         )?;
 
-        self.summarize_present_values(&values, initial_spot, exercise, currency)
+        let intrinsic_floor = self
+            .config
+            .exercise_dates
+            .contains(&0)
+            .then(|| exercise.exercise_value(initial_spot));
+        self.summarize_present_values(&values, intrinsic_floor, currency)
     }
 
     /// Generate Monte Carlo paths (serial or parallel depending on config).
@@ -527,6 +586,8 @@ impl LsmcPricer {
         num_steps: usize,
         seed: u64,
     ) -> Result<PathMatrix> {
+        let path_values =
+            checked_path_values(self.config.num_paths, num_steps, self.config.antithetic)?;
         let time_grid = TimeGrid::uniform(time_to_maturity, num_steps)?;
 
         #[cfg(not(target_arch = "wasm32"))]
@@ -537,10 +598,18 @@ impl LsmcPricer {
                 &time_grid,
                 num_steps,
                 seed,
+                path_values,
             );
         }
 
-        self.generate_paths_serial(process, initial_spot, &time_grid, num_steps, seed)
+        self.generate_paths_serial(
+            process,
+            initial_spot,
+            &time_grid,
+            num_steps,
+            seed,
+            path_values,
+        )
     }
 
     /// Serial path generation.
@@ -551,17 +620,13 @@ impl LsmcPricer {
         time_grid: &TimeGrid,
         num_steps: usize,
         seed: u64,
+        path_values: usize,
     ) -> Result<PathMatrix> {
         let disc = ExactGbm::new();
         let rng = PhiloxRng::new(seed);
         let stride = num_steps + 1;
         let antithetic = self.config.antithetic;
-        let n_rows = if antithetic {
-            2 * self.config.num_paths
-        } else {
-            self.config.num_paths
-        };
-        let mut data = vec![0.0; n_rows * stride];
+        let mut data = vec![0.0; path_values];
 
         for path_id in 0..self.config.num_paths {
             let mut path_rng = rng.substream(path_id as u64);
@@ -604,6 +669,7 @@ impl LsmcPricer {
         time_grid: &TimeGrid,
         num_steps: usize,
         seed: u64,
+        path_values: usize,
     ) -> Result<PathMatrix> {
         use rayon::prelude::*;
 
@@ -611,12 +677,7 @@ impl LsmcPricer {
         let disc = ExactGbm::new();
         let stride = num_steps + 1;
         let antithetic = self.config.antithetic;
-        let n_rows = if antithetic {
-            2 * self.config.num_paths
-        } else {
-            self.config.num_paths
-        };
-        let mut data = vec![0.0; n_rows * stride];
+        let mut data = vec![0.0; path_values];
         let chunk = if antithetic { 2 * stride } else { stride };
 
         // Each path fills its own contiguous row (or antithetic pair of rows);
@@ -653,16 +714,15 @@ impl LsmcPricer {
         Ok(PathMatrix { data, stride })
     }
 
-    /// Average antithetic pairs, then apply intrinsic only if index `0` is eligible.
+    /// Average antithetic pairs and optionally apply the in-sample intrinsic floor.
     ///
     /// When the floor binds, stderr and sample standard deviation are kept
     /// from the unfloored sample. The published CI is the unfloored interval
     /// with its lower bound clamped to `intrinsic`.
-    fn summarize_present_values<E: ImmediateExercise>(
+    fn summarize_present_values(
         &self,
         path_pvs: &[f64],
-        initial_spot: f64,
-        exercise: &E,
+        intrinsic_floor: Option<f64>,
         currency: Currency,
     ) -> finstack_quant_core::Result<MoneyEstimate> {
         let mut stats = OnlineStats::new();
@@ -676,9 +736,8 @@ impl LsmcPricer {
             }
         }
 
-        let intrinsic = exercise.exercise_value(initial_spot);
         let (mean, stderr, ci_95, std_dev) =
-            if self.config.exercise_dates.contains(&0) && stats.mean() < intrinsic {
+            if let Some(intrinsic) = intrinsic_floor.filter(|&value| stats.mean() < value) {
                 let (lo, hi) = stats.confidence_interval(0.05);
                 let lower = lo.max(intrinsic);
                 (
@@ -894,7 +953,9 @@ impl LsmcPricer {
     /// in-sample result.
     ///
     /// `num_steps` and `basis.num_basis()` must match the values used to fit
-    /// the policy.
+    /// the policy. The time-zero exercise decision is also frozen in `policy`;
+    /// the independent pricing sample never selects immediate exercise or
+    /// floors the estimated continuation value at intrinsic.
     ///
     /// # Errors
     ///
@@ -965,14 +1026,16 @@ impl LsmcPricer {
             },
         );
 
-        self.summarize_present_values(&values, initial_spot, exercise, currency)
+        self.summarize_present_values(&values, None, currency)
     }
 
     /// Convenience: run the full two-pass workflow with disjoint seeds.
     ///
     /// Fits an exercise policy on a training run seeded with the pricer's
     /// configured seed, then prices on a fresh run seeded with `pricing_seed`.
-    /// Returns the unbiased out-of-sample price estimate. Equivalent to
+    /// Returns an unbiased estimate of the fitted policy's value, including
+    /// its time-zero decision. A suboptimal policy can underprice the optimal
+    /// Bermudan value. Equivalent to
     /// calling [`Self::fit_exercise_policy`] followed by
     /// [`Self::price_with_policy`].
     ///
@@ -1141,7 +1204,15 @@ impl LsmcPricer {
 
         coefficients_by_date.sort_by_key(|(step, _)| *step);
 
+        let mut continuation = OnlineStats::new();
+        for (&cashflow, &time) in cashflows.iter().zip(&exercise_times) {
+            continuation.update(cashflow * (-discount_rate * time).exp());
+        }
+        let exercise_at_start = self.config.exercise_dates.contains(&0)
+            && exercise.exercise_value(paths.row(0)[0]) >= continuation.mean();
+
         Ok(ExercisePolicy {
+            exercise_at_start,
             coefficients_by_date,
             num_basis: basis.num_basis(),
             num_steps,
@@ -1174,6 +1245,10 @@ impl LsmcPricer {
 
         for i in 0..paths.num_paths() {
             let path = paths.row(i);
+            if policy.exercise_at_start {
+                present_values.push(exercise.exercise_value(path[0]));
+                continue;
+            }
             let mut exercised = false;
             let mut path_pv = 0.0;
 
@@ -1497,6 +1572,41 @@ mod tests {
     use crate::monte_carlo::process::gbm::GbmParams;
 
     #[test]
+    fn lsmc_rejects_oversized_workload_before_allocating_paths_or_schedule() {
+        assert!(LsmcConfig::new(usize::MAX / 4, vec![1], 1).is_err());
+        assert!(LsmcConfig::every_step(2, usize::MAX).is_err());
+        assert!(checked_path_values(400_000, 100, false).is_ok());
+        assert!(checked_path_values(400_000, 100, true).is_err());
+
+        let mut config = LsmcConfig::new(16, vec![1], 1).expect("small config");
+        config.num_paths = usize::MAX;
+        let pricer = LsmcPricer::new(config);
+        let process = GbmProcess::with_params(0.05, 0.0, 0.2).expect("process");
+        assert!(pricer.generate_paths(&process, 100.0, 1.0, 1).is_err());
+    }
+
+    #[test]
+    fn lsmc_requires_two_independent_estimators_with_or_without_antithetics() {
+        let process = GbmProcess::with_params(0.05, 0.0, 0.2).expect("process");
+        for antithetic in [false, true] {
+            for num_paths in [0, 1] {
+                assert!(LsmcConfig::new(num_paths, vec![1], 1).is_err());
+                assert!(LsmcPricer::gbm_american(num_paths, 1, 42, false, antithetic).is_err());
+                // Public fields can be changed after construction; pricing
+                // must revalidate before simulating either paths or pairs.
+                let mut config = LsmcConfig::new(2, vec![1], 1)
+                    .expect("two independent estimators")
+                    .with_antithetic(antithetic);
+                config.num_paths = num_paths;
+                assert!(LsmcPricer::new(config)
+                    .generate_paths(&process, 100.0, 1.0, 1)
+                    .is_err());
+            }
+            assert!(checked_path_values(2, 1, antithetic).is_ok());
+        }
+    }
+
+    #[test]
     fn test_polynomial_basis() {
         let basis = PolynomialBasis::new(2);
         let mut out = vec![0.0; 3];
@@ -1666,7 +1776,7 @@ mod tests {
 
     #[test]
     fn test_lsmc_insufficient_itm_paths_preserves_continuation() {
-        let config = LsmcConfig::new(1, vec![1], 2).unwrap();
+        let config = LsmcConfig::new(2, vec![1], 2).unwrap();
         let pricer = LsmcPricer::new(config);
         let exercise = AmericanCall { strike: 100.0 };
         let basis = PolynomialBasis::new(2);
@@ -1756,6 +1866,44 @@ mod tests {
             /* pricing_seed = */ 7,
         );
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn frozen_policy_replays_time_zero_decision_on_independent_paths() {
+        let config = LsmcConfig::new(2, vec![0, 1], 1)
+            .unwrap()
+            .with_antithetic(false);
+        let pricer = LsmcPricer::new(config);
+        let exercise = AmericanPut::new(100.0).unwrap();
+        let basis = PolynomialBasis::new(1);
+        let zero_continuation = PathMatrix::from_rows(&vec![vec![90.0, 100.0]; 2]);
+        let high_continuation = PathMatrix::from_rows(&vec![vec![90.0, 50.0]; 2]);
+
+        for (training, pricing, exercise_at_start, expected) in [
+            (&zero_continuation, &high_continuation, true, 10.0),
+            (&high_continuation, &zero_continuation, false, 0.0),
+        ] {
+            let policy = pricer
+                .fit_policy_from_paths(training, &exercise, &basis, 0.0, 1.0, 1)
+                .unwrap();
+            assert_eq!(policy.exercise_at_start, exercise_at_start);
+            let values = pricer.apply_policy_to_paths(
+                pricing,
+                &exercise,
+                &basis,
+                &policy,
+                PolicyTiming {
+                    discount_rate: 0.0,
+                    time_to_maturity: 1.0,
+                    num_steps: 1,
+                },
+            );
+            let result = pricer
+                .summarize_present_values(&values, None, Currency::USD)
+                .unwrap();
+            assert_eq!(result.mean.amount(), expected);
+            assert_eq!(result.stderr, 0.0);
+        }
     }
 
     #[test]

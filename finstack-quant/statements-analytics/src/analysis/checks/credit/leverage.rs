@@ -8,7 +8,7 @@ use finstack_quant_statements::checks::{
     Check, CheckCategory, CheckContext, CheckFinding, CheckResult, Materiality, Severity,
 };
 use finstack_quant_statements::types::NodeId;
-use finstack_quant_statements::Result;
+use finstack_quant_statements::{Error, Result};
 
 /// Flags periods where Debt / TTM EBITDA falls outside configurable warning
 /// and error ranges.
@@ -51,6 +51,12 @@ impl Check for LeverageRangeCheck {
 
         for period_spec in &context.model.periods {
             let pid = &period_spec.id;
+            crate::analysis::units::validate_matching_units(
+                context.results,
+                self.debt_node.as_str(),
+                self.ebitda_node.as_str(),
+                pid,
+            )?;
 
             let Some(debt) = get_finite_node_value(context.results, &self.debt_node, pid) else {
                 continue;
@@ -80,6 +86,11 @@ impl Check for LeverageRangeCheck {
             }
 
             let leverage = debt / ebitda;
+            if !leverage.is_finite() {
+                return Err(Error::eval(format!(
+                    "Leverage ratio is not finite in {pid}"
+                )));
+            }
 
             let severity = if leverage < self.error_range.0 || leverage > self.error_range.1 {
                 Some(Severity::Error)

@@ -60,8 +60,8 @@ impl JsDayCountContext {
         next
     }
 
-    /// Return a copy with the coupon frequency used by Act/Act ISMA.
-    /// @param frequency - Coupon-frequency Tenor required by Actual/Actual ICMA calculations.
+    /// Return a copy with the coupon frequency required by Act/Act ICMA and Act/365L.
+    /// @param frequency - Coupon-frequency Tenor required by Actual/Actual ICMA and Act/365L calculations.
     /// @returns A new `DayCountContext` handle.
     #[wasm_bindgen(js_name = withFrequency)]
     pub fn with_frequency(&self, frequency: &JsTenor) -> JsDayCountContext {
@@ -71,31 +71,48 @@ impl JsDayCountContext {
     }
 
     /// Return a copy with the business-day basis used by Bus/252.
-    /// @param bus_basis - Business-day denominator for Bus/252, normally 252.
-    /// @returns A new `DayCountContext` handle.
-    #[wasm_bindgen(js_name = withBusBasis)]
-    pub fn with_bus_basis(&self, bus_basis: u16) -> JsDayCountContext {
-        let mut next = self.clone();
-        next.inner.bus_basis = Some(bus_basis);
-        next
-    }
-
-    /// Return a copy with the reference coupon period (epoch days) used by
-    /// Act/Act ICMA. Errors when either date is out of range or
-    /// `start >= end`.
-    /// @param start_epoch_days - Reference coupon-period start as days since 1970-01-01.
-    /// @param end_epoch_days - Reference coupon-period end as days since 1970-01-01.
-    /// @returns A new `DayCountContext` handle.
+    ///
+    /// # Arguments
+    ///
+    /// * `bus_basis` - Positive integral business-day denominator in `1..=65535`, normally 252.
+    ///
+    /// # Returns
+    ///
+    /// A new `DayCountContext` handle.
     ///
     /// # Errors
     ///
-    /// Throws a JavaScript exception if either epoch-day value is outside the
-    /// representable date range or the start is not strictly before the end.
+    /// Throws Error if `bus_basis` is non-finite, fractional, zero, or outside `1..=65535`.
+    #[wasm_bindgen(js_name = withBusBasis)]
+    pub fn with_bus_basis(&self, bus_basis: f64) -> Result<JsDayCountContext, JsValue> {
+        let bus_basis = checked_integer(bus_basis, 1.0, f64::from(u16::MAX), "busBasis")? as u16;
+        let mut next = self.clone();
+        next.inner.bus_basis = Some(bus_basis);
+        Ok(next)
+    }
+
+    /// Return a copy with the unadjusted regular ICMA reference period or full enclosing ACT/365L
+    /// contractual coupon (epoch days). Errors when either date is out of range or
+    /// `start >= end`.
+    ///
+    /// # Arguments
+    ///
+    /// * `start_epoch_days` - Integral unadjusted ICMA regular reference start or ACT/365L enclosing coupon start as days since 1970-01-01.
+    /// * `end_epoch_days` - Integral unadjusted ICMA regular reference end or ACT/365L enclosing coupon end as days since 1970-01-01. ICMA endpoints must share the contractual nominal month grid, rather than adjusted payment dates.
+    ///
+    /// # Returns
+    ///
+    /// A new `DayCountContext` handle.
+    ///
+    /// # Errors
+    ///
+    /// Throws a JavaScript exception if either epoch-day value is non-finite,
+    /// fractional, or outside the representable date range, or the start is not strictly before the end.
     #[wasm_bindgen(js_name = withCouponPeriod)]
     pub fn with_coupon_period(
         &self,
-        start_epoch_days: i32,
-        end_epoch_days: i32,
+        start_epoch_days: f64,
+        end_epoch_days: f64,
     ) -> Result<JsDayCountContext, JsValue> {
         let start = epoch_to_date(start_epoch_days)?;
         let end = epoch_to_date(end_epoch_days)?;
@@ -278,14 +295,22 @@ impl JsDayCount {
 
     /// Compute the year fraction between two dates given as epoch days.
     ///
-    /// @param startEpochDays - Start date as days since 1970-01-01.
-    /// @param endEpochDays - End date as days since 1970-01-01.
-    /// @returns Year fraction (`>= 0` if `end >= start`).
-    /// @throws If either date is out of representable range.
+    /// # Arguments
     ///
-    /// Act/Act ISMA and Bus/252 require explicit frequency/calendar context.
+    /// * `start_epoch_days` - Integral accrual start as days since 1970-01-01.
+    /// * `end_epoch_days` - Integral accrual end as days since 1970-01-01; must not precede the start.
+    ///
+    /// Act/Act ISMA, Act/365L, and Bus/252 require explicit coupon/calendar context.
     /// This method throws for those conventions; call
     /// `DayCount.yearFractionWithContext` with a configured `DayCountContext`.
+    ///
+    /// # Returns
+    ///
+    /// Non-negative accrual year fraction under this convention.
+    ///
+    /// # Errors
+    ///
+    /// Throws Error if either date is non-finite, fractional, out of representable range, the end precedes the start, or required context is absent.
     ///
     /// @example
     /// ```javascript
@@ -297,8 +322,8 @@ impl JsDayCount {
     #[wasm_bindgen(js_name = yearFraction)]
     pub fn year_fraction(
         &self,
-        start_epoch_days: i32,
-        end_epoch_days: i32,
+        start_epoch_days: f64,
+        end_epoch_days: f64,
     ) -> Result<f64, JsValue> {
         let start = epoch_to_date(start_epoch_days)?;
         let end = epoch_to_date(end_epoch_days)?;
@@ -308,20 +333,23 @@ impl JsDayCount {
     }
 
     /// Compute a signed year fraction, preserving the start/end orientation.
-    /// @param start_epoch_days - Start date as days since 1970-01-01.
-    /// @param end_epoch_days - End date as days since 1970-01-01.
+    ///
+    /// # Arguments
+    ///
+    /// * `start_epoch_days` - Integral accrual start as days since 1970-01-01.
+    /// * `end_epoch_days` - Integral accrual end as days since 1970-01-01; reversing the dates reverses the result's sign.
     ///
     /// # Errors
     ///
-    /// Throws a JavaScript exception if either epoch-day value is outside the
+    /// Throws a JavaScript exception if either epoch-day value is non-finite, fractional, or outside the
     /// representable date range or the selected convention requires calendar or
     /// coupon-frequency context. Use `yearFractionWithContext` for Bus/252 and
-    /// Act/Act ISMA.
+    /// Act/Act ISMA and Act/365L.
     #[wasm_bindgen(js_name = signedYearFraction)]
     pub fn signed_year_fraction(
         &self,
-        start_epoch_days: i32,
-        end_epoch_days: i32,
+        start_epoch_days: f64,
+        end_epoch_days: f64,
     ) -> Result<f64, JsValue> {
         let start = epoch_to_date(start_epoch_days)?;
         let end = epoch_to_date(end_epoch_days)?;
@@ -331,21 +359,26 @@ impl JsDayCount {
     }
 
     /// Compute the year fraction with explicit convention context.
-    /// @param start_epoch_days - Start date as days since 1970-01-01.
-    /// @param end_epoch_days - End date as days since 1970-01-01.
-    /// @param ctx - DayCountContext supplying calendar, frequency, coupon-period, and termination metadata.
+    ///
+    /// # Arguments
+    ///
+    /// * `start_epoch_days` - Integral accrual start as days since 1970-01-01.
+    /// * `end_epoch_days` - Integral accrual end as days since 1970-01-01; must not precede the start.
+    /// * `ctx` - Calendar, coupon frequency and reference period, business-day basis, and termination metadata required by the convention.
     ///
     /// # Errors
     ///
-    /// Throws a JavaScript exception if either epoch-day value is outside the
+    /// Throws a JavaScript exception if either epoch-day value is non-finite, fractional, or outside the
     /// representable date range, the start is after the end, the context names an
     /// unknown calendar, or the selected convention's required context is missing
-    /// or invalid.
+    /// or invalid. Act/365L requires frequency and an enclosing coupon period;
+    /// requested accrual dates outside that coupon throw an exception.
+    /// ICMA reference endpoints outside one unadjusted nominal month grid throw an exception.
     #[wasm_bindgen(js_name = yearFractionWithContext)]
     pub fn year_fraction_with_context(
         &self,
-        start_epoch_days: i32,
-        end_epoch_days: i32,
+        start_epoch_days: f64,
+        end_epoch_days: f64,
         ctx: &JsDayCountContext,
     ) -> Result<f64, JsValue> {
         let start = epoch_to_date(start_epoch_days)?;
@@ -356,19 +389,25 @@ impl JsDayCount {
     }
 
     /// Count the calendar days between two dates (epoch days).
-    /// @param start_epoch_days - Start date as days since 1970-01-01.
-    /// @param end_epoch_days - End date as days since 1970-01-01.
-    /// @returns Signed calendar-day count from start to end.
+    ///
+    /// # Arguments
+    ///
+    /// * `start_epoch_days` - Integral start as days since 1970-01-01.
+    /// * `end_epoch_days` - Integral end as days since 1970-01-01; may precede the start for a negative count.
+    ///
+    /// # Returns
+    ///
+    /// Signed calendar-day count from start to end.
     ///
     /// # Errors
     ///
-    /// Throws a JavaScript exception if either epoch-day value is outside the
+    /// Throws a JavaScript exception if either epoch-day value is non-finite, fractional, or outside the
     /// representable date range.
     #[wasm_bindgen(js_name = calendarDays)]
     pub fn calendar_days(
         &self,
-        start_epoch_days: i32,
-        end_epoch_days: i32,
+        start_epoch_days: f64,
+        end_epoch_days: f64,
     ) -> Result<i64, JsValue> {
         let start = epoch_to_date(start_epoch_days)?;
         let end = epoch_to_date(end_epoch_days)?;
@@ -490,49 +529,57 @@ impl JsTenor {
 }
 
 /// Create a date and return it as epoch days (days since 1970-01-01).
-/// @param year - Four-digit calendar year component of the supplied date.
-/// @param month - Calendar month number from 1 through 12.
-/// @param day - Calendar day number within the selected month.
+/// # Arguments
+///
+/// * `year` - Integral calendar year supported by the Rust date type.
+/// * `month` - Integral calendar month number from 1 through 12.
+/// * `day` - Integral calendar day number within the selected month, from 1 through 31.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `month` is outside `1..=12` or the supplied
-/// year, month, and day do not form a representable calendar date.
+/// Throws a JavaScript exception if any component is non-finite or fractional,
+/// `month` is outside `1..=12`, or the supplied year, month, and day do not form a representable calendar date.
 #[wasm_bindgen(js_name = createDate)]
-pub fn create_date(year: i32, month: u8, day: u8) -> Result<i32, JsValue> {
+pub fn create_date(year: f64, month: f64, day: f64) -> Result<i32, JsValue> {
+    let year = checked_integer(year, f64::from(i32::MIN), f64::from(i32::MAX), "year")? as i32;
+    let month = checked_integer(month, 1.0, 12.0, "month")? as u8;
+    let day = checked_integer(day, 1.0, 31.0, "day")? as u8;
     let m = time::Month::try_from(month).map_err(to_js_err)?;
     let date = finstack_quant_core::dates::create_date(year, m, day).map_err(to_js_err)?;
     Ok(finstack_quant_core::dates::days_since_epoch(date))
 }
 
 /// Convert epoch days back to `[year, month, day]` as a JS array-compatible triple.
-/// @param days - Number of days since 1970-01-01 to decompose into year, month, and day.
+/// # Arguments
+///
+/// * `days` - Integral number of days since 1970-01-01 to decompose into year, month, and day.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `days` is outside the representable date
-/// range.
+/// Throws a JavaScript exception if `days` is non-finite, fractional, or outside the representable date range.
 #[wasm_bindgen(js_name = dateFromEpochDays)]
-pub fn date_from_epoch_days(days: i32) -> Result<Vec<i32>, JsValue> {
-    let date = finstack_quant_core::dates::date_from_epoch_days(days)
-        .ok_or_else(|| to_js_err("epoch days out of valid date range"))?;
+pub fn date_from_epoch_days(days: f64) -> Result<Vec<i32>, JsValue> {
+    let date = epoch_to_date(days)?;
     Ok(vec![date.year(), date.month() as i32, date.day() as i32])
 }
 
 /// Adjust a date (epoch days) according to a business-day convention and calendar.
 ///
 /// Returns the adjusted date as epoch days.
-/// @param epoch_days - Unadjusted date as days since 1970-01-01.
-/// @param convention - Business-day adjustment convention string accepted by the date API.
-/// @param calendar_code - Registered holiday-calendar identifier used to find business days.
+///
+/// # Arguments
+///
+/// * `epoch_days` - Integral unadjusted date as days since 1970-01-01.
+/// * `convention` - Canonical business-day convention name, such as following or modified_following.
+/// * `calendar_code` - Registered holiday-calendar identifier used to select business days; unknown identifiers are rejected.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `epochDays` is outside the representable date
+/// Throws a JavaScript exception if `epochDays` is non-finite, fractional, or outside the representable date
 /// range, `convention` is unrecognized, `calendarCode` is unknown, or adjustment
 /// cannot produce a representable business date.
 #[wasm_bindgen(js_name = adjust)]
-pub fn adjust(epoch_days: i32, convention: &str, calendar_code: &str) -> Result<i32, JsValue> {
+pub fn adjust(epoch_days: f64, convention: &str, calendar_code: &str) -> Result<i32, JsValue> {
     let date = epoch_to_date(epoch_days)?;
     let business_day_convention: BusinessDayConvention =
         convention.parse().map_err(|e: String| to_js_err(e))?;
@@ -551,26 +598,37 @@ pub fn available_calendars() -> Vec<String> {
 }
 
 /// Convert epoch days to a `time::Date`.
-fn epoch_to_date(days: i32) -> Result<time::Date, JsValue> {
+fn epoch_to_date(days: f64) -> Result<time::Date, JsValue> {
+    let days =
+        checked_integer(days, f64::from(i32::MIN), f64::from(i32::MAX), "epoch days")? as i32;
     finstack_quant_core::dates::date_from_epoch_days(days)
         .ok_or_else(|| to_js_err("epoch days out of valid date range"))
+}
+
+fn checked_integer(value: f64, min: f64, max: f64, name: &str) -> Result<f64, JsValue> {
+    if !value.is_finite() || value.fract() != 0.0 || value < min || value > max {
+        return Err(to_js_err(format!(
+            "{name} must be a finite integer in {min}..={max}"
+        )));
+    }
+    Ok(value)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn epoch(y: i32, m: u8, d: u8) -> i32 {
+    fn epoch(y: i32, m: u8, d: u8) -> f64 {
         let month = time::Month::try_from(m).expect("valid month");
         let date = finstack_quant_core::dates::create_date(y, month, d).expect("valid date");
-        finstack_quant_core::dates::days_since_epoch(date)
+        f64::from(finstack_quant_core::dates::days_since_epoch(date))
     }
 
-    fn jan15() -> i32 {
+    fn jan15() -> f64 {
         epoch(2024, 1, 15)
     }
 
-    fn jul15() -> i32 {
+    fn jul15() -> f64 {
         epoch(2024, 7, 15)
     }
 
@@ -673,8 +731,8 @@ mod tests {
 
     #[test]
     fn create_date_valid() {
-        let e = create_date(2024, 1, 15).expect("valid");
-        assert_eq!(e, jan15());
+        let e = create_date(2024.0, 1.0, 15.0).expect("valid");
+        assert_eq!(f64::from(e), jan15());
     }
 
     #[test]
@@ -691,7 +749,7 @@ mod tests {
 
     #[test]
     fn epoch_to_date_via_core() {
-        let d = finstack_quant_core::dates::date_from_epoch_days(jan15()).expect("valid");
+        let d = finstack_quant_core::dates::date_from_epoch_days(jan15() as i32).expect("valid");
         assert_eq!(d.year(), 2024);
     }
 
@@ -699,7 +757,7 @@ mod tests {
     fn year_fraction_act360() {
         let day_count = JsDayCount::act360();
         let yf = day_count.year_fraction(jan15(), jul15()).expect("valid");
-        let days = (jul15() - jan15()) as f64;
+        let days = jul15() - jan15();
         assert!((yf - days / 360.0).abs() < 1e-10);
     }
 
@@ -754,6 +812,31 @@ mod tests {
     fn date_from_epoch_days_extreme() {
         assert!(finstack_quant_core::dates::date_from_epoch_days(i32::MAX).is_none());
         assert!(finstack_quant_core::dates::date_from_epoch_days(i32::MIN).is_none());
+    }
+
+    #[test]
+    fn integer_inputs_reject_truncation_and_wrapping() {
+        assert!(create_date(2025.0, 257.0, 1.0).is_err());
+        assert!(create_date(2025.0, 1.0, 257.0).is_err());
+        assert!(create_date(2025.5, 1.0, 1.0).is_err());
+        for value in [f64::NAN, f64::INFINITY, 0.5, 4_294_967_296.0] {
+            assert!(date_from_epoch_days(value).is_err());
+            assert!(JsDayCount::act360().calendar_days(value, jul15()).is_err());
+            assert!(JsDayCountContext::new()
+                .with_coupon_period(value, jul15())
+                .is_err());
+        }
+        for value in [0.0, 252.5, 65_536.0, f64::NAN] {
+            assert!(JsDayCountContext::new().with_bus_basis(value).is_err());
+        }
+        assert_eq!(
+            JsDayCountContext::new()
+                .with_bus_basis(252.0)
+                .expect("valid basis")
+                .inner
+                .bus_basis,
+            Some(252)
+        );
     }
 
     #[test]

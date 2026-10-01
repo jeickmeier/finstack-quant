@@ -16,6 +16,7 @@ mod helpers;
 mod test_alt_models;
 mod test_constructors;
 mod test_edge_cases;
+mod test_finance_regressions;
 mod test_greeks;
 mod test_implied_vol;
 mod test_moneyness;

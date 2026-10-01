@@ -27,9 +27,9 @@ pub use registry::{
 /// Deliberately minimal: its job is to show the required-key shape, including
 /// the mandatory `hierarchy` key whose value may be an explicit `null`.
 fn market_context_state_examples() -> Result<Vec<Value>> {
-    let state = crate::market_data::context::MarketContextState::from(
+    let state = crate::market_data::context::MarketContextState::try_from(
         &crate::market_data::context::MarketContext::new(),
-    );
+    )?;
     let value = serde_json::to_value(&state)
         .map_err(|error| Error::Internal(format!("serialize market context example: {error}")))?;
     Ok(vec![value])
@@ -53,4 +53,11 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[SchemaArtifact::new::<
     "Curves, surfaces, prices, series and FX for one valuation date; the market input to \
              every pricing, scenario and attribution call.",
 )
-.with_examples(market_context_state_examples)];
+.with_examples(market_context_state_examples),
+SchemaArtifact::new::<crate::market_data::surfaces::VolCubeExpirySlice>(
+    "schemas/market_data/1/vol_cube_expiry_slice.schema.json",
+    "https://finstack_quant.dev/schemas/market_data/1/vol_cube_expiry_slice.schema.json",
+    "Volatility Cube Expiry Slice",
+    "Tenor-by-strike volatility quotes at a fixed option expiry, preserving quote convention and displacement.",
+)
+.with_kind(SchemaKind::Output)];

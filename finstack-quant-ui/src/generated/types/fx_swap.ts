@@ -643,7 +643,8 @@ export interface D_17Ebaf6Bae7Cbde5673D {
   domestic_discount_curve_id: Id;
   far_date: Date;
   /**
-   * Optional far leg FX rate (quote per base). If None, source from forwards.
+   * Optional far leg FX rate (quote per base). If absent, use the market
+   * outright forward from the valuation date to far settlement.
    */
   far_rate?: number | null;
   foreign_discount_curve_id: Id1;
@@ -652,7 +653,8 @@ export interface D_17Ebaf6Bae7Cbde5673D {
   metric_pricing_overrides?: MetricPricingOverrides;
   near_date: Date1;
   /**
-   * Optional near leg FX rate (quote per base). If None, source from market.
+   * Optional near leg FX rate (quote per base). If absent, use the market
+   * outright forward from the valuation date to near settlement.
    */
   near_rate?: number | null;
   notional: Money;

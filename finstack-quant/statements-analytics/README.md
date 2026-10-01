@@ -164,9 +164,21 @@ the display contract is `dpd_stage2 (dpd=30 >= 30)` /
 `dpd_stage3 (dpd=90 >= 90)`. `Exposure` priced EAD is
 `drawn + undrawn × ccf` via core `ead_revolver` (`undrawn` default `0.0`,
 `ccf` default `0.75` / `DEFAULT_REVOLVER_CCF`). `RatingPdMap` is a
-rating-keyed map of `RawPdCurve` values; a missing rating skips the SICR
-PD-delta rather than failing the run. `EclConfig`, `StagingConfig` and
+rating-keyed map of `RawPdCurve` values; a supplied rating missing from its PD source is an error. If either exposure
+rating is `None`, the PD-delta test is explicitly skipped. `EclConfig`, `StagingConfig` and
 `CeclConfig` defaults come from the embedded `ecl_policy.v1.json` registry.
+`classify_stage(exposure, current_pd_source, origination_pd_source, elapsed_years, config)`
+compares reporting-date risk with the initial-recognition conditional PD over
+the same remaining window, given survival to finite non-negative
+`elapsed_years`, even when the rating label is unchanged. `EclEngine::new(config, pd_sources)` uses
+the first current source for staging, and `process_exposure(exposure,
+origination_pd_source, elapsed_years)` takes each exposure's own initial-recognition snapshot. Weighted
+IFRS 9 and CECL calculations define scenario IDs, weights, and LGD overrides
+only in the `MacroScenario` values paired with `pd_sources`; configuration
+objects contain calculation policy and no duplicate scenario list.
+`StagingConfig.pd_delta_relative` defaults to `Some(2.0)`; `None` disables
+relative PD staging and serializes as JSON `null`. Enabled thresholds must
+be finite and non-negative.
 
 **Templates.** Build-time free functions over `ModelBuilder`:
 `roll_forward::add_roll_forward` (beginning + increases − decreases =

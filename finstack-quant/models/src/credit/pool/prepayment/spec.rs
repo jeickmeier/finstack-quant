@@ -57,7 +57,9 @@ pub enum StochasticPrepaySpec {
 
     /// Regime-switching prepayment model.
     ///
-    /// Two-state Markov model for prepayment regimes (high/low).
+    /// Two-state Markov model, initially in the low regime at origination.
+    /// Every simulated month transitions before computing its monthly rate.
+    /// Latent transition draws are independent of the systematic CPR shock.
     RegimeSwitching {
         /// CPR in low prepayment regime
         low_cpr: f64,
@@ -127,6 +129,20 @@ impl StochasticPrepaySpec {
     }
 
     /// Create a regime-switching prepayment spec.
+    ///
+    /// Starts in the low regime at origination, with one transition before
+    /// each monthly prepayment observation.
+    ///
+    /// # Arguments
+    ///
+    /// * `low_cpr` - Annual conditional prepayment rate in the low regime as a
+    ///   decimal fraction, clamped to `[0, 1]`.
+    /// * `high_cpr` - Annual conditional prepayment rate in the high regime as a
+    ///   decimal fraction, clamped to `[0, 1]`.
+    /// * `transition_up` - Monthly probability of switching from low to high,
+    ///   clamped to `[0, 1]`.
+    /// * `transition_down` - Monthly probability of switching from high to low,
+    ///   clamped to `[0, 1]`.
     pub fn regime_switching(
         low_cpr: f64,
         high_cpr: f64,
@@ -215,7 +231,9 @@ impl StochasticPrepaySpec {
 
     /// Get the base SMM (single monthly mortality rate) for this specification.
     ///
-    /// Returns the unconditional expected SMM before factor shocks are applied.
+    /// Returns the baseline SMM before factor shocks are applied. A
+    /// regime-switching model starts in its low regime at origination; use
+    /// [`StochasticPrepayment::expected_smm`] for its seasoning-dependent mean.
     pub fn base_smm(&self) -> f64 {
         match self {
             StochasticPrepaySpec::Deterministic(spec) => {
@@ -226,13 +244,7 @@ impl StochasticPrepaySpec {
                 clamped_cpr_to_smm(base_spec.cpr)
             }
             StochasticPrepaySpec::RichardRoll { base_cpr, .. } => clamped_cpr_to_smm(*base_cpr),
-            StochasticPrepaySpec::RegimeSwitching {
-                low_cpr, high_cpr, ..
-            } => {
-                // Average of low and high states
-                let avg_cpr = (low_cpr + high_cpr) / 2.0;
-                clamped_cpr_to_smm(avg_cpr)
-            }
+            StochasticPrepaySpec::RegimeSwitching { low_cpr, .. } => clamped_cpr_to_smm(*low_cpr),
         }
     }
 }
