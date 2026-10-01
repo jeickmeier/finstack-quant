@@ -2883,9 +2883,6 @@ renames = { explain = { js = "attribution.pnlAttributionExplainText", reason = "
 [parity.members."finstack_quant.calibration.CalibrationEnvelope"]
 renames = { content_hash = { js = "calibration.calibrationEnvelopeContentHash", reason = "WASM envelopes are plain objects; the Rust CalibrationEnvelope::content_hash method is a free function taking the envelope" }, dry_run = { js = "calibration.dryRun", reason = "WASM envelopes are plain objects; the method is the module-level dryRun taking the envelope (Rust validate::validate after the same strict load)" } }
 
-[parity.members."finstack_quant.calibration.CalibrationEnvelopeError"]
-excluded = { add_note = "dunder", with_traceback = "dunder" }
-
 [parity.members."finstack_quant.calibration.CalibrationResult"]
 renames = { content_hash = { js = "calibration.calibrationResultContentHash", reason = "WASM calibration results are plain objects; the Rust CalibrationResultEnvelope::content_hash method is a free function taking the result" }, residuals = { js = "calibration.calibrationResultResiduals", reason = "WASM calibration results are plain objects; the free function returns the Rust CalibrationReport::quote_rows rows that Python frames as a pandas DataFrame" }, step_report = { js = "calibration.calibrationResultStepReport", reason = "WASM calibration results are plain objects; the Rust CalibrationResult::step_report method is a free function taking the result" }, step_report_json = { js = "calibration.calibrationResultStepReportJson", reason = "WASM calibration results are plain objects; JSON wire twin of calibrationResultStepReport" } }
 
@@ -3073,12 +3070,6 @@ backlog = [
     "with_label",
 ]
 
-[parity.members."finstack_quant.portfolio.ContractLimitExceededError"]
-excluded = { add_note = "pure-python", with_traceback = "pure-python" }
-
-[parity.members."finstack_quant.portfolio.ContractValidationError"]
-excluded = { add_note = "pure-python", with_traceback = "pure-python" }
-
 [parity.members."finstack_quant.portfolio.Inequality"]
 backlog = [
     "eq",
@@ -3086,17 +3077,11 @@ backlog = [
     "le",
 ]
 
-[parity.members."finstack_quant.portfolio.MalformedContractSchemaError"]
-excluded = { add_note = "pure-python", with_traceback = "pure-python" }
-
 [parity.members."finstack_quant.portfolio.MetricExpr"]
 backlog = [
     "value_weighted_average",
     "weighted_sum",
 ]
-
-[parity.members."finstack_quant.portfolio.MissingContractVersionError"]
-excluded = { add_note = "pure-python", with_traceback = "pure-python" }
 
 [parity.members."finstack_quant.portfolio.MissingMetricPolicy"]
 backlog = [
@@ -3149,9 +3134,6 @@ backlog = [
     "events_json",
     "issues_json",
 ]
-
-[parity.members."finstack_quant.portfolio.PortfolioError"]
-excluded = { add_note = "pure-python", with_traceback = "pure-python" }
 
 [parity.members."finstack_quant.portfolio.PortfolioMetrics"]
 renames = { get_metric = { js = "portfolio.portfolioMetricsGetMetric", reason = "WASM results are plain objects; the Rust PortfolioMetrics::get_metric method is a free function taking the object" }, get_position_metrics = { js = "portfolio.portfolioMetricsGetPositionMetrics", reason = "WASM results are plain objects; the Rust PortfolioMetrics::get_position_metrics method is a free function taking the object" }, get_total = { js = "portfolio.portfolioMetricsGetTotal", reason = "WASM results are plain objects; the Rust PortfolioMetrics::get_total method is a free function taking the object" }, metric_series = { js = "portfolio.portfolioMetricsSeries", reason = "WASM results are plain objects; the Rust PortfolioMetrics::metric_series method is a free function taking the object" } }
@@ -3233,9 +3215,6 @@ backlog = [
 backlog = [
     "dependency_json",
 ]
-
-[parity.members."finstack_quant.portfolio.UnsupportedContractVersionError"]
-excluded = { add_note = "pure-python", with_traceback = "pure-python" }
 
 [parity.members."finstack_quant.portfolio.WeightingScheme"]
 backlog = [
