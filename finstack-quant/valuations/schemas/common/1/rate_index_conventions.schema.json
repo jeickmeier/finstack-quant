@@ -1,0 +1,201 @@
+{
+  "$defs": {
+    "FloatingLegCompounding": {
+      "description": "How the fixings of one accrual period combine into the period rate.\n\nOne canonical enum for every floating leg and coupon: swaps, basis and\ncross-currency legs, TRS financing, IR futures, FRN / loan / structured\ncredit coupons.\n\n| Variant | Period rate | Typical use |\n|---------|-------------|-------------|\n| `simple` | One term fixing / forward over the period | EURIBOR, Term SOFR, legacy IBOR |\n| `simple_average` | `(Σ rᵢ·dᵢ) / D` of daily overnight fixings | Averaged overnight loans, Fed-Funds futures |\n| `compounded_in_arrears` | `[∏(1 + rᵢ·dᵢ/B) − 1]·B/D` | SOFR / SONIA / €STR / TONA OIS (lookback 0) |\n| `compounded_with_observation_shift` | as above, observations and weights shifted | ISDA 2021 observation shift |\n| `compounded_with_rate_cutoff` | as above, last fixings frozen | ARRC lockout / SWPM \"Rate Cut-Off Days\" |\n\nDay counts are business days and must be non-negative.\n\n# References\n\n- ISDA 2021 Definitions, compounded RFR conventions `docs/REFERENCES.md#isda-2021-definitions`\n- ARRC (2020). \"SOFR: A User's Guide.\" `docs/REFERENCES.md#arrc-sofr-users-guide`\n- BoE SONIA conventions `docs/REFERENCES.md#boe-sonia-key-features`\n\n# Examples\n\n```\nuse finstack_quant_cashflows::builder::FloatingLegCompounding;\n\nassert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);\nassert_eq!(\n    FloatingLegCompounding::sofr(),\n    FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }\n);\n```",
+      "oneOf": [
+        {
+          "const": "simple",
+          "description": "Simple term-rate projection: one fixing or forward over the period.\n\n`Coupon = Notional × (Forward_Rate + Spread) × DCF`. This is the\ndefault; a registered overnight RFR index rejects it.",
+          "type": "string"
+        },
+        {
+          "const": "simple_average",
+          "description": "Arithmetic average of daily overnight fixings weighted by accrual days,\n`Rate = (Σ rᵢ·dᵢ) / D`, for instruments that contractually specify a\nsimple-average overnight index.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Compounded in arrears (overnight RFR rates).\n\n`Coupon = Notional × [∏(1 + rᵢ·dᵢ/B) − 1]` over the daily observations\nof the accrual period.",
+          "properties": {
+            "compounded_in_arrears": {
+              "additionalProperties": false,
+              "properties": {
+                "lookback_days": {
+                  "description": "Business days by which observation dates move backward while the\nday-count weights stay on the original accrual dates (\"lookback\nwithout observation shift\", ISDA 2021 / ARRC). `0` is plain\nin-arrears, the cleared-OIS convention.",
+                  "format": "uint32",
+                  "maximum": 31,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "lookback_days"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "compounded_in_arrears"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Compounded in arrears with ISDA 2021 observation shift: both the\nobservation dates and their day-count weights move back\n(ISDA 2021 Definitions Section 4.5(c)).",
+          "properties": {
+            "compounded_with_observation_shift": {
+              "additionalProperties": false,
+              "properties": {
+                "shift_days": {
+                  "description": "Business days to shift both observation dates and weights.",
+                  "format": "uint32",
+                  "maximum": 31,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "shift_days"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "compounded_with_observation_shift"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Compounded in arrears with a rate cut-off near the period end.\n\nThe last `cutoff_days` business-day observations are frozen at the\nfixing immediately preceding them: for fixings `b_1..b_n` the source is\n`b_{n-cutoff}`, so a positive cut-off must leave a preceding fixing.\nReference: ARRC, December 3, 2021 Statement, Appendix A (\"Lockout\").",
+          "properties": {
+            "compounded_with_rate_cutoff": {
+              "additionalProperties": false,
+              "properties": {
+                "cutoff_days": {
+                  "description": "Business days before period end over which the rate is frozen.",
+                  "format": "uint32",
+                  "maximum": 31,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "cutoff_days"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "compounded_with_rate_cutoff"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "RateIndexKind": {
+      "description": "Type of rate index for convention determination.\n\nDistinguishes between overnight risk-free rate (RFR) indices and term indices, which have\ndifferent conventions for compounding, payment frequencies, and reset lags.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::market::conventions::RateIndexKind;\n\nlet overnight = RateIndexKind::OvernightRfr;\nlet term = RateIndexKind::Term;\n```",
+      "oneOf": [
+        {
+          "const": "overnight_rfr",
+          "description": "Overnight Risk-Free Rate index (e.g., SOFR, SONIA, ESTR).\n\nThese indices require compounding conventions and typically use OIS-style swap conventions.",
+          "type": "string"
+        },
+        {
+          "const": "term",
+          "description": "Term index with a fixed period (e.g., 3M LIBOR, 6M EURIBOR).\n\nThese indices have fixed reset periods and use standard swap conventions.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/common/1/rate_index_conventions.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Market conventions of one interest-rate index.",
+  "properties": {
+    "currency": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+      "description": "Operating currency of the index."
+    },
+    "day_count": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+      "description": "Market standard day count convention."
+    },
+    "default_fixed_leg_day_count": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+      "description": "Market-standard fixed leg day count."
+    },
+    "default_fixed_leg_frequency": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+      "description": "Market-standard fixed leg frequency."
+    },
+    "default_payment_frequency": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+      "description": "Typical payment frequency for swaps referencing this index."
+    },
+    "default_payment_lag_days": {
+      "description": "Business days between accrual end and payment.",
+      "format": "int32",
+      "type": "integer"
+    },
+    "default_reset_lag_days": {
+      "description": "Business days between fixing and accrual start.",
+      "format": "int32",
+      "type": "integer"
+    },
+    "kind": {
+      "$ref": "#/$defs/RateIndexKind",
+      "description": "Index category (Overnight vs Term)."
+    },
+    "market_business_day_convention": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
+      "description": "Market-standard business day convention."
+    },
+    "market_calendar_id": {
+      "description": "Market-standard calendar identifier.",
+      "type": "string"
+    },
+    "market_settlement_days": {
+      "description": "Market-standard spot settlement lag (business days).",
+      "format": "int32",
+      "type": "integer"
+    },
+    "ois_compounding": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/FloatingLegCompounding"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Methodology for compounding overnight rates (OIS only)."
+    },
+    "tenor": {
+      "anyOf": [
+        {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Index tenor (None for overnight indices)."
+    }
+  },
+  "required": [
+    "currency",
+    "kind",
+    "day_count",
+    "default_payment_frequency",
+    "default_payment_lag_days",
+    "default_reset_lag_days",
+    "market_calendar_id",
+    "market_settlement_days",
+    "market_business_day_convention",
+    "default_fixed_leg_day_count",
+    "default_fixed_leg_frequency"
+  ],
+  "title": "RateIndexConventions",
+  "type": "object"
+}

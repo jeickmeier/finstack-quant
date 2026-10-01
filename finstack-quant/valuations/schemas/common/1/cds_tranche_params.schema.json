@@ -1,0 +1,59 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/common/1/cds_tranche_params.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Attachment, detachment, notional and coupon of a CDS index tranche.",
+  "properties": {
+    "attach_pct": {
+      "description": "Attachment point as percentage",
+      "format": "double",
+      "type": "number"
+    },
+    "coupon_bp": {
+      "description": "Running coupon in basis points",
+      "format": "double",
+      "type": "number"
+    },
+    "detach_pct": {
+      "description": "Detachment point as percentage",
+      "format": "double",
+      "type": "number"
+    },
+    "index_name": {
+      "description": "Index name (e.g., \"CDX.NA.IG\", \"iTraxx Europe\")",
+      "type": "string"
+    },
+    "maturity": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+      "description": "Maturity date"
+    },
+    "notional": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+      "description": "Notional amount"
+    },
+    "realized_loss": {
+      "description": "Realized (settled) loss as a decimal fraction of the original portfolio notional, in `[0.0, 1.0]`",
+      "format": "double",
+      "type": "number"
+    },
+    "series": {
+      "description": "Index series",
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "index_name",
+    "series",
+    "attach_pct",
+    "detach_pct",
+    "notional",
+    "maturity",
+    "coupon_bp",
+    "realized_loss"
+  ],
+  "title": "CdsTrancheParams",
+  "type": "object"
+}

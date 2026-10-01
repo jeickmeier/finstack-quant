@@ -247,10 +247,9 @@ impl PyTranche {
 /// Fluent builder for [`PyTranche`]; wraps the hand-written Rust
 /// `TrancheBuilder` (consuming setters).
 ///
-/// ``attach_pct`` and ``detach_pct`` are tracked separately from
-/// the wrapped Rust builder (which only exposes a combined
-/// `attach_detach(a, d)` setter) and applied together on
-/// :meth:`build`, so either call order works.
+/// ``attach_pct`` and ``detach_pct`` are forwarded to the Rust builder, which
+/// requires both or neither on :meth:`build`; the copies kept here only feed
+/// ``repr``.
 #[pyclass(
     module = "finstack_quant.valuations.instruments",
     name = "TrancheBuilder",
@@ -315,9 +314,8 @@ impl PyTrancheBuilder {
     ///     :meth:`TrancheBuilder.build`.
     #[pyo3(text_signature = "($self, value)")]
     fn attach_pct<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
-        if slf.inner.is_none() {
-            return Err(value_error("builder already consumed by build()"));
-        }
+        let b = take_tranche(&mut slf)?;
+        slf.inner = Some(b.attach_pct(value));
         slf.attach_pct = Some(value);
         Ok(slf)
     }
@@ -342,9 +340,8 @@ impl PyTrancheBuilder {
     ///     :meth:`TrancheBuilder.build`.
     #[pyo3(text_signature = "($self, value)")]
     fn detach_pct<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
-        if slf.inner.is_none() {
-            return Err(value_error("builder already consumed by build()"));
-        }
+        let b = take_tranche(&mut slf)?;
+        slf.inner = Some(b.detach_pct(value));
         slf.detach_pct = Some(value);
         Ok(slf)
     }
@@ -791,18 +788,7 @@ impl PyTrancheBuilder {
     ///     detachment not strictly above attachment).
     #[pyo3(text_signature = "($self)")]
     fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyTranche> {
-        let mut b = take_tranche(&mut slf)?;
-        match (slf.attach_pct, slf.detach_pct) {
-            (Some(attachment), Some(detachment)) => {
-                b = b.attach_detach(attachment, detachment);
-            }
-            (None, None) => {}
-            _ => {
-                return Err(value_error(
-                    "attach_pct and detach_pct must be set together, or both omitted so the TrancheStructure derives them from the balances",
-                ));
-            }
-        }
+        let b = take_tranche(&mut slf)?;
         let inner = b.build().map_err(core_to_py)?;
         Ok(PyTranche { inner })
     }

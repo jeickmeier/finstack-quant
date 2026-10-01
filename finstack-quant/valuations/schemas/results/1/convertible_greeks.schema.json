@@ -1,0 +1,47 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/results/1/convertible_greeks.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Tree price and Greeks of a convertible bond.",
+  "properties": {
+    "delta": {
+      "description": "Delta (spot sensitivity per unit spot move)",
+      "format": "double",
+      "type": "number"
+    },
+    "gamma": {
+      "description": "Gamma (curvature, second derivative w.r.t. spot)",
+      "format": "double",
+      "type": "number"
+    },
+    "price": {
+      "description": "Instrument price",
+      "format": "double",
+      "type": "number"
+    },
+    "rho": {
+      "description": "Rho (interest rate sensitivity per 1bp rate move)",
+      "format": "double",
+      "type": "number"
+    },
+    "theta": {
+      "description": "Theta (time decay per day)",
+      "format": "double",
+      "type": "number"
+    },
+    "vega": {
+      "description": "Vega (volatility sensitivity per 1% vol move)",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "price",
+    "delta",
+    "gamma",
+    "vega",
+    "theta",
+    "rho"
+  ],
+  "title": "ConvertibleGreeks",
+  "type": "object"
+}

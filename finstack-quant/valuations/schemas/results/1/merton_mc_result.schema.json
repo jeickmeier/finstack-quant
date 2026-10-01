@@ -1,0 +1,113 @@
+{
+  "$defs": {
+    "PathStatistics": {
+      "additionalProperties": false,
+      "description": "Path-level statistics from the Monte Carlo simulation.",
+      "properties": {
+        "avg_default_time": {
+          "description": "Average default time (in years) among defaulted paths.",
+          "format": "double",
+          "type": "number"
+        },
+        "avg_recovery_rate": {
+          "description": "Average recovery rate (decimal fraction) among defaulted paths.",
+          "format": "double",
+          "type": "number"
+        },
+        "avg_terminal_notional": {
+          "description": "Average terminal notional (reflects PIK accrual).",
+          "format": "double",
+          "type": "number"
+        },
+        "default_rate": {
+          "description": "Fraction of paths that defaulted.",
+          "format": "double",
+          "type": "number"
+        },
+        "pik_exercise_rate": {
+          "description": "Fraction of coupon dates where PIK was elected.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "default_rate",
+        "avg_default_time",
+        "avg_terminal_notional",
+        "avg_recovery_rate",
+        "pik_exercise_rate"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/results/1/merton_mc_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Merton Monte Carlo price of a PIK or toggle bond with path statistics.",
+  "properties": {
+    "average_pik_fraction": {
+      "description": "Average PIK fraction across all coupon dates and paths.",
+      "format": "double",
+      "type": "number"
+    },
+    "clean_price_pct": {
+      "description": "Clean price as percentage of par: `dirty_price_pct` minus the accrued\ninterest at the valuation date.",
+      "format": "double",
+      "type": "number"
+    },
+    "dirty_price_pct": {
+      "description": "Dirty price as percentage of par: the mean simulated present value at\nthe valuation date, including the full next coupon.",
+      "format": "double",
+      "type": "number"
+    },
+    "effective_spread_bp": {
+      "description": "Effective spread in basis points implied by MC price vs risk-free.",
+      "format": "double",
+      "type": "number"
+    },
+    "expected_loss": {
+      "description": "Expected loss as fraction of PIK-aware risk-free PV.\n\nDefined as `1 - mean_mc_pv / risk_free_pv` where the risk-free PV\naccounts for the PIK schedule (accreted notional in the no-default\nscenario). For Toggle periods, the risk-free scenario assumes cash\n(zero hazard implies no PIK trigger).",
+      "format": "double",
+      "type": "number"
+    },
+    "expected_shortfall_95": {
+      "description": "Expected shortfall at the 95% confidence level.",
+      "format": "double",
+      "type": "number"
+    },
+    "num_paths": {
+      "description": "Number of independent estimators used (antithetic pairs count once).",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "path_statistics": {
+      "$ref": "#/$defs/PathStatistics",
+      "description": "Path-level statistics."
+    },
+    "standard_error": {
+      "description": "Standard error of the clean price estimate (percentage of par).",
+      "format": "double",
+      "type": "number"
+    },
+    "unexpected_loss": {
+      "description": "Unexpected loss (standard deviation of path PVs / notional).",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "clean_price_pct",
+    "dirty_price_pct",
+    "expected_loss",
+    "unexpected_loss",
+    "expected_shortfall_95",
+    "average_pik_fraction",
+    "effective_spread_bp",
+    "path_statistics",
+    "num_paths",
+    "standard_error"
+  ],
+  "title": "MertonMcResult",
+  "type": "object"
+}

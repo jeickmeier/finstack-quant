@@ -1,0 +1,80 @@
+{
+  "$defs": {
+    "CdsConvention": {
+      "description": "Regional ISDA CDS schedule family.\n\nExact documentation clauses stay on the instrument or quote. This enum\nidentifies the regional schedule family used to resolve calendars,\nday-count, frequency, stub, and settlement from the convention registry.",
+      "oneOf": [
+        {
+          "const": "isda_na",
+          "description": "Standard North American convention (quarterly, Act/360).",
+          "type": "string"
+        },
+        {
+          "const": "isda_eu",
+          "description": "Standard European convention (quarterly, Act/360).",
+          "type": "string"
+        },
+        {
+          "const": "isda_as",
+          "description": "Standard Asian convention (quarterly, Act/360).",
+          "type": "string"
+        },
+        {
+          "const": "custom",
+          "description": "Custom convention.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/common/1/cds_index_params.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Preset identity, coupon and convention of a standard CDS index series.",
+  "properties": {
+    "convention": {
+      "$ref": "#/$defs/CdsConvention",
+      "description": "Regional ISDA convention. Bundled into the preset because each\nwell-known index has a fixed convention (CDX uses `IsdaNa`, iTraxx\nuses `IsdaEu`)."
+    },
+    "coupon_bp": {
+      "description": "Running fixed coupon in basis points (e.g. 100bp for CDX.NA.IG).",
+      "format": "double",
+      "type": "number"
+    },
+    "index_name": {
+      "description": "Index name (e.g., \"CDX.NA.IG\", \"iTraxx Europe\").",
+      "type": "string"
+    },
+    "num_constituents": {
+      "description": "Number of reference entities in this series, when known.\n\nMembership counts vary by series (e.g. iTraxx Crossover has been 75\nnames only since Series 9; CDX.NA.HY membership varies), so this is\npart of the per-series preset rather than inferred from the name.\n`None` for custom presets where the count is unknown — callers must\nthen attach an explicit count via `CdsIndex::with_num_constituents`.",
+      "format": "uint32",
+      "minimum": 0,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "series": {
+      "description": "Index series number (e.g., 42).",
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "version": {
+      "description": "Index version number within the series.",
+      "format": "uint16",
+      "maximum": 65535,
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "index_name",
+    "series",
+    "version",
+    "coupon_bp",
+    "convention"
+  ],
+  "title": "CdsIndexParams",
+  "type": "object"
+}

@@ -1,0 +1,151 @@
+{
+  "$defs": {
+    "FxPair": {
+      "additionalProperties": false,
+      "description": "FX pair identifier using base/quote currency ordering.",
+      "properties": {
+        "base": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+          "description": "Base currency (numerator)."
+        },
+        "quote": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+          "description": "Quote currency (denominator)."
+        }
+      },
+      "required": [
+        "base",
+        "quote"
+      ],
+      "type": "object"
+    },
+    "InstrumentCurves": {
+      "additionalProperties": false,
+      "description": "Collection of curves used by an instrument, categorized by market role.",
+      "properties": {
+        "credit_curves": {
+          "description": "Credit/hazard curves used by the instrument.",
+          "items": {
+            "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+          },
+          "type": "array"
+        },
+        "discount_curves": {
+          "description": "Discount curves used by the instrument (including primary and foreign).",
+          "items": {
+            "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+          },
+          "type": "array"
+        },
+        "forward_curves": {
+          "description": "Forward/projection curves used by the instrument.",
+          "items": {
+            "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+          },
+          "type": "array"
+        },
+        "inflation_curves": {
+          "description": "Inflation curves or published inflation indices used by the instrument.",
+          "items": {
+            "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "discount_curves",
+        "forward_curves",
+        "credit_curves",
+        "inflation_curves"
+      ],
+      "type": "object"
+    },
+    "VolatilityDependency": {
+      "additionalProperties": false,
+      "description": "A volatility-surface dependency with the context needed for diagnostics.",
+      "properties": {
+        "reference_strike": {
+          "description": "Optional contractual strike used by local volatility diagnostics.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "spot_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional market-scalar id of the underlying spot paired with the surface."
+        },
+        "vol_surface_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Volatility surface identifier."
+        }
+      },
+      "required": [
+        "vol_surface_id"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/results/1/market_dependencies.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Market data an instrument needs to price: curves, spots, surfaces, FX pairs and fixings.",
+  "properties": {
+    "credit_index_ids": {
+      "description": "Credit-index aggregates resolved through `MarketContext::get_credit_index`.\n\nThese identifiers are distinct from direct hazard-curve IDs because a\ncredit index also carries base correlation and optional issuer curves.",
+      "items": {
+        "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+      },
+      "type": "array"
+    },
+    "curves": {
+      "$ref": "#/$defs/InstrumentCurves",
+      "description": "Curve dependencies grouped by type."
+    },
+    "fx_pairs": {
+      "description": "FX pairs required for pricing (spot matrices).",
+      "items": {
+        "$ref": "#/$defs/FxPair"
+      },
+      "type": "array"
+    },
+    "market_scalar_ids": {
+      "description": "Scalar market-value identifiers resolved through `MarketContext::get_price`.\n\nThis includes tradable spots and non-price unitless scalars such as\ncontinuous dividend yields. [`Self::series_ids`] is reserved for\n`MarketContext::get_series` dependencies.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "series_ids": {
+      "description": "Scalar time series identifiers (e.g., OHLC price series for realized variance).",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "volatility_dependencies": {
+      "description": "Typed volatility dependencies in deterministic insertion order.",
+      "items": {
+        "$ref": "#/$defs/VolatilityDependency"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "curves",
+    "market_scalar_ids",
+    "volatility_dependencies",
+    "fx_pairs",
+    "series_ids"
+  ],
+  "title": "MarketDependencies",
+  "type": "object"
+}

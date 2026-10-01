@@ -288,3 +288,198 @@ pub fn composite_history(
     let rows = history(&instrument, &observations, &metrics).map_err(to_js_err)?;
     to_js_value(&rows)
 }
+
+// ---------------------------------------------------------------------------
+// Constructors and methods of the composite data types
+// ---------------------------------------------------------------------------
+//
+// `WeightingMethod`, `RebalanceRule`, `CompositeLegSpec` and the history rows
+// cross the boundary as plain objects; their Rust constructors and methods
+// are free functions that take and return the plain object.
+
+use super::typed::arg;
+use finstack_quant_valuations::instruments::composite::{
+    CompositeHistoryRow, CompositeLegSpec, RebalanceRule, WeightingMethod,
+};
+use finstack_quant_valuations::instruments::InstrumentEnvelope;
+
+/// `WeightingMethod::FixedQuantity`: leg quantities are the leg scores.
+/// @returns The `WeightingMethod` plain object.
+/// @throws Error - Throws if the value cannot be converted to JavaScript.
+#[wasm_bindgen(js_name = weightingMethodFixedQuantity)]
+pub fn weighting_method_fixed_quantity() -> Result<JsValue, JsValue> {
+    to_js_value(&WeightingMethod::FixedQuantity)
+}
+
+/// `WeightingMethod::NotionalWeighted`: scale the legs to a gross notional.
+/// @param gross_notional - Target gross notional as a `Money` plain object in the reporting currency.
+/// @returns The `WeightingMethod` plain object.
+/// @throws Error - Throws with kind `validation` if `grossNotional` is not a `Money` plain object.
+#[wasm_bindgen(js_name = weightingMethodNotionalWeighted)]
+pub fn weighting_method_notional_weighted(gross_notional: JsValue) -> Result<JsValue, JsValue> {
+    to_js_value(&WeightingMethod::NotionalWeighted {
+        gross_notional: arg::json(&gross_notional, "grossNotional")?,
+    })
+}
+
+/// `WeightingMethod::MetricWeighted`: size the legs by an additive metric.
+/// @param metric - Canonical additive metric identifier, e.g. `"dv01"` or `"delta"`.
+/// @param anchor_leg_id - Leg whose quantity is fixed at `anchorQuantity`.
+/// @param anchor_quantity - Quantity of the anchor leg.
+/// @param neutralize - Optional; `true` sizes the other legs so the net metric is zero, `false` (the default) scales them by score.
+/// @returns The `WeightingMethod` plain object.
+/// @throws Error - Throws with kind `validation` if `metric` is not a canonical metric identifier, and kind `invalid_type` for a wrong argument type.
+#[wasm_bindgen(js_name = weightingMethodMetricWeighted)]
+pub fn weighting_method_metric_weighted(
+    metric: JsValue,
+    anchor_leg_id: JsValue,
+    anchor_quantity: JsValue,
+    neutralize: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    to_js_value(&WeightingMethod::MetricWeighted {
+        metric: js_string(&metric, "metric")?.parse().map_err(to_js_err)?,
+        anchor_leg_id: arg::id(&anchor_leg_id, "anchorLegId")?,
+        anchor_quantity: arg::num(&anchor_quantity, "anchorQuantity")?,
+        neutralize: crate::utils::input::js_opt_bool(neutralize.as_ref(), "neutralize")?
+            .unwrap_or(false),
+    })
+}
+
+/// One anchored weighting preset `(anchorLegId, anchorQuantity)`.
+macro_rules! anchored_weighting {
+    ($(#[$doc:meta])* $name:ident as $js_name:ident => $method:ident) => {
+        $(#[$doc])*
+        /// @param anchor_leg_id - Leg whose quantity is fixed at `anchorQuantity`.
+        /// @param anchor_quantity - Quantity of the anchor leg.
+        /// @returns The `WeightingMethod` plain object.
+        /// @throws Error - Throws with kind `invalid_type` if `anchorLegId` is not a string or `anchorQuantity` is not a number.
+        #[wasm_bindgen(js_name = $js_name)]
+        pub fn $name(anchor_leg_id: JsValue, anchor_quantity: JsValue) -> Result<JsValue, JsValue> {
+            to_js_value(&WeightingMethod::$method(
+                js_string(&anchor_leg_id, "anchorLegId")?,
+                arg::num(&anchor_quantity, "anchorQuantity")?,
+            ))
+        }
+    };
+}
+
+anchored_weighting!(
+    /// DV01-neutral weighting (mirrors Rust `WeightingMethod::dv01_neutral`).
+    weighting_method_dv01_neutral as weightingMethodDv01Neutral => dv01_neutral
+);
+anchored_weighting!(
+    /// Delta-neutral weighting (mirrors Rust `WeightingMethod::delta_neutral`).
+    weighting_method_delta_neutral as weightingMethodDeltaNeutral => delta_neutral
+);
+anchored_weighting!(
+    /// Duration-weighted sizing (mirrors Rust `WeightingMethod::duration_weighted`).
+    weighting_method_duration_weighted as weightingMethodDurationWeighted => duration_weighted
+);
+
+/// Inverse-volatility weighting (mirrors Rust `WeightingMethod::volatility_weighted`).
+/// @param anchor_leg_id - Leg whose quantity is fixed at `anchorQuantity`.
+/// @param anchor_quantity - Quantity of the anchor leg.
+/// @param lookback - Number of return observations in the volatility window.
+/// @param min_observations - Minimum observations required to estimate a volatility.
+/// @param annualization_factor - Periods per year used to annualize volatility (252 for daily data).
+/// @returns The `WeightingMethod` plain object.
+/// @throws Error - Throws with kind `invalid_type` if a count is not a non-negative whole number or another argument has the wrong type.
+#[wasm_bindgen(js_name = weightingMethodVolatilityWeighted)]
+pub fn weighting_method_volatility_weighted(
+    anchor_leg_id: JsValue,
+    anchor_quantity: JsValue,
+    lookback: JsValue,
+    min_observations: JsValue,
+    annualization_factor: JsValue,
+) -> Result<JsValue, JsValue> {
+    to_js_value(&WeightingMethod::volatility_weighted(
+        js_string(&anchor_leg_id, "anchorLegId")?,
+        arg::num(&anchor_quantity, "anchorQuantity")?,
+        arg::uint(&lookback, "lookback")?,
+        arg::uint(&min_observations, "minObservations")?,
+        arg::num(&annualization_factor, "annualizationFactor")?,
+    ))
+}
+
+/// Validate a rebalance rule and return its plain object.
+fn rebalance_rule(rule: RebalanceRule) -> Result<JsValue, JsValue> {
+    rule.validate().map_err(to_js_err)?;
+    to_js_value(&rule)
+}
+
+/// `RebalanceRule::Manual`: holdings change only on explicit `rebalance` calls.
+/// @returns The `RebalanceRule` plain object.
+/// @throws Error - Throws if the value cannot be converted to JavaScript.
+#[wasm_bindgen(js_name = rebalanceRuleManual)]
+pub fn rebalance_rule_manual() -> Result<JsValue, JsValue> {
+    rebalance_rule(RebalanceRule::Manual)
+}
+
+/// `RebalanceRule::Dates`: rebalance on explicit dates.
+/// @param dates - Strictly increasing ISO-8601 rebalance dates.
+/// @returns The `RebalanceRule` plain object.
+/// @throws Error - Throws with kind `validation` if a date is malformed or the dates are duplicated or unordered, and kind `invalid_type` if `dates` is not an array of strings.
+#[wasm_bindgen(js_name = rebalanceRuleDates)]
+pub fn rebalance_rule_dates(dates: JsValue) -> Result<JsValue, JsValue> {
+    rebalance_rule(RebalanceRule::Dates {
+        dates: arg::dates(&dates, "dates")?,
+    })
+}
+
+/// `RebalanceRule::Calendar`: rebalance on a business-day adjusted schedule.
+/// @param start - First rebalance date as an ISO-8601 string.
+/// @param frequency - Rebalance cadence as a `Tenor` plain object, e.g. `{ count: 1, unit: "months" }`.
+/// @param calendar_id - Registered holiday-calendar identifier, e.g. `"nyse"`.
+/// @param business_day_convention - Business-day adjustment serde name, e.g. `"modified_following"`.
+/// @param end - Optional last rebalance date as an ISO-8601 string; omit for an open-ended schedule.
+/// @returns The `RebalanceRule` plain object.
+/// @throws Error - Throws with kind `validation` if a date, the tenor or the convention is malformed, `end` precedes `start`, or the calendar is unknown; and kind `invalid_type` for a wrong argument type.
+#[wasm_bindgen(js_name = rebalanceRuleCalendar)]
+pub fn rebalance_rule_calendar(
+    start: JsValue,
+    frequency: JsValue,
+    calendar_id: JsValue,
+    business_day_convention: JsValue,
+    end: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    rebalance_rule(RebalanceRule::Calendar {
+        start: arg::date(&start, "start")?,
+        end: crate::utils::input::js_opt_string(end.as_ref(), "end")?
+            .map(|text| crate::utils::parse_iso_date(&text))
+            .transpose()?,
+        frequency: arg::json(&frequency, "frequency")?,
+        calendar_id: js_string(&calendar_id, "calendarId")?,
+        business_day_convention: arg::en(&business_day_convention, "businessDayConvention")?,
+    })
+}
+
+/// The instrument of a composite leg as its canonical envelope.
+///
+/// Twin of Python `CompositeLegSpec.instrument_dict`.
+/// @param leg - `CompositeLegSpec` plain object or JSON string.
+/// @returns The leg's `finstack_quant.instrument/1` envelope as a plain object.
+/// @throws Error - Throws with kind `validation` if `leg` does not match the `CompositeLegSpec` schema.
+#[wasm_bindgen(js_name = compositeLegSpecInstrumentDict)]
+pub fn composite_leg_spec_instrument_dict(leg: JsValue) -> Result<JsValue, JsValue> {
+    let leg: CompositeLegSpec = from_js_json(&leg, "leg")?;
+    to_js_value(&InstrumentEnvelope::new(*leg.instrument))
+}
+
+/// One row of a composite history as canonical JSON.
+///
+/// Twin of Python `CompositeHistoryResult.row_json`.
+/// @param rows - `CompositeHistoryRow[]` returned by `history` or `historyFromSpec` (or its JSON).
+/// @param index - Zero-based row index.
+/// @returns Canonical `CompositeHistoryRow` JSON text.
+/// @throws Error - Throws with kind `validation` if `rows` does not match the `CompositeHistoryRow` schema or `index` is out of range, and kind `invalid_type` if `index` is not a non-negative whole number.
+#[wasm_bindgen(js_name = compositeHistoryResultRowJson)]
+pub fn composite_history_result_row_json(rows: JsValue, index: JsValue) -> Result<String, JsValue> {
+    let rows: Vec<CompositeHistoryRow> = from_js_json(&rows, "rows")?;
+    let index: usize = arg::uint(&index, "index")?;
+    let row = rows.get(index).ok_or_else(|| {
+        to_js_err(finstack_quant_core::Error::Validation(format!(
+            "history row index {index} is out of range"
+        )))
+    })?;
+    serde_json::to_string(row).map_err(to_js_err)
+}

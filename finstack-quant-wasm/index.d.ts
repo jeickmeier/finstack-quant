@@ -8708,6 +8708,154 @@ export interface Bond extends WasmOwned {
    * @returns A new bond carrying the return floor.
    */
   minXirr(rate: Rate): Bond;
+  /**
+   * Principal amount of the bond.
+   * @returns Currency-tagged principal.
+   */
+  readonly notional: Money;
+  /**
+   * Issue date of the bond.
+   * @returns The contractual issue date.
+   */
+  readonly issueDate: string;
+  /**
+   * Maturity (final redemption) date.
+   * @returns The contractual maturity date.
+   */
+  readonly maturity: string;
+  /**
+   * Coupon/cashflow specification in serde form.
+   * @returns One-key plain object: `{"fixed": {...}}`, `{"floating": {...}}`, `{"step_up": {...}}` or `{"amortizing": {...}}`.
+   */
+  readonly cashflowSpec: generated.valuations.Bond['cashflow_spec'];
+  /**
+   * Discount curve identifier.
+   * @returns Curve id used for discounting.
+   */
+  readonly discountCurveId: string;
+  /**
+   * Hazard curve identifier for `hazard_rate` and `rates_credit` pricing.
+   * @returns Curve id, or `null` when no credit-consuming model is configured.
+   */
+  readonly creditCurveId: string | null;
+  /**
+   * Repo (financing) discount curve identifier.
+   * @returns Curve id, or `null`.
+   */
+  readonly repoCurveId: string | null;
+  /**
+   * Call/put schedule in serde form.
+   * @returns `{"calls": [...], "puts": [...]}` or `null` for a bullet bond.
+   */
+  readonly callPut: NonNullable<generated.valuations.Bond['call_put']> | null;
+  /**
+   * Return-floor specification (minimum MOIC / XIRR) in serde form.
+   * @returns The spec plain object, or `null`.
+   */
+  readonly returnFloor: NonNullable<generated.valuations.Bond['return_floor']> | null;
+  /**
+   * Explicit cashflow schedule overriding generated coupons, in serde form.
+   * @returns The schedule plain object, or `null`.
+   */
+  readonly customCashflows: NonNullable<generated.valuations.Bond['custom_cashflows']> | null;
+  /**
+   * Accrual method (serde string).
+   * @returns `"linear"` unless overridden.
+   */
+  readonly accrualMethod: NonNullable<generated.valuations.Bond['accrual_method']>;
+  /**
+   * Settlement convention (settlement lag, ex-coupon period) in serde form.
+   * @returns `{"settlement_days": ..., "ex_coupon_days": ..., "ex_coupon_calendar_id": ...}` or `null`.
+   */
+  readonly settlementConvention: Pick<generated.valuations.Bond, 'settlement_days' | 'ex_coupon_days' | 'ex_coupon_calendar_id'> | null;
+  /**
+   * Settlement lag in business days.
+   * @returns The lag, or `null` when no settlement convention is set.
+   */
+  readonly settlementDays: number | null;
+  /**
+   * Ex-coupon period in business days.
+   * @returns The period, or `null` when no settlement convention is set.
+   */
+  readonly exCouponDays: number | null;
+  /**
+   * Whether coupons depend on forward-curve projection (FRNs).
+   * @returns `true` for floating (or amortizing-floating) cashflow specs.
+   */
+  readonly hasFloatingCoupons: boolean;
+  /**
+   * Canonical model key used when `model="default"` is passed to `price`.
+   * @returns Registered model key such as `"discounting"` or `"black76"`.
+   */
+  readonly defaultModel: string;
+  /**
+   * Instrument attributes (tags and metadata) used for scenario selection.
+   * @returns The attribute bag; empty when none were set.
+   */
+  readonly attributes: generated.valuations.Bond['attributes'];
+  /**
+   * Expiry date exposed by the Rust `Instrument` trait.
+   * @returns The expiry/maturity date, or `null` when the instrument type reports none.
+   */
+  readonly expiry: string | null;
+  /**
+   * The bare instrument spec as a plain object (no envelope).
+   *
+   * Mirrors Python `to_dict()`: the serde form of the Rust struct, i.e. the `instrument.spec` payload of `toJson()`.
+   * @returns Plain-object instrument spec.
+   * @throws Error - Throws if the instrument cannot be serialized.
+   */
+  toDict(): generated.valuations.Bond;
+  /**
+   * Market data this instrument needs to price (mirrors Rust `Instrument::market_dependencies`).
+   * @returns `MarketDependencies` plain object listing discount, forward and credit curves, spot ids, volatility surfaces, FX pairs and fixing series.
+   * @throws Error - Throws with kind `validation` if the instrument cannot enumerate its dependencies.
+   */
+  marketDependencies(): generated.valuations.MarketDependencies;
+  /**
+   * Price the instrument against a market snapshot.
+   *
+   * Same pipeline and arguments as `valuations.instruments.priceInstrument`.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
+   * @param metricPricingOverrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
+   * @param marketHistory - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
+   * @returns Structured `ValuationResult` for the selected model.
+   * @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
+   */
+  price(
+    marketJson: JsonInput,
+    asOf: string,
+    model?: string | null,
+    metrics?: string[] | null,
+    metricPricingOverrides?: JsonInput | null,
+    marketHistory?: JsonInput | null
+  ): ValuationResult;
+  /**
+   * Compute one metric of the instrument against a market snapshot.
+   *
+   * The same Rust metric path as `price(..., [metricId])`, returning just the value.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param metricId - Fully qualified metric identifier, e.g. `"dv01"` or `"par_rate"`.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @returns The metric value in the metric's documented unit.
+   * @throws Error - Throws with kind `validation` if the market JSON, `asOf`, `model` or `metricId` is invalid or the metric is not defined for this instrument; kind `not_found` if required market data is missing; and kind `computation` if the calculation fails.
+   */
+  metric(marketJson: JsonInput, asOf: string, metricId: string, model?: string | null): number;
+  /**
+   * Price the bond with the Merton structural Monte Carlo engine.
+   *
+   * Mirrors Rust `Bond::price_merton_mc`: simulates the issuer's asset value, defaults on a barrier crossing, and prices cash, PIK and toggle coupons path by path. The estimator count, antithetic flag and seed label come from `instrument_pricing_overrides.model_config` (`mc_paths`, `mc_antithetic`, `mc_seed_scenario`), defaulting to 5,000 antithetic estimators seeded from the bond id.
+   * @param config - Merton Monte Carlo configuration built with `MertonMcConfig`.
+   * @param discountRate - Flat continuously compounded risk-free rate as a decimal (`0.04` = 4%).
+   * @param asOf - ISO-8601 valuation date.
+   * @returns `MertonMcResult` with clean and dirty price in percent of par, loss statistics and path statistics.
+   * @throws Error - Throws with kind `validation` if `asOf` is malformed or the bond or configuration is invalid, kind `invalid_type` if `discountRate` is not a number, and kind `computation` if the simulation fails.
+   */
+  priceMertonMc(config: MertonMcConfig, discountRate: number, asOf: string): generated.valuations.MertonMcResult;
 }
 
 /**
@@ -8896,6 +9044,13 @@ export interface BondConstructor {
    * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
    */
   exampleAmortizing(): Bond;
+  /**
+   * Create a fluent builder (mirrors the Rust `builder()`).
+   *
+   * Each setter stores one field and returns the builder; `build()` validates and consumes it.
+   * @returns An empty builder.
+   */
+  builder(): BondBuilder;
 }
 
 /**
@@ -8920,6 +9075,168 @@ export interface TermLoan extends WasmOwned {
    * @throws If serialization fails.
    */
   toJson(): string;
+  /**
+   * Currency the loan is denominated in.
+   * @returns ISO-4217 currency code such as `"USD"`.
+   */
+  readonly currency: string;
+  /**
+   * Committed notional (facility limit).
+   * @returns Currency-tagged commitment.
+   */
+  readonly notionalLimit: Money;
+  /**
+   * Issue / funding date.
+   * @returns The issue date.
+   */
+  readonly issueDate: string;
+  /**
+   * Maturity (final redemption) date.
+   * @returns The contractual maturity date.
+   */
+  readonly maturity: string;
+  /**
+   * Rate specification in serde form.
+   * @returns `{"fixed": {"rate": 0.06}}` (decimal rate) or `{"floating": {...}}`.
+   */
+  readonly rate: generated.valuations.TermLoan['rate'];
+  /**
+   * Payment frequency.
+   * @returns The payment tenor.
+   */
+  readonly frequency: Tenor;
+  /**
+   * Accrual day-count convention.
+   * @returns The day count.
+   */
+  readonly dayCount: DayCount;
+  /**
+   * Business day convention (serde string).
+   * @returns `"modified_following"` unless overridden.
+   */
+  readonly businessDayConvention: NonNullable<generated.valuations.TermLoan['business_day_convention']>;
+  /**
+   * Holiday calendar identifier.
+   * @returns Calendar id, or `null`.
+   */
+  readonly calendarId: string | null;
+  /**
+   * Stub-period handling rule for the schedule.
+   * @returns Stub rule serde name (`"none"`, `"short_front"`, ...).
+   */
+  readonly stub: NonNullable<generated.valuations.TermLoan['stub']>;
+  /**
+   * Discount curve identifier.
+   * @returns Curve id used for discounting.
+   */
+  readonly discountCurveId: string;
+  /**
+   * Hazard curve identifier.
+   * @returns Curve id, or `null`.
+   */
+  readonly creditCurveId: string | null;
+  /**
+   * Amortization specification in serde form.
+   * @returns `"none"`, `{"percent_of_remaining_per_period": {"pct": 0.025}}`, `{"linear_between": {...}}`, ...
+   */
+  readonly amortization: generated.valuations.TermLoan['amortization'];
+  /**
+   * Coupon type (serde string).
+   * @returns `"cash"`, `"pik"`, ...
+   */
+  readonly couponType: NonNullable<generated.valuations.TermLoan['coupon_type']>;
+  /**
+   * Upfront (arrangement or OID) fee paid on the issue date.
+   * @returns `UpfrontFee` serde plain object (`{"amount": `Money` plain object}` or `{"fraction_of_commitment": 0.02}`), or `null` when the loan has no upfront fee.
+   */
+  readonly upfrontFee: NonNullable<generated.valuations.TermLoan['upfront_fee']> | null;
+  /**
+   * Delayed-draw term loan specification in serde form.
+   * @returns The spec plain object, or `null`.
+   */
+  readonly ddtl: NonNullable<generated.valuations.TermLoan['ddtl']> | null;
+  /**
+   * Covenant event schedule in serde form.
+   * @returns The events plain object, or `null`.
+   */
+  readonly covenants: NonNullable<generated.valuations.TermLoan['covenants']> | null;
+  /**
+   * OID / effective-interest-rate specification in serde form.
+   * @returns The spec plain object, or `null`.
+   */
+  readonly oidEir: NonNullable<generated.valuations.TermLoan['oid_eir']> | null;
+  /**
+   * Prepayment (call) schedule in serde form.
+   * @returns The schedule plain object, or `null`.
+   */
+  readonly callSchedule: NonNullable<generated.valuations.TermLoan['call_schedule']> | null;
+  /**
+   * Settlement lag in business days.
+   * @returns The lag (Rust default 2).
+   */
+  readonly settlementDays: NonNullable<generated.valuations.TermLoan['settlement_days']>;
+  /**
+   * Canonical model key used when `model="default"` is passed to `price`.
+   * @returns Registered model key such as `"discounting"` or `"black76"`.
+   */
+  readonly defaultModel: string;
+  /**
+   * Instrument attributes (tags and metadata) used for scenario selection.
+   * @returns The attribute bag; empty when none were set.
+   */
+  readonly attributes: generated.valuations.TermLoan['attributes'];
+  /**
+   * Expiry date exposed by the Rust `Instrument` trait.
+   * @returns The expiry/maturity date, or `null` when the instrument type reports none.
+   */
+  readonly expiry: string | null;
+  /**
+   * The bare instrument spec as a plain object (no envelope).
+   *
+   * Mirrors Python `to_dict()`: the serde form of the Rust struct, i.e. the `instrument.spec` payload of `toJson()`.
+   * @returns Plain-object instrument spec.
+   * @throws Error - Throws if the instrument cannot be serialized.
+   */
+  toDict(): generated.valuations.TermLoan;
+  /**
+   * Market data this instrument needs to price (mirrors Rust `Instrument::market_dependencies`).
+   * @returns `MarketDependencies` plain object listing discount, forward and credit curves, spot ids, volatility surfaces, FX pairs and fixing series.
+   * @throws Error - Throws with kind `validation` if the instrument cannot enumerate its dependencies.
+   */
+  marketDependencies(): generated.valuations.MarketDependencies;
+  /**
+   * Price the instrument against a market snapshot.
+   *
+   * Same pipeline and arguments as `valuations.instruments.priceInstrument`.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
+   * @param metricPricingOverrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
+   * @param marketHistory - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
+   * @returns Structured `ValuationResult` for the selected model.
+   * @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
+   */
+  price(
+    marketJson: JsonInput,
+    asOf: string,
+    model?: string | null,
+    metrics?: string[] | null,
+    metricPricingOverrides?: JsonInput | null,
+    marketHistory?: JsonInput | null
+  ): ValuationResult;
+  /**
+   * Compute one metric of the instrument against a market snapshot.
+   *
+   * The same Rust metric path as `price(..., [metricId])`, returning just the value.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param metricId - Fully qualified metric identifier, e.g. `"dv01"` or `"par_rate"`.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @returns The metric value in the metric's documented unit.
+   * @throws Error - Throws with kind `validation` if the market JSON, `asOf`, `model` or `metricId` is invalid or the metric is not defined for this instrument; kind `not_found` if required market data is missing; and kind `computation` if the calculation fails.
+   */
+  metric(marketJson: JsonInput, asOf: string, metricId: string, model?: string | null): number;
 }
 
 /**
@@ -8971,6 +9288,13 @@ export interface TermLoanConstructor {
    * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
    */
   exampleCallable(): TermLoan;
+  /**
+   * Create a fluent builder (mirrors the Rust `builder()`).
+   *
+   * Each setter stores one field and returns the builder; `build()` validates and consumes it.
+   * @returns An empty builder.
+   */
+  builder(): TermLoanBuilder;
 }
 
 /**
@@ -9034,6 +9358,183 @@ export interface AssetBackedFacility extends WasmOwned {
    * @throws Error - Throws with kind `validation` if an input is malformed, kind `not_found` if market data is missing, and kind `computation` if the XIRR does not converge.
    */
   facilityIrr(marketJson: JsonInput, asOf: string): number;
+  /**
+   * Collateral pool the facility lends against.
+   * @returns The pool (asset rows, rep lines or instrument collateral).
+   */
+  readonly collateral: generated.valuations.AssetBackedFacility['collateral'];
+  /**
+   * Advance rates and concentration limits as their serde plain object.
+   * @returns `BorrowingBaseRules` with `advance_rates` and `concentration_limits`.
+   */
+  readonly borrowingBaseRules: generated.valuations.AssetBackedFacility['borrowing_base_rules'];
+  /**
+   * Total commitment.
+   * @returns Currency-tagged commitment.
+   */
+  readonly commitment: Money;
+  /**
+   * Amount drawn at closing.
+   * @returns Currency-tagged drawn balance.
+   */
+  readonly drawn: Money;
+  /**
+   * Facility coupon as its `RateSpec` serde plain object.
+   * @returns `{"fixed": {"rate": r}}` with a decimal all-in rate, or `{"floating": {...}}` with a `FloatingRateSpec`.
+   */
+  readonly rate: generated.valuations.AssetBackedFacility['rate'];
+  /**
+   * Commitment fee on the undrawn commitment in basis points per annum.
+   * @returns Basis points per annum.
+   */
+  readonly commitmentFeeBp: number;
+  /**
+   * Closing date; the first payment date is one frequency later.
+   * @returns The closing date.
+   */
+  readonly closingDate: string;
+  /**
+   * Scheduled end of the revolving period.
+   * @returns The scheduled revolving end.
+   */
+  readonly revolvingEnd: string;
+  /**
+   * Final repayment date: the revolving end plus the term-out window, capped at maturity.
+   * @returns The repayment date.
+   */
+  readonly repaymentDate: string;
+  /**
+   * Legal final maturity.
+   * @returns The maturity date.
+   */
+  readonly maturity: string;
+  /**
+   * Payment frequency of interest, fees and the borrowing-base test.
+   * @returns The payment frequency.
+   */
+  readonly frequency: Tenor;
+  /**
+   * Accrual day count of the facility interest and the commitment fee.
+   * @returns The accrual convention.
+   */
+  readonly dayCount: DayCount;
+  /**
+   * Payment calendar identifier, or `null`.
+   * @returns Holiday calendar id (e.g. `"nyse"`).
+   */
+  readonly calendarId: string | null;
+  /**
+   * Events that end revolving early, as `AmortizationEvent` serde plain objects.
+   * @returns Each `{"kind": "date", "date": ...}`, `{"kind": "cumulative_loss", "max_cumulative_loss": ...}` or `{"kind": "excess_spread", "min_excess_spread_3m": ...}`.
+   */
+  readonly amortizationEvents: NonNullable<generated.valuations.AssetBackedFacility['amortization_events']>;
+  /**
+   * Term-out window as its serde plain object (`{"months": ...}`), or `null`.
+   * @returns Months after the revolving end at which the collateral is liquidated.
+   */
+  readonly termOut: NonNullable<generated.valuations.AssetBackedFacility['term_out']> | null;
+  /**
+   * Collateral liquidation price at the term-out end in percent of par, or `null` for par.
+   * @returns Percent of par.
+   */
+  readonly liquidationPricePct: NonNullable<generated.valuations.AssetBackedFacility['liquidation_price_pct']> | null;
+  /**
+   * Transaction fees paid ahead of the facility's interest as the `DealFees` serde plain object.
+   * @returns `null` when the facility carries no fees.
+   */
+  readonly fees: NonNullable<generated.valuations.AssetBackedFacility['fees']> | null;
+  /**
+   * Scheduled draws after closing as `DrawEvent` serde plain objects (`date`, `amount`).
+   * @returns Empty when the line is fully funded at closing.
+   */
+  readonly draws: NonNullable<generated.valuations.AssetBackedFacility['draws']>;
+  /**
+   * Whether the line is re-advanced up to the borrowing base each revolving period.
+   * @returns `true` when re-advances apply.
+   */
+  readonly readvanceToBorrowingBase: NonNullable<generated.valuations.AssetBackedFacility['readvance_to_borrowing_base']>;
+  /**
+   * Discount curve identifier.
+   * @returns The curve id.
+   */
+  readonly discountCurveId: string;
+  /**
+   * Collateral behavior as its `CreditModelConfig` serde plain object.
+   * @returns Prepayment, default, recovery and delinquency assumptions.
+   */
+  readonly creditModel: CreditModelConfig;
+  /**
+   * Deterministic prepayment model of the collateral.
+   * @returns The typed spec.
+   */
+  readonly prepaymentSpec: NonNullable<generated.valuations.AssetBackedFacility['prepayment_spec']>;
+  /**
+   * Deterministic default model of the collateral.
+   * @returns The typed spec.
+   */
+  readonly defaultSpec: NonNullable<generated.valuations.AssetBackedFacility['default_spec']>;
+  /**
+   * Recovery model of the collateral.
+   * @returns The typed spec.
+   */
+  readonly recoverySpec: NonNullable<generated.valuations.AssetBackedFacility['recovery_spec']>;
+  /**
+   * Scenario-selection attributes.
+   * @returns The attribute map.
+   */
+  readonly attributes: NonNullable<generated.valuations.AssetBackedFacility['attributes']>;
+  /**
+   * Default pricing model key from the `Instrument` trait (`"discounting"`).
+   * @returns The model key.
+   */
+  readonly defaultModel: string;
+  /**
+   * The bare instrument spec as a plain object (no envelope).
+   *
+   * Mirrors Python `to_dict()`: the serde form of the Rust struct, i.e. the `instrument.spec` payload of `toJson()`.
+   * @returns Plain-object instrument spec.
+   * @throws Error - Throws if the instrument cannot be serialized.
+   */
+  toDict(): generated.valuations.AssetBackedFacility;
+  /**
+   * Market data this instrument needs to price (mirrors Rust `Instrument::market_dependencies`).
+   * @returns `MarketDependencies` plain object listing discount, forward and credit curves, spot ids, volatility surfaces, FX pairs and fixing series.
+   * @throws Error - Throws with kind `validation` if the instrument cannot enumerate its dependencies.
+   */
+  marketDependencies(): generated.valuations.MarketDependencies;
+  /**
+   * Price the instrument against a market snapshot.
+   *
+   * Same pipeline and arguments as `valuations.instruments.priceInstrument`.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
+   * @param metricPricingOverrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
+   * @param marketHistory - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
+   * @returns Structured `ValuationResult` for the selected model.
+   * @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
+   */
+  price(
+    marketJson: JsonInput,
+    asOf: string,
+    model?: string | null,
+    metrics?: string[] | null,
+    metricPricingOverrides?: JsonInput | null,
+    marketHistory?: JsonInput | null
+  ): ValuationResult;
+  /**
+   * Compute one metric of the instrument against a market snapshot.
+   *
+   * The same Rust metric path as `price(..., [metricId])`, returning just the value.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param metricId - Fully qualified metric identifier, e.g. `"dv01"` or `"par_rate"`.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @returns The metric value in the metric's documented unit.
+   * @throws Error - Throws with kind `validation` if the market JSON, `asOf`, `model` or `metricId` is invalid or the metric is not defined for this instrument; kind `not_found` if required market data is missing; and kind `computation` if the calculation fails.
+   */
+  metric(marketJson: JsonInput, asOf: string, metricId: string, model?: string | null): number;
 }
 
 /**
@@ -9068,6 +9569,13 @@ export interface AssetBackedFacilityConstructor {
    * @throws If construction fails (should not occur).
    */
   example(): AssetBackedFacility;
+  /**
+   * Create a fluent builder (mirrors the Rust `builder()`).
+   *
+   * Each setter stores one field and returns the builder; `build()` validates and consumes it.
+   * @returns An empty builder.
+   */
+  builder(): AssetBackedFacilityBuilder;
 }
 
 /**
@@ -9119,6 +9627,183 @@ export interface RevolvingCredit extends WasmOwned {
    * @throws Error - Throws with kind `validation` if the facility fails validation or an input is malformed, and kind `not_found` if a required curve is missing.
    */
   expectedCashflows(marketJson: JsonInput, asOf: string): generated.valuations.CashFlowSchedule;
+  /**
+   * Total committed amount.
+   * @returns Currency-tagged commitment.
+   */
+  readonly commitment: Money;
+  /**
+   * Drawn balance at the simulation anchor (the later of the commitment and valuation dates), in both deterministic and stochastic mode.
+   * @returns Currency-tagged drawn balance.
+   */
+  readonly drawn: Money;
+  /**
+   * Date the facility becomes available.
+   * @returns The commitment date.
+   */
+  readonly issueDate: string;
+  /**
+   * Expiry of the commitment.
+   * @returns The maturity date.
+   */
+  readonly maturity: string;
+  /**
+   * Coupon specification as its `RateSpec` serde plain object.
+   * @returns `{"fixed": {"rate": r}}` with a decimal rate, or `{"floating": {...}}`.
+   */
+  readonly rate: generated.valuations.RevolvingCredit['rate'];
+  /**
+   * Interest accrual day count.
+   * @returns The accrual convention.
+   */
+  readonly dayCount: DayCount;
+  /**
+   * Payment frequency for interest and fees.
+   * @returns The payment tenor.
+   */
+  readonly frequency: Tenor;
+  /**
+   * Fee structure as its serde plain object (including dated `steps`).
+   * @returns `upfront_fee`, `commitment_fee_tiers`, `usage_fee_tiers`, `facility_fee_bp` and `steps`.
+   */
+  readonly fees: generated.valuations.RevolvingCredit['fees'];
+  /**
+   * Scheduled commitment changes as serde plain object rows (`date`, `amount`, `reduction_fee_bp`); empty when the commitment is flat.
+   * @returns One row per commitment step, in date order.
+   */
+  readonly commitmentSteps: NonNullable<generated.valuations.RevolvingCredit['commitment_steps']>;
+  /**
+   * Dated margin steps as serde plain object rows (`date`, `delta_bp`); empty when the margin is flat.
+   * @returns One row per margin step, in date order.
+   */
+  readonly marginSteps: NonNullable<generated.valuations.RevolvingCredit['margin_steps']>;
+  /**
+   * Dated fixed fees as serde plain object rows (`date`, `amount`); empty when none are scheduled.
+   * @returns One row per scheduled fee, in date order.
+   */
+  readonly scheduledFees: NonNullable<generated.valuations.RevolvingCredit['scheduled_fees']>;
+  /**
+   * Effective-interest-rate reporting switch (`{"include_fees": boolean}`), or `null` for the default (fees included).
+   * @returns The switch, or `null`.
+   */
+  readonly oidEir: NonNullable<generated.valuations.RevolvingCredit['oid_eir']> | null;
+  /**
+   * Letter-of-credit sub-facility as its serde plain object (`sublimit`, `outstanding`, `events`, `fee_bp`, `fronting_fee_bp`, `leq`), or `null` without an LC sublimit.
+   * @returns The LC sub-facility, or `null`.
+   */
+  readonly lc: NonNullable<generated.valuations.RevolvingCredit['lc']> | null;
+  /**
+   * Draw/repay specification as its serde plain object.
+   * @returns `{"deterministic": [...]}` or `{"stochastic": {...}}`.
+   */
+  readonly drawRepaySpec: generated.valuations.RevolvingCredit['draw_repay_spec'];
+  /**
+   * Discount curve identifier.
+   * @returns The curve id.
+   */
+  readonly discountCurveId: string;
+  /**
+   * Credit (hazard) curve identifier, or `null`.
+   * @returns The curve id when the facility carries credit risk.
+   */
+  readonly creditCurveId: string | null;
+  /**
+   * Recovery rate on default, as a decimal in `[0, 1]`.
+   * @returns The recovery fraction.
+   */
+  readonly recoveryRate: generated.valuations.RevolvingCredit['recovery_rate'];
+  /**
+   * Loan-equivalent exposure: fraction of the undrawn commitment drawn at default, as a decimal in `[0, 1]`.
+   * @returns The loan-equivalent exposure.
+   */
+  readonly leq: NonNullable<generated.valuations.RevolvingCredit['leq']>;
+  /**
+   * Stub rule for schedule generation.
+   * @returns The stub kind.
+   */
+  readonly stub: NonNullable<generated.valuations.RevolvingCredit['stub']>;
+  /**
+   * Business-day convention applied to payment dates (serde string, e.g. `"modified_following"`).
+   * @returns `"modified_following"` unless overridden.
+   */
+  readonly businessDayConvention: NonNullable<generated.valuations.RevolvingCredit['business_day_convention']>;
+  /**
+   * Holiday calendar identifier used for payment, fixing and settlement rolls, or `null` for weekends only.
+   * @returns The calendar identifier, or `null`.
+   */
+  readonly calendarId: string | null;
+  /**
+   * Business days between an accrual end and its payment date.
+   * @returns The payment lag; `0` pays on the adjusted accrual end.
+   */
+  readonly paymentLagDays: NonNullable<generated.valuations.RevolvingCredit['payment_lag_days']>;
+  /**
+   * Business days from the valuation date to the settlement date used by quote metrics.
+   * @returns The settlement lag; `0` settles on the valuation date.
+   */
+  readonly settlementDays: NonNullable<generated.valuations.RevolvingCredit['settlement_days']>;
+  /**
+   * Scenario-selection attributes.
+   * @returns The attribute map.
+   */
+  readonly attributes: generated.valuations.RevolvingCredit['attributes'];
+  /**
+   * Default pricing model key from the `Instrument` trait.
+   * @returns The model key.
+   */
+  readonly defaultModel: string;
+  /**
+   * Expiry date exposed by the `Instrument` trait, or `null`.
+   * @returns The expiry date.
+   */
+  readonly expiry: string | null;
+  /**
+   * The bare instrument spec as a plain object (no envelope).
+   *
+   * Mirrors Python `to_dict()`: the serde form of the Rust struct, i.e. the `instrument.spec` payload of `toJson()`.
+   * @returns Plain-object instrument spec.
+   * @throws Error - Throws if the instrument cannot be serialized.
+   */
+  toDict(): generated.valuations.RevolvingCredit;
+  /**
+   * Market data this instrument needs to price (mirrors Rust `Instrument::market_dependencies`).
+   * @returns `MarketDependencies` plain object listing discount, forward and credit curves, spot ids, volatility surfaces, FX pairs and fixing series.
+   * @throws Error - Throws with kind `validation` if the instrument cannot enumerate its dependencies.
+   */
+  marketDependencies(): generated.valuations.MarketDependencies;
+  /**
+   * Price the instrument against a market snapshot.
+   *
+   * Same pipeline and arguments as `valuations.instruments.priceInstrument`.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
+   * @param metricPricingOverrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
+   * @param marketHistory - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
+   * @returns Structured `ValuationResult` for the selected model.
+   * @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
+   */
+  price(
+    marketJson: JsonInput,
+    asOf: string,
+    model?: string | null,
+    metrics?: string[] | null,
+    metricPricingOverrides?: JsonInput | null,
+    marketHistory?: JsonInput | null
+  ): ValuationResult;
+  /**
+   * Compute one metric of the instrument against a market snapshot.
+   *
+   * The same Rust metric path as `price(..., [metricId])`, returning just the value.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param metricId - Fully qualified metric identifier, e.g. `"dv01"` or `"par_rate"`.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @returns The metric value in the metric's documented unit.
+   * @throws Error - Throws with kind `validation` if the market JSON, `asOf`, `model` or `metricId` is invalid or the metric is not defined for this instrument; kind `not_found` if required market data is missing; and kind `computation` if the calculation fails.
+   */
+  metric(marketJson: JsonInput, asOf: string, metricId: string, model?: string | null): number;
 }
 
 /**
@@ -9157,6 +9842,13 @@ export interface RevolvingCreditConstructor {
    * @throws If construction fails (should not occur).
    */
   example(): RevolvingCredit;
+  /**
+   * Create a fluent builder (mirrors the Rust `builder()`).
+   *
+   * Each setter stores one field and returns the builder; `build()` validates and consumes it.
+   * @returns An empty builder.
+   */
+  builder(): RevolvingCreditBuilder;
 }
 
 /**
@@ -9190,6 +9882,5093 @@ export interface ValuationMarketNamespace {
   listedProductCatalog(
     exchange?: 'cme' | 'eurex' | 'montreal' | 'sgx' | null
   ): ListedProductCoverage[];
+  /**
+   * Market convention registry class (see `ConventionRegistryConstructor`).
+   */
+  ConventionRegistry: ConventionRegistryConstructor;
+}
+
+/**
+ * Fluent builder for `Bond`; one setter per Rust builder setter.
+ *
+ * Every setter returns the builder, so calls chain; `build()` validates and consumes it.
+ */
+export interface BondBuilder extends WasmOwned {
+  /**
+   * Validate the staged fields and build the instrument.
+   *
+   * Runs the Rust `build()` validation and consumes the builder; create a new builder for the next instrument.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed, a required field is missing (the message names the field), or validation fails.
+   */
+  build(): Bond;
+  /**
+   * Set the instrument identifier.
+   * @param value - Instrument identifier.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  id(value: string): BondBuilder;
+  /**
+   * Set the principal amount.
+   * @param value - Principal amount, as a `Money` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  notional(value: Money): BondBuilder;
+  /**
+   * Set the required contractual issue date.
+   * @param value - Required contractual issue date as an ISO-8601 string. `build()` throws when it is not set.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  issueDate(value: string): BondBuilder;
+  /**
+   * Set the maturity date.
+   * @param value - Maturity date as an ISO-8601 string.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  maturity(value: string): BondBuilder;
+  /**
+   * Set the coupon/cashflow specification.
+   * @param value - Rust `CashflowSpec` in serde form (plain object or JSON string), e.g. `{"fixed": {"coupon_type": "cash", "rate": "0.05", "schedule": {...}}}` (copy `Bond.example().cashflow_spec`).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  cashflowSpec(value: generated.valuations.Bond['cashflow_spec']): BondBuilder;
+  /**
+   * Set the discount curve identifier.
+   * @param value - Discount curve identifier.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  discountCurveId(value: string): BondBuilder;
+  /**
+   * Set the hazard curve identifier for `hazard_rate` and `rates_credit` pricing.
+   * @param value - Hazard curve identifier for scalar or joint rates-credit pricing.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  creditCurveId(value: string): BondBuilder;
+  /**
+   * Set the repo (financing) discount curve identifier.
+   * @param value - Repo (financing) discount curve identifier.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  repoCurveId(value: string): BondBuilder;
+  /**
+   * Set the call/put schedule.
+   * @param value - Rust `CallPutSchedule` in serde form (plain object or JSON string), e.g. `{"calls": [{"start": "2027-01-15", "end": "2029-01-15", "price_pct_of_par": 100.0}], "puts": []}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  callPut(value: NonNullable<generated.valuations.Bond['call_put']>): BondBuilder;
+  /**
+   * Set the return-floor specification (minimum MOIC / XIRR on early redemption).
+   * @param value - Rust `ReturnFloorSpec` in serde form (plain object or JSON string), e.g. `Bond.example().min_moic(1.25).return_floor`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  returnFloor(value: NonNullable<generated.valuations.Bond['return_floor']>): BondBuilder;
+  /**
+   * Set the explicit cashflow schedule that overrides generated coupons.
+   * @param value - Rust `CashFlowSchedule` in serde form (plain object or JSON string), e.g. the `custom_cashflows` value of a bond built from cashflows.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  customCashflows(value: NonNullable<generated.valuations.Bond['custom_cashflows']>): BondBuilder;
+  /**
+   * Set the accrual method.
+   * @param value - Accrual method (serde string). `"linear"` is the default.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  accrualMethod(value: NonNullable<generated.valuations.Bond['accrual_method']>): BondBuilder;
+  /**
+   * Set the settlement convention (settlement lag and ex-coupon period).
+   * @param value - Rust `BondSettlementConvention` in serde form (plain object or JSON string), e.g. `{"settlement_days": 2, "ex_coupon_days": 0, "ex_coupon_calendar_id": `null`}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  settlementConvention(value: Pick<generated.valuations.Bond, 'settlement_days' | 'ex_coupon_days' | 'ex_coupon_calendar_id'>): BondBuilder;
+  /**
+   * Set instrument attributes (tags and metadata).
+   * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  attributes(value: generated.valuations.Bond['attributes']): BondBuilder;
+}
+
+/**
+ * Class object of `BondBuilder`; create builders with `valuations.instruments.Bond.builder()`.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const builder = valuations.instruments.Bond.builder();
+ * console.log(typeof builder.build);
+ * builder.free();
+ * ```
+ */
+export interface BondBuilderConstructor {
+  /**
+   * JavaScript prototype of `BondBuilder`; instances come from `valuations.instruments.Bond.builder()`, not `new`.
+   */
+  readonly prototype: BondBuilder;
+}
+
+/**
+ * Fluent builder for `TermLoan`; one setter per Rust builder setter.
+ *
+ * Every setter returns the builder, so calls chain; `build()` validates and consumes it.
+ */
+export interface TermLoanBuilder extends WasmOwned {
+  /**
+   * Validate the staged fields and build the instrument.
+   *
+   * Runs the Rust `build()` validation and consumes the builder; create a new builder for the next instrument.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed, a required field is missing (the message names the field), or validation fails.
+   */
+  build(): TermLoan;
+  /**
+   * Set the instrument identifier.
+   * @param value - Instrument identifier.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  id(value: string): TermLoanBuilder;
+  /**
+   * Set the loan currency.
+   * @param value - ISO-4217 currency code of the loan, e.g. `"USD"`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  currency(value: generated.valuations.TermLoan['currency']): TermLoanBuilder;
+  /**
+   * Set the committed notional (facility limit).
+   * @param value - Committed notional (facility limit), as a `Money` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  notionalLimit(value: Money): TermLoanBuilder;
+  /**
+   * Set the required contractual issue / funding date.
+   * @param value - Required contractual issue / funding date as an ISO-8601 string. `build()` throws when it is not set.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  issueDate(value: string): TermLoanBuilder;
+  /**
+   * Set the maturity date.
+   * @param value - Maturity date as an ISO-8601 string.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  maturity(value: string): TermLoanBuilder;
+  /**
+   * Set the interest rate specification.
+   * @param value - `RateSpec` plain object or JSON string: `{"fixed": {"rate": 0.06}}` for a fixed all-in rate (`0.06` = 6%) or `{"floating": {...}}` with a `FloatingRateSpec`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  rate(value: generated.valuations.TermLoan['rate']): TermLoanBuilder;
+  /**
+   * Set the payment frequency.
+   * @param value - Payment frequency, as a `Tenor` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  frequency(value: Tenor): TermLoanBuilder;
+  /**
+   * Set the accrual day-count convention.
+   * @param value - Accrual day-count convention, as a `DayCount` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  dayCount(value: DayCount): TermLoanBuilder;
+  /**
+   * Set the business day convention.
+   * @param value - Business day convention (serde string). Default `"modified_following"`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  businessDayConvention(value: NonNullable<generated.valuations.TermLoan['business_day_convention']>): TermLoanBuilder;
+  /**
+   * Set the holiday calendar identifier (e.g. `"usny"`).
+   * @param value - Holiday calendar identifier (e.g. `"usny"`).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  calendarId(value: string): TermLoanBuilder;
+  /**
+   * Set the stub rule.
+   * @param value - Stub rule (serde string). Default `"short_front"`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  stub(value: NonNullable<generated.valuations.TermLoan['stub']>): TermLoanBuilder;
+  /**
+   * Set the discount curve identifier.
+   * @param value - Discount curve identifier.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  discountCurveId(value: string): TermLoanBuilder;
+  /**
+   * Set the hazard curve identifier for credit-risky pricing.
+   * @param value - Hazard curve identifier for credit-risky pricing.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  creditCurveId(value: string): TermLoanBuilder;
+  /**
+   * Set the amortization schedule.
+   * @param value - Amortization as the serde name of a unit variant (`"none"`) or an `AmortizationSpec` plain object / JSON string.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  amortization(value: generated.valuations.TermLoan['amortization']): TermLoanBuilder;
+  /**
+   * Set the coupon type.
+   * @param value - Coupon type (serde string). `"cash"` (default), `"pik"`, ...
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  couponType(value: NonNullable<generated.valuations.TermLoan['coupon_type']>): TermLoanBuilder;
+  /**
+   * Set the upfront (arrangement or OID) fee paid on the issue date.
+   * @param value - `UpfrontFee` plain object or JSON string: `{"amount": Money}` for a cash fee or `{"fraction_of_commitment": 0.02}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  upfrontFee(value: NonNullable<generated.valuations.TermLoan['upfront_fee']>): TermLoanBuilder;
+  /**
+   * Set the delayed-draw (DDTL) specification.
+   * @param value - Rust `DdtlSpec` in serde form (plain object or JSON string), e.g. `TermLoan.example_floating_with_ddtl().ddtl`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  ddtl(value: NonNullable<generated.valuations.TermLoan['ddtl']>): TermLoanBuilder;
+  /**
+   * Set the covenant event schedule.
+   * @param value - Rust `TermLoanCovenantEvents` in serde form (plain object or JSON string), e.g. `{"events": [...]}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  covenants(value: NonNullable<generated.valuations.TermLoan['covenants']>): TermLoanBuilder;
+  /**
+   * Set the OID / effective-interest-rate specification.
+   * @param value - Rust `OidEirSpec` in serde form (plain object or JSON string), e.g. `{"issue_price_pct": 99.0, ...}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  oidEir(value: NonNullable<generated.valuations.TermLoan['oid_eir']>): TermLoanBuilder;
+  /**
+   * Set the prepayment (call) schedule.
+   * @param value - Rust `LoanCallSchedule` in serde form (plain object or JSON string), e.g. `TermLoan.example_callable().call_schedule`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  callSchedule(value: NonNullable<generated.valuations.TermLoan['call_schedule']>): TermLoanBuilder;
+  /**
+   * Set the settlement lag in business days (default 2).
+   * @param value - Settlement lag.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  settlementDays(value: number): TermLoanBuilder;
+  /**
+   * Set instrument attributes (tags and metadata).
+   * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  attributes(value: generated.valuations.TermLoan['attributes']): TermLoanBuilder;
+}
+
+/**
+ * Class object of `TermLoanBuilder`; create builders with `valuations.instruments.TermLoan.builder()`.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const builder = valuations.instruments.TermLoan.builder();
+ * console.log(typeof builder.build);
+ * builder.free();
+ * ```
+ */
+export interface TermLoanBuilderConstructor {
+  /**
+   * JavaScript prototype of `TermLoanBuilder`; instances come from `valuations.instruments.TermLoan.builder()`, not `new`.
+   */
+  readonly prototype: TermLoanBuilder;
+}
+
+/**
+ * Fluent builder for `RevolvingCredit`; one setter per Rust builder setter.
+ *
+ * Every setter returns the builder, so calls chain; `build()` validates and consumes it.
+ */
+export interface RevolvingCreditBuilder extends WasmOwned {
+  /**
+   * Validate the staged fields and build the instrument.
+   *
+   * Runs the Rust `build()` validation and consumes the builder; create a new builder for the next instrument.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed, a required field is missing (the message names the field), or validation fails.
+   */
+  build(): RevolvingCredit;
+  /**
+   * Set the instrument identifier.
+   * @param value - Unique identifier for the facility.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  id(value: string): RevolvingCreditBuilder;
+  /**
+   * Set the total commitment.
+   * @param value - Total commitment, as a `Money` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  commitment(value: Money): RevolvingCreditBuilder;
+  /**
+   * Set the drawn balance at the simulation anchor, the later of the commitment date and the valuation date, in both modes. Deterministic draw/repay events must be dated after that anchor.
+   * @param value - Drawn balance at the simulation anchor, the later of the commitment date and the valuation date, in both modes. Deterministic draw/repay events must be dated after that anchor, as a `Money` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  drawn(value: Money): RevolvingCreditBuilder;
+  /**
+   * Set the date the facility becomes available.
+   * @param value - Commitment date as an ISO-8601 string.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  issueDate(value: string): RevolvingCreditBuilder;
+  /**
+   * Set the expiry of the commitment.
+   * @param value - Maturity date as an ISO-8601 string.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  maturity(value: string): RevolvingCreditBuilder;
+  /**
+   * Set the facility coupon.
+   * @param value - `RateSpec` plain object or JSON string: `{"fixed": {"rate": 0.06}}` for a fixed all-in rate (`0.06` = 6%) or `{"floating": {...}}` with a `FloatingRateSpec`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  rate(value: generated.valuations.RevolvingCredit['rate']): RevolvingCreditBuilder;
+  /**
+   * Set the interest accrual day count.
+   * @param value - Interest accrual day count, as a `DayCount` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  dayCount(value: DayCount): RevolvingCreditBuilder;
+  /**
+   * Set the payment frequency for interest and fees.
+   * @param value - Payment frequency for interest and fees, as a `Tenor` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  frequency(value: Tenor): RevolvingCreditBuilder;
+  /**
+   * Set the fee structure from its serde shape.
+   * @param value - `RevolvingCreditFees` as a plain object or JSON string (`upfront_fee` as `null`, `{"amount": `Money` plain object}` or `{"fraction_of_commitment": 0.02}`; `commitment_fee_tiers`, `usage_fee_tiers`, `facility_fee_bp` and the dated `steps` list of `{"date", "commitment_delta_bp", "usage_delta_bp", "facility_delta_bp"}` rows).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  fees(value: generated.valuations.RevolvingCredit['fees']): RevolvingCreditBuilder;
+  /**
+   * Set the scheduled commitment changes.
+   * @param value - Rows of `{"date": "YYYY-MM-DD", "amount": `Money` plain object, "reduction_fee_bp": string}` (an array of plain objects or a JSON string), each the commitment in force from its date; `reduction_fee_bp` is the one-off reduction fee on a step down, a decimal string in basis points of the reduced amount (default `"0"`). Dates must be strictly increasing, after the commitment date and on or before maturity.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  commitmentSteps(value: NonNullable<generated.valuations.RevolvingCredit['commitment_steps']>): RevolvingCreditBuilder;
+  /**
+   * Set the dated fixed fees (amendment, waiver, extension, consent).
+   * @param value - Rows of `{"date": "YYYY-MM-DD", "amount": `Money` plain object}` (a array of plain objects or a JSON string), each paid on its date. Dates must lie after the commitment date and on or before maturity.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  scheduledFees(value: NonNullable<generated.valuations.RevolvingCredit['scheduled_fees']>): RevolvingCreditBuilder;
+  /**
+   * Set the effective-interest-rate reporting switch.
+   * @param value - `{"include_fees": boolean}` as a plain object or JSON string; `null` (the default) includes fees in the effective yield.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  oidEir(value: NonNullable<generated.valuations.RevolvingCredit['oid_eir']>): RevolvingCreditBuilder;
+  /**
+   * Set the letter-of-credit sub-facility.
+   * @param value - `LetterOfCreditSpec` as a plain object or JSON string with `sublimit` and `outstanding` (`Money` plain objects), `events` (rows of `{"date", "amount", "is_issue"}`), `fee_bp` (`null` accrues the floating margin), `fronting_fee_bp` and `leq` (the fraction of the LC face drawn at default). `null` removes the sublimit.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  lc(value: NonNullable<generated.valuations.RevolvingCredit['lc']>): RevolvingCreditBuilder;
+  /**
+   * Set the dated margin steps.
+   * @param value - Rows of `{"date": "YYYY-MM-DD", "delta_bp": string}` (a decimal string in basis points; a array of plain objects or a JSON string); each delta shifts the floating spread or the fixed rate from its date, cumulatively. Dates must be strictly increasing and strictly inside the facility life.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  marginSteps(value: NonNullable<generated.valuations.RevolvingCredit['margin_steps']>): RevolvingCreditBuilder;
+  /**
+   * Set the draw/repay specification from its serde shape.
+   * @param value - `DrawRepaySpec` as a plain object or JSON string: `{"deterministic": [{"date": ..., "amount": Money, "is_draw": boolean}, ...]}` or `{"stochastic": {"utilization_process": {...}, "use_sobol_qmc": ..., "mc_config": ...}}`. The estimator count, antithetic flag and seed label come from `instrument_pricing_overrides.model_config` (`mc_paths`, `mc_antithetic`, `mc_seed_scenario`).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  drawRepaySpec(value: generated.valuations.RevolvingCredit['draw_repay_spec']): RevolvingCreditBuilder;
+  /**
+   * Set the discount curve identifier.
+   * @param value - Discount curve id in the market context.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  discountCurveId(value: string): RevolvingCreditBuilder;
+  /**
+   * Set (or clear) the credit curve identifier.
+   * @param value - Hazard curve id used for survival weighting; `null` prices without credit risk. A stochastic facility with a credit curve must use a market-anchored spread process on the same curve.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  creditCurveId(value: string): RevolvingCreditBuilder;
+  /**
+   * Set the recovery rate on default.
+   * @param value - Recovery fraction as a decimal in `[0, 1]`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  recoveryRate(value: number): RevolvingCreditBuilder;
+  /**
+   * Set the loan-equivalent exposure drawn at default.
+   * @param value - Fraction of the undrawn commitment assumed drawn at default, as a decimal in `[0, 1]` (default `0.0`).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  leq(value: number): RevolvingCreditBuilder;
+  /**
+   * Set the stub rule for schedule generation.
+   * @param value - Stub kind object or serde name (`"short_front"`, `"short_back"`, `"long_front"`, `"long_back"`, `"none"`); default `"short_front"`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  stub(value: NonNullable<generated.valuations.RevolvingCredit['stub']>): RevolvingCreditBuilder;
+  /**
+   * Set the business-day convention for payment dates.
+   * @param value - Convention object or serde name (`"modified_following"`, `"following"`, `"preceding"`, ...); default `"modified_following"`. Accrual boundaries stay unadjusted.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  businessDayConvention(value: NonNullable<generated.valuations.RevolvingCredit['business_day_convention']>): RevolvingCreditBuilder;
+  /**
+   * Set the holiday calendar used for payment, fixing and settlement rolls.
+   * @param value - Calendar identifier such as `"usny"`; `null` (the default) adjusts for weekends only. An unknown identifier fails at `build()`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  calendarId(value: string): RevolvingCreditBuilder;
+  /**
+   * Set the payment lag in business days after each accrual end.
+   * @param value - Business days on the facility calendar; `0` (the default) pays on the adjusted accrual end.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  paymentLagDays(value: number): RevolvingCreditBuilder;
+  /**
+   * Set the settlement lag used by quote metrics.
+   * @param value - Business days from the valuation date to settlement; `0` (the default) settles on the valuation date. The base present value is always anchored at the valuation date.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  settlementDays(value: number): RevolvingCreditBuilder;
+  /**
+   * Set scenario-selection attributes.
+   * @param value - Attribute map; `null` clears it.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  attributes(value: generated.valuations.RevolvingCredit['attributes']): RevolvingCreditBuilder;
+}
+
+/**
+ * Class object of `RevolvingCreditBuilder`; create builders with `valuations.instruments.RevolvingCredit.builder()`.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const builder = valuations.instruments.RevolvingCredit.builder();
+ * console.log(typeof builder.build);
+ * builder.free();
+ * ```
+ */
+export interface RevolvingCreditBuilderConstructor {
+  /**
+   * JavaScript prototype of `RevolvingCreditBuilder`; instances come from `valuations.instruments.RevolvingCredit.builder()`, not `new`.
+   */
+  readonly prototype: RevolvingCreditBuilder;
+}
+
+/**
+ * Fluent builder for `AssetBackedFacility`; one setter per Rust builder setter.
+ *
+ * Every setter returns the builder, so calls chain; `build()` validates and consumes it.
+ */
+export interface AssetBackedFacilityBuilder extends WasmOwned {
+  /**
+   * Validate the staged fields and build the instrument.
+   *
+   * Runs the Rust `build()` validation and consumes the builder; create a new builder for the next instrument.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed, a required field is missing (the message names the field), or validation fails.
+   */
+  build(): AssetBackedFacility;
+  /**
+   * Set the facility identifier.
+   * @param value - Stable facility identifier.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  id(value: string): AssetBackedFacilityBuilder;
+  /**
+   * Set the collateral pool.
+   * @param value - Collateral pool (asset rows, rep lines or instrument collateral).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  collateral(value: generated.valuations.AssetBackedFacility['collateral']): AssetBackedFacilityBuilder;
+  /**
+   * Set the advance rates, eligibility and concentration limits.
+   * @param value - `BorrowingBaseRules` serde object: `advance_rates` (each with an `asset_class` wire name or `"*"`, a decimal `rate` and an optional `eligibility`) and `concentration_limits` (each with `scope` `"obligor"` / `"industry"` / `"asset_class"` and a percent `max_pct`).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  borrowingBaseRules(value: generated.valuations.AssetBackedFacility['borrowing_base_rules']): AssetBackedFacilityBuilder;
+  /**
+   * Set the total commitment.
+   * @param value - Total commitment, as a `Money` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  commitment(value: Money): AssetBackedFacilityBuilder;
+  /**
+   * Set the amount drawn at closing.
+   * @param value - Amount drawn at closing, as a `Money` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  drawn(value: Money): AssetBackedFacilityBuilder;
+  /**
+   * Set the facility coupon.
+   * @param value - `RateSpec` plain object or JSON string: `{"fixed": {"rate": 0.06}}` for a fixed all-in rate (`0.06` = 6%) or `{"floating": {...}}` with a `FloatingRateSpec`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  rate(value: generated.valuations.AssetBackedFacility['rate']): AssetBackedFacilityBuilder;
+  /**
+   * Set the commitment fee on the undrawn commitment.
+   * @param value - Basis points per annum (`50.0` = 0.50%).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  commitmentFeeBp(value: number): AssetBackedFacilityBuilder;
+  /**
+   * Set the closing date.
+   * @param value - Closing date; the first payment date is one frequency later.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  closingDate(value: string): AssetBackedFacilityBuilder;
+  /**
+   * Set the scheduled end of the revolving period.
+   * @param value - Revolving end; after it, collateral principal repays the facility.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  revolvingEnd(value: string): AssetBackedFacilityBuilder;
+  /**
+   * Set the legal final maturity.
+   * @param value - Legal final maturity.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  maturity(value: string): AssetBackedFacilityBuilder;
+  /**
+   * Set the payment frequency.
+   * @param value - Payment frequency, as a `Tenor` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  frequency(value: Tenor): AssetBackedFacilityBuilder;
+  /**
+   * Set the accrual day count.
+   * @param value - Accrual day count, as a `DayCount` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  dayCount(value: DayCount): AssetBackedFacilityBuilder;
+  /**
+   * Set the payment calendar.
+   * @param value - Holiday calendar identifier (e.g. `"nyse"`); required for pricing.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  calendarId(value: string): AssetBackedFacilityBuilder;
+  /**
+   * Set the events that end revolving early.
+   * @param value - `AmortizationEvent` objects: `{"kind": "date", "date": ...}`, `{"kind": "cumulative_loss", "max_cumulative_loss": ...}` or `{"kind": "excess_spread", "min_excess_spread_3m": ...}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  amortizationEvents(value: NonNullable<generated.valuations.AssetBackedFacility['amortization_events']>): AssetBackedFacilityBuilder;
+  /**
+   * Set the term-out window after revolving.
+   * @param value - `TermOutSpec` plain object, e.g. `{"months": 24}`: the amortization term after the revolving period ends.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  termOut(value: NonNullable<generated.valuations.AssetBackedFacility['term_out']>): AssetBackedFacilityBuilder;
+  /**
+   * Set the transaction fees paid through the waterfall ahead of the facility's interest.
+   * @param value - `DealFees` serde object (`trustee_fee` Money per annum, `senior_mgmt_fee_bp`, `subordinated_mgmt_fee_bp`, `servicing_fee_bp`, optional `master_servicer_fee_bp` / `workout_fee_pct` / `liquidation_fee_pct` / `special_servicer_fee_bp` / `incentive_fee`).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  fees(value: NonNullable<generated.valuations.AssetBackedFacility['fees']>): AssetBackedFacilityBuilder;
+  /**
+   * Set the scheduled draws after closing.
+   * @param value - `DrawEvent` serde objects `{"date": "2025-01-01", "amount": {"amount": "10000000", "currency": "USD"}}`, ascending by date; each is applied on the first payment date at or after its date.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  draws(value: NonNullable<generated.valuations.AssetBackedFacility['draws']>): AssetBackedFacilityBuilder;
+  /**
+   * Set whether the line is re-advanced up to the borrowing base each revolving period.
+   * @param value - `true` draws `min(commitment, borrowing base) − balance` every revolving period.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  readvanceToBorrowingBase(value: boolean): AssetBackedFacilityBuilder;
+  /**
+   * Set the collateral liquidation price at the term-out end.
+   * @param value - Percent of par (`100.0` = par).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  liquidationPricePct(value: number): AssetBackedFacilityBuilder;
+  /**
+   * Set the discount curve.
+   * @param value - Discount curve identifier.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  discountCurveId(value: string): AssetBackedFacilityBuilder;
+  /**
+   * Replace the whole collateral behavior model.
+   * @param value - `CreditModelConfig` serde object; the per-field setters (`prepayment_spec` ...) then modify it.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  creditModel(value: CreditModelConfig): AssetBackedFacilityBuilder;
+  /**
+   * Set the deterministic prepayment model of the collateral.
+   * @param value - Typed spec or its serde form.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  prepaymentSpec(value: NonNullable<generated.valuations.AssetBackedFacility['prepayment_spec']>): AssetBackedFacilityBuilder;
+  /**
+   * Set the deterministic default model of the collateral.
+   * @param value - Typed spec or its serde form.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  defaultSpec(value: NonNullable<generated.valuations.AssetBackedFacility['default_spec']>): AssetBackedFacilityBuilder;
+  /**
+   * Set the recovery model of the collateral.
+   * @param value - Typed spec or its serde form.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  recoverySpec(value: NonNullable<generated.valuations.AssetBackedFacility['recovery_spec']>): AssetBackedFacilityBuilder;
+  /**
+   * Set scenario-selection attributes.
+   * @param value - Attribute map; `null` clears it.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  attributes(value: NonNullable<generated.valuations.AssetBackedFacility['attributes']>): AssetBackedFacilityBuilder;
+}
+
+/**
+ * Class object of `AssetBackedFacilityBuilder`; create builders with `valuations.instruments.AssetBackedFacility.builder()`.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const builder = valuations.instruments.AssetBackedFacility.builder();
+ * console.log(typeof builder.build);
+ * builder.free();
+ * ```
+ */
+export interface AssetBackedFacilityBuilderConstructor {
+  /**
+   * JavaScript prototype of `AssetBackedFacilityBuilder`; instances come from `valuations.instruments.AssetBackedFacility.builder()`, not `new`.
+   */
+  readonly prototype: AssetBackedFacilityBuilder;
+}
+
+/**
+ * Fluent builder for `FxForward`; one setter per Rust builder setter.
+ *
+ * Every setter returns the builder, so calls chain; `build()` validates and consumes it.
+ */
+export interface FxForwardBuilder extends WasmOwned {
+  /**
+   * Validate the staged fields and build the instrument.
+   *
+   * Runs the Rust `build()` validation and consumes the builder; create a new builder for the next instrument.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed, a required field is missing (the message names the field), or validation fails.
+   */
+  build(): FxForwardInstrument;
+  /**
+   * Set the instrument identifier.
+   * @param value - Unique identifier for the FX forward.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  id(value: string): FxForwardBuilder;
+  /**
+   * Set the base currency (foreign currency, numerator of the pair).
+   * @param value - Base currency (foreign currency, numerator of the pair), as a `Currency` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  baseCurrency(value: Currency): FxForwardBuilder;
+  /**
+   * Set the quote currency (domestic currency, denominator of the pair).
+   * @param value - Quote currency (domestic currency, denominator of the pair), as a `Currency` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  quoteCurrency(value: Currency): FxForwardBuilder;
+  /**
+   * Set the maturity/settlement date.
+   * @param value - Maturity/settlement date as an ISO-8601 string.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  maturity(value: string): FxForwardBuilder;
+  /**
+   * Set the notional amount in base currency.
+   * @param value - Notional amount in base currency, as a `Money` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  notional(value: Money): FxForwardBuilder;
+  /**
+   * Set the contract forward rate (quote per base).
+   * @param value - Contract forward rate; when never set the forward is valued at-market (zero PV at inception).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  contractRate(value: number): FxForwardBuilder;
+  /**
+   * Set the domestic (quote currency) discount curve identifier.
+   * @param value - Domestic (quote currency) discount curve identifier.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  domesticDiscountCurveId(value: string): FxForwardBuilder;
+  /**
+   * Set the foreign (base currency) discount curve identifier.
+   * @param value - Foreign (base currency) discount curve identifier.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  foreignDiscountCurveId(value: string): FxForwardBuilder;
+  /**
+   * Set an explicit spot rate override (quote per base).
+   * @param value - Spot FX rate; when never set the spot is sourced from the market's FX matrix.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  quotedSpot(value: number): FxForwardBuilder;
+  /**
+   * Set the base currency calendar identifier for business day adjustment.
+   * @param value - Base currency holiday calendar identifier.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  baseCalendarId(value: string): FxForwardBuilder;
+  /**
+   * Set the quote currency calendar identifier for business day adjustment.
+   * @param value - Quote currency holiday calendar identifier.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  quoteCalendarId(value: string): FxForwardBuilder;
+  /**
+   * Set instrument attributes (tags and metadata).
+   * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  attributes(value: generated.valuations.FxForward['attributes']): FxForwardBuilder;
+}
+
+/**
+ * Class object of `FxForwardBuilder`; create builders with `valuations.fx.FxForward.builder()`.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const builder = valuations.fx.FxForward.builder();
+ * console.log(typeof builder.build);
+ * builder.free();
+ * ```
+ */
+export interface FxForwardBuilderConstructor {
+  /**
+   * JavaScript prototype of `FxForwardBuilder`; instances come from `valuations.fx.FxForward.builder()`, not `new`.
+   */
+  readonly prototype: FxForwardBuilder;
+}
+
+/**
+ * Fluent builder for `FxOption`; one setter per Rust builder setter.
+ *
+ * Every setter returns the builder, so calls chain; `build()` validates and consumes it.
+ */
+export interface FxOptionBuilder extends WasmOwned {
+  /**
+   * Validate the staged fields and build the instrument.
+   *
+   * Runs the Rust `build()` validation and consumes the builder; create a new builder for the next instrument.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed, a required field is missing (the message names the field), or validation fails.
+   */
+  build(): FxVanillaOptionInstrument;
+  /**
+   * Set the instrument identifier.
+   * @param value - Unique identifier for the FX option.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  id(value: string): FxOptionBuilder;
+  /**
+   * Set the base currency (foreign currency).
+   * @param value - Base currency (foreign currency), as a `Currency` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  baseCurrency(value: Currency): FxOptionBuilder;
+  /**
+   * Set the quote currency (domestic currency).
+   * @param value - Quote currency (domestic currency), as a `Currency` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  quoteCurrency(value: Currency): FxOptionBuilder;
+  /**
+   * Set the strike exchange rate (quote per base).
+   * @param value - Strike exchange rate, quote currency per unit of base currency.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  strike(value: number): FxOptionBuilder;
+  /**
+   * Set the option type: `"call"` or `"put"` on base currency.
+   * @param value - Option type of the FX option.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  optionType(value: generated.valuations.FxOption['option_type']): FxOptionBuilder;
+  /**
+   * Set the option expiry date.
+   * @param value - Option expiry date as an ISO-8601 string.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  expiry(value: string): FxOptionBuilder;
+  /**
+   * Set the model day count for volatility, dividend carry and exercise times.
+   * @param value - Model day count for volatility, dividend carry and exercise times, as a `DayCount` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  dayCount(value: DayCount): FxOptionBuilder;
+  /**
+   * Set the notional amount in base currency.
+   * @param value - Notional amount in base currency, as a `Money` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  notional(value: Money): FxOptionBuilder;
+  /**
+   * Set the domestic currency discount curve identifier.
+   * @param value - Domestic currency discount curve identifier.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  domesticDiscountCurveId(value: string): FxOptionBuilder;
+  /**
+   * Set the foreign currency discount curve identifier.
+   * @param value - Foreign currency discount curve identifier.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  foreignDiscountCurveId(value: string): FxOptionBuilder;
+  /**
+   * Set the FX volatility surface identifier.
+   * @param value - FX volatility surface identifier for option pricing.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  volSurfaceId(value: string): FxOptionBuilder;
+  /**
+   * Set instrument attributes (tags and metadata).
+   * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  attributes(value: generated.valuations.FxOption['attributes']): FxOptionBuilder;
+  /**
+   * Set the delta convention used to read the volatility surface.
+   *
+   * Mirrors Rust `FxDeltaConvention::new`; the convention decides which delta (spot or forward, premium-adjusted or not) a surface pillar means.
+   * @param kind - Delta convention kind: `spot`, `forward`, `spot_premium_adjusted`, or `forward_premium_adjusted`.
+   * @param premiumCurrency - Currency the option premium is paid in.
+   * @param venue - Market or broker whose quoting convention this is (for example `"interbank"`); must not be blank.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `kind` or `venue` is not a string, and kind `validation` if `kind` is unknown, `venue` is blank, or the builder was already consumed by `build()`.
+   */
+  deltaConvention(
+    kind: generated.valuations.FxDeltaConvention['kind'],
+    premiumCurrency: Currency,
+    venue: string
+  ): FxOptionBuilder;
+}
+
+/**
+ * Class object of `FxOptionBuilder`; create builders with `valuations.fx.FxOption.builder()`.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const builder = valuations.fx.FxOption.builder();
+ * console.log(typeof builder.build);
+ * builder.free();
+ * ```
+ */
+export interface FxOptionBuilderConstructor {
+  /**
+   * JavaScript prototype of `FxOptionBuilder`; instances come from `valuations.fx.FxOption.builder()`, not `new`.
+   */
+  readonly prototype: FxOptionBuilder;
+}
+
+/**
+ * Typed handle on the Rust `InterestRateSwap` instrument (fixed-for-floating swap).
+ *
+ * Every public Rust field is a read-only property; `price` and `metric` run the same pricer as `valuations.instruments.priceInstrument`.
+ */
+export interface InterestRateSwap extends WasmOwned {
+  /**
+   * Instrument identifier.
+   * @returns Stable instrument identifier used in metric keys.
+   */
+  readonly id: string;
+  /**
+   * Serialize to the canonical `finstack_quant.instrument/1` envelope.
+   *
+   * The output is compact JSON, byte-identical to the Python `to_json()` of the same instrument; pass it to `valuations.instruments.priceInstrument` or `fromJson`.
+   * @returns Canonical instrument envelope JSON.
+   * @throws Error - Throws if the instrument cannot be serialized.
+   */
+  toJson(): string;
+  /**
+   * Notional shared by both legs.
+   * @returns Currency-tagged notional.
+   */
+  readonly notional: Money;
+  /**
+   * Swap direction for the fixed leg.
+   * @returns `"pay"` or `"receive"`.
+   */
+  readonly side: generated.valuations.InterestRateSwap['side'];
+  /**
+   * Fixed leg specification.
+   * @returns The fixed leg.
+   */
+  readonly fixedLeg: generated.valuations.InterestRateSwap['fixed_leg'];
+  /**
+   * Floating leg specification.
+   * @returns The floating leg.
+   */
+  readonly floatLeg: generated.valuations.InterestRateSwap['float_leg'];
+  /**
+   * OTC margin (CSA / initial-margin) specification in serde form.
+   * @returns The spec plain object, or `null`.
+   */
+  readonly marginSpec: NonNullable<generated.valuations.InterestRateSwap['margin_spec']> | null;
+  /**
+   * Canonical model key used when `model="default"` is passed to `price`.
+   * @returns Registered model key such as `"discounting"` or `"black76"`.
+   */
+  readonly defaultModel: string;
+  /**
+   * Instrument attributes (tags and metadata) used for scenario selection.
+   * @returns The attribute bag; empty when none were set.
+   */
+  readonly attributes: generated.valuations.InterestRateSwap['attributes'];
+  /**
+   * Expiry date exposed by the Rust `Instrument` trait.
+   * @returns The expiry/maturity date, or `null` when the instrument type reports none.
+   */
+  readonly expiry: string | null;
+  /**
+   * The bare instrument spec as a plain object (no envelope).
+   *
+   * Mirrors Python `to_dict()`: the serde form of the Rust struct, i.e. the `instrument.spec` payload of `toJson()`.
+   * @returns Plain-object instrument spec.
+   * @throws Error - Throws if the instrument cannot be serialized.
+   */
+  toDict(): generated.valuations.InterestRateSwap;
+  /**
+   * Market data this instrument needs to price (mirrors Rust `Instrument::market_dependencies`).
+   * @returns `MarketDependencies` plain object listing discount, forward and credit curves, spot ids, volatility surfaces, FX pairs and fixing series.
+   * @throws Error - Throws with kind `validation` if the instrument cannot enumerate its dependencies.
+   */
+  marketDependencies(): generated.valuations.MarketDependencies;
+  /**
+   * Price the instrument against a market snapshot.
+   *
+   * Same pipeline and arguments as `valuations.instruments.priceInstrument`.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
+   * @param metricPricingOverrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
+   * @param marketHistory - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
+   * @returns Structured `ValuationResult` for the selected model.
+   * @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
+   */
+  price(
+    marketJson: JsonInput,
+    asOf: string,
+    model?: string | null,
+    metrics?: string[] | null,
+    metricPricingOverrides?: JsonInput | null,
+    marketHistory?: JsonInput | null
+  ): ValuationResult;
+  /**
+   * Compute one metric of the instrument against a market snapshot.
+   *
+   * The same Rust metric path as `price(..., [metricId])`, returning just the value.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param metricId - Fully qualified metric identifier, e.g. `"dv01"` or `"par_rate"`.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @returns The metric value in the metric's documented unit.
+   * @throws Error - Throws with kind `validation` if the market JSON, `asOf`, `model` or `metricId` is invalid or the metric is not defined for this instrument; kind `not_found` if required market data is missing; and kind `computation` if the calculation fails.
+   */
+  metric(marketJson: JsonInput, asOf: string, metricId: string, model?: string | null): number;
+}
+
+/**
+ * Constructor surface for the typed `InterestRateSwap` WebAssembly instrument.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const interestRateSwap = valuations.instruments.InterestRateSwap.example();
+ * console.log(interestRateSwap.id, interestRateSwap.toDict());
+ * interestRateSwap.free();
+ * ```
+ */
+export interface InterestRateSwapConstructor {
+  /**
+   * JavaScript prototype of `InterestRateSwap`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: InterestRateSwap;
+  /**
+   * Deserialize the instrument from its canonical v1 envelope.
+   *
+   * Bare payloads are rejected; the loader's validation runs on the result.
+   * @param json - A `finstack_quant.instrument/1` envelope (JSON string or plain object) for this exact instrument type.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if `json` is malformed, carries a different instrument type, or fails instrument validation.
+   */
+  fromJson(json: JsonInput): InterestRateSwap;
+  /**
+   * Create a fluent builder (mirrors the Rust `builder()`).
+   *
+   * Each setter stores one field and returns the builder; `build()` validates and consumes it.
+   * @returns An empty builder.
+   */
+  builder(): InterestRateSwapBuilder;
+  /**
+   * Canonical 5-year USD pay-fixed swap (mirrors Rust `InterestRateSwap::example`): semi-annual 30/360 fixed vs quarterly ACT/360 `USD-SOFR-3M`, T-2 reset lag, `usny` calendar.
+   * @returns The example swap.
+   * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+   */
+  example(): InterestRateSwap;
+  /**
+   * Create a swap from the conventions registered for a rate index.
+   *
+   * Mirrors Rust `InterestRateSwap::from_conventions`: payment frequency, day counts, calendar, business-day convention, reset and payment lags all come from the rate-index convention registry.
+   * @param id - Unique instrument identifier.
+   * @param notional - Notional shared by both legs.
+   * @param side - Fixed-leg direction: `pay` (pay fixed, receive floating) or `receive`.
+   * @param fixedRate - Fixed coupon as a decimal (`0.035` = 3.5%).
+   * @param startDate - Effective date as an ISO-8601 string.
+   * @param maturity - Maturity date as an ISO-8601 string.
+   * @param indexId - Rate index whose conventions apply, e.g. `"USD-SOFR"`.
+   * @param discountCurveId - Discount curve identifier used for both legs.
+   * @param forwardCurveId - Forward curve identifier projecting the floating leg.
+   * @returns The validated swap.
+   * @throws Error - Throws with kind `not_found` if `indexId` has no registered conventions, kind `validation` if `side` or a date is malformed or the swap fails validation, and kind `invalid_type` for a wrong argument type.
+   */
+  fromConventions(
+    id: string,
+    notional: Money,
+    side: 'pay' | 'receive',
+    fixedRate: number,
+    startDate: string,
+    maturity: string,
+    indexId: string,
+    discountCurveId: string,
+    forwardCurveId: string
+  ): InterestRateSwap;
+}
+
+/**
+ * Fluent builder for `InterestRateSwap`; one setter per Rust builder setter.
+ *
+ * Every setter returns the builder, so calls chain; `build()` validates and consumes it.
+ */
+export interface InterestRateSwapBuilder extends WasmOwned {
+  /**
+   * Validate the staged fields and build the instrument.
+   *
+   * Runs the Rust `build()` validation and consumes the builder; create a new builder for the next instrument.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed, a required field is missing (the message names the field), or validation fails.
+   */
+  build(): InterestRateSwap;
+  /**
+   * Set the instrument identifier.
+   * @param value - Instrument identifier.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  id(value: string): InterestRateSwapBuilder;
+  /**
+   * Set the notional shared by both legs.
+   * @param value - Notional shared by both legs, as a `Money` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  notional(value: Money): InterestRateSwapBuilder;
+  /**
+   * Set the swap direction for the fixed leg.
+   * @param value - Swap direction for the fixed leg (serde string). `"pay"` pays fixed / receives floating.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  side(value: generated.valuations.InterestRateSwap['side']): InterestRateSwapBuilder;
+  /**
+   * Set the fixed leg specification.
+   * @param value - Fixed leg specification.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  fixedLeg(value: generated.valuations.InterestRateSwap['fixed_leg']): InterestRateSwapBuilder;
+  /**
+   * Set the floating leg specification.
+   * @param value - Floating leg specification.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  floatLeg(value: generated.valuations.InterestRateSwap['float_leg']): InterestRateSwapBuilder;
+  /**
+   * Set the OTC margin (CSA / initial-margin) specification.
+   * @param value - Rust `OtcMarginSpec` in serde form (plain object or JSON string), e.g. the `margin_spec` value of a margined swap's `toDict()`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  marginSpec(value: NonNullable<generated.valuations.InterestRateSwap['margin_spec']>): InterestRateSwapBuilder;
+  /**
+   * Set instrument attributes (tags and metadata).
+   * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  attributes(value: generated.valuations.InterestRateSwap['attributes']): InterestRateSwapBuilder;
+}
+
+/**
+ * Class object of `InterestRateSwapBuilder`; create builders with `valuations.instruments.InterestRateSwap.builder()`.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const builder = valuations.instruments.InterestRateSwap.builder();
+ * console.log(typeof builder.build);
+ * builder.free();
+ * ```
+ */
+export interface InterestRateSwapBuilderConstructor {
+  /**
+   * JavaScript prototype of `InterestRateSwapBuilder`; instances come from `valuations.instruments.InterestRateSwap.builder()`, not `new`.
+   */
+  readonly prototype: InterestRateSwapBuilder;
+}
+
+/**
+ * Typed handle on the Rust `Swaption` instrument (European, American or Bermudan option on a swap).
+ *
+ * Every public Rust field is a read-only property; `price` and `metric` run the same pricer as `valuations.instruments.priceInstrument`.
+ */
+export interface Swaption extends WasmOwned {
+  /**
+   * Instrument identifier.
+   * @returns Stable instrument identifier used in metric keys.
+   */
+  readonly id: string;
+  /**
+   * Serialize to the canonical `finstack_quant.instrument/1` envelope.
+   *
+   * The output is compact JSON, byte-identical to the Python `to_json()` of the same instrument; pass it to `valuations.instruments.priceInstrument` or `fromJson`.
+   * @returns Canonical instrument envelope JSON.
+   * @throws Error - Throws if the instrument cannot be serialized.
+   */
+  toJson(): string;
+  /**
+   * Forward swap rate of the underlying (mirrors Rust `Swaption::forward_swap_rate`).
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying the curves and quotes this instrument needs.
+   * @param asOf - ISO-8601 valuation date.
+   * @returns Par swap rate of the underlying as a decimal.
+   * @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if the market JSON or `asOf` is malformed, and kind `computation` if the calculation fails.
+   */
+  forwardSwapRate(marketJson: JsonInput, asOf: string): number;
+  /**
+   * Fixed strike of the underlying swap (mirrors Rust `get_strike`).
+   * @returns Strike as a decimal rate.
+   */
+  getStrike(): number;
+  /**
+   * Effective date of the underlying swap (mirrors Rust `get_underlying_start_date`).
+   * @returns The underlying start date.
+   */
+  getUnderlyingStartDate(): string;
+  /**
+   * Maturity of the underlying swap (mirrors Rust `get_underlying_maturity`).
+   * @returns The underlying end date.
+   */
+  getUnderlyingMaturity(): string;
+  /**
+   * Option type of the swaption.
+   * @returns `"call"` (payer) or `"put"` (receiver).
+   */
+  readonly optionType: generated.valuations.Swaption['option_type'];
+  /**
+   * Notional of the underlying swap.
+   * @returns Currency-tagged notional.
+   */
+  readonly notional: Money;
+  /**
+   * Option expiry date.
+   * @returns The expiry date.
+   */
+  readonly expiry: string;
+  /**
+   * Exercise style of the swaption.
+   * @returns `"european"`, `"bermudan"` or `"american"`.
+   */
+  readonly exerciseStyle: generated.valuations.Swaption['exercise_style'];
+  /**
+   * Settlement method.
+   * @returns `"physical"` or `"cash"`.
+   */
+  readonly settlement: generated.valuations.Swaption['settlement'];
+  /**
+   * Cash settlement annuity method (serde string).
+   * @returns `"collateralized_cash_price"`, `"par_yield"`, `"isda_par_par"` or `"zero_coupon"`.
+   */
+  readonly cashSettlementMethod: generated.valuations.Swaption['cash_settlement_method'];
+  /**
+   * Volatility model.
+   * @returns `"black"` or `"normal"`.
+   */
+  readonly volModel: generated.valuations.Swaption['vol_model'];
+  /**
+   * Volatility surface identifier.
+   * @returns Surface id looked up in the market context.
+   */
+  readonly volSurfaceId: string;
+  /**
+   * Fixed leg of the underlying swap.
+   * @returns The fixed leg.
+   */
+  readonly underlyingFixedLeg: generated.valuations.Swaption['underlying_fixed_leg'];
+  /**
+   * Floating leg of the underlying swap.
+   * @returns The floating leg.
+   */
+  readonly underlyingFloatLeg: generated.valuations.Swaption['underlying_float_leg'];
+  /**
+   * SABR parameters (`alpha`, `beta`, `nu`, `rho`, `shift`).
+   * @returns The parameter plain object, or `null`.
+   */
+  readonly sabrParams: NonNullable<generated.valuations.Swaption['sabr_params']> | null;
+  /**
+   * Canonical model key used when `model="default"` is passed to `price`.
+   * @returns Registered model key such as `"discounting"` or `"black76"`.
+   */
+  readonly defaultModel: string;
+  /**
+   * Instrument attributes (tags and metadata) used for scenario selection.
+   * @returns The attribute bag; empty when none were set.
+   */
+  readonly attributes: generated.valuations.Swaption['attributes'];
+  /**
+   * The bare instrument spec as a plain object (no envelope).
+   *
+   * Mirrors Python `to_dict()`: the serde form of the Rust struct, i.e. the `instrument.spec` payload of `toJson()`.
+   * @returns Plain-object instrument spec.
+   * @throws Error - Throws if the instrument cannot be serialized.
+   */
+  toDict(): generated.valuations.Swaption;
+  /**
+   * Market data this instrument needs to price (mirrors Rust `Instrument::market_dependencies`).
+   * @returns `MarketDependencies` plain object listing discount, forward and credit curves, spot ids, volatility surfaces, FX pairs and fixing series.
+   * @throws Error - Throws with kind `validation` if the instrument cannot enumerate its dependencies.
+   */
+  marketDependencies(): generated.valuations.MarketDependencies;
+  /**
+   * Price the instrument against a market snapshot.
+   *
+   * Same pipeline and arguments as `valuations.instruments.priceInstrument`.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
+   * @param metricPricingOverrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
+   * @param marketHistory - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
+   * @returns Structured `ValuationResult` for the selected model.
+   * @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
+   */
+  price(
+    marketJson: JsonInput,
+    asOf: string,
+    model?: string | null,
+    metrics?: string[] | null,
+    metricPricingOverrides?: JsonInput | null,
+    marketHistory?: JsonInput | null
+  ): ValuationResult;
+  /**
+   * Compute one metric of the instrument against a market snapshot.
+   *
+   * The same Rust metric path as `price(..., [metricId])`, returning just the value.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param metricId - Fully qualified metric identifier, e.g. `"dv01"` or `"par_rate"`.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @returns The metric value in the metric's documented unit.
+   * @throws Error - Throws with kind `validation` if the market JSON, `asOf`, `model` or `metricId` is invalid or the metric is not defined for this instrument; kind `not_found` if required market data is missing; and kind `computation` if the calculation fails.
+   */
+  metric(marketJson: JsonInput, asOf: string, metricId: string, model?: string | null): number;
+}
+
+/**
+ * Constructor surface for the typed `Swaption` WebAssembly instrument.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const swaption = valuations.instruments.Swaption.example();
+ * console.log(swaption.id, swaption.toDict());
+ * swaption.free();
+ * ```
+ */
+export interface SwaptionConstructor {
+  /**
+   * JavaScript prototype of `Swaption`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: Swaption;
+  /**
+   * Deserialize the instrument from its canonical v1 envelope.
+   *
+   * Bare payloads are rejected; the loader's validation runs on the result.
+   * @param json - A `finstack_quant.instrument/1` envelope (JSON string or plain object) for this exact instrument type.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if `json` is malformed, carries a different instrument type, or fails instrument validation.
+   */
+  fromJson(json: JsonInput): Swaption;
+  /**
+   * Create a fluent builder (mirrors the Rust `builder()`).
+   *
+   * Each setter stores one field and returns the builder; `build()` validates and consumes it.
+   * @returns An empty builder.
+   */
+  builder(): SwaptionBuilder;
+  /**
+   * Canonical European 1Yx5Y USD payer swaption (mirrors Rust `Swaption::example`): cash-settled, Black vol, 3% strike on a 5-year swap, vol surface `USD-SWPNVOL`.
+   * @returns The example swaption.
+   * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+   */
+  example(): Swaption;
+  /**
+   * Bermudan-exercise variant of the example (mirrors Rust `Swaption::example_bermudan`).
+   * @returns The example swaption with `exercise_style == "bermudan"`.
+   * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+   */
+  exampleBermudan(): Swaption;
+}
+
+/**
+ * Fluent builder for `Swaption`; one setter per Rust builder setter.
+ *
+ * Every setter returns the builder, so calls chain; `build()` validates and consumes it.
+ */
+export interface SwaptionBuilder extends WasmOwned {
+  /**
+   * Validate the staged fields and build the instrument.
+   *
+   * Runs the Rust `build()` validation and consumes the builder; create a new builder for the next instrument.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed, a required field is missing (the message names the field), or validation fails.
+   */
+  build(): Swaption;
+  /**
+   * Set the instrument identifier.
+   * @param value - Instrument identifier.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  id(value: string): SwaptionBuilder;
+  /**
+   * Set the option type.
+   * @param value - Option type (serde string). `"call"` is a payer, `"put"` a receiver swaption.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  optionType(value: generated.valuations.Swaption['option_type']): SwaptionBuilder;
+  /**
+   * Set the notional of the underlying swap.
+   * @param value - Notional of the underlying swap, as a `Money` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  notional(value: Money): SwaptionBuilder;
+  /**
+   * Set the option expiry date.
+   * @param value - Option expiry date as an ISO-8601 string.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  expiry(value: string): SwaptionBuilder;
+  /**
+   * Set the exercise style.
+   * @param value - Exercise style (serde string). Default `"european"`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  exerciseStyle(value: generated.valuations.Swaption['exercise_style']): SwaptionBuilder;
+  /**
+   * Set the settlement method.
+   * @param value - Settlement method (serde string).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  settlement(value: generated.valuations.Swaption['settlement']): SwaptionBuilder;
+  /**
+   * Set the cash settlement annuity method (only used when `settlement` is `"cash"`).
+   * @param value - Cash settlement annuity method (only used when `settlement` is `"cash"`) (serde string). `"collateralized_cash_price"` discounts the physical fixed-leg annuity.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  cashSettlementMethod(value: generated.valuations.Swaption['cash_settlement_method']): SwaptionBuilder;
+  /**
+   * Set the volatility model used for pricing.
+   * @param value - Volatility model used for pricing (serde string).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  volModel(value: generated.valuations.Swaption['vol_model']): SwaptionBuilder;
+  /**
+   * Set the volatility surface identifier.
+   * @param value - Volatility surface identifier.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  volSurfaceId(value: string): SwaptionBuilder;
+  /**
+   * Set the complete fixed leg of the underlying swap.
+   * @param value - Fixed leg of the underlying swap.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  underlyingFixedLeg(value: generated.valuations.Swaption['underlying_fixed_leg']): SwaptionBuilder;
+  /**
+   * Set the complete floating leg of the underlying swap.
+   * @param value - Floating leg of the underlying swap.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  underlyingFloatLeg(value: generated.valuations.Swaption['underlying_float_leg']): SwaptionBuilder;
+  /**
+   * Set the SABR volatility model parameters.
+   * @param value - Rust `SabrParameters` in serde form (plain object or JSON string), e.g. `{"alpha": 0.025, "beta": 0.5, "nu": 0.4, "rho": -0.3, "shift": `null`}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  sabrParams(value: NonNullable<generated.valuations.Swaption['sabr_params']>): SwaptionBuilder;
+  /**
+   * Set instrument attributes (tags and metadata).
+   * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  attributes(value: generated.valuations.Swaption['attributes']): SwaptionBuilder;
+}
+
+/**
+ * Class object of `SwaptionBuilder`; create builders with `valuations.instruments.Swaption.builder()`.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const builder = valuations.instruments.Swaption.builder();
+ * console.log(typeof builder.build);
+ * builder.free();
+ * ```
+ */
+export interface SwaptionBuilderConstructor {
+  /**
+   * JavaScript prototype of `SwaptionBuilder`; instances come from `valuations.instruments.Swaption.builder()`, not `new`.
+   */
+  readonly prototype: SwaptionBuilder;
+}
+
+/**
+ * Typed handle on the Rust `CapFloor` instrument (interest-rate cap, floor, caplet or floorlet).
+ *
+ * Every public Rust field is a read-only property; `price` and `metric` run the same pricer as `valuations.instruments.priceInstrument`.
+ */
+export interface CapFloor extends WasmOwned {
+  /**
+   * Instrument identifier.
+   * @returns Stable instrument identifier used in metric keys.
+   */
+  readonly id: string;
+  /**
+   * Serialize to the canonical `finstack_quant.instrument/1` envelope.
+   *
+   * The output is compact JSON, byte-identical to the Python `to_json()` of the same instrument; pass it to `valuations.instruments.priceInstrument` or `fromJson`.
+   * @returns Canonical instrument envelope JSON.
+   * @throws Error - Throws if the instrument cannot be serialized.
+   */
+  toJson(): string;
+  /**
+   * Option type of the cap/floor.
+   * @returns `"cap"`, `"floor"`, `"caplet"` or `"floorlet"`.
+   */
+  readonly rateOptionType: generated.valuations.CapFloor['rate_option_type'];
+  /**
+   * Notional amount.
+   * @returns Currency-tagged notional.
+   */
+  readonly notional: Money;
+  /**
+   * Strike as a decimal rate.
+   * @returns `0.03` for 3%.
+   */
+  readonly strike: number;
+  /**
+   * Contractual margin added to the index, in basis points.
+   * @returns `0.0` when unset.
+   */
+  readonly spreadBp: number;
+  /**
+   * Start date of the underlying period.
+   * @returns The start date.
+   */
+  readonly startDate: string;
+  /**
+   * End date of the underlying period.
+   * @returns The maturity date.
+   */
+  readonly maturity: string;
+  /**
+   * Payment frequency.
+   * @returns The payment tenor.
+   */
+  readonly frequency: Tenor;
+  /**
+   * Accrual day-count convention.
+   * @returns The day count.
+   */
+  readonly dayCount: DayCount;
+  /**
+   * Stub-period handling rule for the schedule.
+   * @returns Stub rule serde name (`"none"`, `"short_front"`, ...).
+   */
+  readonly stub: NonNullable<generated.valuations.CapFloor['stub']>;
+  /**
+   * Business day convention (serde string).
+   * @returns `"modified_following"` unless overridden.
+   */
+  readonly businessDayConvention: NonNullable<generated.valuations.CapFloor['business_day_convention']>;
+  /**
+   * Holiday calendar identifier.
+   * @returns Calendar id, or `null`.
+   */
+  readonly calendarId: string | null;
+  /**
+   * Exercise style (serde string).
+   * @returns `"european"` unless overridden.
+   */
+  readonly exerciseStyle: NonNullable<generated.valuations.CapFloor['exercise_style']>;
+  /**
+   * Settlement type (serde string).
+   * @returns `"cash"` unless overridden.
+   */
+  readonly settlement: NonNullable<generated.valuations.CapFloor['settlement']>;
+  /**
+   * Discount curve identifier.
+   * @returns Curve id used for discounting.
+   */
+  readonly discountCurveId: string;
+  /**
+   * Forward curve identifier.
+   * @returns Curve id used to project the index.
+   */
+  readonly forwardCurveId: string;
+  /**
+   * Volatility surface identifier.
+   * @returns Surface id looked up in the market context.
+   */
+  readonly volSurfaceId: string;
+  /**
+   * Volatility convention.
+   * @returns `"lognormal"`, `"shifted_lognormal"`, `"normal"` or `"auto"`.
+   */
+  readonly volType: NonNullable<generated.valuations.CapFloor['vol_type']>;
+  /**
+   * Displacement shift for shifted-lognormal pricing.
+   * @returns Non-negative shift; `0.0` when unset.
+   */
+  readonly volShift: NonNullable<generated.valuations.CapFloor['vol_shift']>;
+  /**
+   * Overnight (RFR) coupon convention in serde form.
+   * @returns The convention plain object, or `null`.
+   */
+  readonly overnightCoupon: NonNullable<generated.valuations.CapFloor['overnight_coupon']> | null;
+  /**
+   * Dated premium paid by the holder.
+   * @returns `(payment_date, amount)` or `null`.
+   */
+  readonly premium: [string, Money] | null;
+  /**
+   * Canonical model key used when `model="default"` is passed to `price`.
+   * @returns Registered model key such as `"discounting"` or `"black76"`.
+   */
+  readonly defaultModel: string;
+  /**
+   * Instrument attributes (tags and metadata) used for scenario selection.
+   * @returns The attribute bag; empty when none were set.
+   */
+  readonly attributes: generated.valuations.CapFloor['attributes'];
+  /**
+   * Expiry date exposed by the Rust `Instrument` trait.
+   * @returns The expiry/maturity date, or `null` when the instrument type reports none.
+   */
+  readonly expiry: string | null;
+  /**
+   * The bare instrument spec as a plain object (no envelope).
+   *
+   * Mirrors Python `to_dict()`: the serde form of the Rust struct, i.e. the `instrument.spec` payload of `toJson()`.
+   * @returns Plain-object instrument spec.
+   * @throws Error - Throws if the instrument cannot be serialized.
+   */
+  toDict(): generated.valuations.CapFloor;
+  /**
+   * Market data this instrument needs to price (mirrors Rust `Instrument::market_dependencies`).
+   * @returns `MarketDependencies` plain object listing discount, forward and credit curves, spot ids, volatility surfaces, FX pairs and fixing series.
+   * @throws Error - Throws with kind `validation` if the instrument cannot enumerate its dependencies.
+   */
+  marketDependencies(): generated.valuations.MarketDependencies;
+  /**
+   * Price the instrument against a market snapshot.
+   *
+   * Same pipeline and arguments as `valuations.instruments.priceInstrument`.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
+   * @param metricPricingOverrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
+   * @param marketHistory - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
+   * @returns Structured `ValuationResult` for the selected model.
+   * @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
+   */
+  price(
+    marketJson: JsonInput,
+    asOf: string,
+    model?: string | null,
+    metrics?: string[] | null,
+    metricPricingOverrides?: JsonInput | null,
+    marketHistory?: JsonInput | null
+  ): ValuationResult;
+  /**
+   * Compute one metric of the instrument against a market snapshot.
+   *
+   * The same Rust metric path as `price(..., [metricId])`, returning just the value.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param metricId - Fully qualified metric identifier, e.g. `"dv01"` or `"par_rate"`.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @returns The metric value in the metric's documented unit.
+   * @throws Error - Throws with kind `validation` if the market JSON, `asOf`, `model` or `metricId` is invalid or the metric is not defined for this instrument; kind `not_found` if required market data is missing; and kind `computation` if the calculation fails.
+   */
+  metric(marketJson: JsonInput, asOf: string, metricId: string, model?: string | null): number;
+}
+
+/**
+ * Constructor surface for the typed `CapFloor` WebAssembly instrument.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const capFloor = valuations.instruments.CapFloor.example();
+ * console.log(capFloor.id, capFloor.toDict());
+ * capFloor.free();
+ * ```
+ */
+export interface CapFloorConstructor {
+  /**
+   * JavaScript prototype of `CapFloor`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: CapFloor;
+  /**
+   * Deserialize the instrument from its canonical v1 envelope.
+   *
+   * Bare payloads are rejected; the loader's validation runs on the result.
+   * @param json - A `finstack_quant.instrument/1` envelope (JSON string or plain object) for this exact instrument type.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if `json` is malformed, carries a different instrument type, or fails instrument validation.
+   */
+  fromJson(json: JsonInput): CapFloor;
+  /**
+   * Create a fluent builder (mirrors the Rust `builder()`).
+   *
+   * Each setter stores one field and returns the builder; `build()` validates and consumes it.
+   * @returns An empty builder.
+   */
+  builder(): CapFloorBuilder;
+  /**
+   * Canonical 5-year USD 3% cap (mirrors Rust `CapFloor::example`): quarterly ACT/360 on `USD-SOFR-3M` discounted on `USD-OIS` with vol surface `USD-CAPFLOOR-VOL`.
+   * @returns The example cap.
+   * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+   */
+  example(): CapFloor;
+}
+
+/**
+ * Fluent builder for `CapFloor`; one setter per Rust builder setter.
+ *
+ * Every setter returns the builder, so calls chain; `build()` validates and consumes it.
+ */
+export interface CapFloorBuilder extends WasmOwned {
+  /**
+   * Validate the staged fields and build the instrument.
+   *
+   * Runs the Rust `build()` validation and consumes the builder; create a new builder for the next instrument.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed, a required field is missing (the message names the field), or validation fails.
+   */
+  build(): CapFloor;
+  /**
+   * Set the instrument identifier.
+   * @param value - Instrument identifier.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  id(value: string): CapFloorBuilder;
+  /**
+   * Set the option type.
+   * @param value - Option type (serde string). `"cap"`/`"floor"` price a series of caplets/floorlets, `"caplet"`/`"floorlet"` a single period.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  rateOptionType(value: generated.valuations.CapFloor['rate_option_type']): CapFloorBuilder;
+  /**
+   * Set the notional amount.
+   * @param value - Notional amount, as a `Money` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  notional(value: Money): CapFloorBuilder;
+  /**
+   * Set the strike rate of every caplet/floorlet.
+   * @param value - Strike rate as a decimal (`0.05` = 5%).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  strike(value: number): CapFloorBuilder;
+  /**
+   * Set the contractual margin added to the referenced rate.
+   * @param value - Margin in basis points (`10` = 10bp), added after projecting the index.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  spreadBp(value: number): CapFloorBuilder;
+  /**
+   * Set the start date of the underlying period.
+   * @param value - Start date of the underlying period as an ISO-8601 string.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  startDate(value: string): CapFloorBuilder;
+  /**
+   * Set the end date of the underlying period.
+   * @param value - End date of the underlying period as an ISO-8601 string.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  maturity(value: string): CapFloorBuilder;
+  /**
+   * Set the payment frequency.
+   * @param value - Payment frequency, as a `Tenor` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  frequency(value: Tenor): CapFloorBuilder;
+  /**
+   * Set the day count convention.
+   * @param value - Day count convention, as a `DayCount` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  dayCount(value: DayCount): CapFloorBuilder;
+  /**
+   * Set the stub rule.
+   * @param value - Stub rule (serde string). Default `"short_front"`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  stub(value: NonNullable<generated.valuations.CapFloor['stub']>): CapFloorBuilder;
+  /**
+   * Set the business day convention.
+   * @param value - Business day convention (serde string). Default `"modified_following"`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  businessDayConvention(value: NonNullable<generated.valuations.CapFloor['business_day_convention']>): CapFloorBuilder;
+  /**
+   * Set the holiday calendar identifier for schedule and roll conventions.
+   * @param value - Holiday calendar identifier for schedule and roll conventions.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  calendarId(value: string): CapFloorBuilder;
+  /**
+   * Set the exercise style.
+   * @param value - Exercise style (serde string). Default `"european"`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  exerciseStyle(value: NonNullable<generated.valuations.CapFloor['exercise_style']>): CapFloorBuilder;
+  /**
+   * Set the settlement type.
+   * @param value - Settlement type (serde string). Default `"cash"`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  settlement(value: NonNullable<generated.valuations.CapFloor['settlement']>): CapFloorBuilder;
+  /**
+   * Set the discount curve identifier.
+   * @param value - Discount curve identifier.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  discountCurveId(value: string): CapFloorBuilder;
+  /**
+   * Set the forward curve identifier.
+   * @param value - Forward curve identifier.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  forwardCurveId(value: string): CapFloorBuilder;
+  /**
+   * Set the volatility surface identifier.
+   * @param value - Volatility surface identifier.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  volSurfaceId(value: string): CapFloorBuilder;
+  /**
+   * Set the volatility type convention.
+   * @param value - Volatility type convention (serde string). Must match the configured surface; `"auto"` (the default when unset) follows source convention and displacement metadata. Normal quotes use decimal rate units; Black quotes use dimensionless annual volatility. Incompatible model/source conventions raise `ValueError`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  volType(value: NonNullable<generated.valuations.CapFloor['vol_type']>): CapFloorBuilder;
+  /**
+   * Set the displacement shift used for shifted-lognormal pricing.
+   * @param value - Displacement added to forward and strike; must be non-negative.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  volShift(value: number): CapFloorBuilder;
+  /**
+   * Set the overnight (RFR) coupon convention for compounded caplets.
+   * @param value - Rust `OvernightCouponConvention` in serde form (plain object or JSON string), e.g. `{"compounding": {"compounded_in_arrears": {"lookback_days": 0}}, "payment_lag_days": 2}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  overnightCoupon(value: NonNullable<generated.valuations.CapFloor['overnight_coupon']>): CapFloorBuilder;
+  /**
+   * Set instrument attributes (tags and metadata).
+   * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  attributes(value: generated.valuations.CapFloor['attributes']): CapFloorBuilder;
+  /**
+   * Set the option premium paid on a given date.
+   * @param paymentDate - Premium payment date as an ISO-8601 string.
+   * @param amount - Premium amount; its currency must match the notional currency.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if `paymentDate` is malformed or the builder was already consumed by `build()`, and kind `invalid_type` if `paymentDate` is not a string.
+   */
+  premium(paymentDate: string, amount: Money): CapFloorBuilder;
+}
+
+/**
+ * Class object of `CapFloorBuilder`; create builders with `valuations.instruments.CapFloor.builder()`.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const builder = valuations.instruments.CapFloor.builder();
+ * console.log(typeof builder.build);
+ * builder.free();
+ * ```
+ */
+export interface CapFloorBuilderConstructor {
+  /**
+   * JavaScript prototype of `CapFloorBuilder`; instances come from `valuations.instruments.CapFloor.builder()`, not `new`.
+   */
+  readonly prototype: CapFloorBuilder;
+}
+
+/**
+ * Typed handle on the Rust `CreditDefaultSwap` instrument (single-name CDS).
+ *
+ * Every public Rust field is a read-only property; `price` and `metric` run the same pricer as `valuations.instruments.priceInstrument`.
+ */
+export interface CreditDefaultSwap extends WasmOwned {
+  /**
+   * Instrument identifier.
+   * @returns Stable instrument identifier used in metric keys.
+   */
+  readonly id: string;
+  /**
+   * Serialize to the canonical `finstack_quant.instrument/1` envelope.
+   *
+   * The output is compact JSON, byte-identical to the Python `to_json()` of the same instrument; pass it to `valuations.instruments.priceInstrument` or `fromJson`.
+   * @returns Canonical instrument envelope JSON.
+   * @throws Error - Throws if the instrument cannot be serialized.
+   */
+  toJson(): string;
+  /**
+   * Canonical model key used when `model="default"` is passed to `price`.
+   * @returns Registered model key such as `"hazard_rate"` or `"black76"`.
+   */
+  readonly defaultModel: string;
+  /**
+   * Instrument attributes (tags and metadata) used for scenario selection.
+   * @returns The attribute bag; empty when none were set.
+   */
+  readonly attributes: NonNullable<generated.valuations.CreditDefaultSwap['attributes']>;
+  /**
+   * Par spread implied by the market, in basis points (mirrors Rust `CreditDefaultSwap::par_spread`): the running spread at which the contract is worth zero under this CDS's valuation convention, premium schedule, discount curve, hazard curve and recovery assumption.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying the curves and quotes this instrument needs.
+   * @param asOf - ISO-8601 valuation date.
+   * @returns Par spread in basis points.
+   * @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if the market JSON or `asOf` is malformed, and kind `computation` if the calculation fails.
+   */
+  parSpread(marketJson: JsonInput, asOf: string): number;
+  /**
+   * Notional amount of protection.
+   * @returns Currency-tagged notional.
+   */
+  readonly notional: Money;
+  /**
+   * Protection perspective.
+   * @returns `"pay"` (buy protection) or `"receive"` (sell protection).
+   */
+  readonly side: generated.valuations.CreditDefaultSwap['side'];
+  /**
+   * ISDA regional convention (serde name).
+   * @returns `"isda_na"`, `"isda_eu"`, `"isda_as"` or `"custom"`.
+   */
+  readonly convention: generated.valuations.CreditDefaultSwap['convention'];
+  /**
+   * Premium (fixed coupon) leg specification.
+   * @returns The premium leg.
+   */
+  readonly premiumLeg: generated.valuations.CreditDefaultSwap['premium_leg'];
+  /**
+   * Protection (default-contingent) leg specification.
+   * @returns The protection leg.
+   */
+  readonly protectionLeg: generated.valuations.CreditDefaultSwap['protection_leg'];
+  /**
+   * Valuation presentation convention (serde name).
+   * @returns `"bloomberg_cdsw_clean"` (default), `"bloomberg_cdsw_clean_full_premium"`, `"isda_dirty"` or `"quant_lib_isda_parity"`.
+   */
+  readonly valuationConvention: NonNullable<generated.valuations.CreditDefaultSwap['valuation_convention']>;
+  /**
+   * Points-upfront payment as `(payment_date, amount)`; positive means the protection buyer pays.
+   * @returns The upfront pair, or `null` when the trade has no upfront.
+   */
+  readonly upfront: [string, Money] | null;
+  /**
+   * Explicit ISDA documentation clause (serde name).
+   * @returns The clause, or `null` when derived from the convention.
+   */
+  readonly docClause: NonNullable<generated.valuations.CreditDefaultSwap['doc_clause']> | null;
+  /**
+   * Effective documentation clause after convention-based resolution (mirrors Rust `doc_clause_effective`).
+   * @returns `"xr14"` for `isda_na` / `isda_as` / `custom`, `"mm14"` for `isda_eu`, or the explicit clause resolved to its 2014 variant.
+   */
+  readonly docClauseEffective: string;
+  /**
+   * Protection effective date for a forward-starting CDS.
+   * @returns The date, or `null` when protection starts with the premium leg.
+   */
+  readonly protectionEffectiveDate: string | null;
+  /**
+   * Date protection starts (mirrors Rust `protection_start`).
+   * @returns `protection_effective_date` when set, else the premium start date.
+   */
+  readonly protectionStart: string;
+  /**
+   * OTC margin specification in serde form.
+   * @returns The `OtcMarginSpec` plain object, or `null` for unmargined trades.
+   */
+  readonly marginSpec: NonNullable<generated.valuations.CreditDefaultSwap['margin_spec']> | null;
+  /**
+   * Premium-leg end date as seen by the pricer.
+   * @returns The scheduled maturity, or `null`.
+   */
+  readonly expiry: string | null;
+  /**
+   * The bare instrument spec as a plain object (no envelope).
+   *
+   * Mirrors Python `to_dict()`: the serde form of the Rust struct, i.e. the `instrument.spec` payload of `toJson()`.
+   * @returns Plain-object instrument spec.
+   * @throws Error - Throws if the instrument cannot be serialized.
+   */
+  toDict(): generated.valuations.CreditDefaultSwap;
+  /**
+   * Market data this instrument needs to price (mirrors Rust `Instrument::market_dependencies`).
+   * @returns `MarketDependencies` plain object listing discount, forward and credit curves, spot ids, volatility surfaces, FX pairs and fixing series.
+   * @throws Error - Throws with kind `validation` if the instrument cannot enumerate its dependencies.
+   */
+  marketDependencies(): generated.valuations.MarketDependencies;
+  /**
+   * Price the instrument against a market snapshot.
+   *
+   * Same pipeline and arguments as `valuations.instruments.priceInstrument`.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
+   * @param metricPricingOverrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
+   * @param marketHistory - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
+   * @returns Structured `ValuationResult` for the selected model.
+   * @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
+   */
+  price(
+    marketJson: JsonInput,
+    asOf: string,
+    model?: string | null,
+    metrics?: string[] | null,
+    metricPricingOverrides?: JsonInput | null,
+    marketHistory?: JsonInput | null
+  ): ValuationResult;
+  /**
+   * Compute one metric of the instrument against a market snapshot.
+   *
+   * The same Rust metric path as `price(..., [metricId])`, returning just the value.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param metricId - Fully qualified metric identifier, e.g. `"dv01"` or `"par_rate"`.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @returns The metric value in the metric's documented unit.
+   * @throws Error - Throws with kind `validation` if the market JSON, `asOf`, `model` or `metricId` is invalid or the metric is not defined for this instrument; kind `not_found` if required market data is missing; and kind `computation` if the calculation fails.
+   */
+  metric(marketJson: JsonInput, asOf: string, metricId: string, model?: string | null): number;
+}
+
+/**
+ * Constructor surface for the typed `CreditDefaultSwap` WebAssembly instrument.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const creditDefaultSwap = valuations.instruments.CreditDefaultSwap.example();
+ * console.log(creditDefaultSwap.id, creditDefaultSwap.toDict());
+ * creditDefaultSwap.free();
+ * ```
+ */
+export interface CreditDefaultSwapConstructor {
+  /**
+   * JavaScript prototype of `CreditDefaultSwap`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: CreditDefaultSwap;
+  /**
+   * Deserialize the instrument from its canonical v1 envelope.
+   *
+   * Bare payloads are rejected; the loader's validation runs on the result.
+   * @param json - A `finstack_quant.instrument/1` envelope (JSON string or plain object) for this exact instrument type.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if `json` is malformed, carries a different instrument type, or fails instrument validation.
+   */
+  fromJson(json: JsonInput): CreditDefaultSwap;
+  /**
+   * Create a fluent builder (mirrors the Rust `builder()`).
+   *
+   * Each setter stores one field and returns the builder; `build()` validates and consumes it.
+   * @returns An empty builder.
+   */
+  builder(): CreditDefaultSwapBuilder;
+  /**
+   * Canonical 5-year USD 10,000,000 investment-grade payer CDS (mirrors Rust `CreditDefaultSwap::example`): `isda_na` convention, 100bp running spread, 40% recovery, curves `USD-OIS` / `CORP-HAZARD`, premium 2024-03-20 to 2029-03-20.
+   * @returns The example CDS.
+   * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+   */
+  example(): CreditDefaultSwap;
+}
+
+/**
+ * Fluent builder for `CreditDefaultSwap`; one setter per Rust builder setter.
+ *
+ * Every setter returns the builder, so calls chain; `build()` validates and consumes it.
+ */
+export interface CreditDefaultSwapBuilder extends WasmOwned {
+  /**
+   * Validate the staged fields and build the instrument.
+   *
+   * Runs the Rust `build()` validation and consumes the builder; create a new builder for the next instrument.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed, a required field is missing (the message names the field), or validation fails.
+   */
+  build(): CreditDefaultSwap;
+  /**
+   * Set the instrument identifier.
+   * @param value - Unique identifier for the CDS.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  id(value: string): CreditDefaultSwapBuilder;
+  /**
+   * Set the notional amount.
+   * @param value - Notional amount, as a `Money` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  notional(value: Money): CreditDefaultSwapBuilder;
+  /**
+   * Set the protection buyer/seller perspective.
+   * @param value - `"pay"` to buy protection (pay premium), `"receive"` to sell protection (receive premium).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  side(value: generated.valuations.CreditDefaultSwap['side']): CreditDefaultSwapBuilder;
+  /**
+   * Set the ISDA regional convention.
+   * @param value - `"isda_na"` is the SNAC / post-Big-Bang North American standard (ACT/360, quarterly IMM, T+3); `"isda_eu"` the European standard (T+1, TARGET2); `"isda_as"` Asian (ACT/365F, Tokyo); `"custom"` for a manually configured convention.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  convention(value: generated.valuations.CreditDefaultSwap['convention']): CreditDefaultSwapBuilder;
+  /**
+   * Set the premium leg specification.
+   * @param value - Premium leg specification.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  premiumLeg(value: generated.valuations.CreditDefaultSwap['premium_leg']): CreditDefaultSwapBuilder;
+  /**
+   * Set the protection leg specification.
+   * @param value - Protection leg specification.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  protectionLeg(value: generated.valuations.CreditDefaultSwap['protection_leg']): CreditDefaultSwapBuilder;
+  /**
+   * Set the valuation presentation convention.
+   * @param value - `"bloomberg_cdsw_clean"` (default) reports Bloomberg CDSW clean principal; `"isda_dirty"` the academic ISDA dirty PV; `"quant_lib_isda_parity"` reproduces QuantLib `IsdaCdsEngine`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  valuationConvention(value: NonNullable<generated.valuations.CreditDefaultSwap['valuation_convention']>): CreditDefaultSwapBuilder;
+  /**
+   * Set the ISDA documentation clause for restructuring credit events.
+   * @param value - One of the four 2014 ISDA restructuring elections, a regional ISDA corporate default, or `"custom"`. If never set, the effective clause is derived from the CDS convention (see `CreditDefaultSwap.doc_clause_effective`).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  docClause(value: NonNullable<generated.valuations.CreditDefaultSwap['doc_clause']>): CreditDefaultSwapBuilder;
+  /**
+   * Set the protection effective date for a forward-starting CDS.
+   * @param value - Date on which credit protection begins; must satisfy `premium.start <= value <= premium.end` as an ISO-8601 string.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  protectionEffectiveDate(value: string): CreditDefaultSwapBuilder;
+  /**
+   * Set the OTC margin (CSA / initial-margin) specification.
+   * @param value - Rust `OtcMarginSpec` in serde form (plain object or JSON string); cleared CDS use the `cleared` form, bilateral CDS need a SIMM credit classification.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  marginSpec(value: NonNullable<generated.valuations.CreditDefaultSwap['margin_spec']>): CreditDefaultSwapBuilder;
+  /**
+   * Set instrument attributes (tags and metadata).
+   * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  attributes(value: NonNullable<generated.valuations.CreditDefaultSwap['attributes']>): CreditDefaultSwapBuilder;
+  /**
+   * Set the upfront payment exchanged at inception.
+   * @param paymentDate - Upfront payment date as an ISO-8601 string.
+   * @param amount - Upfront amount; positive when the protection buyer pays.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if `paymentDate` is malformed or the builder was already consumed by `build()`, and kind `invalid_type` if `paymentDate` is not a string.
+   */
+  upfront(paymentDate: string, amount: Money): CreditDefaultSwapBuilder;
+}
+
+/**
+ * Class object of `CreditDefaultSwapBuilder`; create builders with `valuations.instruments.CreditDefaultSwap.builder()`.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const builder = valuations.instruments.CreditDefaultSwap.builder();
+ * console.log(typeof builder.build);
+ * builder.free();
+ * ```
+ */
+export interface CreditDefaultSwapBuilderConstructor {
+  /**
+   * JavaScript prototype of `CreditDefaultSwapBuilder`; instances come from `valuations.instruments.CreditDefaultSwap.builder()`, not `new`.
+   */
+  readonly prototype: CreditDefaultSwapBuilder;
+}
+
+/**
+ * Typed handle on the Rust `CdsIndex` instrument (CDX / iTraxx style index swap).
+ *
+ * Every public Rust field is a read-only property; `price` and `metric` run the same pricer as `valuations.instruments.priceInstrument`.
+ */
+export interface CdsIndex extends WasmOwned {
+  /**
+   * Instrument identifier.
+   * @returns Stable instrument identifier used in metric keys.
+   */
+  readonly id: string;
+  /**
+   * Serialize to the canonical `finstack_quant.instrument/1` envelope.
+   *
+   * The output is compact JSON, byte-identical to the Python `to_json()` of the same instrument; pass it to `valuations.instruments.priceInstrument` or `fromJson`.
+   * @returns Canonical instrument envelope JSON.
+   * @throws Error - Throws if the instrument cannot be serialized.
+   */
+  toJson(): string;
+  /**
+   * Canonical model key used when `model="default"` is passed to `price`.
+   * @returns Registered model key such as `"hazard_rate"` or `"black76"`.
+   */
+  readonly defaultModel: string;
+  /**
+   * Instrument attributes (tags and metadata) used for scenario selection.
+   * @returns The attribute bag; empty when none were set.
+   */
+  readonly attributes: NonNullable<generated.valuations.CdsIndex['attributes']>;
+  /**
+   * Par spread of the index in basis points (mirrors Rust `CdsIndex::par_spread`; risky-annuity denominator in `single_curve` mode, weighted constituents otherwise).
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying the curves and quotes this instrument needs.
+   * @param asOf - ISO-8601 valuation date.
+   * @returns Par spread in basis points.
+   * @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if the market JSON or `asOf` is malformed, and kind `computation` if the calculation fails.
+   */
+  parSpread(marketJson: JsonInput, asOf: string): number;
+  /**
+   * Risky PV01 (risky annuity) of the premium leg (mirrors Rust `CdsIndex::risky_pv01`): PV of 1bp running on the surviving notional.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying the curves and quotes this instrument needs.
+   * @param asOf - ISO-8601 valuation date.
+   * @returns Risky PV01 in notional currency units per basis point.
+   * @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if the market JSON or `asOf` is malformed, and kind `computation` if the calculation fails.
+   */
+  riskyPv01(marketJson: JsonInput, asOf: string): number;
+  /**
+   * Ticker of the credit index family this contract references.
+   * @returns Index family ticker as supplied at construction, for example `"CDX.NA.IG"` or `"iTraxx Europe"`. The value is stored verbatim and is not normalised or validated against a registry.
+   */
+  readonly indexName: generated.valuations.CdsIndex['index_name'];
+  /**
+   * Roll series of the credit index, incremented each semi-annual roll.
+   * @returns Series number as an unsigned integer (for example `41` for CDX.NA.IG series 41). Higher numbers denote more recent on-the-run rolls.
+   */
+  readonly series: generated.valuations.CdsIndex['series'];
+  /**
+   * Version within the series.
+   * @returns The version number.
+   */
+  readonly version: generated.valuations.CdsIndex['version'];
+  /**
+   * Traded notional of the index position, carrying its own currency.
+   * @returns Currency-tagged notional in the index deal currency (USD for CDX, EUR for iTraxx). It is the full original notional and is not scaled by the index factor; apply `index_factor` to obtain the current outstanding amount.
+   */
+  readonly notional: Money;
+  /**
+   * Fraction of surviving notional.
+   * @returns `1.0` when no constituent has defaulted since inception.
+   */
+  readonly indexFactor: generated.valuations.CdsIndex['index_factor'];
+  /**
+   * Protection perspective.
+   * @returns `"pay"` (buy protection) or `"receive"` (sell protection).
+   */
+  readonly side: generated.valuations.CdsIndex['side'];
+  /**
+   * Regional ISDA convention (serde name).
+   * @returns `"isda_na"`, `"isda_eu"`, `"isda_as"` or `"custom"`.
+   */
+  readonly convention: generated.valuations.CdsIndex['convention'];
+  /**
+   * Premium leg specification.
+   * @returns The premium leg.
+   */
+  readonly premiumLeg: generated.valuations.CdsIndex['premium_leg'];
+  /**
+   * Protection leg specification.
+   * @returns The protection leg.
+   */
+  readonly protectionLeg: generated.valuations.CdsIndex['protection_leg'];
+  /**
+   * Pricing aggregation mode.
+   * @returns `"single_curve"` or `"constituents"`.
+   */
+  readonly pricing: generated.valuations.CdsIndex['pricing'];
+  /**
+   * Constituent rows.
+   * @returns Typed rows; empty in `single_curve` mode.
+   */
+  readonly constituents: generated.valuations.CdsIndex['constituents'];
+  /**
+   * Number of names in the pool.
+   * @returns The count, or `null` when unset.
+   */
+  readonly numConstituents: NonNullable<generated.valuations.CdsIndex['num_constituents']> | null;
+  /**
+   * Contractual upfront payment as `(payment_date, amount)`; positive means the protection buyer pays.
+   * @returns The upfront pair, or `null` when the trade has no upfront.
+   */
+  readonly upfront: [string, Money] | null;
+  /**
+   * OTC margin specification in serde form.
+   * @returns The `OtcMarginSpec` plain object, or `null` for unmargined trades.
+   */
+  readonly marginSpec: NonNullable<generated.valuations.CdsIndex['margin_spec']> | null;
+  /**
+   * Premium-leg end date as seen by the pricer.
+   * @returns The scheduled maturity, or `null`.
+   */
+  readonly expiry: string | null;
+  /**
+   * The bare instrument spec as a plain object (no envelope).
+   *
+   * Mirrors Python `to_dict()`: the serde form of the Rust struct, i.e. the `instrument.spec` payload of `toJson()`.
+   * @returns Plain-object instrument spec.
+   * @throws Error - Throws if the instrument cannot be serialized.
+   */
+  toDict(): generated.valuations.CdsIndex;
+  /**
+   * Market data this instrument needs to price (mirrors Rust `Instrument::market_dependencies`).
+   * @returns `MarketDependencies` plain object listing discount, forward and credit curves, spot ids, volatility surfaces, FX pairs and fixing series.
+   * @throws Error - Throws with kind `validation` if the instrument cannot enumerate its dependencies.
+   */
+  marketDependencies(): generated.valuations.MarketDependencies;
+  /**
+   * Price the instrument against a market snapshot.
+   *
+   * Same pipeline and arguments as `valuations.instruments.priceInstrument`.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
+   * @param metricPricingOverrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
+   * @param marketHistory - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
+   * @returns Structured `ValuationResult` for the selected model.
+   * @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
+   */
+  price(
+    marketJson: JsonInput,
+    asOf: string,
+    model?: string | null,
+    metrics?: string[] | null,
+    metricPricingOverrides?: JsonInput | null,
+    marketHistory?: JsonInput | null
+  ): ValuationResult;
+  /**
+   * Compute one metric of the instrument against a market snapshot.
+   *
+   * The same Rust metric path as `price(..., [metricId])`, returning just the value.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param metricId - Fully qualified metric identifier, e.g. `"dv01"` or `"par_rate"`.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @returns The metric value in the metric's documented unit.
+   * @throws Error - Throws with kind `validation` if the market JSON, `asOf`, `model` or `metricId` is invalid or the metric is not defined for this instrument; kind `not_found` if required market data is missing; and kind `computation` if the calculation fails.
+   */
+  metric(marketJson: JsonInput, asOf: string, metricId: string, model?: string | null): number;
+  /**
+   * Credit spread sensitivity of the index (mirrors Rust `CdsIndex::cs01`).
+   *
+   * Bumps the index par spread by one basis point, recalibrates the hazard curve and reprices.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying the discount and index hazard curves.
+   * @param asOf - ISO-8601 valuation date.
+   * @returns Change in present value for a one basis point spread widening, in the notional currency.
+   * @throws Error - Throws with kind `not_found` if a curve is missing, kind `validation` if the market JSON or `asOf` is malformed, and kind `computation` if recalibration or pricing fails.
+   */
+  cs01(marketJson: JsonInput, asOf: string): number;
+}
+
+/**
+ * Constructor surface for the typed `CdsIndex` WebAssembly instrument.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const cdsIndex = valuations.instruments.CdsIndex.example();
+ * console.log(cdsIndex.id, cdsIndex.toDict());
+ * cdsIndex.free();
+ * ```
+ */
+export interface CdsIndexConstructor {
+  /**
+   * JavaScript prototype of `CdsIndex`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: CdsIndex;
+  /**
+   * Deserialize the instrument from its canonical v1 envelope.
+   *
+   * Bare payloads are rejected; the loader's validation runs on the result.
+   * @param json - A `finstack_quant.instrument/1` envelope (JSON string or plain object) for this exact instrument type.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if `json` is malformed, carries a different instrument type, or fails instrument validation.
+   */
+  fromJson(json: JsonInput): CdsIndex;
+  /**
+   * Create a fluent builder (mirrors the Rust `builder()`).
+   *
+   * Each setter stores one field and returns the builder; `build()` validates and consumes it.
+   * @returns An empty builder.
+   */
+  builder(): CdsIndexBuilder;
+  /**
+   * Canonical CDX.NA.IG series 42 USD 10,000,000 payer (mirrors Rust `CdsIndex::example`): 60bp running coupon, `single_curve` pricing off `CDX.NA.IG.HAZARD` discounted on `USD-OIS`, premium 2024-03-20 to 2029-12-20, 125 names.
+   * @returns The example index trade.
+   * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+   */
+  example(): CdsIndex;
+  /**
+   * Create an index swap from a standard series preset.
+   *
+   * Mirrors Rust `CdsIndex::from_preset`: the preset supplies the index name, series, version, running coupon and regional ISDA convention; the remaining arguments are the trade terms.
+   * @param preset - `CdsIndexParams` preset, e.g. from `valuations.instruments.cdsIndexParamsCdxNaIg`.
+   * @param id - Unique instrument identifier.
+   * @param notional - Index notional on which the premium and protection legs are computed.
+   * @param side - Protection direction: `pay` (buy protection) or `receive`.
+   * @param start - Effective date as an ISO-8601 string.
+   * @param end - Maturity date as an ISO-8601 string.
+   * @param recoveryRate - Assumed recovery as a decimal fraction of par (`0.4` = 40%).
+   * @param discountCurveId - Discount curve identifier.
+   * @param creditCurveId - Index hazard curve identifier.
+   * @returns The validated index swap.
+   * @throws Error - Throws with kind `validation` if `preset`, `side` or a date is malformed or the instrument fails validation, and kind `invalid_type` for a wrong argument type.
+   */
+  fromPreset(
+    preset: generated.valuations.CdsIndexParams | string,
+    id: string,
+    notional: Money,
+    side: 'pay' | 'receive',
+    start: string,
+    end: string,
+    recoveryRate: number,
+    discountCurveId: string,
+    creditCurveId: string
+  ): CdsIndex;
+}
+
+/**
+ * Fluent builder for `CdsIndex`; one setter per Rust builder setter.
+ *
+ * Every setter returns the builder, so calls chain; `build()` validates and consumes it.
+ */
+export interface CdsIndexBuilder extends WasmOwned {
+  /**
+   * Validate the staged fields and build the instrument.
+   *
+   * Runs the Rust `build()` validation and consumes the builder; create a new builder for the next instrument.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed, a required field is missing (the message names the field), or validation fails.
+   */
+  build(): CdsIndex;
+  /**
+   * Set the instrument identifier.
+   * @param value - Unique identifier for the index trade.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  id(value: string): CdsIndexBuilder;
+  /**
+   * Set the index name.
+   * @param value - Index name, e.g. `"CDX.NA.IG"`, `"CDX.NA.HY"`, `"iTraxx Europe"`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  indexName(value: string): CdsIndexBuilder;
+  /**
+   * Set the series number.
+   * @param value - Series number, e.g. `42`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  series(value: number): CdsIndexBuilder;
+  /**
+   * Set the version number within the series.
+   * @param value - Version number, e.g. `1`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  version(value: number): CdsIndexBuilder;
+  /**
+   * Set the notional amount of the index.
+   * @param value - Notional amount of the index, as a `Money` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  notional(value: Money): CdsIndexBuilder;
+  /**
+   * Set the index factor (fraction of surviving notional).
+   * @param value - Index factor in `[0.0, 1.0]`; `1.0` means no constituent has defaulted since series inception.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  indexFactor(value: number): CdsIndexBuilder;
+  /**
+   * Set the protection buyer/seller perspective.
+   * @param value - `"pay"` to buy protection (pay premium), `"receive"` to sell protection (receive premium).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  side(value: generated.valuations.CdsIndex['side']): CdsIndexBuilder;
+  /**
+   * Set the ISDA regional convention.
+   * @param value - `"isda_na"` is the SNAC / post-Big-Bang North American standard; `"isda_eu"` European; `"isda_as"` Asian; `"custom"` for a manually configured convention.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  convention(value: generated.valuations.CdsIndex['convention']): CdsIndexBuilder;
+  /**
+   * Set the premium leg specification.
+   * @param value - Premium leg specification (coupon schedule and discounting).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  premiumLeg(value: generated.valuations.CdsIndex['premium_leg']): CdsIndexBuilder;
+  /**
+   * Set the protection leg specification.
+   * @param value - Protection leg specification (credit curve and settlement).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  protectionLeg(value: generated.valuations.CdsIndex['protection_leg']): CdsIndexBuilder;
+  /**
+   * Set the pricing aggregation mode.
+   * @param value - `"single_curve"` prices the index against a single index hazard curve (synthetic CDS). `"constituents"` prices each issuer separately and aggregates by weight; requires `CdsIndexBuilder.constituents` to be set.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  pricing(value: generated.valuations.CdsIndex['pricing']): CdsIndexBuilder;
+  /**
+   * Set the index constituents.
+   * @param value - Constituent rows as typed `CdsIndexConstituent` objects, plain objects with `credit` (`reference_entity`, `recovery_rate`, `credit_curve_id`), `weight` and optional `defaulted`, or a JSON array of the same shape.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  constituents(value: generated.valuations.CdsIndex['constituents']): CdsIndexBuilder;
+  /**
+   * Set the number of reference entities in the index pool.
+   * @param value - Number of names in the index pool, e.g. `125` for CDX.NA.IG; required for portfolio-level analytics (e.g. jump-to-default) when `constituents` is empty.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  numConstituents(value: number): CdsIndexBuilder;
+  /**
+   * Set the OTC margin (CSA / initial-margin) specification.
+   * @param value - Rust `OtcMarginSpec` in serde form (plain object or JSON string).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  marginSpec(value: NonNullable<generated.valuations.CdsIndex['margin_spec']>): CdsIndexBuilder;
+  /**
+   * Set instrument attributes (tags and metadata).
+   * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  attributes(value: NonNullable<generated.valuations.CdsIndex['attributes']>): CdsIndexBuilder;
+  /**
+   * Set the upfront payment exchanged at inception.
+   * @param paymentDate - Upfront payment date as an ISO-8601 string.
+   * @param amount - Upfront amount; positive when the protection buyer pays.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if `paymentDate` is malformed or the builder was already consumed by `build()`, and kind `invalid_type` if `paymentDate` is not a string.
+   */
+  upfront(paymentDate: string, amount: Money): CdsIndexBuilder;
+}
+
+/**
+ * Class object of `CdsIndexBuilder`; create builders with `valuations.instruments.CdsIndex.builder()`.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const builder = valuations.instruments.CdsIndex.builder();
+ * console.log(typeof builder.build);
+ * builder.free();
+ * ```
+ */
+export interface CdsIndexBuilderConstructor {
+  /**
+   * JavaScript prototype of `CdsIndexBuilder`; instances come from `valuations.instruments.CdsIndex.builder()`, not `new`.
+   */
+  readonly prototype: CdsIndexBuilder;
+}
+
+/**
+ * Typed handle on the Rust `CdsTranche` instrument (synthetic index tranche).
+ *
+ * Every public Rust field is a read-only property; `price` and `metric` run the same pricer as `valuations.instruments.priceInstrument`.
+ */
+export interface CdsTranche extends WasmOwned {
+  /**
+   * Instrument identifier.
+   * @returns Stable instrument identifier used in metric keys.
+   */
+  readonly id: string;
+  /**
+   * Serialize to the canonical `finstack_quant.instrument/1` envelope.
+   *
+   * The output is compact JSON, byte-identical to the Python `to_json()` of the same instrument; pass it to `valuations.instruments.priceInstrument` or `fromJson`.
+   * @returns Canonical instrument envelope JSON.
+   * @throws Error - Throws if the instrument cannot be serialized.
+   */
+  toJson(): string;
+  /**
+   * Canonical model key used when `model="default"` is passed to `price`.
+   * @returns Registered model key such as `"hazard_rate"` or `"black76"`.
+   */
+  readonly defaultModel: string;
+  /**
+   * Instrument attributes (tags and metadata) used for scenario selection.
+   * @returns The attribute bag; empty when none were set.
+   */
+  readonly attributes: generated.valuations.CdsTranche['attributes'];
+  /**
+   * Jump-to-default exposure (mirrors Rust `CdsTranche::jump_to_default`): PV impact of one constituent defaulting immediately.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying the curves and quotes this instrument needs.
+   * @param asOf - ISO-8601 valuation date.
+   * @returns Jump-to-default PV change in notional currency units.
+   * @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if the market JSON or `asOf` is malformed, and kind `computation` if the calculation fails.
+   */
+  jumpToDefault(marketJson: JsonInput, asOf: string): number;
+  /**
+   * Underlying index name.
+   * @returns The index name.
+   */
+  readonly indexName: generated.valuations.CdsTranche['index_name'];
+  /**
+   * Index series number.
+   * @returns The series number.
+   */
+  readonly series: generated.valuations.CdsTranche['series'];
+  /**
+   * Attachment point in percent.
+   * @returns Attachment (`3.0` = 3%).
+   */
+  readonly attachPct: generated.valuations.CdsTranche['attach_pct'];
+  /**
+   * Detachment point in percent.
+   * @returns Detachment (`7.0` = 7%).
+   */
+  readonly detachPct: generated.valuations.CdsTranche['detach_pct'];
+  /**
+   * Tranche notional.
+   * @returns Currency-tagged notional.
+   */
+  readonly notional: Money;
+  /**
+   * Scheduled maturity.
+   * @returns The maturity date.
+   */
+  readonly maturity: string;
+  /**
+   * Contractual running coupon (bp) paid on the tranche premium leg.
+   * @returns Coupon quoted in basis points per annum on the outstanding tranche notional (for example `100.0` for a 100 bp coupon), not as a decimal rate. Accrues on the premium-leg day count.
+   */
+  readonly couponBp: generated.valuations.CdsTranche['coupon_bp'];
+  /**
+   * Payment frequency.
+   * @returns The coupon tenor (typically quarterly).
+   */
+  readonly frequency: Tenor;
+  /**
+   * Day count convention.
+   * @returns Act/360 for standard tranches.
+   */
+  readonly dayCount: DayCount;
+  /**
+   * Business day convention (serde name).
+   * @returns `"modified_following"` unless set otherwise.
+   */
+  readonly businessDayConvention: NonNullable<generated.valuations.CdsTranche['business_day_convention']>;
+  /**
+   * Holiday calendar identifier.
+   * @returns The calendar id, or `null`.
+   */
+  readonly calendarId: string | null;
+  /**
+   * Discount curve identifier.
+   * @returns The curve id.
+   */
+  readonly discountCurveId: string;
+  /**
+   * Credit index identifier for the loss distribution.
+   * @returns The credit index id.
+   */
+  readonly creditIndexId: string;
+  /**
+   * Direction of the tranche position from the holder's perspective.
+   * @returns Serde string, either `"pay"` (buys protection: pays the running coupon and receives tranche loss payments) or `"receive"` (sells protection: receives the coupon and pays losses), matching the CDS and CDS index `side`.
+   */
+  readonly side: generated.valuations.CdsTranche['side'];
+  /**
+   * Explicit contract start (effective) date for schedule anchoring.
+   * @returns The date, or `null`.
+   */
+  readonly startDate: string | null;
+  /**
+   * Realized portfolio loss so far.
+   * @returns Fraction of the original portfolio notional.
+   */
+  readonly realizedLoss: generated.valuations.CdsTranche['realized_loss'];
+  /**
+   * Coupon roll-date grid.
+   * @returns `"cds_imm"` for the CDS roll dates (20th of Mar/Jun/Sep/Dec); `"none"` for a bespoke `frequency`/`stub` schedule.
+   */
+  readonly rollRule: NonNullable<generated.valuations.CdsTranche['roll_rule']>;
+  /**
+   * Stub convention for a bespoke (`"none"`) coupon schedule.
+   * @returns The stub rule (`short_front` by default).
+   */
+  readonly stub: NonNullable<generated.valuations.CdsTranche['stub']>;
+  /**
+   * Upfront payment as `(payment_date, amount)`.
+   * @returns The pair, or `null`.
+   */
+  readonly upfront: [string, Money] | null;
+  /**
+   * Maturity as seen by the pricer.
+   * @returns The maturity, or `null`.
+   */
+  readonly expiry: string | null;
+  /**
+   * The bare instrument spec as a plain object (no envelope).
+   *
+   * Mirrors Python `to_dict()`: the serde form of the Rust struct, i.e. the `instrument.spec` payload of `toJson()`.
+   * @returns Plain-object instrument spec.
+   * @throws Error - Throws if the instrument cannot be serialized.
+   */
+  toDict(): generated.valuations.CdsTranche;
+  /**
+   * Market data this instrument needs to price (mirrors Rust `Instrument::market_dependencies`).
+   * @returns `MarketDependencies` plain object listing discount, forward and credit curves, spot ids, volatility surfaces, FX pairs and fixing series.
+   * @throws Error - Throws with kind `validation` if the instrument cannot enumerate its dependencies.
+   */
+  marketDependencies(): generated.valuations.MarketDependencies;
+  /**
+   * Price the instrument against a market snapshot.
+   *
+   * Same pipeline and arguments as `valuations.instruments.priceInstrument`.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
+   * @param metricPricingOverrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
+   * @param marketHistory - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
+   * @returns Structured `ValuationResult` for the selected model.
+   * @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
+   */
+  price(
+    marketJson: JsonInput,
+    asOf: string,
+    model?: string | null,
+    metrics?: string[] | null,
+    metricPricingOverrides?: JsonInput | null,
+    marketHistory?: JsonInput | null
+  ): ValuationResult;
+  /**
+   * Compute one metric of the instrument against a market snapshot.
+   *
+   * The same Rust metric path as `price(..., [metricId])`, returning just the value.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param metricId - Fully qualified metric identifier, e.g. `"dv01"` or `"par_rate"`.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @returns The metric value in the metric's documented unit.
+   * @throws Error - Throws with kind `validation` if the market JSON, `asOf`, `model` or `metricId` is invalid or the metric is not defined for this instrument; kind `not_found` if required market data is missing; and kind `computation` if the calculation fails.
+   */
+  metric(marketJson: JsonInput, asOf: string, metricId: string, model?: string | null): number;
+  /**
+   * Expected tranche loss at maturity (mirrors Rust `CdsTranche::expected_loss`).
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying the credit index data.
+   * @returns Expected loss of the tranche in the notional currency.
+   * @throws Error - Throws with kind `not_found` if the credit index data is missing, kind `validation` if the market JSON is malformed, and kind `computation` if the loss model fails.
+   */
+  expectedLoss(marketJson: JsonInput): number;
+}
+
+/**
+ * Constructor surface for the typed `CdsTranche` WebAssembly instrument.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const cdsTranche = valuations.instruments.CdsTranche.example();
+ * console.log(cdsTranche.id, cdsTranche.toDict());
+ * cdsTranche.free();
+ * ```
+ */
+export interface CdsTrancheConstructor {
+  /**
+   * JavaScript prototype of `CdsTranche`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: CdsTranche;
+  /**
+   * Deserialize the instrument from its canonical v1 envelope.
+   *
+   * Bare payloads are rejected; the loader's validation runs on the result.
+   * @param json - A `finstack_quant.instrument/1` envelope (JSON string or plain object) for this exact instrument type.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if `json` is malformed, carries a different instrument type, or fails instrument validation.
+   */
+  fromJson(json: JsonInput): CdsTranche;
+  /**
+   * Create a fluent builder (mirrors the Rust `builder()`).
+   *
+   * Each setter stores one field and returns the builder; `build()` validates and consumes it.
+   * @returns An empty builder.
+   */
+  builder(): CdsTrancheBuilder;
+  /**
+   * Canonical CDX.NA.IG 42 equity (0–3%) tranche, USD 10,000,000 (mirrors Rust `CdsTranche::example`): buy protection, 100bp running, maturity 2029-12-20, curves `USD-OIS` / `CDX.NA.IG.HAZARD`.
+   * @returns The example tranche.
+   * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+   */
+  example(): CdsTranche;
+  /**
+   * Create a standard index tranche (mirrors Rust `CdsTranche::standard`).
+   *
+   * Uses the standard quarterly, Act/360, following, CDS-IMM schedule.
+   * @param id - Unique instrument identifier.
+   * @param params - `CdsTrancheParams`, e.g. from `valuations.instruments.cdsTrancheParamsEquityTranche`.
+   * @param discountCurveId - Discount curve identifier.
+   * @param creditIndexId - Credit index data identifier (index hazard curve and base correlation).
+   * @param side - Protection direction: `pay` (buy protection) or `receive`.
+   * @returns The validated tranche.
+   * @throws Error - Throws with kind `validation` if `params` or `side` is malformed or the tranche fails validation, and kind `invalid_type` for a wrong argument type.
+   */
+  standard(
+    id: string,
+    params: generated.valuations.CdsTrancheParams | string,
+    discountCurveId: string,
+    creditIndexId: string,
+    side: 'pay' | 'receive'
+  ): CdsTranche;
+}
+
+/**
+ * Fluent builder for `CdsTranche`; one setter per Rust builder setter.
+ *
+ * Every setter returns the builder, so calls chain; `build()` validates and consumes it.
+ */
+export interface CdsTrancheBuilder extends WasmOwned {
+  /**
+   * Validate the staged fields and build the instrument.
+   *
+   * Runs the Rust `build()` validation and consumes the builder; create a new builder for the next instrument.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed, a required field is missing (the message names the field), or validation fails.
+   */
+  build(): CdsTranche;
+  /**
+   * Set the instrument identifier.
+   * @param value - Unique identifier for the tranche trade.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  id(value: string): CdsTrancheBuilder;
+  /**
+   * Set the underlying index name.
+   * @param value - Index name, e.g. `"CDX.NA.IG"`, `"CDX.NA.HY"`, `"iTraxx EUR"`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  indexName(value: string): CdsTrancheBuilder;
+  /**
+   * Set the series number.
+   * @param value - Series number, e.g. `42`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  series(value: number): CdsTrancheBuilder;
+  /**
+   * Set the attachment point.
+   * @param value - Attachment point quoted in percent (`0.0` for equity; `3.0` for a tranche attaching at 3%).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  attachPct(value: number): CdsTrancheBuilder;
+  /**
+   * Set the detachment point.
+   * @param value - Detachment point quoted in percent (`3.0` for a 0-3% tranche).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  detachPct(value: number): CdsTrancheBuilder;
+  /**
+   * Set the notional amount of the tranche.
+   * @param value - Notional amount of the tranche, as a `Money` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  notional(value: Money): CdsTrancheBuilder;
+  /**
+   * Set the maturity date of the tranche.
+   * @param value - Maturity date as an ISO-8601 string.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  maturity(value: string): CdsTrancheBuilder;
+  /**
+   * Set the running coupon.
+   * @param value - Running coupon in basis points (`100.0` = 1.00%).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  couponBp(value: number): CdsTrancheBuilder;
+  /**
+   * Set the payment frequency.
+   * @param value - Payment frequency, as a `Tenor` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  frequency(value: Tenor): CdsTrancheBuilder;
+  /**
+   * Set the day count convention.
+   * @param value - Day count convention, as a `DayCount` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  dayCount(value: DayCount): CdsTrancheBuilder;
+  /**
+   * Set the business day convention for coupon dates.
+   * @param value - Roll rule (`"modified_following"` when never set).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  businessDayConvention(value: NonNullable<generated.valuations.CdsTranche['business_day_convention']>): CdsTrancheBuilder;
+  /**
+   * Set the holiday calendar identifier.
+   * @param value - Holiday calendar identifier.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  calendarId(value: string): CdsTrancheBuilder;
+  /**
+   * Set the discount curve identifier (by quote currency).
+   * @param value - Discount curve identifier.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  discountCurveId(value: string): CdsTrancheBuilder;
+  /**
+   * Set the credit index identifier for survival/loss modeling.
+   * @param value - Credit index identifier.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  creditIndexId(value: string): CdsTrancheBuilder;
+  /**
+   * Set the tranche side (`"pay"` buys protection, `"receive"` sells it).
+   * @param value - Tranche side.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  side(value: generated.valuations.CdsTranche['side']): CdsTrancheBuilder;
+  /**
+   * Set the contract start (effective) date for schedule anchoring.
+   * @param value - Effective date; if never set, uses the as-of date (or the prior CDS roll date when `roll_rule` is `"cds_imm"`).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  startDate(value: string): CdsTrancheBuilder;
+  /**
+   * Set the realized (settled) loss.
+   * @param value - Realized loss as a fraction of the original portfolio notional; `0.0` when never set.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  realizedLoss(value: number): CdsTrancheBuilder;
+  /**
+   * Set the coupon roll-date grid.
+   * @param value - `"cds_imm"` for the CDS roll dates (20th of Mar, Jun, Sep, Dec) or `"none"` (the default) for a schedule from `frequency` and `stub`; `"imm"` is rejected by `build()`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  rollRule(value: NonNullable<generated.valuations.CdsTranche['roll_rule']>): CdsTrancheBuilder;
+  /**
+   * Set the stub convention for a bespoke coupon schedule.
+   * @param value - Stub rule used when `roll_rule` is `"none"`; `"short_front"` when never set.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  stub(value: NonNullable<generated.valuations.CdsTranche['stub']>): CdsTrancheBuilder;
+  /**
+   * Set instrument attributes (tags and metadata).
+   * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  attributes(value: generated.valuations.CdsTranche['attributes']): CdsTrancheBuilder;
+  /**
+   * Set the upfront payment exchanged at inception.
+   * @param paymentDate - Upfront payment date as an ISO-8601 string.
+   * @param amount - Upfront amount; positive when the protection buyer pays.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if `paymentDate` is malformed or the builder was already consumed by `build()`, and kind `invalid_type` if `paymentDate` is not a string.
+   */
+  upfront(paymentDate: string, amount: Money): CdsTrancheBuilder;
+}
+
+/**
+ * Class object of `CdsTrancheBuilder`; create builders with `valuations.instruments.CdsTranche.builder()`.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const builder = valuations.instruments.CdsTranche.builder();
+ * console.log(typeof builder.build);
+ * builder.free();
+ * ```
+ */
+export interface CdsTrancheBuilderConstructor {
+  /**
+   * JavaScript prototype of `CdsTrancheBuilder`; instances come from `valuations.instruments.CdsTranche.builder()`, not `new`.
+   */
+  readonly prototype: CdsTrancheBuilder;
+}
+
+/**
+ * Typed handle on the Rust `ConvertibleBond` instrument.
+ *
+ * Every public Rust field is a read-only property; `price` and `metric` run the same pricer as `valuations.instruments.priceInstrument`.
+ */
+export interface ConvertibleBond extends WasmOwned {
+  /**
+   * Instrument identifier.
+   * @returns Stable instrument identifier used in metric keys.
+   */
+  readonly id: string;
+  /**
+   * Serialize to the canonical `finstack_quant.instrument/1` envelope.
+   *
+   * The output is compact JSON, byte-identical to the Python `to_json()` of the same instrument; pass it to `valuations.instruments.priceInstrument` or `fromJson`.
+   * @returns Canonical instrument envelope JSON.
+   * @throws Error - Throws if the instrument cannot be serialized.
+   */
+  toJson(): string;
+  /**
+   * Canonical model key used when `model="default"` is passed to `price`.
+   * @returns Registered model key such as `"hazard_rate"` or `"black76"`.
+   */
+  readonly defaultModel: string;
+  /**
+   * Instrument attributes (tags and metadata) used for scenario selection.
+   * @returns The attribute bag; empty when none were set.
+   */
+  readonly attributes: generated.valuations.ConvertibleBond['attributes'];
+  /**
+   * Principal amount.
+   * @returns Currency-tagged principal.
+   */
+  readonly notional: Money;
+  /**
+   * Dated date from which the bond starts accruing interest.
+   * @returns Calendar date, unadjusted for business days. It anchors the coupon schedule and the first accrual period.
+   */
+  readonly issueDate: string;
+  /**
+   * Scheduled redemption date on which principal is repaid.
+   * @returns Unadjusted calendar maturity; payment dates derived from it are rolled by the instrument's business-day convention.
+   */
+  readonly maturity: string;
+  /**
+   * Discount curve identifier for the debt component.
+   * @returns The curve id.
+   */
+  readonly discountCurveId: string;
+  /**
+   * Issuer hazard curve identifier.
+   * @returns The hazard curve id, or `null` (the cash component discounts at the risk-free curve).
+   */
+  readonly creditCurveId: string | null;
+  /**
+   * Conversion terms.
+   * @returns The typed conversion spec.
+   */
+  readonly conversion: generated.valuations.ConvertibleBond['conversion'];
+  /**
+   * Base conversion ratio (shares per bond), derived from ratio or price (mirrors Rust `conversion_ratio`).
+   * @returns The ratio, or `null` when neither ratio nor price is set.
+   */
+  readonly conversionRatio: number | null;
+  /**
+   * Conversion ratio after anti-dilution adjustments (mirrors Rust `effective_conversion_ratio`).
+   * @returns The adjusted ratio, or `null`.
+   */
+  readonly effectiveConversionRatio: number | null;
+  /**
+   * Market-scalar id of the underlying share price.
+   * @returns The `MarketContext` price id read for the equity spot.
+   */
+  readonly spotId: string;
+  /**
+   * Equity volatility id: a volatility surface, or a unitless scalar holding a flat volatility.
+   * @returns The volatility id.
+   */
+  readonly volSurfaceId: string;
+  /**
+   * Unitless continuous dividend-yield scalar id.
+   * @returns The id, or `null` for a zero dividend yield.
+   */
+  readonly divYieldId: string | null;
+  /**
+   * Call/put schedule.
+   * @returns The typed schedule, or `null`.
+   */
+  readonly callPut: NonNullable<generated.valuations.ConvertibleBond['call_put']> | null;
+  /**
+   * Soft-call trigger (`threshold_pct`, `observation_days`, `required_days_above`).
+   * @returns The trigger plain object, or `null`.
+   */
+  readonly softCallTrigger: NonNullable<generated.valuations.ConvertibleBond['soft_call_trigger']> | null;
+  /**
+   * Settlement lag in business days.
+   * @returns The lag, or `null` for same-day.
+   */
+  readonly settlementDays: NonNullable<generated.valuations.ConvertibleBond['settlement_days']> | null;
+  /**
+   * Assumed recovery rate on default as a fraction.
+   * @returns The recovery, or `null`.
+   */
+  readonly recoveryRate: NonNullable<generated.valuations.ConvertibleBond['recovery_rate']> | null;
+  /**
+   * Coupon/cashflow specification in serde form, the same shape as `Bond.cashflow_spec`.
+   * @returns `{"fixed": {...}}`, `{"floating": {...}}`, `{"step_up": {...}}` or `{"amortizing": {...}}`; a zero-coupon convertible is a fixed spec with rate `"0"`.
+   */
+  readonly cashflowSpec: generated.valuations.ConvertibleBond['cashflow_spec'];
+  /**
+   * Maturity as seen by the pricer.
+   * @returns The maturity, or `null`.
+   */
+  readonly expiry: string | null;
+  /**
+   * The bare instrument spec as a plain object (no envelope).
+   *
+   * Mirrors Python `to_dict()`: the serde form of the Rust struct, i.e. the `instrument.spec` payload of `toJson()`.
+   * @returns Plain-object instrument spec.
+   * @throws Error - Throws if the instrument cannot be serialized.
+   */
+  toDict(): generated.valuations.ConvertibleBond;
+  /**
+   * Market data this instrument needs to price (mirrors Rust `Instrument::market_dependencies`).
+   * @returns `MarketDependencies` plain object listing discount, forward and credit curves, spot ids, volatility surfaces, FX pairs and fixing series.
+   * @throws Error - Throws with kind `validation` if the instrument cannot enumerate its dependencies.
+   */
+  marketDependencies(): generated.valuations.MarketDependencies;
+  /**
+   * Price the instrument against a market snapshot.
+   *
+   * Same pipeline and arguments as `valuations.instruments.priceInstrument`.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
+   * @param metricPricingOverrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
+   * @param marketHistory - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
+   * @returns Structured `ValuationResult` for the selected model.
+   * @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
+   */
+  price(
+    marketJson: JsonInput,
+    asOf: string,
+    model?: string | null,
+    metrics?: string[] | null,
+    metricPricingOverrides?: JsonInput | null,
+    marketHistory?: JsonInput | null
+  ): ValuationResult;
+  /**
+   * Compute one metric of the instrument against a market snapshot.
+   *
+   * The same Rust metric path as `price(..., [metricId])`, returning just the value.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param metricId - Fully qualified metric identifier, e.g. `"dv01"` or `"par_rate"`.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @returns The metric value in the metric's documented unit.
+   * @throws Error - Throws with kind `validation` if the market JSON, `asOf`, `model` or `metricId` is invalid or the metric is not defined for this instrument; kind `not_found` if required market data is missing; and kind `computation` if the calculation fails.
+   */
+  metric(marketJson: JsonInput, asOf: string, metricId: string, model?: string | null): number;
+  /**
+   * Conversion parity (mirrors Rust `ConvertibleBond::parity`).
+   * @param marketJson - Canonical market-context JSON (string or plain object) carrying the underlying spot under `spot_id`.
+   * @returns Value of the shares received on conversion, in the bond's currency.
+   * @throws Error - Throws with kind `not_found` if the spot is missing, and kind `validation` if the market JSON is malformed or the bond fails validation.
+   */
+  parity(marketJson: JsonInput): number;
+  /**
+   * Conversion premium over parity (mirrors Rust `ConvertibleBond::conversion_premium`).
+   * @param marketJson - Canonical market-context JSON (string or plain object) carrying the underlying spot under `spot_id`.
+   * @param bondPrice - Bond price in currency units for the whole notional, on the same scale as parity.
+   * @returns Premium as a decimal fraction of parity (`0.25` = 25% above parity).
+   * @throws Error - Throws with kind `not_found` if the spot is missing, kind `validation` if the market JSON is malformed or the bond fails validation, and kind `invalid_type` if `bondPrice` is not a number.
+   */
+  conversionPremium(marketJson: JsonInput, bondPrice: number): number;
+  /**
+   * Tree Greeks of the convertible (mirrors Rust `ConvertibleBond::greeks`).
+   *
+   * Uses the default binomial tree; its step count is `instrument_pricing_overrides.model_config.tree_steps`.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying the curves, spot and volatility.
+   * @param asOf - ISO-8601 valuation date.
+   * @returns `ConvertibleGreeks` plain object with the price and its delta, gamma, vega, rho and theta.
+   * @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if the market JSON or `asOf` is malformed, and kind `computation` if the tree fails.
+   */
+  greeks(marketJson: JsonInput, asOf: string): generated.valuations.ConvertibleGreeks;
+}
+
+/**
+ * Constructor surface for the typed `ConvertibleBond` WebAssembly instrument.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const convertibleBond = valuations.instruments.ConvertibleBond.example();
+ * console.log(convertibleBond.id, convertibleBond.toDict());
+ * convertibleBond.free();
+ * ```
+ */
+export interface ConvertibleBondConstructor {
+  /**
+   * JavaScript prototype of `ConvertibleBond`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: ConvertibleBond;
+  /**
+   * Deserialize the instrument from its canonical v1 envelope.
+   *
+   * Bare payloads are rejected; the loader's validation runs on the result.
+   * @param json - A `finstack_quant.instrument/1` envelope (JSON string or plain object) for this exact instrument type.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if `json` is malformed, carries a different instrument type, or fails instrument validation.
+   */
+  fromJson(json: JsonInput): ConvertibleBond;
+  /**
+   * Create a fluent builder (mirrors the Rust `builder()`).
+   *
+   * Each setter stores one field and returns the builder; `build()` validates and consumes it.
+   * @returns An empty builder.
+   */
+  builder(): ConvertibleBondBuilder;
+  /**
+   * Canonical 5-year USD 1,000,000 2% semi-annual convertible (mirrors Rust `ConvertibleBond::example`): ratio 25 shares per bond, voluntary conversion, underlying `"TECH"`, curves `USD-IG` / `USD-CREDIT-BBB`, issue 2024-01-15, maturity 2029-01-15.
+   * @returns The example bond.
+   * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+   */
+  example(): ConvertibleBond;
+  /**
+   * Mandatory (PERCS/DECS-style) convertible example (mirrors Rust `ConvertibleBond::example_mandatory`): 3-year 5% semi-annual, mandatory-variable conversion at maturity (upper conversion price 60, lower 40), 130% soft call, call at 101% after year 2 and put at 100% after year 1.
+   * @returns The example bond.
+   * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+   */
+  exampleMandatory(): ConvertibleBond;
+}
+
+/**
+ * Fluent builder for `ConvertibleBond`; one setter per Rust builder setter.
+ *
+ * Every setter returns the builder, so calls chain; `build()` validates and consumes it.
+ */
+export interface ConvertibleBondBuilder extends WasmOwned {
+  /**
+   * Validate the staged fields and build the instrument.
+   *
+   * Runs the Rust `build()` validation and consumes the builder; create a new builder for the next instrument.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed, a required field is missing (the message names the field), or validation fails.
+   */
+  build(): ConvertibleBond;
+  /**
+   * Set the instrument identifier.
+   * @param value - Unique identifier for the convertible bond.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  id(value: string): ConvertibleBondBuilder;
+  /**
+   * Set the principal amount.
+   * @param value - Principal amount, as a `Money` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  notional(value: Money): ConvertibleBondBuilder;
+  /**
+   * Set the issue date.
+   * @param value - Issue date as an ISO-8601 string.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  issueDate(value: string): ConvertibleBondBuilder;
+  /**
+   * Set the maturity date.
+   * @param value - Maturity date as an ISO-8601 string.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  maturity(value: string): ConvertibleBondBuilder;
+  /**
+   * Set the discount curve identifier for the debt component.
+   * @param value - Discount curve identifier (risk-free or funding).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  discountCurveId(value: string): ConvertibleBondBuilder;
+  /**
+   * Set the issuer hazard curve identifier.
+   * @param value - `HazardCurve` identifier; the zero-recovery risky discount factor is the risk-free discount factor times its survival probability. If never set, the cash component discounts at the risk-free curve (no credit spread). Requires an explicit `recovery_rate`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  creditCurveId(value: string): ConvertibleBondBuilder;
+  /**
+   * Set the conversion terms.
+   * @param value - Typed `ConversionSpec`, a plain object, or a JSON object string with `ratio`, `price`, `policy`, `anti_dilution`, `dividend_adjustment` and `dilution_events`; at least one of `ratio` / `price` must be set.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  conversion(value: generated.valuations.ConvertibleBond['conversion']): ConvertibleBondBuilder;
+  /**
+   * Set the market-scalar id of the underlying share price (required).
+   * @param value - `MarketContext` price id holding the share price in the bond's currency, or a unitless level.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  spotId(value: string): ConvertibleBondBuilder;
+  /**
+   * Set the equity volatility id (required).
+   * @param value - Volatility surface id read at the conversion strike and maturity, or the id of a unitless scalar holding a flat volatility.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  volSurfaceId(value: string): ConvertibleBondBuilder;
+  /**
+   * Set the continuous dividend-yield scalar id.
+   * @param value - Id of a unitless decimal dividend yield (`0.02` = 2%). When never set the dividend yield is zero; a set id must exist in the market.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  divYieldId(value: string): ConvertibleBondBuilder;
+  /**
+   * Set the call/put schedule.
+   * @param value - Typed `CallPutSchedule`, a plain object, or a JSON object string with `calls` and `puts` arrays of windows.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  callPut(value: NonNullable<generated.valuations.ConvertibleBond['call_put']>): ConvertibleBondBuilder;
+  /**
+   * Set the soft-call trigger condition.
+   * @param value - `PriceTrigger` as a plain object or JSON object string with `threshold_pct` (percent of conversion price, e.g. `130.0`), `observation_days` and `required_days_above`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  softCallTrigger(value: NonNullable<generated.valuations.ConvertibleBond['soft_call_trigger']>): ConvertibleBondBuilder;
+  /**
+   * Set the settlement lag.
+   * @param value - Business days from trade date to settlement (e.g. `2` for US corporate convertibles); same-day when never set.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  settlementDays(value: number): ConvertibleBondBuilder;
+  /**
+   * Set the assumed recovery rate on default.
+   * @param value - Recovery rate as a fraction (`0.40` = 40%); only relevant when `credit_curve_id` is set.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  recoveryRate(value: number): ConvertibleBondBuilder;
+  /**
+   * Set the coupon/cashflow specification.
+   * @param value - Rust `CashflowSpec` as a plain object or JSON object string (the same shape as `Bond.cashflow_spec`, e.g. `{"fixed": {"coupon_type": "cash", "rate": "0.05", ...schedule}}`); a zero-coupon convertible uses a fixed spec with rate `"0"`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  cashflowSpec(value: generated.valuations.ConvertibleBond['cashflow_spec']): ConvertibleBondBuilder;
+  /**
+   * Set instrument attributes (tags and metadata).
+   * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  attributes(value: generated.valuations.ConvertibleBond['attributes']): ConvertibleBondBuilder;
+}
+
+/**
+ * Class object of `ConvertibleBondBuilder`; create builders with `valuations.instruments.ConvertibleBond.builder()`.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const builder = valuations.instruments.ConvertibleBond.builder();
+ * console.log(typeof builder.build);
+ * builder.free();
+ * ```
+ */
+export interface ConvertibleBondBuilderConstructor {
+  /**
+   * JavaScript prototype of `ConvertibleBondBuilder`; instances come from `valuations.instruments.ConvertibleBond.builder()`, not `new`.
+   */
+  readonly prototype: ConvertibleBondBuilder;
+}
+
+/**
+ * Typed handle on the Rust `EquityOption` instrument (vanilla option on one equity or index).
+ *
+ * Every public Rust field is a read-only property; `price` and `metric` run the same pricer as `valuations.instruments.priceInstrument`.
+ */
+export interface EquityOption extends WasmOwned {
+  /**
+   * Instrument identifier.
+   * @returns Stable instrument identifier used in metric keys.
+   */
+  readonly id: string;
+  /**
+   * Serialize to the canonical `finstack_quant.instrument/1` envelope.
+   *
+   * The output is compact JSON, byte-identical to the Python `to_json()` of the same instrument; pass it to `valuations.instruments.priceInstrument` or `fromJson`.
+   * @returns Canonical instrument envelope JSON.
+   * @throws Error - Throws if the instrument cannot be serialized.
+   */
+  toJson(): string;
+  /**
+   * Canonical model key used when `model="default"` is passed to `price`.
+   * @returns Registered model key such as `"hazard_rate"` or `"black76"`.
+   */
+  readonly defaultModel: string;
+  /**
+   * Instrument attributes (tags and metadata) used for scenario selection.
+   * @returns The attribute bag; empty when none were set.
+   */
+  readonly attributes: generated.valuations.EquityOption['attributes'];
+  /**
+   * Spot delta of the option under the selected model.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and spot data.
+   * @param asOf - ISO-8601 valuation date.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @returns Spot delta produced by the selected model.
+   * @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if an input is malformed or the Greek is not produced by the selected model, and kind `computation` if pricing fails.
+   */
+  delta(marketJson: JsonInput, asOf: string, model?: string | null): number;
+  /**
+   * Gamma of the option under the selected model.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and spot data.
+   * @param asOf - ISO-8601 valuation date.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @returns Gamma produced by the selected model.
+   * @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if an input is malformed or the Greek is not produced by the selected model, and kind `computation` if pricing fails.
+   */
+  gamma(marketJson: JsonInput, asOf: string, model?: string | null): number;
+  /**
+   * Vega (per 1% vol) of the option under the selected model.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and spot data.
+   * @param asOf - ISO-8601 valuation date.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @returns Vega (per 1% vol) produced by the selected model.
+   * @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if an input is malformed or the Greek is not produced by the selected model, and kind `computation` if pricing fails.
+   */
+  vega(marketJson: JsonInput, asOf: string, model?: string | null): number;
+  /**
+   * Theta (per day on `metric_pricing_overrides.theta_day_basis`, calendar days by default) of the option under the selected model.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and spot data.
+   * @param asOf - ISO-8601 valuation date.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @returns Theta (per day on `metric_pricing_overrides.theta_day_basis`, calendar days by default) produced by the selected model.
+   * @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if an input is malformed or the Greek is not produced by the selected model, and kind `computation` if pricing fails.
+   */
+  theta(marketJson: JsonInput, asOf: string, model?: string | null): number;
+  /**
+   * Rho of the option under the selected model.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and spot data.
+   * @param asOf - ISO-8601 valuation date.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @returns Rho produced by the selected model.
+   * @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if an input is malformed or the Greek is not produced by the selected model, and kind `computation` if pricing fails.
+   */
+  rho(marketJson: JsonInput, asOf: string, model?: string | null): number;
+  /**
+   * Identifier of the underlying equity referenced by the option.
+   * @returns Ticker string exactly as supplied at construction; it is the key used to look up the spot price and volatility surface in the market context, so it must match the market-data identifier.
+   */
+  readonly underlyingTicker: generated.valuations.EquityOption['underlying_ticker'];
+  /**
+   * Contractual exercise price of the option.
+   * @returns Strike expressed in the same price units and currency as the underlying spot quote, not as a percentage of spot or as moneyness.
+   */
+  readonly strike: generated.valuations.EquityOption['strike'];
+  /**
+   * Payoff direction of the option contract.
+   * @returns Serde string, either `"call"` (payoff `max(S - K, 0)`) or `"put"` (payoff `max(K - S, 0)`).
+   */
+  readonly optionType: generated.valuations.EquityOption['option_type'];
+  /**
+   * Exercise rights attached to the option, which select the pricing engine used.
+   * @returns Serde string: `"european"` (exercise only at expiry), `"american"` (any time up to expiry) or `"bermudan"` (on a discrete set of scheduled exercise dates).
+   */
+  readonly exerciseStyle: NonNullable<generated.valuations.EquityOption['exercise_style']>;
+  /**
+   * Last date on which the option may be exercised.
+   * @returns Unadjusted calendar expiry date. Time to expiry used in pricing is measured from the valuation date to this date under the pricing day-count convention.
+   */
+  readonly expiry: string;
+  /**
+   * Number of underlying units; PV and Greeks scale linearly with it.
+   * @returns Underlying unit count (contract size).
+   */
+  readonly quantity: generated.valuations.EquityOption['quantity'];
+  /**
+   * Currency of the strike, premium and present value.
+   * @returns ISO-4217 currency code, e.g. `"USD"`.
+   */
+  readonly currency: string;
+  /**
+   * Model day count for volatility, carry and exercise times. Discount factors use the discount curve's own date convention.
+   * @returns Act/365F unless set otherwise.
+   */
+  readonly dayCount: DayCount;
+  /**
+   * Settlement method.
+   * @returns `"physical"` or `"cash"`.
+   */
+  readonly settlement: NonNullable<generated.valuations.EquityOption['settlement']>;
+  /**
+   * Observed exercise state (`date`, `spot`, `settlement_date`, `exercised`).
+   * @returns The lifecycle plain object, or `null`.
+   */
+  readonly exercise: NonNullable<generated.valuations.EquityOption['exercise']> | null;
+  /**
+   * Discount curve identifier.
+   * @returns The curve id.
+   */
+  readonly discountCurveId: string;
+  /**
+   * Equity spot price identifier.
+   * @returns The price id.
+   */
+  readonly spotId: string;
+  /**
+   * Volatility surface identifier.
+   * @returns The surface id.
+   */
+  readonly volSurfaceId: string;
+  /**
+   * Continuous dividend yield identifier.
+   * @returns The id, or `null`.
+   */
+  readonly divYieldId: string | null;
+  /**
+   * Discrete dividend schedule.
+   * @returns `(ex_date, amount)` pairs in date order.
+   */
+  readonly discreteDividends: [string, number][];
+  /**
+   * Bermudan exercise dates.
+   * @returns The dates, or `null`.
+   */
+  readonly exerciseDates: string[] | null;
+  /**
+   * The bare instrument spec as a plain object (no envelope).
+   *
+   * Mirrors Python `to_dict()`: the serde form of the Rust struct, i.e. the `instrument.spec` payload of `toJson()`.
+   * @returns Plain-object instrument spec.
+   * @throws Error - Throws if the instrument cannot be serialized.
+   */
+  toDict(): generated.valuations.EquityOption;
+  /**
+   * Market data this instrument needs to price (mirrors Rust `Instrument::market_dependencies`).
+   * @returns `MarketDependencies` plain object listing discount, forward and credit curves, spot ids, volatility surfaces, FX pairs and fixing series.
+   * @throws Error - Throws with kind `validation` if the instrument cannot enumerate its dependencies.
+   */
+  marketDependencies(): generated.valuations.MarketDependencies;
+  /**
+   * Price the instrument against a market snapshot.
+   *
+   * Same pipeline and arguments as `valuations.instruments.priceInstrument`.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
+   * @param metricPricingOverrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
+   * @param marketHistory - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
+   * @returns Structured `ValuationResult` for the selected model.
+   * @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
+   */
+  price(
+    marketJson: JsonInput,
+    asOf: string,
+    model?: string | null,
+    metrics?: string[] | null,
+    metricPricingOverrides?: JsonInput | null,
+    marketHistory?: JsonInput | null
+  ): ValuationResult;
+  /**
+   * Compute one metric of the instrument against a market snapshot.
+   *
+   * The same Rust metric path as `price(..., [metricId])`, returning just the value.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param metricId - Fully qualified metric identifier, e.g. `"dv01"` or `"par_rate"`.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @returns The metric value in the metric's documented unit.
+   * @throws Error - Throws with kind `validation` if the market JSON, `asOf`, `model` or `metricId` is invalid or the metric is not defined for this instrument; kind `not_found` if required market data is missing; and kind `computation` if the calculation fails.
+   */
+  metric(marketJson: JsonInput, asOf: string, metricId: string, model?: string | null): number;
+  /**
+   * Solve for the Black-Scholes volatility that reproduces a target price.
+   *
+   * Mirrors Rust `EquityOption::implied_vol`.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying the discount curve, spot and dividend yield.
+   * @param asOf - ISO-8601 valuation date.
+   * @param targetPrice - Observed option value for the whole position, on the same scale as `price`.
+   * @returns Annualized lognormal volatility as a decimal (`0.20` = 20%).
+   * @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if an input is malformed, and kind `computation` if the root search does not converge.
+   */
+  impliedVol(marketJson: JsonInput, asOf: string, targetPrice: number): number;
+  /**
+   * Compute every Greek that applies to this option as a plain object.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and spot data.
+   * @param asOf - ISO-8601 valuation date.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @returns Map of Greek name to value, with keys in the Rust `STANDARD_OPTION_GREEKS` order (`delta`, `gamma`, `vega`, `theta`, `rho`).
+   * @throws Error - Throws with kind `not_found` if required market data is missing, kind `validation` if an input is malformed, and kind `computation` if pricing fails or a Greek is non-finite.
+   */
+  greeks(marketJson: JsonInput, asOf: string, model?: string | null): Record<string, number>;
+}
+
+/**
+ * Constructor surface for the typed `EquityOption` WebAssembly instrument.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const equityOption = valuations.instruments.EquityOption.example();
+ * console.log(equityOption.id, equityOption.toDict());
+ * equityOption.free();
+ * ```
+ */
+export interface EquityOptionConstructor {
+  /**
+   * JavaScript prototype of `EquityOption`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: EquityOption;
+  /**
+   * Deserialize the instrument from its canonical v1 envelope.
+   *
+   * Bare payloads are rejected; the loader's validation runs on the result.
+   * @param json - A `finstack_quant.instrument/1` envelope (JSON string or plain object) for this exact instrument type.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if `json` is malformed, carries a different instrument type, or fails instrument validation.
+   */
+  fromJson(json: JsonInput): EquityOption;
+  /**
+   * Create a fluent builder (mirrors the Rust `builder()`).
+   *
+   * Each setter stores one field and returns the builder; `build()` validates and consumes it.
+   * @returns An empty builder.
+   */
+  builder(): EquityOptionBuilder;
+  /**
+   * Canonical SPX 4500 European call expiring 2024-06-21 (mirrors Rust `EquityOption::example`): 100 units in USD, curve `USD-OIS`, spot `EQUITY-SPOT`, surface `EQUITY-VOL`, dividend yield `EQUITY-DIVYIELD`.
+   * @returns The example option.
+   * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+   */
+  example(): EquityOption;
+  /**
+   * Create a cash-settled European option (mirrors Rust `EquityOption::european`).
+   *
+   * Market data ids take the Rust defaults: discount curve `USD-OIS`, spot `EQUITY-SPOT`, volatility surface `EQUITY-VOL` and dividend yield `EQUITY-DIVYIELD`. Use `EquityOption.builder()` for other ids.
+   * @param id - Unique instrument identifier.
+   * @param ticker - Underlying equity ticker symbol.
+   * @param strike - Strike price in `currency` units per share; must be positive.
+   * @param expiry - Expiry date as an ISO-8601 string.
+   * @param quantity - Number of shares per contract times contracts held.
+   * @param currency - Currency of the strike and the payoff.
+   * @param optionType - Option type: `call` (right to buy the underlying) or `put` (right to sell it).
+   * @returns The validated option.
+   * @throws Error - Throws with kind `validation` if `expiry` or `optionType` is malformed or the option fails validation, and kind `invalid_type` for a wrong argument type.
+   */
+  european(
+    id: string,
+    ticker: string,
+    strike: number,
+    expiry: string,
+    quantity: number,
+    currency: Currency,
+    optionType: 'call' | 'put'
+  ): EquityOption;
+}
+
+/**
+ * Fluent builder for `EquityOption`; one setter per Rust builder setter.
+ *
+ * Every setter returns the builder, so calls chain; `build()` validates and consumes it.
+ */
+export interface EquityOptionBuilder extends WasmOwned {
+  /**
+   * Validate the staged fields and build the instrument.
+   *
+   * Runs the Rust `build()` validation and consumes the builder; create a new builder for the next instrument.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed, a required field is missing (the message names the field), or validation fails.
+   */
+  build(): EquityOption;
+  /**
+   * Set the instrument identifier.
+   * @param value - Unique identifier for the equity option.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  id(value: string): EquityOptionBuilder;
+  /**
+   * Set the underlying equity ticker symbol.
+   * @param value - Underlying equity ticker symbol.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  underlyingTicker(value: string): EquityOptionBuilder;
+  /**
+   * Set the strike price.
+   * @param value - Strike price; must be finite and positive.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  strike(value: number): EquityOptionBuilder;
+  /**
+   * Set the option type.
+   * @param value - Option type of the equity option.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  optionType(value: generated.valuations.EquityOption['option_type']): EquityOptionBuilder;
+  /**
+   * Set the exercise style.
+   * @param value - Exercise style; defaults to `"european"` when never set.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  exerciseStyle(value: NonNullable<generated.valuations.EquityOption['exercise_style']>): EquityOptionBuilder;
+  /**
+   * Set the option expiry date.
+   * @param value - Option expiry date as an ISO-8601 string.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  expiry(value: string): EquityOptionBuilder;
+  /**
+   * Set the model day count for volatility, dividend carry and exercise times.
+   * @param value - Model day count for volatility, dividend carry and exercise times, as a `DayCount` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  dayCount(value: DayCount): EquityOptionBuilder;
+  /**
+   * Set the settlement method.
+   * @param value - Physical delivery or fixed cash settlement.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  settlement(value: NonNullable<generated.valuations.EquityOption['settlement']>): EquityOptionBuilder;
+  /**
+   * Set the number of underlying units the option is written on.
+   * @param value - Number of underlying units; PV and Greeks scale linearly with it.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  quantity(value: number): EquityOptionBuilder;
+  /**
+   * Set the currency of the strike, premium and present value.
+   * @param value - ISO-4217 currency code of the strike and the payoff, e.g. `"USD"`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  currency(value: generated.valuations.EquityOption['currency']): EquityOptionBuilder;
+  /**
+   * Set the discount curve identifier for present value calculations.
+   * @param value - Discount curve identifier.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  discountCurveId(value: string): EquityOptionBuilder;
+  /**
+   * Set the equity spot price identifier.
+   * @param value - Equity spot price identifier.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  spotId(value: string): EquityOptionBuilder;
+  /**
+   * Set the equity volatility surface identifier.
+   * @param value - Equity volatility surface identifier.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  volSurfaceId(value: string): EquityOptionBuilder;
+  /**
+   * Set the continuous dividend yield identifier.
+   * @param value - Continuous dividend yield identifier; zero yield when never set.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  divYieldId(value: string): EquityOptionBuilder;
+  /**
+   * Set the exercise schedule for Bermudan options.
+   * @param value - Dates on which early exercise is permitted; required when `exercise_style` is `"bermudan"`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  exerciseDates(value: string[]): EquityOptionBuilder;
+  /**
+   * Set instrument attributes (tags and metadata).
+   * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  attributes(value: generated.valuations.EquityOption['attributes']): EquityOptionBuilder;
+  /**
+   * Record an observed exercise or expiry outcome.
+   *
+   * Mirrors Rust `EquityOptionExercise::new`; an option past expiry needs this lifecycle state to be priced.
+   * @param date - Exercise or expiry observation date as an ISO-8601 string.
+   * @param spot - Underlying spot observed on `date`, in the option currency.
+   * @param settlementDate - Date the exercise payoff settles, as an ISO-8601 string.
+   * @param exercised - Whether the holder exercised.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if a date is malformed or the builder was already consumed by `build()`, and kind `invalid_type` for a wrong argument type.
+   */
+  exercise(
+    date: string,
+    spot: number,
+    settlementDate: string,
+    exercised: boolean
+  ): EquityOptionBuilder;
+  /**
+   * Set the discrete cash dividends paid before expiry.
+   * @param value - Dividends as `[isoDate, amount]` pairs, amount in the option currency per share.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` is not an array of `[string, number]` pairs, and kind `validation` if a date is malformed or the builder was already consumed by `build()`.
+   */
+  discreteDividends(value: [string, number][]): EquityOptionBuilder;
+}
+
+/**
+ * Class object of `EquityOptionBuilder`; create builders with `valuations.instruments.EquityOption.builder()`.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const builder = valuations.instruments.EquityOption.builder();
+ * console.log(typeof builder.build);
+ * builder.free();
+ * ```
+ */
+export interface EquityOptionBuilderConstructor {
+  /**
+   * JavaScript prototype of `EquityOptionBuilder`; instances come from `valuations.instruments.EquityOption.builder()`, not `new`.
+   */
+  readonly prototype: EquityOptionBuilder;
+}
+
+/**
+ * Typed handle on the Rust `StructuredCredit` instrument (ABS, CLO, CMBS or RMBS deal).
+ *
+ * Every public Rust field is a read-only property; `price` and `metric` run the same pricer as `valuations.instruments.priceInstrument`.
+ */
+export interface StructuredCredit extends WasmOwned {
+  /**
+   * Instrument identifier.
+   * @returns Stable instrument identifier used in metric keys.
+   */
+  readonly id: string;
+  /**
+   * Serialize to the canonical `finstack_quant.instrument/1` envelope.
+   *
+   * The output is compact JSON, byte-identical to the Python `to_json()` of the same instrument; pass it to `valuations.instruments.priceInstrument` or `fromJson`.
+   * @returns Canonical instrument envelope JSON.
+   * @throws Error - Throws if the instrument cannot be serialized.
+   */
+  toJson(): string;
+  /**
+   * Deal classification (serde string).
+   * @returns `"abs"`, `"clo"`, `"cmbs"`, `"rmbs"` ...
+   */
+  readonly dealType: generated.valuations.StructuredCredit['deal_type'];
+  /**
+   * Collateral pool.
+   * @returns Independent copy of the pool.
+   */
+  readonly pool: generated.valuations.StructuredCredit['pool'];
+  /**
+   * Capital structure.
+   * @returns Independent copy of the tranche structure.
+   */
+  readonly tranches: generated.valuations.StructuredCredit['tranches'];
+  /**
+   * Deal closing (issuance) date.
+   * @returns The closing date.
+   */
+  readonly closingDate: string;
+  /**
+   * First tranche payment date.
+   * @returns The first payment date.
+   */
+  readonly firstPaymentDate: string;
+  /**
+   * Buyer settlement date for note price and spread calculations.
+   * @returns Settlement date; `null` uses the valuation date. Payments on or before settlement belong to the seller. Model PV stays at valuation.
+   */
+  readonly quoteSettlementDate: string | null;
+  /**
+   * Legal final maturity date.
+   * @returns The maturity date.
+   */
+  readonly maturity: string;
+  /**
+   * Discount curve identifier.
+   * @returns Curve id used for discounting.
+   */
+  readonly discountCurveId: string;
+  /**
+   * Payment frequency.
+   * @returns The tranche payment tenor.
+   */
+  readonly frequency: Tenor;
+  /**
+   * Payment calendar identifier.
+   * @returns `null` when no calendar is set.
+   */
+  readonly calendarId: string | null;
+  /**
+   * Payment business-day convention string.
+   * @returns `null` for the default convention.
+   */
+  readonly businessDayConvention: NonNullable<generated.valuations.StructuredCredit['business_day_convention']> | null;
+  /**
+   * Credit model as its `CreditModelConfig` serde plain object.
+   * @returns Prepayment, default, recovery, stochastic, delinquency and card specs.
+   */
+  readonly creditModel: CreditModelConfig;
+  /**
+   * Market conditions as their serde plain object.
+   * @returns `MarketConditions` fields.
+   */
+  readonly marketConditions: generated.valuations.StructuredCredit['market_conditions'];
+  /**
+   * Deal metadata as its serde plain object.
+   * @returns `Metadata` fields.
+   */
+  readonly dealMetadata: NonNullable<generated.valuations.StructuredCredit['deal_metadata']>;
+  /**
+   * Hedges settled through the waterfall.
+   * @returns One typed `HedgeSwap` per hedge (empty when unhedged).
+   */
+  readonly hedgeSwaps: NonNullable<generated.valuations.StructuredCredit['hedge_swaps']>;
+  /**
+   * Senior transaction fees as their `DealFees` serde plain object.
+   * @returns `null` when no fee tier is attached.
+   */
+  readonly fees: NonNullable<generated.valuations.StructuredCredit['fees']> | null;
+  /**
+   * Deal-level coverage tests as `CoverageTestSpec` serde plain objects.
+   * @returns One plain object per test (empty when none run).
+   */
+  readonly coverageTriggers: NonNullable<generated.valuations.StructuredCredit['coverage_triggers']>;
+  /**
+   * Clean-up call pool-factor threshold (decimal).
+   * @returns `null` when no clean-up call is set.
+   */
+  readonly cleanupCallDecimal: NonNullable<generated.valuations.StructuredCredit['cleanup_call_decimal']> | null;
+  /**
+   * Assumed optional redemption.
+   * @returns `null` without a call assumption.
+   */
+  readonly callAssumption: NonNullable<generated.valuations.StructuredCredit['call_assumption']> | null;
+  /**
+   * Collateral liquidation price in percent of par.
+   * @returns `null` for par.
+   */
+  readonly liquidationPricePct: NonNullable<generated.valuations.StructuredCredit['liquidation_price_pct']> | null;
+  /**
+   * Explicit loss-allocation policy (`"write_down"` / `"par_preserving"`).
+   * @returns `null` for the deal-type default.
+   */
+  readonly lossAllocation: NonNullable<generated.valuations.StructuredCredit['loss_allocation']> | null;
+  /**
+   * Explicit loss-recognition timing (`"at_default"` / `"at_liquidation"`).
+   * @returns `null` for the deal-type default (at liquidation for RMBS/CMBS, at default otherwise).
+   */
+  readonly lossRecognition: NonNullable<generated.valuations.StructuredCredit['loss_recognition']> | null;
+  /**
+   * Scheduled lender draws on notes as `TrancheDraw` serde plain objects (`tranche_id`, `date`, `amount`).
+   * @returns Empty for a fully funded structure.
+   */
+  readonly trancheDraws: NonNullable<generated.valuations.StructuredCredit['tranche_draws']>;
+  /**
+   * Per-period re-advance rule as its `TrancheReadvance` serde plain object (`tranche_id`, `commitment`).
+   * @returns `null` for no re-advances.
+   */
+  readonly trancheReadvance: NonNullable<generated.valuations.StructuredCredit['tranche_readvance']> | null;
+  /**
+   * Explicit principal-covers-senior-interest flag.
+   * @returns `null` for the deal-type default.
+   */
+  readonly principalCoversSeniorInterest: NonNullable<generated.valuations.StructuredCredit['principal_covers_senior_interest']> | null;
+  /**
+   * Collateral valuation rules for the coverage tests.
+   * @returns `null` when performing collateral is carried at par.
+   */
+  readonly coverageRules: NonNullable<generated.valuations.StructuredCredit['coverage_rules']> | null;
+  /**
+   * Declarative waterfall rules as their serde plain object.
+   * @returns `null` when no rules are layered on the base waterfall.
+   */
+  readonly waterfallRules: NonNullable<generated.valuations.StructuredCredit['waterfall_rules']> | null;
+  /**
+   * Custom priority of payments.
+   * @returns `null` when the deal-type template applies.
+   */
+  readonly waterfall: NonNullable<generated.valuations.StructuredCredit['waterfall']> | null;
+  /**
+   * Free-form attributes (tags and metadata).
+   * @returns The attribute bag.
+   */
+  readonly attributes: generated.valuations.StructuredCredit['attributes'];
+  /**
+   * Deterministic prepayment model.
+   * @returns A typed copy of the spec.
+   */
+  readonly prepaymentSpec: NonNullable<generated.valuations.StructuredCredit['prepayment_spec']>;
+  /**
+   * Deterministic default model.
+   * @returns A typed copy of the spec.
+   */
+  readonly defaultSpec: NonNullable<generated.valuations.StructuredCredit['default_spec']>;
+  /**
+   * Recovery rate and lag model for defaulted collateral.
+   * @returns A typed copy of the spec.
+   */
+  readonly recoverySpec: NonNullable<generated.valuations.StructuredCredit['recovery_spec']>;
+  /**
+   * Stochastic prepayment specification as its serde plain object.
+   * @returns `null` until set or enabled.
+   */
+  readonly stochasticPrepaySpec: NonNullable<generated.valuations.StructuredCredit['stochastic_prepay_spec']> | null;
+  /**
+   * Stochastic default specification as its serde plain object.
+   * @returns `null` until set or enabled.
+   */
+  readonly stochasticDefaultSpec: NonNullable<generated.valuations.StructuredCredit['stochastic_default_spec']> | null;
+  /**
+   * Stochastic recovery specification as its `RecoverySpec` serde plain object.
+   * @returns `{"type": "constant", "rate": ...}` or `{"type": "market_correlated", "mean_recovery": ..., "recovery_volatility": ..., "factor_correlation": ...}`; `null` for constant recoveries at the deterministic rate.
+   */
+  readonly stochasticRecoverySpec: NonNullable<generated.valuations.StructuredCredit['stochastic_recovery_spec']> | null;
+  /**
+   * Default correlation structure as its serde plain object.
+   * @returns `null` until set or enabled.
+   */
+  readonly correlationStructure: NonNullable<generated.valuations.StructuredCredit['correlation_structure']> | null;
+  /**
+   * Delinquency model as its `DelinquencyModel` serde plain object.
+   * @returns `null` when no roll-rate model is set.
+   */
+  readonly delinquency: NonNullable<generated.valuations.StructuredCredit['delinquency']> | null;
+  /**
+   * Card portfolio model as its `CardPortfolioSpec` serde plain object.
+   * @returns `null` for non-card deals.
+   */
+  readonly card: NonNullable<generated.valuations.StructuredCredit['card']> | null;
+  /**
+   * The bare instrument spec as a plain object (no envelope).
+   *
+   * Mirrors Python `to_dict()`: the serde form of the Rust struct, i.e. the `instrument.spec` payload of `toJson()`.
+   * @returns Plain-object instrument spec.
+   * @throws Error - Throws if the instrument cannot be serialized.
+   */
+  toDict(): generated.valuations.StructuredCredit;
+  /**
+   * Return a copy of this deal with the deal type's standard fee schedule.
+   *
+   * Mirrors Rust `StructuredCredit::with_standard_fees`; the receiver is not modified.
+   * @returns A new deal carrying the standard trustee, servicing and management fees.
+   */
+  withStandardFees(): StructuredCredit;
+  /**
+   * Return a copy of this deal with the default stochastic specifications.
+   *
+   * Mirrors Rust `StructuredCredit::enable_stochastic`: fills the stochastic prepayment, default and correlation specs for the deal type. The receiver is not modified.
+   * @returns A new deal ready for `priceStochastic`.
+   * @throws Error - Throws with kind `validation` if the deal type has no stochastic defaults or the deal is invalid.
+   */
+  enableStochastic(): StructuredCredit;
+  /**
+   * The waterfall this deal runs (mirrors Rust `StructuredCredit::create_waterfall`).
+   *
+   * Returns the explicit waterfall when one is set, otherwise the deal type's template built from the tranches, fees and coverage triggers.
+   * @returns `Waterfall` plain object with the payment tiers and coverage rules.
+   * @throws Error - Throws with kind `validation` if the deal's fees or tranches cannot form a waterfall.
+   */
+  createWaterfall(): generated.valuations.Waterfall;
+  /**
+   * Projected cashflows of one tranche from the deterministic simulation.
+   *
+   * Mirrors Rust `StructuredCredit::tranche_cashflows`.
+   * @param trancheId - Identifier of a tranche of this deal.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying the discount and forward curves.
+   * @param asOf - ISO-8601 valuation date.
+   * @returns `TrancheCashflows` plain object with total, interest, principal, PIK, deferred and writedown flows.
+   * @throws Error - Throws with kind `not_found` if `trancheId` is not a class of the deal or a curve is missing, kind `validation` if an input is malformed, and kind `computation` if the simulation fails.
+   */
+  trancheCashflows(trancheId: string, marketJson: JsonInput, asOf: string): generated.valuations.TrancheCashflows;
+  /**
+   * Equity-tranche return metrics (mirrors Rust `calculate_equity_metrics`).
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying the discount and forward curves.
+   * @param asOf - ISO-8601 valuation date.
+   * @param purchasePricePct - Optional equity purchase price in percent of its balance (`60` = 60%); omit to invest at the model net asset value.
+   * @returns `EquityMetrics` plain object with IRR, MOIC, NAV in percent of balance and cash-on-cash yields.
+   * @throws Error - Throws with kind `not_found` if a curve is missing, kind `validation` if an input is malformed or the deal has no equity tranche, and kind `computation` if the simulation fails.
+   */
+  equityMetrics(
+    marketJson: JsonInput,
+    asOf: string,
+    purchasePricePct?: number | null
+  ): generated.valuations.EquityMetrics;
+  /**
+   * Monte Carlo stochastic price of the deal.
+   *
+   * Mirrors Rust `StructuredCredit::price_stochastic_monte_carlo`. Call `enableStochastic()` first when the deal carries no stochastic specs.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying the discount and forward curves.
+   * @param asOf - ISO-8601 valuation date.
+   * @param numPaths - Optional number of independent estimators; omit to use `model_config.mc_paths` (default 5,000).
+   * @param antithetic - Optional antithetic pairing; `true` (the default) simulates `2 x numPaths` scenario paths.
+   * @returns `StochasticPricingResult` plain object with NPV, expected and unexpected loss, expected shortfall and per-tranche results.
+   * @throws Error - Throws with kind `not_found` if a curve is missing, kind `validation` if an input is malformed or the deal has no stochastic specs, and kind `computation` if the simulation fails.
+   */
+  priceStochastic(
+    marketJson: JsonInput,
+    asOf: string,
+    numPaths?: number | null,
+    antithetic?: boolean | null
+  ): generated.valuations.StochasticPricingResult;
+  /**
+   * Run the deterministic simulation and return the deal-level accounting.
+   *
+   * Mirrors Rust `run_simulation_with_diagnostics`.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying the discount and forward curves.
+   * @param asOf - ISO-8601 valuation date.
+   * @returns `SimulationDiagnostics` plain object with per-period pool, account and coverage-test records.
+   * @throws Error - Throws with kind `not_found` if a curve is missing, kind `validation` if an input is malformed, and kind `computation` if the simulation fails.
+   */
+  runSimulationWithDiagnostics(marketJson: JsonInput, asOf: string): generated.valuations.SimulationDiagnostics;
+}
+
+/**
+ * Constructor surface for the typed `StructuredCredit` WebAssembly instrument.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const structuredCredit = valuations.instruments.StructuredCredit.example();
+ * console.log(structuredCredit.id, structuredCredit.toDict());
+ * structuredCredit.free();
+ * ```
+ */
+export interface StructuredCreditConstructor {
+  /**
+   * JavaScript prototype of `StructuredCredit`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: StructuredCredit;
+  /**
+   * Deserialize the instrument from its canonical v1 envelope.
+   *
+   * Bare payloads are rejected; the loader's validation runs on the result.
+   * @param json - A `finstack_quant.instrument/1` envelope (JSON string or plain object) for this exact instrument type.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if `json` is malformed, carries a different instrument type, or fails instrument validation.
+   */
+  fromJson(json: JsonInput): StructuredCredit;
+  /**
+   * Create a fluent builder (mirrors the Rust `builder()`).
+   *
+   * Each setter stores one field and returns the builder; `build()` validates and consumes it.
+   * @returns An empty builder.
+   */
+  builder(): StructuredCreditBuilder;
+  /**
+   * Create an asset-backed security deal (mirrors Rust `StructuredCredit::new_abs`).
+   * @param id - Unique instrument identifier.
+   * @param pool - Collateral `AssetPool` (plain object or JSON string).
+   * @param tranches - Liability `TrancheStructure` (plain object or JSON string).
+   * @param closingDate - Deal closing date as an ISO-8601 string.
+   * @param maturity - Legal final maturity as an ISO-8601 string.
+   * @param discountCurveId - Discount curve identifier used to value tranche cashflows.
+   * @param calendarId - Optional holiday calendar for payment-date adjustment; omit to leave payment dates unadjusted.
+   * @returns The validated deal with the deal type's standard waterfall and assumptions.
+   * @throws Error - Throws with kind `validation` if `pool` or `tranches` does not match its schema, a date is malformed, or the deal fails pricing validation; and kind `invalid_type` for a wrong argument type.
+   */
+  newAbs(
+    id: string,
+    pool: generated.valuations.AssetPool | string,
+    tranches: generated.valuations.TrancheStructure | string,
+    closingDate: string,
+    maturity: string,
+    discountCurveId: string,
+    calendarId?: string | null
+  ): StructuredCredit;
+  /**
+   * Create a collateralized loan obligation (mirrors Rust `StructuredCredit::new_clo`).
+   * @param id - Unique instrument identifier.
+   * @param pool - Collateral `AssetPool` (plain object or JSON string).
+   * @param tranches - Liability `TrancheStructure` (plain object or JSON string).
+   * @param closingDate - Deal closing date as an ISO-8601 string.
+   * @param maturity - Legal final maturity as an ISO-8601 string.
+   * @param discountCurveId - Discount curve identifier used to value tranche cashflows.
+   * @param calendarId - Optional holiday calendar for payment-date adjustment; omit to leave payment dates unadjusted.
+   * @returns The validated deal with the deal type's standard waterfall and assumptions.
+   * @throws Error - Throws with kind `validation` if `pool` or `tranches` does not match its schema, a date is malformed, or the deal fails pricing validation; and kind `invalid_type` for a wrong argument type.
+   */
+  newClo(
+    id: string,
+    pool: generated.valuations.AssetPool | string,
+    tranches: generated.valuations.TrancheStructure | string,
+    closingDate: string,
+    maturity: string,
+    discountCurveId: string,
+    calendarId?: string | null
+  ): StructuredCredit;
+  /**
+   * Create a commercial mortgage-backed security deal (mirrors Rust `StructuredCredit::new_cmbs`).
+   * @param id - Unique instrument identifier.
+   * @param pool - Collateral `AssetPool` (plain object or JSON string).
+   * @param tranches - Liability `TrancheStructure` (plain object or JSON string).
+   * @param closingDate - Deal closing date as an ISO-8601 string.
+   * @param maturity - Legal final maturity as an ISO-8601 string.
+   * @param discountCurveId - Discount curve identifier used to value tranche cashflows.
+   * @param calendarId - Optional holiday calendar for payment-date adjustment; omit to leave payment dates unadjusted.
+   * @returns The validated deal with the deal type's standard waterfall and assumptions.
+   * @throws Error - Throws with kind `validation` if `pool` or `tranches` does not match its schema, a date is malformed, or the deal fails pricing validation; and kind `invalid_type` for a wrong argument type.
+   */
+  newCmbs(
+    id: string,
+    pool: generated.valuations.AssetPool | string,
+    tranches: generated.valuations.TrancheStructure | string,
+    closingDate: string,
+    maturity: string,
+    discountCurveId: string,
+    calendarId?: string | null
+  ): StructuredCredit;
+  /**
+   * Create a residential mortgage-backed security deal (mirrors Rust `StructuredCredit::new_rmbs`).
+   * @param id - Unique instrument identifier.
+   * @param pool - Collateral `AssetPool` (plain object or JSON string).
+   * @param tranches - Liability `TrancheStructure` (plain object or JSON string).
+   * @param closingDate - Deal closing date as an ISO-8601 string.
+   * @param maturity - Legal final maturity as an ISO-8601 string.
+   * @param discountCurveId - Discount curve identifier used to value tranche cashflows.
+   * @param calendarId - Optional holiday calendar for payment-date adjustment; omit to leave payment dates unadjusted.
+   * @returns The validated deal with the deal type's standard waterfall and assumptions.
+   * @throws Error - Throws with kind `validation` if `pool` or `tranches` does not match its schema, a date is malformed, or the deal fails pricing validation; and kind `invalid_type` for a wrong argument type.
+   */
+  newRmbs(
+    id: string,
+    pool: generated.valuations.AssetPool | string,
+    tranches: generated.valuations.TrancheStructure | string,
+    closingDate: string,
+    maturity: string,
+    discountCurveId: string,
+    calendarId?: string | null
+  ): StructuredCredit;
+}
+
+/**
+ * Fluent builder for `StructuredCredit`; one setter per Rust builder setter.
+ *
+ * Every setter returns the builder, so calls chain; `build()` validates and consumes it.
+ */
+export interface StructuredCreditBuilder extends WasmOwned {
+  /**
+   * Validate the staged fields and build the instrument.
+   *
+   * Runs the Rust `build()` validation and consumes the builder; create a new builder for the next instrument.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed, a required field is missing (the message names the field), or validation fails.
+   */
+  build(): StructuredCredit;
+  /**
+   * Set the instrument identifier.
+   * @param value - Unique identifier for the deal.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  id(value: string): StructuredCreditBuilder;
+  /**
+   * Set the deal-type classification.
+   * @param value - Deal classification.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  dealType(value: generated.valuations.StructuredCredit['deal_type']): StructuredCreditBuilder;
+  /**
+   * Set the structured-credit asset pool backing the deal.
+   * @param value - Asset pool definition.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  pool(value: generated.valuations.StructuredCredit['pool']): StructuredCreditBuilder;
+  /**
+   * Set the tranche capital structure.
+   * @param value - Tranche capital structure.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  tranches(value: generated.valuations.StructuredCredit['tranches']): StructuredCreditBuilder;
+  /**
+   * Set the deal closing (issuance) date.
+   * @param value - Deal closing date.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  closingDate(value: string): StructuredCreditBuilder;
+  /**
+   * Set the first payment date to tranches.
+   * @param value - First payment date.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  firstPaymentDate(value: string): StructuredCreditBuilder;
+  /**
+   * Set buyer settlement for prices, yields and spreads.
+   * @param value - Settlement on or after valuation and closing. Payments on or before this date are excluded. Omission uses the valuation date.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  quoteSettlementDate(value: string): StructuredCreditBuilder;
+  /**
+   * Set the legal final maturity date.
+   * @param value - Legal final maturity date.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  maturity(value: string): StructuredCreditBuilder;
+  /**
+   * Set the payment frequency for the structure.
+   * @param value - Payment frequency for the structure, as a `Tenor` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  frequency(value: Tenor): StructuredCreditBuilder;
+  /**
+   * Set the payment calendar identifier for schedule adjustments.
+   * @param value - Holiday calendar identifier (e.g. `"nyse"`). Required for accurate schedule generation.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  calendarId(value: string): StructuredCreditBuilder;
+  /**
+   * Set the business day convention for tranche payments.
+   * @param value - Business day convention (e.g. `"following"`, `"modified_following"`). Defaults to `"following"` when never set.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  businessDayConvention(value: NonNullable<generated.valuations.StructuredCredit['business_day_convention']>): StructuredCreditBuilder;
+  /**
+   * Set the discount curve identifier for valuation.
+   * @param value - Discount curve identifier.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  discountCurveId(value: string): StructuredCreditBuilder;
+  /**
+   * Set market conditions from a JSON object.
+   * @param value - `MarketConditions` object with finite annual decimal `refi_rate` for Richard-Roll refinancing incentives. Negative rates are accepted. This replaces the registry default; unknown macro-factor fields fail.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  marketConditions(value: generated.valuations.StructuredCredit['market_conditions']): StructuredCreditBuilder;
+  /**
+   * Set declarative waterfall rules from a JSON object.
+   * @param value - JSON-encoded `WaterfallRules` object (available-funds caps, step-down, shifting interest, controlled accumulation), layered onto the base waterfall.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  waterfallRules(value: NonNullable<generated.valuations.StructuredCredit['waterfall_rules']>): StructuredCreditBuilder;
+  /**
+   * Set senior transaction fees from a JSON object.
+   * @param value - JSON-encoded `DealFees` object (trustee, senior management, servicing, and optional master/special servicer fees), paid ahead of every note. Optional `workout_fee_pct` (percent of the P&I collected on specially serviced loans) and `liquidation_fee_pct` (percent of liquidation proceeds) are taken inside the collateral flows. Skipped (`null`) by default.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  fees(value: NonNullable<generated.valuations.StructuredCredit['fees']>): StructuredCreditBuilder;
+  /**
+   * Replace the whole credit model (prepayment, default, recovery, stochastic and correlation specs, delinquency and card models).
+   * @param value - `CreditModelConfig` serde object. Later per-field setters (`prepayment_spec` ...) modify this model.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  creditModel(value: CreditModelConfig): StructuredCreditBuilder;
+  /**
+   * Set the deterministic prepayment model.
+   * @param value - Typed spec (`PrepaymentModelSpec.constant_cpr` / `psa` / `abs` / `vector` / `cmbs_with_lockout`) or its serde form.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  prepaymentSpec(value: NonNullable<generated.valuations.StructuredCredit['prepayment_spec']>): StructuredCreditBuilder;
+  /**
+   * Set the deterministic default model.
+   * @param value - Typed spec (`DefaultModelSpec.constant_cdr` / `sda` / `vector` / `cumulative_loss` / `timing`) or its serde form.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  defaultSpec(value: NonNullable<generated.valuations.StructuredCredit['default_spec']>): StructuredCreditBuilder;
+  /**
+   * Set the recovery model.
+   * @param value - Typed spec (rate, lag, optional severity vector) or its serde form.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  recoverySpec(value: NonNullable<generated.valuations.StructuredCredit['recovery_spec']>): StructuredCreditBuilder;
+  /**
+   * Set the stochastic prepayment specification used by `StructuredCredit.price_stochastic`.
+   * @param value - `StochasticPrepaySpec` serde object (Richard-Roll or factor parameters).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  stochasticPrepaySpec(value: NonNullable<generated.valuations.StructuredCredit['stochastic_prepay_spec']>): StructuredCreditBuilder;
+  /**
+   * Set the stochastic default specification used by `StructuredCredit.price_stochastic`.
+   * @param value - `StochasticDefaultSpec` serde object.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  stochasticDefaultSpec(value: NonNullable<generated.valuations.StructuredCredit['stochastic_default_spec']>): StructuredCreditBuilder;
+  /**
+   * Set the stochastic recovery specification used by `StructuredCredit.price_stochastic`.
+   * @param value - `RecoverySpec` serde object: `{"type": "constant", "rate": 0.4}` or `{"type": "market_correlated", "mean_recovery": 0.4, "recovery_volatility": 0.25, "factor_correlation": 0.4}` (recovery falls with the systematic factor, so heavy-default paths recover less).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  stochasticRecoverySpec(value: NonNullable<generated.valuations.StructuredCredit['stochastic_recovery_spec']>): StructuredCreditBuilder;
+  /**
+   * Set the default correlation structure used by `StructuredCredit.price_stochastic`.
+   * @param value - `CorrelationStructure` serde object (factor loadings).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  correlationStructure(value: NonNullable<generated.valuations.StructuredCredit['correlation_structure']>): StructuredCreditBuilder;
+  /**
+   * Set the delinquency roll-rate, advancing and modification model (ABS/RMBS asset and rep-line pools).
+   * @param value - `DelinquencyModel` serde object: `roll_rates` (per bucket, the last rolls to charge-off), `cure_rates`, `advancing` (`{"policy": "none"}` or `{"policy": "principal_and_interest", "recoverability_cap_pct": ..., "reimburse_from_collections": false}`) and optional `modification`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  delinquency(value: NonNullable<generated.valuations.StructuredCredit['delinquency']>): StructuredCreditBuilder;
+  /**
+   * Set the card master-trust portfolio model.
+   * @param value - `CardPortfolioSpec` serde object: `monthly_payment_rate`, `portfolio_yield` and `charge_off_rate` (annual decimals), plus the optional `seller_interest` (`Money` serde object in the pool currency) and `fixed_allocation_decimal` (decimal in `(0, 1]`) that fix the investor allocation of trust collections once the revolving period ends.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  card(value: NonNullable<generated.valuations.StructuredCredit['card']>): StructuredCreditBuilder;
+  /**
+   * Set the deal-level OC / IC coverage tests.
+   * @param value - `CoverageTestSpec` objects (`id`, `tranche_id`, `kind` (`"oc"` / `"ic"`), `trigger_level` ratio, `action`, optional `placement` (`{"kind": "after_tranche", "tranche_id": ...}` or `{"kind": "after_junior_fees"}`) and `divert_pct`).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  coverageTriggers(value: NonNullable<generated.valuations.StructuredCredit['coverage_triggers']>): StructuredCreditBuilder;
+  /**
+   * Set the collateral valuation rules for the coverage tests.
+   * @param value - Typed `CoverageRules` or its serde form.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  coverageRules(value: NonNullable<generated.valuations.StructuredCredit['coverage_rules']>): StructuredCreditBuilder;
+  /**
+   * Set the assumed optional redemption for price-to-call analytics.
+   * @param value - Typed `CallAssumption` or its serde form (`date`, `price_pct`, `scope`).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  callAssumption(value: NonNullable<generated.valuations.StructuredCredit['call_assumption']>): StructuredCreditBuilder;
+  /**
+   * Set a custom priority of payments in place of the deal-type template.
+   * @param value - Typed `Waterfall` or its serde form (`tiers`, `currency`, optional `coverage_rules`).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  waterfall(value: NonNullable<generated.valuations.StructuredCredit['waterfall']>): StructuredCreditBuilder;
+  /**
+   * Set the interest-rate hedges settled through the waterfall.
+   * @param value - Typed `HedgeSwap` objects, their serde plain objects, or a JSON array string.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  hedgeSwaps(value: NonNullable<generated.valuations.StructuredCredit['hedge_swaps']>): StructuredCreditBuilder;
+  /**
+   * Set the clean-up call pool-factor threshold.
+   * @param value - Pool factor (decimal in `(0, 1)`, typically `0.10`) below which the deal is redeemed when the liquidation proceeds cover the notes.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  cleanupCallDecimal(value: number): StructuredCreditBuilder;
+  /**
+   * Set the collateral liquidation price used by deal calls and clean-up calls.
+   * @param value - Percent of par the collateral realizes (`100.0` = par).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  liquidationPricePct(value: number): StructuredCreditBuilder;
+  /**
+   * Set how collateral losses reach the note balances.
+   * @param value - `"write_down"` allocates realized losses junior-first at default (RMBS/CMBS convention); `"par_preserving"` keeps note balances at par and realizes shortfalls at legal final (CLO/ABS convention). The deal type's default applies when never set.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  lossAllocation(value: NonNullable<generated.valuations.StructuredCredit['loss_allocation']>): StructuredCreditBuilder;
+  /**
+   * Set when collateral losses are booked.
+   * @param value - `"at_default"` books the expected net loss on the default date (CLO/ABS convention); `"at_liquidation"` books the realized loss when the claim settles after the recovery lag (RMBS/CMBS convention), which delays write-downs and every cumulative-loss trigger. The deal type's default applies when never set.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  lossRecognition(value: NonNullable<generated.valuations.StructuredCredit['loss_recognition']>): StructuredCreditBuilder;
+  /**
+   * Set the scheduled lender draws on notes after closing.
+   * @param value - `TrancheDraw` serde objects `{"tranche_id": "A", "date": "2025-01-01", "amount": {"amount": "5000000", "currency": "USD"}}`, ascending by date; each is applied on the first payment date at or after its date, lifting the note's balance and adding the cash to principal proceeds.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  trancheDraws(value: NonNullable<generated.valuations.StructuredCredit['tranche_draws']>): StructuredCreditBuilder;
+  /**
+   * Set the per-period re-advance of one note up to its commitment and the borrowing base while the deal revolves.
+   * @param value - `TrancheReadvance` serde object `{"tranche_id": "A", "commitment": {"amount": "70000000", "currency": "USD"}}`; requires `coverage_rules.borrowing_base`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  trancheReadvance(value: NonNullable<generated.valuations.StructuredCredit['tranche_readvance']>): StructuredCreditBuilder;
+  /**
+   * Set whether principal proceeds cover senior fees and senior interest shortfalls before any note is redeemed.
+   * @param value - `true` for the CLO principal-waterfall convention, `false` for strictly separate accounts. The deal type's default applies when never set.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  principalCoversSeniorInterest(value: boolean): StructuredCreditBuilder;
+  /**
+   * Set deal metadata (counterparties, identifiers).
+   * @param value - `Metadata` serde object.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  dealMetadata(value: NonNullable<generated.valuations.StructuredCredit['deal_metadata']>): StructuredCreditBuilder;
+  /**
+   * Set free-form attributes (tags and metadata) on the deal.
+   * @param value - Attribute bag; a plain object populates `meta` (an optional `"tags"` list populates `tags`).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  attributes(value: generated.valuations.StructuredCredit['attributes']): StructuredCreditBuilder;
+}
+
+/**
+ * Class object of `StructuredCreditBuilder`; create builders with `valuations.instruments.StructuredCredit.builder()`.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const builder = valuations.instruments.StructuredCredit.builder();
+ * console.log(typeof builder.build);
+ * builder.free();
+ * ```
+ */
+export interface StructuredCreditBuilderConstructor {
+  /**
+   * JavaScript prototype of `StructuredCreditBuilder`; instances come from `valuations.instruments.StructuredCredit.builder()`, not `new`.
+   */
+  readonly prototype: StructuredCreditBuilder;
+}
+
+/**
+ * Fluent builder for the `Tranche` plain object; one setter per Rust builder setter.
+ *
+ * Every setter returns the builder, so calls chain; `build()` validates and consumes it.
+ */
+export interface TrancheBuilder extends WasmOwned {
+  /**
+   * Validate the staged fields and build the `Tranche`.
+   *
+   * Runs the Rust `build()` validation and consumes the builder. Attachment and detachment points may both be omitted, in which case `TrancheStructure` derives them from the balances.
+   * @returns The validated `Tranche` plain object.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed, a required field is missing, only one of the attachment and detachment points is set, or validation fails.
+   */
+  build(): generated.valuations.Tranche;
+  /**
+   * Set the tranche identifier.
+   * @param value - Unique identifier for the tranche.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  id(value: string): TrancheBuilder;
+  /**
+   * Set the attachment point.
+   * @param value - Attachment point quoted in percent on a 0-100 scale (e.g. `0.0` for equity, `10.0` for a tranche attaching at 10%).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  attachPct(value: number): TrancheBuilder;
+  /**
+   * Set the detachment point.
+   * @param value - Detachment point quoted in percent on a 0-100 scale (e.g. `100.0` for the most senior tranche).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  detachPct(value: number): TrancheBuilder;
+  /**
+   * Set the tranche seniority.
+   * @param value - Structural seniority of the tranche.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  seniority(value: generated.valuations.Tranche['seniority']): TrancheBuilder;
+  /**
+   * Set the original tranche balance.
+   * @param value - Original tranche balance, as a `Money` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  originalBalance(value: Money): TrancheBuilder;
+  /**
+   * Set a floating-rate coupon from a JSON `RateSpec::Floating` payload.
+   * @param value - JSON-encoded, externally-tagged `RateSpec` value, e.g. `{"floating": {...FloatingRateSpec fields...}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  couponFloating(value: generated.valuations.Tranche['coupon']): TrancheBuilder;
+  /**
+   * Set the legal final maturity date.
+   * @param value - Legal final maturity date.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  maturity(value: string): TrancheBuilder;
+  /**
+   * Set the payment frequency.
+   * @param value - Payment frequency, as a `Tenor` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  frequency(value: Tenor): TrancheBuilder;
+  /**
+   * Set the day count convention for interest accrual.
+   * @param value - Day count convention for interest accrual, as a `DayCount` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  dayCount(value: DayCount): TrancheBuilder;
+  /**
+   * Set the current (factored) balance.
+   * @param value - Current (factored) balance, as a `Money` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  currentBalance(value: Money): TrancheBuilder;
+  /**
+   * Set interest already deferred (unpaid, still owed) at closing.
+   * @param value - Interest already deferred (unpaid, still owed) at closing, as a `Money` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  deferredInterest(value: Money): TrancheBuilder;
+  /**
+   * Enable payment-in-kind accretion of interest shortfalls.
+   * @param value - `true` capitalizes unpaid interest into the balance; `false` (the default) defers it as a claim.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  pikEnabled(value: boolean): TrancheBuilder;
+  /**
+   * Mark the coupon non-deferrable or deferrable, overriding the seniority convention.
+   * @param value - `true` for a coupon the template pays from principal proceeds when interest falls short (the senior default); `false` for one that defers (the default for every other class).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  nonDeferrable(value: boolean): TrancheBuilder;
+  /**
+   * Set the credit rating.
+   * @param value - Rating string (`"AAA"`, `"BBB"`, `"NR"` ...).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  rating(value: NonNullable<generated.valuations.Tranche['rating']>): TrancheBuilder;
+  /**
+   * Attach a per-tranche overcollateralization trigger.
+   * @param value - `CoverageTrigger` serde object: `trigger_level` (ratio), optional `cure_level`, `consequence` and breach memory fields.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  ocTrigger(value: NonNullable<generated.valuations.Tranche['oc_trigger']>): TrancheBuilder;
+  /**
+   * Attach a per-tranche interest-coverage trigger.
+   * @param value - `CoverageTrigger` serde object (see `oc_trigger`).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  icTrigger(value: NonNullable<generated.valuations.Tranche['ic_trigger']>): TrancheBuilder;
+  /**
+   * Set free-form attributes (tags and metadata).
+   * @param value - Attribute bag; a plain object populates `meta` (an optional `"tags"` list populates `tags`).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  attributes(value: generated.valuations.Tranche['attributes']): TrancheBuilder;
+  /**
+   * Set a fixed coupon.
+   * @param rate - Annual coupon as a decimal (`0.05` = 5%).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `rate` is not a number, and kind `validation` if the builder was already consumed by `build()`.
+   */
+  couponFixed(rate: number): TrancheBuilder;
+}
+
+/**
+ * Class object of `TrancheBuilder`; create builders with `valuations.instruments.trancheBuilder()`.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const builder = valuations.instruments.trancheBuilder();
+ * console.log(typeof builder.build);
+ * builder.free();
+ * ```
+ */
+export interface TrancheBuilderConstructor {
+  /**
+   * JavaScript prototype of `TrancheBuilder`; instances come from `valuations.instruments.trancheBuilder()`, not `new`.
+   */
+  readonly prototype: TrancheBuilder;
+}
+
+/**
+ * Configuration of the Merton structural Monte Carlo bond engine.
+ *
+ * Each fluent method returns a new configuration with one field replaced; pass the result to `Bond.priceMertonMc`.
+ */
+export interface MertonMcConfig extends WasmOwned {
+  /**
+   * Return a copy with a different PIK schedule.
+   * @param s - `PikSchedule` plain object or JSON string, e.g. from `valuations.instruments.pikScheduleUniform`.
+   * @returns A new configuration; the receiver is not modified.
+   * @throws Error - Throws with kind `validation` if `s` does not match the `PikSchedule` schema.
+   */
+  pikSchedule(s: generated.valuations.PikSchedule | string): MertonMcConfig;
+  /**
+   * Return a copy with a different number of simulation steps per year.
+   * @param n - Time steps per year; more steps monitor the default barrier more finely.
+   * @returns A new configuration; the receiver is not modified.
+   * @throws Error - Throws with kind `invalid_type` if `n` is not a non-negative whole number.
+   */
+  stepsPerYear(n: number): MertonMcConfig;
+  /**
+   * Return a copy with a different barrier-crossing treatment.
+   * @param p - `BarrierCrossing` serde string: `"discrete"` or `"brownian_bridge"`.
+   * @returns A new configuration; the receiver is not modified.
+   * @throws Error - Throws with kind `validation` if `p` is not a known barrier-crossing name.
+   */
+  barrierCrossing(p: generated.valuations.BarrierCrossing): MertonMcConfig;
+  /**
+   * Return a copy with a different recovery rate.
+   * @param r - Recovery on default as a decimal fraction of the accreted notional, in `[0, 1]`.
+   * @returns A new configuration; the receiver is not modified.
+   * @throws Error - Throws with kind `validation` if `r` is outside `[0, 1]`, and kind `invalid_type` if it is not a number.
+   */
+  recoveryRate(r: number): MertonMcConfig;
+  /**
+   * Return a copy with an endogenous (leverage-dependent) hazard specification.
+   * @param h - `EndogenousHazardSpec` plain object or JSON string.
+   * @returns A new configuration; the receiver is not modified.
+   * @throws Error - Throws with kind `validation` if `h` does not match the `EndogenousHazardSpec` schema.
+   */
+  endogenousHazard(h: generated.valuations.EndogenousHazardSpec | string): MertonMcConfig;
+  /**
+   * Return a copy with a dynamic (notional-dependent) recovery specification.
+   * @param r - `DynamicRecoverySpec` plain object or JSON string.
+   * @returns A new configuration; the receiver is not modified.
+   * @throws Error - Throws with kind `validation` if `r` does not match the `DynamicRecoverySpec` schema.
+   */
+  dynamicRecovery(r: generated.valuations.DynamicRecoverySpec | string): MertonMcConfig;
+  /**
+   * Return a copy with a PIK-toggle exercise model.
+   * @param t - `ToggleExerciseModel` plain object or JSON string.
+   * @returns A new configuration; the receiver is not modified.
+   * @throws Error - Throws with kind `validation` if `t` does not match the `ToggleExerciseModel` schema.
+   */
+  toggleModel(t: generated.valuations.ToggleExerciseModel | string): MertonMcConfig;
+  /**
+   * Serialize the configuration to JSON.
+   * @returns Compact `MertonMcConfig` JSON accepted by `fromJson`.
+   * @throws Error - Throws if the configuration cannot be serialized.
+   */
+  toJson(): string;
+}
+
+/**
+ * Constructor surface for `MertonMcConfig`.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const config = valuations.instruments.MertonMcConfig.fromJson(configJson).stepsPerYear(24);
+ * console.log(JSON.parse(config.toJson()).steps_per_year);
+ * config.free();
+ * ```
+ */
+export interface MertonMcConfigConstructor {
+  /**
+   * JavaScript prototype of `MertonMcConfig`.
+   */
+  readonly prototype: MertonMcConfig;
+  /**
+   * Create a configuration with the Rust defaults (cash coupons, discrete barrier monitoring).
+   * @param merton - `MertonModel` plain object or JSON string: asset value, asset volatility, debt barrier and risk-free rate.
+   * @param recoveryRate - Recovery on default as a decimal fraction of the accreted notional, in `[0, 1]`.
+   * @returns The configuration with Rust defaults for every other field.
+   * @throws Error - Throws with kind `validation` if `merton` does not match the `MertonModel` schema or `recoveryRate` is outside `[0, 1]`, and kind `invalid_type` for a wrong argument type.
+   */
+  new (merton: generated.valuations.MertonModel | string, recoveryRate: number): MertonMcConfig;
+  /**
+   * Deserialize a configuration from its JSON form.
+   * @param json - `MertonMcConfig` JSON string or plain object.
+   * @returns The configuration.
+   * @throws Error - Throws with kind `validation` if `json` does not match the `MertonMcConfig` schema.
+   */
+  fromJson(json: generated.valuations.MertonMcConfig | string): MertonMcConfig;
+}
+
+/**
+ * Handle on the process-global market convention registry.
+ *
+ * Each lookup returns the convention record as a plain object.
+ */
+export interface ConventionRegistry extends WasmOwned {
+  /**
+   * Conventions of a rate index (mirrors Rust `ConventionRegistry::require_rate_index`).
+   * @param id - Rate index identifier, e.g. `"USD-SOFR-OIS"`.
+   * @returns `RateIndexConventions` plain object: currency, kind, tenor, day count, payment and reset lags, calendar and fixed-leg defaults.
+   * @throws Error - Throws with kind `not_found` if `id` has no registered conventions, and kind `invalid_type` if it is not a string.
+   */
+  requireRateIndex(id: string): generated.valuations.RateIndexConventions;
+  /**
+   * CDS conventions for a currency and documentation clause (mirrors Rust `ConventionRegistry::resolve_cds`).
+   * @param currency - ISO-4217 currency code of the contract, e.g. `"USD"`.
+   * @param docClause - Documentation clause: `cr14`, `mr14`, `mm14`, `xr14`, `isda_na`, `isda_eu`, `isda_as`, `isda_au`, or `isda_nz`.
+   * @returns `CdsConventionSpec` plain object: convention family, calendar, day count, business-day convention, stub rule, settlement lag and frequency.
+   * @throws Error - Throws with kind `validation` if `currency` or `docClause` is not recognized, kind `not_found` if the pair has no registered conventions, and kind `invalid_type` for a non-string argument.
+   */
+  resolveCds(
+    currency: string,
+    docClause: generated.valuations.CdsDocClause
+  ): generated.valuations.CdsConventionSpec;
+  /**
+   * Primary CDS convention family of a currency (mirrors Rust `ConventionRegistry::primary_cds_family`).
+   * @param currency - ISO-4217 currency code, e.g. `"EUR"`.
+   * @returns The convention family serde name (for example `"isda_eu"`), or `null` when the currency has none.
+   * @throws Error - Throws with kind `validation` if `currency` is not an ISO-4217 code, and kind `invalid_type` if it is not a string.
+   */
+  primaryCdsFamily(currency: string): generated.valuations.CdsConventionSpec['family'] | null;
+  /**
+   * Conventions of a swaption market (mirrors Rust `ConventionRegistry::require_swaption`).
+   * @param id - Swaption convention identifier, e.g. `"USD"`.
+   * @returns `SwaptionConventions` plain object: calendar, settlement lag, business-day convention and the underlying swap's fixed-leg and floating-index conventions.
+   * @throws Error - Throws with kind `not_found` if `id` has no registered conventions, and kind `invalid_type` if it is not a string.
+   */
+  requireSwaption(id: string): generated.valuations.SwaptionConventions;
+  /**
+   * Conventions of an inflation-swap market (mirrors Rust `ConventionRegistry::require_inflation_swap`).
+   * @param id - Inflation-swap convention identifier, e.g. `"USD-CPI"`.
+   * @returns `InflationSwapConventions` plain object: calendar, settlement lag, business-day convention, day count, inflation lag and interpolation.
+   * @throws Error - Throws with kind `not_found` if `id` has no registered conventions, and kind `invalid_type` if it is not a string.
+   */
+  requireInflationSwap(id: string): generated.valuations.InflationSwapConventions;
+  /**
+   * Conventions of an interest-rate future contract (mirrors Rust `ConventionRegistry::require_ir_future`).
+   * @param id - Contract identifier, e.g. `"CME:SR3"`.
+   * @returns `IrFutureConventions` plain object: index, compounding, reference period, calendar, face value, tick size and tick value.
+   * @throws Error - Throws with kind `not_found` if `id` has no registered conventions, and kind `invalid_type` if it is not a string.
+   */
+  requireIrFuture(id: string): generated.valuations.IrFutureConventions;
+  /**
+   * Conventions of a cross-currency swap pair (mirrors Rust `ConventionRegistry::require_xccy`).
+   * @param id - Cross-currency convention identifier, e.g. `"EUR/USD-XCCY"`.
+   * @returns `XccyConventions` plain object: currencies, index identifiers, settlement lag, payment frequency, day count, calendars and notional exchange.
+   * @throws Error - Throws with kind `not_found` if `id` has no registered conventions, and kind `invalid_type` if it is not a string.
+   */
+  requireXccy(id: string): generated.valuations.XccyConventions;
+}
+
+/**
+ * Constructor surface for `ConventionRegistry`.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const registry = new valuations.market.ConventionRegistry();
+ * console.log(registry.requireRateIndex("USD-SOFR-OIS").currency);
+ * registry.free();
+ * ```
+ */
+export interface ConventionRegistryConstructor {
+  /**
+   * JavaScript prototype of `ConventionRegistry`.
+   */
+  readonly prototype: ConventionRegistry;
+  /**
+   * Open the process-global convention registry.
+   * @returns A handle on the registry; every handle reads the same embedded data.
+   * @throws Error - Throws with kind `validation` if the embedded convention data fails to load (does not occur for a released build).
+   */
+  new (): ConventionRegistry;
+}
+
+/**
+ * The flattened credit-model fields of a structured-credit deal or asset-backed facility (Rust `CreditModelConfig`).
+ */
+export type CreditModelConfig = Pick<
+  generated.valuations.StructuredCredit,
+  | 'prepayment_spec'
+  | 'default_spec'
+  | 'recovery_spec'
+  | 'stochastic_prepay_spec'
+  | 'stochastic_default_spec'
+  | 'stochastic_recovery_spec'
+  | 'correlation_structure'
+  | 'delinquency'
+  | 'card'
+>;
+
+/**
+ * Chronological composite history rows returned by `valuations.composite.history` and `historyFromSpec`.
+ */
+export type CompositeHistoryResult = CompositeHistoryRow[];
+
+/**
+ * Compiled-in JSON Schemas of the valuations wire format.
+ *
+ * Each accessor returns the JSON Schema document as a plain object that always matches this build.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const types = valuations.schema.instrumentTypes();
+ * console.log(types.includes("bond"));
+ * ```
+ */
+export interface ValuationsSchemaNamespace {
+  /**
+   * JSON Schema of the canonical instrument envelope.
+   *
+   * The envelope is the `finstack_quant.instrument/1` wrapper carrying a
+   * `type` discriminator and the matching `spec` payload. The document is
+   * large (about one megabyte); read it once and cache the parsed result.
+   * @returns JSON Schema document of the instrument envelope.
+   * @throws Error - Throws with kind `validation` if the embedded schema is malformed (does not occur for a released build).
+   */
+  instrumentEnvelopeSchema(): Record<string, unknown>;
+  /**
+   * Canonical instrument type discriminators, in registry order.
+   * @returns Every `type` tag accepted by the instrument envelope, e.g. `"bond"`, `"interest_rate_swap"`.
+   * @throws Error - Throws if the instrument registry cannot be read (does not occur for a released build).
+   */
+  instrumentTypes(): string[];
+  /**
+   * JSON Schema of one instrument type.
+   * @param instrumentType - Canonical instrument type discriminator from `instrumentTypes()`, e.g. `"bond"`.
+   * @returns JSON Schema document of that instrument type's envelope.
+   * @throws Error - Throws with kind `not_found` if `instrumentType` is not a registered instrument type, and kind `invalid_type` if it is not a string.
+   */
+  instrumentSchema(instrumentType: string): Record<string, unknown>;
+  /**
+   * JSON Schema of the `ValuationResult` envelope returned by the pricing entry points.
+   * @returns JSON Schema document of the valuation result.
+   * @throws Error - Throws with kind `validation` if the embedded schema is malformed (does not occur for a released build).
+   */
+  valuationResultSchema(): Record<string, unknown>;
 }
 
 /**
@@ -9544,6 +15323,452 @@ export interface ValuationInstrumentsNamespace {
     asOf: string,
     marketPricePct?: number | null
   ): TrancheMetrics;
+  /**
+   * Fluent `BondBuilder` class (see `BondBuilderConstructor`).
+   */
+  BondBuilder: BondBuilderConstructor;
+  /**
+   * Fluent `TermLoanBuilder` class (see `TermLoanBuilderConstructor`).
+   */
+  TermLoanBuilder: TermLoanBuilderConstructor;
+  /**
+   * Fluent `RevolvingCreditBuilder` class (see `RevolvingCreditBuilderConstructor`).
+   */
+  RevolvingCreditBuilder: RevolvingCreditBuilderConstructor;
+  /**
+   * Fluent `AssetBackedFacilityBuilder` class (see `AssetBackedFacilityBuilderConstructor`).
+   */
+  AssetBackedFacilityBuilder: AssetBackedFacilityBuilderConstructor;
+  /**
+   * Typed `InterestRateSwap` instrument class (see `InterestRateSwapConstructor`).
+   */
+  InterestRateSwap: InterestRateSwapConstructor;
+  /**
+   * Fluent `InterestRateSwapBuilder` class (see `InterestRateSwapBuilderConstructor`).
+   */
+  InterestRateSwapBuilder: InterestRateSwapBuilderConstructor;
+  /**
+   * Typed `Swaption` instrument class (see `SwaptionConstructor`).
+   */
+  Swaption: SwaptionConstructor;
+  /**
+   * Fluent `SwaptionBuilder` class (see `SwaptionBuilderConstructor`).
+   */
+  SwaptionBuilder: SwaptionBuilderConstructor;
+  /**
+   * Typed `CapFloor` instrument class (see `CapFloorConstructor`).
+   */
+  CapFloor: CapFloorConstructor;
+  /**
+   * Fluent `CapFloorBuilder` class (see `CapFloorBuilderConstructor`).
+   */
+  CapFloorBuilder: CapFloorBuilderConstructor;
+  /**
+   * Typed `CreditDefaultSwap` instrument class (see `CreditDefaultSwapConstructor`).
+   */
+  CreditDefaultSwap: CreditDefaultSwapConstructor;
+  /**
+   * Fluent `CreditDefaultSwapBuilder` class (see `CreditDefaultSwapBuilderConstructor`).
+   */
+  CreditDefaultSwapBuilder: CreditDefaultSwapBuilderConstructor;
+  /**
+   * Typed `CdsIndex` instrument class (see `CdsIndexConstructor`).
+   */
+  CdsIndex: CdsIndexConstructor;
+  /**
+   * Fluent `CdsIndexBuilder` class (see `CdsIndexBuilderConstructor`).
+   */
+  CdsIndexBuilder: CdsIndexBuilderConstructor;
+  /**
+   * Typed `CdsTranche` instrument class (see `CdsTrancheConstructor`).
+   */
+  CdsTranche: CdsTrancheConstructor;
+  /**
+   * Fluent `CdsTrancheBuilder` class (see `CdsTrancheBuilderConstructor`).
+   */
+  CdsTrancheBuilder: CdsTrancheBuilderConstructor;
+  /**
+   * Typed `ConvertibleBond` instrument class (see `ConvertibleBondConstructor`).
+   */
+  ConvertibleBond: ConvertibleBondConstructor;
+  /**
+   * Fluent `ConvertibleBondBuilder` class (see `ConvertibleBondBuilderConstructor`).
+   */
+  ConvertibleBondBuilder: ConvertibleBondBuilderConstructor;
+  /**
+   * Typed `EquityOption` instrument class (see `EquityOptionConstructor`).
+   */
+  EquityOption: EquityOptionConstructor;
+  /**
+   * Fluent `EquityOptionBuilder` class (see `EquityOptionBuilderConstructor`).
+   */
+  EquityOptionBuilder: EquityOptionBuilderConstructor;
+  /**
+   * Typed `StructuredCredit` instrument class (see `StructuredCreditConstructor`).
+   */
+  StructuredCredit: StructuredCreditConstructor;
+  /**
+   * Fluent `StructuredCreditBuilder` class (see `StructuredCreditBuilderConstructor`).
+   */
+  StructuredCreditBuilder: StructuredCreditBuilderConstructor;
+  /**
+   * Fluent `TrancheBuilder` class (see `TrancheBuilderConstructor`).
+   */
+  TrancheBuilder: TrancheBuilderConstructor;
+  /**
+   * Merton Monte Carlo configuration class (see `MertonMcConfigConstructor`).
+   */
+  MertonMcConfig: MertonMcConfigConstructor;
+  /**
+   * `BarrierCrossing::Discrete`: default is checked only on the simulation grid.
+   * @returns The `BarrierCrossing` value `"discrete"`.
+   * @throws Error - Throws if the value cannot be converted to JavaScript.
+   */
+  barrierCrossingDiscrete(): generated.valuations.BarrierCrossing;
+  /**
+   * `BarrierCrossing::BrownianBridge`: corrects for crossings between grid points.
+   * @returns The `BarrierCrossing` value `"brownian_bridge"`.
+   * @throws Error - Throws if the value cannot be converted to JavaScript.
+   */
+  barrierCrossingBrownianBridge(): generated.valuations.BarrierCrossing;
+  /**
+   * `PikMode::Cash`: the coupon is paid in cash.
+   * @returns The `PikMode` value.
+   * @throws Error - Throws if the value cannot be converted to JavaScript.
+   */
+  pikModeCash(): generated.valuations.PikMode;
+  /**
+   * `PikMode::Pik`: the coupon accretes to the notional.
+   * @returns The `PikMode` value.
+   * @throws Error - Throws if the value cannot be converted to JavaScript.
+   */
+  pikModePik(): generated.valuations.PikMode;
+  /**
+   * `PikMode::Split`: part of the coupon is paid in cash and part accretes.
+   * @param cashFraction - Fraction of the coupon paid in cash, in `[0, 1]`.
+   * @param pikFraction - Fraction of the coupon accreted, in `[0, 1]`.
+   * @returns The `PikMode` value.
+   * @throws Error - Throws with kind `invalid_type` if a fraction is not a number.
+   */
+  pikModeSplit(cashFraction: number, pikFraction: number): generated.valuations.PikMode;
+  /**
+   * `PikMode::Toggle`: the issuer elects cash or PIK each period under the toggle model.
+   * @returns The `PikMode` value.
+   * @throws Error - Throws if the value cannot be converted to JavaScript.
+   */
+  pikModeToggle(): generated.valuations.PikMode;
+  /**
+   * `PikSchedule::Uniform`: one PIK mode for the life of the bond.
+   * @param mode - `PikMode` plain value or JSON string.
+   * @returns The `PikSchedule` plain object.
+   * @throws Error - Throws with kind `validation` if `mode` does not match the `PikMode` schema.
+   */
+  pikScheduleUniform(mode: generated.valuations.PikMode): generated.valuations.PikSchedule;
+  /**
+   * `PikSchedule::Stepped`: the PIK mode changes at given times.
+   * @param steps - `[timeInYears, PikMode]` pairs in increasing time order; each mode applies from its time on.
+   * @returns The `PikSchedule` plain object.
+   * @throws Error - Throws with kind `validation` if `steps` is not an array of `[number, PikMode]` pairs.
+   */
+  pikScheduleStepped(steps: [number, generated.valuations.PikMode][] | string): generated.valuations.PikSchedule;
+  /**
+   * The PIK mode in force at a time (mirrors Rust `PikSchedule::mode_at`).
+   * @param schedule - `PikSchedule` plain object or JSON string.
+   * @param t - Time from issue in years.
+   * @returns The `PikMode` applying at `t`.
+   * @throws Error - Throws with kind `validation` if `schedule` does not match the `PikSchedule` schema, and kind `invalid_type` if `t` is not a number.
+   */
+  pikScheduleModeAt(schedule: generated.valuations.PikSchedule | string, t: number): generated.valuations.PikMode;
+  /**
+   * Create a fluent `TrancheBuilder` (mirrors Rust `Tranche::builder`).
+   * @returns An empty tranche builder.
+   */
+  trancheBuilder(): TrancheBuilder;
+  /**
+   * Build a tranche structure whose attachment points come from the balances.
+   *
+   * Mirrors Rust `TrancheStructure::from_balances`: tranches are ordered by
+   * seniority and each one attaches where the more junior ones detach.
+   * @param tranches - `Tranche` plain objects (or a JSON array string).
+   * @returns The validated `TrancheStructure` plain object.
+   * @throws Error - Throws with kind `validation` if a tranche does not match the `Tranche` schema or the structure is invalid (empty, mixed currencies, duplicate ids).
+   */
+  trancheStructureFromBalances(tranches: generated.valuations.Tranche[] | string): generated.valuations.TrancheStructure;
+  /**
+   * Create a fixed-rate bond pool asset (mirrors Rust `PoolAsset::fixed_rate_bond`).
+   * @param id - Asset identifier, unique within the pool.
+   * @param balance - Current balance as a `Money` plain object.
+   * @param rate - Annual coupon as a decimal (`0.07` = 7%).
+   * @param maturity - Maturity date as an ISO-8601 string.
+   * @param dayCount - Day-count serde name, e.g. `"30_360"`.
+   * @returns The `PoolAsset` plain object.
+   * @throws Error - Throws with kind `validation` if `balance`, `maturity` or `dayCount` is malformed, and kind `invalid_type` for a wrong argument type.
+   */
+  poolAssetFixedRateBond(
+    id: string,
+    balance: MoneyValue,
+    rate: number,
+    maturity: string,
+    dayCount: generated.valuations.PoolAsset['day_count']
+  ): generated.valuations.PoolAsset;
+  /**
+   * Create a floating-rate loan pool asset (mirrors Rust `PoolAsset::floating_rate_loan`).
+   * @param id - Asset identifier, unique within the pool.
+   * @param balance - Current balance as a `Money` plain object.
+   * @param forwardCurveId - Forward curve projecting the loan's index, e.g. `"USD-SOFR-3M"`.
+   * @param spreadBp - Margin over the index in basis points.
+   * @param maturity - Maturity date as an ISO-8601 string.
+   * @param dayCount - Day-count serde name, e.g. `"act_360"`.
+   * @returns The `PoolAsset` plain object.
+   * @throws Error - Throws with kind `validation` if `balance`, `maturity` or `dayCount` is malformed, and kind `invalid_type` for a wrong argument type.
+   */
+  poolAssetFloatingRateLoan(
+    id: string,
+    balance: MoneyValue,
+    forwardCurveId: string,
+    spreadBp: number,
+    maturity: string,
+    dayCount: generated.valuations.PoolAsset['day_count']
+  ): generated.valuations.PoolAsset;
+  /**
+   * Return a copy of a pool with its representative lines replaced.
+   * @param pool - `AssetPool` plain object or JSON string.
+   * @param repLines - `RepLine` plain objects (or a JSON array string).
+   * @returns A new `AssetPool` plain object carrying `rep_lines`.
+   * @throws Error - Throws with kind `validation` if `pool` or `repLines` does not match its schema.
+   */
+  assetPoolWithRepLines(pool: generated.valuations.AssetPool | string, repLines: generated.valuations.RepLine[] | string): generated.valuations.AssetPool;
+  /**
+   * Return a copy of a pool with its loan-level assets replaced.
+   * @param pool - `AssetPool` plain object or JSON string.
+   * @param value - `PoolAsset` plain objects (or a JSON array string).
+   * @returns A new `AssetPool` plain object carrying `assets`.
+   * @throws Error - Throws with kind `validation` if `pool` or `value` does not match its schema.
+   */
+  assetPoolWithAssets(pool: generated.valuations.AssetPool | string, value: generated.valuations.PoolAsset[] | string): generated.valuations.AssetPool;
+  /**
+   * Return a copy of a pool collateralized by typed instruments.
+   * @param pool - `AssetPool` plain object or JSON string.
+   * @param collateral - `InstrumentCollateral` plain object: `bonds`, `term_loans` and `revolvers` instrument specs plus the optional `call_exercise`, `put_exercise` and `overrides` exercise policies.
+   * @returns A new `AssetPool` plain object carrying `instruments`.
+   * @throws Error - Throws with kind `validation` if `pool` or `collateral` does not match its schema.
+   */
+  assetPoolWithInstruments(pool: generated.valuations.AssetPool | string, collateral: generated.valuations.InstrumentCollateral | string): generated.valuations.AssetPool;
+  /**
+   * Return a copy of a pool with its reserve account configured.
+   * @param pool - `AssetPool` plain object or JSON string.
+   * @param reserveAccount - Opening reserve balance as a `Money` plain object.
+   * @param reserveAccountRate - Annual interest rate earned on the reserve, as a decimal.
+   * @param reserveTarget - Optional reserve target as a `Money` plain object; omit for no target.
+   * @param reserveInterestDestination - Optional `ReserveInterestDestination` plain object; omit for the Rust default (interest stays in the reserve).
+   * @returns A new `AssetPool` plain object with the reserve fields set.
+   * @throws Error - Throws with kind `validation` if an argument does not match its schema, and kind `invalid_type` if `reserveAccountRate` is not a number.
+   */
+  assetPoolWithReserve(
+    pool: generated.valuations.AssetPool | string,
+    reserveAccount: MoneyValue,
+    reserveAccountRate: number,
+    reserveTarget?: MoneyValue | null,
+    reserveInterestDestination?: generated.valuations.AssetPool['reserve_interest_destination'] | null
+  ): generated.valuations.AssetPool;
+  /**
+   * Return a copy of a pool with a reinvestment period.
+   * @param pool - `AssetPool` plain object or JSON string.
+   * @param value - `ReinvestmentPeriod` plain object or JSON string: end date, active flag and reinvestment criteria.
+   * @returns A new `AssetPool` plain object carrying `reinvestment_period`.
+   * @throws Error - Throws with kind `validation` if `pool` or `value` does not match its schema.
+   */
+  assetPoolWithReinvestmentPeriod(pool: generated.valuations.AssetPool | string, value: generated.valuations.ReinvestmentPeriod | string): generated.valuations.AssetPool;
+  /**
+   * Return a copy of a pool with seasoned account balances.
+   * @param pool - `AssetPool` plain object or JSON string.
+   * @param accounts - Plain object with any of `cumulative_defaults`, `cumulative_recoveries`, `cumulative_prepayments`, `cumulative_scheduled_amortization`, `collection_account`, `excess_spread_account` and `original_balance`, each a `Money` plain object; absent fields keep the pool's value.
+   * @returns A new `AssetPool` plain object with the given balances.
+   * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema or `accounts` has an unknown field or a malformed amount.
+   */
+  assetPoolWithAccounts(
+    pool: generated.valuations.AssetPool | string,
+    accounts: Partial<
+      Pick<
+        generated.valuations.AssetPool,
+        | 'cumulative_defaults'
+        | 'cumulative_recoveries'
+        | 'cumulative_prepayments'
+        | 'cumulative_scheduled_amortization'
+        | 'collection_account'
+        | 'excess_spread_account'
+        | 'original_balance'
+      >
+    >
+  ): generated.valuations.AssetPool;
+  /**
+   * `PrepaymentPenalty::Lockout`: voluntary prepayment is not allowed.
+   * @param through - Optional last date of the lockout as an ISO-8601 string; omit for a lockout to maturity.
+   * @returns The `PrepaymentPenalty` plain object.
+   * @throws Error - Throws with kind `validation` if `through` is malformed, and kind `invalid_type` if it is not a string.
+   */
+  prepaymentPenaltyLockout(through?: string | null): generated.valuations.PrepaymentPenalty;
+  /**
+   * `PrepaymentPenalty::Fixed`: a fixed percentage of the prepaid balance.
+   * @param pct - Penalty in percent of the prepaid balance (`3` = 3%).
+   * @param through - Optional last date the penalty applies, as an ISO-8601 string; omit for the life of the loan.
+   * @returns The `PrepaymentPenalty` plain object.
+   * @throws Error - Throws with kind `validation` if `pct` is negative or not finite or `through` is malformed, and kind `invalid_type` for a wrong argument type.
+   */
+  prepaymentPenaltyFixed(pct: number, through?: string | null): generated.valuations.PrepaymentPenalty;
+  /**
+   * `PrepaymentPenalty::StepDown`: a declining schedule of percentages.
+   * @param schedule - `[throughDate, pct]` pairs in increasing date order: `pct` percent of the prepaid balance applies through each ISO-8601 date.
+   * @returns The `PrepaymentPenalty` plain object.
+   * @throws Error - Throws with kind `validation` if `schedule` is not an array of `[string, number]` pairs, a date is malformed, or the schedule is empty, unordered or has a negative percentage.
+   */
+  prepaymentPenaltyStepDown(schedule: [string, number][] | string): generated.valuations.PrepaymentPenalty;
+  /**
+   * `PrepaymentPenalty::YieldMaintenance`: the lender is made whole on lost interest.
+   * @param reinvestmentRate - Optional flat reinvestment rate as a decimal; omit to discount on `discountCurveId`.
+   * @param discountCurveId - Optional discount curve used for the reinvestment yield; omit to use `reinvestmentRate`.
+   * @param floorPct - Optional minimum penalty in percent of the prepaid balance.
+   * @param through - Optional last date the penalty applies, as an ISO-8601 string; omit for the life of the loan.
+   * @returns The `PrepaymentPenalty` plain object.
+   * @throws Error - Throws with kind `validation` if neither or both of `reinvestmentRate` and `discountCurveId` are usable, a value is negative or not finite, or `through` is malformed; and kind `invalid_type` for a wrong argument type.
+   */
+  prepaymentPenaltyYieldMaintenance(
+    reinvestmentRate?: number | null,
+    discountCurveId?: string | null,
+    floorPct?: number | null,
+    through?: string | null
+  ): generated.valuations.PrepaymentPenalty;
+  /**
+   * Standard CLO par-value test rules (mirrors Rust `CoverageRules::clo_standard`).
+   *
+   * Performing collateral at par, defaulted collateral at recovery, a 7.5%
+   * CCC bucket carried at market value and an 80% discount-obligation threshold.
+   * @returns The `CoverageRules` plain object.
+   * @throws Error - Throws if the value cannot be converted to JavaScript.
+   */
+  coverageRulesCloStandard(): generated.valuations.CoverageRules;
+  /**
+   * Validate coverage rules (mirrors Rust `CoverageRules::validate`).
+   * @param rules - `CoverageRules` plain object or JSON string.
+   * @throws Error - Throws with kind `validation` if `rules` does not match the `CoverageRules` schema or a haircut, threshold or carry value is out of range.
+   */
+  coverageRulesValidate(rules: generated.valuations.CoverageRules | string): void;
+  /**
+   * Coverage tests a waterfall evaluates, in tier order (mirrors Rust `Waterfall::coverage_tests`).
+   * @param waterfall - `Waterfall` plain object or JSON string.
+   * @returns `CoverageTestSpec` plain objects in the order the waterfall runs them.
+   * @throws Error - Throws with kind `validation` if `waterfall` does not match the `Waterfall` schema.
+   */
+  waterfallCoverageTests(waterfall: generated.valuations.Waterfall | string): generated.valuations.CoverageTestSpec[];
+  /**
+   * The grid cells of a structured-credit scenario table.
+   * @param table - `ScenarioTable` plain object or JSON string, as returned by `structuredCreditTrancheScenarioTable`.
+   * @returns `ScenarioCell` plain objects: `cpr`, `cdr`, `severity`, `price`, `wal` and `writedown` per grid point.
+   * @throws Error - Throws with kind `validation` if `table` does not match the `ScenarioTable` schema.
+   */
+  scenarioTableCells(table: ScenarioTable | string): ScenarioCell[];
+  /**
+   * `AmortizationEvent::Date`: revolving stops on a scheduled date.
+   * @param date - Date revolving stops, as an ISO-8601 string.
+   * @returns The `AmortizationEvent` plain object.
+   * @throws Error - Throws with kind `validation` if `date` is malformed, and kind `invalid_type` if it is not a string.
+   */
+  amortizationEventDate(date: string): generated.valuations.AmortizationEvent;
+  /**
+   * `AmortizationEvent::CumulativeLoss`: revolving stops when losses pass a limit.
+   * @param maxCumulativeLoss - Cumulative net loss limit as a decimal fraction of the original pool balance (`0.05` = 5%).
+   * @returns The `AmortizationEvent` plain object.
+   * @throws Error - Throws with kind `validation` if the limit is outside `(0, 1]`, and kind `invalid_type` if it is not a number.
+   */
+  amortizationEventCumulativeLoss(maxCumulativeLoss: number): generated.valuations.AmortizationEvent;
+  /**
+   * `AmortizationEvent::ExcessSpread`: revolving stops when excess spread falls below a floor.
+   * @param minExcessSpread3m - Minimum three-month average annualized excess spread as a decimal (`0.01` = 1%).
+   * @returns The `AmortizationEvent` plain object.
+   * @throws Error - Throws with kind `validation` if the floor is not finite, and kind `invalid_type` if it is not a number.
+   */
+  amortizationEventExcessSpread(minExcessSpread3m: number): generated.valuations.AmortizationEvent;
+  /**
+   * CDX North America Investment Grade preset (mirrors Rust `CdsIndexParams::cdx_na_ig`).
+   * @param series - Published series number of the index.
+   * @param version - Index version within the series after credit events (1 at launch).
+   * @param couponBp - Running fixed coupon in basis points.
+   * @returns The `CdsIndexParams` plain object for `CdsIndex.fromPreset`.
+   * @throws Error - Throws with kind `invalid_type` if `series` or `version` is not a whole number in `0..=65535` or `couponBp` is not a number.
+   */
+  cdsIndexParamsCdxNaIg(series: number, version: number, couponBp: number): generated.valuations.CdsIndexParams;
+  /**
+   * CDX North America High Yield preset (mirrors Rust `CdsIndexParams::cdx_na_hy`).
+   * @param series - Published series number of the index.
+   * @param version - Index version within the series after credit events (1 at launch).
+   * @param couponBp - Running fixed coupon in basis points.
+   * @returns The `CdsIndexParams` plain object for `CdsIndex.fromPreset`.
+   * @throws Error - Throws with kind `invalid_type` if `series` or `version` is not a whole number in `0..=65535` or `couponBp` is not a number.
+   */
+  cdsIndexParamsCdxNaHy(series: number, version: number, couponBp: number): generated.valuations.CdsIndexParams;
+  /**
+   * iTraxx Europe preset (mirrors Rust `CdsIndexParams::itraxx_europe`).
+   * @param series - Published series number of the index.
+   * @param version - Index version within the series after credit events (1 at launch).
+   * @param couponBp - Running fixed coupon in basis points.
+   * @returns The `CdsIndexParams` plain object for `CdsIndex.fromPreset`.
+   * @throws Error - Throws with kind `invalid_type` if `series` or `version` is not a whole number in `0..=65535` or `couponBp` is not a number.
+   */
+  cdsIndexParamsItraxxEurope(series: number, version: number, couponBp: number): generated.valuations.CdsIndexParams;
+  /**
+   * Equity tranche, 0% to 3% (mirrors Rust `CdsTrancheParams::equity_tranche`).
+   * @param indexName - Index family name, e.g. `"CDX.NA.IG"`.
+   * @param series - Published series number of the index.
+   * @param notional - Tranche notional as a `Money` plain object.
+   * @param maturity - Maturity date as an ISO-8601 string.
+   * @param couponBp - Running coupon in basis points.
+   * @returns The `CdsTrancheParams` plain object for `CdsTranche.standard`.
+   * @throws Error - Throws with kind `validation` if `notional` or `maturity` is malformed, and kind `invalid_type` for a wrong argument type.
+   */
+  cdsTrancheParamsEquityTranche(
+    indexName: string,
+    series: number,
+    notional: MoneyValue,
+    maturity: string,
+    couponBp: number
+  ): generated.valuations.CdsTrancheParams;
+  /**
+   * Mezzanine tranche, 3% to 7% (mirrors Rust `CdsTrancheParams::mezzanine_tranche`).
+   * @param indexName - Index family name, e.g. `"CDX.NA.IG"`.
+   * @param series - Published series number of the index.
+   * @param notional - Tranche notional as a `Money` plain object.
+   * @param maturity - Maturity date as an ISO-8601 string.
+   * @param couponBp - Running coupon in basis points.
+   * @returns The `CdsTrancheParams` plain object for `CdsTranche.standard`.
+   * @throws Error - Throws with kind `validation` if `notional` or `maturity` is malformed, and kind `invalid_type` for a wrong argument type.
+   */
+  cdsTrancheParamsMezzanineTranche(
+    indexName: string,
+    series: number,
+    notional: MoneyValue,
+    maturity: string,
+    couponBp: number
+  ): generated.valuations.CdsTrancheParams;
+  /**
+   * Validate a canonical envelope for one exact instrument type.
+   *
+   * Mirrors Rust `pricer::validate_typed_instrument_json`.
+   * @param typeTag - Canonical instrument discriminator expected by the caller, e.g. `"bond"`.
+   * @param json - Canonical v1 instrument envelope (JSON string or plain object).
+   * @returns The canonical envelope JSON.
+   * @throws Error - Throws with kind `validation` if `json` is malformed, fails instrument validation, or carries another instrument type.
+   */
+  validateTypedInstrumentJson(typeTag: string, json: JsonInput): string;
+  /**
+   * Pretty-print a canonical instrument envelope.
+   *
+   * Mirrors Rust `pricer::pretty_instrument_json`: validates the envelope and
+   * re-serializes it with indentation.
+   * @param json - Canonical v1 instrument envelope (JSON string or plain object).
+   * @returns Indented canonical envelope JSON.
+   * @throws Error - Throws with kind `validation` if `json` is malformed or fails instrument validation.
+   */
+  prettyInstrumentJson(json: JsonInput): string;
 }
 
 /**
@@ -9627,6 +15852,85 @@ export interface FxForwardInstrument extends FxInstrument {
    * @throws Error - Throws with kind `not_found` if a discount curve or the FX spot is missing, and kind `validation` if an input is malformed.
    */
   marketForwardRate(marketJson: JsonInput, asOf: string): number;
+  /**
+   * Canonical model key used when `model="default"` is passed to `price`.
+   * @returns Registered model key such as `"hazard_rate"` or `"black76"`.
+   */
+  readonly defaultModel: string;
+  /**
+   * Instrument attributes (tags and metadata) used for scenario selection.
+   * @returns The attribute bag; empty when none were set.
+   */
+  readonly attributes: generated.valuations.FxForward['attributes'];
+  /**
+   * Base (foreign) currency; the notional currency.
+   * @returns The base currency.
+   */
+  readonly baseCurrency: Currency;
+  /**
+   * Quote (domestic) currency; the PV currency.
+   * @returns The quote currency.
+   */
+  readonly quoteCurrency: Currency;
+  /**
+   * Maturity / settlement date.
+   * @returns The maturity date.
+   */
+  readonly maturity: string;
+  /**
+   * Notional amount in the base currency.
+   * @returns Currency-tagged notional.
+   */
+  readonly notional: Money;
+  /**
+   * Contract forward rate (quote per base).
+   * @returns The rate, or `null` when at-market.
+   */
+  readonly contractRate: NonNullable<generated.valuations.FxForward['contract_rate']> | null;
+  /**
+   * Domestic (quote-currency) discount curve identifier.
+   * @returns The curve id.
+   */
+  readonly domesticDiscountCurveId: string;
+  /**
+   * Foreign (base-currency) discount curve identifier.
+   * @returns The curve id.
+   */
+  readonly foreignDiscountCurveId: string;
+  /**
+   * Explicit spot override (quote per base).
+   * @returns The override, or `null` to use the FX matrix.
+   */
+  readonly quotedSpot: NonNullable<generated.valuations.FxForward['quoted_spot']> | null;
+  /**
+   * Base-currency holiday calendar identifier.
+   * @returns The calendar id, or `null`.
+   */
+  readonly baseCalendarId: string | null;
+  /**
+   * Quote-currency holiday calendar identifier.
+   * @returns The calendar id, or `null`.
+   */
+  readonly quoteCalendarId: string | null;
+  /**
+   * Expiry as seen by the pricer.
+   * @returns `null`: FX forwards carry no option expiry.
+   */
+  readonly expiry: string | null;
+  /**
+   * The bare instrument spec as a plain object (no envelope).
+   *
+   * Mirrors Python `to_dict()`: the serde form of the Rust struct, i.e. the `instrument.spec` payload of `toJson()`.
+   * @returns Plain-object instrument spec.
+   * @throws Error - Throws if the instrument cannot be serialized.
+   */
+  toDict(): generated.valuations.FxForward;
+  /**
+   * Market data this instrument needs to price (mirrors Rust `Instrument::market_dependencies`).
+   * @returns `MarketDependencies` plain object listing discount, forward and credit curves, spot ids, volatility surfaces, FX pairs and fixing series.
+   * @throws Error - Throws with kind `validation` if the instrument cannot enumerate its dependencies.
+   */
+  marketDependencies(): generated.valuations.MarketDependencies;
 }
 
 /**
@@ -9668,6 +15972,85 @@ export interface FxVanillaOptionInstrument extends FxOptionInstrument {
    * @throws Error - Throws with kind `not_found` if a curve or the spot is missing, kind `validation` if an input is malformed, and kind `computation` if the root search does not converge.
    */
   impliedVol(marketJson: JsonInput, asOf: string, targetPrice: number): number;
+  /**
+   * Canonical model key used when `model="default"` is passed to `price`.
+   * @returns Registered model key such as `"hazard_rate"` or `"black76"`.
+   */
+  readonly defaultModel: string;
+  /**
+   * Instrument attributes (tags and metadata) used for scenario selection.
+   * @returns The attribute bag; empty when none were set.
+   */
+  readonly attributes: generated.valuations.FxOption['attributes'];
+  /**
+   * Base (foreign) currency; the notional currency.
+   * @returns The base currency.
+   */
+  readonly baseCurrency: Currency;
+  /**
+   * Quote (domestic) currency.
+   * @returns The quote currency.
+   */
+  readonly quoteCurrency: Currency;
+  /**
+   * Strike, quote currency per unit of base currency.
+   * @returns The strike rate.
+   */
+  readonly strike: generated.valuations.FxOption['strike'];
+  /**
+   * Option type on the base currency.
+   * @returns `"call"` or `"put"`.
+   */
+  readonly optionType: generated.valuations.FxOption['option_type'];
+  /**
+   * Delta convention.
+   * @returns `{"kind", "premium_currency", "venue"}`.
+   */
+  readonly deltaConvention: generated.valuations.FxOption['delta_convention'];
+  /**
+   * Last date on which the option may be exercised.
+   * @returns Unadjusted calendar expiry date. Time to expiry used in pricing is measured from the valuation date to this date under the pricing day-count convention.
+   */
+  readonly expiry: string;
+  /**
+   * Day count for the time-to-expiry year fraction.
+   * @returns Act/365F unless set otherwise.
+   */
+  readonly dayCount: DayCount;
+  /**
+   * Notional amount in the base currency.
+   * @returns Currency-tagged notional.
+   */
+  readonly notional: Money;
+  /**
+   * Domestic (quote-currency) discount curve identifier.
+   * @returns The curve id.
+   */
+  readonly domesticDiscountCurveId: string;
+  /**
+   * Foreign (base-currency) discount curve identifier.
+   * @returns The curve id.
+   */
+  readonly foreignDiscountCurveId: string;
+  /**
+   * FX volatility surface identifier.
+   * @returns The surface id.
+   */
+  readonly volSurfaceId: string;
+  /**
+   * The bare instrument spec as a plain object (no envelope).
+   *
+   * Mirrors Python `to_dict()`: the serde form of the Rust struct, i.e. the `instrument.spec` payload of `toJson()`.
+   * @returns Plain-object instrument spec.
+   * @throws Error - Throws if the instrument cannot be serialized.
+   */
+  toDict(): generated.valuations.FxOption;
+  /**
+   * Market data this instrument needs to price (mirrors Rust `Instrument::market_dependencies`).
+   * @returns `MarketDependencies` plain object listing discount, forward and credit curves, spot ids, volatility surfaces, FX pairs and fixing series.
+   * @throws Error - Throws with kind `validation` if the instrument cannot enumerate its dependencies.
+   */
+  marketDependencies(): generated.valuations.MarketDependencies;
 }
 
 /**
@@ -9964,6 +16347,13 @@ export interface FxForwardConstructor extends FxInstrumentConstructor<FxForwardI
     foreignDiscountCurveId: string,
     options?: FxForwardFromTradeDateOptions | null
   ): FxForwardInstrument;
+  /**
+   * Create a fluent builder (mirrors the Rust `builder()`).
+   *
+   * Each setter stores one field and returns the builder; `build()` validates and consumes it.
+   * @returns An empty builder.
+   */
+  builder(): FxForwardBuilder;
 }
 
 /**
@@ -10013,6 +16403,13 @@ export interface FxOptionConstructor extends FxInstrumentConstructor<FxVanillaOp
     premiumCurrency: string,
     venue: string
   ): FxVanillaOptionInstrument;
+  /**
+   * Create a fluent builder (mirrors the Rust `builder()`).
+   *
+   * Each setter stores one field and returns the builder; `build()` validates and consumes it.
+   * @returns An empty builder.
+   */
+  builder(): FxOptionBuilder;
 }
 
 /**
@@ -10076,6 +16473,14 @@ export interface FxNamespace {
    * Quanto option constructor.
    */
   QuantoOption: FxInstrumentConstructor<FxOptionInstrument>;
+  /**
+   * Fluent `FxForwardBuilder` class (see `FxForwardBuilderConstructor`).
+   */
+  FxForwardBuilder: FxForwardBuilderConstructor;
+  /**
+   * Fluent `FxOptionBuilder` class (see `FxOptionBuilderConstructor`).
+   */
+  FxOptionBuilder: FxOptionBuilderConstructor;
 }
 
 // --- SABR (Stochastic Alpha Beta Rho) volatility -------------------------
@@ -12976,6 +19381,124 @@ export interface CompositeNamespace {
     observations: Record<string, unknown>[] | string,
     metrics?: string[]
   ): CompositeHistoryRow[];
+  /**
+   * `WeightingMethod::FixedQuantity`: leg quantities are the leg scores.
+   * @returns The `WeightingMethod` plain object.
+   * @throws Error - Throws if the value cannot be converted to JavaScript.
+   */
+  weightingMethodFixedQuantity(): generated.valuations.WeightingMethod;
+  /**
+   * `WeightingMethod::NotionalWeighted`: scale the legs to a gross notional.
+   * @param grossNotional - Target gross notional as a `Money` plain object in the reporting currency.
+   * @returns The `WeightingMethod` plain object.
+   * @throws Error - Throws with kind `validation` if `grossNotional` is not a `Money` plain object.
+   */
+  weightingMethodNotionalWeighted(grossNotional: MoneyValue): generated.valuations.WeightingMethod;
+  /**
+   * `WeightingMethod::MetricWeighted`: size the legs by an additive metric.
+   * @param metric - Canonical additive metric identifier, e.g. `"dv01"` or `"delta"`.
+   * @param anchorLegId - Leg whose quantity is fixed at `anchorQuantity`.
+   * @param anchorQuantity - Quantity of the anchor leg.
+   * @param neutralize - Optional; `true` sizes the other legs so the net metric is zero, `false` (the default) scales them by score.
+   * @returns The `WeightingMethod` plain object.
+   * @throws Error - Throws with kind `validation` if `metric` is not a canonical metric identifier, and kind `invalid_type` for a wrong argument type.
+   */
+  weightingMethodMetricWeighted(
+    metric: string,
+    anchorLegId: string,
+    anchorQuantity: number,
+    neutralize?: boolean | null
+  ): generated.valuations.WeightingMethod;
+  /**
+   * DV01-neutral weighting (mirrors Rust `WeightingMethod::dv01_neutral`).
+   * @param anchorLegId - Leg whose quantity is fixed at `anchorQuantity`.
+   * @param anchorQuantity - Quantity of the anchor leg.
+   * @returns The `WeightingMethod` plain object.
+   * @throws Error - Throws with kind `invalid_type` if `anchorLegId` is not a string or `anchorQuantity` is not a number.
+   */
+  weightingMethodDv01Neutral(anchorLegId: string, anchorQuantity: number): generated.valuations.WeightingMethod;
+  /**
+   * Delta-neutral weighting (mirrors Rust `WeightingMethod::delta_neutral`).
+   * @param anchorLegId - Leg whose quantity is fixed at `anchorQuantity`.
+   * @param anchorQuantity - Quantity of the anchor leg.
+   * @returns The `WeightingMethod` plain object.
+   * @throws Error - Throws with kind `invalid_type` if `anchorLegId` is not a string or `anchorQuantity` is not a number.
+   */
+  weightingMethodDeltaNeutral(anchorLegId: string, anchorQuantity: number): generated.valuations.WeightingMethod;
+  /**
+   * Duration-weighted sizing (mirrors Rust `WeightingMethod::duration_weighted`).
+   * @param anchorLegId - Leg whose quantity is fixed at `anchorQuantity`.
+   * @param anchorQuantity - Quantity of the anchor leg.
+   * @returns The `WeightingMethod` plain object.
+   * @throws Error - Throws with kind `invalid_type` if `anchorLegId` is not a string or `anchorQuantity` is not a number.
+   */
+  weightingMethodDurationWeighted(anchorLegId: string, anchorQuantity: number): generated.valuations.WeightingMethod;
+  /**
+   * Inverse-volatility weighting (mirrors Rust `WeightingMethod::volatility_weighted`).
+   * @param anchorLegId - Leg whose quantity is fixed at `anchorQuantity`.
+   * @param anchorQuantity - Quantity of the anchor leg.
+   * @param lookback - Number of return observations in the volatility window.
+   * @param minObservations - Minimum observations required to estimate a volatility.
+   * @param annualizationFactor - Periods per year used to annualize volatility (252 for daily data).
+   * @returns The `WeightingMethod` plain object.
+   * @throws Error - Throws with kind `invalid_type` if a count is not a non-negative whole number or another argument has the wrong type.
+   */
+  weightingMethodVolatilityWeighted(
+    anchorLegId: string,
+    anchorQuantity: number,
+    lookback: number,
+    minObservations: number,
+    annualizationFactor: number
+  ): generated.valuations.WeightingMethod;
+  /**
+   * `RebalanceRule::Manual`: holdings change only on explicit `rebalance` calls.
+   * @returns The `RebalanceRule` plain object.
+   * @throws Error - Throws if the value cannot be converted to JavaScript.
+   */
+  rebalanceRuleManual(): generated.valuations.RebalanceRule;
+  /**
+   * `RebalanceRule::Dates`: rebalance on explicit dates.
+   * @param dates - Strictly increasing ISO-8601 rebalance dates.
+   * @returns The `RebalanceRule` plain object.
+   * @throws Error - Throws with kind `validation` if a date is malformed or the dates are duplicated or unordered, and kind `invalid_type` if `dates` is not an array of strings.
+   */
+  rebalanceRuleDates(dates: string[]): generated.valuations.RebalanceRule;
+  /**
+   * `RebalanceRule::Calendar`: rebalance on a business-day adjusted schedule.
+   * @param start - First rebalance date as an ISO-8601 string.
+   * @param frequency - Rebalance cadence as a `Tenor` plain object, e.g. `{ count: 1, unit: "months" }`.
+   * @param calendarId - Registered holiday-calendar identifier, e.g. `"nyse"`.
+   * @param businessDayConvention - Business-day adjustment serde name, e.g. `"modified_following"`.
+   * @param end - Optional last rebalance date as an ISO-8601 string; omit for an open-ended schedule.
+   * @returns The `RebalanceRule` plain object.
+   * @throws Error - Throws with kind `validation` if a date, the tenor or the convention is malformed, `end` precedes `start`, or the calendar is unknown; and kind `invalid_type` for a wrong argument type.
+   */
+  rebalanceRuleCalendar(
+    start: string,
+    frequency: generated.valuations.Tenor,
+    calendarId: string,
+    businessDayConvention: generated.valuations.BusinessDayConvention,
+    end?: string | null
+  ): generated.valuations.RebalanceRule;
+  /**
+   * The instrument of a composite leg as its canonical envelope.
+   *
+   * Twin of Python `CompositeLegSpec.instrument_dict`.
+   * @param leg - `CompositeLegSpec` plain object or JSON string.
+   * @returns The leg's `finstack_quant.instrument/1` envelope as a plain object.
+   * @throws Error - Throws with kind `validation` if `leg` does not match the `CompositeLegSpec` schema.
+   */
+  compositeLegSpecInstrumentDict(leg: generated.valuations.CompositeLegSpec | string): Record<string, unknown>;
+  /**
+   * One row of a composite history as canonical JSON.
+   *
+   * Twin of Python `CompositeHistoryResult.row_json`.
+   * @param rows - `CompositeHistoryRow[]` returned by `history` or `historyFromSpec` (or its JSON).
+   * @param index - Zero-based row index.
+   * @returns Canonical `CompositeHistoryRow` JSON text.
+   * @throws Error - Throws with kind `validation` if `rows` does not match the `CompositeHistoryRow` schema or `index` is out of range, and kind `invalid_type` if `index` is not a non-negative whole number.
+   */
+  compositeHistoryResultRowJson(rows: CompositeHistoryRow[] | string, index: number): string;
 }
 
 /**
@@ -15085,6 +21608,75 @@ export interface ValuationsNamespace {
     couponRate: number,
     dayCountFraction: number
   ): number;
+  /**
+   * Compiled-in JSON Schemas of the valuations wire format.
+   */
+  schema: ValuationsSchemaNamespace;
+  /**
+   * Present value as an exact decimal string.
+   *
+   * Twin of Python `ValuationResult.price_decimal`: the `Money` amount without
+   * the binary rounding a JavaScript number would add.
+   * @param result - `ValuationResult` object returned by `priceInstrument` (or its canonical JSON); 64-bit fields may be `BigInt`.
+   * @returns The present value amount as a decimal string, e.g. `"1042315.67"`.
+   * @throws Error - Throws with kind `validation` if `result` does not match the `ValuationResult` schema.
+   */
+  valuationResultPriceDecimal(result: ValuationResult | string): string;
+  /**
+   * One measure of a valuation result by its metric key.
+   *
+   * Twin of Python `ValuationResult.get_metric` (Rust `ValuationResult::metric_str`).
+   * @param result - `ValuationResult` object returned by `priceInstrument` (or its canonical JSON); 64-bit fields may be `BigInt`.
+   * @param key - Fully qualified metric key, e.g. `"dv01"` or `"bucketed_dv01::USD-OIS::10y"`.
+   * @returns The measure value, or `undefined` when the result has no such key.
+   * @throws Error - Throws with kind `validation` if `result` does not match the `ValuationResult` schema, and kind `invalid_type` if `key` is not a string.
+   */
+  valuationResultGetMetric(result: ValuationResult | string, key: string): number | undefined;
+  /**
+   * Metric keys of a valuation result, in measure order.
+   *
+   * Twin of Python `ValuationResult.metric_keys`.
+   * @param result - `ValuationResult` object returned by `priceInstrument` (or its canonical JSON); 64-bit fields may be `BigInt`.
+   * @returns Fully qualified metric keys in the order the measures were computed.
+   * @throws Error - Throws with kind `validation` if `result` does not match the `ValuationResult` schema.
+   */
+  valuationResultMetricKeys(result: ValuationResult | string): string[];
+  /**
+   * Number of measures in a valuation result.
+   *
+   * Twin of Python `ValuationResult.metric_count`.
+   * @param result - `ValuationResult` object returned by `priceInstrument` (or its canonical JSON); 64-bit fields may be `BigInt`.
+   * @returns Count of measure keys.
+   * @throws Error - Throws with kind `validation` if `result` does not match the `ValuationResult` schema.
+   */
+  valuationResultMetricCount(result: ValuationResult | string): number;
+  /**
+   * Unit of every measure in a valuation result.
+   *
+   * Twin of Python `ValuationResult.metric_units` (Rust `ValuationResult::metric_units`).
+   * @param result - `ValuationResult` object returned by `priceInstrument` (or its canonical JSON); 64-bit fields may be `BigInt`.
+   * @returns Map of metric key to its unit name (for example `"currency_per_bp"`), in measure order.
+   * @throws Error - Throws with kind `validation` if `result` does not match the `ValuationResult` schema.
+   */
+  valuationResultMetricUnits(result: ValuationResult | string): Record<string, string>;
+  /**
+   * Whether every covenant in a valuation result passed.
+   *
+   * Twin of Python `ValuationResult.all_covenants_passed` (Rust `ValuationResult::all_covenants_passed`).
+   * @param result - `ValuationResult` object returned by `priceInstrument` (or its canonical JSON); 64-bit fields may be `BigInt`.
+   * @returns `true` when all covenants passed or the result carries no covenant reports.
+   * @throws Error - Throws with kind `validation` if `result` does not match the `ValuationResult` schema.
+   */
+  valuationResultAllCovenantsPassed(result: ValuationResult | string): boolean;
+  /**
+   * Identifiers of the covenants that failed in a valuation result.
+   *
+   * Twin of Python `ValuationResult.failed_covenants` (Rust `ValuationResult::failed_covenants`).
+   * @param result - `ValuationResult` object returned by `priceInstrument` (or its canonical JSON); 64-bit fields may be `BigInt`.
+   * @returns Covenant identifiers whose report did not pass; empty when none failed.
+   * @throws Error - Throws with kind `validation` if `result` does not match the `ValuationResult` schema.
+   */
+  valuationResultFailedCovenants(result: ValuationResult | string): string[];
 }
 
 /**

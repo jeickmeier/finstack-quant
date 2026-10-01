@@ -74,20 +74,32 @@ pub struct TrancheCashflows {
     /// Tranche identifier.
     pub tranche_id: String,
     /// Cashflow schedule for this tranche (simple dated flows).
-    #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<(finstack_quant_core::wire::DateWire, Money)>")
+    )]
     pub cashflows: DatedFlows,
     /// Detailed cashflows with proper classification using CFKind.
     pub detailed_flows: Vec<CashFlow>,
     /// Contractual coupon periods with balances before projected principal events.
     pub accrual_periods: Vec<TrancheAccrualPeriod>,
     /// Interest cashflows (component of total).
-    #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<(finstack_quant_core::wire::DateWire, Money)>")
+    )]
     pub interest_flows: DatedFlows,
     /// Principal cashflows (component of total).
-    #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<(finstack_quant_core::wire::DateWire, Money)>")
+    )]
     pub principal_flows: DatedFlows,
     /// PIK capitalization flows.
-    #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<(finstack_quant_core::wire::DateWire, Money)>")
+    )]
     pub pik_flows: DatedFlows,
     /// Interest DEFERRED to future periods on a non-PIK tranche.
     ///
@@ -98,10 +110,16 @@ pub struct TrancheCashflows {
     /// `total_pik` as capitalized balance — the two have different effects on
     /// notional, on later interest due, and on OC denominators.
     #[serde(default)]
-    #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<(finstack_quant_core::wire::DateWire, Money)>")
+    )]
     pub deferred_flows: DatedFlows,
     /// Write-down flows (loss allocation reducing tranche balance).
-    #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<(finstack_quant_core::wire::DateWire, Money)>")
+    )]
     pub writedown_flows: DatedFlows,
     /// Final tranche balance after all payments.
     pub final_balance: Money,

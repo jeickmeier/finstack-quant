@@ -5,7 +5,9 @@ use finstack_quant_core::{dates::Date, money::Money, Error, Result};
 /// CDS Tranche specific parameters.
 ///
 /// Groups parameters specific to CDS tranches.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct CdsTrancheParams {
     /// Index name (e.g., "CDX.NA.IG", "iTraxx Europe")
     pub index_name: String,
@@ -18,6 +20,11 @@ pub struct CdsTrancheParams {
     /// Notional amount
     pub notional: Money,
     /// Maturity date
+    #[serde(with = "finstack_quant_core::wire::date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub maturity: Date,
     /// Running coupon in basis points
     pub coupon_bp: f64,
@@ -98,6 +105,25 @@ mod tests {
     use super::*;
     use finstack_quant_core::currency::Currency;
     use time::macros::date;
+
+    #[test]
+    fn params_round_trip_through_json() {
+        let params = CdsTrancheParams::mezzanine_tranche(
+            "CDX.NA.IG",
+            42,
+            Money::from((1_000_000_i64, Currency::USD)),
+            date!(2029 - 12 - 20),
+            100.0,
+        )
+        .with_realized_loss(0.01)
+        .expect("valid loss");
+        let json = serde_json::to_string(&params).expect("serialize");
+        assert!(json.contains(r#""maturity":"2029-12-20""#), "{json}");
+        let back: CdsTrancheParams = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, params);
+        let unknown = json.replace(r#""series""#, r#""serie""#);
+        assert!(serde_json::from_str::<CdsTrancheParams>(&unknown).is_err());
+    }
 
     #[test]
     fn test_tranche_helper_units_are_percent_points() {

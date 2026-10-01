@@ -15,9 +15,9 @@ use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, R
 use finstack_quant_core::dates::BusinessDayConvention;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    calculate_equity_metrics, run_simulation, run_simulation_with_diagnostics, CreditModelConfig,
-    DealFees, DealType, LossAllocationPolicy, LossRecognition, MarketConditions, Metadata,
-    StructuredCredit, StructuredCreditPricingMode, TrancheDraw, TrancheReadvance, WaterfallRules,
+    calculate_equity_metrics, run_simulation_with_diagnostics, CreditModelConfig, DealFees,
+    DealType, LossAllocationPolicy, LossRecognition, MarketConditions, Metadata, StructuredCredit,
+    TrancheDraw, TrancheReadvance, WaterfallRules,
 };
 use finstack_quant_valuations::instruments::{Instrument, InstrumentJson};
 
@@ -85,13 +85,7 @@ impl PyStructuredCredit {
     #[pyo3(text_signature = "()")]
     fn builder() -> PyStructuredCreditBuilder {
         PyStructuredCreditBuilder {
-            inner: Some(
-                StructuredCredit::builder()
-                    .market_conditions(MarketConditions::default())
-                    .deal_metadata(Metadata::default())
-                    .hedge_swaps(Vec::new()),
-            ),
-            credit_model: None,
+            inner: Some(StructuredCredit::builder()),
         }
     }
 
@@ -384,18 +378,10 @@ impl PyStructuredCredit {
         let market = extract_market(py, market)?;
         let as_of = extract_date(as_of)?;
         let deal = self.inner.clone();
-        let num_paths = num_paths.unwrap_or_else(|| {
-            deal.instrument_pricing_overrides
-                .model_config
-                .mc_paths
-                .unwrap_or(5_000)
-        });
-        let mode = StructuredCreditPricingMode::MonteCarlo {
-            num_paths,
-            antithetic,
-        };
         let inner = py
-            .detach(move || deal.price_stochastic_with_mode(&market, as_of, mode))
+            .detach(move || {
+                deal.price_stochastic_monte_carlo(&market, as_of, num_paths, antithetic)
+            })
             .map_err(core_to_py)?;
         Ok(PyStochasticPricingResult { inner })
     }
@@ -605,15 +591,10 @@ impl PyStructuredCredit {
         let market = extract_market(py, market)?;
         let as_of = extract_date(as_of)?;
         let deal = self.inner.clone();
-        let mut flows = py
-            .detach(move || run_simulation(&deal, &market, as_of))
+        let tranche_id = tranche_id.to_string();
+        let inner = py
+            .detach(move || deal.tranche_cashflows(&tranche_id, &market, as_of))
             .map_err(core_to_py)?;
-        let inner = flows.remove(tranche_id).ok_or_else(|| {
-            pyo3::exceptions::PyKeyError::new_err(format!(
-                "tranche {tranche_id:?} is not a class of deal {:?}",
-                self.inner.id.as_str()
-            ))
-        })?;
         Ok(PyTrancheCashflows { inner })
     }
 
@@ -951,8 +932,6 @@ impl PyStructuredCredit {
 )]
 pub struct PyStructuredCreditBuilder {
     inner: Option<StructuredCreditBuilderInner>,
-    /// Credit model assembled by the per-field setters; applied on ``build``.
-    credit_model: Option<CreditModelConfig>,
 }
 
 /// Take the wrapped Rust builder or fail if `build()` already consumed it.
@@ -1414,10 +1393,8 @@ impl PyStructuredCreditBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let converted: CreditModelConfig =
             crate::bindings::module_utils::py_to_serde(py, value, "credit_model")?;
-        if slf.inner.is_none() {
-            return Err(value_error("builder already consumed by build()"));
-        }
-        slf.credit_model = Some(converted);
+        let b = take_sc(&mut slf)?;
+        slf.inner = Some(b.credit_model(converted));
         Ok(slf)
     }
 
@@ -1451,12 +1428,8 @@ impl PyStructuredCreditBuilder {
             } else {
                 crate::bindings::module_utils::py_to_serde(py, value, "prepayment_spec")?
             };
-        if slf.inner.is_none() {
-            return Err(value_error("builder already consumed by build()"));
-        }
-        slf.credit_model
-            .get_or_insert_with(CreditModelConfig::default)
-            .prepayment_spec = converted;
+        let b = take_sc(&mut slf)?;
+        slf.inner = Some(b.prepayment_spec(converted));
         Ok(slf)
     }
 
@@ -1489,12 +1462,8 @@ impl PyStructuredCreditBuilder {
         } else {
             crate::bindings::module_utils::py_to_serde(py, value, "default_spec")?
         };
-        if slf.inner.is_none() {
-            return Err(value_error("builder already consumed by build()"));
-        }
-        slf.credit_model
-            .get_or_insert_with(CreditModelConfig::default)
-            .default_spec = converted;
+        let b = take_sc(&mut slf)?;
+        slf.inner = Some(b.default_spec(converted));
         Ok(slf)
     }
 
@@ -1526,12 +1495,8 @@ impl PyStructuredCreditBuilder {
         } else {
             crate::bindings::module_utils::py_to_serde(py, value, "recovery_spec")?
         };
-        if slf.inner.is_none() {
-            return Err(value_error("builder already consumed by build()"));
-        }
-        slf.credit_model
-            .get_or_insert_with(CreditModelConfig::default)
-            .recovery_spec = converted;
+        let b = take_sc(&mut slf)?;
+        slf.inner = Some(b.recovery_spec(converted));
         Ok(slf)
     }
 
@@ -1562,12 +1527,8 @@ impl PyStructuredCreditBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let converted =
             crate::bindings::module_utils::py_to_serde(py, value, "stochastic_prepay_spec")?;
-        if slf.inner.is_none() {
-            return Err(value_error("builder already consumed by build()"));
-        }
-        slf.credit_model
-            .get_or_insert_with(CreditModelConfig::default)
-            .stochastic_prepay_spec = Some(converted);
+        let b = take_sc(&mut slf)?;
+        slf.inner = Some(b.stochastic_prepay_spec(converted));
         Ok(slf)
     }
 
@@ -1597,12 +1558,8 @@ impl PyStructuredCreditBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let converted =
             crate::bindings::module_utils::py_to_serde(py, value, "stochastic_default_spec")?;
-        if slf.inner.is_none() {
-            return Err(value_error("builder already consumed by build()"));
-        }
-        slf.credit_model
-            .get_or_insert_with(CreditModelConfig::default)
-            .stochastic_default_spec = Some(converted);
+        let b = take_sc(&mut slf)?;
+        slf.inner = Some(b.stochastic_default_spec(converted));
         Ok(slf)
     }
 
@@ -1636,12 +1593,8 @@ impl PyStructuredCreditBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let converted =
             crate::bindings::module_utils::py_to_serde(py, value, "stochastic_recovery_spec")?;
-        if slf.inner.is_none() {
-            return Err(value_error("builder already consumed by build()"));
-        }
-        slf.credit_model
-            .get_or_insert_with(CreditModelConfig::default)
-            .stochastic_recovery_spec = Some(converted);
+        let b = take_sc(&mut slf)?;
+        slf.inner = Some(b.stochastic_recovery_spec(converted));
         Ok(slf)
     }
 
@@ -1670,12 +1623,8 @@ impl PyStructuredCreditBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let converted =
             crate::bindings::module_utils::py_to_serde(py, value, "correlation_structure")?;
-        if slf.inner.is_none() {
-            return Err(value_error("builder already consumed by build()"));
-        }
-        slf.credit_model
-            .get_or_insert_with(CreditModelConfig::default)
-            .correlation_structure = Some(converted);
+        let b = take_sc(&mut slf)?;
+        slf.inner = Some(b.correlation_structure(converted));
         Ok(slf)
     }
 
@@ -1709,12 +1658,8 @@ impl PyStructuredCreditBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let converted: finstack_quant_valuations::instruments::fixed_income::structured_credit::DelinquencyModel =
             crate::bindings::module_utils::py_to_serde(py, value, "delinquency")?;
-        if slf.inner.is_none() {
-            return Err(value_error("builder already consumed by build()"));
-        }
-        slf.credit_model
-            .get_or_insert_with(CreditModelConfig::default)
-            .delinquency = Some(converted);
+        let b = take_sc(&mut slf)?;
+        slf.inner = Some(b.delinquency(converted));
         Ok(slf)
     }
 
@@ -1748,12 +1693,8 @@ impl PyStructuredCreditBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let converted: finstack_quant_valuations::instruments::fixed_income::structured_credit::CardPortfolioSpec =
             crate::bindings::module_utils::py_to_serde(py, value, "card")?;
-        if slf.inner.is_none() {
-            return Err(value_error("builder already consumed by build()"));
-        }
-        slf.credit_model
-            .get_or_insert_with(CreditModelConfig::default)
-            .card = Some(converted);
+        let b = take_sc(&mut slf)?;
+        slf.inner = Some(b.card(converted));
         Ok(slf)
     }
 
@@ -2213,10 +2154,7 @@ impl PyStructuredCreditBuilder {
     ///     or the completed deal fails pricing validation.
     #[pyo3(text_signature = "($self)")]
     fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyStructuredCredit> {
-        let mut b = take_sc(&mut slf)?;
-        if let Some(credit_model) = slf.credit_model.take() {
-            b = b.credit_model(credit_model);
-        }
+        let b = take_sc(&mut slf)?;
         let inner = b.build().map_err(core_to_py)?;
         Ok(PyStructuredCredit { inner })
     }

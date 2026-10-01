@@ -204,11 +204,6 @@ RUNTIME_RESULT_EXCEPTIONS = (
     ),
     *_runtime_exception(
         "valuations",
-        "src/instruments/fixed_income/bond/pricing/engine/merton_mc/types.rs",
-        ("MertonMcResult",),
-    ),
-    *_runtime_exception(
-        "valuations",
         "src/instruments/fixed_income/bond/pricing/ytm_solver.rs",
         ("YtmPricingSpec",),
         "runtime-spec",

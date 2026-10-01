@@ -18,6 +18,7 @@ use finstack_quant_core::Result;
 /// portfolio valuations. Risk factors are bucketed at standard tenors/strikes
 /// to enable historical simulation.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum RiskFactorType {
     /// Discount curve rate at a specific tenor (in years).

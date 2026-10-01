@@ -1,0 +1,224 @@
+{
+  "$defs": {
+    "MarketScenario": {
+      "additionalProperties": false,
+      "description": "Collection of all risk factor shifts for a single historical date.\n\nRepresents a complete market scenario that can be applied to revalue\na portfolio. Each scenario contains shifts for all relevant risk factors.",
+      "properties": {
+        "date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Historical date this scenario represents"
+        },
+        "shifts": {
+          "description": "All risk factor shifts on this date (relative to base date)",
+          "items": {
+            "$ref": "#/$defs/RiskFactorShift"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "date",
+        "shifts"
+      ],
+      "type": "object"
+    },
+    "RiskFactorShift": {
+      "additionalProperties": false,
+      "description": "Historical shift for a single risk factor on a single date.\n\nRepresents the change in a market variable from its base value.\nFor example, a +15bp shift in 5Y USD rates.",
+      "properties": {
+        "factor": {
+          "$ref": "#/$defs/RiskFactorType",
+          "description": "Risk factor being shifted"
+        },
+        "shift": {
+          "description": "Absolute change in the factor\n- For rates/spreads: change in basis points as decimal (e.g., 0.0015 = 15bp)\n- For equity/FX spot: relative change (e.g., -0.025 = -2.5%)\n- For volatility: absolute vol change (e.g., 0.02 = +2 vol points)",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "factor",
+        "shift"
+      ],
+      "type": "object"
+    },
+    "RiskFactorType": {
+      "description": "Risk factor categories for VaR calculation.\n\nEach risk factor represents a market variable that can shift and impact\nportfolio valuations. Risk factors are bucketed at standard tenors/strikes\nto enable historical simulation.",
+      "oneOf": [
+        {
+          "description": "Discount curve rate at a specific tenor (in years).",
+          "properties": {
+            "curve_id": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Curve identifier"
+            },
+            "tenor_years": {
+              "description": "Tenor in years (e.g., 1.0, 5.0, 10.0)",
+              "format": "double",
+              "type": "number"
+            },
+            "type": {
+              "const": "discount_rate",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "curve_id",
+            "tenor_years"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Forward curve rate at a specific tenor (in years).",
+          "properties": {
+            "curve_id": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Curve identifier"
+            },
+            "tenor_years": {
+              "description": "Tenor in years",
+              "format": "double",
+              "type": "number"
+            },
+            "type": {
+              "const": "forward_rate",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "curve_id",
+            "tenor_years"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Credit spread (hazard rate) at a specific tenor (in years).",
+          "properties": {
+            "curve_id": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Curve identifier"
+            },
+            "tenor_years": {
+              "description": "Tenor in years",
+              "format": "double",
+              "type": "number"
+            },
+            "type": {
+              "const": "credit_spread",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "curve_id",
+            "tenor_years"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Equity spot price.",
+          "properties": {
+            "ticker": {
+              "description": "Equity ticker or identifier",
+              "type": "string"
+            },
+            "type": {
+              "const": "equity_spot",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "ticker"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "FX spot rate as quote currency per one unit of base currency.",
+          "properties": {
+            "base": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+              "description": "Base currency of the FX pair."
+            },
+            "quote": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+              "description": "Quote currency of the FX pair."
+            },
+            "type": {
+              "const": "fx_spot",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "base",
+            "quote"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Implied volatility at specific expiry and strike.",
+          "properties": {
+            "expiry_years": {
+              "description": "Expiry in years",
+              "format": "double",
+              "type": "number"
+            },
+            "strike": {
+              "description": "Strike level (absolute or moneyness)",
+              "format": "double",
+              "type": "number"
+            },
+            "type": {
+              "const": "implied_vol",
+              "type": "string"
+            },
+            "vol_surface_id": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Volatility surface identifier"
+            }
+          },
+          "required": [
+            "type",
+            "vol_surface_id",
+            "expiry_years",
+            "strike"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/common/1/market_history.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Historical market scenarios for historical VaR and expected shortfall.",
+  "properties": {
+    "base_date": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+      "description": "Base date (current market state reference point)"
+    },
+    "scenarios": {
+      "description": "Historical scenarios (one per day in lookback window)\nOrdered chronologically from oldest to newest",
+      "items": {
+        "$ref": "#/$defs/MarketScenario"
+      },
+      "type": "array"
+    },
+    "window_days": {
+      "description": "Historical window size in days",
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "base_date",
+    "window_days",
+    "scenarios"
+  ],
+  "title": "MarketHistory",
+  "type": "object"
+}

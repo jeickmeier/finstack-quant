@@ -1,0 +1,127 @@
+{
+  "$defs": {
+    "NotionalExchange": {
+      "description": "Notional exchange convention for XCCY swaps.",
+      "oneOf": [
+        {
+          "const": "none",
+          "description": "No principal exchange.",
+          "type": "string"
+        },
+        {
+          "const": "final",
+          "description": "Exchange principal at maturity only.",
+          "type": "string"
+        },
+        {
+          "const": "initial_and_final",
+          "description": "Exchange principal at start and maturity (typical for fixed-notional XCCY basis swaps).",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Mark-to-market resetting. The notional of `resetting_side` is re-marked at each\nof its coupon reset dates to match the constant leg's notional in current FX.\nA rebalancing cashflow is paid on the resetting leg only — the constant leg's\nprincipal-and-coupon schedule is unchanged, matching standard MtM-XCCY market\nconvention (QuantLib's `MtMCrossCurrencyBasisSwap` follows the same pattern).\nUnder CIP no-FX-vol the constant-currency leg of the FX swap that funds the\nrebalancing is PV-fair from today's perspective, so the resetting-leg flow is\nthe only cashflow that needs to be emitted explicitly. Implies initial AND\nfinal principal exchange.",
+          "properties": {
+            "mtm_resetting": {
+              "properties": {
+                "resetting_side": {
+                  "$ref": "#/$defs/ResettingSide",
+                  "description": "Which leg (`Leg1` or `Leg2`) has its notional reset each period."
+                }
+              },
+              "required": [
+                "resetting_side"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "mtm_resetting"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ResettingSide": {
+      "description": "Identifies which leg of an XCCY swap has its notional reset under\nMtM-resetting. `Leg1` and `Leg2` refer to `XccySwap::leg1` and `XccySwap::leg2`\nrespectively.",
+      "oneOf": [
+        {
+          "const": "leg1",
+          "description": "The first leg (`XccySwap::leg1`) has its notional reset each period.",
+          "type": "string"
+        },
+        {
+          "const": "leg2",
+          "description": "The second leg (`XccySwap::leg2`) has its notional reset each period.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/common/1/xccy_conventions.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Market conventions of one cross-currency swap pair.",
+  "properties": {
+    "base_calendar_id": {
+      "description": "Base-currency calendar identifier for business day adjustments.",
+      "type": "string"
+    },
+    "base_currency": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+      "description": "Base (foreign) currency of the pair."
+    },
+    "base_index_id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Rate index identifier for the base-currency floating leg."
+    },
+    "business_day_convention": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
+      "description": "Business day convention for schedule and settlement dates."
+    },
+    "day_count": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+      "description": "Accrual day count convention."
+    },
+    "notional_exchange": {
+      "$ref": "#/$defs/NotionalExchange",
+      "description": "Notional-exchange behaviour for this currency pair.\n\nFor G10 pairs against USD (where `quote_currency = USD`) the dealer convention\nis `MtmResetting { resetting_side: Leg1 }`: the base-currency leg (leg1) has its\nnotional re-marked each period to match the constant quote-currency (leg2)\nnotional in current FX. Pair conventions registered the other way around (USD\nas base) must invert this to `Leg2`. Registry entries must state it\nexplicitly."
+    },
+    "payment_frequency": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+      "description": "Coupon payment frequency for both legs."
+    },
+    "quote_calendar_id": {
+      "description": "Quote-currency calendar identifier for business day adjustments.",
+      "type": "string"
+    },
+    "quote_currency": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+      "description": "Quote (domestic) currency of the pair."
+    },
+    "quote_index_id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Rate index identifier for the quote-currency floating leg."
+    },
+    "settlement_days": {
+      "description": "Standard T+N spot settlement lag in business days.",
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "base_currency",
+    "quote_currency",
+    "base_index_id",
+    "quote_index_id",
+    "settlement_days",
+    "payment_frequency",
+    "day_count",
+    "business_day_convention",
+    "base_calendar_id",
+    "quote_calendar_id",
+    "notional_exchange"
+  ],
+  "title": "XccyConventions",
+  "type": "object"
+}

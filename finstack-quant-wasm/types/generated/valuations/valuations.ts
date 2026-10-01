@@ -4364,6 +4364,11 @@ export type InstrumentType =
   | "volatility_index_future_option"
   | "asset_backed_facility";
 /**
+ * Rule for deriving an interest-rate future's reference period from its expiry.
+ */
+export type IrFutureReferencePeriod =
+  "forward_starting" | "imm_quarter_in_arrears" | "calendar_month_in_arrears" | "business_month_in_arrears";
+/**
  * Readiness of the mapped valuation route.
  */
 export type ListedCoverageStatus = "native" | "composed" | "partial";
@@ -4376,6 +4381,86 @@ export type ListedExchange = "cme" | "eurex" | "montreal" | "sgx";
  */
 export type ListedProductKind = "future" | "option_on_future" | "option";
 /**
+ * Risk factor categories for VaR calculation.
+ *
+ * Each risk factor represents a market variable that can shift and impact
+ * portfolio valuations. Risk factors are bucketed at standard tenors/strikes
+ * to enable historical simulation.
+ */
+export type RiskFactorType =
+  | {
+      /**
+       * Curve identifier
+       */
+      curve_id: Id;
+      /**
+       * Tenor in years (e.g., 1.0, 5.0, 10.0)
+       */
+      tenor_years: number;
+      type: "discount_rate";
+      [k: string]: unknown;
+    }
+  | {
+      /**
+       * Curve identifier
+       */
+      curve_id: Id;
+      /**
+       * Tenor in years
+       */
+      tenor_years: number;
+      type: "forward_rate";
+      [k: string]: unknown;
+    }
+  | {
+      /**
+       * Curve identifier
+       */
+      curve_id: Id;
+      /**
+       * Tenor in years
+       */
+      tenor_years: number;
+      type: "credit_spread";
+      [k: string]: unknown;
+    }
+  | {
+      /**
+       * Equity ticker or identifier
+       */
+      ticker: string;
+      type: "equity_spot";
+      [k: string]: unknown;
+    }
+  | {
+      /**
+       * Base currency of the FX pair.
+       */
+      base: Currency;
+      /**
+       * Quote currency of the FX pair.
+       */
+      quote: Currency;
+      type: "fx_spot";
+      [k: string]: unknown;
+    }
+  | {
+      /**
+       * Expiry in years
+       */
+      expiry_years: number;
+      /**
+       * Strike level (absolute or moneyness)
+       */
+      strike: number;
+      type: "implied_vol";
+      /**
+       * Volatility surface identifier
+       */
+      vol_surface_id: Id;
+      [k: string]: unknown;
+    };
+/**
  * Unit family of a metric value.
  *
  * The classification follows the unit documented on each `MetricId`
@@ -4384,6 +4469,22 @@ export type ListedProductKind = "future" | "option_on_future" | "option";
  * the bump is part of the metric's definition, not of its unit.
  */
 export type MetricUnit = "currency" | "decimal" | "basis_points" | "years" | "percent" | "dimensionless" | "unknown";
+/**
+ * Type of rate index for convention determination.
+ *
+ * Distinguishes between overnight risk-free rate (RFR) indices and term indices, which have
+ * different conventions for compounding, payment frequencies, and reset lags.
+ *
+ * # Examples
+ *
+ * ```rust
+ * use finstack_quant_valuations::market::conventions::RateIndexKind;
+ *
+ * let overnight = RateIndexKind::OvernightRfr;
+ * let term = RateIndexKind::Term;
+ * ```
+ */
+export type RateIndexKind = "overnight_rfr" | "term";
 
 /**
  * Advance rate applied to one collateral class.
@@ -18643,6 +18744,114 @@ export interface CashflowRow {
   [k: string]: unknown;
 }
 /**
+ * Market conventions of one CDS currency and documentation clause.
+ */
+export interface CdsConventionSpec {
+  /**
+   * The business day convention.
+   */
+  business_day_convention: BusinessDayConvention;
+  /**
+   * The calendar used for business day adjustments.
+   */
+  calendar_id: string;
+  /**
+   * The day count convention for the premium leg.
+   */
+  day_count: DayCount;
+  /**
+   * Regional schedule family represented by this registry row.
+   */
+  family: CdsConvention;
+  /**
+   * The payment frequency of the premium leg.
+   */
+  frequency: Tenor;
+  /**
+   * The number of business days for settlement.
+   */
+  settlement_days: number;
+  /**
+   * Stub convention used when constructing the premium schedule.
+   */
+  stub: StubKind;
+  [k: string]: unknown;
+}
+/**
+ * Preset identity, coupon and convention of a standard CDS index series.
+ */
+export interface CdsIndexParams {
+  /**
+   * Regional ISDA convention. Bundled into the preset because each
+   * well-known index has a fixed convention (CDX uses `IsdaNa`, iTraxx
+   * uses `IsdaEu`).
+   */
+  convention: CdsConvention;
+  /**
+   * Running fixed coupon in basis points (e.g. 100bp for CDX.NA.IG).
+   */
+  coupon_bp: number;
+  /**
+   * Index name (e.g., "CDX.NA.IG", "iTraxx Europe").
+   */
+  index_name: string;
+  /**
+   * Number of reference entities in this series, when known.
+   *
+   * Membership counts vary by series (e.g. iTraxx Crossover has been 75
+   * names only since Series 9; CDX.NA.HY membership varies), so this is
+   * part of the per-series preset rather than inferred from the name.
+   * `None` for custom presets where the count is unknown — callers must
+   * then attach an explicit count via `CdsIndex::with_num_constituents`.
+   */
+  num_constituents?: number | null;
+  /**
+   * Index series number (e.g., 42).
+   */
+  series: number;
+  /**
+   * Index version number within the series.
+   */
+  version: number;
+}
+/**
+ * Attachment, detachment, notional and coupon of a CDS index tranche.
+ */
+export interface CdsTrancheParams {
+  /**
+   * Attachment point as percentage
+   */
+  attach_pct: number;
+  /**
+   * Running coupon in basis points
+   */
+  coupon_bp: number;
+  /**
+   * Detachment point as percentage
+   */
+  detach_pct: number;
+  /**
+   * Index name (e.g., "CDX.NA.IG", "iTraxx Europe")
+   */
+  index_name: string;
+  /**
+   * Maturity date
+   */
+  maturity: DateWire;
+  /**
+   * Notional amount
+   */
+  notional: Money;
+  /**
+   * Realized (settled) loss as a decimal fraction of the original portfolio notional, in `[0.0, 1.0]`
+   */
+  realized_loss: number;
+  /**
+   * Index series
+   */
+  series: number;
+}
+/**
  * Complete primitive decomposition with path, net, and gross views.
  */
 export interface CompositeExposureReport {
@@ -19424,6 +19633,62 @@ export interface InstrumentEnvelope {
   schema: InstrumentSchema;
 }
 /**
+ * Tree price and Greeks of a convertible bond.
+ */
+export interface ConvertibleGreeks {
+  /**
+   * Delta (spot sensitivity per unit spot move)
+   */
+  delta: number;
+  /**
+   * Gamma (curvature, second derivative w.r.t. spot)
+   */
+  gamma: number;
+  /**
+   * Instrument price
+   */
+  price: number;
+  /**
+   * Rho (interest rate sensitivity per 1bp rate move)
+   */
+  rho: number;
+  /**
+   * Theta (time decay per day)
+   */
+  theta: number;
+  /**
+   * Vega (volatility sensitivity per 1% vol move)
+   */
+  vega: number;
+  [k: string]: unknown;
+}
+/**
+ * One coverage test as the waterfall executor evaluated it in a period.
+ */
+export interface CoverageTestDiagnostic {
+  /**
+   * `ratio − trigger_level`; negative while the test fails.
+   */
+  cushion: number;
+  /**
+   * Whether the test passed in this period.
+   */
+  passing: boolean;
+  /**
+   * Ratio the executor computed (OC: collateral ÷ notes; IC: interest ÷ due).
+   */
+  ratio: number;
+  /**
+   * `CoverageTestSpec::id` of the test.
+   */
+  test_id: string;
+  /**
+   * Trigger level the ratio was tested against.
+   */
+  trigger_level: number;
+  [k: string]: unknown;
+}
+/**
  * One structured finding emitted while loading a persisted contract.
  */
 export interface Diagnostic {
@@ -19820,6 +20085,345 @@ export interface ThreeFactorPathData {
   [k: string]: unknown;
 }
 /**
+ * Equity-tranche return metrics: IRR, MOIC, NAV and cash-on-cash.
+ */
+export interface EquityMetrics {
+  /**
+   * Each distribution as a fraction of `invested`, by payment date.
+   */
+  cash_on_cash: [unknown, unknown][];
+  /**
+   * ISO-4217 code of the currency the amounts are denominated in.
+   */
+  currency: Currency;
+  /**
+   * Cash invested on the valuation date: current balance × purchase price.
+   */
+  invested: number;
+  /**
+   * Annualized IRR of `−invested` on the valuation date against every
+   * projected distribution (XIRR); `None` when no rate solves.
+   */
+  irr?: number | null;
+  /**
+   * Multiple on invested capital: total distributions ÷ `invested`.
+   */
+  moic: number;
+  /**
+   * Present value of the distributions on the deal's discount curve, as a
+   * percent of the equity's current balance.
+   */
+  nav_pct: number;
+  /**
+   * Identifier of the equity tranche.
+   */
+  tranche_id: string;
+}
+/**
+ * Projected cashflows of an asset-backed facility and its residual.
+ */
+export interface FacilityProjection {
+  /**
+   * Commitment fee accrued on `commitment − opening facility balance` per
+   * accrual period while the line revolves, paid on the period's payment
+   * date.
+   */
+  commitment_fees: [unknown, unknown][];
+  /**
+   * Per-period deal record of the synthetic deal.
+   */
+  diagnostics: SimulationDiagnostics;
+  /**
+   * Lender draws applied (scheduled draws and re-advances) per payment
+   * date: cash the lender advances, an outflow in the lender's IRR.
+   */
+  draws?: [unknown, unknown][];
+  /**
+   * Interest and principal paid to the facility note.
+   */
+  facility: TrancheCashflows;
+  /**
+   * Cash paid to the residual class.
+   */
+  residual: TrancheCashflows;
+}
+/**
+ * Deal-level accounting produced alongside the tranche cashflows.
+ */
+export interface SimulationDiagnostics {
+  /**
+   * Collateral draws funded from principal collections over the simulation.
+   */
+  draws_from_principal: Money;
+  /**
+   * Collateral draws funded from the reserve account over the simulation.
+   */
+  draws_from_reserve: Money;
+  /**
+   * Payment date on which an early-amortization event (or a coverage-test
+   * acceleration) ended the revolving period, when one fired.
+   */
+  early_amortization_date?: DateWire | null;
+  /**
+   * Per-period deal accounting, in payment order.
+   */
+  periods?: PeriodDiagnostics[];
+  /**
+   * Reserve-account balance at the end of each simulated period.
+   */
+  reserve_balance_path: [unknown, unknown][];
+  /**
+   * Reserve interest earned each period, before routing to its destination.
+   */
+  reserve_interest_paid: [unknown, unknown][];
+  /**
+   * Revolver repayments diverted to replenish the reserve over the simulation.
+   */
+  reserve_replenished: Money;
+  /**
+   * Lender draws applied to notes, as `(tranche id, payment date, amount)`.
+   */
+  tranche_draws?: [unknown, unknown, unknown][];
+  /**
+   * Collateral draws that could not be funded over the simulation.
+   */
+  unfunded_draws: Money;
+  [k: string]: unknown;
+}
+/**
+ * Deal accounting for one payment period, recorded after the waterfall.
+ *
+ * Balances are end-of-period; collections, defaults, recoveries and fees are
+ * the period's amounts; composition statistics are balance-weighted over the
+ * performing pool at period end.
+ */
+export interface PeriodDiagnostics {
+  /**
+   * Every coverage test the executor evaluated this period.
+   */
+  coverage_tests: CoverageTestDiagnostic[];
+  /**
+   * Par that defaulted (charged off) this period.
+   */
+  defaults: Money;
+  /**
+   * Delinquent collateral balance at period end (delinquency model).
+   */
+  delinquent_balance: Money;
+  /**
+   * Annualized excess spread realized this period (decimal).
+   */
+  excess_spread: number;
+  /**
+   * Fees paid through the waterfall this period.
+   */
+  fees_paid: Money;
+  /**
+   * Controlled-accumulation funding account at period end.
+   */
+  funding_account: Money;
+  /**
+   * Interest collected from the pool (including servicer advances).
+   */
+  interest_collections: Money;
+  /**
+   * Payment date of the period.
+   */
+  payment_date: DateWire;
+  /**
+   * Collateral balance at period end.
+   */
+  pool_balance: Money;
+  /**
+   * `pool_balance` divided by the original (cut-off) pool balance
+   * (`AssetPool::original_balance_or_reconstructed`).
+   */
+  pool_factor: number;
+  /**
+   * Scheduled and prepaid principal collected from the pool.
+   */
+  principal_collections: Money;
+  /**
+   * Recovery cash released to the waterfall this period.
+   */
+  recoveries: Money;
+  /**
+   * Principal recycled into replacement collateral this period.
+   */
+  reinvested_par: Money;
+  /**
+   * Reserve account balance at period end.
+   */
+  reserve_balance: Money;
+  /**
+   * Servicer advances of missed principal and interest outstanding at
+   * period end (not yet repaid by cures or liquidations).
+   */
+  servicer_advances_outstanding: Money;
+  /**
+   * Excess-spread account balance at period end.
+   */
+  spread_account: Money;
+  /**
+   * Weighted-average coupon (annual decimal) of the performing fixed-rate
+   * collateral at period end: the same population as `AssetPool::wac`.
+   */
+  wac: number;
+  /**
+   * Balance-weighted Moody's rating factor of the collateral.
+   */
+  warf: number;
+  /**
+   * Balance-weighted spread of the floating-rate collateral (basis points).
+   */
+  weighted_avg_spread_bp: number;
+  [k: string]: unknown;
+}
+/**
+ * Result containing tranche-specific cashflows and metadata.
+ */
+export interface TrancheCashflows {
+  /**
+   * Contractual coupon periods with balances before projected principal events.
+   */
+  accrual_periods: TrancheAccrualPeriod[];
+  /**
+   * Cashflow schedule for this tranche (simple dated flows).
+   */
+  cashflows: [unknown, unknown][];
+  /**
+   * Interest DEFERRED to future periods on a non-PIK tranche.
+   *
+   * Non-PIK shortfalls used to be recorded in `pik_flows`. PIK means
+   * the unpaid interest is CAPITALIZED into the tranche balance and accrues
+   * thereafter; a non-PIK deferral is a separate senior claim that does not
+   * touch notional. Conflating them misleads any consumer reading
+   * `total_pik` as capitalized balance — the two have different effects on
+   * notional, on later interest due, and on OC denominators.
+   */
+  deferred_flows?: [unknown, unknown][];
+  /**
+   * Detailed cashflows with proper classification using CFKind.
+   */
+  detailed_flows: CashFlow[];
+  /**
+   * Final tranche balance after all payments.
+   */
+  final_balance: Money;
+  /**
+   * Interest cashflows (component of total).
+   */
+  interest_flows: [unknown, unknown][];
+  /**
+   * PIK capitalization flows.
+   */
+  pik_flows: [unknown, unknown][];
+  /**
+   * Principal cashflows (component of total).
+   */
+  principal_flows: [unknown, unknown][];
+  /**
+   * Total interest deferred on a non-PIK tranche.
+   */
+  total_deferred: Money;
+  /**
+   * Total interest received.
+   */
+  total_interest: Money;
+  /**
+   * Total PIK capitalized.
+   */
+  total_pik: Money;
+  /**
+   * Total principal received.
+   */
+  total_principal: Money;
+  /**
+   * Total write-down (loss allocation).
+   */
+  total_writedown: Money;
+  /**
+   * Tranche identifier.
+   */
+  tranche_id: string;
+  /**
+   * Write-down flows (loss allocation reducing tranche balance).
+   */
+  writedown_flows: [unknown, unknown][];
+}
+/**
+ * Contractual coupon accrual retained independently of paid or deferred cash.
+ */
+export interface TrancheAccrualPeriod {
+  /**
+   * Annual decimal coupon after any contractual available-funds cap.
+   */
+  coupon_rate: number;
+  /**
+   * Contractual convention used to accrue this note's coupon.
+   */
+  day_count: DayCount;
+  /**
+   * Unadjusted exclusive contractual accrual boundary.
+   */
+  end: DateWire;
+  /**
+   * Outstanding note balance at the start of the period, in note currency.
+   */
+  opening_balance: Money;
+  /**
+   * Adjusted date on which the coupon is payable.
+   */
+  payment_date: DateWire;
+  /**
+   * Unadjusted inclusive contractual accrual boundary.
+   */
+  start: DateWire;
+}
+/**
+ * FX pair identifier using base/quote currency ordering.
+ */
+export interface FxPair {
+  /**
+   * Base currency (numerator).
+   */
+  base: Currency;
+  /**
+   * Quote currency (denominator).
+   */
+  quote: Currency;
+}
+/**
+ * Market conventions of one inflation-swap market.
+ */
+export interface InflationSwapConventions {
+  /**
+   * Business day convention.
+   */
+  business_day_convention: BusinessDayConvention;
+  /**
+   * Calendar for payment/fixing.
+   */
+  calendar_id: string;
+  /**
+   * Day count for the fixed leg.
+   */
+  day_count: DayCount;
+  /**
+   * Inflation lag (observation lag) in months/period.
+   */
+  inflation_lag: Tenor;
+  /**
+   * Monthly reference CPI rule: interpolated daily for USD, monthly step for EUR/UK.
+   */
+  interpolation: InflationInterpolation;
+  /**
+   * Settlement lag in business days.
+   */
+  settlement_days: number;
+  [k: string]: unknown;
+}
+/**
  * Native cashflow rows, reporting-currency PV and reconciliation status.
  */
 export interface InstrumentCashflowEnvelope {
@@ -19869,6 +20473,75 @@ export interface InstrumentCashflowEnvelope {
   [k: string]: unknown;
 }
 /**
+ * Collection of curves used by an instrument, categorized by market role.
+ */
+export interface InstrumentCurves {
+  /**
+   * Credit/hazard curves used by the instrument.
+   */
+  credit_curves: Id[];
+  /**
+   * Discount curves used by the instrument (including primary and foreign).
+   */
+  discount_curves: Id[];
+  /**
+   * Forward/projection curves used by the instrument.
+   */
+  forward_curves: Id[];
+  /**
+   * Inflation curves or published inflation indices used by the instrument.
+   */
+  inflation_curves: Id[];
+}
+/**
+ * Contract conventions of one interest-rate future.
+ */
+export interface IrFutureConventions {
+  /**
+   * Calendar for business day adjustments.
+   */
+  calendar_id: string;
+  /**
+   * Exchange-defined averaging or fixing method for final settlement.
+   */
+  compounding: FloatingLegCompounding;
+  /**
+   * Optional convexity adjustment in rate terms.
+   */
+  convexity_adjustment?: number | null;
+  /**
+   * Number of delivery months for the underlying rate period.
+   */
+  delivery_months: number;
+  /**
+   * Face value of the contract.
+   */
+  face_value: number;
+  /**
+   * Underlying rate index identifier.
+   */
+  index_id: Id;
+  /**
+   * Rule used to derive the rate reference period from the quoted expiry.
+   */
+  reference_period: IrFutureReferencePeriod;
+  /**
+   * Business-day lag from expiry to period start for forward-starting contracts.
+   *
+   * This must be zero for in-arrears reference-period rules.
+   */
+  settlement_days: number;
+  /**
+   * Tick size in price points.
+   */
+  tick_size: number;
+  /**
+   * Tick value in currency units.
+   */
+  tick_value: number;
+  [k: string]: unknown;
+}
+/**
  * Listed-product catalog coverage for one exchange product.
  */
 export interface ListedProductCoverage {
@@ -19912,6 +20585,189 @@ export interface ListedProductCoverage {
    * Exchange root symbols, comma-separated where one row covers a close family.
    */
   symbols: string;
+}
+/**
+ * Market data an instrument needs to price: curves, spots, surfaces, FX pairs and fixings.
+ */
+export interface MarketDependencies {
+  /**
+   * Credit-index aggregates resolved through `MarketContext::get_credit_index`.
+   *
+   * These identifiers are distinct from direct hazard-curve IDs because a
+   * credit index also carries base correlation and optional issuer curves.
+   */
+  credit_index_ids?: Id[];
+  /**
+   * Curve dependencies grouped by type.
+   */
+  curves: InstrumentCurves;
+  /**
+   * FX pairs required for pricing (spot matrices).
+   */
+  fx_pairs: FxPair[];
+  /**
+   * Scalar market-value identifiers resolved through `MarketContext::get_price`.
+   *
+   * This includes tradable spots and non-price unitless scalars such as
+   * continuous dividend yields. [`Self::series_ids`] is reserved for
+   * `MarketContext::get_series` dependencies.
+   */
+  market_scalar_ids: string[];
+  /**
+   * Scalar time series identifiers (e.g., OHLC price series for realized variance).
+   */
+  series_ids: string[];
+  /**
+   * Typed volatility dependencies in deterministic insertion order.
+   */
+  volatility_dependencies: VolatilityDependency[];
+}
+/**
+ * A volatility-surface dependency with the context needed for diagnostics.
+ */
+export interface VolatilityDependency {
+  /**
+   * Optional contractual strike used by local volatility diagnostics.
+   */
+  reference_strike?: number | null;
+  /**
+   * Optional market-scalar id of the underlying spot paired with the surface.
+   */
+  spot_id?: Id | null;
+  /**
+   * Volatility surface identifier.
+   */
+  vol_surface_id: Id;
+}
+/**
+ * Historical market scenarios for historical VaR and expected shortfall.
+ */
+export interface MarketHistory {
+  /**
+   * Base date (current market state reference point)
+   */
+  base_date: DateWire;
+  /**
+   * Historical scenarios (one per day in lookback window)
+   * Ordered chronologically from oldest to newest
+   */
+  scenarios: MarketScenario[];
+  /**
+   * Historical window size in days
+   */
+  window_days: number;
+}
+/**
+ * Collection of all risk factor shifts for a single historical date.
+ *
+ * Represents a complete market scenario that can be applied to revalue
+ * a portfolio. Each scenario contains shifts for all relevant risk factors.
+ */
+export interface MarketScenario {
+  /**
+   * Historical date this scenario represents
+   */
+  date: DateWire;
+  /**
+   * All risk factor shifts on this date (relative to base date)
+   */
+  shifts: RiskFactorShift[];
+}
+/**
+ * Historical shift for a single risk factor on a single date.
+ *
+ * Represents the change in a market variable from its base value.
+ * For example, a +15bp shift in 5Y USD rates.
+ */
+export interface RiskFactorShift {
+  /**
+   * Risk factor being shifted
+   */
+  factor: RiskFactorType;
+  /**
+   * Absolute change in the factor
+   * - For rates/spreads: change in basis points as decimal (e.g., 0.0015 = 15bp)
+   * - For equity/FX spot: relative change (e.g., -0.025 = -2.5%)
+   * - For volatility: absolute vol change (e.g., 0.02 = +2 vol points)
+   */
+  shift: number;
+}
+/**
+ * Merton Monte Carlo price of a PIK or toggle bond with path statistics.
+ */
+export interface MertonMcResult {
+  /**
+   * Average PIK fraction across all coupon dates and paths.
+   */
+  average_pik_fraction: number;
+  /**
+   * Clean price as percentage of par: `dirty_price_pct` minus the accrued
+   * interest at the valuation date.
+   */
+  clean_price_pct: number;
+  /**
+   * Dirty price as percentage of par: the mean simulated present value at
+   * the valuation date, including the full next coupon.
+   */
+  dirty_price_pct: number;
+  /**
+   * Effective spread in basis points implied by MC price vs risk-free.
+   */
+  effective_spread_bp: number;
+  /**
+   * Expected loss as fraction of PIK-aware risk-free PV.
+   *
+   * Defined as `1 - mean_mc_pv / risk_free_pv` where the risk-free PV
+   * accounts for the PIK schedule (accreted notional in the no-default
+   * scenario). For Toggle periods, the risk-free scenario assumes cash
+   * (zero hazard implies no PIK trigger).
+   */
+  expected_loss: number;
+  /**
+   * Expected shortfall at the 95% confidence level.
+   */
+  expected_shortfall_95: number;
+  /**
+   * Number of independent estimators used (antithetic pairs count once).
+   */
+  num_paths: number;
+  /**
+   * Path-level statistics.
+   */
+  path_statistics: PathStatistics;
+  /**
+   * Standard error of the clean price estimate (percentage of par).
+   */
+  standard_error: number;
+  /**
+   * Unexpected loss (standard deviation of path PVs / notional).
+   */
+  unexpected_loss: number;
+}
+/**
+ * Path-level statistics from the Monte Carlo simulation.
+ */
+export interface PathStatistics {
+  /**
+   * Average default time (in years) among defaulted paths.
+   */
+  avg_default_time: number;
+  /**
+   * Average recovery rate (decimal fraction) among defaulted paths.
+   */
+  avg_recovery_rate: number;
+  /**
+   * Average terminal notional (reflects PIK accrual).
+   */
+  avg_terminal_notional: number;
+  /**
+   * Fraction of paths that defaulted.
+   */
+  default_rate: number;
+  /**
+   * Fraction of coupon dates where PIK was elected.
+   */
+  pik_exercise_rate: number;
 }
 /**
  * Canonical per-key metric interpretation for host presentation.
@@ -19970,6 +20826,64 @@ export interface OasResult {
   [k: string]: unknown;
 }
 /**
+ * Market conventions of one interest-rate index.
+ */
+export interface RateIndexConventions {
+  /**
+   * Operating currency of the index.
+   */
+  currency: Currency;
+  /**
+   * Market standard day count convention.
+   */
+  day_count: DayCount;
+  /**
+   * Market-standard fixed leg day count.
+   */
+  default_fixed_leg_day_count: DayCount;
+  /**
+   * Market-standard fixed leg frequency.
+   */
+  default_fixed_leg_frequency: Tenor;
+  /**
+   * Typical payment frequency for swaps referencing this index.
+   */
+  default_payment_frequency: Tenor;
+  /**
+   * Business days between accrual end and payment.
+   */
+  default_payment_lag_days: number;
+  /**
+   * Business days between fixing and accrual start.
+   */
+  default_reset_lag_days: number;
+  /**
+   * Index category (Overnight vs Term).
+   */
+  kind: RateIndexKind;
+  /**
+   * Market-standard business day convention.
+   */
+  market_business_day_convention: BusinessDayConvention;
+  /**
+   * Market-standard calendar identifier.
+   */
+  market_calendar_id: string;
+  /**
+   * Market-standard spot settlement lag (business days).
+   */
+  market_settlement_days: number;
+  /**
+   * Methodology for compounding overnight rates (OIS only).
+   */
+  ois_compounding?: FloatingLegCompounding | null;
+  /**
+   * Index tenor (None for overnight indices).
+   */
+  tenor?: Tenor | null;
+  [k: string]: unknown;
+}
+/**
  * One evaluated cell of the scenario table.
  */
 export interface ScenarioCell {
@@ -20013,6 +20927,36 @@ export interface ScenarioTable {
    * Identifier of the tranche evaluated.
    */
   tranche_id: string;
+}
+/**
+ * Market conventions of one swaption market.
+ */
+export interface SwaptionConventions {
+  /**
+   * Business day convention for dates.
+   */
+  business_day_convention: BusinessDayConvention;
+  /**
+   * Calendar for exercise and settlement.
+   */
+  calendar_id: string;
+  /**
+   * Fixed leg day count.
+   */
+  fixed_leg_day_count: DayCount;
+  /**
+   * Fixed leg payment frequency.
+   */
+  fixed_leg_frequency: Tenor;
+  /**
+   * Floating leg index (implies float leg conventions).
+   */
+  float_leg_index: string;
+  /**
+   * Settlement lag in business days.
+   */
+  settlement_days: number;
+  [k: string]: unknown;
 }
 /**
  * Per-tranche risk and spread metrics from the tranche's own projected cashflows.
@@ -20118,4 +21062,61 @@ export interface ValidationReport {
    * because the wire format cannot distinguish omitted warnings from errors.
    */
   truncated: boolean;
+}
+/**
+ * Market conventions of one cross-currency swap pair.
+ */
+export interface XccyConventions {
+  /**
+   * Base-currency calendar identifier for business day adjustments.
+   */
+  base_calendar_id: string;
+  /**
+   * Base (foreign) currency of the pair.
+   */
+  base_currency: Currency;
+  /**
+   * Rate index identifier for the base-currency floating leg.
+   */
+  base_index_id: Id;
+  /**
+   * Business day convention for schedule and settlement dates.
+   */
+  business_day_convention: BusinessDayConvention;
+  /**
+   * Accrual day count convention.
+   */
+  day_count: DayCount;
+  /**
+   * Notional-exchange behaviour for this currency pair.
+   *
+   * For G10 pairs against USD (where `quote_currency = USD`) the dealer convention
+   * is `MtmResetting { resetting_side: Leg1 }`: the base-currency leg (leg1) has its
+   * notional re-marked each period to match the constant quote-currency (leg2)
+   * notional in current FX. Pair conventions registered the other way around (USD
+   * as base) must invert this to `Leg2`. Registry entries must state it
+   * explicitly.
+   */
+  notional_exchange: NotionalExchange;
+  /**
+   * Coupon payment frequency for both legs.
+   */
+  payment_frequency: Tenor;
+  /**
+   * Quote-currency calendar identifier for business day adjustments.
+   */
+  quote_calendar_id: string;
+  /**
+   * Quote (domestic) currency of the pair.
+   */
+  quote_currency: Currency;
+  /**
+   * Rate index identifier for the quote-currency floating leg.
+   */
+  quote_index_id: Id;
+  /**
+   * Standard T+N spot settlement lag in business days.
+   */
+  settlement_days: number;
+  [k: string]: unknown;
 }

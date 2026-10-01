@@ -1,0 +1,67 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/results/1/equity_metrics.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Equity-tranche return metrics: IRR, MOIC, NAV and cash-on-cash.",
+  "properties": {
+    "cash_on_cash": {
+      "description": "Each distribution as a fraction of `invested`, by payment date.",
+      "items": {
+        "maxItems": 2,
+        "minItems": 2,
+        "prefixItems": [
+          {
+            "type": "string"
+          },
+          {
+            "format": "double",
+            "type": "number"
+          }
+        ],
+        "type": "array"
+      },
+      "type": "array"
+    },
+    "currency": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+      "description": "ISO-4217 code of the currency the amounts are denominated in."
+    },
+    "invested": {
+      "description": "Cash invested on the valuation date: current balance × purchase price.",
+      "format": "double",
+      "type": "number"
+    },
+    "irr": {
+      "description": "Annualized IRR of `−invested` on the valuation date against every\nprojected distribution (XIRR); `None` when no rate solves.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "moic": {
+      "description": "Multiple on invested capital: total distributions ÷ `invested`.",
+      "format": "double",
+      "type": "number"
+    },
+    "nav_pct": {
+      "description": "Present value of the distributions on the deal's discount curve, as a\npercent of the equity's current balance.",
+      "format": "double",
+      "type": "number"
+    },
+    "tranche_id": {
+      "description": "Identifier of the equity tranche.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "tranche_id",
+    "currency",
+    "invested",
+    "moic",
+    "nav_pct",
+    "cash_on_cash"
+  ],
+  "title": "EquityMetrics",
+  "type": "object"
+}

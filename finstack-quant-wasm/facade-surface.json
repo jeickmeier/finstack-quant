@@ -2756,22 +2756,42 @@
       "instruments",
       "inverseFloaterCouponProfile",
       "market",
+      "schema",
       "snowballCouponProfile",
       "tarnCouponProfile",
       "validateValuationResultJson",
+      "valuationResultAllCovenantsPassed",
+      "valuationResultFailedCovenants",
+      "valuationResultGetMetric",
+      "valuationResultMetricCount",
+      "valuationResultMetricKeys",
       "valuationResultMetricSeries",
+      "valuationResultMetricUnits",
+      "valuationResultPriceDecimal",
       "valuationResultToJson"
     ]
   },
   "valuations.composite": {
     "kind": "namespace",
     "keys": [
+      "compositeHistoryResultRowJson",
+      "compositeLegSpecInstrumentDict",
       "executionTrades",
       "history",
       "historyFromSpec",
       "initialize",
       "primitiveExposures",
-      "rebalance"
+      "rebalance",
+      "rebalanceRuleCalendar",
+      "rebalanceRuleDates",
+      "rebalanceRuleManual",
+      "weightingMethodDeltaNeutral",
+      "weightingMethodDurationWeighted",
+      "weightingMethodDv01Neutral",
+      "weightingMethodFixedQuantity",
+      "weightingMethodMetricWeighted",
+      "weightingMethodNotionalWeighted",
+      "weightingMethodVolatilityWeighted"
     ]
   },
   "valuations.composite.initialize": {
@@ -2790,6 +2810,42 @@
     "kind": "function"
   },
   "valuations.composite.history": {
+    "kind": "function"
+  },
+  "valuations.composite.weightingMethodFixedQuantity": {
+    "kind": "function"
+  },
+  "valuations.composite.weightingMethodNotionalWeighted": {
+    "kind": "function"
+  },
+  "valuations.composite.weightingMethodMetricWeighted": {
+    "kind": "function"
+  },
+  "valuations.composite.weightingMethodDv01Neutral": {
+    "kind": "function"
+  },
+  "valuations.composite.weightingMethodDeltaNeutral": {
+    "kind": "function"
+  },
+  "valuations.composite.weightingMethodDurationWeighted": {
+    "kind": "function"
+  },
+  "valuations.composite.weightingMethodVolatilityWeighted": {
+    "kind": "function"
+  },
+  "valuations.composite.rebalanceRuleManual": {
+    "kind": "function"
+  },
+  "valuations.composite.rebalanceRuleDates": {
+    "kind": "function"
+  },
+  "valuations.composite.rebalanceRuleCalendar": {
+    "kind": "function"
+  },
+  "valuations.composite.compositeLegSpecInstrumentDict": {
+    "kind": "function"
+  },
+  "valuations.composite.compositeHistoryResultRowJson": {
     "kind": "function"
   },
   "valuations.creditDerivatives": {
@@ -2819,7 +2875,9 @@
       "FxBarrierOption",
       "FxDigitalOption",
       "FxForward",
+      "FxForwardBuilder",
       "FxOption",
+      "FxOptionBuilder",
       "FxSpot",
       "FxSwap",
       "FxTouchOption",
@@ -2836,17 +2894,34 @@
   },
   "valuations.fx.FxForward": {
     "kind": "class",
-    "statics": ["example", "fromJson", "fromTradeDate", "standardSettlementDays"],
+    "statics": ["builder", "example", "fromJson", "fromTradeDate", "standardSettlementDays"],
     "methods": [
       "free",
+      "marketDependencies",
       "marketForwardRate",
       "metric",
       "price",
+      "toDict",
       "toJson",
       "withForwardPips",
       "withForwardPoints"
     ],
-    "getters": ["id"]
+    "getters": [
+      "attributes",
+      "baseCalendarId",
+      "baseCurrency",
+      "contractRate",
+      "defaultModel",
+      "domesticDiscountCurveId",
+      "expiry",
+      "foreignDiscountCurveId",
+      "id",
+      "maturity",
+      "notional",
+      "quoteCalendarId",
+      "quoteCurrency",
+      "quotedSpot"
+    ]
   },
   "valuations.fx.FxSwap": {
     "kind": "class",
@@ -2862,7 +2937,7 @@
   },
   "valuations.fx.FxOption": {
     "kind": "class",
-    "statics": ["european", "example", "fromJson"],
+    "statics": ["builder", "european", "example", "fromJson"],
     "methods": [
       "delta",
       "foreignRho",
@@ -2870,16 +2945,33 @@
       "gamma",
       "greeks",
       "impliedVol",
+      "marketDependencies",
       "metric",
       "price",
       "rho",
       "theta",
+      "toDict",
       "toJson",
       "vanna",
       "vega",
       "volga"
     ],
-    "getters": ["id"]
+    "getters": [
+      "attributes",
+      "baseCurrency",
+      "dayCount",
+      "defaultModel",
+      "deltaConvention",
+      "domesticDiscountCurveId",
+      "expiry",
+      "foreignDiscountCurveId",
+      "id",
+      "notional",
+      "optionType",
+      "quoteCurrency",
+      "strike",
+      "volSurfaceId"
+    ]
   },
   "valuations.fx.FxDigitalOption": {
     "kind": "class",
@@ -2960,14 +3052,99 @@
     ],
     "getters": ["id"]
   },
+  "valuations.fx.FxForwardBuilder": {
+    "kind": "class",
+    "statics": [],
+    "methods": [
+      "attributes",
+      "baseCalendarId",
+      "baseCurrency",
+      "build",
+      "contractRate",
+      "domesticDiscountCurveId",
+      "foreignDiscountCurveId",
+      "free",
+      "id",
+      "maturity",
+      "notional",
+      "quoteCalendarId",
+      "quoteCurrency",
+      "quotedSpot"
+    ],
+    "getters": []
+  },
+  "valuations.fx.FxOptionBuilder": {
+    "kind": "class",
+    "statics": [],
+    "methods": [
+      "attributes",
+      "baseCurrency",
+      "build",
+      "dayCount",
+      "deltaConvention",
+      "domesticDiscountCurveId",
+      "expiry",
+      "foreignDiscountCurveId",
+      "free",
+      "id",
+      "notional",
+      "optionType",
+      "quoteCurrency",
+      "strike",
+      "volSurfaceId"
+    ],
+    "getters": []
+  },
   "valuations.instruments": {
     "kind": "namespace",
     "keys": [
       "AssetBackedFacility",
+      "AssetBackedFacilityBuilder",
       "Bond",
+      "BondBuilder",
+      "CapFloor",
+      "CapFloorBuilder",
+      "CdsIndex",
+      "CdsIndexBuilder",
+      "CdsTranche",
+      "CdsTrancheBuilder",
+      "ConvertibleBond",
+      "ConvertibleBondBuilder",
+      "CreditDefaultSwap",
+      "CreditDefaultSwapBuilder",
+      "EquityOption",
+      "EquityOptionBuilder",
+      "InterestRateSwap",
+      "InterestRateSwapBuilder",
+      "MertonMcConfig",
       "RevolvingCredit",
+      "RevolvingCreditBuilder",
+      "StructuredCredit",
+      "StructuredCreditBuilder",
+      "Swaption",
+      "SwaptionBuilder",
       "TermLoan",
+      "TermLoanBuilder",
+      "TrancheBuilder",
+      "amortizationEventCumulativeLoss",
+      "amortizationEventDate",
+      "amortizationEventExcessSpread",
+      "assetPoolWithAccounts",
+      "assetPoolWithAssets",
+      "assetPoolWithInstruments",
+      "assetPoolWithReinvestmentPeriod",
+      "assetPoolWithRepLines",
+      "assetPoolWithReserve",
+      "barrierCrossingBrownianBridge",
+      "barrierCrossingDiscrete",
       "bondFromCashflowsJson",
+      "cdsIndexParamsCdxNaHy",
+      "cdsIndexParamsCdxNaIg",
+      "cdsIndexParamsItraxxEurope",
+      "cdsTrancheParamsEquityTranche",
+      "cdsTrancheParamsMezzanineTranche",
+      "coverageRulesCloStandard",
+      "coverageRulesValidate",
       "instrumentCashflows",
       "instrumentCashflowsJson",
       "instrumentCashflowsWithMarket",
@@ -2977,19 +3154,39 @@
       "listStandardMetrics",
       "listStandardMetricsGrouped",
       "metricMetadata",
+      "pikModeCash",
+      "pikModePik",
+      "pikModeSplit",
+      "pikModeToggle",
+      "pikScheduleModeAt",
+      "pikScheduleStepped",
+      "pikScheduleUniform",
+      "poolAssetFixedRateBond",
+      "poolAssetFloatingRateLoan",
+      "prepaymentPenaltyFixed",
+      "prepaymentPenaltyLockout",
+      "prepaymentPenaltyStepDown",
+      "prepaymentPenaltyYieldMaintenance",
+      "prettyInstrumentJson",
       "priceInstrument",
       "priceInstrumentWithMarket",
+      "scenarioTableCells",
       "structuredCreditTrancheBreakevenCdr",
       "structuredCreditTrancheDiscountMargin",
       "structuredCreditTrancheMetrics",
       "structuredCreditTrancheOas",
       "structuredCreditTrancheScenarioTable",
-      "validateInstrumentJson"
+      "trancheBuilder",
+      "trancheStructureFromBalances",
+      "validateInstrumentJson",
+      "validateTypedInstrumentJson",
+      "waterfallCoverageTests"
     ]
   },
   "valuations.instruments.Bond": {
     "kind": "class",
     "statics": [
+      "builder",
       "example",
       "exampleAmortizing",
       "exampleCallable",
@@ -3001,26 +3198,161 @@
       "withConvention",
       "zeroCoupon"
     ],
-    "methods": ["free", "minMoic", "minXirr", "toJson", "withStub"],
-    "getters": ["id"]
+    "methods": [
+      "free",
+      "marketDependencies",
+      "metric",
+      "minMoic",
+      "minXirr",
+      "price",
+      "priceMertonMc",
+      "toDict",
+      "toJson",
+      "withStub"
+    ],
+    "getters": [
+      "accrualMethod",
+      "attributes",
+      "callPut",
+      "cashflowSpec",
+      "creditCurveId",
+      "customCashflows",
+      "defaultModel",
+      "discountCurveId",
+      "exCouponDays",
+      "expiry",
+      "hasFloatingCoupons",
+      "id",
+      "issueDate",
+      "maturity",
+      "notional",
+      "repoCurveId",
+      "returnFloor",
+      "settlementConvention",
+      "settlementDays"
+    ]
   },
   "valuations.instruments.TermLoan": {
     "kind": "class",
-    "statics": ["example", "exampleCallable", "exampleFloatingWithDdtl", "fromJson"],
-    "methods": ["free", "toJson"],
-    "getters": ["id"]
+    "statics": ["builder", "example", "exampleCallable", "exampleFloatingWithDdtl", "fromJson"],
+    "methods": ["free", "marketDependencies", "metric", "price", "toDict", "toJson"],
+    "getters": [
+      "amortization",
+      "attributes",
+      "businessDayConvention",
+      "calendarId",
+      "callSchedule",
+      "couponType",
+      "covenants",
+      "creditCurveId",
+      "currency",
+      "dayCount",
+      "ddtl",
+      "defaultModel",
+      "discountCurveId",
+      "expiry",
+      "frequency",
+      "id",
+      "issueDate",
+      "maturity",
+      "notionalLimit",
+      "oidEir",
+      "rate",
+      "settlementDays",
+      "stub",
+      "upfrontFee"
+    ]
   },
   "valuations.instruments.RevolvingCredit": {
     "kind": "class",
-    "statics": ["example", "fromJson"],
-    "methods": ["expectedCashflows", "free", "priceWithPaths", "toJson"],
-    "getters": ["id", "isStochastic"]
+    "statics": ["builder", "example", "fromJson"],
+    "methods": [
+      "expectedCashflows",
+      "free",
+      "marketDependencies",
+      "metric",
+      "price",
+      "priceWithPaths",
+      "toDict",
+      "toJson"
+    ],
+    "getters": [
+      "attributes",
+      "businessDayConvention",
+      "calendarId",
+      "commitment",
+      "commitmentSteps",
+      "creditCurveId",
+      "dayCount",
+      "defaultModel",
+      "discountCurveId",
+      "drawRepaySpec",
+      "drawn",
+      "expiry",
+      "fees",
+      "frequency",
+      "id",
+      "isStochastic",
+      "issueDate",
+      "lc",
+      "leq",
+      "marginSteps",
+      "maturity",
+      "oidEir",
+      "paymentLagDays",
+      "rate",
+      "recoveryRate",
+      "scheduledFees",
+      "settlementDays",
+      "stub"
+    ]
   },
   "valuations.instruments.AssetBackedFacility": {
     "kind": "class",
-    "statics": ["example", "fromJson"],
-    "methods": ["borrowingBase", "facilityIrr", "free", "project", "synthesizedDealJson", "toJson"],
-    "getters": ["effectiveRevolvingEnd", "id", "undrawn"]
+    "statics": ["builder", "example", "fromJson"],
+    "methods": [
+      "borrowingBase",
+      "facilityIrr",
+      "free",
+      "marketDependencies",
+      "metric",
+      "price",
+      "project",
+      "synthesizedDealJson",
+      "toDict",
+      "toJson"
+    ],
+    "getters": [
+      "amortizationEvents",
+      "attributes",
+      "borrowingBaseRules",
+      "calendarId",
+      "closingDate",
+      "collateral",
+      "commitment",
+      "commitmentFeeBp",
+      "creditModel",
+      "dayCount",
+      "defaultModel",
+      "defaultSpec",
+      "discountCurveId",
+      "drawn",
+      "draws",
+      "effectiveRevolvingEnd",
+      "fees",
+      "frequency",
+      "id",
+      "liquidationPricePct",
+      "maturity",
+      "prepaymentSpec",
+      "rate",
+      "readvanceToBorrowingBase",
+      "recoverySpec",
+      "repaymentDate",
+      "revolvingEnd",
+      "termOut",
+      "undrawn"
+    ]
   },
   "valuations.instruments.bondFromCashflowsJson": {
     "kind": "function"
@@ -3076,11 +3408,878 @@
   "valuations.instruments.structuredCreditTrancheMetrics": {
     "kind": "function"
   },
+  "valuations.instruments.InterestRateSwap": {
+    "kind": "class",
+    "statics": ["builder", "example", "fromConventions", "fromJson"],
+    "methods": ["free", "marketDependencies", "metric", "price", "toDict", "toJson"],
+    "getters": [
+      "attributes",
+      "defaultModel",
+      "expiry",
+      "fixedLeg",
+      "floatLeg",
+      "id",
+      "marginSpec",
+      "notional",
+      "side"
+    ]
+  },
+  "valuations.instruments.Swaption": {
+    "kind": "class",
+    "statics": ["builder", "example", "exampleBermudan", "fromJson"],
+    "methods": [
+      "forwardSwapRate",
+      "free",
+      "getStrike",
+      "getUnderlyingMaturity",
+      "getUnderlyingStartDate",
+      "marketDependencies",
+      "metric",
+      "price",
+      "toDict",
+      "toJson"
+    ],
+    "getters": [
+      "attributes",
+      "cashSettlementMethod",
+      "defaultModel",
+      "exerciseStyle",
+      "expiry",
+      "id",
+      "notional",
+      "optionType",
+      "sabrParams",
+      "settlement",
+      "underlyingFixedLeg",
+      "underlyingFloatLeg",
+      "volModel",
+      "volSurfaceId"
+    ]
+  },
+  "valuations.instruments.CapFloor": {
+    "kind": "class",
+    "statics": ["builder", "example", "fromJson"],
+    "methods": ["free", "marketDependencies", "metric", "price", "toDict", "toJson"],
+    "getters": [
+      "attributes",
+      "businessDayConvention",
+      "calendarId",
+      "dayCount",
+      "defaultModel",
+      "discountCurveId",
+      "exerciseStyle",
+      "expiry",
+      "forwardCurveId",
+      "frequency",
+      "id",
+      "maturity",
+      "notional",
+      "overnightCoupon",
+      "premium",
+      "rateOptionType",
+      "settlement",
+      "spreadBp",
+      "startDate",
+      "strike",
+      "stub",
+      "volShift",
+      "volSurfaceId",
+      "volType"
+    ]
+  },
+  "valuations.instruments.CreditDefaultSwap": {
+    "kind": "class",
+    "statics": ["builder", "example", "fromJson"],
+    "methods": ["free", "marketDependencies", "metric", "parSpread", "price", "toDict", "toJson"],
+    "getters": [
+      "attributes",
+      "convention",
+      "defaultModel",
+      "docClause",
+      "docClauseEffective",
+      "expiry",
+      "id",
+      "marginSpec",
+      "notional",
+      "premiumLeg",
+      "protectionEffectiveDate",
+      "protectionLeg",
+      "protectionStart",
+      "side",
+      "upfront",
+      "valuationConvention"
+    ]
+  },
+  "valuations.instruments.CdsIndex": {
+    "kind": "class",
+    "statics": ["builder", "example", "fromJson", "fromPreset"],
+    "methods": [
+      "cs01",
+      "free",
+      "marketDependencies",
+      "metric",
+      "parSpread",
+      "price",
+      "riskyPv01",
+      "toDict",
+      "toJson"
+    ],
+    "getters": [
+      "attributes",
+      "constituents",
+      "convention",
+      "defaultModel",
+      "expiry",
+      "id",
+      "indexFactor",
+      "indexName",
+      "marginSpec",
+      "notional",
+      "numConstituents",
+      "premiumLeg",
+      "pricing",
+      "protectionLeg",
+      "series",
+      "side",
+      "upfront",
+      "version"
+    ]
+  },
+  "valuations.instruments.CdsTranche": {
+    "kind": "class",
+    "statics": ["builder", "example", "fromJson", "standard"],
+    "methods": [
+      "expectedLoss",
+      "free",
+      "jumpToDefault",
+      "marketDependencies",
+      "metric",
+      "price",
+      "toDict",
+      "toJson"
+    ],
+    "getters": [
+      "attachPct",
+      "attributes",
+      "businessDayConvention",
+      "calendarId",
+      "couponBp",
+      "creditIndexId",
+      "dayCount",
+      "defaultModel",
+      "detachPct",
+      "discountCurveId",
+      "expiry",
+      "frequency",
+      "id",
+      "indexName",
+      "maturity",
+      "notional",
+      "realizedLoss",
+      "rollRule",
+      "series",
+      "side",
+      "startDate",
+      "stub",
+      "upfront"
+    ]
+  },
+  "valuations.instruments.ConvertibleBond": {
+    "kind": "class",
+    "statics": ["builder", "example", "exampleMandatory", "fromJson"],
+    "methods": [
+      "conversionPremium",
+      "free",
+      "greeks",
+      "marketDependencies",
+      "metric",
+      "parity",
+      "price",
+      "toDict",
+      "toJson"
+    ],
+    "getters": [
+      "attributes",
+      "callPut",
+      "cashflowSpec",
+      "conversion",
+      "conversionRatio",
+      "creditCurveId",
+      "defaultModel",
+      "discountCurveId",
+      "divYieldId",
+      "effectiveConversionRatio",
+      "expiry",
+      "id",
+      "issueDate",
+      "maturity",
+      "notional",
+      "recoveryRate",
+      "settlementDays",
+      "softCallTrigger",
+      "spotId",
+      "volSurfaceId"
+    ]
+  },
+  "valuations.instruments.EquityOption": {
+    "kind": "class",
+    "statics": ["builder", "european", "example", "fromJson"],
+    "methods": [
+      "delta",
+      "free",
+      "gamma",
+      "greeks",
+      "impliedVol",
+      "marketDependencies",
+      "metric",
+      "price",
+      "rho",
+      "theta",
+      "toDict",
+      "toJson",
+      "vega"
+    ],
+    "getters": [
+      "attributes",
+      "currency",
+      "dayCount",
+      "defaultModel",
+      "discountCurveId",
+      "discreteDividends",
+      "divYieldId",
+      "exercise",
+      "exerciseDates",
+      "exerciseStyle",
+      "expiry",
+      "id",
+      "optionType",
+      "quantity",
+      "settlement",
+      "spotId",
+      "strike",
+      "underlyingTicker",
+      "volSurfaceId"
+    ]
+  },
+  "valuations.instruments.StructuredCredit": {
+    "kind": "class",
+    "statics": ["builder", "fromJson", "newAbs", "newClo", "newCmbs", "newRmbs"],
+    "methods": [
+      "createWaterfall",
+      "enableStochastic",
+      "equityMetrics",
+      "free",
+      "priceStochastic",
+      "runSimulationWithDiagnostics",
+      "toDict",
+      "toJson",
+      "trancheCashflows",
+      "withStandardFees"
+    ],
+    "getters": [
+      "attributes",
+      "businessDayConvention",
+      "calendarId",
+      "callAssumption",
+      "card",
+      "cleanupCallDecimal",
+      "closingDate",
+      "correlationStructure",
+      "coverageRules",
+      "coverageTriggers",
+      "creditModel",
+      "dealMetadata",
+      "dealType",
+      "defaultSpec",
+      "delinquency",
+      "discountCurveId",
+      "fees",
+      "firstPaymentDate",
+      "frequency",
+      "hedgeSwaps",
+      "id",
+      "liquidationPricePct",
+      "lossAllocation",
+      "lossRecognition",
+      "marketConditions",
+      "maturity",
+      "pool",
+      "prepaymentSpec",
+      "principalCoversSeniorInterest",
+      "quoteSettlementDate",
+      "recoverySpec",
+      "stochasticDefaultSpec",
+      "stochasticPrepaySpec",
+      "stochasticRecoverySpec",
+      "trancheDraws",
+      "trancheReadvance",
+      "tranches",
+      "waterfall",
+      "waterfallRules"
+    ]
+  },
+  "valuations.instruments.BondBuilder": {
+    "kind": "class",
+    "statics": [],
+    "methods": [
+      "accrualMethod",
+      "attributes",
+      "build",
+      "callPut",
+      "cashflowSpec",
+      "creditCurveId",
+      "customCashflows",
+      "discountCurveId",
+      "free",
+      "id",
+      "issueDate",
+      "maturity",
+      "notional",
+      "repoCurveId",
+      "returnFloor",
+      "settlementConvention"
+    ],
+    "getters": []
+  },
+  "valuations.instruments.TermLoanBuilder": {
+    "kind": "class",
+    "statics": [],
+    "methods": [
+      "amortization",
+      "attributes",
+      "build",
+      "businessDayConvention",
+      "calendarId",
+      "callSchedule",
+      "couponType",
+      "covenants",
+      "creditCurveId",
+      "currency",
+      "dayCount",
+      "ddtl",
+      "discountCurveId",
+      "free",
+      "frequency",
+      "id",
+      "issueDate",
+      "maturity",
+      "notionalLimit",
+      "oidEir",
+      "rate",
+      "settlementDays",
+      "stub",
+      "upfrontFee"
+    ],
+    "getters": []
+  },
+  "valuations.instruments.RevolvingCreditBuilder": {
+    "kind": "class",
+    "statics": [],
+    "methods": [
+      "attributes",
+      "build",
+      "businessDayConvention",
+      "calendarId",
+      "commitment",
+      "commitmentSteps",
+      "creditCurveId",
+      "dayCount",
+      "discountCurveId",
+      "drawRepaySpec",
+      "drawn",
+      "fees",
+      "free",
+      "frequency",
+      "id",
+      "issueDate",
+      "lc",
+      "leq",
+      "marginSteps",
+      "maturity",
+      "oidEir",
+      "paymentLagDays",
+      "rate",
+      "recoveryRate",
+      "scheduledFees",
+      "settlementDays",
+      "stub"
+    ],
+    "getters": []
+  },
+  "valuations.instruments.AssetBackedFacilityBuilder": {
+    "kind": "class",
+    "statics": [],
+    "methods": [
+      "amortizationEvents",
+      "attributes",
+      "borrowingBaseRules",
+      "build",
+      "calendarId",
+      "closingDate",
+      "collateral",
+      "commitment",
+      "commitmentFeeBp",
+      "creditModel",
+      "dayCount",
+      "defaultSpec",
+      "discountCurveId",
+      "drawn",
+      "draws",
+      "fees",
+      "free",
+      "frequency",
+      "id",
+      "liquidationPricePct",
+      "maturity",
+      "prepaymentSpec",
+      "rate",
+      "readvanceToBorrowingBase",
+      "recoverySpec",
+      "revolvingEnd",
+      "termOut"
+    ],
+    "getters": []
+  },
+  "valuations.instruments.InterestRateSwapBuilder": {
+    "kind": "class",
+    "statics": [],
+    "methods": [
+      "attributes",
+      "build",
+      "fixedLeg",
+      "floatLeg",
+      "free",
+      "id",
+      "marginSpec",
+      "notional",
+      "side"
+    ],
+    "getters": []
+  },
+  "valuations.instruments.SwaptionBuilder": {
+    "kind": "class",
+    "statics": [],
+    "methods": [
+      "attributes",
+      "build",
+      "cashSettlementMethod",
+      "exerciseStyle",
+      "expiry",
+      "free",
+      "id",
+      "notional",
+      "optionType",
+      "sabrParams",
+      "settlement",
+      "underlyingFixedLeg",
+      "underlyingFloatLeg",
+      "volModel",
+      "volSurfaceId"
+    ],
+    "getters": []
+  },
+  "valuations.instruments.CapFloorBuilder": {
+    "kind": "class",
+    "statics": [],
+    "methods": [
+      "attributes",
+      "build",
+      "businessDayConvention",
+      "calendarId",
+      "dayCount",
+      "discountCurveId",
+      "exerciseStyle",
+      "forwardCurveId",
+      "free",
+      "frequency",
+      "id",
+      "maturity",
+      "notional",
+      "overnightCoupon",
+      "premium",
+      "rateOptionType",
+      "settlement",
+      "spreadBp",
+      "startDate",
+      "strike",
+      "stub",
+      "volShift",
+      "volSurfaceId",
+      "volType"
+    ],
+    "getters": []
+  },
+  "valuations.instruments.CreditDefaultSwapBuilder": {
+    "kind": "class",
+    "statics": [],
+    "methods": [
+      "attributes",
+      "build",
+      "convention",
+      "docClause",
+      "free",
+      "id",
+      "marginSpec",
+      "notional",
+      "premiumLeg",
+      "protectionEffectiveDate",
+      "protectionLeg",
+      "side",
+      "upfront",
+      "valuationConvention"
+    ],
+    "getters": []
+  },
+  "valuations.instruments.CdsIndexBuilder": {
+    "kind": "class",
+    "statics": [],
+    "methods": [
+      "attributes",
+      "build",
+      "constituents",
+      "convention",
+      "free",
+      "id",
+      "indexFactor",
+      "indexName",
+      "marginSpec",
+      "notional",
+      "numConstituents",
+      "premiumLeg",
+      "pricing",
+      "protectionLeg",
+      "series",
+      "side",
+      "upfront",
+      "version"
+    ],
+    "getters": []
+  },
+  "valuations.instruments.CdsTrancheBuilder": {
+    "kind": "class",
+    "statics": [],
+    "methods": [
+      "attachPct",
+      "attributes",
+      "build",
+      "businessDayConvention",
+      "calendarId",
+      "couponBp",
+      "creditIndexId",
+      "dayCount",
+      "detachPct",
+      "discountCurveId",
+      "free",
+      "frequency",
+      "id",
+      "indexName",
+      "maturity",
+      "notional",
+      "realizedLoss",
+      "rollRule",
+      "series",
+      "side",
+      "startDate",
+      "stub",
+      "upfront"
+    ],
+    "getters": []
+  },
+  "valuations.instruments.ConvertibleBondBuilder": {
+    "kind": "class",
+    "statics": [],
+    "methods": [
+      "attributes",
+      "build",
+      "callPut",
+      "cashflowSpec",
+      "conversion",
+      "creditCurveId",
+      "discountCurveId",
+      "divYieldId",
+      "free",
+      "id",
+      "issueDate",
+      "maturity",
+      "notional",
+      "recoveryRate",
+      "settlementDays",
+      "softCallTrigger",
+      "spotId",
+      "volSurfaceId"
+    ],
+    "getters": []
+  },
+  "valuations.instruments.EquityOptionBuilder": {
+    "kind": "class",
+    "statics": [],
+    "methods": [
+      "attributes",
+      "build",
+      "currency",
+      "dayCount",
+      "discountCurveId",
+      "discreteDividends",
+      "divYieldId",
+      "exercise",
+      "exerciseDates",
+      "exerciseStyle",
+      "expiry",
+      "free",
+      "id",
+      "optionType",
+      "quantity",
+      "settlement",
+      "spotId",
+      "strike",
+      "underlyingTicker",
+      "volSurfaceId"
+    ],
+    "getters": []
+  },
+  "valuations.instruments.StructuredCreditBuilder": {
+    "kind": "class",
+    "statics": [],
+    "methods": [
+      "attributes",
+      "build",
+      "businessDayConvention",
+      "calendarId",
+      "callAssumption",
+      "card",
+      "cleanupCallDecimal",
+      "closingDate",
+      "correlationStructure",
+      "coverageRules",
+      "coverageTriggers",
+      "creditModel",
+      "dealMetadata",
+      "dealType",
+      "defaultSpec",
+      "delinquency",
+      "discountCurveId",
+      "fees",
+      "firstPaymentDate",
+      "free",
+      "frequency",
+      "hedgeSwaps",
+      "id",
+      "liquidationPricePct",
+      "lossAllocation",
+      "lossRecognition",
+      "marketConditions",
+      "maturity",
+      "pool",
+      "prepaymentSpec",
+      "principalCoversSeniorInterest",
+      "quoteSettlementDate",
+      "recoverySpec",
+      "stochasticDefaultSpec",
+      "stochasticPrepaySpec",
+      "stochasticRecoverySpec",
+      "trancheDraws",
+      "trancheReadvance",
+      "tranches",
+      "waterfall",
+      "waterfallRules"
+    ],
+    "getters": []
+  },
+  "valuations.instruments.TrancheBuilder": {
+    "kind": "class",
+    "statics": [],
+    "methods": [
+      "attachPct",
+      "attributes",
+      "build",
+      "couponFixed",
+      "couponFloating",
+      "currentBalance",
+      "dayCount",
+      "deferredInterest",
+      "detachPct",
+      "free",
+      "frequency",
+      "icTrigger",
+      "id",
+      "maturity",
+      "nonDeferrable",
+      "ocTrigger",
+      "originalBalance",
+      "pikEnabled",
+      "rating",
+      "seniority"
+    ],
+    "getters": []
+  },
+  "valuations.instruments.MertonMcConfig": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": [
+      "barrierCrossing",
+      "dynamicRecovery",
+      "endogenousHazard",
+      "free",
+      "pikSchedule",
+      "recoveryRate",
+      "stepsPerYear",
+      "toJson",
+      "toggleModel"
+    ],
+    "getters": []
+  },
+  "valuations.instruments.barrierCrossingDiscrete": {
+    "kind": "function"
+  },
+  "valuations.instruments.barrierCrossingBrownianBridge": {
+    "kind": "function"
+  },
+  "valuations.instruments.pikModeCash": {
+    "kind": "function"
+  },
+  "valuations.instruments.pikModePik": {
+    "kind": "function"
+  },
+  "valuations.instruments.pikModeSplit": {
+    "kind": "function"
+  },
+  "valuations.instruments.pikModeToggle": {
+    "kind": "function"
+  },
+  "valuations.instruments.pikScheduleUniform": {
+    "kind": "function"
+  },
+  "valuations.instruments.pikScheduleStepped": {
+    "kind": "function"
+  },
+  "valuations.instruments.pikScheduleModeAt": {
+    "kind": "function"
+  },
+  "valuations.instruments.trancheBuilder": {
+    "kind": "function"
+  },
+  "valuations.instruments.trancheStructureFromBalances": {
+    "kind": "function"
+  },
+  "valuations.instruments.poolAssetFixedRateBond": {
+    "kind": "function"
+  },
+  "valuations.instruments.poolAssetFloatingRateLoan": {
+    "kind": "function"
+  },
+  "valuations.instruments.assetPoolWithRepLines": {
+    "kind": "function"
+  },
+  "valuations.instruments.assetPoolWithAssets": {
+    "kind": "function"
+  },
+  "valuations.instruments.assetPoolWithInstruments": {
+    "kind": "function"
+  },
+  "valuations.instruments.assetPoolWithReserve": {
+    "kind": "function"
+  },
+  "valuations.instruments.assetPoolWithReinvestmentPeriod": {
+    "kind": "function"
+  },
+  "valuations.instruments.assetPoolWithAccounts": {
+    "kind": "function"
+  },
+  "valuations.instruments.prepaymentPenaltyLockout": {
+    "kind": "function"
+  },
+  "valuations.instruments.prepaymentPenaltyFixed": {
+    "kind": "function"
+  },
+  "valuations.instruments.prepaymentPenaltyStepDown": {
+    "kind": "function"
+  },
+  "valuations.instruments.prepaymentPenaltyYieldMaintenance": {
+    "kind": "function"
+  },
+  "valuations.instruments.coverageRulesCloStandard": {
+    "kind": "function"
+  },
+  "valuations.instruments.coverageRulesValidate": {
+    "kind": "function"
+  },
+  "valuations.instruments.waterfallCoverageTests": {
+    "kind": "function"
+  },
+  "valuations.instruments.scenarioTableCells": {
+    "kind": "function"
+  },
+  "valuations.instruments.amortizationEventDate": {
+    "kind": "function"
+  },
+  "valuations.instruments.amortizationEventCumulativeLoss": {
+    "kind": "function"
+  },
+  "valuations.instruments.amortizationEventExcessSpread": {
+    "kind": "function"
+  },
+  "valuations.instruments.cdsIndexParamsCdxNaIg": {
+    "kind": "function"
+  },
+  "valuations.instruments.cdsIndexParamsCdxNaHy": {
+    "kind": "function"
+  },
+  "valuations.instruments.cdsIndexParamsItraxxEurope": {
+    "kind": "function"
+  },
+  "valuations.instruments.cdsTrancheParamsEquityTranche": {
+    "kind": "function"
+  },
+  "valuations.instruments.cdsTrancheParamsMezzanineTranche": {
+    "kind": "function"
+  },
+  "valuations.instruments.validateTypedInstrumentJson": {
+    "kind": "function"
+  },
+  "valuations.instruments.prettyInstrumentJson": {
+    "kind": "function"
+  },
   "valuations.market": {
     "kind": "namespace",
-    "keys": ["listedProductCatalog"]
+    "keys": ["ConventionRegistry", "listedProductCatalog"]
   },
   "valuations.market.listedProductCatalog": {
+    "kind": "function"
+  },
+  "valuations.market.ConventionRegistry": {
+    "kind": "class",
+    "statics": [],
+    "methods": [
+      "free",
+      "primaryCdsFamily",
+      "requireInflationSwap",
+      "requireIrFuture",
+      "requireRateIndex",
+      "requireSwaption",
+      "requireXccy",
+      "resolveCds"
+    ],
+    "getters": []
+  },
+  "valuations.schema": {
+    "kind": "namespace",
+    "keys": [
+      "instrumentEnvelopeSchema",
+      "instrumentSchema",
+      "instrumentTypes",
+      "valuationResultSchema"
+    ]
+  },
+  "valuations.schema.instrumentEnvelopeSchema": {
+    "kind": "function"
+  },
+  "valuations.schema.instrumentTypes": {
+    "kind": "function"
+  },
+  "valuations.schema.instrumentSchema": {
+    "kind": "function"
+  },
+  "valuations.schema.valuationResultSchema": {
     "kind": "function"
   },
   "valuations.validateValuationResultJson": {
@@ -3105,6 +4304,27 @@
     "kind": "function"
   },
   "valuations.callableRangeAccrualAccrued": {
+    "kind": "function"
+  },
+  "valuations.valuationResultPriceDecimal": {
+    "kind": "function"
+  },
+  "valuations.valuationResultGetMetric": {
+    "kind": "function"
+  },
+  "valuations.valuationResultMetricKeys": {
+    "kind": "function"
+  },
+  "valuations.valuationResultMetricCount": {
+    "kind": "function"
+  },
+  "valuations.valuationResultMetricUnits": {
+    "kind": "function"
+  },
+  "valuations.valuationResultAllCovenantsPassed": {
+    "kind": "function"
+  },
+  "valuations.valuationResultFailedCovenants": {
     "kind": "function"
   }
 }
