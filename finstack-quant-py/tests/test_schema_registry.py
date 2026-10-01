@@ -177,14 +177,21 @@ def test_llm_profile_flattens_unit_enums() -> None:
 
 
 def test_llm_profile_strips_rust_prose_but_keeps_the_values() -> None:
+    # A contract whose canonical artifact carries rustdoc verbatim; that is the
+    # cost being cut.
+    verbose = valuations_schema.get("rate_index_conventions.schema.json")
+    assert "```" in verbose
+    assert "# Examples" in verbose
+    trimmed = valuations_schema.get("rate_index_conventions.schema.json", profile="llm")
+    assert "```" not in trimmed, "code fences do not help a payload author"
+    assert "# Examples" not in trimmed
+
+    # `day_count` is inlined into every instrument, so its variant docs are kept
+    # to the definition and citation at source and carry no Rust examples.
     canonical = valuations_schema.get("day_count.schema.json")
     projected = valuations_schema.get("day_count.schema.json", profile="llm")
-
-    # The canonical artifact carries rustdoc verbatim; that is the cost being cut.
-    assert "```" in canonical
-    assert "# Examples" in canonical
-    assert "```" not in projected, "code fences do not help a payload author"
-    assert "# Examples" not in projected
+    assert "```" not in canonical
+    assert "```" not in projected
 
     # ISDA grounding and every accepted spelling must survive the trim.
     assert "ISDA" in projected, "domain references are the part worth keeping"
@@ -193,11 +200,8 @@ def test_llm_profile_strips_rust_prose_but_keeps_the_values() -> None:
 
     # Each spelling keeps its own citation, so the caller can tell `act_360`
     # from `act_365f` by the section each implements rather than by guessing.
-    # That grounding is not free: it is why the projection lands around 6x
-    # smaller rather than the 10x achievable by dropping citations with the
-    # rest of the prose.
     assert "4.16(d)" in projected, "per-variant section numbers survive"
-    assert len(projected) * 5 < len(canonical), f"{len(canonical)} -> {len(projected)}"
+    assert len(projected) < len(canonical), f"{len(canonical)} -> {len(projected)}"
 
 
 def test_get_rejects_an_unknown_profile() -> None:
