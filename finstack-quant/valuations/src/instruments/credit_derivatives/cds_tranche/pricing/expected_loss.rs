@@ -24,6 +24,9 @@ struct ElInvariants {
     attach_pct: f64,
     /// Original (contractual) detachment point, percent.
     detach_pct: f64,
+    /// Tranche maturity: the horizon the base-correlation curve is quoted for
+    /// and the only date at which a negative tranchelet loss is arbitrage.
+    maturity: Date,
 }
 
 impl CdsTranchePricer {
@@ -126,6 +129,7 @@ impl CdsTranchePricer {
                 prior_wd: 0.0,
                 attach_pct: tranche.attach_pct,
                 detach_pct: tranche.detach_pct,
+                maturity: tranche.maturity,
             });
         }
         let corr_attach = self.smooth_correlation_boundary(
@@ -152,6 +156,7 @@ impl CdsTranchePricer {
             prior_wd,
             attach_pct: tranche.attach_pct,
             detach_pct: tranche.detach_pct,
+            maturity: tranche.maturity,
         })
     }
 
@@ -182,16 +187,40 @@ impl CdsTranchePricer {
             index_data,
             date,
         )?;
-        // Surface base-correlation arbitrage explicitly (see
-        // `resolve_tranchelet_difference`) instead of silently clamping a
-        // tranche's protection leg to zero.
-        let current_portfolio_loss_fraction = self.resolve_tranchelet_difference(
-            el_to_detach,
-            el_to_attach,
-            inv.attach_pct,
-            inv.detach_pct,
-            date,
-        )?;
+        // Base correlations are quoted for the tranche maturity, so the
+        // tranchelet loss is only guaranteed non-negative there. Applying the
+        // same pair of correlations at an earlier date is a model
+        // interpolation in time, and a steep skew dips slightly below zero at
+        // short horizons (order 1e-5 of pool notional) without any arbitrage
+        // in the quotes. Those interim losses are floored at zero and the
+        // curve is then made monotone in time; arbitrage at maturity is still
+        // an error (see `resolve_tranchelet_difference`).
+        let current_portfolio_loss_fraction = if date < inv.maturity {
+            let diff = el_to_detach - el_to_attach;
+            if !diff.is_finite() {
+                return Err(Error::Validation(
+                    "non-finite base-correlation loss difference".to_owned(),
+                ));
+            }
+            if diff < 0.0 {
+                tracing::debug!(
+                    attach_pct = inv.attach_pct,
+                    detach_pct = inv.detach_pct,
+                    ?date,
+                    gap = diff,
+                    "interim base-correlation tranchelet loss floored at zero"
+                );
+            }
+            diff.max(0.0)
+        } else {
+            self.resolve_tranchelet_difference(
+                el_to_detach,
+                el_to_attach,
+                inv.attach_pct,
+                inv.detach_pct,
+                date,
+            )?
+        };
         let tranche_loss_fraction =
             (current_portfolio_loss_fraction * inv.pool_factor) / inv.orig_width;
         let el_fraction = (tranche_loss_fraction + inv.prior_loss).clamp(0.0, 1.0);

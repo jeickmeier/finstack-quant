@@ -2112,6 +2112,99 @@ fn well_formed_base_correlation_prices_without_arbitrage_error() {
     }
 }
 
+/// A market-realistic base-correlation skew (CDX IG 2007 shape) is
+/// arbitrage-free at the tranche maturity it is quoted for, yet its tranchelet
+/// loss `EL(0,D) − EL(0,A)` dips a few 1e-6 below zero at the first coupon
+/// dates, where default probabilities are tiny. Those interim dips are a
+/// time-interpolation artefact, not arbitrage, and must not stop the
+/// mezzanine and senior tranches from pricing.
+#[test]
+fn realistic_base_correlation_skew_prices_every_tranche() {
+    let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+    let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("Valid test date");
+    let discount_curve = DiscountCurve::builder("USD-OIS")
+        .base_date(base_date)
+        .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.80), (10.0, 0.60)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .build()
+        .expect("discount curve");
+    let index_curve = HazardCurve::builder("CDX.NA.IG.42")
+        .base_date(base_date)
+        .recovery_rate(0.40)
+        .knots(vec![(1.0, 0.01), (3.0, 0.015), (5.0, 0.02), (10.0, 0.025)])
+        .par_spreads(vec![(1.0, 60.0), (3.0, 80.0), (5.0, 100.0), (10.0, 140.0)])
+        .build()
+        .expect("hazard curve");
+    let base_corr_curve = BaseCorrelationCurve::builder("CDX.NA.IG.42_5Y")
+        .knots(vec![
+            (3.0, 0.18),
+            (7.0, 0.30),
+            (10.0, 0.37),
+            (15.0, 0.48),
+            (30.0, 0.72),
+        ])
+        .build()
+        .expect("base correlation curve");
+    let index_data = CreditIndexData::builder()
+        .num_constituents(125)
+        .recovery_rate(0.40)
+        .index_credit_curve(Arc::new(index_curve))
+        .base_correlation_curve(Arc::new(base_corr_curve))
+        .build()
+        .expect("index data");
+    let market_ctx = MarketContext::new()
+        .insert(discount_curve)
+        .insert_credit_index("CDX.NA.IG.42", index_data);
+    let pricer = CdsTranchePricer::new();
+
+    for &(attach, detach, coupon) in &[
+        (3.0_f64, 7.0_f64, 500.0_f64),
+        (7.0, 10.0, 300.0),
+        (7.0, 15.0, 100.0),
+        (10.0, 15.0, 100.0),
+        (15.0, 30.0, 50.0),
+    ] {
+        let params = CdsTrancheParams::new(
+            "CDX.NA.IG.42",
+            42,
+            attach,
+            detach,
+            Money::from((10000000_i64, Currency::USD)),
+            maturity,
+            coupon,
+        );
+        let tranche = CdsTranche::new(
+            "SKEW_TEST",
+            &params,
+            &crate::cashflow::builder::ScheduleParams::quarterly_act360(),
+            finstack_quant_core::types::CurveId::from("USD-OIS"),
+            finstack_quant_core::types::CurveId::from("CDX.NA.IG.42"),
+            PayReceive::Receive,
+        )
+        .expect("Valid tranche parameters");
+
+        let pv = pricer
+            .price_tranche(&tranche, &market_ctx, base_date)
+            .unwrap_or_else(|e| {
+                panic!("realistic skew must price [{attach}%, {detach}%], got: {e:?}")
+            });
+        assert!(pv.amount().is_finite());
+
+        // The maturity loss is strictly positive: the curve is arbitrage-free
+        // where it is quoted, so protection has value.
+        let index = market_ctx
+            .get_credit_index("CDX.NA.IG.42")
+            .expect("credit index");
+        let terminal_loss = pricer
+            .calculate_expected_tranche_loss(&tranche, &index, maturity)
+            .expect("maturity loss");
+        assert!(
+            terminal_loss > 0.0,
+            "[{attach}%, {detach}%] maturity expected loss must be positive, got {terminal_loss}"
+        );
+    }
+}
+
 /// C2: homogeneous Gaussian path must not panic when `default_prob` is outside
 /// the open interval `(0, 1)`.
 ///
