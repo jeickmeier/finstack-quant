@@ -361,8 +361,9 @@ impl PyPerformance {
     /// frequency : str, optional
     ///     Observation frequency: ``"daily"``, ``"weekly"``, ``"monthly"``,
     ///     ``"quarterly"``, ``"semi_annual"``, ``"annual"`` or a pandas offset
-    ///     alias (``D``/``B``, ``W``, ``M``, ``Q``, ``A``/``Y``). Sets the
-    ///     annualization factor (252, 52, 12, 4, 2, 1). ``None`` uses the Rust
+    ///     alias (``D``/``B``, ``W``, ``M``/``ME``, ``Q``/``QE``,
+    ///     ``A``/``Y``/``YE``). Sets the annualization factor
+    ///     (252, 52, 12, 4, 2, 1). ``None`` uses the Rust
     ///     default ``DEFAULT_FREQUENCY`` (daily).
     ///
     /// Raises
@@ -499,7 +500,7 @@ impl PyPerformance {
     /// ``"annual"``) that round-trips through the ``frequency`` constructor
     /// argument and the :meth:`period_stats` ``aggregation_frequency``
     /// parameter. Inputs also accept the pandas offset aliases ``D``/``B``,
-    /// ``W``, ``M``, ``Q``, ``A``/``Y``.
+    /// ``W``, ``M``/``ME``, ``Q``/``QE``, ``A``/``Y``/``YE``.
     #[getter]
     fn frequency(&self) -> String {
         self.inner.frequency().to_string()
@@ -1102,7 +1103,7 @@ impl PyPerformance {
     ///
     /// ``frequency`` accepts ``"daily"``, ``"weekly"``, ``"monthly"``,
     /// ``"quarterly"``, ``"semi_annual"``, or ``"annual"`` (or the pandas
-    /// offset aliases ``D``/``B``, ``W``, ``M``, ``Q``, ``A``/``Y``). The outer list is
+    /// offset aliases ``D``/``B``, ``W``, ``M``/``ME``, ``Q``/``QE``, ``A``/``Y``/``YE``). The outer list is
     /// ticker-major in :attr:`ticker_names` order. Each inner list contains
     /// chronological ``(period_end_date, compounded_return)`` tuples, where
     /// returns are decimal fractions (``0.01`` means 1%). Chaining the values
@@ -1420,7 +1421,7 @@ impl PyPerformance {
     ///
     /// ``frequency`` is one of ``"daily"``, ``"weekly"``, ``"monthly"``,
     /// ``"quarterly"``, ``"semi_annual"``, or ``"annual"`` (pandas offset
-    /// aliases ``D``/``B``, ``W``, ``M``, ``Q``, ``A``/``Y`` are accepted too).
+    /// aliases ``D``/``B``, ``W``, ``M``/``ME``, ``Q``/``QE``, ``A``/``Y``/``YE`` are accepted too).
     /// Returns a DataFrame
     /// indexed by period-end date with one column per ticker; buckets reconcile
     /// with :meth:`to_cumulative_returns_dataframe`. This convenience exit is
