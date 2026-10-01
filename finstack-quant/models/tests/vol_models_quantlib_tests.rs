@@ -10,7 +10,8 @@
 //! - Bachelier (normal) prices, including negative forwards/strikes,
 //!   + implied normal vol round-trip
 //! - SABR Hagan lognormal vol (beta in {0, 0.5, 1}, shifted SABR) and
-//!   Hagan normal vol
+//!   Hagan normal vol (beta = 0 cases, including a cross-zero quote, against
+//!   an mpmath evaluation of the exact beta = 0 form rather than QuantLib)
 //! - Heston (Gatheral / little-trap formulation) European prices
 //! - SVI total variance / implied vol (mpmath 50-digit reference)
 //! - Rough Heston classical limit: H = 0.499 vs classical Heston price
@@ -37,7 +38,19 @@
 //!   to ~1e-9 relative price error at moderate moneyness, while QuantLib's
 //!   CDF carries up to ~2.5e-9 relative error on far-OTM tail prices (where
 //!   finstack is the more accurate side). See `data/gen_vol_golden.py`.
-//! - SABR: 1e-10 relative (same Hagan 2002 formula as QuantLib).
+//! - SABR: 1e-10 relative. Lognormal vol, and normal vol for beta > 0, are
+//!   the same Hagan (2002) formulas as QuantLib. Normal vol at beta = 0 is
+//!   not: QuantLib's `sabrVolatility(..., Normal)` has no beta = 0 special
+//!   case and evaluates the general expansion with
+//!   `zeta = (nu/alpha) * sqrt(F*K) * ln(F/K)`, while
+//!   [`SabrParameters::implied_vol_normal`] uses Hagan's exact beta = 0
+//!   result (eq. B.70a), `zeta = (nu/alpha) * (F - K)`. The two zetas differ
+//!   by `sinh(L/2)/(L/2)`, `L = ln(F/K)` (about 0.13% in vol at F/K = 1.5),
+//!   and only the exact form is defined for `F*K <= 0`. The beta = 0 expected
+//!   values are therefore an independent 50-digit mpmath evaluation of
+//!   B.70a, the formula of OpenGamma Strata's
+//!   `SabrHaganNormalVolatilityFormula.volatilityBeta0`; each `sabr_normal`
+//!   case names its source in the fixture's `reference` field.
 //! - Heston: 1e-6 relative (different quadrature: composite Gauss-Legendre
 //!   here vs adaptive Gauss-Lobatto in QuantLib). Four high-vol-of-vol T=1
 //!   cases carry an explicit `skip` flag in the fixture because they once

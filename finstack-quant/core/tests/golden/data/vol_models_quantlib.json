@@ -8,7 +8,8 @@
       "vendor": "QuantLib Project",
       "url": "https://www.quantlib.org/",
       "extra": {
-        "svi_reference": "SVI section only: raw SVI total variance evaluated with mpmath at 50-digit precision (Gatheral 2004 raw parameterisation); QuantLib has no analytic SVI."
+        "svi_reference": "SVI section only: raw SVI total variance evaluated with mpmath at 50-digit precision (Gatheral 2004 raw parameterisation); QuantLib has no analytic SVI.",
+        "sabr_normal_beta0_reference": "sabr_normal cases with beta = 0 only: mpmath 50-digit evaluation of Hagan (2002) eq. B.70a, zeta = (nu/alpha)*(F - K); same formula as OpenGamma Strata SabrHaganNormalVolatilityFormula.volatilityBeta0. Not QuantLib: its normal SABR has no beta = 0 special case and uses zeta = (nu/alpha)*sqrt(F*K)*ln(F/K), smaller by sinh(L/2)/(L/2), L = ln(F/K)."
       }
     },
     "generated": {
@@ -28,7 +29,7 @@
         "time": "year fractions passed directly; Heston dates chosen so Act/365F year fraction is exactly T",
         "black76_bachelier_prices": "undiscounted (unit annuity, QuantLib discount=1.0); discount_factor recorded separately for Black-76",
         "bsm_prices": "discounted spot-based prices via blackFormula(forward=S*exp((r-q)T), discount=exp(-rT))",
-        "sabr": "QuantLib sabrVolatility(strike, forward, T, alpha, beta, nu, rho[, type]); Hagan et al. (2002)",
+        "sabr": "QuantLib sabrVolatility(strike, forward, T, alpha, beta, nu, rho[, type]); Hagan et al. (2002). Normal vol at beta = 0 is the exact Hagan B.70a form via mpmath, not QuantLib (see reference_source.extra.sabr_normal_beta0_reference)",
         "heston": "AnalyticHestonEngine, Gatheral formulation (little Heston trap), adaptive Gauss-Lobatto relTol 1e-12",
         "rough_heston": "expected values are classical Heston prices; Rust prices at Hurst H=0.499 (classical limit)"
       }
@@ -1277,6 +1278,7 @@
       "beta": 0.5,
       "rho": -0.3,
       "nu": 0.4,
+      "reference": "QuantLib sabrVolatility(..., Normal)",
       "expected": {
         "vol": 0.01026344492592822,
         "tolerance_rel": 1e-10
@@ -1292,6 +1294,7 @@
       "beta": 0.5,
       "rho": -0.3,
       "nu": 0.4,
+      "reference": "QuantLib sabrVolatility(..., Normal)",
       "expected": {
         "vol": 0.010446078390840196,
         "tolerance_rel": 1e-10
@@ -1307,6 +1310,7 @@
       "beta": 0.5,
       "rho": -0.3,
       "nu": 0.4,
+      "reference": "QuantLib sabrVolatility(..., Normal)",
       "expected": {
         "vol": 0.011682605355963436,
         "tolerance_rel": 1e-10
@@ -1322,8 +1326,9 @@
       "beta": 0.0,
       "rho": -0.3,
       "nu": 0.4,
+      "reference": "mpmath 50-digit evaluation of Hagan (2002) eq. B.70a, zeta = (nu/alpha)*(F - K); same formula as OpenGamma Strata SabrHaganNormalVolatilityFormula.volatilityBeta0. Not QuantLib: its normal SABR has no beta = 0 special case and uses zeta = (nu/alpha)*sqrt(F*K)*ln(F/K), smaller by sinh(L/2)/(L/2), L = ln(F/K).",
       "expected": {
-        "vol": 0.006045137029275855,
+        "vol": 0.006052862127760564,
         "tolerance_rel": 1e-10
       }
     },
@@ -1337,8 +1342,9 @@
       "beta": 0.0,
       "rho": -0.3,
       "nu": 0.4,
+      "reference": "mpmath 50-digit evaluation of Hagan (2002) eq. B.70a, zeta = (nu/alpha)*(F - K); same formula as OpenGamma Strata SabrHaganNormalVolatilityFormula.volatilityBeta0. Not QuantLib: its normal SABR has no beta = 0 special case and uses zeta = (nu/alpha)*sqrt(F*K)*ln(F/K), smaller by sinh(L/2)/(L/2), L = ln(F/K).",
       "expected": {
-        "vol": 0.005328738570836563,
+        "vol": 0.005336159615071239,
         "tolerance_rel": 1e-10
       }
     },
@@ -1352,8 +1358,25 @@
       "beta": 1.0,
       "rho": 0.2,
       "nu": 0.5,
+      "reference": "QuantLib sabrVolatility(..., Normal)",
       "expected": {
         "vol": 0.00912825684610586,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_normal",
+      "id": "sabr_normal_beta0_cross_zero",
+      "forward": -0.002,
+      "strike": 0.003,
+      "t": 2.0,
+      "alpha": 0.008,
+      "beta": 0.0,
+      "rho": -0.35,
+      "nu": 0.6,
+      "reference": "mpmath 50-digit evaluation of Hagan (2002) eq. B.70a, zeta = (nu/alpha)*(F - K); same formula as OpenGamma Strata SabrHaganNormalVolatilityFormula.volatilityBeta0. Not QuantLib: its normal SABR has no beta = 0 special case and uses zeta = (nu/alpha)*sqrt(F*K)*ln(F/K), smaller by sinh(L/2)/(L/2), L = ln(F/K).",
+      "expected": {
+        "vol": 0.008025236866337973,
         "tolerance_rel": 1e-10
       }
     },

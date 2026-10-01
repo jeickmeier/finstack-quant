@@ -22,6 +22,17 @@ Conventions
   volatilityType)` implements Hagan et al. (2002). Lognormal uses
   ShiftedLognormal (shift 0); normal uses VolatilityType.Normal. Shifted SABR
   uses `shiftedSabrVolatility`.
+- SABR normal vol at beta = 0 is NOT taken from QuantLib. QuantLib's
+  `sabrVolatility(..., Normal)` has no beta = 0 special case: it evaluates the
+  general-beta expansion with zeta = (nu/alpha)*sqrt(F*K)*ln(F/K), whereas
+  Hagan's exact beta = 0 result (2002, eq. B.70a) has
+  zeta = (nu/alpha)*(F - K). The two zetas differ by the factor
+  sinh(L/2)/(L/2), L = ln(F/K) (about 0.69% at F/K = 1.5, i.e. ~0.13% in vol),
+  and only the exact form is defined across zero (F*K <= 0). The beta = 0
+  cases are therefore evaluated here with mpmath at 50-digit precision from
+  the exact form, the same formula as OpenGamma Strata's
+  `SabrHaganNormalVolatilityFormula.volatilityBeta0`. Each sabr_normal case
+  records its `reference`.
 - Heston: QuantLib AnalyticHestonEngine (Gatheral / "little Heston trap"
   formulation, adaptive Gauss-Lobatto, relTol 1e-12).
 - SVI: no QuantLib analytic exists; the raw SVI total variance
@@ -187,7 +198,38 @@ for f, k, shift, alpha, beta, rho, nu, t, label in SHIFTED_CASES:
         expected={"vol": vol, "tolerance_rel": 1e-10},
     )
 
-# SABR — Hagan normal (Bachelier) vol via ql.sabrVolatility(..., ql.Normal)
+# SABR — Hagan normal (Bachelier) vol.
+#
+# beta > 0: ql.sabrVolatility(..., ql.Normal).
+# beta = 0: Hagan's exact normal-SABR result (2002, eq. B.70a), evaluated with
+# mpmath. QuantLib is deliberately not used there; see the module docstring.
+SABR_NORMAL_QL_REFERENCE = "QuantLib sabrVolatility(..., Normal)"
+SABR_NORMAL_BETA0_REFERENCE = (
+    "mpmath 50-digit evaluation of Hagan (2002) eq. B.70a, "
+    "zeta = (nu/alpha)*(F - K); same formula as OpenGamma Strata "
+    "SabrHaganNormalVolatilityFormula.volatilityBeta0. Not QuantLib: its "
+    "normal SABR has no beta = 0 special case and uses "
+    "zeta = (nu/alpha)*sqrt(F*K)*ln(F/K), smaller by sinh(L/2)/(L/2), L = ln(F/K)."
+)
+
+
+def sabr_normal_beta0(f, k, t, alpha, nu, rho) -> float:
+    """Hagan (2002) eq. B.70a normal vol for beta = 0.
+
+    sigma_N = alpha * zeta/x(zeta) * (1 + (2 - 3 rho^2)/24 * nu^2 * T)
+    zeta    = (nu/alpha) * (F - K)
+    x(zeta) = ln((sqrt(1 - 2 rho zeta + zeta^2) + zeta - rho) / (1 - rho))
+
+    Depends on F and K only through F - K, so it is valid for negative and
+    cross-zero rates. Requires F != K (zeta/x(zeta) -> 1 at the money).
+    """
+    f, k, t, alpha, nu, rho = (mp.mpf(repr(v)) for v in (f, k, t, alpha, nu, rho))
+    zeta = nu / alpha * (f - k)
+    x = mp.log((mp.sqrt(1 - 2 * rho * zeta + zeta * zeta) + zeta - rho) / (1 - rho))
+    correction = 1 + (2 - 3 * rho * rho) / 24 * nu * nu * t
+    return float(alpha * zeta / x * correction)
+
+
 SABR_NORMAL_CASES = [
     (0.03, 0.02, 0.06, 0.5, -0.30, 0.40, 2.0, "beta05_low_k"),
     (0.03, 0.03, 0.06, 0.5, -0.30, 0.40, 2.0, "beta05_atm"),
@@ -195,9 +237,16 @@ SABR_NORMAL_CASES = [
     (0.03, 0.02, 0.005, 0.0, -0.30, 0.40, 2.0, "beta0_low_k"),
     (0.03, 0.045, 0.005, 0.0, -0.30, 0.40, 2.0, "beta0_high_k"),
     (0.05, 0.04, 0.20, 1.0, 0.20, 0.50, 1.0, "beta1"),
+    # Cross-zero (F*K < 0): only the exact beta = 0 form can express this.
+    (-0.002, 0.003, 0.008, 0.0, -0.35, 0.60, 2.0, "beta0_cross_zero"),
 ]
 for f, k, alpha, beta, rho, nu, t, label in SABR_NORMAL_CASES:
-    vol = ql.sabrVolatility(k, f, t, alpha, beta, nu, rho, ql.Normal)
+    if beta == 0.0:
+        vol = sabr_normal_beta0(f, k, t, alpha, nu, rho)
+        reference = SABR_NORMAL_BETA0_REFERENCE
+    else:
+        vol = ql.sabrVolatility(k, f, t, alpha, beta, nu, rho, ql.Normal)
+        reference = SABR_NORMAL_QL_REFERENCE
     case(
         "sabr_normal",
         label,
@@ -208,6 +257,7 @@ for f, k, alpha, beta, rho, nu, t, label in SABR_NORMAL_CASES:
         beta=beta,
         rho=rho,
         nu=nu,
+        reference=reference,
         expected={"vol": vol, "tolerance_rel": 1e-10},
     )
 
@@ -233,20 +283,15 @@ def heston_price(spot, strike, r, q, t, v0, kappa, theta, sigma, rho, is_call):
 HESTON_R, HESTON_Q = 0.025, 0.0
 HESTON_V0, HESTON_THETA, HESTON_KAPPA = 0.04, 0.04, 1.5
 
-# Known discrepancies at T=1 (short maturity): finstack-quant's fixed composite
-# Gauss-Legendre Fourier quadrature carries ~2.6e-6 absolute error for
-# (vov=0.3, rho=-0.5) and ~7.5e-5 absolute error for the extreme little-trap
-# stress point (vov=0.5, rho=-0.9), exceeding the 1e-6 relative tolerance
-# against QuantLib's adaptive Gauss-Lobatto (relTol 1e-12). Verified on
-# 2026-06-11: call/put absolute errors are equal per case (put-call-parity
-# consistent), confirming pure quadrature error, not a convention mismatch.
-# T=5 and T=10 pass at 1e-6. Cases stay pinned but are skipped until the
-# quadrature accuracy at short maturity is improved.
-HESTON_SKIP = {
-    "heston_vov0.3_rho-0.5_k80_t1": "quadrature error ~2.6e-6 abs at T=1 (put rel err 2.0e-6 > 1e-6)",
-    "heston_vov0.5_rho-0.9_k80_t1": "quadrature error ~7.3e-5 abs at T=1 (put rel err 4.2e-5 > 1e-6)",
-    "heston_vov0.5_rho-0.9_k100_t1": "quadrature error ~7.8e-5 abs at T=1 (rel err up to 1.3e-5 > 1e-6)",
-    "heston_vov0.5_rho-0.9_k120_t1": "quadrature error ~7.5e-5 abs at T=1 (call rel err 1.6e-4 > 1e-6)",
+# Four T=1 (short maturity) cases once exceeded the 1e-6 relative tolerance
+# against QuantLib's adaptive Gauss-Lobatto (relTol 1e-12) and were skipped.
+# They pass since the Kahl-Jaeckel truncation fix and are pinned with
+# `skip: false`; the comment records the residual error for each.
+HESTON_NOTES = {
+    "heston_vov0.3_rho-0.5_k80_t1": "passes after Kahl-Jaeckel truncation fix (put rel err ~2.2e-8)",
+    "heston_vov0.5_rho-0.9_k80_t1": "passes after Kahl-Jaeckel truncation fix (put rel err ~1.6e-8)",
+    "heston_vov0.5_rho-0.9_k100_t1": "passes after Kahl-Jaeckel truncation fix (rel err ~2e-9)",
+    "heston_vov0.5_rho-0.9_k120_t1": "passes after Kahl-Jaeckel truncation fix (call rel err ~4.6e-8)",
 }
 
 for sigma_v, rho in ((0.3, -0.5), (0.5, -0.9)):
@@ -280,7 +325,7 @@ for sigma_v, rho in ((0.3, -0.5), (0.5, -0.9)):
             )
             cid = f"vov{sigma_v:g}_rho{rho:g}_k{strike:g}_t{t:g}"
             skip_extra = (
-                {"skip": True, "comment": HESTON_SKIP[f"heston_{cid}"]} if f"heston_{cid}" in HESTON_SKIP else {}
+                {"skip": False, "comment": HESTON_NOTES[f"heston_{cid}"]} if f"heston_{cid}" in HESTON_NOTES else {}
             )
             case(
                 "heston",
@@ -380,7 +425,11 @@ suite = {
                     "SVI section only: raw SVI total variance evaluated with "
                     "mpmath at 50-digit precision (Gatheral 2004 raw "
                     "parameterisation); QuantLib has no analytic SVI."
-                )
+                ),
+                "sabr_normal_beta0_reference": (
+                    "sabr_normal cases with beta = 0 only: "
+                    + SABR_NORMAL_BETA0_REFERENCE
+                ),
             },
         },
         "generated": {
@@ -397,7 +446,7 @@ suite = {
                 "time": "year fractions passed directly; Heston dates chosen so Act/365F year fraction is exactly T",
                 "black76_bachelier_prices": "undiscounted (unit annuity, QuantLib discount=1.0); discount_factor recorded separately for Black-76",
                 "bsm_prices": "discounted spot-based prices via blackFormula(forward=S*exp((r-q)T), discount=exp(-rT))",
-                "sabr": "QuantLib sabrVolatility(strike, forward, T, alpha, beta, nu, rho[, type]); Hagan et al. (2002)",
+                "sabr": "QuantLib sabrVolatility(strike, forward, T, alpha, beta, nu, rho[, type]); Hagan et al. (2002). Normal vol at beta = 0 is the exact Hagan B.70a form via mpmath, not QuantLib (see reference_source.extra.sabr_normal_beta0_reference)",
                 "heston": "AnalyticHestonEngine, Gatheral formulation (little Heston trap), adaptive Gauss-Lobatto relTol 1e-12",
                 "rough_heston": "expected values are classical Heston prices; Rust prices at Hurst H=0.499 (classical limit)",
             }
