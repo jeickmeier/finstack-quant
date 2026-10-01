@@ -46,6 +46,47 @@ fn b17_fixed_inflation_leg_compounds_one_per_annual_period() {
     }
 }
 
+/// A maturity that is not an anniversary of the start leaves a short first
+/// period. It compounds for its share of a year, so the fixed amount is
+/// continuous in the maturity date instead of jumping by a full year of
+/// compounding one day past the anniversary.
+#[test]
+fn fixed_inflation_leg_counts_a_stub_as_a_fraction_of_a_year() {
+    let as_of = date!(2024 - 01 - 15);
+    let market = MarketContext::new().insert(
+        DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (40.0, 1.0)])
+            .build()
+            .expect("discount"),
+    );
+    let mut swap = InflationSwap::example().expect("example");
+    swap.day_count = DayCount::OneOne;
+    assert_eq!(
+        swap.start_date, as_of,
+        "fixture starts on the valuation date"
+    );
+
+    // (maturity, whole years, stub days, days in the stub's reference year)
+    for (maturity, years, stub_days, year_days) in [
+        (date!(2029 - 01 - 16), 5, 1.0, 365.0),
+        (date!(2029 - 02 - 15), 5, 31.0, 365.0),
+        (date!(2028 - 12 - 15), 4, 335.0, 366.0),
+    ] {
+        swap.maturity = maturity;
+        let actual = swap
+            .pv_fixed_leg(&market, as_of)
+            .expect("fixed PV")
+            .amount();
+        let tau = f64::from(years) + stub_days / year_days;
+        let expected = 1_000_000.0 * (1.02_f64.powf(tau) - 1.0);
+        assert!(
+            (actual - expected).abs() < 1e-6,
+            "{maturity}: {actual} vs {expected} (tau {tau})"
+        );
+    }
+}
+
 #[test]
 fn b17_month_end_cpi_has_the_same_reference_month_in_index_and_hybrid_sources() {
     let mut bond = InflationLinkedBond::example().expect("example");

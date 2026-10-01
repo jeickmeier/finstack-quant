@@ -5,7 +5,6 @@
 //! to be fully implemented to compute forward swap rates and convexity adjustments.
 
 use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
-use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::cms_common::ConvexityAdjustmentRiskCalculator;
 use crate::instruments::rates::cms_option::pricer::convexity_adjustment_with_frequency;
 use crate::instruments::rates::cms_option::types::CmsOption;
@@ -72,7 +71,7 @@ impl MetricCalculator for DeltaCalculator {
             spec: BumpSpec::parallel_bp(bump_bp),
         }])?;
 
-        let pv_bumped = option.value(&curves_bumped, context.as_of)?.amount();
+        let pv_bumped = context.reprice_raw(&curves_bumped, context.as_of)?;
 
         // Delta = PV change per 1bp of the forward curve.
         Ok((pv_bumped - base_pv) / bump_bp)
@@ -106,7 +105,7 @@ impl MetricCalculator for VegaCalculator {
             bump_surface_vol_absolute(&context.curves, option.vol_surface_id.as_str(), vol_bump)?;
 
         // Reprice with bumped vol
-        let pv_bumped = option.value(&curves_bumped, as_of)?.amount();
+        let pv_bumped = context.reprice_raw(&curves_bumped, as_of)?;
 
         // Vega per **vol point** (consistent with `MetricId::Vega` and the
         // FD/analytic vega used elsewhere): normalize by the bump expressed in
@@ -145,7 +144,7 @@ impl MetricCalculator for RhoCalculator {
             bump_discount_curve_parallel(&context.curves, &option.discount_curve_id, bump_bp)?;
 
         // Reprice with bumped curve
-        let pv_bumped = option.value(&curves_bumped, as_of)?.amount();
+        let pv_bumped = context.reprice_raw(&curves_bumped, as_of)?;
 
         // Rho per 1bp = (PV(rate + bump) − PV(base)) / bump_bp
         Ok((pv_bumped - base_pv) / bump_bp)
@@ -293,11 +292,11 @@ impl MetricCalculator for VolgaCalculator {
 
         let curves_vol_up =
             bump_surface_vol_absolute(&context.curves, option.vol_surface_id.as_str(), vol_bump)?;
-        let pv_vol_up = option.value(&curves_vol_up, as_of)?.amount();
+        let pv_vol_up = context.reprice_raw(&curves_vol_up, as_of)?;
 
         let curves_vol_down =
             bump_surface_vol_absolute(&context.curves, option.vol_surface_id.as_str(), -vol_bump)?;
-        let pv_vol_down = option.value(&curves_vol_down, as_of)?.amount();
+        let pv_vol_down = context.reprice_raw(&curves_vol_down, as_of)?;
 
         // Volga per **vol point squared** (consistent with `MetricId::Volga`):
         // normalize by the bump in vol points, squared. Dividing by the raw

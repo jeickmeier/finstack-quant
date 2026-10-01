@@ -364,16 +364,37 @@ fn test_swap_risk_attribution() {
     let dv01 = *result.measures.get("dv01").unwrap();
     let annuity = *result.measures.get("annuity").unwrap();
 
-    // Verify risk attribution is consistent. With a multi-curve setup the
-    // float leg also contributes discounting risk. For off-market swaps,
-    // DV01 diverges from annuity × notional × 0.0001 due to curve basis.
-    let expected_dv01 = annuity * 1_000_000.0 * 0.0001;
-    let ratio = dv01.abs() / expected_dv01;
+    // DV01 is a full revaluation with both rate curves moved one basis point.
+    let reprice = |bp: f64| {
+        use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+        let bumped = market
+            .bump([
+                MarketBump::Curve {
+                    id: "USD-OIS".into(),
+                    spec: BumpSpec::parallel_bp(bp),
+                },
+                MarketBump::Curve {
+                    id: "USD-SOFR-3M".into(),
+                    spec: BumpSpec::parallel_bp(bp),
+                },
+            ])
+            .unwrap();
+        swap.value(&bumped, as_of).unwrap().amount()
+    };
+    let revaluation = (reprice(1.0) - reprice(-1.0)) / 2.0;
     assert!(
-        (ratio - 1.0).abs() < 0.03, // 3% tolerance for multi-curve + off-market effects
-        "DV01 {} should be close to annuity-based estimate {}, ratio: {}",
-        dv01,
-        expected_dv01,
-        ratio
+        (dv01 - revaluation).abs() < 1e-6 * revaluation.abs(),
+        "DV01 {dv01} should equal the two-curve revaluation {revaluation}"
+    );
+
+    // The market carries the first coupon's fixing, so that coupon has no
+    // projection risk: DV01 sits below annuity × notional × 1bp by roughly
+    // the first quarter's share of the annuity (about 6%), less the small
+    // discounting gain on this off-market receiver.
+    let annuity_estimate = annuity * 1_000_000.0 * 0.0001;
+    let ratio = dv01.abs() / annuity_estimate;
+    assert!(
+        (0.88..0.96).contains(&ratio),
+        "DV01 {dv01} vs annuity-based estimate {annuity_estimate}, ratio: {ratio}"
     );
 }

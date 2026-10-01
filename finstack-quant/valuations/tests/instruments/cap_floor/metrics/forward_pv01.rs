@@ -234,3 +234,59 @@ fn test_forward_pv01_scales_with_maturity() {
         short_fpv01
     );
 }
+
+#[test]
+fn test_forward_pv01_keeps_the_forward_curve_interpolation() {
+    use finstack_quant_core::math::interp::InterpStyle;
+
+    let as_of = date!(2024 - 01 - 01);
+    let cap = create_standard_cap(as_of, date!(2024 - 03 - 01), date!(2029 - 03 - 01), 0.04);
+    let knots = [
+        (0.0, 0.030),
+        (1.0, 0.036),
+        (2.0, 0.045),
+        (5.0, 0.041),
+        (10.0, 0.048),
+    ];
+
+    for style in [
+        InterpStyle::Linear,
+        InterpStyle::LogLinear,
+        InterpStyle::CubicHermite,
+    ] {
+        let forward_curve = |shift: f64| {
+            ForwardCurve::builder("USD_LIBOR_3M", 0.25)
+                .base_date(as_of)
+                .day_count(DayCount::Act360)
+                .knots(knots.map(|(t, rate)| (t, rate + shift)))
+                .interp(style)
+                .build()
+                .unwrap()
+        };
+        let market = |shift: f64| {
+            MarketContext::new()
+                .insert(build_flat_discount_curve(0.04, as_of, "USD_OIS"))
+                .insert(forward_curve(shift))
+                .insert_surface(build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL"))
+        };
+
+        let result = cap
+            .price_with_metrics(
+                &market(0.0),
+                as_of,
+                &[MetricId::ForwardPv01],
+                finstack_quant_valuations::instruments::PricingOptions::default(),
+            )
+            .unwrap();
+        let forward_pv01 = *result.measures.get("forward_pv01").unwrap();
+
+        // Independent revaluation on curves rebuilt with the same interpolation.
+        let pv = |shift: f64| cap.value(&market(shift), as_of).unwrap().amount();
+        let expected = (pv(1e-4) - pv(-1e-4)) / 2.0;
+        assert!(
+            (forward_pv01 - expected).abs() < 1e-6 * expected.abs().max(1.0),
+            "{style:?}: forward PV01 {forward_pv01} should equal the same-interpolation \
+             revaluation {expected}"
+        );
+    }
+}

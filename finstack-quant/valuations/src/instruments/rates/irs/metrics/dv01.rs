@@ -1,91 +1,73 @@
-//! Market-convention DV01 for interest rate swaps.
+//! Market DV01 for interest rate swaps.
 //!
-//! Bloomberg SWPM reports IRS DV01 under a constant par-rate bump convention
-//! (`docs/REFERENCES.md#bloomberg-swpm`).
-//! This differs from generic curve DV01, which bumps zero/forward curves directly.
+//! DV01 is a full revaluation: the rate market moves one basis point and the
+//! swap is repriced, so coupons that have already fixed carry no projection
+//! risk. The closed form `N·[(K − S)·dA − A·1bp]` is only valid for an
+//! unseasoned swap, because it moves the swap's own par rate by a full basis
+//! point even when part of the floating leg is realized.
+//!
+//! When the discount and projection curves carry rate-calibration metadata,
+//! the shock is applied to the calibration quotes and the curves are
+//! re-bootstrapped. That is the par-curve DV01 Bloomberg SWPM reports
+//! (`docs/REFERENCES.md#bloomberg-swpm`). Otherwise the fitted curves are
+//! bumped in parallel through [`UnifiedDv01Calculator`].
 
-use crate::instruments::common_impl::numeric::decimal_to_f64;
-use crate::instruments::rates::irs::{InterestRateSwap, PayReceive};
-use crate::metrics::{MetricCalculator, MetricContext, MetricId};
-use finstack_quant_core::market_data::bumps::BumpSpec;
-use std::sync::Arc;
+use crate::instruments::rates::irs::InterestRateSwap;
+use crate::metrics::sensitivities::config as sens_config;
+use crate::metrics::sensitivities::cs01::sensitivity_central_diff;
+use crate::metrics::{
+    Dv01CalculatorConfig, MetricCalculator, MetricContext, UnifiedDv01Calculator,
+};
+use finstack_quant_core::Result;
 
-const ONE_BP_DECIMAL: f64 = crate::constants::ONE_BASIS_POINT;
-
-/// IRS DV01 calculator using par-rate bump convention.
+/// IRS DV01 calculator: quote-shock re-bootstrap when the curves carry
+/// calibration metadata, fitted-curve parallel bump otherwise.
 pub(crate) struct IrsDv01Calculator;
 
 impl MetricCalculator for IrsDv01Calculator {
-    fn dependencies(&self) -> &[MetricId] {
-        &[MetricId::Annuity, MetricId::ParRate]
-    }
-
-    fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+    fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let irs: &InterestRateSwap = context.instrument_as()?;
-        let annuity = *context.computed.get(&MetricId::Annuity).ok_or_else(|| {
-            finstack_quant_core::Error::Validation("IRS DV01 requires annuity".to_string())
-        })?;
-        let par_rate = *context.computed.get(&MetricId::ParRate).ok_or_else(|| {
-            finstack_quant_core::Error::Validation("IRS DV01 requires par_rate".to_string())
-        })?;
-        let fixed_rate = decimal_to_f64(irs.fixed_leg.rate, "fixed leg rate")?;
-        let bump_bp = crate::metrics::sensitivities::config::from_context_or_default(
+        let market = context.curves.as_ref();
+        let discount_id = irs.fixed_leg.discount_curve_id.clone();
+        let forward_id = irs.float_leg.forward_curve_id.clone();
+        let discount_has_replay = market
+            .get_discount(discount_id.as_str())?
+            .rate_calibration()
+            .is_some();
+
+        // One OIS curve both discounts and projects the overnight leg.
+        let single_curve_ois =
+            discount_id == forward_id && market.get_forward(forward_id.as_str()).is_err();
+        let has_replay = if single_curve_ois {
+            discount_has_replay
+        } else {
+            discount_has_replay
+                && market
+                    .get_forward(forward_id.as_str())?
+                    .rate_calibration()
+                    .is_some()
+        };
+        if !has_replay {
+            return UnifiedDv01Calculator::<InterestRateSwap>::new(
+                Dv01CalculatorConfig::parallel_combined(),
+            )
+            .calculate(context);
+        }
+
+        let bump_bp = sens_config::from_context_or_default(
             context.get_config(),
             context.get_metric_pricing_overrides(),
         )?
         .rate_bump_bp;
-
-        let d_annuity_dbp = annuity_derivative_per_bp(context, irs, bump_bp)?;
-        let receive_fixed_dv01 = irs.notional.amount()
-            * ((fixed_rate - par_rate) * d_annuity_dbp - annuity * ONE_BP_DECIMAL);
-
-        Ok(match irs.side {
-            PayReceive::Receive => receive_fixed_dv01,
-            PayReceive::Pay => -receive_fixed_dv01,
-        })
+        let bumped_market = |bp: f64| {
+            if single_curve_ois {
+                context.bump_single_ois_rate_market_cached(&discount_id, bp)
+            } else {
+                context.bump_rate_market_cached(&discount_id, &forward_id, bp)
+            }
+        };
+        let pv_up = context.reprice_raw(bumped_market(bump_bp)?.as_ref(), context.as_of)?;
+        let pv_down = context.reprice_raw(bumped_market(-bump_bp)?.as_ref(), context.as_of)?;
+        Ok(sensitivity_central_diff(pv_up, pv_down, bump_bp))
     }
-}
-
-fn annuity_derivative_per_bp(
-    context: &MetricContext,
-    irs: &InterestRateSwap,
-    bump_bp: f64,
-) -> finstack_quant_core::Result<f64> {
-    if bump_bp.abs() <= f64::EPSILON {
-        return Ok(0.0);
-    }
-
-    // Bump up and down on independent clones that are moved straight into the
-    // annuity computation (which needs an owned `MarketContext` to Arc-wrap). This
-    // drops one full `MarketContext` clone per DV01 versus bumping a shared scratch
-    // in place and cloning it for each side, and removes the revert bookkeeping.
-    let mut curves_up = context.curves.as_ref().clone();
-    let _bump_up = curves_up.apply_curve_bump_in_place(
-        &irs.fixed_leg.discount_curve_id,
-        BumpSpec::parallel_bp(bump_bp),
-    )?;
-    let annuity_up = annuity_with_curves(context, curves_up)?;
-
-    let mut curves_down = context.curves.as_ref().clone();
-    let _bump_down = curves_down.apply_curve_bump_in_place(
-        &irs.fixed_leg.discount_curve_id,
-        BumpSpec::parallel_bp(-bump_bp),
-    )?;
-    let annuity_down = annuity_with_curves(context, curves_down)?;
-
-    Ok((annuity_up - annuity_down) / (2.0 * bump_bp))
-}
-
-fn annuity_with_curves(
-    context: &MetricContext,
-    curves: finstack_quant_core::market_data::context::MarketContext,
-) -> finstack_quant_core::Result<f64> {
-    let mut bumped_context = MetricContext::new(
-        Arc::clone(&context.instrument),
-        Arc::new(curves),
-        context.as_of,
-        context.base_value,
-        context.config_arc(),
-    );
-    super::annuity::AnnuityCalculator.calculate(&mut bumped_context)
 }

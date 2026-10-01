@@ -1,6 +1,8 @@
 //! DV01 metric tests.
 //!
-//! Tests dollar value of a basis point: DV01 = Annuity × Notional × 0.0001
+//! DV01 is the PV change for a one-basis-point move in the rate market. For an
+//! unseasoned par swap that equals Annuity × Notional × 0.0001; once a coupon
+//! has fixed, only the unfixed floating coupons carry projection risk.
 //! Sign depends on swap side (Receive vs Pay).
 
 use finstack_quant_core::currency::Currency;
@@ -450,5 +452,74 @@ fn test_dv01_typical_range() {
         dv01.abs() > 100.0 && dv01.abs() < 1000.0,
         "DV01 {} outside typical range for $1MM 5Y swap",
         dv01
+    );
+}
+
+#[test]
+fn test_dv01_seasoned_swap_excludes_fixed_coupon() {
+    use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+    use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+
+    // 1Y quarterly swap valued two months into its third coupon period: the
+    // Jul-Oct floating coupon has fixed, so only the Oct-Jan coupon reprices.
+    let start = date!(2024 - 01 - 01);
+    let end = date!(2025 - 01 - 01);
+    let as_of = date!(2024 - 09 - 02);
+    let rate = 0.05;
+
+    let mut swap = create_standard_swap(start, end, PayReceive::Receive);
+    swap.fixed_leg.start = start;
+    swap.float_leg.start = start;
+    let fixings = ScalarTimeSeries::new(
+        "FIXING:USD_LIBOR_3M",
+        vec![
+            (date!(2024 - 01 - 01), rate),
+            (date!(2024 - 04 - 01), rate),
+            (date!(2024 - 07 - 01), rate),
+        ],
+        None,
+    )
+    .expect("fixings series");
+    let market = build_market(rate, as_of).insert_series(fixings);
+
+    let result = swap
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Annuity, MetricId::Dv01],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .unwrap();
+    let dv01 = *result.measures.get("dv01").unwrap();
+    let annuity = *result.measures.get("annuity").unwrap();
+
+    // Independent full revaluation: both curves move one basis point.
+    let reprice = |bp: f64| {
+        let bumped = market
+            .bump([
+                MarketBump::Curve {
+                    id: "USD_OIS".into(),
+                    spec: BumpSpec::parallel_bp(bp),
+                },
+                MarketBump::Curve {
+                    id: "USD_LIBOR_3M".into(),
+                    spec: BumpSpec::parallel_bp(bp),
+                },
+            ])
+            .unwrap();
+        swap.value(&bumped, as_of).unwrap().amount()
+    };
+    let expected = (reprice(1.0) - reprice(-1.0)) / 2.0;
+    assert!(
+        (dv01 - expected).abs() < 0.01,
+        "seasoned DV01 {dv01} should equal the full-revaluation value {expected}"
+    );
+
+    // The remaining annuity still counts the fixed Jul-Oct coupon, so the
+    // unseasoned shortcut Annuity x Notional x 1bp overstates the risk.
+    let par_shortcut = annuity * 1_000_000.0 * 0.0001;
+    assert!(
+        dv01.abs() < 0.75 * par_shortcut,
+        "seasoned DV01 {dv01} must be well below the unseasoned shortcut {par_shortcut}"
     );
 }

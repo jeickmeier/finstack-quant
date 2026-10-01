@@ -9,7 +9,7 @@ use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
 use finstack_quant_core::cashflow::CashFlowAccrual;
 use finstack_quant_core::dates::{
-    BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
+    BusinessDayConvention, Date, DateExt, DayCount, DayCountContext, StubKind, Tenor,
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::{InflationInterpolation, InflationLag};
@@ -268,9 +268,10 @@ impl InflationSwap {
     /// Calculate PV of the fixed leg (real rate leg).
     ///
     /// The fixed leg pays `Notional × [(1 + fixed_rate)^τ - 1]` at maturity,
-    /// where τ sums annual contractual periods under 1/1, including a short
-    /// initial stub as one period. Other explicitly selected day counts use
-    /// their full-term year fraction.
+    /// where τ counts the annual contractual periods under 1/1: one for each
+    /// full year, plus a short initial stub as the fraction of the year it
+    /// covers. Other explicitly selected day counts use their full-term year
+    /// fraction.
     ///
     /// # Errors
     ///
@@ -302,7 +303,13 @@ impl InflationSwap {
         Ok(fixed_payment * df)
     }
 
-    /// Sum contractual annual accrual periods for 1/1 fixed-leg compounding.
+    /// Compounding term τ of the fixed leg in years.
+    ///
+    /// Under 1/1 every full annual period, rolled back from maturity, counts
+    /// exactly one. A swap whose term is not a whole number of years has a
+    /// short first period; it counts as its share of the annual period that
+    /// ends on the first roll date, so τ is continuous in the maturity date
+    /// (a 5-year-and-one-day swap compounds for 5.003 years, not 6).
     fn fixed_accrual(&self) -> finstack_quant_core::Result<f64> {
         if self.day_count != DayCount::OneOne {
             return self.day_count.year_fraction(
@@ -327,7 +334,17 @@ impl InflationSwap {
                 roll_rule: crate::cashflow::builder::specs::RollRule::None,
             },
         )?;
-        Ok(periods.len() as f64)
+        let Some(first) = periods.first() else {
+            return Ok(0.0);
+        };
+        let reference_start = first.accrual_end.add_months(-12);
+        let first_fraction = if first.accrual_start <= reference_start {
+            1.0
+        } else {
+            (first.accrual_end - first.accrual_start).whole_days() as f64
+                / (first.accrual_end - reference_start).whole_days() as f64
+        };
+        Ok((periods.len() - 1) as f64 + first_fraction)
     }
 
     fn fixed_leg_amount(&self) -> finstack_quant_core::Result<Money> {

@@ -549,3 +549,57 @@ fn convexity_adjustment_uses_atm_vol_not_strike_vol() {
          rel_diff={rel_diff}"
     );
 }
+
+/// Greeks reprice with the model the request selected. Under static
+/// replication a bumped Hagan price minus a replication base mixes two models
+/// and is dominated by their price gap rather than the sensitivity.
+#[test]
+fn replication_greeks_reprice_with_the_replication_pricer() {
+    use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+    use finstack_quant_valuations::instruments::rates::cms_option::replication_pricer::CmsReplicationPricer;
+    use finstack_quant_valuations::instruments::PricingOptions;
+    use finstack_quant_valuations::pricer::{ModelKey, Pricer};
+
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+    let market = skewed_vol_market(as_of, 0.20, 0.35);
+    let inst = CmsOption::example().expect("example");
+    let replication = |market: &MarketContext| {
+        CmsReplicationPricer::new()
+            .price_dyn(&inst, market, as_of)
+            .expect("replication price")
+            .value
+            .amount()
+    };
+
+    let result = inst
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Delta, MetricId::Rho],
+            PricingOptions::default().with_model(ModelKey::StaticReplication),
+        )
+        .expect("replication metrics");
+    let base = replication(&market);
+    assert!(
+        (result.value.amount() - base).abs() < 0.01,
+        "the request must price with static replication"
+    );
+
+    for (metric, curve_id) in [
+        (MetricId::Delta, inst.forward_curve_id.clone()),
+        (MetricId::Rho, inst.discount_curve_id.clone()),
+    ] {
+        let bumped = market
+            .bump([MarketBump::Curve {
+                id: curve_id,
+                spec: BumpSpec::parallel_bp(1.0),
+            }])
+            .unwrap();
+        let expected = replication(&bumped) - base;
+        let actual = result.measures.get(metric.as_str()).copied().unwrap();
+        assert!(
+            (actual - expected).abs() <= 0.01 + 1e-6 * expected.abs(),
+            "{metric:?} {actual} should equal the replication 1bp reprice {expected}"
+        );
+    }
+}
