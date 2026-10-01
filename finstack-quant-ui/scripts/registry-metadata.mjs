@@ -2,14 +2,15 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 const read = async (file) => JSON.parse(await readFile(file, "utf8"));
 export async function metadataInputs(cwd) {
-  const [ui, roots, provenance] = await Promise.all([
+  const [ui, wasm, roots, provenance] = await Promise.all([
     read(path.join(cwd, "package.json")),
+    read(path.resolve(cwd, "../finstack-quant-wasm/package.json")),
     read(path.join(cwd, "src/generated/roots.json")),
     read(path.join(cwd, "src/contract-provenance.json")),
   ]);
   return {
     version: ui.version,
-    wasmVersion: ui.registryWasmVersion,
+    wasmVersion: wasm.version,
     roots,
     provenance,
   };
