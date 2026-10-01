@@ -148,16 +148,19 @@ const EXPORTED_KEYS = [
   'scheduleParamsUsdTreasury',
   'scheduleParamsValidate',
   'scheduleWal',
+  'schema',
   'smmToCpr',
   'validateCashflowScheduleJson',
 ];
 
 test('cashflows namespace exposes exactly the contract surface as functions and classes', () => {
   for (const key of EXPORTED_KEYS) {
+    // `schema` is the nested JSON Schema namespace; every other key is callable.
+    const expected = key === 'schema' ? 'object' : 'function';
     assert.equal(
       typeof cashflows[key],
-      'function',
-      `cashflows.${key} must be a function (got ${typeof cashflows[key]})`
+      expected,
+      `cashflows.${key} must be a ${expected} (got ${typeof cashflows[key]})`
     );
   }
   assert.deepEqual(Object.keys(cashflows).sort(), EXPORTED_KEYS);

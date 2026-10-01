@@ -1,4 +1,5 @@
 import * as wasm from '../pkg/finstack_quant_wasm.js';
+import { schema } from './margin/schema.js';
 
 // Rust `compute_mva` takes an optional own-survival curve. wasm-bindgen cannot
 // borrow an optional handle, so the two raw exports are one Rust call each and
@@ -102,4 +103,5 @@ export const margin = {
   saccrEad: wasm.saccrEad,
   vmResultNetMargin: wasm.vmResultNetMargin,
   vmResultRequiresCall: wasm.vmResultRequiresCall,
+  schema,
 };

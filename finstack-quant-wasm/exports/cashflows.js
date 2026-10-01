@@ -1,4 +1,5 @@
 import * as wasm from '../pkg/finstack_quant_wasm.js';
+import { schema } from './cashflows/schema.js';
 
 // Rust `CashFlowBuilder::build` and `CashflowScheduleBuildSpec::build` take an
 // optional market. wasm-bindgen cannot borrow an optional handle, so the
@@ -116,4 +117,5 @@ export const cashflows = {
   scheduleWal: wasm.scheduleWal,
   smmToCpr: wasm.smmToCpr,
   validateCashflowScheduleJson: wasm.validateCashflowScheduleJson,
+  schema,
 };

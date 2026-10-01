@@ -1,4 +1,5 @@
 import * as wasm from '../pkg/finstack_quant_wasm.js';
+import { schema } from './calibration/schema.js';
 
 // The cap/floor Hull-White calibrators take an optional projection curve
 // (`forward`). wasm-bindgen cannot borrow an optional class handle
@@ -64,4 +65,5 @@ export const calibration = {
   calibrateHullWhiteToCapFloors,
   bootstrapHullWhiteSigmaScheduleToCapFloors,
   hullWhiteParamsSigmaAt: wasm.hullWhiteParamsSigmaAt,
+  schema,
 };

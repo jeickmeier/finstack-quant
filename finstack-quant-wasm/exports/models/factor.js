@@ -1,4 +1,5 @@
 import * as wasm from '../../pkg/finstack_quant_wasm.js';
+import { schema } from './factor/schema.js';
 
 const credit = {
   CreditFactorModel: wasm.CreditFactorModel,
@@ -30,4 +31,5 @@ const risk = {
 export const factor = {
   credit,
   risk,
+  schema,
 };

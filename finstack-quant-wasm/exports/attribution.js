@@ -1,4 +1,5 @@
 import * as wasm from '../pkg/finstack_quant_wasm.js';
+import { schema } from './attribution/schema.js';
 
 export const attribution = {
   AttributionJsonInputs: wasm.AttributionJsonInputs,
@@ -19,4 +20,5 @@ export const attribution = {
   pnlAttributionResidualWithinTolerance: wasm.pnlAttributionResidualWithinTolerance,
   pnlAttributionValidateCurrencies: wasm.pnlAttributionValidateCurrencies,
   pnlAttributionRequiredMetrics: wasm.pnlAttributionRequiredMetrics,
+  schema,
 };

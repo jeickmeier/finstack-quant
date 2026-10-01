@@ -61,7 +61,7 @@ table         = { python = "finstack_quant.core.table",         status = "exists
 types         = { python = "finstack_quant.core.types",         status = "exists" }
 validation    = { python = "finstack_quant.core.validation",    status = "missing", note = "Deliberately excluded, not a backlog gap: internal validation helpers — see [exclusions] entry for finstack_quant_core::validation." }
 wire          = { python = "finstack_quant.core.wire",          status = "missing", note = "Rust-only wire-format (de)serialization helpers backing the stable serde field names." }
-schema = { python = "finstack_quant.core.schema", status = "exists", note = "Registry-backed index/get/validate over the crate's published JSON Schemas; the WASM twin is tracked in the [parity] ledger backlog." }
+schema = { python = "finstack_quant.core.schema", status = "exists", note = "Registry-backed index/get/validate over the crate's published JSON Schemas; bound in WASM as the `schema` sub-namespace (plain objects instead of JSON text)." }
 
 [crates.core.module_symbols.schema]
 python_package = "finstack_quant.core.schema"
@@ -193,7 +193,7 @@ public = ["credit", "risk", "schema"]
 matching           = { python = "finstack_quant.models.factor.matching", status = "missing", note = "MatchingConfig typed host-language constructors deferred; JSON contracts remain Rust-owned. The crate-root matching re-exports (CascadeMatcher, HierarchicalMatcher, MappingTableMatcher, FactorMatcher trait family, MappingRule, AttributeFilter, DependencyFilter) are Rust-only." }
 credit             = { python = "finstack_quant.models.factor.credit", status = "exists", note = "Credit hierarchy artifacts, covariance forecasts, VolHorizon, and typed FactorCovarianceMatrix/FactorModelConfig forecast outputs are flattened into this namespace. CreditCalibrator accepts CreditCalibrationConfig / CreditCalibrationInputs as dicts or JSON strings (plus CreditCalibrator.from_dataframe for pandas panels); the config/input structs themselves (CreditCalibrationConfig, CreditCalibrationInputs, HistoryPanel, IssuerTagPanel, GenericFactorSeries, BucketSizeThresholds and the enum families PanelFrequency, PanelSpace, VolModelChoice, CovarianceStrategy, BetaShrinkage, BucketWeighting, IssuerBetaPolicy) are reached through those wire shapes and CreditFactorModel getters, not parallel constructors. Rust-only families: hierarchy internals (CreditHierarchySpec, HierarchyDimension, IssuerBetaRow, IssuerBetas, IssuerBetaMode, IssuerTags, FitQuality, LevelsAtAnchor, LevelAnchor, VolState, FactorVolModel, FactorHistories, FactorCorrelationMatrix, CalibrationDiagnostics, FoldUpRecord, DateRange, GenericFactorSpec, dimension_key), the peel kernel (credit::peel), unit helpers (credit::units), DecompositionError (mapped to KeyError/ValueError/RuntimeError), and the calibration sub-pipeline (assemble, inventory, panel, peel_fit, statistics, validation)." }
 risk               = { python = "finstack_quant.models.factor.risk", status = "exists", note = "Pure factor and position decomposition, stress attribution, and risk-budget result types and functions. Both hosts return the canonical Rust results: parametric_var_decomposition / historical_var_decomposition return PositionRiskDecomposition and evaluate_risk_budget returns RiskBudgetResult (WASM returns the same serde shapes as plain objects); parametric_es_decomposition returns the ParametricEsDecompositionView reporting view in both. An omitted confidence resolves to DecompositionConfig::parametric_95() / historical_95() in both hosts. Position P&L matrices are position-major (one row per position) in both hosts; Python additionally reads a labelled pandas.DataFrame (rows = scenarios) and NumPy arrays as host input conversions. Rust-only families: the decomposer engines (ParametricDecomposer, ParametricPositionDecomposer, HistoricalPositionDecomposer, DecompositionMethod as a bare enum - hosts read DecompositionConfig.method), residual plumbing (apply_residual_contributions, ResidualContributionSource as a bare enum - hosts read source_kind/source_issuer_id), the ES view builder parametric_es_decomposition_view, the flat-matrix adapters flatten_square_matrix/flatten_position_pnls (the hosts call them on list input), evaluate_risk_budget_arrays (bound as evaluate_risk_budget), and risk::math kernels." }
-schema             = { python = "finstack_quant.models.factor.schema", status = "exists", note = "Compiled-in JSON Schema accessors; the WASM twin is tracked in the [parity] ledger backlog." }
+schema             = { python = "finstack_quant.models.factor.schema", status = "exists", note = "Compiled-in JSON Schema accessors; bound in WASM as the `schema` sub-namespace (plain objects instead of JSON text)." }
 
 # The remaining crate-root `pub use` surface (BumpSizeConfig, PricingMode,
 # RiskMeasure, UnmatchedPolicy, SensitivityMatrix, envelope types,
@@ -446,7 +446,7 @@ table       = { python = "finstack_quant.margin", status = "flattened", note = "
 traits      = { python = "finstack_quant.margin.traits",      status = "missing" }
 types       = { python = "finstack_quant.margin", status = "flattened", note = "CSA, collateral, netting, and enum wrappers exposed flat on finstack_quant.margin. SimmCurvatureSensitivity supplies expiry-resolved sigma*dPV/dsigma inputs. SimmSensitivities binds every Rust adder (delta and vega for all risk classes), merge/scaled/scaled_to_currency/total_ir_delta/total_equity_delta/validate, plus from_dataframe (Python-only bulk ingest of the to_dataframe long frame). CsaSpec binds apply_im_terms (returning ImCollateralResult), regulatory (Rust regulatory_for_currency), with_vm_threshold, with_im and typed getters for every VmParameters/ImParameters field; VmParameters and ImParameters themselves stay Rust-only (their fields are read through CsaSpec.vm_* / im_* and written through the two builders), and MarginCallTiming surfaces as the CsaSpec.call_timing dict. EligibleCollateralSchedule binds haircut_for_maturity, check_concentration_limits (ConcentrationBreach rows as a DataFrame) and to_dataframe (CollateralEligibility rows); those two row types stay Rust-only. MarginCall is surfaced as the rows of VmCalculator.generate_margin_calls. NettingSetId is eq/hash/pickle-able. Rust-only, uncontracted-by-design: OtcMarginSpec and mandatory-for-credit SimmCreditClassification (carried through nested instrument JSON and the published margin schema), RepoMarginSpec, RepoMarginType, MaturityConstraints, SimmSensitivitiesJson, the ordered_*_pair helpers and commodity_bucket_id; margin cashflow generators also remain Rust-only." }
 xva         = { python = "finstack_quant.margin", status = "flattened", note = "XVA config/result/netting container wrappers plus MVA (ImDecayProfile, ImProfile, MvaResult, compute_mva, im_profile_from_simm) and compute_bilateral_xva exposed flat on finstack_quant.margin. ExposureProfile carries the optional diagnostics (ExposureDiagnostics is constructible) and a from_dataframe twin; compute_mva also accepts a pandas Series for the funding-spread curve (Python-only ergonomic). Rust-only, uncontracted-by-design leaves: compute_cva/compute_dva/compute_fva — hosts consume them through compute_bilateral_xva." }
-schema = { python = "finstack_quant.margin.schema", status = "exists", note = "Registry-backed index/get/validate over the crate's published JSON Schemas; the WASM twin is tracked in the [parity] ledger backlog." }
+schema = { python = "finstack_quant.margin.schema", status = "exists", note = "Registry-backed index/get/validate over the crate's published JSON Schemas; bound in WASM as the `schema` sub-namespace (plain objects instead of JSON text)." }
 
 [crates.margin.symbols]
 public = [
@@ -724,7 +724,7 @@ visibility = "pub"
 status = "exists"
 
 [crates.calibration.modules]
-schema = { python = "finstack_quant.calibration.schema", status = "exists", note = "Registry-backed index/get/validate over calibration envelopes and raw market-quote schemas; the WASM twin is tracked in the [parity] ledger backlog." }
+schema = { python = "finstack_quant.calibration.schema", status = "exists", note = "Registry-backed index/get/validate over calibration envelopes and raw market-quote schemas; bound in WASM as the `schema` sub-namespace (plain objects instead of JSON text)." }
 hull_white = { python = "finstack_quant.calibration.hull_white", status = "exists", note = "Scalar and piecewise-sigma Hull-White fits to swaption and cap/floor quotes, with SwaptionQuote / CapFloorQuote / HullWhiteCalibrationParams / HullWhiteParams / CapFloorCalibrationConfig / PiecewiseSigmaCalibrationConfig. Both hosts call the curve-input Rust entry points (calibrate_hull_white_to_swaptions_from_curve, calibrate_hull_white_to_cap_floors_from_curves, bootstrap_hull_white_sigma_schedule_to_cap_floors_from_curves), which adapt a DiscountCurve to the model clock; the closure-input solvers stay Rust-only. WASM binds the three functions on the calibration namespace with the quote, config and parameter types as plain objects, returns the (params, report) tuple as a two-element array, and exposes HullWhiteParams.sigma_at as hullWhiteParamsSigmaAt." }
 
 [crates.calibration.symbols]
@@ -788,7 +788,7 @@ status = "exists"
 instruments  = { python = "finstack_quant.valuations.instruments",  status = "exists", note = "Instrument JSON validation and pricing helpers live under finstack_quant.valuations.instruments" }
 composite    = { python = "finstack_quant.valuations.composite",    status = "exists", note = "Resolved generic composite instruments, primitive exposure reports, explicit rebalancing, and dated history." }
 credit_derivatives = { python = "finstack_quant.valuations.credit_derivatives", status = "exists", note = "CDS-family example-payload factories; mirrors WASM valuations.creditDerivatives" }
-schema       = { python = "finstack_quant.valuations.schema",       status = "exists", note = "Compiled-in JSON Schema accessors and envelope/type validators; the WASM twin is tracked in the [parity] ledger backlog." }
+schema       = { python = "finstack_quant.valuations.schema",       status = "exists", note = "Compiled-in JSON Schema accessors and envelope/type validators; bound in WASM as the `schema` sub-namespace (plain objects instead of JSON text)." }
 # Rust-only infrastructure modules, listed for completeness so the module
 # inventory covers the whole crate root. None is surfaced as a host namespace.
 constants    = { python = "finstack_quant.valuations.constants",    status = "missing", note = "Rust-only numeric/convention constants; hosts see the values through APIs that consume them (e.g. theta_days_per_year defaults), not as a namespace" }
@@ -1189,7 +1189,7 @@ visibility = "pub"
 status = "exists"
 
 [crates.attribution.modules]
-schema = { python = "finstack_quant.attribution.schema", status = "exists", note = "Registry-backed index/get/validate over the crate's published JSON Schemas; the WASM twin is tracked in the [parity] ledger backlog." }
+schema = { python = "finstack_quant.attribution.schema", status = "exists", note = "Registry-backed index/get/validate over the crate's published JSON Schemas; bound in WASM as the `schema` sub-namespace (plain objects instead of JSON text)." }
 
 [crates.attribution.symbols]
 # Rust-only surface (deliberate, tracked as a decision rather than drift):
@@ -1264,7 +1264,7 @@ forecast         = { python = "finstack_quant.statements.forecast",          sta
 formula          = { python = "finstack_quant.statements.formula",           status = "missing", note = "Formula identifier-extraction helpers; Rust-only, consumed internally by the analytics introspection tools" }
 prelude          = { python = "finstack_quant.statements.prelude",           status = "missing" }
 registry         = { python = "finstack_quant.statements.registry",          status = "missing", note = "Bindings are currently exported from finstack_quant.statements root" }
-schema           = { python = "finstack_quant.statements.schema",            status = "exists", note = "Compiled-in JSON Schema accessors; the WASM twin is tracked in the [parity] ledger backlog." }
+schema           = { python = "finstack_quant.statements.schema",            status = "exists", note = "Compiled-in JSON Schema accessors; bound in WASM as the `schema` sub-namespace (plain objects instead of JSON text)." }
 types            = { python = "finstack_quant.statements.types",             status = "missing", note = "Bindings are currently exported from finstack_quant.statements root" }
 utils            = { python = "finstack_quant.statements.utils",             status = "missing" }
 
@@ -1559,7 +1559,7 @@ sensitivity  = { python = "finstack_quant.portfolio",              status = "fla
 types        = { python = "finstack_quant.portfolio.types",        status = "missing", note = "Entity/EntityId/PositionId/AttributeValue and friends are Rust-only; the Python root does NOT re-export them (identifiers cross the boundary as plain strings)" }
 valuation    = { python = "finstack_quant.portfolio.valuation",    status = "missing", note = "Bindings are currently exported from finstack_quant.portfolio root" }
 scenarios    = { python = "finstack_quant.portfolio.scenarios",    status = "missing", note = "Scenario support is exposed via root helpers rather than a dedicated submodule" }
-schema = { python = "finstack_quant.portfolio.schema", status = "exists", note = "Registry-backed index/get/validate over the crate's published JSON Schemas; the WASM twin is tracked in the [parity] ledger backlog." }
+schema = { python = "finstack_quant.portfolio.schema", status = "exists", note = "Registry-backed index/get/validate over the crate's published JSON Schemas; bound in WASM as the `schema` sub-namespace (plain objects instead of JSON text)." }
 
 # Rust-only inventory (no binding in either host; representative names, not
 # exhaustive). Documented so their absence from the symbol lists reads as a
@@ -1758,7 +1758,7 @@ horizon   = { python = "finstack_quant.scenarios",           status = "flattened
 spec      = { python = "finstack_quant.scenarios",           status = "flattened", note = "ScenarioSpec, OperationSpec (typed classmethod constructors), RateBindingSpec, HierarchyTarget (core::market_data::hierarchy::HierarchyTarget, bound here because only hierarchy-targeted operations consume it), and the enums CurveKind/TenorMatchMode/TimeRollMode/Compounding are exported flat; every enum also constructs from its wire label (CurveKind('par_cds')) and OperationSpec constructors accept the wrapper or the label. ScenarioSpec.hazard_bump_mode is a shared string-literal field in both hosts (solve_to_par / first_order_shift), not a typed host enum. Construction is ScenarioSpec(...) / ScenarioSpec.from_json (the former build_scenario_spec / parse_scenario_spec free functions were removed as duplicates); compose_scenarios returns a typed ScenarioSpec and validate_scenario_spec accepts ScenarioSpec | str. OperationSpec.curve_parallel_bp(curve_id=list[str]) expands via Rust ScenarioSpec::parallel_bp_many." }
 templates = { python = "finstack_quant.scenarios",           status = "flattened", note = "TemplateMetadata plus registry access (list_builtin_templates, list_builtin_template_metadata, build_from_template, list_template_components, build_template_component) are exported flat; TemplateRegistry/RegisteredTemplate types remain Rust-only. WASM returns equivalent plain objects." }
 warning   = { python = "finstack_quant.scenarios.warning",   status = "missing", note = "The structured Warning enum has no typed host class; ApplicationReport.warnings / HorizonResult.warnings surface it as list[dict] via serde (each dict carries the `kind` tag plus variant fields), matching the WASM plain-object shape, with warnings_json as the JSON twin" }
-schema = { python = "finstack_quant.scenarios.schema", status = "exists", note = "Registry-backed index/get/validate over the crate's published JSON Schemas; the WASM twin is tracked in the [parity] ledger backlog." }
+schema = { python = "finstack_quant.scenarios.schema", status = "exists", note = "Registry-backed index/get/validate over the crate's published JSON Schemas; bound in WASM as the `schema` sub-namespace (plain objects instead of JSON text)." }
 
 # ExecutionContext: the Python entry points (apply_scenario,
 # apply_scenario_to_market) accept `instruments: list[Instrument | str] | None`
@@ -1831,7 +1831,7 @@ names = [
     "scenarios",
     # `finstack_quant.schema` binds the umbrella crate's own `schema` module
     # rather than a domain crate: the merged, domain-labelled index over all
-    # nine per-crate registries. Its WASM twin is tracked in the [parity] ledger backlog.
+    # nine per-crate registries. WASM binds it as the root `schema` namespace.
     "schema",
     "statements",
     "statements_analytics",
@@ -1868,7 +1868,7 @@ js_rule_members = { free = "wasm ownership: releases the wasm-bindgen handle", t
 # now recorded as TypeScript types, so their 68 unbound methods (variant
 # constructors, `with_*` setters, single-field `*_json` exits) moved to the
 # member backlog; 7 portfolio member entries were cleared (286 - 7 + 68).
-backlog_ceiling = { modules = 55, members = 68 }
+backlog_ceiling = { modules = 11, members = 68 }
 
 [parity.modules."finstack_quant"]
 js = ""
@@ -1883,12 +1883,7 @@ js = "attribution"
 types = { AttributionResultEnvelope = "AttributionResultEnvelope", PnlAttribution = "PnlAttribution", ReturnContributionResult = "ReturnContributionResult" }
 
 [parity.modules."finstack_quant.attribution.schema"]
-js = "attribution"
-backlog = [
-    "get",
-    "index",
-    "validate",
-]
+js = "attribution.schema"
 
 [parity.modules."finstack_quant.calibration"]
 js = "calibration"
@@ -1899,12 +1894,7 @@ js = "calibration"
 types = { CapFloorCalibrationConfig = "CapFloorCalibrationConfig", CapFloorQuote = "CapFloorQuote", HullWhiteCalibrationParams = "HullWhiteCalibrationParams", HullWhiteParams = "HullWhiteParams", PiecewiseSigmaCalibrationConfig = "PiecewiseSigmaCalibrationConfig", SwaptionQuote = "SwaptionQuote" }
 
 [parity.modules."finstack_quant.calibration.schema"]
-js = "calibration"
-backlog = [
-    "get",
-    "index",
-    "validate",
-]
+js = "calibration.schema"
 
 [parity.modules."finstack_quant.cashflows"]
 js = "cashflows"
@@ -1932,16 +1922,7 @@ js = "cashflows"
 types = { CFKind = "CFKind", CashFlow = "CashFlow", CashFlowAccrual = "CashFlowAccrual" }
 
 [parity.modules."finstack_quant.cashflows.schema"]
-# The schema accessors render from the crate's `ARTIFACTS` registry, which needs the
-# `json-schema` / `jsonschema-validate` features; the WASM crate builds every domain
-# crate without them. Enabling them is a package-size decision for all crates (P10).
-js = "cashflows"
-backlog = [
-    "get",
-    "index",
-    "resources",
-    "validate",
-]
+js = "cashflows.schema"
 
 [parity.modules."finstack_quant.core"]
 js = "core"
@@ -2003,12 +1984,7 @@ js = "core"
 types = { RatingLevel = "RatingLevel", ScorecardScale = "ScorecardScale" }
 
 [parity.modules."finstack_quant.core.schema"]
-js = "core"
-backlog = [
-    "get",
-    "index",
-    "validate",
-]
+js = "core.schema"
 
 [parity.modules."finstack_quant.core.table"]
 js = "core"
@@ -2035,12 +2011,7 @@ js = "margin"
 types = { ClearingStatus = "ClearingStatus", CollateralAssetClass = "CollateralAssetClass", CsaSpec = "CsaSpec", EadResult = "EadResult", EligibleCollateralSchedule = "EligibleCollateralSchedule", ExcessCollateral = "ExcessCollateral", ExposureDiagnostics = "ExposureDiagnostics", ExposureProfile = "ExposureProfile", FrtbSbaResult = "FrtbSbaResult", FundingConfig = "FundingConfig", Haircut01 = "Haircut01", ImCollateralResult = "ImCollateralResult", ImDecayProfile = "ImDecayProfile", ImMethodology = "ImMethodology", ImProfile = "ImProfile", ImResult = "ImResult", MarginCallType = "MarginCallType", MarginFundingCost = "MarginFundingCost", MarginTenor = "MarginTenor", MarginUtilization = "MarginUtilization", MvaResult = "MvaResult", NettingSetId = "NettingSetId", SaCcrNettingSetConfig = "SaCcrNettingSetConfig", SaCcrTrade = "SaCcrTrade", SimmCurvatureSensitivity = "SimmCurvatureSensitivity", VmResult = "VmResult", XvaResult = "XvaResult" }
 
 [parity.modules."finstack_quant.margin.schema"]
-js = "margin"
-backlog = [
-    "get",
-    "index",
-    "validate",
-]
+js = "margin.schema"
 
 [parity.modules."finstack_quant.models"]
 js = "models"
@@ -2085,22 +2056,8 @@ types = { FactorCovarianceMatrix = "FactorCovarianceMatrix", FactorModelConfig =
 js = "models.factor.risk"
 types = { FactorContribution = "FactorContribution", ParametricEsDecompositionView = "ParametricEsDecompositionView", PositionBudgetEntry = "PositionBudgetEntry", PositionEsContribution = "PositionEsContribution", PositionEsContributionView = "PositionEsContributionView", PositionFactorContribution = "PositionFactorContribution", PositionResidualContribution = "PositionResidualContribution", PositionRiskDecomposition = "PositionRiskDecomposition", PositionVarContribution = "PositionVarContribution", RiskBudgetResult = "RiskBudgetResult", RiskDecomposition = "RiskDecomposition", StressAttribution = "StressAttribution", StressPositionEntry = "StressPositionEntry", TailScenarioBreakdown = "TailScenarioBreakdown" }
 
-# Not bound in WASM yet: `finstack_quant_models::factor::schema` (like every
-# other `*::schema` module) exists only under the `json-schema` feature, which
-# the WASM crate leaves off. Turning it on, together with the umbrella
-# `render_profile` / `validate` (jsonschema) entry points, is one decision for
-# all `*.schema` namespaces (slice P10).
 [parity.modules."finstack_quant.models.factor.schema"]
-js = "models.factor"
-backlog = [
-    "credit_calibration_config_schema",
-    "credit_calibration_inputs_schema",
-    "credit_factor_model_schema",
-    "factor_model_config_schema",
-    "get",
-    "index",
-    "validate",
-]
+js = "models.factor.schema"
 
 [parity.modules."finstack_quant.models.liquidity"]
 js = "models.liquidity"
@@ -2134,12 +2091,7 @@ types = { BrinsonPeriodResult = "BrinsonPeriodResult", CandidatePosition = "Cand
 renames = { aggregate_metrics_json = { js = "portfolio.aggregateMetrics", reason = "Python-only JSON-string exit of the typed function (Rust has no `_json` twin); the WASM function returns the same result as a plain object, so JSON.stringify of it is this wire form" }, brinson_fachler_json = { js = "portfolio.brinsonFachler", reason = "Python-only JSON-string exit of the typed function (Rust has no `_json` twin); the WASM function returns the same result as a plain object, so JSON.stringify of it is this wire form" }, campisi_attribution_json = { js = "portfolio.campisiAttribution", reason = "Python-only JSON-string exit of the typed function (Rust has no `_json` twin); the WASM function returns the same result as a plain object, so JSON.stringify of it is this wire form" }, campisi_carino_link_from_snapshots_json = { js = "portfolio.campisiCarinoLinkFromSnapshots", reason = "Python-only JSON-string exit of the typed function (Rust has no `_json` twin); the WASM function returns the same result as a plain object, so JSON.stringify of it is this wire form" }, campisi_carino_link_json = { js = "portfolio.campisiCarinoLink", reason = "Python-only JSON-string exit of the typed function (Rust has no `_json` twin); the WASM function returns the same result as a plain object, so JSON.stringify of it is this wire form" }, campisi_reconciliation_check_json = { js = "portfolio.campisiReconciliationCheck", reason = "Python-only JSON-string exit of the typed function (Rust has no `_json` twin); the WASM function returns the same result as a plain object, so JSON.stringify of it is this wire form" }, carino_link_from_sector_periods_json = { js = "portfolio.carinoLinkFromSectorPeriods", reason = "Python-only JSON-string exit of the typed function (Rust has no `_json` twin); the WASM function returns the same result as a plain object, so JSON.stringify of it is this wire form" }, carino_link_json = { js = "portfolio.carinoLink", reason = "Python-only JSON-string exit of the typed function (Rust has no `_json` twin); the WASM function returns the same result as a plain object, so JSON.stringify of it is this wire form" }, cell_returns_from_curves_json = { js = "portfolio.cellReturnsFromCurves", reason = "Python-only JSON-string exit of the typed function (Rust has no `_json` twin); the WASM function returns the same result as a plain object, so JSON.stringify of it is this wire form" }, cell_returns_from_reference_json = { js = "portfolio.cellReturnsFromReference", reason = "Python-only JSON-string exit of the typed function (Rust has no `_json` twin); the WASM function returns the same result as a plain object, so JSON.stringify of it is this wire form" }, excess_returns_json = { js = "portfolio.excessReturns", reason = "Python-only JSON-string exit of the typed function (Rust has no `_json` twin); the WASM function returns the same result as a plain object, so JSON.stringify of it is this wire form" }, factor_brinson_attribution_json = { js = "portfolio.factorBrinsonAttribution", reason = "Python-only JSON-string exit of the typed function (Rust has no `_json` twin); the WASM function returns the same result as a plain object, so JSON.stringify of it is this wire form" }, grid_attribution_json = { js = "portfolio.gridAttribution", reason = "Python-only JSON-string exit of the typed function (Rust has no `_json` twin); the WASM function returns the same result as a plain object, so JSON.stringify of it is this wire form" }, grid_carino_link_json = { js = "portfolio.gridCarinoLink", reason = "Python-only JSON-string exit of the typed function (Rust has no `_json` twin); the WASM function returns the same result as a plain object, so JSON.stringify of it is this wire form" }, replay_portfolio_json = { js = "portfolio.replayPortfolio", reason = "Python-only JSON-string exit of the typed function (Rust has no `_json` twin); the WASM function returns the same result as a plain object, so JSON.stringify of it is this wire form" }, scenario_pnl_batch_json = { js = "portfolio.scenarioPnlBatch", reason = "Python-only JSON-string exit of the typed function (Rust has no `_json` twin); the WASM function returns the same result as a plain object, so JSON.stringify of it is this wire form" }, twrr_linked_json = { js = "portfolio.twrrLinked", reason = "Python-only JSON-string exit of the typed function (Rust has no `_json` twin); the WASM function returns the same result as a plain object, so JSON.stringify of it is this wire form" } }
 
 [parity.modules."finstack_quant.portfolio.schema"]
-js = "portfolio"
-backlog = [
-    "get",
-    "index",
-    "validate",
-]
+js = "portfolio.schema"
 
 [parity.modules."finstack_quant.reporting"]
 js = ""
@@ -2150,21 +2102,10 @@ js = "scenarios"
 types = { ApplicationReport = "ApplicationReport", ApplicationResult = "ApplicationEnvelope", Compounding = "Compounding", CurveKind = "CurveKind", HierarchyTarget = "HierarchyTarget", HorizonResult = "HorizonResult", OperationSpec = "OperationSpec", RateBindingSpec = "RateBindingSpec", ScenarioSpec = "ScenarioSpec", TemplateMetadata = "TemplateMetadata", TenorMatchMode = "TenorMatchMode", TimeRollMode = "TimeRollMode" }
 
 [parity.modules."finstack_quant.scenarios.schema"]
-js = "scenarios"
-backlog = [
-    "get",
-    "index",
-    "validate",
-]
+js = "scenarios.schema"
 
 [parity.modules."finstack_quant.schema"]
-js = ""
-backlog = [
-    "domains",
-    "get",
-    "index",
-    "validate",
-]
+js = "schema"
 
 [parity.modules."finstack_quant.statements"]
 js = "statements"
@@ -2181,15 +2122,7 @@ backlog = [
 ]
 
 [parity.modules."finstack_quant.statements.schema"]
-js = "statements"
-backlog = [
-    "financial_model_spec_schema",
-    "get",
-    "index",
-    "normalization_config_schema",
-    "statement_result_schema",
-    "validate",
-]
+js = "statements.schema"
 
 [parity.modules."finstack_quant.statements_analytics"]
 js = "statements_analytics"
@@ -2232,17 +2165,6 @@ types = { CdsConventionSpec = "CdsConventionSpec", InflationSwapConventions = "I
 
 [parity.modules."finstack_quant.valuations.schema"]
 js = "valuations.schema"
-# The registry accessors and the JSON-Schema validators need schemars and the
-# `jsonschema` crate in the WASM build; its `ahash` dependency needs a getrandom
-# backend for wasm32 (`--cfg getrandom_backend="wasm_js"`), a workspace build
-# decision shared with the other `*.schema` namespaces.
-backlog = [
-    "get",
-    "index",
-    "validate",
-    "validate_instrument_envelope_json",
-    "validate_instrument_type_json",
-]
 
 [parity.js."attribution".wasm_only]
 AttributionJsonInputs = "the Rust AttributionJsonInputs fragments as a class (JS has no keyword arguments; Python passes the same fields as attribute_pnl kwargs)"

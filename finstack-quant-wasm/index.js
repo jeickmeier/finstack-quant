@@ -20,3 +20,4 @@ export { statements } from './exports/statements.js';
 export { statements_analytics } from './exports/statements_analytics.js';
 export { portfolio } from './exports/portfolio.js';
 export { scenarios } from './exports/scenarios.js';
+export { schema } from './exports/schema.js';

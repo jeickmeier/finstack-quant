@@ -175,14 +175,8 @@ fn validate(selector: &str, payload: &str) -> PyResult<String> {
 /// True
 #[pyfunction]
 #[pyo3(text_signature = "()")]
-fn domains() -> PyResult<Vec<String>> {
-    let mut names: Vec<String> = finstack_quant::schema::artifacts_with_domain()
-        .into_iter()
-        .map(|(domain, _)| domain.to_string())
-        .collect();
-    names.sort_unstable();
-    names.dedup();
-    Ok(names)
+fn domains() -> Vec<&'static str> {
+    finstack_quant::schema::domains()
 }
 
 /// Register the `finstack_quant.schema` Python namespace.
