@@ -52,6 +52,8 @@ kinded_js_error!(
     finstack_quant_statements::error::Error,
     finstack_quant_models::factor::credit::decomposition::DecompositionError,
     finstack_quant_models::credit::migration::MigrationError,
+    finstack_quant_models::credit::pd::PdCalibrationError,
+    finstack_quant_models::credit::scoring::CreditScoringError,
 );
 
 /// Errors reported through their fold into [`finstack_quant_core::Error`]:

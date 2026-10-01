@@ -77,21 +77,6 @@ const ISSUER_ROW_COLUMNS: &[ColumnSchema<'static>] = &[
     ("spread_duration", "float64"),
 ];
 
-/// Display label for a hierarchy dimension, matching
-/// `PyCreditFactorModel::level_names` so the two line up on a join.
-fn dimension_label(
-    dim: &finstack_quant_models::factor::credit::hierarchy::HierarchyDimension,
-) -> String {
-    use finstack_quant_models::factor::credit::hierarchy::HierarchyDimension;
-    match dim {
-        HierarchyDimension::Rating => "Rating".to_owned(),
-        HierarchyDimension::Region => "Region".to_owned(),
-        HierarchyDimension::Sector => "Sector".to_owned(),
-        HierarchyDimension::Custom(name) => name.clone(),
-        _ => "Unknown".to_owned(),
-    }
-}
-
 /// Serde label (snake_case string) of a unit-variant enum.
 fn label<T: serde::Serialize>(value: &T) -> PyResult<String> {
     finstack_quant_core::wire::serde_label(value).map_err(core_to_py)
@@ -205,8 +190,8 @@ impl PyCreditFactorModel {
     /// Issuer-beta policy used during calibration (serde label, e.g.
     /// ``"globally_off"``).
     #[getter]
-    fn policy(&self) -> PyResult<String> {
-        label(&self.inner.policy)
+    fn policy(&self) -> &'static str {
+        self.inner.policy.kind()
     }
 
     /// Panel observation frequency (``"daily"``, ``"monthly"`` or
@@ -272,31 +257,17 @@ impl PyCreditFactorModel {
     /// Returns:
     ///     List of dimension names (e.g. ``["Rating", "Region", "Sector"]``).
     fn level_names(&self) -> Vec<String> {
-        self.inner
-            .hierarchy
-            .levels
-            .iter()
-            .map(dimension_label)
-            .collect()
+        self.inner.level_names()
     }
 
     /// Issuer IDs present in the artifact.
     fn issuer_ids(&self) -> Vec<String> {
-        self.inner
-            .issuer_betas
-            .iter()
-            .map(|row| row.issuer_id.as_str().to_owned())
-            .collect()
+        self.inner.issuer_ids()
     }
 
     /// Factor IDs in the model configuration.
     fn factor_ids(&self) -> Vec<String> {
-        self.inner
-            .config
-            .factors
-            .iter()
-            .map(|f| f.id.to_string())
-            .collect()
+        self.inner.factor_ids()
     }
 
     /// Export the per-issuer beta rows as a pandas ``DataFrame``.
@@ -748,7 +719,7 @@ impl PyLevelsAtDate {
         let date = self.inner.date.to_string();
         let mut rows: Vec<serde_json::Value> = Vec::new();
         for level in &self.inner.by_level {
-            let dimension = dimension_label(&level.dimension);
+            let dimension = level.dimension.label();
             for (bucket, value) in &level.values {
                 rows.push(serde_json::json!({
                     "date": date,
@@ -928,7 +899,7 @@ impl PyPeriodDecomposition {
         let to_date = self.inner.to.to_string();
         let mut rows: Vec<serde_json::Value> = Vec::new();
         for level in &self.inner.by_level {
-            let dimension = dimension_label(&level.dimension);
+            let dimension = level.dimension.label();
             for (bucket, delta) in &level.deltas {
                 rows.push(serde_json::json!({
                     "from_date": from_date,

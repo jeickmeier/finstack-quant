@@ -1219,6 +1219,7 @@
       "blackShiftedVega",
       "bsCosPrice",
       "bsGreeks",
+      "bsGreeksIsValid",
       "bsImpliedVol",
       "bsPrice",
       "correlation",
@@ -1241,19 +1242,28 @@
     "keys": [
       "Copula",
       "CopulaSpec",
+      "CorrelatedBernoulli",
+      "LatentFactorKind",
+      "LatentFactorSpec",
+      "LatentMultiFactor",
+      "LatentSingleFactor",
+      "LatentTwoFactor",
       "PortfolioLossResult",
       "RecoveryModel",
       "RecoverySpec",
+      "choleskyDecompose",
       "correlationBounds",
       "jointProbabilities",
+      "maxPortfolioLossPaths",
       "nearestCorrelation",
+      "simulatePortfolioLoss",
       "validateCorrelationMatrix"
     ]
   },
   "models.correlation.CopulaSpec": {
     "kind": "class",
-    "statics": ["gaussian", "multiFactor", "randomFactorLoading", "studentT"],
-    "methods": ["build", "free"],
+    "statics": ["fromJson", "gaussian", "multiFactor", "randomFactorLoading", "studentT"],
+    "methods": ["build", "free", "toJson"],
     "getters": ["isGaussian", "isMultiFactor", "isRfl", "isStudentT"]
   },
   "models.correlation.Copula": {
@@ -1264,8 +1274,8 @@
   },
   "models.correlation.RecoverySpec": {
     "kind": "class",
-    "statics": ["constant", "marketCorrelated", "marketStandardStochastic"],
-    "methods": ["build", "free"],
+    "statics": ["constant", "fromJson", "marketCorrelated", "marketStandardStochastic"],
+    "methods": ["build", "free", "toJson"],
     "getters": ["expectedRecovery"]
   },
   "models.correlation.RecoveryModel": {
@@ -1280,6 +1290,57 @@
     "methods": ["free", "toJson", "trancheLossStatistics"],
     "getters": ["confidence", "expectedLoss", "expectedShortfall", "losses", "var"]
   },
+  "models.correlation.CorrelatedBernoulli": {
+    "kind": "class",
+    "statics": [],
+    "methods": [
+      "conditionalP1GivenX2",
+      "conditionalP2GivenX1",
+      "free",
+      "jointProbabilities",
+      "sampleFromUniform"
+    ],
+    "getters": [
+      "correlation",
+      "jointP00",
+      "jointP01",
+      "jointP10",
+      "jointP11",
+      "p1",
+      "p2",
+      "requestedCorrelation"
+    ]
+  },
+  "models.correlation.LatentFactorSpec": {
+    "kind": "class",
+    "statics": ["singleFactor", "twoFactor"],
+    "methods": ["build", "free"],
+    "getters": ["numFactors"]
+  },
+  "models.correlation.LatentFactorKind": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["diagonalFactorContribution", "free"],
+    "getters": ["correlationMatrix", "factorNames", "modelName", "numFactors", "volatilities"]
+  },
+  "models.correlation.LatentSingleFactor": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["free"],
+    "getters": ["meanReversion", "numFactors", "volatility"]
+  },
+  "models.correlation.LatentTwoFactor": {
+    "kind": "class",
+    "statics": ["cloStandard", "rmbsStandard"],
+    "methods": ["free"],
+    "getters": ["choleskyL10", "choleskyL11", "correlation", "creditVol", "numFactors", "prepayVol"]
+  },
+  "models.correlation.LatentMultiFactor": {
+    "kind": "class",
+    "statics": ["uncorrelated"],
+    "methods": ["free", "generateCorrelatedFactors"],
+    "getters": ["correlationMatrix", "numFactors", "volatilities"]
+  },
   "models.correlation.correlationBounds": {
     "kind": "function"
   },
@@ -1292,37 +1353,153 @@
   "models.correlation.nearestCorrelation": {
     "kind": "function"
   },
+  "models.correlation.choleskyDecompose": {
+    "kind": "function"
+  },
+  "models.correlation.maxPortfolioLossPaths": {
+    "kind": "function"
+  },
+  "models.correlation.simulatePortfolioLoss": {
+    "kind": "function"
+  },
   "models.credit": {
     "kind": "namespace",
     "keys": [
+      "AssetDynamics",
+      "BetaRecovery",
+      "DownturnLgd",
+      "DynamicRecoverySpec",
+      "EadCalculator",
+      "EndogenousHazardSpec",
+      "GeneratorMatrix",
+      "MasterScale",
+      "MertonBarrierType",
+      "MertonModel",
+      "MigrationSimulator",
+      "RatingFactorTable",
+      "RatingPath",
+      "RatingPaths",
+      "RatingScale",
+      "SimulatedPaths",
+      "ToggleExerciseModel",
+      "TransitionMatrix",
+      "WorkoutCosts",
+      "WorkoutLgd",
+      "WorkoutLgdBuilder",
+      "allocateRecovery",
+      "altmanEmScore",
+      "altmanZDoublePrime",
+      "altmanZPrime",
+      "altmanZScore",
       "analyzeExchangeOffer",
       "analyzeLme",
-      "creditGradesModelJson",
-      "creditStateJson",
-      "dynamicRecoveryAtNotional",
-      "dynamicRecoveryConstantJson",
-      "endogenousHazardAfterPikAccrual",
-      "endogenousHazardAtLeverage",
-      "endogenousHazardPowerLawJson",
-      "mertonCdsParSpread",
-      "mertonDebtSpread",
-      "mertonDefaultProbability",
-      "mertonDefaultProbabilityWithDrift",
-      "mertonDistanceToDefault",
-      "mertonDistanceToDefaultWithDrift",
-      "mertonFromCdsSpreadJson",
-      "mertonFromEquityJson",
-      "mertonFromTargetPdJson",
-      "mertonImpliedSpread",
-      "mertonKmvDefaultPoint",
-      "mertonModelJson",
-      "mertonModelWithDynamicsJson",
-      "mertonSimulatePathsJson",
-      "mertonToHazardCurveJson",
-      "mertonTryImpliedEquity",
-      "toggleExerciseOptimalJson",
-      "toggleExerciseThresholdJson"
+      "applyBaselIrbPdFloor",
+      "baselIrbPdFloor",
+      "betaRecoveryQuantile",
+      "betaRecoverySample",
+      "centralTendency",
+      "downturnLgdRegulatoryFloor",
+      "downturnLgdStressed",
+      "eadRevolver",
+      "eadTermLoan",
+      "moodysWarfFactor",
+      "ohlsonOScore",
+      "pitToTtc",
+      "project",
+      "seniorityRecoveryStats",
+      "tenderRecommendationHurdle",
+      "ttcToPit",
+      "workoutLgd",
+      "zmijewskiScore"
     ]
+  },
+  "models.credit.MertonModel": {
+    "kind": "class",
+    "statics": [
+      "creditGrades",
+      "fromCdsSpread",
+      "fromEquity",
+      "fromJson",
+      "fromTargetPd",
+      "kmvDefaultPoint",
+      "newWithDynamics"
+    ],
+    "methods": [
+      "cdsParSpread",
+      "debtSpread",
+      "defaultProbabilities",
+      "defaultProbability",
+      "defaultProbabilityWithDrift",
+      "distanceToDefault",
+      "distanceToDefaultWithDrift",
+      "free",
+      "impliedSpread",
+      "simulatePaths",
+      "toHazardCurve",
+      "toJson",
+      "tryImpliedEquity"
+    ],
+    "getters": [
+      "assetValue",
+      "assetVol",
+      "barrierType",
+      "debtBarrier",
+      "dynamics",
+      "payoutRate",
+      "riskFreeRate"
+    ]
+  },
+  "models.credit.MertonBarrierType": {
+    "kind": "class",
+    "statics": ["firstPassage", "fromJson", "terminal"],
+    "methods": ["free", "toJson"],
+    "getters": []
+  },
+  "models.credit.AssetDynamics": {
+    "kind": "class",
+    "statics": ["creditGrades", "fromJson", "geometricBrownian", "jumpDiffusion"],
+    "methods": ["free", "toJson"],
+    "getters": []
+  },
+  "models.credit.SimulatedPaths": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": ["free", "get", "path", "toJson", "toNested"],
+    "getters": ["assetValues", "numPaths", "numSteps", "times", "valuesPerPath"]
+  },
+  "models.credit.DynamicRecoverySpec": {
+    "kind": "class",
+    "statics": [
+      "constant",
+      "flooredInverse",
+      "fromJson",
+      "inverseLinear",
+      "inversePower",
+      "linearDecline"
+    ],
+    "methods": ["free", "recoveryAtNotional", "toJson"],
+    "getters": ["baseNotional", "baseRecovery", "kind", "model"]
+  },
+  "models.credit.EndogenousHazardSpec": {
+    "kind": "class",
+    "statics": ["exponential", "fromJson", "powerLaw", "tabular"],
+    "methods": ["free", "hazardAfterPikAccrual", "hazardAtLeverage", "toJson"],
+    "getters": ["baseHazardRate", "baseLeverage", "kind", "leverageHazardMap"]
+  },
+  "models.credit.ToggleExerciseModel": {
+    "kind": "class",
+    "statics": ["fromJson", "optimal", "stochastic", "threshold"],
+    "methods": ["free", "shouldPikWithUniform", "toJson"],
+    "getters": ["kind", "params"]
+  },
+  "models.credit.RatingFactorTable": {
+    "kind": "class",
+    "statics": ["fromJson", "fromRegistryId", "moodysStandard"],
+    "methods": ["free", "getFactor", "toJson"],
+    "getters": ["agency", "defaultFactor", "methodology"]
+  },
+  "models.credit.moodysWarfFactor": {
+    "kind": "function"
   },
   "models.credit.analyzeExchangeOffer": {
     "kind": "function"
@@ -1330,79 +1507,191 @@
   "models.credit.analyzeLme": {
     "kind": "function"
   },
-  "models.credit.mertonModelJson": {
+  "models.credit.tenderRecommendationHurdle": {
     "kind": "function"
   },
-  "models.credit.creditGradesModelJson": {
+  "models.credit.BetaRecovery": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": ["free", "quantile", "sampleSeeded", "toJson"],
+    "getters": ["alpha", "betaParam", "mean", "meanLgd", "mode", "stdDev", "variance"]
+  },
+  "models.credit.WorkoutCosts": {
+    "kind": "class",
+    "statics": ["fromJson", "standard", "zero"],
+    "methods": ["free", "toJson"],
+    "getters": ["directCostRate", "indirectCostRate", "totalRate"]
+  },
+  "models.credit.WorkoutLgd": {
+    "kind": "class",
+    "statics": ["builder", "fromJson"],
+    "methods": ["evaluate", "free", "lgd", "netRecovery", "recoveryRate", "toJson"],
+    "getters": ["collateral", "costs", "discountRate", "workoutYears"]
+  },
+  "models.credit.WorkoutLgdBuilder": {
+    "kind": "class",
+    "statics": [],
+    "methods": [
+      "build",
+      "collateral",
+      "collateralPieces",
+      "costs",
+      "discountRate",
+      "free",
+      "workoutYears"
+    ],
+    "getters": []
+  },
+  "models.credit.DownturnLgd": {
+    "kind": "class",
+    "statics": [
+      "baselSecured",
+      "baselUnsecured",
+      "fromJson",
+      "fromRegistryId",
+      "regulatoryFloor",
+      "stressed"
+    ],
+    "methods": ["adjust", "free", "toJson"],
+    "getters": ["method", "params"]
+  },
+  "models.credit.EadCalculator": {
+    "kind": "class",
+    "statics": ["fromJson", "revolver", "termLoan"],
+    "methods": ["free", "leqFromObservedEad", "toJson"],
+    "getters": ["ead", "totalCommitment", "utilization"]
+  },
+  "models.credit.seniorityRecoveryStats": {
     "kind": "function"
   },
-  "models.credit.mertonDefaultProbability": {
+  "models.credit.betaRecoverySample": {
     "kind": "function"
   },
-  "models.credit.mertonDefaultProbabilityWithDrift": {
+  "models.credit.betaRecoveryQuantile": {
     "kind": "function"
   },
-  "models.credit.mertonDistanceToDefault": {
+  "models.credit.workoutLgd": {
     "kind": "function"
   },
-  "models.credit.mertonDistanceToDefaultWithDrift": {
+  "models.credit.downturnLgdStressed": {
     "kind": "function"
   },
-  "models.credit.mertonKmvDefaultPoint": {
+  "models.credit.downturnLgdRegulatoryFloor": {
     "kind": "function"
   },
-  "models.credit.mertonImpliedSpread": {
+  "models.credit.eadTermLoan": {
     "kind": "function"
   },
-  "models.credit.mertonDebtSpread": {
+  "models.credit.eadRevolver": {
     "kind": "function"
   },
-  "models.credit.mertonCdsParSpread": {
+  "models.credit.MasterScale": {
+    "kind": "class",
+    "statics": ["fromJson", "fromRegistryId", "moodysAssumptions", "spAssumptions"],
+    "methods": ["free", "mapPd", "mapPds", "mapScore", "toJson"],
+    "getters": ["grades", "nGrades"]
+  },
+  "models.credit.baselIrbPdFloor": {
     "kind": "function"
   },
-  "models.credit.mertonFromEquityJson": {
+  "models.credit.applyBaselIrbPdFloor": {
     "kind": "function"
   },
-  "models.credit.mertonFromCdsSpreadJson": {
+  "models.credit.pitToTtc": {
     "kind": "function"
   },
-  "models.credit.mertonFromTargetPdJson": {
+  "models.credit.ttcToPit": {
     "kind": "function"
   },
-  "models.credit.mertonModelWithDynamicsJson": {
+  "models.credit.centralTendency": {
     "kind": "function"
   },
-  "models.credit.mertonTryImpliedEquity": {
+  "models.credit.RatingScale": {
+    "kind": "class",
+    "statics": ["custom", "customWithDefault", "fromJson", "notched", "standard", "standardWithNr"],
+    "methods": [
+      "defaultState",
+      "free",
+      "indexOf",
+      "indexOfRequired",
+      "labelOf",
+      "labels",
+      "ratingFromWarf",
+      "toJson",
+      "warf"
+    ],
+    "getters": ["nStates"]
+  },
+  "models.credit.TransitionMatrix": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": [
+      "compose",
+      "defaultProbabilities",
+      "free",
+      "probability",
+      "probabilityByIndex",
+      "row",
+      "toJson",
+      "toMatrix"
+    ],
+    "getters": ["horizon", "nStates", "scale"]
+  },
+  "models.credit.GeneratorMatrix": {
+    "kind": "class",
+    "statics": ["fromJson", "fromTransitionMatrix", "fromTransitionMatrixWithTol"],
+    "methods": ["exitRate", "free", "intensity", "toJson", "toMatrix"],
+    "getters": ["nStates", "regularizationL1", "roundTripError", "scale"]
+  },
+  "models.credit.RatingPath": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": [
+      "defaultTime",
+      "defaulted",
+      "free",
+      "labelAt",
+      "nTransitions",
+      "stateAt",
+      "toJson",
+      "transitions"
+    ],
+    "getters": ["horizon", "scale"]
+  },
+  "models.credit.RatingPaths": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": ["free", "toJson"],
+    "getters": ["defaultRate", "length", "paths"]
+  },
+  "models.credit.MigrationSimulator": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": ["empiricalMatrix", "free", "simulate", "toJson"],
+    "getters": ["generator", "horizon"]
+  },
+  "models.credit.project": {
     "kind": "function"
   },
-  "models.credit.mertonToHazardCurveJson": {
+  "models.credit.altmanZScore": {
     "kind": "function"
   },
-  "models.credit.mertonSimulatePathsJson": {
+  "models.credit.altmanZPrime": {
     "kind": "function"
   },
-  "models.credit.dynamicRecoveryAtNotional": {
+  "models.credit.altmanZDoublePrime": {
     "kind": "function"
   },
-  "models.credit.endogenousHazardAtLeverage": {
+  "models.credit.altmanEmScore": {
     "kind": "function"
   },
-  "models.credit.endogenousHazardAfterPikAccrual": {
+  "models.credit.ohlsonOScore": {
     "kind": "function"
   },
-  "models.credit.dynamicRecoveryConstantJson": {
+  "models.credit.zmijewskiScore": {
     "kind": "function"
   },
-  "models.credit.endogenousHazardPowerLawJson": {
-    "kind": "function"
-  },
-  "models.credit.creditStateJson": {
-    "kind": "function"
-  },
-  "models.credit.toggleExerciseThresholdJson": {
-    "kind": "function"
-  },
-  "models.credit.toggleExerciseOptimalJson": {
+  "models.credit.allocateRecovery": {
     "kind": "function"
   },
   "models.factor": {
@@ -1417,21 +1706,41 @@
       "FactorCovarianceForecast",
       "LevelsAtDate",
       "PeriodDecomposition",
+      "VolHorizon",
       "decomposeLevels",
-      "decomposePeriod"
+      "decomposePeriod",
+      "factorCorrelation",
+      "factorCovariance",
+      "factorCovarianceRows",
+      "factorVariance",
+      "validateFactorModelConfig"
     ]
   },
   "models.factor.credit.CreditFactorModel": {
     "kind": "class",
     "statics": ["fromJson"],
-    "methods": ["free", "toJson"],
-    "getters": ["schema"]
+    "methods": ["factorIds", "free", "issuerIds", "levelNames", "toJson"],
+    "getters": [
+      "asOf",
+      "bucketWeighting",
+      "calibrationWindow",
+      "config",
+      "covariance",
+      "diagnostics",
+      "nFactors",
+      "nIssuers",
+      "nLevels",
+      "panelFrequency",
+      "policy",
+      "schema",
+      "staticCorrelation"
+    ]
   },
   "models.factor.credit.CreditCalibrator": {
     "kind": "class",
     "statics": [],
     "methods": ["calibrate", "free"],
-    "getters": []
+    "getters": ["config"]
   },
   "models.factor.credit.LevelsAtDate": {
     "kind": "class",
@@ -1451,20 +1760,58 @@
     "methods": ["covarianceAt", "factorModelAt", "free", "idiosyncraticVol"],
     "getters": []
   },
+  "models.factor.credit.VolHorizon": {
+    "kind": "class",
+    "statics": ["nSteps", "oneStep", "parse", "unconditional", "years"],
+    "methods": ["free", "toString"],
+    "getters": ["kind", "n", "yearsValue"]
+  },
   "models.factor.credit.decomposeLevels": {
     "kind": "function"
   },
   "models.factor.credit.decomposePeriod": {
     "kind": "function"
   },
+  "models.factor.credit.factorVariance": {
+    "kind": "function"
+  },
+  "models.factor.credit.factorCovariance": {
+    "kind": "function"
+  },
+  "models.factor.credit.factorCorrelation": {
+    "kind": "function"
+  },
+  "models.factor.credit.factorCovarianceRows": {
+    "kind": "function"
+  },
+  "models.factor.credit.validateFactorModelConfig": {
+    "kind": "function"
+  },
   "models.factor.risk": {
     "kind": "namespace",
     "keys": [
+      "DecompositionConfig",
+      "buildStressAttribution",
+      "defaultUtilizationThreshold",
       "evaluateRiskBudget",
       "historicalVarDecomposition",
       "parametricEsDecomposition",
-      "parametricVarDecomposition"
+      "parametricVarDecomposition",
+      "positionComponentVar"
     ]
+  },
+  "models.factor.risk.DecompositionConfig": {
+    "kind": "class",
+    "statics": [
+      "fromJson",
+      "historical",
+      "historical95",
+      "parametric",
+      "parametric95",
+      "parametric99"
+    ],
+    "methods": ["free", "toJson", "withIncremental"],
+    "getters": ["computeIncremental", "confidence", "method"]
   },
   "models.factor.risk.parametricVarDecomposition": {
     "kind": "function"
@@ -1478,9 +1825,20 @@
   "models.factor.risk.evaluateRiskBudget": {
     "kind": "function"
   },
+  "models.factor.risk.buildStressAttribution": {
+    "kind": "function"
+  },
+  "models.factor.risk.positionComponentVar": {
+    "kind": "function"
+  },
+  "models.factor.risk.defaultUtilizationThreshold": {
+    "kind": "function"
+  },
   "models.liquidity": {
     "kind": "namespace",
     "keys": [
+      "AlmgrenChrissModel",
+      "KyleLambdaModel",
       "almgrenChrissImpact",
       "amihudIlliquidity",
       "daysToLiquidate",
@@ -1489,6 +1847,18 @@
       "lvarBangia",
       "rollEffectiveSpread"
     ]
+  },
+  "models.liquidity.AlmgrenChrissModel": {
+    "kind": "class",
+    "statics": ["fromJson", "fromProfile"],
+    "methods": ["estimateCost", "free", "optimalTrajectory", "toJson"],
+    "getters": ["delta", "eta", "gamma", "modelName"]
+  },
+  "models.liquidity.KyleLambdaModel": {
+    "kind": "class",
+    "statics": ["fromAmihud", "fromJson"],
+    "methods": ["estimateCost", "free", "optimalTrajectory", "toJson"],
+    "getters": ["lambda", "modelName"]
   },
   "models.liquidity.rollEffectiveSpread": {
     "kind": "function"
@@ -1513,7 +1883,44 @@
   },
   "models.monteCarlo": {
     "kind": "namespace",
-    "keys": ["priceHestonCall", "priceHestonPut"]
+    "keys": [
+      "EuropeanPricer",
+      "LsmcPricer",
+      "PathDependentPricer",
+      "finiteDiffDelta",
+      "finiteDiffDeltaCrn",
+      "finiteDiffGamma",
+      "finiteDiffGammaCrn",
+      "hestonSatisfiesFeller",
+      "priceHestonCall",
+      "priceHestonPut",
+      "relativeStderr",
+      "simulateGbmPaths"
+    ]
+  },
+  "models.monteCarlo.EuropeanPricer": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["free", "priceCall", "pricePut"],
+    "getters": ["numPaths", "seed", "useParallel"]
+  },
+  "models.monteCarlo.PathDependentPricer": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["free", "priceAsianCall", "priceAsianPut"],
+    "getters": ["antithetic", "numPaths", "seed", "useBrownianBridge", "useParallel", "useSobol"]
+  },
+  "models.monteCarlo.LsmcPricer": {
+    "kind": "class",
+    "statics": [],
+    "methods": [
+      "free",
+      "priceAmericanCall",
+      "priceAmericanCallUnbiased",
+      "priceAmericanPut",
+      "priceAmericanPutUnbiased"
+    ],
+    "getters": ["antithetic", "basis", "basisDegree", "numPaths", "seed", "useParallel"]
   },
   "models.monteCarlo.priceHestonCall": {
     "kind": "function"
@@ -1521,15 +1928,125 @@
   "models.monteCarlo.priceHestonPut": {
     "kind": "function"
   },
+  "models.monteCarlo.hestonSatisfiesFeller": {
+    "kind": "function"
+  },
+  "models.monteCarlo.simulateGbmPaths": {
+    "kind": "function"
+  },
+  "models.monteCarlo.finiteDiffDelta": {
+    "kind": "function"
+  },
+  "models.monteCarlo.finiteDiffDeltaCrn": {
+    "kind": "function"
+  },
+  "models.monteCarlo.finiteDiffGamma": {
+    "kind": "function"
+  },
+  "models.monteCarlo.finiteDiffGammaCrn": {
+    "kind": "function"
+  },
+  "models.monteCarlo.relativeStderr": {
+    "kind": "function"
+  },
   "models.rates": {
     "kind": "namespace",
-    "keys": ["dtsm"]
+    "keys": ["dtsm", "hullWhite"]
   },
   "models.rates.dtsm": {
     "kind": "namespace",
-    "keys": ["nelsonSiegelYields"]
+    "keys": [
+      "DieboldLi",
+      "YieldPanel",
+      "YieldPca",
+      "dieboldLiFitFactors",
+      "dieboldLiForecast",
+      "nelsonSiegelYields",
+      "yieldPcaFit",
+      "yieldPcaScenario"
+    ]
+  },
+  "models.rates.dtsm.YieldPanel": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": ["free", "toJson", "yieldChanges"],
+    "getters": ["dates", "numDates", "numTenors", "tenors", "yields"]
+  },
+  "models.rates.dtsm.DieboldLi": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": ["extractFactors", "fit", "fitVar", "forecast", "free", "loadingMatrix", "toJson"],
+    "getters": ["factors", "lambda", "mu", "phi", "qCov", "tenors"]
+  },
+  "models.rates.dtsm.YieldPca": {
+    "kind": "class",
+    "statics": ["fit", "fitYieldChanges", "fromJson"],
+    "methods": [
+      "applyScenario",
+      "componentsForThreshold",
+      "free",
+      "loading",
+      "reconstruct",
+      "scenario",
+      "toJson",
+      "truncated"
+    ],
+    "getters": [
+      "cumulativeVariance",
+      "eigenvalues",
+      "loadings",
+      "meanChange",
+      "numComponents",
+      "scores",
+      "tenors",
+      "varianceExplained"
+    ]
   },
   "models.rates.dtsm.nelsonSiegelYields": {
+    "kind": "function"
+  },
+  "models.rates.dtsm.dieboldLiFitFactors": {
+    "kind": "function"
+  },
+  "models.rates.dtsm.dieboldLiForecast": {
+    "kind": "function"
+  },
+  "models.rates.dtsm.yieldPcaFit": {
+    "kind": "function"
+  },
+  "models.rates.dtsm.yieldPcaScenario": {
+    "kind": "function"
+  },
+  "models.rates.hullWhite": {
+    "kind": "namespace",
+    "keys": [
+      "HullWhiteParams",
+      "hw1fCapFloorPrice",
+      "hw1fCapletForwardRateNormalVol",
+      "hw1fConvexityAdjustment",
+      "hw1fZcbOptionPrice",
+      "hwBondVol"
+    ]
+  },
+  "models.rates.hullWhite.HullWhiteParams": {
+    "kind": "class",
+    "statics": ["fromJson", "piecewise"],
+    "methods": ["bondVol", "free", "sigma", "stateCovariance", "stateVariance", "toJson"],
+    "getters": ["kappa", "times", "values"]
+  },
+  "models.rates.hullWhite.hw1fConvexityAdjustment": {
+    "kind": "function"
+  },
+  "models.rates.hullWhite.hwBondVol": {
+    "kind": "function"
+  },
+  "models.rates.hullWhite.hw1fZcbOptionPrice": {
+    "kind": "function"
+  },
+  "models.rates.hullWhite.hw1fCapletForwardRateNormalVol": {
+    "kind": "function"
+  },
+  "models.rates.hullWhite.hw1fCapFloorPrice": {
     "kind": "function"
   },
   "models.volatility": {
@@ -1540,6 +2057,10 @@
       "SabrParameters",
       "SabrSmile",
       "calibrateSvi",
+      "checkButterflyGrid",
+      "checkCalendarSpreadGrid",
+      "checkLocalVolDensityGrid",
+      "checkSurfaceGrid",
       "convertAtmVolatility",
       "deltaToStrike",
       "getCubeNormalVol",
@@ -1548,8 +2069,17 @@
       "getCubeVolClamped",
       "getFxDeltaPillarVols",
       "getFxDeltaVol",
+      "getSurfaceVol",
+      "getSurfaceVolClamped",
+      "materializeCubeExpirySlice",
+      "materializeCubeExpirySliceNormal",
+      "materializeCubeTenorSlice",
+      "materializeCubeTenorSliceNormal",
+      "materializeFxDeltaSurface",
       "strikeToDelta",
-      "sviImpliedVol"
+      "sviDurrlemanG",
+      "sviImpliedVol",
+      "sviTotalVariance"
     ]
   },
   "models.volatility.SabrCalibrator": {
@@ -1581,7 +2111,7 @@
     "kind": "class",
     "statics": [],
     "methods": ["atmVol", "free", "generateSmile", "impliedVol", "validateNoArbitrage"],
-    "getters": []
+    "getters": ["forward", "t"]
   },
   "models.volatility.calibrateSvi": {
     "kind": "function"
@@ -1616,6 +2146,45 @@
   "models.volatility.sviImpliedVol": {
     "kind": "function"
   },
+  "models.volatility.sviTotalVariance": {
+    "kind": "function"
+  },
+  "models.volatility.sviDurrlemanG": {
+    "kind": "function"
+  },
+  "models.volatility.checkButterflyGrid": {
+    "kind": "function"
+  },
+  "models.volatility.checkCalendarSpreadGrid": {
+    "kind": "function"
+  },
+  "models.volatility.checkLocalVolDensityGrid": {
+    "kind": "function"
+  },
+  "models.volatility.checkSurfaceGrid": {
+    "kind": "function"
+  },
+  "models.volatility.getSurfaceVol": {
+    "kind": "function"
+  },
+  "models.volatility.getSurfaceVolClamped": {
+    "kind": "function"
+  },
+  "models.volatility.materializeCubeTenorSlice": {
+    "kind": "function"
+  },
+  "models.volatility.materializeCubeTenorSliceNormal": {
+    "kind": "function"
+  },
+  "models.volatility.materializeCubeExpirySlice": {
+    "kind": "function"
+  },
+  "models.volatility.materializeCubeExpirySliceNormal": {
+    "kind": "function"
+  },
+  "models.volatility.materializeFxDeltaSurface": {
+    "kind": "function"
+  },
   "models.bsPrice": {
     "kind": "function"
   },
@@ -1623,6 +2192,9 @@
     "kind": "function"
   },
   "models.bsGreeks": {
+    "kind": "function"
+  },
+  "models.bsGreeksIsValid": {
     "kind": "function"
   },
   "models.bsImpliedVol": {

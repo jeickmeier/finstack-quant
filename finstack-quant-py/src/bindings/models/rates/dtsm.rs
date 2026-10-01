@@ -1095,7 +1095,7 @@ fn diebold_li_forecast(
 ///     If the panel is empty/ragged/non-finite, has fewer than two rows or
 ///     tenors, or ``n_components`` is out of range.
 #[pyfunction]
-#[pyo3(signature = (yield_changes, n_components = 3))]
+#[pyo3(signature = (yield_changes, n_components = dtsm::DEFAULT_PCA_COMPONENTS))]
 #[pyo3(text_signature = "(yield_changes, n_components=3)")]
 fn yield_pca_fit(
     py: Python<'_>,
@@ -1135,7 +1135,7 @@ fn yield_pca_fit(
 ///     If the panel is malformed or ``component_index`` / ``n_components``
 ///     are out of range.
 #[pyfunction]
-#[pyo3(signature = (yield_changes, component_index, sigma_shock, n_components=3))]
+#[pyo3(signature = (yield_changes, component_index, sigma_shock, n_components = dtsm::DEFAULT_PCA_COMPONENTS))]
 #[pyo3(text_signature = "(yield_changes, component_index, sigma_shock, n_components=3)")]
 fn yield_pca_scenario(
     yield_changes: Vec<Vec<f64>>,

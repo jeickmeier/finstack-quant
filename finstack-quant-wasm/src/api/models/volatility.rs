@@ -7,13 +7,16 @@
 
 use crate::api::core::market_data::{JsFxDeltaVolSurface, JsVolCube};
 use crate::utils::input::{
-    from_js_json, invalid_type, js_bool, js_f64, js_f64_seq, js_opt_f64, js_uint,
+    from_js_json, invalid_type, js_bool, js_f64, js_f64_matrix, js_f64_seq, js_opt_f64, js_uint,
 };
 use crate::utils::{to_js_err, to_js_value};
+use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_models::volatility as vol;
+use finstack_quant_models::volatility::arbitrage as model_arbitrage;
 use finstack_quant_models::volatility::sabr::{
     SabrCalibrator, SabrModel, SabrParameters, SabrShift, SabrSmile,
 };
+use finstack_quant_models::volatility::svi::SviParams;
 use wasm_bindgen::prelude::*;
 
 /// SABR model parameters `(alpha, beta, nu, rho)` with optional `shift`.
@@ -741,4 +744,349 @@ mod tests {
         assert!(fitted.is_shifted());
         assert!((shift - 0.02).abs() < 1e-12);
     }
+}
+
+#[wasm_bindgen(js_class = SabrSmile)]
+impl JsSabrSmile {
+    /// Forward price or rate the smile is built around.
+    #[wasm_bindgen(getter)]
+    pub fn forward(&self) -> f64 {
+        self.inner.forward()
+    }
+
+    /// Time to expiry of the smile, in years.
+    #[wasm_bindgen(getter)]
+    pub fn t(&self) -> f64 {
+        self.inner.time_to_expiry()
+    }
+}
+
+/// SVI total implied variance `w(k)` at a log-moneyness.
+///
+/// Twin of the Rust and Python `SviParams.total_variance`.
+/// @param params - `SviParams` object or JSON (`a`, `b`, `rho`, `m`, `sigma`).
+/// @param k - Log-moneyness `ln(K / F)`.
+/// @returns Total variance `sigma^2 * T` at `k`.
+///
+/// # Errors
+///
+/// Throws a `validation` error if `params` is malformed or fails validation.
+#[wasm_bindgen(js_name = sviTotalVariance)]
+pub fn svi_total_variance(params: JsValue, k: JsValue) -> Result<f64, JsValue> {
+    let params: SviParams = from_js_json(&params, "params")?;
+    Ok(params.total_variance(js_f64(&k, "k")?))
+}
+
+/// Durrleman's function `g(k)` of an SVI slice; the slice is free of butterfly
+/// arbitrage where `g(k) >= 0`.
+///
+/// Twin of the Rust and Python `SviParams.durrleman_g`.
+/// @param params - `SviParams` object or JSON (`a`, `b`, `rho`, `m`, `sigma`).
+/// @param k - Log-moneyness `ln(K / F)`.
+/// @returns `g(k)`; `-Infinity` where the total variance is not positive.
+///
+/// # Errors
+///
+/// Throws a `validation` error if `params` is malformed or fails validation.
+#[wasm_bindgen(js_name = sviDurrlemanG)]
+pub fn svi_durrleman_g(params: JsValue, k: JsValue) -> Result<f64, JsValue> {
+    let params: SviParams = from_js_json(&params, "params")?;
+    Ok(params.durrleman_g(js_f64(&k, "k")?))
+}
+
+fn grid_tolerance(tolerance: Option<&JsValue>) -> Result<f64, JsValue> {
+    Ok(js_opt_f64(tolerance, "tolerance")?.unwrap_or(model_arbitrage::DEFAULT_GRID_TOLERANCE))
+}
+
+/// Butterfly-arbitrage check on a strike by expiry volatility grid.
+/// @param strikes - Strictly increasing strike grid shared by every row.
+/// @param expiries - Strictly increasing expiries in years, one per row of `vols`.
+/// @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
+/// @param forward_prices - One forward price to broadcast, or one per expiry.
+/// @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_GRID_TOLERANCE` (1e-6).
+/// @returns The `ArbitrageViolation` objects found (empty when the grid is clean).
+///
+/// # Errors
+///
+/// Throws a `validation` error if the grid or forwards are invalid or the
+/// tolerance is negative or non-finite.
+#[wasm_bindgen(js_name = checkButterflyGrid)]
+pub fn check_butterfly_grid(
+    strikes: JsValue,
+    expiries: JsValue,
+    vols: JsValue,
+    forward_prices: JsValue,
+    tolerance: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    let violations = model_arbitrage::check_butterfly_grid(
+        &js_f64_seq(&strikes, "strikes")?,
+        &js_f64_seq(&expiries, "expiries")?,
+        &js_f64_matrix(&vols, "vols")?,
+        js_f64_seq(&forward_prices, "forwardPrices")?,
+        grid_tolerance(tolerance.as_ref())?,
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&violations)
+}
+
+/// Calendar-spread arbitrage check on a strike by expiry volatility grid.
+/// @param strikes - Strictly increasing strike grid shared by every row.
+/// @param expiries - Strictly increasing expiries in years, one per row of `vols`.
+/// @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
+/// @param forward_prices - One forward price to broadcast, or one per expiry.
+/// @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_GRID_TOLERANCE` (1e-6).
+/// @returns The `ArbitrageViolation` objects found (empty when the grid is clean).
+///
+/// # Errors
+///
+/// Throws a `validation` error if the grid or forwards are invalid or the
+/// tolerance is negative or non-finite.
+#[wasm_bindgen(js_name = checkCalendarSpreadGrid)]
+pub fn check_calendar_spread_grid(
+    strikes: JsValue,
+    expiries: JsValue,
+    vols: JsValue,
+    forward_prices: JsValue,
+    tolerance: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    let violations = model_arbitrage::check_calendar_spread_grid(
+        &js_f64_seq(&strikes, "strikes")?,
+        &js_f64_seq(&expiries, "expiries")?,
+        &js_f64_matrix(&vols, "vols")?,
+        js_f64_seq(&forward_prices, "forwardPrices")?,
+        grid_tolerance(tolerance.as_ref())?,
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&violations)
+}
+
+/// Local-volatility density check (Dupire denominator positivity) on a volatility grid.
+/// @param strikes - Strictly increasing strike grid shared by every row.
+/// @param expiries - Strictly increasing expiries in years, one per row of `vols`.
+/// @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
+/// @param forward_prices - One forward price per expiry.
+/// @returns The `ArbitrageViolation` objects found (empty when the grid is clean).
+///
+/// # Errors
+///
+/// Throws a `validation` error if the grid is invalid or the forwards do not
+/// match the expiries.
+#[wasm_bindgen(js_name = checkLocalVolDensityGrid)]
+pub fn check_local_vol_density_grid(
+    strikes: JsValue,
+    expiries: JsValue,
+    vols: JsValue,
+    forward_prices: JsValue,
+) -> Result<JsValue, JsValue> {
+    let violations = model_arbitrage::check_local_vol_density_grid(
+        &js_f64_seq(&strikes, "strikes")?,
+        &js_f64_seq(&expiries, "expiries")?,
+        &js_f64_matrix(&vols, "vols")?,
+        js_f64_seq(&forward_prices, "forwardPrices")?,
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&violations)
+}
+
+/// Run every static-arbitrage check on a strike by expiry volatility grid.
+/// @param strikes - Strictly increasing strike grid shared by every row.
+/// @param expiries - Strictly increasing expiries in years, one per row of `vols`.
+/// @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
+/// @param forward_prices - One forward price to broadcast, or one per expiry.
+/// @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_GRID_TOLERANCE` (1e-6).
+/// @returns The `ArbitrageReport` object (`vol_surface_id`, `violations`, `passed`, `counts_by_type`, `counts_by_severity`).
+///
+/// # Errors
+///
+/// Throws a `validation` error if the grid or forwards are invalid or the
+/// tolerance is negative or non-finite.
+#[wasm_bindgen(js_name = checkSurfaceGrid)]
+pub fn check_surface_grid(
+    strikes: JsValue,
+    expiries: JsValue,
+    vols: JsValue,
+    forward_prices: JsValue,
+    tolerance: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    let report = model_arbitrage::check_surface_grid(
+        &js_f64_seq(&strikes, "strikes")?,
+        &js_f64_seq(&expiries, "expiries")?,
+        &js_f64_matrix(&vols, "vols")?,
+        js_f64_seq(&forward_prices, "forwardPrices")?,
+        grid_tolerance(tolerance.as_ref())?,
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&report)
+}
+
+/// Interpolate a volatility surface; coordinates outside the grid are rejected.
+/// @param surface - `VolSurface` object or JSON in the canonical wire form (`id`, `expiries`, `strikes`, `vols_row_major`, ...), such as a `materializeCube*` result.
+/// @param expiry - Option expiry in years, within the surface grid.
+/// @param strike - Strike in the surface's own units, within the surface grid.
+/// @returns The interpolated volatility, as a decimal.
+///
+/// # Errors
+///
+/// Throws a `validation` error if `surface` is malformed or a coordinate is
+/// outside the grid.
+#[wasm_bindgen(js_name = getSurfaceVol)]
+pub fn get_surface_vol(surface: JsValue, expiry: JsValue, strike: JsValue) -> Result<f64, JsValue> {
+    let surface: VolSurface = from_js_json(&surface, "surface")?;
+    vol::get_surface_vol(
+        &surface,
+        js_f64(&expiry, "expiry")?,
+        js_f64(&strike, "strike")?,
+    )
+    .map_err(to_js_err)
+}
+
+/// Interpolate a volatility surface with flat clamping to the grid edges.
+/// @param surface - `VolSurface` object or JSON in the canonical wire form.
+/// @param expiry - Option expiry in years; clamped to the surface grid.
+/// @param strike - Strike in the surface's own units; clamped to the surface grid.
+/// @returns The interpolated volatility, as a decimal; `NaN` for non-finite coordinates.
+///
+/// # Errors
+///
+/// Throws a `validation` error if `surface` is malformed.
+#[wasm_bindgen(js_name = getSurfaceVolClamped)]
+pub fn get_surface_vol_clamped(
+    surface: JsValue,
+    expiry: JsValue,
+    strike: JsValue,
+) -> Result<f64, JsValue> {
+    let surface: VolSurface = from_js_json(&surface, "surface")?;
+    Ok(vol::get_surface_vol_clamped(
+        &surface,
+        js_f64(&expiry, "expiry")?,
+        js_f64(&strike, "strike")?,
+    ))
+}
+
+/// Materialize the Black volatility slice of a SABR cube at one underlying tenor.
+/// @param cube - `core.VolCube` handle.
+/// @param tenor - Underlying tenor in years, within the cube grid.
+/// @param strikes - Strictly increasing strikes of the output surface.
+/// @returns The expiry by strike `VolSurface` object in its canonical wire form.
+///
+/// # Errors
+///
+/// Throws a `validation` error if the tenor is outside the cube, the strikes
+/// are invalid, or a SABR evaluation fails.
+#[wasm_bindgen(js_name = materializeCubeTenorSlice)]
+pub fn materialize_cube_tenor_slice(
+    cube: &JsVolCube,
+    tenor: JsValue,
+    strikes: JsValue,
+) -> Result<JsValue, JsValue> {
+    let surface = vol::materialize_cube_tenor_slice(
+        &cube.inner,
+        js_f64(&tenor, "tenor")?,
+        &js_f64_seq(&strikes, "strikes")?,
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&surface)
+}
+
+/// Materialize the normal (Bachelier) volatility slice of a SABR cube at one underlying tenor.
+/// @param cube - `core.VolCube` handle.
+/// @param tenor - Underlying tenor in years, within the cube grid.
+/// @param strikes - Strictly increasing strikes of the output surface.
+/// @returns The expiry by strike `VolSurface` object of normal volatilities.
+///
+/// # Errors
+///
+/// Throws a `validation` error if the tenor is outside the cube, the strikes
+/// are invalid, or a SABR evaluation fails.
+#[wasm_bindgen(js_name = materializeCubeTenorSliceNormal)]
+pub fn materialize_cube_tenor_slice_normal(
+    cube: &JsVolCube,
+    tenor: JsValue,
+    strikes: JsValue,
+) -> Result<JsValue, JsValue> {
+    let surface = vol::materialize_cube_tenor_slice_normal(
+        &cube.inner,
+        js_f64(&tenor, "tenor")?,
+        &js_f64_seq(&strikes, "strikes")?,
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&surface)
+}
+
+/// Materialize the Black volatility slice of a SABR cube at one option expiry.
+/// @param cube - `core.VolCube` handle.
+/// @param expiry - Option expiry in years, within the cube grid.
+/// @param strikes - Strictly increasing strikes of the output surface.
+/// @returns The tenor by strike `VolSurface` object in its canonical wire form.
+///
+/// # Errors
+///
+/// Throws a `validation` error if the expiry is outside the cube, the strikes
+/// are invalid, or a SABR evaluation fails.
+#[wasm_bindgen(js_name = materializeCubeExpirySlice)]
+pub fn materialize_cube_expiry_slice(
+    cube: &JsVolCube,
+    expiry: JsValue,
+    strikes: JsValue,
+) -> Result<JsValue, JsValue> {
+    let surface = vol::materialize_cube_expiry_slice(
+        &cube.inner,
+        js_f64(&expiry, "expiry")?,
+        &js_f64_seq(&strikes, "strikes")?,
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&surface)
+}
+
+/// Materialize the normal (Bachelier) volatility slice of a SABR cube at one option expiry.
+/// @param cube - `core.VolCube` handle.
+/// @param expiry - Option expiry in years, within the cube grid.
+/// @param strikes - Strictly increasing strikes of the output surface.
+/// @returns The tenor by strike `VolSurface` object of normal volatilities.
+///
+/// # Errors
+///
+/// Throws a `validation` error if the expiry is outside the cube, the strikes
+/// are invalid, or a SABR evaluation fails.
+#[wasm_bindgen(js_name = materializeCubeExpirySliceNormal)]
+pub fn materialize_cube_expiry_slice_normal(
+    cube: &JsVolCube,
+    expiry: JsValue,
+    strikes: JsValue,
+) -> Result<JsValue, JsValue> {
+    let surface = vol::materialize_cube_expiry_slice_normal(
+        &cube.inner,
+        js_f64(&expiry, "expiry")?,
+        &js_f64_seq(&strikes, "strikes")?,
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&surface)
+}
+
+/// Materialize an FX delta-quoted surface as an expiry by strike volatility surface.
+/// @param surface - `core.FxDeltaVolSurface` handle.
+/// @param spot - FX spot rate (domestic per unit of foreign); positive.
+/// @param domestic_rate - Continuously compounded domestic rate, as a decimal.
+/// @param foreign_rate - Continuously compounded foreign rate, as a decimal.
+/// @returns The strike-space `VolSurface` object in its canonical wire form.
+///
+/// # Errors
+///
+/// Throws a `validation` error if an input is non-finite or out of range or a
+/// delta-to-strike conversion fails.
+#[wasm_bindgen(js_name = materializeFxDeltaSurface)]
+pub fn materialize_fx_delta_surface(
+    surface: &JsFxDeltaVolSurface,
+    spot: JsValue,
+    domestic_rate: JsValue,
+    foreign_rate: JsValue,
+) -> Result<JsValue, JsValue> {
+    let surface = vol::materialize_fx_delta_surface(
+        &surface.inner,
+        js_f64(&spot, "spot")?,
+        js_f64(&domestic_rate, "domesticRate")?,
+        js_f64(&foreign_rate, "foreignRate")?,
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&surface)
 }

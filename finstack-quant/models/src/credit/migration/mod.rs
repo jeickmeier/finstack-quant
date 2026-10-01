@@ -54,4 +54,4 @@ pub use error::MigrationError;
 pub use generator::GeneratorMatrix;
 pub use matrix::TransitionMatrix;
 pub use scale::RatingScale;
-pub use simulation::{MigrationSimulator, RatingPath};
+pub use simulation::{default_rate, MigrationSimulator, RatingPath};

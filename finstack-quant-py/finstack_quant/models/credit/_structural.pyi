@@ -2659,8 +2659,10 @@ class ToggleExerciseModel:
             Observed credit state at the decision date.
         u : float
             Uniform draw in ``[0, 1)``; ignored by threshold rules, used as the
-            Bernoulli draw by stochastic rules. Optimal-exercise rules need
-            nested simulation and return ``False`` here.
+            Bernoulli draw by stochastic rules (PIK when ``u`` is below the
+            logistic probability). Optimal-exercise rules run their nested
+            simulation with a seed derived from ``u``, so equal draws give equal
+            decisions.
 
         Returns
         -------

@@ -69,6 +69,17 @@ pub enum CreditScoringError {
     },
 }
 
+impl CreditScoringError {
+    /// Classify this error for host-language exception mapping.
+    ///
+    /// Every variant rejects a caller-supplied financial ratio or indicator,
+    /// so the kind is always validation.
+    #[must_use]
+    pub fn kind(&self) -> finstack_quant_core::error::ErrorKind {
+        finstack_quant_core::error::ErrorKind::Validation
+    }
+}
+
 /// Validate that a value is finite, returning `CreditScoringError::NonFiniteInput` if not.
 pub(crate) fn check_finite(field: &'static str, value: f64) -> Result<(), CreditScoringError> {
     if value.is_finite() {

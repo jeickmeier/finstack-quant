@@ -149,7 +149,7 @@ pub fn core_to_py(e: finstack_quant_core::Error) -> PyErr {
 ///
 /// Every variant is a validation failure, so all map to `ValueError`.
 pub fn pd_calibration_to_py(e: finstack_quant_models::credit::pd::PdCalibrationError) -> PyErr {
-    PyValueError::new_err(format_chain(&e))
+    kind_to_py(e.kind(), format_chain(&e))
 }
 
 /// Convert a `MigrationError` into a Python exception by its Rust-owned
@@ -339,7 +339,7 @@ pub fn serde_json_to_py(err: serde_json::Error, context: &str) -> PyErr {
 /// Every variant (non-finite ratio, non-binary indicator) is a validation
 /// failure of the caller's inputs, so all map to `ValueError`.
 pub fn scoring_to_py(e: finstack_quant_models::credit::scoring::CreditScoringError) -> PyErr {
-    PyValueError::new_err(format_chain(&e))
+    kind_to_py(e.kind(), format_chain(&e))
 }
 
 /// Convert a `finstack_quant_models::correlation::Error` into a Python

@@ -1,5 +1,4 @@
 use numpy::{PyReadonlyArray2, PyUntypedArrayMethods};
-use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -296,13 +295,8 @@ pub(super) fn position_component_var(
 ) -> PyResult<f64> {
     decomp
         .inner
-        .var_contributions
-        .iter()
-        .find(|c| c.position_id.as_str() == position_id)
-        .map(|c| c.component_var)
-        .ok_or_else(|| {
-            PyKeyError::new_err(format!("position '{position_id}' not in decomposition"))
-        })
+        .try_component_var(position_id)
+        .map_err(core_to_py)
 }
 
 /// One position's row in a ``ParametricEsDecompositionView``.

@@ -33,8 +33,10 @@ function structured(value, label) {
   return value;
 }
 
+const MODEL_CLASSES = ['AlmgrenChrissModel', 'KyleLambdaModel'];
+
 test('models.liquidity exposes exactly the moved API', () => {
-  assert.deepEqual(Object.keys(liquidity).sort(), expected);
+  assert.deepEqual(Object.keys(liquidity).sort(), [...MODEL_CLASSES, ...expected]);
   assert.equal(liquidity.kyleLambda.length, 3);
   for (const key of expected) assert.equal(typeof liquidity[key], 'function');
 });

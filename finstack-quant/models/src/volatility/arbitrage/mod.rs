@@ -272,6 +272,15 @@ pub fn check_surface(
     })
 }
 
+/// Violation tolerance the host bindings apply to the raw-grid checks
+/// ([`check_butterfly_grid`], [`check_calendar_spread_grid`],
+/// [`check_surface_grid`]) when the caller does not choose one.
+///
+/// Expressed in the units of each check's own violation magnitude (call-price
+/// convexity or total variance), so quote-level noise on a market grid is not
+/// reported as an arbitrage.
+pub const DEFAULT_GRID_TOLERANCE: f64 = 1e-6;
+
 /// Run a butterfly arbitrage check on volatility rows.
 ///
 /// # Arguments

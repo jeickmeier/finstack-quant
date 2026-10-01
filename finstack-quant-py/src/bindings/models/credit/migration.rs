@@ -5,17 +5,9 @@ use finstack_quant_models::credit::migration::{
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyModule};
-use rand::SeedableRng;
-use rand_pcg::Pcg64;
 
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::errors::{migration_to_py, serde_json_to_py, value_error};
-
-fn matrix_rows(data: &nalgebra::DMatrix<f64>) -> Vec<Vec<f64>> {
-    (0..data.nrows())
-        .map(|row| (0..data.ncols()).map(|col| data[(row, col)]).collect())
-        .collect()
-}
 
 /// Flatten a matrix argument into row-major data.
 ///
@@ -334,18 +326,14 @@ impl PyTransitionMatrix {
         self.inner.probability(from_, to).map_err(migration_to_py)
     }
 
-    /// Transition probability by state indices (no bounds checking beyond
-    /// the matrix dimension; raises ``IndexError`` when out of range).
+    /// Transition probability by state indices; raises ``ValueError`` when
+    /// either index is outside the scale.
     #[pyo3(signature = (from_, to))]
     #[pyo3(text_signature = "($self, from_, to)")]
     fn probability_by_index(&self, from_: usize, to: usize) -> PyResult<f64> {
-        let n = self.inner.n_states();
-        if from_ >= n || to >= n {
-            return Err(pyo3::exceptions::PyIndexError::new_err(format!(
-                "state index out of range for a {n}-state scale: ({from_}, {to})"
-            )));
-        }
-        Ok(self.inner.probability_by_index(from_, to))
+        self.inner
+            .try_probability_by_index(from_, to)
+            .map_err(migration_to_py)
     }
 
     /// One row of transition probabilities, indexed by destination state.
@@ -371,7 +359,7 @@ impl PyTransitionMatrix {
     /// Row-major copy of the underlying matrix as nested lists.
     #[pyo3(text_signature = "($self)")]
     fn to_matrix(&self) -> Vec<Vec<f64>> {
-        matrix_rows(self.inner.as_matrix())
+        self.inner.to_rows()
     }
 
     /// Labelled square ``pandas.DataFrame`` (index = origin, columns = destination).
@@ -540,7 +528,7 @@ impl PyGeneratorMatrix {
     /// Row-major copy of the underlying matrix as nested lists.
     #[pyo3(text_signature = "($self)")]
     fn to_matrix(&self) -> Vec<Vec<f64>> {
-        matrix_rows(self.inner.as_matrix())
+        self.inner.to_rows()
     }
 
     /// Labelled square ``pandas.DataFrame`` (index = origin, columns = destination).
@@ -746,11 +734,7 @@ impl PyRatingPaths {
     /// Fraction of paths that reached the default state.
     #[getter]
     fn default_rate(&self) -> f64 {
-        if self.inner.is_empty() {
-            return 0.0;
-        }
-        let defaulted = self.inner.iter().filter(|p| p.defaulted()).count();
-        defaulted as f64 / self.inner.len() as f64
+        finstack_quant_models::credit::migration::default_rate(&self.inner)
     }
 
     /// Long-format ``pandas.DataFrame`` of every transition.
@@ -893,10 +877,7 @@ impl PyMigrationSimulator {
         seed: u64,
     ) -> PyResult<PyRatingPaths> {
         let paths = py
-            .detach(|| {
-                let mut rng = Pcg64::seed_from_u64(seed);
-                self.inner.simulate(initial_state, n_paths, &mut rng)
-            })
+            .detach(|| self.inner.simulate_seeded(initial_state, n_paths, seed))
             .map_err(migration_to_py)?;
         Ok(PyRatingPaths { inner: paths })
     }
@@ -921,10 +902,7 @@ impl PyMigrationSimulator {
         n_paths_per_state: usize,
         seed: u64,
     ) -> PyResult<PyTransitionMatrix> {
-        let matrix = py.detach(|| {
-            let mut rng = Pcg64::seed_from_u64(seed);
-            self.inner.empirical_matrix(n_paths_per_state, &mut rng)
-        });
+        let matrix = py.detach(|| self.inner.empirical_matrix_seeded(n_paths_per_state, seed));
         matrix
             .map(PyTransitionMatrix::from_inner)
             .map_err(migration_to_py)

@@ -286,6 +286,26 @@ impl PositionRiskDecomposition {
             .find(|c| c.position_id == position_id)
             .map(|c| c.component_var)
     }
+
+    /// Look up one position's component VaR, failing when the position is
+    /// absent.
+    ///
+    /// # Arguments
+    ///
+    /// * `position_id` - Position identifier exactly as it appears in
+    ///   [`PositionVarContribution::position_id`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::error::InputError::NotFound`] when the
+    /// decomposition holds no contribution for `position_id`.
+    pub fn try_component_var(&self, position_id: &str) -> finstack_quant_core::Result<f64> {
+        self.component_var(position_id).ok_or_else(|| {
+            finstack_quant_core::Error::Input(finstack_quant_core::error::InputError::NotFound {
+                id: format!("position '{position_id}' in decomposition"),
+            })
+        })
+    }
 }
 
 // Stress attribution (historical)

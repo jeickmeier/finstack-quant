@@ -19,6 +19,8 @@ mod factor_schema_contract;
 mod factor_strictness;
 #[path = "fx_delta_vol_tests.rs"]
 mod fx_delta_vol_tests;
+#[path = "host_bridges.rs"]
+mod host_bridges;
 #[path = "liability_management.rs"]
 mod liability_management;
 #[path = "lookback_commodity_regressions.rs"]

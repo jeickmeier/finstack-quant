@@ -4,17 +4,7 @@ use super::results::{PyGbmPathSummary, PyMoneyEstimate};
 use crate::bindings::core::currency::extract_currency;
 use crate::errors::core_to_py;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_models::monte_carlo::registry::{self, ConvenienceDefaults};
 use pyo3::prelude::*;
-use std::str::FromStr;
-
-/// Resolve the embedded Python-binding defaults, mapping registry errors to
-/// Python exceptions.
-pub(super) fn py_mc_defaults() -> PyResult<&'static ConvenienceDefaults> {
-    registry::embedded_defaults()
-        .map(|defaults| &defaults.convenience)
-        .map_err(core_to_py)
-}
 
 /// Simulate a compact set of GBM spot paths through Rust path capture.
 ///
@@ -112,15 +102,10 @@ fn heston_satisfies_feller(kappa: f64, theta: f64, vol_of_vol: f64) -> bool {
 pub(super) fn resolve_currency(
     currency: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<finstack_quant_core::currency::Currency> {
-    match currency {
-        Some(obj) => extract_currency(obj),
-        None => {
-            let default_currency = &py_mc_defaults()?.default_currency;
-            finstack_quant_core::currency::Currency::from_str(default_currency).map_err(|e| {
-                crate::errors::value_error(format!("Failed to resolve default currency: {e}"))
-            })
-        }
-    }
+    finstack_quant_models::monte_carlo::convenience::resolve_currency(extract_optional_currency(
+        currency,
+    )?)
+    .map_err(core_to_py)
 }
 
 /// Extract an optional currency argument without applying any default.

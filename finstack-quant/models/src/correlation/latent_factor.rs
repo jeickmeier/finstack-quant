@@ -710,6 +710,28 @@ impl LatentMultiFactor {
         &self.cholesky_factor
     }
 
+    /// Generate correlated factor values, rejecting a draw vector of the
+    /// wrong length instead of panicking.
+    ///
+    /// # Arguments
+    ///
+    /// * `independent_z` - Independent standard normal draws, exactly one per
+    ///   factor, in factor order.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::FactorDrawLengthMismatch`] if `independent_z` does not
+    /// hold exactly [`Self::num_factors`] entries.
+    pub fn try_generate_correlated_factors(&self, independent_z: &[f64]) -> Result<Vec<f64>> {
+        if independent_z.len() != self.num_factors {
+            return Err(Error::FactorDrawLengthMismatch {
+                expected: self.num_factors,
+                actual: independent_z.len(),
+            });
+        }
+        Ok(self.generate_correlated_factors(independent_z))
+    }
+
     /// Generate correlated factor values from independent standard normal draws.
     ///
     /// # Arguments

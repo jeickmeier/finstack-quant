@@ -196,6 +196,16 @@ impl FactorCovarianceMatrix {
         self.data[i * self.n + j]
     }
 
+    /// Covariance entries as one row per factor, in [`Self::factor_ids`]
+    /// order.
+    #[must_use]
+    pub fn to_rows(&self) -> Vec<Vec<f64>> {
+        if self.n == 0 {
+            return Vec::new();
+        }
+        self.data.chunks(self.n).map(<[f64]>::to_vec).collect()
+    }
+
     /// Correlation at a known pair of axis indices, using cached standard
     /// deviations.
     ///

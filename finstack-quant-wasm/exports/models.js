@@ -18,6 +18,7 @@ export const models = {
   bsPrice: wasm.bsPrice,
   vanillaExpiryPayoff: wasm.vanillaExpiryPayoff,
   bsGreeks: wasm.bsGreeks,
+  bsGreeksIsValid: wasm.bsGreeksIsValid,
   bsImpliedVol: wasm.bsImpliedVol,
   black76ImpliedVol: wasm.black76ImpliedVol,
   black76Price: wasm.black76Price,

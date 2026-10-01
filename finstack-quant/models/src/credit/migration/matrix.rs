@@ -119,6 +119,36 @@ impl TransitionMatrix {
         self.data[(from, to)]
     }
 
+    /// Transition probability by row/column index, with bounds checking.
+    ///
+    /// # Arguments
+    ///
+    /// * `from` - Zero-based index of the starting state in scale order.
+    /// * `to` - Zero-based index of the ending state in scale order.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MigrationError::InvalidState`] if either index is outside the
+    /// scale.
+    pub fn try_probability_by_index(&self, from: usize, to: usize) -> Result<f64, MigrationError> {
+        let n_states = self.n_states();
+        for state in [from, to] {
+            if state >= n_states {
+                return Err(MigrationError::InvalidState { state, n_states });
+            }
+        }
+        Ok(self.data[(from, to)])
+    }
+
+    /// Transition probabilities as one row per starting state, in scale order.
+    #[must_use]
+    pub fn to_rows(&self) -> Vec<Vec<f64>> {
+        self.data
+            .row_iter()
+            .map(|row| row.iter().copied().collect())
+            .collect()
+    }
+
     /// Row of transition probabilities from a given state.
     ///
     /// # Errors

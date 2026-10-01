@@ -824,3 +824,22 @@ pub fn heston_price(
     let option_type = OptionType::from(is_call.unwrap_or(true));
     heston_price_core(spot, strike, expiry, &params, option_type, None).map_err(to_js_err)
 }
+
+/// Whether a set of Black-Scholes Greeks is internally consistent: gamma and
+/// vega non-negative and every value finite.
+///
+/// Twin of the Rust and Python `BsGreeks.is_valid`. Delta is not bounded here
+/// because its true bound `exp(-q T)` depends on the carry.
+/// @param greeks - `BsGreeks` object or JSON, as returned by `bsGreeks`.
+/// @returns `true` when the Greeks pass the consistency checks.
+///
+/// # Errors
+///
+/// Throws a `TypeError` if `greeks` is neither a string nor a plain object,
+/// and a `validation` error if it is malformed.
+#[wasm_bindgen(js_name = bsGreeksIsValid)]
+pub fn bs_greeks_is_valid(greeks: JsValue) -> Result<bool, JsValue> {
+    let greeks: finstack_quant_models::closed_form::BsGreeks =
+        crate::utils::input::from_js_json(&greeks, "greeks")?;
+    Ok(greeks.is_valid())
+}

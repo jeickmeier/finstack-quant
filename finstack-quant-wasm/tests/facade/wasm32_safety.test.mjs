@@ -54,13 +54,12 @@ test('correlation checks reject a wrapping dimension', () => {
 });
 
 test('Merton path simulation rejects sizes that overflow or cannot be allocated', () => {
-  const merton = models.credit.mertonModelJson(100.0, 0.25, 80.0, 0.05);
-  const simulate = (paths, steps) =>
-    models.credit.mertonSimulatePathsJson(merton, paths, steps, 1.0, 7n, false);
+  const merton = new models.credit.MertonModel(100.0, 0.25, 80.0, 0.05);
+  const simulate = (paths, steps) => merton.simulatePaths(paths, steps, 1.0, 7n, false);
   assert.throws(() => simulate(2 ** 32 - 1, 4), validation);
   assert.throws(() => simulate(1, 2 ** 32 - 1), validation);
   assert.throws(() => simulate(1e8, 4), validation);
-  assert.equal(JSON.parse(simulate(2, 4)).asset_values.length, 2 * 5);
+  assert.equal(simulate(2, 4).assetValues.length, 2 * 5);
 });
 
 test('Student-t tail dependence propagates NaN instead of trapping', () => {

@@ -401,11 +401,7 @@ impl PyMasterScale {
     /// Raises ``ValueError`` when any PD is non-finite or outside [0, 1].
     #[pyo3(text_signature = "($self, pds)")]
     fn map_pds<'py>(&self, py: Python<'py>, pds: Vec<f64>) -> PyResult<Bound<'py, PyAny>> {
-        let rows = pds
-            .iter()
-            .map(|pd| self.inner.map_pd(*pd))
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(pd_calibration_to_py)?;
+        let rows = self.inner.map_pds(&pds).map_err(pd_calibration_to_py)?;
         serde_rows_to_dataframe_with_schema(py, &rows, RESULT_COLUMNS)
     }
 

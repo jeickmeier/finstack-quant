@@ -28,6 +28,11 @@ use serde::{Deserialize, Serialize};
 
 use super::types::YieldPanel;
 
+/// Number of leading principal components kept by the host convenience
+/// functions (`yield_pca_fit`, `yield_pca_scenario`) when the caller does not
+/// choose one: level, slope and curvature.
+pub const DEFAULT_PCA_COMPONENTS: usize = 3;
+
 /// Serializable view of the leading components of a [`YieldPca`] fit.
 ///
 /// Produced by [`YieldPca::truncated`]; this is the wire form the language

@@ -5309,8 +5309,8 @@ class migration:
 
             Raises
             ------
-            IndexError
-                If an index is out of range.
+            ValueError
+                If an index is outside the rating scale.
             """
             ...
 

@@ -74,5 +74,5 @@ pub mod types;
 pub use diebold_li::{
     diebold_li_fit_factors, diebold_li_forecast, diebold_li_model, nelson_siegel_yields, DieboldLi,
 };
-pub use pca::{YieldPca, YieldPcaView};
+pub use pca::{YieldPca, YieldPcaView, DEFAULT_PCA_COMPONENTS};
 pub use types::{FactorTimeSeries, YieldForecast, YieldPanel};
