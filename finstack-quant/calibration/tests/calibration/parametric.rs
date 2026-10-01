@@ -8,7 +8,7 @@ use finstack_quant_calibration::api::schema::{
 use finstack_quant_calibration::quotes::ids::{Pillar, QuoteId};
 use finstack_quant_calibration::quotes::market_quote::MarketQuote;
 use finstack_quant_calibration::quotes::rates::RateQuote;
-use finstack_quant_calibration::CalibrationConfig;
+use finstack_quant_calibration::{CalibrationConfig, DiscountCurveSolveConfig};
 use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::market_data::term_structures::NsVariant;
 use finstack_quant_core::types::IndexId;
@@ -388,9 +388,14 @@ fn parametric_delivered_models_reprice_short_end_deposits_analytically() {
             contracts.push((quote.id().to_string(), start_time, end_time, accrual, rate));
             quotes.push(quote);
         }
-        let mut settings = CalibrationConfig::default();
-        settings.fail_on_bad_fit = true;
-        settings.discount_curve.validation_tolerance = 1e-8;
+        let settings = CalibrationConfig {
+            fail_on_bad_fit: true,
+            discount_curve: DiscountCurveSolveConfig {
+                validation_tolerance: 1e-8,
+                ..DiscountCurveSolveConfig::default()
+            },
+            ..CalibrationConfig::default()
+        };
         let envelope = CalibrationEnvelope {
             schema_url: None,
             schema: finstack_quant_calibration::api::schema::CalibrationSchema::CURRENT,
@@ -564,9 +569,14 @@ fn parametric_delivered_curve_reprices_ois_with_payment_lag_analytically() {
         contracts.push((quote.id().to_string(), terms, par_rate));
         quotes.push(quote);
     }
-    let mut settings = CalibrationConfig::default();
-    settings.fail_on_bad_fit = true;
-    settings.discount_curve.validation_tolerance = 1e-8;
+    let settings = CalibrationConfig {
+        fail_on_bad_fit: true,
+        discount_curve: DiscountCurveSolveConfig {
+            validation_tolerance: 1e-8,
+            ..DiscountCurveSolveConfig::default()
+        },
+        ..CalibrationConfig::default()
+    };
     let envelope = CalibrationEnvelope {
         schema_url: None,
         schema: finstack_quant_calibration::api::schema::CalibrationSchema::CURRENT,

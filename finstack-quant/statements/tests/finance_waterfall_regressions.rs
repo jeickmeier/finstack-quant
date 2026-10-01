@@ -679,8 +679,7 @@ fn residual_rebuild_reserves_due_principal_ahead_of_future_installments() {
         let path = schedule.outstanding_by_date().expect("economic path");
         let balance_before_advance = path
             .iter()
-            .filter(|(date, _)| *date <= date!(2025 - 04 - 02))
-            .next_back()
+            .rfind(|(date, _)| *date <= date!(2025 - 04 - 02))
             .expect("balance before the paid advance becomes effective")
             .1;
         assert_eq!(balance_before_advance.amount(), 50.0);

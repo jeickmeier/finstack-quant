@@ -307,9 +307,9 @@ flag "--all-features" help="Enable all crate features for clippy"
 flag "--lib" help="Clippy the library target only"
 '''
 run = '''
-set -e
+status=0
 pkg="${usage_package?}"
-cargo fmt --all -- --check
+cargo fmt --all -- --check || status=1
 features=""
 targets="--lib --tests --bins --examples"
 if [ "${usage_all_features:-false}" = "true" ]; then
@@ -318,7 +318,8 @@ fi
 if [ "${usage_lib:-false}" = "true" ]; then
   targets="--lib"
 fi
-cargo clippy -p "$pkg" $targets $features -- -D warnings
+cargo clippy -p "$pkg" $targets $features --keep-going -- -D warnings || status=1
+exit "$status"
 '''
 
 [tasks.rust-fix-crate]
@@ -362,11 +363,16 @@ run = "cargo clippy --workspace --lib --bins --tests --examples --all-features -
 # workspace (including `--all-features`) so feature-gated code is covered in one
 # pass at commit time.
 # Omit `--benches`: Criterion targets are compiled by `rust-bench`, not lint.
+# Both checks always run. A format failure does not skip clippy, and
+# `--keep-going` keeps linting the rest of the workspace after the first
+# crate error. The task still exits non-zero if either check fails.
 description = "Lint full workspace (use rust-lint-crate while iterating; run before commit/CI; skips benches)"
-run = [
-  "cargo fmt --all -- --check",
-  "cargo clippy --workspace --lib --bins --tests --examples --all-features -- -D warnings",
-]
+run = '''
+status=0
+cargo fmt --all -- --check || status=1
+cargo clippy --workspace --lib --bins --tests --examples --all-features --keep-going -- -D warnings || status=1
+exit "$status"
+'''
 
 [tasks.rust-audit]
 description = "Audit Rust dependencies via cargo-deny"

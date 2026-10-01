@@ -1391,7 +1391,7 @@ mod tests {
             for stochastic_rates in [false, true] {
                 let mut path_facility = facility.clone();
                 path_facility.draw_repay_spec =
-                    DrawRepaySpec::Stochastic(StochasticUtilizationSpec {
+                    DrawRepaySpec::Stochastic(Box::new(StochasticUtilizationSpec {
                         utilization_process: UtilizationProcess::MeanReverting {
                             theta: 1.0,
                             kappa: 0.1,
@@ -1400,7 +1400,7 @@ mod tests {
                         },
                         use_sobol_qmc: false,
                         mc_config: None,
-                    });
+                    }));
                 let engine =
                     CashflowEngine::new(&path_facility, Some(&market), as_of, fixing_series)
                         .expect("path engine");
