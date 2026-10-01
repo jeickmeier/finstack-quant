@@ -393,7 +393,7 @@ test('structured-credit deal analytics match Python', () => {
     sc.as_of,
     8
   );
-  assert.equal(Number(priced.num_paths), sc.stochastic_paths);
+  assert.equal(priced.num_paths, sc.stochastic_paths);
   close(Number(priced.npv.amount), sc.stochastic_npv, 1e-4, 'stochastic npv');
   assert.throws(
     () => deal.trancheCashflows('Z', sc.market, sc.as_of),

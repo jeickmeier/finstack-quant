@@ -630,7 +630,7 @@ impl JsStructuredCredit {
         let num_paths = crate::utils::input::js_opt_uint(num_paths.as_ref(), "numPaths")?;
         let antithetic =
             crate::utils::input::js_opt_bool(antithetic.as_ref(), "antithetic")?.unwrap_or(true);
-        crate::utils::to_js_value_with_bigints(
+        crate::utils::to_js_value(
             &self
                 .inner
                 .price_stochastic_monte_carlo(&market, as_of, num_paths, antithetic)
