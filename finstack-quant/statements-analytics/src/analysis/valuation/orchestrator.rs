@@ -8,7 +8,7 @@ use crate::analysis::credit::{compute_credit_context, CreditContextMetrics, Cred
 use crate::analysis::valuation::corporate::{CorporateValuationResult, DcfOptions};
 use finstack_quant_core::dates::{Date, Period, PeriodId};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_statements::checks::CheckSuite;
+use finstack_quant_statements::checks::{CheckSuite, CheckSuiteSpec};
 use finstack_quant_statements::error::{Error, Result};
 use finstack_quant_statements::evaluator::StatementResult;
 use finstack_quant_statements::types::FinancialModelSpec;
@@ -476,6 +476,105 @@ impl CorporateAnalysisBuilder {
     }
 }
 
+/// Serializable inputs of [`run_corporate_analysis`] beyond the model and market.
+///
+/// Every field is optional; a missing key takes the default described on the
+/// field. This is the one request shape both host bindings hand to the
+/// pipeline, so the "DCF needs a terminal value" rule lives here rather than
+/// in a binding.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields, default)]
+pub struct CorporateAnalysisOptions {
+    /// Weighted average cost of capital as a decimal (`0.10` = 10%). Setting it
+    /// enables the DCF equity valuation and requires `terminal_value`.
+    pub wacc: Option<f64>,
+    /// Terminal-value method for the DCF; required when `wacc` is set and
+    /// ignored otherwise.
+    pub terminal_value: Option<TerminalValueSpec>,
+    /// Flat net debt in model currency used instead of the model-derived
+    /// equity bridge; only read when `wacc` is set.
+    pub net_debt_override: Option<f64>,
+    /// Statement node supplying cash flow available for debt service; `None`
+    /// leaves DSCR out of the credit metrics.
+    pub cfads_node: Option<String>,
+    /// Statement node used as the interest-coverage numerator; `None` uses
+    /// `"ebitda"`.
+    pub interest_coverage_node: Option<String>,
+    /// Check suite run against the statement evaluation. DCF and
+    /// capital-structure analyses require one that includes the `non_finite`
+    /// built-in check.
+    pub check_suite: Option<CheckSuiteSpec>,
+    /// Valuation date (ISO `YYYY-MM-DD`); required when a market context is
+    /// supplied.
+    #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
+    )]
+    pub as_of: Option<Date>,
+    /// Statement node supplying a per-period LTV denominator; `None`
+    /// broadcasts a positive DCF enterprise value instead.
+    pub ltv_value_node: Option<String>,
+}
+
+/// Run the corporate analysis pipeline from one serializable request.
+///
+/// Assembles a [`CorporateAnalysisBuilder`] from `options` and analyzes the
+/// model: statement evaluation, the optional DCF equity valuation and the
+/// per-instrument credit metrics.
+///
+/// # Arguments
+///
+/// * `model` - Financial model to evaluate; its metadata must carry a
+///   `currency` when a DCF is requested.
+/// * `options` - Optional DCF, coverage, check-suite, valuation-date and LTV
+///   settings; see [`CorporateAnalysisOptions`] for each default.
+/// * `market` - Market context for statement evaluation and instrument
+///   pricing; requires `options.as_of`. `None` evaluates without market data.
+///
+/// # Errors
+///
+/// Returns an error when `options.wacc` is set without
+/// `options.terminal_value`, the check suite cannot be resolved, `market` is
+/// supplied without `options.as_of`, or the pipeline itself fails (see
+/// [`CorporateAnalysisBuilder::analyze`]).
+pub fn run_corporate_analysis(
+    model: FinancialModelSpec,
+    options: CorporateAnalysisOptions,
+    market: Option<MarketContext>,
+) -> Result<CorporateAnalysis> {
+    let mut builder = CorporateAnalysisBuilder::new(model);
+    if let Some(node) = options.interest_coverage_node.as_deref() {
+        builder = builder.interest_coverage_node(node);
+    }
+    if let Some(node) = options.cfads_node.as_deref() {
+        builder = builder.cfads_node(node);
+    }
+    if let Some(spec) = options.check_suite.as_ref() {
+        builder = builder.checks(spec.resolve()?);
+    }
+    if let Some(wacc) = options.wacc {
+        let terminal_value = options
+            .terminal_value
+            .ok_or_else(|| Error::invalid_input("terminal_value is required when wacc is set"))?;
+        builder = builder.dcf(wacc, terminal_value);
+        if let Some(net_debt) = options.net_debt_override {
+            builder = builder.net_debt_override(net_debt);
+        }
+    }
+    if let Some(market) = market {
+        builder = builder.market(market);
+    }
+    if let Some(as_of) = options.as_of {
+        builder = builder.as_of(as_of);
+    }
+    if let Some(node) = options.ltv_value_node.as_deref() {
+        builder = builder.ltv_value_node(node);
+    }
+    builder.analyze()
+}
+
 /// Per-period LTV denominators for [`compute_credit_context`].
 ///
 /// A statement node, when configured, supplies `value[t]` (missing or
@@ -585,6 +684,57 @@ mod tests {
                 &PeriodId::quarter(2025, 1).expect("valid period fixture")
             )
             .is_some());
+    }
+
+    #[test]
+    fn run_corporate_analysis_statement_only_uses_defaults() {
+        let model = ModelBuilder::new("test")
+            .periods("2025Q1..Q1", None)
+            .expect("periods")
+            .value(
+                "revenue",
+                &[(
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(1_000_000.0),
+                )],
+            )
+            .build()
+            .expect("model");
+
+        let options: CorporateAnalysisOptions = serde_json::from_str("{}").expect("empty options");
+        let result = run_corporate_analysis(model, options, None).expect("statement-only");
+
+        assert!(result.equity.is_none());
+        assert_eq!(result.statement.nodes.len(), 1);
+    }
+
+    #[test]
+    fn run_corporate_analysis_requires_terminal_value_with_wacc() {
+        let model = ModelBuilder::new("test")
+            .periods("2025Q1..Q1", None)
+            .expect("periods")
+            .value(
+                "revenue",
+                &[(
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(1_000_000.0),
+                )],
+            )
+            .build()
+            .expect("model");
+        let options = CorporateAnalysisOptions {
+            wacc: Some(0.10),
+            ..CorporateAnalysisOptions::default()
+        };
+
+        let error = run_corporate_analysis(model, options, None).expect_err("missing terminal");
+
+        assert!(error.to_string().contains("terminal_value is required"));
+    }
+
+    #[test]
+    fn corporate_analysis_options_reject_unknown_keys() {
+        assert!(serde_json::from_str::<CorporateAnalysisOptions>(r#"{"waccc": 0.1}"#).is_err());
     }
 
     #[test]

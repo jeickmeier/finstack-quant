@@ -127,20 +127,6 @@ NON_MAINTAINED_SERDE_EXCEPTIONS = (
         "Embedded rating-scale registry uses component validation and is explicitly outside "
         "the maintained public persistence catalog.",
     ),
-    *_computed_output("statements", "src/adjustments/types.rs", ("NormalizationResult",)),
-    *_in_process_spec(
-        "statements",
-        "src/checks/suite.rs",
-        ("CheckSuiteSpec", "BuiltinCheckSpec", "FormulaCheckSpec"),
-    ),
-    *_classification(
-        "statements",
-        "src/registry/schema.rs",
-        ("MetricRegistry",),
-        "internal-registry-document",
-        "Embedded statement-metric registry has registry-specific validation and is outside "
-        "the maintained public persistence catalog.",
-    ),
 )
 
 RESULT_ALIAS_EXCEPTIONS = tuple(

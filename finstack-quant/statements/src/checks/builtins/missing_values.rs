@@ -15,6 +15,7 @@ use crate::Result;
 /// `CheckResult::passed` is always `true`; the check surfaces gaps without
 /// failing a pipeline gate.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct MissingValueCheck {
     /// Nodes that must have values in every in-scope period.
     pub required_nodes: Vec<NodeId>,

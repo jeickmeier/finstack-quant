@@ -250,7 +250,7 @@ test('producer results feed consumers directly as objects', () => {
     },
     schema_version: 1,
   };
-  const results = statements.evaluateModel(model);
+  const results = new statements.Evaluator().evaluate(model);
   assert.deepEqual(
     statements_analytics.creditAssessment(results, '2025Q1'),
     statements_analytics.creditAssessment(JSON.stringify(results), '2025Q1')

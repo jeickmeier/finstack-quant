@@ -184,7 +184,7 @@ class DependencyTracer:
         DependencyTree
             Typed tree rooted at ``node_id`` with its complete upstream
             dependency hierarchy; ``to_json()`` matches the WASM
-            ``dependencyTree`` result.
+            ``DependencyTracer.dependencyTree`` result.
 
         Raises
         ------
@@ -201,7 +201,7 @@ class DependencyTracer:
 
         The root is on the first line; every dependency follows on its own
         line behind ``├──`` / ``└──`` connectors, indented by depth, with its
-        formula in parentheses. Identical to the WASM ``dependencyTreeText``.
+        formula in parentheses. Identical to the WASM ``DependencyTracer.dependencyTreeText``.
 
         Parameters
         ----------
@@ -324,7 +324,7 @@ class DependencyTree:
     Dependency tree of one statement node (the Rust ``DependencyTree``).
 
     Returned by :meth:`DependencyTracer.dependency_tree`; its JSON form is the
-    WASM ``dependencyTree`` result.
+    WASM ``DependencyTracer.dependencyTree`` result.
 
     Examples
     --------
@@ -397,7 +397,7 @@ class DependencyTree:
         ----------
         json : str
             JSON document produced by :meth:`to_json` or the WASM
-            ``dependencyTree`` result; unknown fields are rejected.
+            ``DependencyTracer.dependencyTree`` result; unknown fields are rejected.
 
         Returns
         -------
@@ -8352,7 +8352,7 @@ class SensitivityResult:
 
         Raises
         ------
-        IndexError
+        ValueError
             If ``scenario_index`` is outside the evaluated scenario range.
         """
     def get_value(self, scenario_index: int, node_id: str, period: str) -> float | None:
@@ -8376,10 +8376,9 @@ class SensitivityResult:
 
         Raises
         ------
-        IndexError
-            If ``scenario_index`` is outside the evaluated scenario range.
         ValueError
-            If ``period`` is not a parsable period id.
+            If ``scenario_index`` is outside the evaluated scenario range, or
+            ``period`` is not a parsable period id.
         """
 
 class Stage:
@@ -11003,7 +11002,7 @@ def run_corporate_analysis(
     terminal_value: Any | None = None,
     net_debt_override: float | None = None,
     cfads_node: str | None = None,
-    interest_coverage_node: str = "ebitda",
+    interest_coverage_node: str | None = None,
     check_suite: Any | None = None,
     market: Any | None = None,
     as_of: Any | None = None,
@@ -11012,7 +11011,8 @@ def run_corporate_analysis(
     """Run the full corporate analysis pipeline.
 
     Evaluates statements and optionally runs DCF equity valuation plus credit
-    context through the Rust ``CorporateAnalysisBuilder``.
+    context through the Rust ``run_corporate_analysis`` (the same entry point
+    WASM ``runCorporateAnalysis`` calls).
 
     Parameters
     ----------
@@ -11027,8 +11027,9 @@ def run_corporate_analysis(
     cfads_node : str | None
         CFADS numerator required when the model has capital-structure credit
         analytics; no EBITDA fallback is applied.
-    interest_coverage_node : str
-        Earnings numerator used for interest coverage. Default ``"ebitda"``.
+    interest_coverage_node : str | None
+        Earnings numerator used for interest coverage. ``None`` uses the Rust
+        default, ``"ebitda"``.
     check_suite : CheckSuiteSpec | dict | str | None
         Check suite required for DCF or credit analysis; must include
         ``NonFiniteCheck``.

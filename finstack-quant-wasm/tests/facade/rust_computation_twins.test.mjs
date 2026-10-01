@@ -537,7 +537,7 @@ const MODEL = JSON.stringify({
 });
 
 test('nodeToDatedSchedule applies the Rust period-date convention', () => {
-  const result = statements.evaluateModel(MODEL);
+  const result = new statements.Evaluator().evaluate(MODEL);
   assert.deepEqual(statements.nodeToDatedSchedule(MODEL, result, 'revenue'), [
     ['2025-03-31', 100000],
   ]);
@@ -582,10 +582,13 @@ test('monteCarloBreachProbability reads the serialized path table', () => {
     schema_version: 1,
   });
   const config = { n_paths: 200, seed: 42, percentiles: [0.05, 0.5, 0.95] };
-  const withPaths = statements.evaluateMonteCarlo(model, { ...config, include_path_data: true });
+  const withPaths = new statements.Evaluator().evaluateMonteCarlo(model, {
+    ...config,
+    include_path_data: true,
+  });
   assert.equal(statements.monteCarloBreachProbability(withPaths, 'revenue', 410), 0.22);
   assert.equal(statements.monteCarloBreachProbability(withPaths, 'missing', 410), undefined);
-  const withoutPaths = statements.evaluateMonteCarlo(model, {
+  const withoutPaths = new statements.Evaluator().evaluateMonteCarlo(model, {
     ...config,
     include_path_data: false,
   });
@@ -600,7 +603,7 @@ test('monteCarloBreachProbability reads the serialized path table', () => {
 });
 
 test('statementResultToTableLong/Wide export the Rust table envelopes', () => {
-  const result = statements.evaluateModel(MODEL);
+  const result = new statements.Evaluator().evaluate(MODEL);
   const long = statements.statementResultToTableLong(result);
   assert.deepEqual(
     long.columns.map((column) => column.name),

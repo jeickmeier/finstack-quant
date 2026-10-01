@@ -355,7 +355,7 @@ impl PyStatementResult {
     /// value holds the variant fields: node ids as strings, periods as
     /// ``"2025Q1"``-style ids and non-finite numbers as ``"nan"`` / ``"inf"``
     /// / ``"-inf"``. The same objects appear in ``to_json()["meta"]`` and in
-    /// the WASM ``evaluateModel`` result.
+    /// the WASM ``Evaluator.evaluate`` result.
     #[getter]
     fn warnings<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner.meta.warnings)

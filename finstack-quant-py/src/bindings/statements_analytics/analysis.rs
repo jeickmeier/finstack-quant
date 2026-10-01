@@ -802,7 +802,7 @@ impl PyDependencyTracer {
     /// -------
     /// DependencyTree
     ///     Typed tree with ``node_id``, ``formula`` and ``children``; its
-    ///     ``to_json()`` matches the WASM ``dependencyTree`` result.
+    ///     ``to_json()`` matches the WASM ``DependencyTracer.dependencyTree`` result.
     ///
     /// Raises
     /// ------
@@ -826,7 +826,7 @@ impl PyDependencyTracer {
     /// str
     ///     Root on the first line, then one line per dependency drawn with
     ///     ``├──`` / ``└──`` connectors and indented by depth; identical to the
-    ///     WASM ``dependencyTreeText``.
+    ///     WASM ``DependencyTracer.dependencyTreeText``.
     ///
     /// Raises
     /// ------
@@ -967,7 +967,7 @@ impl PyDependencyTree {
             .collect()
     }
 
-    /// Serialize to canonical JSON (identical to the WASM ``dependencyTree`` output).
+    /// Serialize to canonical JSON (identical to the WASM ``DependencyTracer.dependencyTree`` output).
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "DependencyTree"))
     }

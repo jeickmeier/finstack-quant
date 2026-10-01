@@ -174,4 +174,133 @@ impl SensitivityResult {
     pub fn is_empty(&self) -> bool {
         self.scenarios.is_empty()
     }
+
+    fn scenario(
+        &self,
+        scenario_index: usize,
+    ) -> finstack_quant_statements::Result<&SensitivityScenario> {
+        self.scenarios.get(scenario_index).ok_or_else(|| {
+            finstack_quant_statements::Error::invalid_input(format!(
+                "scenario index {scenario_index} out of range: the result holds {} scenarios",
+                self.scenarios.len()
+            ))
+        })
+    }
+
+    /// Value a parameter took in one scenario.
+    ///
+    /// # Arguments
+    ///
+    /// * `scenario_index` - Zero-based position of the scenario in
+    ///   [`scenarios`](Self::scenarios).
+    /// * `parameter` - Parameter key as `node_id@period_id`, e.g.
+    ///   `"revenue@2025Q1"`.
+    ///
+    /// # Returns
+    ///
+    /// The perturbed parameter value in the node's own units, or `None` when
+    /// the scenario did not vary that parameter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an invalid-input error when `scenario_index` is out of range.
+    pub fn get_parameter_value(
+        &self,
+        scenario_index: usize,
+        parameter: &str,
+    ) -> finstack_quant_statements::Result<Option<f64>> {
+        Ok(self
+            .scenario(scenario_index)?
+            .parameter_values
+            .get(parameter)
+            .copied())
+    }
+
+    /// Evaluated node value in one scenario.
+    ///
+    /// # Arguments
+    ///
+    /// * `scenario_index` - Zero-based position of the scenario in
+    ///   [`scenarios`](Self::scenarios).
+    /// * `node_id` - Node identifier to read from the scenario's results.
+    /// * `period` - Period to read.
+    ///
+    /// # Returns
+    ///
+    /// The node value in its own units, or `None` when the node or period is
+    /// absent from the scenario's results.
+    ///
+    /// # Errors
+    ///
+    /// Returns an invalid-input error when `scenario_index` is out of range.
+    pub fn get_value(
+        &self,
+        scenario_index: usize,
+        node_id: &str,
+        period: &PeriodId,
+    ) -> finstack_quant_statements::Result<Option<f64>> {
+        Ok(self.scenario(scenario_index)?.results.get(node_id, period))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn result_with_one_scenario() -> SensitivityResult {
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let mut results = StatementResult::default();
+        results
+            .nodes
+            .entry("profit".to_string())
+            .or_default()
+            .insert(period, 42.0);
+        SensitivityResult {
+            config: SensitivityConfig::new(SensitivityMode::Diagonal),
+            scenarios: vec![SensitivityScenario {
+                parameter_values: IndexMap::from([("revenue@2025Q1".to_string(), 110.0)]),
+                results,
+            }],
+            baseline: None,
+        }
+    }
+
+    #[test]
+    fn scenario_accessors_read_parameters_and_values() {
+        let result = result_with_one_scenario();
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
+
+        assert_eq!(
+            result
+                .get_parameter_value(0, "revenue@2025Q1")
+                .expect("in range"),
+            Some(110.0)
+        );
+        assert_eq!(
+            result
+                .get_parameter_value(0, "cogs@2025Q1")
+                .expect("in range"),
+            None
+        );
+        assert_eq!(
+            result.get_value(0, "profit", &period).expect("in range"),
+            Some(42.0)
+        );
+        assert_eq!(
+            result.get_value(0, "missing", &period).expect("in range"),
+            None
+        );
+    }
+
+    #[test]
+    fn scenario_accessors_reject_an_out_of_range_index() {
+        let result = result_with_one_scenario();
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
+
+        let error = result
+            .get_parameter_value(1, "revenue@2025Q1")
+            .expect_err("out of range");
+        assert!(error.to_string().contains("scenario index 1 out of range"));
+        assert!(result.get_value(3, "profit", &period).is_err());
+    }
 }

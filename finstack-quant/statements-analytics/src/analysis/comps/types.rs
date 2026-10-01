@@ -267,6 +267,23 @@ impl CompanyMetrics {
         ebitda_margin,
     );
 
+    /// Look up a metric by name: a canonical named field first, then a custom metric.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - Exact snake_case canonical field name (for example
+    ///   `"ebitda"` or `"leverage"`) or the key of an entry in
+    ///   [`custom`](Self::custom).
+    ///
+    /// # Returns
+    ///
+    /// The metric value in its own units, or `None` when the name is neither
+    /// a populated canonical field nor a custom metric.
+    pub fn get(&self, name: &str) -> Option<f64> {
+        self.named_metric(name)
+            .or_else(|| self.custom.get(name).copied())
+    }
+
     /// Create a new `CompanyMetrics` with only the company ID set.
     /// All other fields default to `None` / empty.
     pub fn new(id: impl Into<String>) -> Self {
@@ -320,5 +337,24 @@ impl CompanyMetrics {
             }
         }
         metrics
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn get_reads_named_fields_before_custom_metrics() {
+        let mut metrics = CompanyMetrics::new("ACME");
+        metrics.ebitda = Some(100.0);
+        metrics.custom.insert("rule_of_40".to_string(), 42.0);
+        // A custom entry never shadows a canonical field of the same name.
+        metrics.custom.insert("ebitda".to_string(), 1.0);
+
+        assert_eq!(metrics.get("ebitda"), Some(100.0));
+        assert_eq!(metrics.get("rule_of_40"), Some(42.0));
+        assert_eq!(metrics.get("leverage"), None);
+        assert_eq!(metrics.get("unknown"), None);
     }
 }

@@ -207,6 +207,13 @@ fn statement_result_examples() -> finstack_quant_core::Result<Vec<Value>> {
 /// contract tests and the bindings all render from one definition. Render an
 /// entry with [`finstack_quant_core::schema::SchemaArtifact::generate`].
 pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
+    finstack_quant_core::schema::SchemaArtifact::new::<crate::checks::CheckSuiteSpec>(
+        "schemas/statements/1/check_suite_spec.schema.json",
+        "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
+        "CheckSuiteSpec",
+        "Serializable check suite: built-in checks, formula checks and filtering configuration.",
+    )
+    .with_kind(finstack_quant_core::schema::SchemaKind::Input),
     finstack_quant_core::schema::SchemaArtifact::new::<crate::FinancialModelSpec>(
         "schemas/statements/1/financial_model_spec.schema.json",
         "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
@@ -237,11 +244,34 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
     .with_kind(finstack_quant_core::schema::SchemaKind::Output)
     .with_summary("Evaluated node values per period, with policy stamps.")
     .with_examples(statement_result_examples),
+    finstack_quant_core::schema::SchemaArtifact::new::<crate::registry::MetricRegistry>(
+        "schemas/statements/1/metric_registry.schema.json",
+        "https://finstack_quant.dev/schemas/statements/1/metric_registry.schema.json",
+        "MetricRegistry",
+        "Namespaced catalog of reusable metric definitions.",
+    )
+    .with_kind(finstack_quant_core::schema::SchemaKind::Input),
+    finstack_quant_core::schema::SchemaArtifact::new::<crate::evaluator::MonteCarloConfig>(
+        "schemas/statements/1/monte_carlo_config.schema.json",
+        "https://finstack_quant.dev/schemas/statements/1/monte_carlo_config.schema.json",
+        "MonteCarloConfig",
+        "Path count, seed and reported percentiles of a Monte Carlo statement-model evaluation.",
+    )
+    .with_kind(finstack_quant_core::schema::SchemaKind::Input),
     finstack_quant_core::schema::SchemaArtifact::new::<crate::evaluator::MonteCarloResults>(
         "schemas/statements/1/monte_carlo_results.schema.json",
         "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json",
         "MonteCarloResults",
         "Percentile summaries of a Monte Carlo statement-model evaluation.",
+    )
+    .with_kind(finstack_quant_core::schema::SchemaKind::Output),
+    finstack_quant_core::schema::SchemaArtifact::new::<
+        crate::adjustments::types::NormalizationResult,
+    >(
+        "schemas/statements/1/normalization_result.schema.json",
+        "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json",
+        "NormalizationResult",
+        "Per-period normalization outcome: base value, applied adjustments and final value.",
     )
     .with_kind(finstack_quant_core::schema::SchemaKind::Output),
 ];

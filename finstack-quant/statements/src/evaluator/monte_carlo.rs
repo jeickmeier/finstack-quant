@@ -40,6 +40,7 @@ fn default_percentiles() -> Vec<f64> {
 /// minimum—callers choose the path count explicitly so the trade-off between
 /// accuracy and runtime is visible.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct MonteCarloConfig {
     /// Number of Monte Carlo paths to simulate.

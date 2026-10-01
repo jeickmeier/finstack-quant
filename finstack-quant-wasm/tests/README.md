@@ -137,6 +137,8 @@ hunts lives below the facade (see below).
 | `core_members.test.mjs`                                    | S20 handle members and JSON round-trips (Rate/Bps/Percentage, DayCount, Tenor, curves, surfaces, FxRateResult, realized variance); goldens shared with `test_core_members_parity.py` |
 | `core_rust_owned.test.mjs`                                 | core currency/money/date/curve behaviour owned by Rust; asserts the same values and messages as `finstack-quant-py/tests/test_core_rust_owned.py`                                    |
 | `contract_types.test.mjs`                                  | runtime calibration, materialization and valuation outputs type-check against the schema-generated TypeScript types under NodeNext                                                   |
+| `statements_parity.test.mjs`                               | `Evaluator`, `ModelBuilder`, `Registry` and the statements free-function twins; goldens shared with `test_statements_wasm_parity.py`                                                 |
+| `statements_analytics_parity.test.mjs`                     | `DependencyTracer`, extensions, templates, ECL, DCF and twins; goldens shared with `test_statements_wasm_parity.py`                                                                  |
 
 **These need a build.** All of them except `plain_object_returns.test.mjs` load
 the web target from `pkg/finstack_quant_wasm_bg.wasm` (Node has no fetchable

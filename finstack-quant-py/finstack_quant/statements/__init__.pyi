@@ -383,7 +383,7 @@ class MonteCarloResults:
         (``"division_by_zero"``, ``"non_finite_value"``, ...) whose value holds
         the variant fields (periods as ``"2025Q1"``-style ids, non-finite
         numbers as ``"nan"`` / ``"inf"`` / ``"-inf"``), identical to the WASM
-        ``evaluateMonteCarlo`` result.
+        ``Evaluator.evaluateMonteCarlo`` result.
 
         Returns
         -------
@@ -3103,7 +3103,7 @@ class StatementResult:
         value holds the variant fields: node ids as strings, periods as
         ``"2025Q1"``-style ids and non-finite numbers as ``"nan"`` / ``"inf"``
         / ``"-inf"``. The same objects appear in ``to_json()["meta"]`` and in
-        the WASM ``evaluateModel`` result.
+        the WASM ``Evaluator.evaluate`` result.
 
         Returns
         -------

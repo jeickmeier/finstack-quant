@@ -1418,7 +1418,8 @@ fn wacc(
 /// Run the full corporate analysis pipeline.
 ///
 /// Evaluates statements and optionally runs DCF equity valuation plus credit
-/// context through the Rust ``CorporateAnalysisBuilder``.
+/// context through the Rust ``run_corporate_analysis`` (the same entry point
+/// WASM ``runCorporateAnalysis`` calls).
 ///
 /// Parameters
 /// ----------
@@ -1433,8 +1434,9 @@ fn wacc(
 /// cfads_node : str | None
 ///     CFADS numerator required when the model has capital-structure credit
 ///     analytics; no EBITDA fallback is applied.
-/// interest_coverage_node : str
-///     Earnings numerator used for interest coverage. Default ``"ebitda"``.
+/// interest_coverage_node : str | None
+///     Earnings numerator used for interest coverage. ``None`` uses the Rust
+///     default, ``"ebitda"``.
 /// check_suite : CheckSuiteSpec | dict | str | None
 ///     Check suite required for DCF or credit analysis; must include
 ///     ``NonFiniteCheck``.
@@ -1475,7 +1477,7 @@ fn wacc(
     terminal_value=None,
     net_debt_override=None,
     cfads_node=None,
-    interest_coverage_node="ebitda",
+    interest_coverage_node=None,
     check_suite=None,
     market=None,
     as_of=None,
@@ -1489,50 +1491,37 @@ fn run_corporate_analysis<'py>(
     terminal_value: Option<&Bound<'py, PyAny>>,
     net_debt_override: Option<f64>,
     cfads_node: Option<&str>,
-    interest_coverage_node: &str,
+    interest_coverage_node: Option<&str>,
     check_suite: Option<&Bound<'py, PyAny>>,
     market: Option<&Bound<'py, PyAny>>,
     as_of: Option<&Bound<'py, PyAny>>,
     ltv_value_node: Option<&str>,
 ) -> PyResult<PyCorporateAnalysis> {
     let model = extract_model_ref(model)?.into_owned();
-    let mut builder =
-        finstack_quant_statements_analytics::analysis::CorporateAnalysisBuilder::new(model)
-            .interest_coverage_node(interest_coverage_node);
-    if let Some(node) = cfads_node {
-        builder = builder.cfads_node(node);
-    }
-    if let Some(spec) = check_suite {
-        let spec = extract_check_suite_spec(py, spec)?;
-        builder = builder.checks(spec.resolve().map_err(statements_to_py)?);
-    }
-
-    if let Some(w) = wacc {
-        let terminal_value = terminal_value.ok_or_else(|| {
-            crate::errors::value_error("terminal_value is required when wacc is set")
-        })?;
-        let tv = extract_terminal_value(py, terminal_value)?;
-        builder = builder.dcf(w, tv);
-        if let Some(nd) = net_debt_override {
-            builder = builder.net_debt_override(nd);
-        }
-    }
-
-    if let Some(mkt) = extract_market_opt(py, market)? {
-        builder = builder.market(mkt);
-    }
-
-    if let Some(as_of) = as_of {
-        let date = crate::bindings::date_utils::extract_date(as_of)?;
-        builder = builder.as_of(date);
-    }
-
-    if let Some(node) = ltv_value_node {
-        builder = builder.ltv_value_node(node);
-    }
+    let options = finstack_quant_statements_analytics::analysis::CorporateAnalysisOptions {
+        wacc,
+        terminal_value: terminal_value
+            .map(|spec| extract_terminal_value(py, spec))
+            .transpose()?,
+        net_debt_override,
+        cfads_node: cfads_node.map(str::to_owned),
+        interest_coverage_node: interest_coverage_node.map(str::to_owned),
+        check_suite: check_suite
+            .map(|spec| extract_check_suite_spec(py, spec))
+            .transpose()?,
+        as_of: as_of
+            .map(crate::bindings::date_utils::extract_date)
+            .transpose()?,
+        ltv_value_node: ltv_value_node.map(str::to_owned),
+    };
+    let market = extract_market_opt(py, market)?;
 
     let inner = py
-        .detach(move || builder.analyze())
+        .detach(move || {
+            finstack_quant_statements_analytics::analysis::run_corporate_analysis(
+                model, options, market,
+            )
+        })
         .map_err(statements_to_py)?;
     Ok(PyCorporateAnalysis { inner })
 }

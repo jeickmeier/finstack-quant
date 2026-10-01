@@ -26,6 +26,7 @@ use crate::Result;
 ///   [`SignConventionPolicy::InflowPositive`] — they are signed amounts
 ///   added directly.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct RetainedEarningsReconciliation {
     /// Node for retained earnings balance.
     pub retained_earnings_node: NodeId,

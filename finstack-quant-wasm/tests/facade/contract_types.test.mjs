@@ -474,7 +474,7 @@ test('namespace results match their published result types', () => {
   ]);
 
   // statements: the evaluator keeps the JSON sentinel strings.
-  const results = statements.evaluateModel(LAG_MODEL);
+  const results = new statements.Evaluator().evaluate(LAG_MODEL);
   assert.equal(results.nodes.lagged['2025Q1'], 'nan');
   declarations.push(['statement_result', 'fq.StatementResult', results]);
 

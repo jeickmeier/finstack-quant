@@ -222,9 +222,13 @@ are in [INVARIANTS.md](../../INVARIANTS.md).
 - **WASM** — `statements_analytics` namespace in
   `finstack-quant-wasm/exports/statements_analytics.js`: `runSensitivity`,
   `runVariance`, `evaluateScenarioSet`, `backtestForecast`,
-  `generateTornadoEntries`, `goalSeek`, `dcfSensitivity`, `evaluateLbo`, `wacc`,
-  `dependencyTree`, `dependencyTreeText`, `explainFormula`, the report
-  renderers, the check runners, and the comps helpers.
+  `generateTornadoEntries`, `goalSeek`, `evaluateDcf`, `dcfSensitivity`,
+  `evaluateLbo`, `runCorporateAnalysis`, `wacc`, `scenarioDiff`,
+  `varianceBridge`, `explainFormula`, the `DependencyTracer`,
+  `CorkscrewExtension` and `CreditScorecardExtension` classes, the ECL entry
+  points (`classifyStage`, `computeEcl`, `computeEclWeighted`), the `add*`
+  model templates, the report renderers, the check runners, and the comps
+  helpers.
 
 ## Verification
 

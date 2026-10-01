@@ -251,6 +251,7 @@ impl CheckSuiteBuilder {
 ///
 /// Both built-in and formula checks are resolved by [`CheckSuiteSpec::resolve`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CheckSuiteSpec {
     /// Suite name.
@@ -307,6 +308,7 @@ impl CheckSuiteSpec {
 /// the JSON shape is the struct's fields plus a `type` tag. Convert into a
 /// boxed [`Check`] via [`BuiltinCheckSpec::to_check`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum BuiltinCheckSpec {
     /// Balance sheet articulation: Assets = Liabilities + Equity.
@@ -358,6 +360,7 @@ impl BuiltinCheckSpec {
 /// Full suite definitions (built-in + formula) can be stored as a single JSON
 /// document and resolved directly with [`CheckSuiteSpec::resolve`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct FormulaCheckSpec {
     /// Unique identifier for this check instance.

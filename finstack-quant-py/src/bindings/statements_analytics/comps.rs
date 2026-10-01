@@ -166,9 +166,7 @@ impl PyCompanyMetrics {
     /// Returns ``None`` when the metric is absent.
     #[pyo3(text_signature = "($self, name)")]
     fn get(&self, name: &str) -> Option<f64> {
-        self.inner
-            .named_metric(name)
-            .or_else(|| self.inner.custom.get(name).copied())
+        self.inner.get(name)
     }
 
     /// Serialize to canonical JSON.
