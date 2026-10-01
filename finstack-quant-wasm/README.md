@@ -52,7 +52,7 @@ Its `README.md` and `.d.ts` are wasm-pack copies; treat nothing in `pkg/` or
 
 | Namespace              | Contents                                                                                                                                                                                                                                                        |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `core`                 | `Currency`, `Money`, `Rate`/`Bps`/`Percentage`, `DayCount`, `Tenor`, date helpers, `DiscountCurve`/`HazardCurve`/`ForwardCurve`, `VolCube`, `FxDeltaVolSurface`, `FxMatrix`, and the `math` helpers (Cholesky, statistics, special functions, stable summation) |
+| `core`                 | `Currency` (with a static per ISO code), `Money`, `Rate`/`Bps`/`Percentage`, `CreditRating`, `FinstackConfig`, `DayCount`, `Tenor`, calendars, periods, schedules and IMM/CDS/SIFMA date rules, every curve and surface handle (`DiscountCurve` … `VolSurface`), `ScalarTimeSeries`, `InflationIndex`, `FxMatrix`, `MarketContext`, the rating-scale registry, and the `math` helpers |
 | `analytics`            | `Performance` panel engine, `constrainedLeastSquares`, scalar metrics `sharpe`/`sortino`/`volatility`/`maxDrawdown`                                                                                                                                             |
 | `attribution`          | `attributePnl`, `attributePnlEnvelope` and their `*Json` twins, waterfall/metric defaults, schema validation                                                                                                                                                    |
 | `calibration`          | quote ingestion, market construction, plan validation, dependency graphs, and explicit Bermudan LMM base-vol fitting                                                                                                                                            |
@@ -235,8 +235,10 @@ for quoted units. `Rate.fromBp` is integer-backed and rejects fractional basis p
 rather than rounding them.
 
 **Dates.** Two conventions coexist, both matching the Rust API. The `core` date
-functions (`createDate`, `dateFromEpochDays`, `adjust`) speak signed epoch-day
-integers. Instrument, market, and pricing entry points take ISO-8601 date strings
+utilities (`createDate`, `dateFromEpochDays`, `adjust`, the IMM/CDS/SIFMA rules,
+`HolidayCalendar`, `Schedule`, `PeriodKind`) speak signed epoch-day integers;
+`core.daysSinceEpoch('2025-06-15')` converts an ISO string. Curves, series,
+`MarketContext`, instrument and pricing entry points take ISO-8601 date strings
 (`'2025-06-15'`). Calendar codes come from `core.availableCalendars()`.
 
 **Argument types are checked, not coerced.** Every string, boolean, number and

@@ -42,6 +42,8 @@ time = { workspace = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
+# `Currency::iter()` in the currency-statics coverage test
+strum = { workspace = true }
 
 # Features
 #

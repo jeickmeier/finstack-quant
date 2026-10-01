@@ -82,7 +82,9 @@ pub use calendar::business_days::{
 };
 
 pub use calendar::business_days::available_calendars;
-pub use calendar::{calendar_by_id, calendar_by_id_strict, calendars_by_ids, WEEKENDS_ONLY};
+pub use calendar::{
+    calendar_by_id, calendar_by_id_strict, calendars_by_ids, canonical_calendar_id, WEEKENDS_ONLY,
+};
 
 mod schedule;
 

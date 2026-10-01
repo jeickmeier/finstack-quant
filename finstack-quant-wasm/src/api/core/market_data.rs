@@ -1,8 +1,7 @@
 //! WASM bindings for `finstack_quant_core::market_data` term structures and FX.
 
 use crate::utils::input::{
-    from_js_json, js_f64, js_f64_seq, js_opt_f64_seq, js_opt_string, js_string, js_string_seq,
-    js_uint, json_text,
+    from_js_json, js_f64, js_f64_seq, js_opt_string, js_string, js_string_seq,
 };
 use std::sync::Arc;
 
@@ -10,18 +9,15 @@ use crate::api::core::currency::JsCurrency;
 use crate::utils::{date_to_iso, parse_iso_date, parse_iso_dates, to_js_err};
 use finstack_quant_core::currency::Currency as RustCurrency;
 use finstack_quant_core::dates::DayCount;
-use finstack_quant_core::market_data::surfaces::{
-    FxDeltaVolSurface as RustFxDeltaVolSurface, SabrParameterData, VolCube as RustVolCube,
-    VolInterpolationMode,
-};
 use finstack_quant_core::market_data::term_structures::{
     DiscountCurve as RustDiscountCurve, ForwardCurve as RustForwardCurve,
     HazardCurve as RustHazardCurve, ValidationMode,
 };
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
+use finstack_quant_core::math::Compounding;
 use finstack_quant_core::money::fx::{
     fx_market_pair as rust_fx_market_pair, fx_pair_convention as rust_fx_pair_convention,
-    fx_pip_size as rust_fx_pip_size, invert_fx_rate as rust_invert_fx_rate,
+    fx_pip_size as rust_fx_pip_size, invert_fx_rate as rust_invert_fx_rate, CurrencyPair,
     FxConversionPolicy as RustFxConversionPolicy, FxMatrix as RustFxMatrix,
     FxPairConvention as RustFxPairConvention, FxQuery, FxQuoteConvention as RustFxQuoteConvention,
     FxRateResult as RustFxRateResult, SimpleFxProvider,
@@ -32,17 +28,17 @@ use serde::Deserialize;
 use wasm_bindgen::prelude::*;
 
 /// Parse a day-count string.
-fn parse_day_count(s: &str) -> Result<DayCount, JsValue> {
+pub(crate) fn parse_day_count(s: &str) -> Result<DayCount, JsValue> {
     s.parse::<DayCount>().map_err(to_js_err)
 }
 
 /// Parse an interpolation style string.
-fn parse_interp_style(s: &str) -> Result<InterpStyle, JsValue> {
+pub(crate) fn parse_interp_style(s: &str) -> Result<InterpStyle, JsValue> {
     s.parse::<InterpStyle>().map_err(to_js_err)
 }
 
 /// Parse an extrapolation policy string.
-fn parse_extrapolation(s: &str) -> Result<ExtrapolationPolicy, JsValue> {
+pub(crate) fn parse_extrapolation(s: &str) -> Result<ExtrapolationPolicy, JsValue> {
     s.parse::<ExtrapolationPolicy>().map_err(to_js_err)
 }
 
@@ -95,6 +91,12 @@ struct DiscountCurveOptions {
 }
 
 impl JsDiscountCurve {
+    fn wrap(curve: RustDiscountCurve) -> Self {
+        Self {
+            inner: Arc::new(curve),
+        }
+    }
+
     fn build(options: DiscountCurveOptions) -> Result<JsDiscountCurve, JsValue> {
         let base = parse_iso_date(&options.base_date)?;
         if !options.knots.len().is_multiple_of(2) {
@@ -223,6 +225,234 @@ impl JsDiscountCurve {
         self.inner.forward(t1, t2).map_err(to_js_err)
     }
 
+    /// Construct a curve from zero rates (Rust `DiscountCurve::from_zero_rates`).
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Curve identifier stored on the curve.
+    /// * `base_date` - ISO-8601 valuation date anchoring `t = 0`.
+    /// * `points` - Flat `[t0, z0, t1, z1, …]` array: times in years and
+    ///   zero rates as decimals (`0.05` is 5%), with strictly increasing times.
+    /// * `compounding` - Compounding of the zero rates: `"continuous"`,
+    ///   `"simple"`, `"annual"`, `"semi_annual"`, `"quarterly"` or `"monthly"`;
+    ///   omitted means `"continuous"`.
+    ///
+    /// @returns Curve whose discount factors reproduce every zero rate.
+    /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
+    /// `validation`) for an empty or odd-length `points`, a malformed date, an
+    /// unknown compounding, or discount factors the curve validation rejects.
+    #[wasm_bindgen(js_name = fromZeroRates)]
+    pub fn from_zero_rates(
+        id: JsValue,
+        base_date: JsValue,
+        points: JsValue,
+        compounding: Option<JsValue>,
+    ) -> Result<JsDiscountCurve, JsValue> {
+        let id = js_string(&id, "id")?;
+        let base_date = parse_iso_date(&js_string(&base_date, "baseDate")?)?;
+        let points = flat_pairs(&js_f64_seq(&points, "points")?, "points")?;
+        let compounding = compounding_arg(compounding.as_ref())?;
+        RustDiscountCurve::from_zero_rates(id, base_date, &points, compounding)
+            .map(Self::wrap)
+            .map_err(to_js_err)
+    }
+
+    /// Construct a curve from dated discount factors (Rust `DiscountCurve::from_dates`).
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Curve identifier stored on the curve.
+    /// * `base_date` - ISO-8601 valuation date anchoring `t = 0`.
+    /// * `points` - Array of `[isoDate, discountFactor]` pairs with strictly
+    ///   increasing dates on or after `baseDate` and strictly positive
+    ///   discount factors.
+    /// * `day_count` - Day count that converts each date to curve time;
+    ///   omitted uses the Rust default (`"act_365f"`).
+    ///
+    /// @returns Curve with one pillar per dated point.
+    /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
+    /// `validation`) for empty `points`, a malformed date, an unknown day
+    /// count, or discount factors the curve validation rejects.
+    #[wasm_bindgen(js_name = fromDates)]
+    pub fn from_dates(
+        id: JsValue,
+        base_date: JsValue,
+        points: JsValue,
+        day_count: Option<JsValue>,
+    ) -> Result<JsDiscountCurve, JsValue> {
+        let id = js_string(&id, "id")?;
+        let base_date = parse_iso_date(&js_string(&base_date, "baseDate")?)?;
+        let points = from_js_json::<Vec<(String, f64)>>(&points, "points")?
+            .into_iter()
+            .map(|(date, df)| Ok((parse_iso_date(&date)?, df)))
+            .collect::<Result<Vec<_>, JsValue>>()?;
+        let day_count = js_opt_string(day_count.as_ref(), "dayCount")?
+            .map(|name| parse_day_count(&name))
+            .transpose()?;
+        RustDiscountCurve::from_dates(id, base_date, &points, day_count)
+            .map(Self::wrap)
+            .map_err(to_js_err)
+    }
+
+    /// Deserialize from the canonical JSON wire form shared with Python `DiscountCurve.to_json`.
+    ///
+    /// # Arguments
+    ///
+    /// * `json` - Canonical DiscountCurve JSON text or plain object; unknown
+    ///   fields are rejected and the curve is re-validated.
+    ///
+    /// @returns The validated `DiscountCurve`.
+    /// @throws `TypeError` if `json` is not a JSON string or plain object;
+    /// `FinstackError` (kind `validation`) if it does not match the schema or
+    /// fails curve validation.
+    #[wasm_bindgen(js_name = fromJson)]
+    pub fn from_json(json: JsValue) -> Result<JsDiscountCurve, JsValue> {
+        from_js_json::<RustDiscountCurve>(&json, "json").map(Self::wrap)
+    }
+
+    /// Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
+    ///
+    /// @returns Compact JSON text.
+    /// @throws If serialization fails (not expected for a valid curve).
+    #[wasm_bindgen(js_name = toJson)]
+    pub fn to_json(&self) -> Result<String, JsValue> {
+        serde_json::to_string(&*self.inner).map_err(to_js_err)
+    }
+
+    /// Annually compounded zero rate at year fraction `t` (Rust `DiscountCurve::zero_annual`).
+    ///
+    /// # Arguments
+    ///
+    /// * `t` - Time from the curve base date in years.
+    ///
+    /// @returns The zero rate as a decimal; `0` at `t = 0`.
+    /// @throws `TypeError` if `t` is not a number.
+    #[wasm_bindgen(js_name = zeroAnnual)]
+    pub fn zero_annual(&self, t: JsValue) -> Result<f64, JsValue> {
+        Ok(self.inner.zero_annual(js_f64(&t, "t")?))
+    }
+
+    /// Zero rate at year fraction `t` under a compounding convention (Rust
+    /// `DiscountCurve::zero_rate`).
+    ///
+    /// # Arguments
+    ///
+    /// * `t` - Time from the curve base date in years.
+    /// * `compounding` - `"continuous"`, `"simple"`, `"annual"`,
+    ///   `"semi_annual"`, `"quarterly"` or `"monthly"`; omitted means
+    ///   `"continuous"`.
+    ///
+    /// @returns The zero rate as a decimal; `0` at `t = 0`.
+    /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
+    /// `validation`) for an unknown compounding.
+    #[wasm_bindgen(js_name = zeroRate)]
+    pub fn zero_rate(&self, t: JsValue, compounding: Option<JsValue>) -> Result<f64, JsValue> {
+        let t = js_f64(&t, "t")?;
+        Ok(self
+            .inner
+            .zero_rate(t, compounding_arg(compounding.as_ref())?))
+    }
+
+    /// Zero rate to a date, measured with the curve day count (Rust
+    /// `DiscountCurve::zero_rate_on_date`).
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - ISO-8601 target date.
+    /// * `compounding` - `"continuous"`, `"simple"`, `"annual"`,
+    ///   `"semi_annual"`, `"quarterly"` or `"monthly"`; omitted means
+    ///   `"continuous"`.
+    ///
+    /// @returns The zero rate as a decimal.
+    /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
+    /// `validation`) for a malformed date, an unknown compounding, or a year
+    /// fraction that cannot be computed.
+    #[wasm_bindgen(js_name = zeroRateOnDate)]
+    pub fn zero_rate_on_date(
+        &self,
+        date: JsValue,
+        compounding: Option<JsValue>,
+    ) -> Result<f64, JsValue> {
+        let date = parse_iso_date(&js_string(&date, "date")?)?;
+        self.inner
+            .zero_rate_on_date(date, compounding_arg(compounding.as_ref())?)
+            .map_err(to_js_err)
+    }
+
+    /// Discount factor to a date, measured with the curve day count (Rust
+    /// `DiscountCurve::df_on_date_curve`).
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - ISO-8601 target date.
+    ///
+    /// @returns The discount factor from the base date to `date`.
+    /// @throws `TypeError` if `date` is not a string; `FinstackError` (kind
+    /// `validation`) for a malformed date or a year fraction that cannot be
+    /// computed.
+    #[wasm_bindgen(js_name = dfOnDateCurve)]
+    pub fn df_on_date_curve(&self, date: JsValue) -> Result<f64, JsValue> {
+        let date = parse_iso_date(&js_string(&date, "date")?)?;
+        self.inner.df_on_date_curve(date).map_err(to_js_err)
+    }
+
+    /// Forward discount factor between two dates, `df(toDate) / df(fromDate)`
+    /// (Rust `DiscountCurve::df_between_dates`).
+    ///
+    /// # Arguments
+    ///
+    /// * `from_date` - ISO-8601 start date of the discounting interval.
+    /// * `to_date` - ISO-8601 end date of the discounting interval.
+    ///
+    /// @returns The discount factor that brings a cashflow on `toDate` back to
+    /// `fromDate`.
+    /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
+    /// `validation`) for a malformed date, a year fraction that cannot be
+    /// computed, or a non-finite or non-positive discount factor.
+    #[wasm_bindgen(js_name = dfBetweenDates)]
+    pub fn df_between_dates(&self, from_date: JsValue, to_date: JsValue) -> Result<f64, JsValue> {
+        let from_date = parse_iso_date(&js_string(&from_date, "fromDate")?)?;
+        let to_date = parse_iso_date(&js_string(&to_date, "toDate")?)?;
+        self.inner
+            .df_between_dates(from_date, to_date)
+            .map_err(to_js_err)
+    }
+
+    /// Derive a single-curve forward curve from this discount curve (Rust
+    /// `DiscountCurve::to_forward_curve`).
+    ///
+    /// # Arguments
+    ///
+    /// * `forward_id` - Identifier of the new forward curve.
+    /// * `tenor` - Index tenor in years (for example `0.25` for 3M); finite
+    ///   and strictly positive.
+    /// * `interp` - Interpolation style of the forward curve (for example
+    ///   `"linear"`); omitted uses the Rust default.
+    ///
+    /// @returns A `ForwardCurve` of simple forward rates implied by this curve.
+    /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
+    /// `validation`) for a non-positive tenor, an unknown interpolation style,
+    /// or forwards the forward-curve builder rejects.
+    #[wasm_bindgen(js_name = toForwardCurve)]
+    pub fn to_forward_curve(
+        &self,
+        forward_id: JsValue,
+        tenor: JsValue,
+        interp: Option<JsValue>,
+    ) -> Result<JsForwardCurve, JsValue> {
+        let forward_id = js_string(&forward_id, "forwardId")?;
+        let tenor = js_f64(&tenor, "tenor")?;
+        let interp = js_opt_string(interp.as_ref(), "interp")?
+            .map(|name| parse_interp_style(&name))
+            .transpose()?;
+        self.inner
+            .to_forward_curve(forward_id, tenor, interp)
+            .map(|curve| JsForwardCurve {
+                inner: Arc::new(curve),
+            })
+            .map_err(to_js_err)
+    }
+
     /// Curve identifier.
     #[wasm_bindgen(getter, js_name = id)]
     pub fn id(&self) -> String {
@@ -234,6 +464,48 @@ impl JsDiscountCurve {
     pub fn base_date(&self) -> String {
         date_to_iso(self.inner.base_date())
     }
+
+    /// Pillar times in years from the base date, strictly increasing.
+    #[wasm_bindgen(getter, js_name = knots)]
+    pub fn knots(&self) -> Box<[f64]> {
+        self.inner.knots().into()
+    }
+
+    /// Discount factor at each pillar, aligned with `knots`.
+    #[wasm_bindgen(getter, js_name = dfs)]
+    pub fn dfs(&self) -> Box<[f64]> {
+        self.inner.dfs().into()
+    }
+
+    /// Day count that converts dates to curve time, such as `"act_365f"`.
+    #[wasm_bindgen(getter, js_name = dayCount)]
+    pub fn day_count(&self) -> String {
+        self.inner.day_count().to_string()
+    }
+
+    /// Interpolation style between pillars, such as `"monotone_convex"`.
+    #[wasm_bindgen(getter, js_name = interpStyle)]
+    pub fn interp_style(&self) -> String {
+        self.inner.interp_style().to_string()
+    }
+
+    /// Extrapolation policy beyond the last pillar, such as `"flat_forward"`.
+    #[wasm_bindgen(getter, js_name = extrapolation)]
+    pub fn extrapolation(&self) -> String {
+        self.inner.extrapolation().to_string()
+    }
+}
+
+/// Parse an optional compounding name; omitted means continuous.
+fn compounding_arg(value: Option<&JsValue>) -> Result<Compounding, JsValue> {
+    match js_opt_string(value, "compounding")? {
+        Some(name) => name.parse::<Compounding>().map_err(|_| {
+            to_js_err(format!(
+                "Invalid compounding {name:?}: expected one of continuous, simple, annual, semi_annual, quarterly, monthly"
+            ))
+        }),
+        None => Ok(Compounding::default()),
+    }
 }
 
 /// Split a flat `[x0, y0, x1, y1, …]` array into `(x, y)` pairs.
@@ -241,7 +513,7 @@ impl JsDiscountCurve {
 /// # Errors
 ///
 /// Returns a validation error naming `label` when the array has odd length.
-fn flat_pairs(values: &[f64], label: &str) -> Result<Vec<(f64, f64)>, JsValue> {
+pub(crate) fn flat_pairs(values: &[f64], label: &str) -> Result<Vec<(f64, f64)>, JsValue> {
     if !values.len().is_multiple_of(2) {
         return Err(to_js_err(format!(
             "{label} array must have even length (flat [x0, y0, x1, y1, …] pairs)"
@@ -1226,7 +1498,7 @@ pub fn invert_fx_rate(rate: JsValue) -> Result<f64, JsValue> {
 /// Foreign-exchange rate matrix for currency conversion.
 #[wasm_bindgen(js_name = FxMatrix)]
 pub struct JsFxMatrix {
-    inner: Arc<RustFxMatrix>,
+    pub(crate) inner: Arc<RustFxMatrix>,
 }
 
 impl Default for JsFxMatrix {
@@ -1268,6 +1540,61 @@ impl JsFxMatrix {
             .set_quote(base_currency, quote_currency, rate)
             .map_err(to_js_err)?;
         Ok(())
+    }
+
+    /// Set several pair-global quotes atomically (Rust `FxMatrix::set_quotes`).
+    ///
+    /// # Arguments
+    ///
+    /// * `quotes` - Array of `[base, quote, rate]` triples: two ISO-4217
+    ///   currency codes and the finite, strictly positive number of quote
+    ///   units per one base unit.
+    ///
+    /// @throws `TypeError` (kind `invalid_type`) if `quotes` is not an array
+    /// (or its JSON text); `FinstackError` (kind `validation`) for a triple of
+    /// the wrong shape, an unknown currency code, or a non-positive or
+    /// non-finite rate. On an error none of the batch is applied.
+    #[wasm_bindgen(js_name = setQuotes)]
+    pub fn set_quotes(&self, quotes: JsValue) -> Result<(), JsValue> {
+        let quotes = from_js_json::<Vec<(String, String, f64)>>(&quotes, "quotes")?
+            .into_iter()
+            .map(|(base, quote, rate)| {
+                Ok((
+                    base.parse::<RustCurrency>().map_err(to_js_err)?,
+                    quote.parse::<RustCurrency>().map_err(to_js_err)?,
+                    rate,
+                ))
+            })
+            .collect::<Result<Vec<_>, JsValue>>()?;
+        self.inner.set_quotes(&quotes).map_err(to_js_err)
+    }
+
+    /// Build a matrix from quotes keyed by currency pair (Rust `CurrencyPair`
+    /// parsing plus `FxMatrix::set_quotes`).
+    ///
+    /// # Arguments
+    ///
+    /// * `quotes` - Plain object (or its JSON text) mapping a pair to its
+    ///   rate, such as `{ "EUR/USD": 1.1, "GBPUSD": 1.27 }`. A key is
+    ///   `"BASE/QUOTE"` or the six-letter compact form; the rate is the
+    ///   finite, strictly positive number of quote units per one base unit.
+    ///
+    /// @returns A new `FxMatrix` holding every quote.
+    /// @throws `TypeError` (kind `invalid_type`) if `quotes` is not a plain
+    /// object or JSON text; `FinstackError` (kind `validation`) for a malformed
+    /// pair key, an unknown currency code, or a non-positive or non-finite rate.
+    #[wasm_bindgen(js_name = fromDict)]
+    pub fn from_dict(quotes: JsValue) -> Result<JsFxMatrix, JsValue> {
+        let quotes = from_js_json::<std::collections::BTreeMap<String, f64>>(&quotes, "quotes")?
+            .into_iter()
+            .map(|(pair, rate)| {
+                let pair: CurrencyPair = pair.parse().map_err(to_js_err)?;
+                Ok((pair.base, pair.quote, rate))
+            })
+            .collect::<Result<Vec<_>, JsValue>>()?;
+        let matrix = Self::new();
+        matrix.inner.set_quotes(&quotes).map_err(to_js_err)?;
+        Ok(matrix)
     }
 
     /// Set an authoritative quote scoped to one date and conversion policy.
@@ -1373,346 +1700,6 @@ impl JsFxMatrix {
             .rate(query)
             .map(|inner| JsFxRateResult { inner })
             .map_err(to_js_err)
-    }
-}
-
-/// SABR volatility cube for swaption pricing.
-///
-/// Stores calibrated SABR parameters on an expiry × tenor grid and evaluates
-/// implied volatilities via bilinear parameter interpolation followed by the
-/// Hagan (2002) approximation.
-#[wasm_bindgen(js_name = VolCube)]
-pub struct JsVolCube {
-    pub(crate) inner: Arc<RustVolCube>,
-}
-
-#[wasm_bindgen(js_class = VolCube)]
-impl JsVolCube {
-    /// Construct a vol cube from a flat SABR parameter array.
-    ///
-    /// # Arguments
-    /// * `id` - Curve identifier.
-    /// * `expiries` - Option expiry axis in years (strictly increasing).
-    /// * `tenors` - Swap tenor axis in years (strictly increasing).
-    /// * `params_flat` - Row-major flat array of SABR parameters:
-    ///   `[alpha0, beta0, rho0, nu0, shift0, alpha1, …]`.
-    ///   Length must equal `expiries.len() * tenors.len() * 5`.
-    ///   Pass `NaN` for the shift element of a node to omit the shift.
-    /// * `forwards` - Row-major forward rates, one per grid node.
-    /// @param interpolation_mode - Interpolation across the expiry axis: `"vol"` or
-    /// `"total_variance"`; omitted keeps the Rust `VolCube::from_grid` default (`"vol"`).
-    ///
-    /// # Errors
-    ///
-    /// Throws a JavaScript exception if an axis is empty, non-finite,
-    /// non-positive, or not strictly increasing; the parameter or forward array
-    /// has the wrong length; a forward is non-finite; any SABR node has invalid
-    /// alpha, beta, rho, nu, or shift; or `interpolationMode` is neither `vol`
-    /// nor `total_variance`.
-    #[wasm_bindgen(constructor)]
-    pub fn new(
-        id: JsValue,
-        expiries: JsValue,
-        tenors: JsValue,
-        params_flat: JsValue,
-        forwards: JsValue,
-        interpolation_mode: Option<JsValue>,
-    ) -> Result<JsVolCube, JsValue> {
-        let expiries: &[f64] = &js_f64_seq(&expiries, "expiries")?;
-        let tenors: &[f64] = &js_f64_seq(&tenors, "tenors")?;
-        let params_flat: &[f64] = &js_f64_seq(&params_flat, "paramsFlat")?;
-        let forwards: &[f64] = &js_f64_seq(&forwards, "forwards")?;
-        let id: &str = &js_string(&id, "id")?;
-        let interpolation_mode = js_opt_string(interpolation_mode.as_ref(), "interpolationMode")?;
-        let n_nodes = expiries.len() * tenors.len();
-        if params_flat.len() != n_nodes * 5 {
-            return Err(to_js_err(format!(
-                "params_flat length {} != {} nodes * 5 params",
-                params_flat.len(),
-                n_nodes
-            )));
-        }
-        let mut sabr_params = Vec::with_capacity(n_nodes);
-        for i in 0..n_nodes {
-            let base = i * 5;
-            let shift = params_flat[base + 4];
-            let shift = if shift.is_nan() { None } else { Some(shift) };
-            let p = SabrParameterData::new_with_shift(
-                params_flat[base],     // alpha
-                params_flat[base + 1], // beta
-                params_flat[base + 2], // rho
-                params_flat[base + 3], // nu
-                shift,
-            )
-            .map_err(to_js_err)?;
-            sabr_params.push(p);
-        }
-        let mut cube = RustVolCube::from_grid(id, expiries, tenors, &sabr_params, forwards)
-            .map_err(to_js_err)?;
-        if let Some(mode) = interpolation_mode.as_deref() {
-            let mode: VolInterpolationMode =
-                finstack_quant_core::wire::serde_parse(mode).map_err(to_js_err)?;
-            cube = cube.with_interpolation_mode(mode);
-        }
-        Ok(Self {
-            inner: Arc::new(cube),
-        })
-    }
-
-    /// Deserialize a canonical SABR cube state without flattening parameter nodes.
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - Canonical VolCube JSON containing id, expiry and tenor axes in years,
-    ///   row-major SABR nodes and decimal-rate forwards, and interpolation_mode.
-    ///   Missing or null node shifts remain absent; unknown fields are rejected.
-    /// @returns A validated VolCube handle owned by the caller; release it with free().
-    /// @throws Error - Throws when JSON is malformed, fields are unknown, or native axis, parameter, or forward validation fails.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsVolCube, JsValue> {
-        let json: &str = &json_text(&json, "json")?;
-        let inner = serde_json::from_str::<RustVolCube>(json).map_err(to_js_err)?;
-        Ok(Self {
-            inner: Arc::new(inner),
-        })
-    }
-
-    /// Interpolation contract used across the expiry axis.
-    #[wasm_bindgen(getter, js_name = interpolationMode)]
-    pub fn interpolation_mode(&self) -> Result<String, JsValue> {
-        finstack_quant_core::wire::serde_label(&self.inner.interpolation_mode()).map_err(to_js_err)
-    }
-
-    /// Cube identifier.
-    #[wasm_bindgen(getter, js_name = id)]
-    pub fn id(&self) -> String {
-        self.inner.id().as_str().to_string()
-    }
-
-    /// Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
-    ///
-    /// @returns Compact JSON text.
-    /// @throws If serialization fails (not expected for a valid cube).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&*self.inner).map_err(to_js_err)
-    }
-
-    /// Option expiry axis in years.
-    #[wasm_bindgen(getter, js_name = expiries)]
-    pub fn expiries(&self) -> Box<[f64]> {
-        self.inner.expiries().into()
-    }
-
-    /// Underlying swap tenor axis in years.
-    #[wasm_bindgen(getter, js_name = tenors)]
-    pub fn tenors(&self) -> Box<[f64]> {
-        self.inner.tenors().into()
-    }
-
-    /// Grid shape as `[nExpiries, nTenors]`.
-    #[wasm_bindgen(getter, js_name = gridShape)]
-    pub fn grid_shape(&self) -> Result<Box<[u32]>, JsValue> {
-        let (n_exp, n_ten) = self.inner.grid_shape();
-        let n_exp = u32::try_from(n_exp).map_err(|e| to_js_err(e.to_string()))?;
-        let n_ten = u32::try_from(n_ten).map_err(|e| to_js_err(e.to_string()))?;
-        Ok(Box::new([n_exp, n_ten]))
-    }
-
-    /// Row-major forward rates (decimals), one per grid node.
-    #[wasm_bindgen(getter, js_name = forwards)]
-    pub fn forwards(&self) -> Box<[f64]> {
-        self.inner.forwards().into()
-    }
-
-    /// Row-major SABR nodes as plain `{alpha, beta, rho, nu, shift?}` objects.
-    ///
-    /// @returns One object per grid node in row-major (expiry, tenor) order.
-    /// @throws If serialization fails (not expected for a valid cube).
-    #[wasm_bindgen(getter, js_name = params)]
-    pub fn params(&self) -> Result<JsValue, JsValue> {
-        crate::utils::to_js_value(&self.inner.params())
-    }
-
-    /// SABR parameters at grid indices, as a plain `{alpha, beta, rho, nu, shift?}` object.
-    ///
-    /// # Arguments
-    ///
-    /// * `exp_idx` - Zero-based index into `expiries`.
-    /// * `tenor_idx` - Zero-based index into `tenors`.
-    ///
-    /// @returns The node's SABR parameters.
-    /// @throws `TypeError` if an index is not a non-negative integer;
-    /// `FinstackError` (kind `validation`) if it lies outside `gridShape`.
-    #[wasm_bindgen(js_name = paramsAt)]
-    pub fn params_at(&self, exp_idx: JsValue, tenor_idx: JsValue) -> Result<JsValue, JsValue> {
-        let exp_idx: usize = js_uint(&exp_idx, "expIdx")?;
-        let tenor_idx: usize = js_uint(&tenor_idx, "tenorIdx")?;
-        let params = self
-            .inner
-            .params_at(exp_idx, tenor_idx)
-            .map_err(to_js_err)?;
-        crate::utils::to_js_value(params)
-    }
-
-    /// Forward rate (decimal) at grid indices.
-    ///
-    /// # Arguments
-    ///
-    /// * `exp_idx` - Zero-based index into `expiries`.
-    /// * `tenor_idx` - Zero-based index into `tenors`.
-    ///
-    /// @returns The node's forward rate.
-    /// @throws `TypeError` if an index is not a non-negative integer;
-    /// `FinstackError` (kind `validation`) if it lies outside `gridShape`.
-    #[wasm_bindgen(js_name = forwardAt)]
-    pub fn forward_at(&self, exp_idx: JsValue, tenor_idx: JsValue) -> Result<f64, JsValue> {
-        let exp_idx: usize = js_uint(&exp_idx, "expIdx")?;
-        let tenor_idx: usize = js_uint(&tenor_idx, "tenorIdx")?;
-        self.inner.forward_at(exp_idx, tenor_idx).map_err(to_js_err)
-    }
-}
-
-/// FX vol surface quoted in **delta space** (ATM, 25-delta RR/BF, optional
-/// 10-delta wings).
-///
-/// Stores market-standard FX delta quotes (Wystup 2006, Clark 2011). Use
-/// `models.volatility` (`getFxDeltaVol`, `getFxDeltaPillarVols`) for
-/// evaluation; this type does not convert quotes to strikes itself.
-/// The delta convention is **forward delta (premium-unadjusted)**.
-#[wasm_bindgen(js_name = FxDeltaVolSurface)]
-pub struct JsFxDeltaVolSurface {
-    pub(crate) inner: Arc<RustFxDeltaVolSurface>,
-}
-
-#[wasm_bindgen(js_class = FxDeltaVolSurface)]
-impl JsFxDeltaVolSurface {
-    /// Construct an FX delta-quoted vol surface with 25-delta wings.
-    ///
-    /// Optional `rr10d` / `bf10d` add 10-delta wings for richer wing
-    /// interpolation. Omit both (`undefined`/`null`) for a three-point smile;
-    /// the Rust constructor rejects one without the other.
-    ///
-    /// # Arguments
-    /// * `id`        - Stable surface identifier.
-    /// * `expiries`  - Strictly increasing positive expiry times (years).
-    /// * `atm_vols`  - ATM delta-neutral straddle vols per expiry.
-    /// * `rr25d`     - 25-delta risk reversal per expiry (call vol − put vol).
-    /// * `bf25d`     - 25-delta butterfly per expiry (wing avg − ATM).
-    /// * `rr10d`     - Optional 10-delta risk reversal per expiry.
-    /// * `bf10d`     - Optional 10-delta butterfly per expiry.
-    ///
-    /// # Errors
-    ///
-    /// Throws a JavaScript exception if `rr10d` and `bf10d` are not both present
-    /// or both absent; quote arrays are empty or have mismatched lengths;
-    /// expiries are not finite, positive, and strictly increasing; ATM vols are
-    /// not finite and positive; or any risk reversal or butterfly is non-finite.
-    #[wasm_bindgen(constructor)]
-    pub fn new(
-        id: JsValue,
-        expiries: JsValue,
-        atm_vols: JsValue,
-        rr25d: JsValue,
-        bf25d: JsValue,
-        rr10d: Option<JsValue>,
-        bf10d: Option<JsValue>,
-    ) -> Result<JsFxDeltaVolSurface, JsValue> {
-        let expiries: &[f64] = &js_f64_seq(&expiries, "expiries")?;
-        let atm_vols: &[f64] = &js_f64_seq(&atm_vols, "atmVols")?;
-        let rr25d: &[f64] = &js_f64_seq(&rr25d, "rr25d")?;
-        let bf25d: &[f64] = &js_f64_seq(&bf25d, "bf25d")?;
-        let rr10d = js_opt_f64_seq(rr10d.as_ref(), "rr10d")?;
-        let bf10d = js_opt_f64_seq(bf10d.as_ref(), "bf10d")?;
-        let id: &str = &js_string(&id, "id")?;
-        let surface = RustFxDeltaVolSurface::new(
-            id,
-            expiries.to_vec(),
-            atm_vols.to_vec(),
-            rr25d.to_vec(),
-            bf25d.to_vec(),
-            rr10d,
-            bf10d,
-        )
-        .map_err(to_js_err)?;
-        Ok(Self {
-            inner: Arc::new(surface),
-        })
-    }
-
-    /// Deserialize canonical FX delta quotes without reconstructing positional arrays.
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - Canonical FxDeltaVolSurface JSON with expiries in years and
-    ///   annualized decimal ATM, risk-reversal, and butterfly quotes. Optional
-    ///   10-delta wings must occur together; unknown fields are rejected.
-    /// @returns A validated FxDeltaVolSurface handle owned by the caller; release it with free().
-    /// @throws Error - Throws when JSON is malformed, fields are unknown, or native expiry, quote, or wing validation fails.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsFxDeltaVolSurface, JsValue> {
-        let json: &str = &json_text(&json, "json")?;
-        let inner = serde_json::from_str::<RustFxDeltaVolSurface>(json).map_err(to_js_err)?;
-        Ok(Self {
-            inner: Arc::new(inner),
-        })
-    }
-
-    /// Surface identifier.
-    #[wasm_bindgen(getter, js_name = id)]
-    pub fn id(&self) -> String {
-        self.inner.id().as_str().to_string()
-    }
-
-    /// Expiry axis in years.
-    #[wasm_bindgen(getter, js_name = expiries)]
-    pub fn expiries(&self) -> Box<[f64]> {
-        self.inner.expiries().into()
-    }
-
-    /// Number of expiry pillars.
-    #[wasm_bindgen(getter, js_name = numExpiries)]
-    pub fn num_expiries(&self) -> usize {
-        self.inner.num_expiries()
-    }
-
-    /// Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
-    ///
-    /// @returns Compact JSON text.
-    /// @throws If serialization fails (not expected for a valid surface).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&*self.inner).map_err(to_js_err)
-    }
-
-    /// ATM delta-neutral straddle vols per expiry (decimals).
-    #[wasm_bindgen(getter, js_name = atmVols)]
-    pub fn atm_vols(&self) -> Box<[f64]> {
-        self.inner.atm_vols().into()
-    }
-
-    /// 25-delta risk reversals per expiry (call vol minus put vol, decimals).
-    #[wasm_bindgen(getter, js_name = rr25d)]
-    pub fn rr_25d(&self) -> Box<[f64]> {
-        self.inner.rr_25d().into()
-    }
-
-    /// 25-delta butterflies per expiry (wing average minus ATM, decimals).
-    #[wasm_bindgen(getter, js_name = bf25d)]
-    pub fn bf_25d(&self) -> Box<[f64]> {
-        self.inner.bf_25d().into()
-    }
-
-    /// 10-delta risk reversals per expiry, or `undefined` without 10-delta wings.
-    #[wasm_bindgen(getter, js_name = rr10d)]
-    pub fn rr_10d(&self) -> Option<Box<[f64]>> {
-        self.inner.rr_10d().map(Into::into)
-    }
-
-    /// 10-delta butterflies per expiry, or `undefined` without 10-delta wings.
-    #[wasm_bindgen(getter, js_name = bf10d)]
-    pub fn bf_10d(&self) -> Option<Box<[f64]>> {
-        self.inner.bf_10d().map(Into::into)
     }
 }
 

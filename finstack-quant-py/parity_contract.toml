@@ -1864,7 +1864,7 @@ js_rule_members = { free = "wasm ownership: releases the wasm-bindgen handle", t
 # now recorded as TypeScript types, so their 68 unbound methods (variant
 # constructors, `with_*` setters, single-field `*_json` exits) moved to the
 # member backlog; 7 portfolio member entries were cleared (286 - 7 + 68).
-backlog_ceiling = { modules = 395, members = 126 }
+backlog_ceiling = { modules = 149, members = 71 }
 
 [parity.modules."finstack_quant"]
 js = ""
@@ -1941,230 +1941,22 @@ backlog = [
 
 [parity.modules."finstack_quant.core"]
 js = "core"
-backlog = [
-    "FinstackError",
-]
+types = { FinstackError = "FinstackError" }
 
 [parity.modules."finstack_quant.core.config"]
 js = "core"
-backlog = [
-    "FinstackConfig",
-    "RoundingMode",
-    "ToleranceConfig",
-]
+types = { ToleranceConfig = "ToleranceConfig" }
 
 [parity.modules."finstack_quant.core.currency"]
 js = "core"
-backlog = [
-    "AED",
-    "AFN",
-    "ALL",
-    "AMD",
-    "ANG",
-    "AOA",
-    "ARS",
-    "AUD",
-    "AWG",
-    "AZN",
-    "BAM",
-    "BBD",
-    "BDT",
-    "BGN",
-    "BHD",
-    "BIF",
-    "BMD",
-    "BND",
-    "BOB",
-    "BRL",
-    "BSD",
-    "BTN",
-    "BWP",
-    "BYN",
-    "BZD",
-    "CAD",
-    "CDF",
-    "CHF",
-    "CLF",
-    "CLP",
-    "CNY",
-    "COP",
-    "CRC",
-    "CUC",
-    "CUP",
-    "CVE",
-    "CZK",
-    "DJF",
-    "DKK",
-    "DOP",
-    "DZD",
-    "EGP",
-    "ERN",
-    "ETB",
-    "EUR",
-    "FJD",
-    "FKP",
-    "GBP",
-    "GEL",
-    "GHS",
-    "GIP",
-    "GMD",
-    "GNF",
-    "GTQ",
-    "GYD",
-    "HKD",
-    "HNL",
-    "HRK",
-    "HTG",
-    "HUF",
-    "IDR",
-    "ILS",
-    "INR",
-    "IQD",
-    "IRR",
-    "ISK",
-    "JMD",
-    "JOD",
-    "JPY",
-    "KES",
-    "KGS",
-    "KHR",
-    "KMF",
-    "KPW",
-    "KRW",
-    "KWD",
-    "KYD",
-    "KZT",
-    "LAK",
-    "LBP",
-    "LKR",
-    "LRD",
-    "LSL",
-    "LYD",
-    "MAD",
-    "MDL",
-    "MGA",
-    "MKD",
-    "MMK",
-    "MNT",
-    "MOP",
-    "MRU",
-    "MUR",
-    "MVR",
-    "MWK",
-    "MXN",
-    "MYR",
-    "MZN",
-    "NAD",
-    "NGN",
-    "NIO",
-    "NOK",
-    "NPR",
-    "NZD",
-    "OMR",
-    "PAB",
-    "PEN",
-    "PGK",
-    "PHP",
-    "PKR",
-    "PLN",
-    "PYG",
-    "QAR",
-    "RON",
-    "RSD",
-    "RUB",
-    "RWF",
-    "SAR",
-    "SBD",
-    "SCR",
-    "SDG",
-    "SEK",
-    "SGD",
-    "SHP",
-    "SLE",
-    "SLL",
-    "SOS",
-    "SRD",
-    "SSP",
-    "STN",
-    "SYP",
-    "SZL",
-    "THB",
-    "TJS",
-    "TMT",
-    "TND",
-    "TOP",
-    "TRY",
-    "TTD",
-    "TWD",
-    "TZS",
-    "UAH",
-    "UGX",
-    "USD",
-    "UYU",
-    "UZS",
-    "VED",
-    "VES",
-    "VND",
-    "VUV",
-    "WST",
-    "XAF",
-    "XCD",
-    "XOF",
-    "XPF",
-    "YER",
-    "ZAR",
-    "ZMW",
-    "ZWL",
-]
+# The ISO-4217 module constants (`currency.USD`) are the static factories of
+# the WASM class (`core.Currency.usd()`): a facade value cannot hold a wasm
+# handle before `init()` runs, so each constant is a factory.
+constants_on = "core.Currency"
 
 [parity.modules."finstack_quant.core.dates"]
 js = "core"
-backlog = [
-    "BusinessDayConvention",
-    "CalendarMetadata",
-    "FiscalConfig",
-    "HolidayCalendar",
-    "Period",
-    "PeriodId",
-    "PeriodKind",
-    "PeriodPlan",
-    "Schedule",
-    "ScheduleBuilder",
-    "ScheduleErrorPolicy",
-    "SifmaSettlementClass",
-    "StubKind",
-    "TenorUnit",
-    "Thirty360Convention",
-    "add_business_days",
-    "add_months",
-    "add_weekdays",
-    "build_fiscal_periods",
-    "build_periods",
-    "days_30_360",
-    "days_30e_360_isda",
-    "days_since_epoch",
-    "end_of_month",
-    "estimated_sifma_settlement_date_for_class",
-    "fiscal_year",
-    "imm_option_expiry",
-    "is_cds_date",
-    "is_imm_date",
-    "is_weekend",
-    "months_until",
-    "next_cds_date",
-    "next_equity_option_expiry",
-    "next_imm",
-    "next_imm_option_expiry",
-    "next_semiannual_cds_maturity",
-    "next_sifma_settlement",
-    "prev_cds_date",
-    "prev_cds_semiannual_roll",
-    "quarter",
-    "sifma_settlement_date",
-    "sifma_settlement_date_for_class",
-    "third_friday",
-    "third_wednesday",
-]
+types = { CalendarMetadata = "CalendarMetadata", Period = "Period", PeriodPlan = "PeriodPlan" }
 
 [parity.modules."finstack_quant.core.market_data"]
 js = "core"
@@ -2174,62 +1966,27 @@ js = "core"
 
 [parity.modules."finstack_quant.core.market_data.curves"]
 js = "core"
-backlog = [
-    "BaseCorrelationCurve",
-    "CreditIndexData",
-    "InflationCurve",
-    "PriceCurve",
-    "SabrParameterData",
-    "VolSurface",
-]
+types = { SabrParameterData = "SabrParameterData" }
 
 [parity.modules."finstack_quant.core.market_data.fx"]
 js = "core"
 
 [parity.modules."finstack_quant.core.market_data.scalars"]
 js = "core"
-backlog = [
-    "InflationIndex",
-    "ScalarTimeSeries",
-]
 
 [parity.modules."finstack_quant.core.math"]
 js = "core"
 
 [parity.modules."finstack_quant.core.math.linalg"]
 js = "core"
-backlog = [
-    "CholeskyError",
-    "DIAGONAL_TOLERANCE",
-    "SINGULAR_THRESHOLD",
-    "SYMMETRY_TOLERANCE",
-    "ledoit_wolf_shrinkage",
-    "symmetric_eigen",
-]
+# WASM throws a `FinstackError` (kind `validation`) for a Cholesky failure.
+types = { CholeskyError = "FinstackError" }
 
 [parity.modules."finstack_quant.core.math.special_functions"]
 js = "core"
-backlog = [
-    "norm_cdf_with_params",
-    "norm_pdf_with_params",
-    "student_t_cdf",
-    "student_t_inv_cdf",
-]
 
 [parity.modules."finstack_quant.core.math.stats"]
 js = "core"
-backlog = [
-    "finite_count",
-    "finite_max_or_nan",
-    "finite_min_or_nan",
-    "log_returns",
-    "mean_or_nan",
-    "mean_var",
-    "median_or_nan",
-    "quantile_linear_or_nan",
-    "sample_std_or_nan",
-    "sample_variance_or_nan",
-]
 
 [parity.modules."finstack_quant.core.math.summation"]
 js = "core"
@@ -2239,15 +1996,7 @@ js = "core"
 
 [parity.modules."finstack_quant.core.rating_scales"]
 js = "core"
-backlog = [
-    "RATING_SCALES_EXTENSION_KEY",
-    "RatingLevel",
-    "RatingScaleRegistry",
-    "ScorecardScale",
-    "UnknownScalePolicy",
-    "embedded_registry",
-    "registry_from_config",
-]
+types = { RatingLevel = "RatingLevel", ScorecardScale = "ScorecardScale" }
 
 [parity.modules."finstack_quant.core.schema"]
 js = "core"
@@ -2263,12 +2012,6 @@ excluded = { "ArrowTable" = "arrow" }
 
 [parity.modules."finstack_quant.core.types"]
 js = "core"
-backlog = [
-    "Attributes",
-    "CreditRating",
-    "CurveId",
-    "InstrumentId",
-]
 
 [parity.modules."finstack_quant.covenants"]
 js = "covenants"
@@ -3085,98 +2828,14 @@ renames = { synthesized_deal = { js = "synthesizedDealJson", reason = "the Rust 
 [parity.members."finstack_quant.analytics.Performance"]
 wasm_only = { summary = "WASM twin of the pandas exit Performance.to_summary_dataframe, returned as a TableEnvelope" }
 
-[parity.members."finstack_quant.analytics.AnalyticsError"]
-excluded = { add_note = "dunder", with_traceback = "dunder" }
-
-[parity.members."finstack_quant.core.currency.Currency"]
-backlog = [
-    "from_numeric",
-]
-
-[parity.members."finstack_quant.core.market_data.context.MarketContext"]
-# WASM core.MarketContext binds the fromJson/toJson round trip only (S16);
-# the insertion, lookup and conversion methods are the remaining gap.
-backlog = [
-    "contains",
-    "convert_money",
-    "curve_ids",
-    "fx",
-    "fx_required",
-    "get_base_correlation",
-    "get_credit_index",
-    "get_discount",
-    "get_forward",
-    "get_fx_delta_vol_surface",
-    "get_hazard",
-    "get_inflation_curve",
-    "get_inflation_index",
-    "get_price",
-    "get_price_curve",
-    "get_series",
-    "get_surface",
-    "get_vol_cube",
-    "get_vol_index_curve",
-    "insert",
-    "insert_credit_index",
-    "insert_fx",
-    "insert_inflation_index",
-    "insert_price",
-    "insert_series",
-    "is_empty",
-    "map_collateral",
-    "roll_forward",
-    "stats",
-]
-
-[parity.members."finstack_quant.core.market_data.curves.DiscountCurve"]
-backlog = [
-    "day_count",
-    "df_between_dates",
-    "df_on_date_curve",
-    "dfs",
-    "extrapolation",
-    "from_dates",
-    "from_json",
-    "from_zero_rates",
-    "interp_style",
-    "knots",
-    "to_forward_curve",
-    "to_json",
-    "zero_annual",
-    "zero_rate",
-    "zero_rate_on_date",
-]
-
 [parity.members."finstack_quant.core.market_data.fx.FxMatrix"]
-backlog = [
-    "from_dict",
-    "quotes",
-    "set_quotes",
-]
+excluded = { quotes = "pandas" }
 
 [parity.members."finstack_quant.core.money.Money"]
-backlog = [
-    "from_decimal",
-    "from_tuple",
-    "to_tuple",
-    "zero",
-]
+renames = { from_decimal = { js = "fromDecimalStr", reason = "JavaScript has no decimal type: the exact-decimal constructor takes the amount as decimal text (Rust Money::from_decimal_str), which Python also binds as from_decimal_str" } }
 wasm_only = { checkedAdd = "Rust Money::checked_add; twin of Python Money.__add__ (JS has no operator overloading)", checkedDivF64 = "Rust Money::checked_div_f64; twin of Python Money.__truediv__ (JS has no operator overloading)", checkedMulF64 = "Rust Money::checked_mul_f64; twin of Python Money.__mul__ (JS has no operator overloading)", checkedNeg = "Rust Money::checked_neg; twin of Python Money.__neg__ (JS has no operator overloading)", checkedSub = "Rust Money::checked_sub; twin of Python Money.__sub__ (JS has no operator overloading)" }
 
-[parity.members."finstack_quant.core.types.Bps"]
-backlog = [
-    "ZERO",
-]
-
-[parity.members."finstack_quant.core.types.Percentage"]
-backlog = [
-    "ZERO",
-]
-
 [parity.members."finstack_quant.core.types.Rate"]
-backlog = [
-    "ZERO",
-]
 wasm_only = { parse = "Rust Rate::from_str; twin of the Python Rate(text) constructor, which parses quotes such as \"25bp\" and \"5%\"" }
 
 

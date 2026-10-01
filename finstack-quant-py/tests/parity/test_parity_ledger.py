@@ -16,6 +16,11 @@ CONSTANT_CASE) name. Everything else is recorded explicitly:
 * ``wasm_only`` -- WASM keys with no Python twin, with a reason.
 
 The same partition applies to the members of every class bound in both hosts.
+
+A module entry may also name ``constants_on``: a WASM class whose static
+factories are the twins of that module's ``CONSTANT_CASE`` values (Python
+``core.currency.USD`` is WASM ``core.Currency.usd()``). Those constants pair by
+the naming rule against the class statics instead of the namespace keys.
 """
 
 from __future__ import annotations
@@ -109,6 +114,19 @@ def python_surface() -> dict[str, dict[str, Any]]:
 PY = python_surface()
 
 
+def constant_statics(module_path: str) -> set[str]:
+    """Module constants paired, by the naming rule, with statics of the entry's ``constants_on`` class."""
+    owner = MODULES.get(module_path, {}).get("constants_on")
+    if not owner:
+        return set()
+    statics = set(SURFACE.get(owner, {}).get("statics", []))
+    return {
+        name
+        for name, value in PY.get(module_path, {}).items()
+        if name.isupper() and not inspect.isclass(value) and not inspect.isroutine(value) and js_name(name) in statics
+    }
+
+
 def entry_problems(label: str, names: set[str], rule_matched: set[str], entry: dict[str, Any]) -> list[str]:
     """Partition ``names`` across rule matches and the entry's lists exactly once."""
     buckets = {
@@ -153,8 +171,11 @@ def test_python_module_is_partitioned(module_path: str) -> None:
     keys = set(SURFACE[js]["keys"]) if js else set()
     assert not js or SURFACE.get(js, {}).get("kind") == "namespace", f"{js!r} is not a WASM namespace"
     names = set(PY[module_path])
-    rule_matched = {name for name in names if js_name(name) in keys}
+    rule_matched = {name for name in names if js_name(name) in keys} | constant_statics(module_path)
     problems = entry_problems(module_path, names, rule_matched, entry)
+    owner = entry.get("constants_on")
+    if owner and SURFACE.get(owner, {}).get("kind") != "class":
+        problems.append(f"{module_path}: constants_on {owner!r} is not a WASM class")
     for name, rename in entry.get("renames", {}).items():
         if rename["js"] not in SURFACE:
             problems.append(f"{module_path}.{name}: rename target {rename['js']!r} is not on the facade")
@@ -234,10 +255,16 @@ TYPED = typed_classes()
 
 
 def data_class_methods(cls: Any) -> set[str]:
-    """Public methods (not properties) of a data class, beyond its serde exits."""
+    """Public methods (not properties) of a data class, beyond its serde exits.
+
+    An exception class recorded as a TypeScript error type inherits
+    ``add_note`` / ``with_traceback`` from ``BaseException``; those belong to
+    the Python exception protocol, not to the bound surface.
+    """
+    inherited = set(dir(BaseException)) if issubclass(cls, BaseException) else set()
     methods = set()
     for name in dir(cls):
-        if name.startswith("_") or rule_excluded(name) or name in DATA_EXITS:
+        if name.startswith("_") or rule_excluded(name) or name in DATA_EXITS or name in inherited:
             continue
         raw = inspect.getattr_static(cls, name)
         if isinstance(raw, (staticmethod, classmethod)) or inspect.isroutine(raw) or inspect.ismethoddescriptor(raw):
@@ -270,6 +297,12 @@ def test_shared_class_members_are_partitioned(qualified: str) -> None:
     rule_matched = {name for name in py_members if js_name(name) in js_members}
     problems = entry_problems(qualified, py_members, rule_matched, entry)
     claimed = {js_name(name) for name in rule_matched} | {rename["js"] for rename in entry.get("renames", {}).values()}
+    claimed |= {
+        js_name(name)
+        for path, module in MODULES.items()
+        if module.get("constants_on") == target
+        for name in constant_statics(path)
+    }
     wasm_only = entry.get("wasm_only", {})
     for name in sorted(js_members - claimed - set(JS_RULE_MEMBERS)):
         if name not in wasm_only:

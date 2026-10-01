@@ -112,6 +112,41 @@ pub enum PriceCurveKind {
     VolIndex,
 }
 
+impl PriceCurveKind {
+    /// Canonical label: `"price"` or `"vol_index"`.
+    ///
+    /// This is the name host bindings accept and report for the kind; the
+    /// JSON wire form carries the kind through the spot field name instead.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Price => "price",
+            Self::VolIndex => "vol_index",
+        }
+    }
+}
+
+impl std::fmt::Display for PriceCurveKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl std::str::FromStr for PriceCurveKind {
+    type Err = crate::Error;
+
+    /// Parse the canonical label `"price"` or `"vol_index"` (exact match).
+    fn from_str(s: &str) -> crate::Result<Self> {
+        match s {
+            "price" => Ok(Self::Price),
+            "vol_index" => Ok(Self::VolIndex),
+            other => Err(crate::Error::Validation(format!(
+                "Invalid price curve kind {other:?}: expected \"price\" or \"vol_index\""
+            ))),
+        }
+    }
+}
+
 /// Forward price curve for commodities, other price-based assets and
 /// volatility indices.
 ///
@@ -962,6 +997,15 @@ mod tests {
             "interp_style": "linear", "extrapolation": "flat_zero"
         });
         assert!(serde_json::from_value::<PriceCurve>(both).is_err());
+    }
+
+    #[test]
+    fn kind_labels_round_trip_and_reject_unknown_names() {
+        for kind in [PriceCurveKind::Price, PriceCurveKind::VolIndex] {
+            assert_eq!(kind.to_string().parse::<PriceCurveKind>().ok(), Some(kind));
+        }
+        assert_eq!(PriceCurveKind::VolIndex.as_str(), "vol_index");
+        assert!("Price".parse::<PriceCurveKind>().is_err());
     }
 
     #[test]

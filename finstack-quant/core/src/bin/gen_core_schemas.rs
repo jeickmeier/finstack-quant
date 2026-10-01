@@ -8,7 +8,12 @@ use finstack_quant_core::schema::{
 };
 
 /// Schema families owned by core; each is regenerated (and pruned) on its own.
-const ROOTS: [&str; 2] = ["schemas/market_data", "schemas/table"];
+const ROOTS: [&str; 4] = [
+    "schemas/dates",
+    "schemas/market_data",
+    "schemas/rating_scales",
+    "schemas/table",
+];
 
 fn main() {
     let command = SchemaGenerationCommand::from_env()

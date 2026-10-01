@@ -5,7 +5,7 @@
 //!
 //! Hagan SABR (2002): see docs/REFERENCES.md#hagan-2002-sabr.
 
-use crate::api::core::market_data::{JsFxDeltaVolSurface, JsVolCube};
+use crate::api::core::surfaces::{JsFxDeltaVolSurface, JsVolCube};
 use crate::utils::input::{
     from_js_json, invalid_type, js_bool, js_f64, js_f64_matrix, js_f64_seq, js_opt_f64, js_uint,
 };

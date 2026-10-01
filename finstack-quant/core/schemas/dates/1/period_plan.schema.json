@@ -1,0 +1,74 @@
+{
+  "$defs": {
+    "Period": {
+      "additionalProperties": false,
+      "description": "A concrete period with start/end dates and actual/forecast flag.",
+      "properties": {
+        "end": {
+          "description": "Exclusive end date.",
+          "format": "date",
+          "type": "string"
+        },
+        "id": {
+          "$ref": "#/$defs/PeriodId",
+          "description": "Identifier of this period."
+        },
+        "is_actual": {
+          "description": "True when this period is part of the \"actuals\" subset.",
+          "type": "boolean"
+        },
+        "start": {
+          "description": "Inclusive start date.",
+          "format": "date",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "start",
+        "end",
+        "is_actual"
+      ],
+      "type": "object"
+    },
+    "PeriodId": {
+      "description": "Identifier for a Gregorian period like `2025Q1` or a fiscal period like\n`FY2025W53`.",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/dates/1/period_plan.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Ordered reporting periods with their calendar bounds and actual/forecast flags.",
+  "examples": [
+    {
+      "periods": [
+        {
+          "end": "2025-04-01",
+          "id": "2025Q1",
+          "is_actual": true,
+          "start": "2025-01-01"
+        },
+        {
+          "end": "2025-07-01",
+          "id": "2025Q2",
+          "is_actual": false,
+          "start": "2025-04-01"
+        }
+      ]
+    }
+  ],
+  "properties": {
+    "periods": {
+      "description": "Ordered periods produced by the parser.",
+      "items": {
+        "$ref": "#/$defs/Period"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "periods"
+  ],
+  "title": "PeriodPlan",
+  "type": "object"
+}

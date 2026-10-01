@@ -1,6 +1,47 @@
 // Generated from the finstack-quant-core JSON schemas by scripts/generate-contract-types.mjs. Do not edit.
 
 /**
+ * Business day adjustment conventions per ISDA standards.
+ *
+ * Defines how dates are adjusted when they fall on non-business days
+ * (weekends or holidays). Used throughout fixed income and derivatives
+ * markets for determining payment dates, fixing dates, and maturity dates.
+ *
+ * # Standards References
+ *
+ * - **ISDA**: 2006 ISDA Definitions, Section 4.12
+ * - **FpML**: BusinessDayConventionEnum
+ * - **ISO 20022**: Business Day Convention codes
+ *
+ * # Examples
+ *
+ * ```rust
+ * use finstack_quant_core::dates::{adjust, BusinessDayConvention, Date};
+ * use finstack_quant_core::dates::calendar::TARGET2;
+ * use time::Month;
+ *
+ * // Saturday, January 4, 2025
+ * let weekend = Date::from_calendar_date(2025, Month::January, 4).expect("Valid date");
+ *
+ * // Following: moves to next Monday (Jan 6)
+ * let adj = adjust(weekend, BusinessDayConvention::Following, &TARGET2)?;
+ * assert_eq!(adj.day(), 6);
+ *
+ * // Preceding: moves to previous Friday (Jan 3)
+ * let adj = adjust(weekend, BusinessDayConvention::Preceding, &TARGET2)?;
+ * assert_eq!(adj.day(), 3);
+ * # Ok::<(), finstack_quant_core::Error>(())
+ * ```
+ *
+ * # Default
+ *
+ * `BusinessDayConvention::default()` is `ModifiedFollowing`, the ISDA 2006
+ * Definitions Section 4.12(c) convention used for swap and bond period dates.
+ * Host bindings use it whenever a caller omits the convention.
+ */
+export type BusinessDayConvention =
+  "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
+/**
  * ISO 4217 currency enumeration
  */
 export type Currency =
@@ -1051,6 +1092,114 @@ export type VolQuoteType = "black_lognormal" | "normal";
  */
 export type VolSurfaceAxis = "strike" | "tenor";
 /**
+ * Identifier for a Gregorian period like `2025Q1` or a fiscal period like
+ * `FY2025W53`.
+ */
+export type PeriodId = string;
+/**
+ * Warning generated during schedule construction.
+ *
+ * Warnings indicate non-fatal issues that occurred during schedule generation.
+ * Unlike errors, these allow the schedule to be created but signal that
+ * something unexpected happened that callers should be aware of.
+ *
+ * # Use Cases
+ *
+ * - **Graceful fallback**: When [`ScheduleErrorPolicy::GracefulEmpty`] is set and an error
+ *   would normally occur, the builder returns an empty schedule with a warning
+ *   describing the original error.
+ *
+ * # Examples
+ *
+ * ```rust
+ * use finstack_quant_core::dates::{ScheduleBuilder, Tenor, ScheduleWarning};
+ * use time::{Date, Month};
+ *
+ * let start = Date::from_calendar_date(2025, Month::December, 31)?;
+ * let end = Date::from_calendar_date(2025, Month::January, 1)?; // Invalid: end before start
+ *
+ * // Invalid date ranges are rejected by new() before an error policy applies.
+ * // rather than an error. Note: new() itself returns Result, so we handle the error
+ * let result = ScheduleBuilder::new(start, end);
+ * assert!(result.is_err()); // new() validates start <= end
+ * # Ok::<(), Box<dyn std::error::Error>>(())
+ * ```
+ */
+export type ScheduleWarning =
+  | {
+      graceful_fallback: {
+        /**
+         * Human-readable description of the error that was suppressed.
+         */
+        error_message: string;
+      };
+    }
+  | {
+      missing_calendar_id: {
+        /**
+         * The calendar identifier that could not be resolved.
+         */
+        calendar_id: string;
+      };
+    };
+/**
+ * Explicit policy for how schedule construction should respond to recoverable issues.
+ */
+export type ScheduleErrorPolicy = "strict" | "missing_calendar_warning" | "graceful_empty";
+/**
+ * Stub period handling when start/end dates don't align with payment frequency.
+ *
+ * Controls how schedules are generated when the start and end dates don't
+ * divide evenly by the payment frequency, resulting in an irregular period
+ * (stub) at the beginning or end of the schedule.
+ *
+ * # Variants
+ *
+ * - **`None`**: No stub allowed (default). Generates regular periods from
+ *   start to end and returns an error
+ *   ([`InputError::NonIntegerScheduleTenor`]) when the dates don't divide
+ *   evenly by the frequency. Use a stub variant for misaligned schedules.
+ *
+ * [`InputError::NonIntegerScheduleTenor`]: crate::error::InputError::NonIntegerScheduleTenor
+ * - **`ShortFront`**: Short stub period at the start. Schedule is built
+ *   backward from the end date, creating a short first period.
+ * - **`ShortBack`**: Short stub period at the end. Schedule is built forward
+ *   from the start date, creating a short final period.
+ * - **`LongFront`**: Long stub period at the start. Combines the first two
+ *   periods into a single longer period.
+ * - **`LongBack`**: Long stub period at the end. Combines the last two periods
+ *   into a single longer period.
+ *
+ * # Financial Context
+ *
+ * Stub conventions are important for:
+ * - Interest accrual calculations (short/long first coupons)
+ * - Cash flow present value computations
+ * - Matching market conventions for specific instruments
+ *
+ * # Examples
+ *
+ * ```rust
+ * use finstack_quant_core::dates::{ScheduleBuilder, Tenor, StubKind};
+ * use time::{Date, Month};
+ *
+ * let start = Date::from_calendar_date(2025, Month::January, 10)?;
+ * let end = Date::from_calendar_date(2025, Month::December, 15)?;
+ *
+ * // Short stub at front
+ * let sched = ScheduleBuilder::new(start, end)?
+ *     .frequency(Tenor::quarterly())
+ *     .stub_rule(StubKind::ShortFront)
+ *     .build()?;
+ * # Ok::<(), Box<dyn std::error::Error>>(())
+ * ```
+ *
+ * # See Also
+ *
+ * - [`ScheduleBuilder::stub_rule`] to configure stub behavior
+ */
+export type StubKind = "none" | "short_front" | "short_back" | "long_front" | "long_back";
+/**
  * Column storage variants supported by the table envelope.
  */
 export type TableColumnData =
@@ -1835,6 +1984,123 @@ export interface SabrParameterData {
   nu: number;
   rho: number;
   shift?: number | null;
+}
+/**
+ * A concrete period with start/end dates and actual/forecast flag.
+ */
+export interface Period {
+  /**
+   * Exclusive end date.
+   */
+  end: string;
+  /**
+   * Identifier of this period.
+   */
+  id: PeriodId;
+  /**
+   * True when this period is part of the "actuals" subset.
+   */
+  is_actual: boolean;
+  /**
+   * Inclusive start date.
+   */
+  start: string;
+}
+/**
+ * Ordered reporting periods with their calendar bounds and actual/forecast flags.
+ */
+export interface PeriodPlan {
+  /**
+   * Ordered periods produced by the parser.
+   */
+  periods: Period[];
+  [k: string]: unknown;
+}
+/**
+ * Rating level for credit rating scales.
+ */
+export interface RatingLevel {
+  /**
+   * Minimum score threshold for this rating.
+   */
+  min_score: number;
+  /**
+   * Rating name, for example `AAA` or `Aaa`.
+   */
+  name: string;
+  /**
+   * Numeric score on a 0-100 scale.
+   */
+  score: number;
+}
+/**
+ * Generated accrual, payment and fixing dates with any construction warnings.
+ */
+export interface Schedule {
+  /**
+   * Unadjusted accrual grid (period start plus each period end).
+   *
+   * These dates are never business-day adjusted. Payment-date adjustment,
+   * payment lag, and fixing lag live on [`Self::payment_dates`] and
+   * [`Self::fixing_dates`].
+   */
+  dates: DateWire[];
+  /**
+   * Fixing dates for each accrual period.
+   *
+   * Empty when no fixing lag is configured; otherwise the same length as
+   * [`Self::payment_dates`].
+   */
+  fixing_dates?: DateWire[];
+  /**
+   * Payment date for each accrual period (one per period end).
+   *
+   * Length is `dates.len().saturating_sub(1)`. Duplicate payment dates are
+   * retained so the series stays 1:1 with period ends.
+   */
+  payment_dates?: DateWire[];
+  /**
+   * Warnings generated during schedule construction.
+   *
+   * Non-empty when graceful fallback mode suppressed an error or when
+   * other non-fatal issues occurred during generation.
+   */
+  warnings?: ScheduleWarning[];
+  [k: string]: unknown;
+}
+/**
+ * Persisted inputs of a date schedule: range, frequency, stub, adjustment and lags.
+ */
+export interface ScheduleSpec {
+  business_day_convention?: BusinessDayConvention | null;
+  calendar_id?: string | null;
+  cds_imm_mode: boolean;
+  end: DateWire;
+  end_of_month: boolean;
+  error_policy: ScheduleErrorPolicy;
+  fixing_lag_business_days?: number | null;
+  frequency: Tenor;
+  imm_mode?: boolean;
+  payment_lag_days?: number;
+  start: DateWire;
+  stub: StubKind;
+}
+/**
+ * Named scorecard rating scale: rating levels ordered best to worst with score thresholds.
+ */
+export interface ScorecardScale {
+  /**
+   * Human-readable description.
+   */
+  description?: string | null;
+  /**
+   * Ordered list of rating levels from best to worst.
+   */
+  ratings: RatingLevel[];
+  /**
+   * Scale name, for example `S&P` or `Moody's`.
+   */
+  scale_name: string;
 }
 /**
  * A single named column in a [`TableEnvelope`].

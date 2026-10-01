@@ -3,8 +3,8 @@
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::errors::core_to_py;
 use finstack_quant_core::dates::{
-    adjust, available_calendars, fx::resolve_calendar, BusinessDayConvention, CalendarMetadata,
-    HolidayCalendar, WeekendRule,
+    adjust, available_calendars, canonical_calendar_id, fx::resolve_calendar,
+    BusinessDayConvention, CalendarMetadata, HolidayCalendar, WeekendRule,
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyModule, PyType};
@@ -271,19 +271,7 @@ impl PyHolidayCalendar {
     #[pyo3(text_signature = "(code)")]
     fn new(code: &str) -> PyResult<Self> {
         let cal = resolve_calendar(Some(code)).map_err(core_to_py)?;
-        let code = match cal.metadata() {
-            Some(meta) => meta.id.to_string(),
-            None => {
-                let mut parts: Vec<String> = code
-                    .split('+')
-                    .map(|p| p.trim().to_ascii_lowercase())
-                    .filter(|p| !p.is_empty())
-                    .collect();
-                parts.sort_unstable();
-                parts.dedup();
-                parts.join("+")
-            }
-        };
+        let code = canonical_calendar_id(code).map_err(core_to_py)?;
         Ok(Self { cal, code })
     }
 

@@ -147,6 +147,54 @@ pub fn calendar_by_id_strict(id: &str) -> crate::Result<&'static dyn HolidayCale
         .ok_or_else(|| crate::Error::calendar_not_found_with_suggestions(id, available_calendars()))
 }
 
+/// Canonical identifier of the calendar an id resolves to.
+///
+/// A built-in calendar reports its registry id (`"USNY"` gives `"usny"`); a
+/// `+`-joined union reports its members trimmed, lower-cased, sorted and
+/// de-duplicated (`"GBLO + nyse"` gives `"gblo+nyse"`), which is the key the
+/// union is interned under. Two ids with the same canonical form resolve to
+/// the same calendar.
+///
+/// # Arguments
+///
+/// * `id` - Calendar identifier accepted by [`calendar_by_id_strict`]: a
+///   built-in id in any case, or `+`-joined built-in ids.
+///
+/// # Errors
+///
+/// Returns `InputError::CalendarNotFound` (with suggestions) when `id` or any
+/// `+`-joined member is not a built-in calendar.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_core::dates::calendar::canonical_calendar_id;
+///
+/// assert_eq!(canonical_calendar_id("NYSE")?, "nyse");
+/// assert_eq!(canonical_calendar_id("nyse + GBLO")?, "gblo+nyse");
+/// assert!(canonical_calendar_id("nope").is_err());
+/// # Ok::<(), finstack_quant_core::Error>(())
+/// ```
+pub fn canonical_calendar_id(id: &str) -> crate::Result<String> {
+    let calendar = calendar_by_id_strict(id)?;
+    Ok(match calendar.metadata() {
+        Some(metadata) => metadata.id.to_string(),
+        None => joint_members(id).join("+"),
+    })
+}
+
+/// Members of a `+`-joined calendar id: trimmed, lower-cased, sorted, de-duplicated.
+fn joint_members(id: &str) -> Vec<String> {
+    let mut parts: Vec<String> = id
+        .split('+')
+        .map(|p| p.trim().to_ascii_lowercase())
+        .filter(|p| !p.is_empty())
+        .collect();
+    parts.sort_unstable();
+    parts.dedup();
+    parts
+}
+
 /// Interned union calendars keyed by their normalized `a+b` identifier.
 ///
 /// Composite calendars borrow their members, so a `'static` handle needs a
@@ -163,13 +211,7 @@ static JOINT_CALENDARS: std::sync::OnceLock<
 /// `"GBLO + nyse"` and `"nyse+gblo"` share one interned composite; a single
 /// distinct member resolves to that built-in calendar directly.
 fn joint_calendar(id: &str) -> crate::Result<&'static dyn HolidayCalendar> {
-    let mut parts: Vec<String> = id
-        .split('+')
-        .map(|p| p.trim().to_ascii_lowercase())
-        .filter(|p| !p.is_empty())
-        .collect();
-    parts.sort_unstable();
-    parts.dedup();
+    let parts = joint_members(id);
     if parts.is_empty() {
         return Err(crate::Error::calendar_not_found_with_suggestions(
             id,
@@ -246,5 +288,31 @@ mod joint_tests {
         ));
         assert!(calendar_by_id_strict("nyse+bogus").is_err());
         assert!(calendar_by_id_strict("+").is_err());
+    }
+}
+
+#[cfg(test)]
+mod canonical_id_tests {
+    use super::*;
+
+    #[test]
+    fn canonical_id_is_registry_id_for_builtin_calendars() {
+        assert_eq!(canonical_calendar_id("NYSE").expect("nyse"), "nyse");
+    }
+
+    #[test]
+    fn canonical_id_normalizes_union_members() {
+        assert_eq!(
+            canonical_calendar_id(" nyse + GBLO+nyse").expect("union"),
+            "gblo+nyse"
+        );
+        // A union of one distinct member is that built-in calendar.
+        assert_eq!(canonical_calendar_id("nyse+NYSE").expect("single"), "nyse");
+    }
+
+    #[test]
+    fn canonical_id_rejects_unknown_members() {
+        assert!(canonical_calendar_id("nyse+nope").is_err());
+        assert!(canonical_calendar_id("+").is_err());
     }
 }
