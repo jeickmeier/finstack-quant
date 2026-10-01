@@ -314,7 +314,7 @@ test('number arrays must be arrays of numbers or Float64Array', () => {
   assert.throws(() => core.mean([1, '2', 3]), invalidType('data[1]'));
   // eslint-disable-next-line no-sparse-arrays -- a hole is not a number
   assert.throws(() => core.mean([1, , 3]), invalidType('data[1]'));
-  // eslint-disable-next-line no-new-wrappers -- a boxed Number is not a number
+
   assert.throws(() => core.mean([1, new Number(2)]), invalidType('data[1]'));
   assert.ok(Number.isNaN(core.mean([1, Number.NaN])));
   assert.equal(core.mean([1, Number.POSITIVE_INFINITY]), Number.POSITIVE_INFINITY);
