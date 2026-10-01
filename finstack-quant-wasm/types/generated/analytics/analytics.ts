@@ -29,12 +29,109 @@ export type CagrDayCount =
  * ISDA, ICMA, or local market conventions. The conventions determine how
  * interest accrues between payment dates.
  *
+ * The variant docs are deliberately short: they are published verbatim as the
+ * `description` of each wire value in the `common/1/day_count` JSON Schema,
+ * which every instrument contract inlines. Each one carries the convention
+ * name, its defining rule and its standards citation. Formulas, market usage
+ * and worked examples live in the sections below.
+ *
  * # Standards References
  *
  * Implementations follow:
- * - **ISDA**: 2006 ISDA Definitions, Section 4.16
- * - **ICMA**: ICMA Rule Book, Rule 251
+ * - **ISDA**: 2006 ISDA Definitions, Section 4.16.
+ *   `docs/REFERENCES.md#isda-2006-definitions`
+ * - **ICMA**: ICMA Rule Book, Rule 251. `docs/REFERENCES.md#icma-rule-book`
+ * - **ISMA** (1999). "Recommendations for Accrued Interest Calculations."
+ * - **SIA/PSA**: Standard Securities Calculation Methods (SIA Standard Formulas)
  * - **ISO**: ISO 20022 Day Count Fraction Codes
+ *
+ * # Formulas
+ *
+ * The 30/360 family shares one day-count formula and differs only in how the
+ * day-of-month values are adjusted:
+ *
+ * ```text
+ * Days = 360(Y₂ - Y₁) + 30(M₂ - M₁) + (D₂' - D₁')
+ * year_fraction = Days / 360
+ *
+ * Thirty360 (SIA/PSA):
+ *   D₁' = 30   if D₁ is 31 or last day of February
+ *   D₂' = 30   if D₂ is 31 and D₁' = 30
+ *   D₂' = 30   if D₂ is last day of Feb and D₁ is last day of Feb
+ *
+ * ThirtyE360 (ISDA §4.16(g)):
+ *   D₁' = min(D₁, 30)
+ *   D₂' = min(D₂, 30)
+ *
+ * ThirtyE360Isda (ISDA §4.16(h)):
+ *   D₁' = 30   if D₁ is the last day of its month (incl. end of February)
+ *   D₂' = 30   if D₂ is 31, or if D₂ is the last day of February and the
+ *              period does not end on the termination (maturity) date
+ *
+ * Thirty360It (QuantLib `Thirty360::Italian`):
+ *   D₁' = 30   if D₁ is 31 or (month is February and D₁ > 27)
+ *   D₂' = 30   if D₂ is 31 or (month is February and D₂ > 27)
+ * ```
+ *
+ * - **`Thirty360`, SIA/PSA versus ISDA**: this implementation follows the
+ *   SIA/PSA convention, which includes a February end-of-month rule. ISDA 2006
+ *   §4.16(f) specifies a slightly different set of adjustments that omit it.
+ *   Both are commonly called "30/360 US", but they can produce different day
+ *   counts for periods that start or end on the last day of February.
+ * - **`ThirtyE360Isda` termination-date exception**: ISDA §4.16(h) keeps D₂
+ *   unadjusted when the period ends on the termination date and that date is
+ *   the last day of February. Set
+ *   [`DayCountContext::end_is_termination_date`] for the final period to
+ *   maturity; ordinary coupon periods leave it false.
+ * - **`Thirty360It`** is distinct from US SIA (February EOM only when both
+ *   ends are February EOM) and from 30E/360 (no February-after-27 rule).
+ *
+ * The actual-day conventions:
+ *
+ * - **`Act365L`** (ICMA Rule 251.1(i)(c)): the denominator depends on the
+ *   coupon frequency supplied via [`DayCountContext`]. Annual, or no frequency
+ *   supplied: 366 if February 29 falls in `(start, end]` (exclusive of start,
+ *   inclusive of end), else 365. Non-annual: 366 if the period end date falls
+ *   in a leap year, else 365. This is **not** ACT/ACT AFB, which uses a
+ *   sub-period splitting algorithm; use [`DayCount::ActActAfb`] for AFB /
+ *   Actual/Actual Euro.
+ * - **`Nl365`**: counts the actual calendar days in `[start, end)` and removes
+ *   every February 29 that falls in the period, so a full leap year still
+ *   yields exactly 1.0.
+ * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
+ *   (days in segment) / (days in that year) for each segment, and sum.
+ * - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
+ *   frequency, take (actual days) / (actual days in coupon period) for each,
+ *   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
+ *   first/last coupons use
+ *   [`act_act_isma_year_fraction_with_reference_period`].
+ * - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
+ *   **backwards from `end`** until the candidate is before `start`; each
+ *   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
+ *   leap year is bumped to 29 February. The residual fraction is
+ *   `days(start, residual_end) / den`, where `den` is 366 if 29 February lies
+ *   in `[start, residual_end)`, else 365. No [`DayCountContext`] is required.
+ * - **`Bus252`**: requires `calendar` in [`DayCountContext`]. It iterates each
+ *   calendar day in the range to check business-day status, giving O(n) cost
+ *   in the number of calendar days between the dates (about 11,000 iterations
+ *   for a 30Y instrument).
+ * - **`OneOne`**: inflation fixed legs compound across annual periods using
+ *   this convention. Empty intervals return zero and reversed intervals are
+ *   rejected, as for all day counts in this API.
+ *
+ * # Usage
+ *
+ * | Convention | Standard for |
+ * | --- | --- |
+ * | `Act360` | USD and EUR money markets, short-term rate derivatives (SOFR, €STR), FX swaps and forwards |
+ * | `Act365F` | GBP money markets (SONIA), cable (GBP/USD) FX, some Commonwealth bond markets |
+ * | `Act365L` | GBP floating-rate notes, some European bond markets |
+ * | `Thirty360` | US corporate bonds, US municipal bonds, US agency debt |
+ * | `ThirtyE360` | Eurobonds, international bonds, some interest rate swaps |
+ * | `Nl365` | Some Canadian money-market and mortgage instruments, legacy systems that ignore leap days |
+ * | `ActAct` | US Treasury bonds, USD and EUR swap fixed legs, government bonds in many markets |
+ * | `ActActIsma` | International bonds with regular coupons, Eurobonds, ICMA-governed securities |
+ * | `Bus252` | BRL-denominated instruments (ANBIMA), some equity derivatives and variance swaps |
  */
 export type DayCount =
   | "one_one"

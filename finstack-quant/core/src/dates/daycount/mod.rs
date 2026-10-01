@@ -153,40 +153,184 @@ use crate::dates::Tenor;
 /// ISDA, ICMA, or local market conventions. The conventions determine how
 /// interest accrues between payment dates.
 ///
+/// The variant docs are deliberately short: they are published verbatim as the
+/// `description` of each wire value in the `common/1/day_count` JSON Schema,
+/// which every instrument contract inlines. Each one carries the convention
+/// name, its defining rule and its standards citation. Formulas, market usage
+/// and worked examples live in the sections below.
+///
 /// # Standards References
 ///
 /// Implementations follow:
-/// - **ISDA**: 2006 ISDA Definitions, Section 4.16
-/// - **ICMA**: ICMA Rule Book, Rule 251
+/// - **ISDA**: 2006 ISDA Definitions, Section 4.16.
+///   `docs/REFERENCES.md#isda-2006-definitions`
+/// - **ICMA**: ICMA Rule Book, Rule 251. `docs/REFERENCES.md#icma-rule-book`
+/// - **ISMA** (1999). "Recommendations for Accrued Interest Calculations."
+/// - **SIA/PSA**: Standard Securities Calculation Methods (SIA Standard Formulas)
 /// - **ISO**: ISO 20022 Day Count Fraction Codes
+///
+/// # Formulas
+///
+/// The 30/360 family shares one day-count formula and differs only in how the
+/// day-of-month values are adjusted:
+///
+/// ```text
+/// Days = 360(Y₂ - Y₁) + 30(M₂ - M₁) + (D₂' - D₁')
+/// year_fraction = Days / 360
+///
+/// Thirty360 (SIA/PSA):
+///   D₁' = 30   if D₁ is 31 or last day of February
+///   D₂' = 30   if D₂ is 31 and D₁' = 30
+///   D₂' = 30   if D₂ is last day of Feb and D₁ is last day of Feb
+///
+/// ThirtyE360 (ISDA §4.16(g)):
+///   D₁' = min(D₁, 30)
+///   D₂' = min(D₂, 30)
+///
+/// ThirtyE360Isda (ISDA §4.16(h)):
+///   D₁' = 30   if D₁ is the last day of its month (incl. end of February)
+///   D₂' = 30   if D₂ is 31, or if D₂ is the last day of February and the
+///              period does not end on the termination (maturity) date
+///
+/// Thirty360It (QuantLib `Thirty360::Italian`):
+///   D₁' = 30   if D₁ is 31 or (month is February and D₁ > 27)
+///   D₂' = 30   if D₂ is 31 or (month is February and D₂ > 27)
+/// ```
+///
+/// - **`Thirty360`, SIA/PSA versus ISDA**: this implementation follows the
+///   SIA/PSA convention, which includes a February end-of-month rule. ISDA 2006
+///   §4.16(f) specifies a slightly different set of adjustments that omit it.
+///   Both are commonly called "30/360 US", but they can produce different day
+///   counts for periods that start or end on the last day of February.
+/// - **`ThirtyE360Isda` termination-date exception**: ISDA §4.16(h) keeps D₂
+///   unadjusted when the period ends on the termination date and that date is
+///   the last day of February. Set
+///   [`DayCountContext::end_is_termination_date`] for the final period to
+///   maturity; ordinary coupon periods leave it false.
+/// - **`Thirty360It`** is distinct from US SIA (February EOM only when both
+///   ends are February EOM) and from 30E/360 (no February-after-27 rule).
+///
+/// The actual-day conventions:
+///
+/// - **`Act365L`** (ICMA Rule 251.1(i)(c)): the denominator depends on the
+///   coupon frequency supplied via [`DayCountContext`]. Annual, or no frequency
+///   supplied: 366 if February 29 falls in `(start, end]` (exclusive of start,
+///   inclusive of end), else 365. Non-annual: 366 if the period end date falls
+///   in a leap year, else 365. This is **not** ACT/ACT AFB, which uses a
+///   sub-period splitting algorithm; use [`DayCount::ActActAfb`] for AFB /
+///   Actual/Actual Euro.
+/// - **`Nl365`**: counts the actual calendar days in `[start, end)` and removes
+///   every February 29 that falls in the period, so a full leap year still
+///   yields exactly 1.0.
+/// - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
+///   (days in segment) / (days in that year) for each segment, and sum.
+/// - **`ActActIsma`** (ICMA): determine quasi-coupon periods from the payment
+///   frequency, take (actual days) / (actual days in coupon period) for each,
+///   and sum. Requires `frequency` in [`DayCountContext`]; for irregular
+///   first/last coupons use
+///   [`act_act_isma_year_fraction_with_reference_period`].
+/// - **`ActActAfb`** (QuantLib `ActualActual::AFB`): walk whole years
+///   **backwards from `end`** until the candidate is before `start`; each
+///   accepted year-step adds `1.0`. A year-step that lands on 28 February of a
+///   leap year is bumped to 29 February. The residual fraction is
+///   `days(start, residual_end) / den`, where `den` is 366 if 29 February lies
+///   in `[start, residual_end)`, else 365. No [`DayCountContext`] is required.
+/// - **`Bus252`**: requires `calendar` in [`DayCountContext`]. It iterates each
+///   calendar day in the range to check business-day status, giving O(n) cost
+///   in the number of calendar days between the dates (about 11,000 iterations
+///   for a 30Y instrument).
+/// - **`OneOne`**: inflation fixed legs compound across annual periods using
+///   this convention. Empty intervals return zero and reversed intervals are
+///   rejected, as for all day counts in this API.
+///
+/// # Usage
+///
+/// | Convention | Standard for |
+/// | --- | --- |
+/// | `Act360` | USD and EUR money markets, short-term rate derivatives (SOFR, €STR), FX swaps and forwards |
+/// | `Act365F` | GBP money markets (SONIA), cable (GBP/USD) FX, some Commonwealth bond markets |
+/// | `Act365L` | GBP floating-rate notes, some European bond markets |
+/// | `Thirty360` | US corporate bonds, US municipal bonds, US agency debt |
+/// | `ThirtyE360` | Eurobonds, international bonds, some interest rate swaps |
+/// | `Nl365` | Some Canadian money-market and mortgage instruments, legacy systems that ignore leap days |
+/// | `ActAct` | US Treasury bonds, USD and EUR swap fixed legs, government bonds in many markets |
+/// | `ActActIsma` | International bonds with regular coupons, Eurobonds, ICMA-governed securities |
+/// | `Bus252` | BRL-denominated instruments (ANBIMA), some equity derivatives and variance swaps |
 ///
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
+/// use finstack_quant_core::dates::calendar::NYSE;
+/// use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
 /// use time::Month;
 ///
-/// let start = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
-/// let end = Date::from_calendar_date(2025, Month::July, 1).expect("Valid date");
+/// let date = |y, m, d| Date::from_calendar_date(y, m, d).expect("Valid date");
+/// let yf = |convention: DayCount, start, end, ctx| {
+///     convention.year_fraction(start, end, ctx).expect("Year fraction calculation should succeed")
+/// };
+/// let none = DayCountContext::default;
 ///
-/// // Actual/360 - money market convention
-/// let yf_360 = DayCount::Act360.year_fraction(start, end, DayCountContext::default()).expect("Year fraction calculation should succeed");
+/// // Actual/360: 90 days / 360
+/// let (start, end) = (date(2025, Month::January, 1), date(2025, Month::April, 1));
+/// assert_eq!(yf(DayCount::Act360, start, end, none()), 90.0 / 360.0);
 ///
-/// // 30/360 - bond convention
-/// let yf_30360 = DayCount::Thirty360.year_fraction(start, end, DayCountContext::default()).expect("Year fraction calculation should succeed");
+/// // Actual/365 Fixed: 365 days / 365
+/// let (start, end) = (date(2025, Month::January, 1), date(2026, Month::January, 1));
+/// assert!((yf(DayCount::Act365F, start, end, none()) - 1.0).abs() < 1e-9);
 ///
-/// assert!(yf_360 > yf_30360); // Act/360 has larger denominator
+/// // Actual/365L: 29 days over a period containing Feb 29 → 366 denominator
+/// let (start, end) = (date(2024, Month::February, 1), date(2024, Month::March, 1));
+/// assert_eq!(yf(DayCount::Act365L, start, end, none()), 29.0 / 366.0);
+/// // Actual/Actual AFB: 29 February lies in the residual period
+/// assert_eq!(yf(DayCount::ActActAfb, start, end, none()), 29.0 / 366.0);
+///
+/// // The 30/360 family differs on month ends: Jan 31 → Feb 28
+/// let (start, end) = (date(2025, Month::January, 31), date(2025, Month::February, 28));
+/// // US: Jan 31 is day 30, Feb 28 stays 28
+/// assert_eq!(yf(DayCount::Thirty360, start, end, none()), 28.0 / 360.0);
+/// // Italian: Feb 28 > 27 also becomes day 30
+/// assert_eq!(yf(DayCount::Thirty360It, start, end, none()), 30.0 / 360.0);
+///
+/// // 30E/360: both 31sts count as day 30
+/// let (start, end) = (date(2025, Month::January, 31), date(2025, Month::March, 31));
+/// assert_eq!(yf(DayCount::ThirtyE360, start, end, none()), 60.0 / 360.0);
+///
+/// // 30E/360 (ISDA): both end-of-Feb and Aug 31 count as day 30
+/// let (start, end) = (date(2011, Month::August, 31), date(2012, Month::February, 29));
+/// assert_eq!(yf(DayCount::ThirtyE360Isda, start, end, none()), 180.0 / 360.0);
+///
+/// // NL/365: full leap year, Feb 29 excluded → 365/365
+/// let (start, end) = (date(2024, Month::January, 1), date(2025, Month::January, 1));
+/// assert_eq!(yf(DayCount::Nl365, start, end, none()), 1.0);
+///
+/// // Actual/Actual (ISDA): 184/366 (Jul-Dec 2024) + 181/365 (Jan-Jun 2025)
+/// let (start, end) = (date(2024, Month::July, 1), date(2025, Month::July, 1));
+/// assert!((yf(DayCount::ActAct, start, end, none()) - 1.0).abs() < 0.01);
+///
+/// // Actual/Actual (ICMA): one full semi-annual period is 0.5
+/// let (start, end) = (date(2025, Month::January, 15), date(2025, Month::July, 15));
+/// let ctx = DayCountContext { frequency: Some(Tenor::semi_annual()), ..Default::default() };
+/// assert!((yf(DayCount::ActActIsma, start, end, ctx) - 0.5).abs() < 1e-6);
+///
+/// // Business/252: Monday to next Monday is 5 business days
+/// let (start, end) = (date(2025, Month::January, 6), date(2025, Month::January, 13));
+/// let ctx = DayCountContext { calendar: Some(&NYSE), ..Default::default() };
+/// assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 5.0).abs() < 0.1);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub enum DayCount {
+    /// 1/1 day count convention.
+    ///
     /// One unit per contractual accrual period, irrespective of its length.
-    /// Inflation fixed legs compound across annual periods using this convention.
-    /// Empty intervals return zero and reversed intervals are rejected, as for
-    /// all day counts in this API.
+    ///
+    /// # Standards Reference
+    ///
+    /// - **ISDA**: 2006 ISDA Definitions, Section 4.16(a) - "1/1"
     #[serde(rename = "one_one")]
     OneOne,
+
     /// Actual/360 day count convention.
     ///
     /// Year fraction = (actual days between dates) / 360
@@ -196,27 +340,6 @@ pub enum DayCount {
     /// - **ISDA**: 2006 ISDA Definitions, Section 4.16(d)
     /// - **ISO 20022**: Day Count Fraction Code "Actual/360" (A004)
     /// - **Also known as**: Act/360, A/360, French
-    ///
-    /// # Usage
-    ///
-    /// Standard for:
-    /// - USD money market deposits
-    /// - EUR money market instruments
-    /// - Short-term rate derivatives (SOFR, €STR)
-    /// - FX swaps and forwards
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
-    /// use time::Month;
-    ///
-    /// let start = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
-    /// let end = Date::from_calendar_date(2025, Month::April, 1).expect("Valid date"); // 90 days
-    ///
-    /// let yf = DayCount::Act360.year_fraction(start, end, DayCountContext::default()).expect("Year fraction calculation should succeed");
-    /// assert_eq!(yf, 90.0 / 360.0);
-    /// ```
     #[serde(rename = "act_360")]
     Act360,
 
@@ -229,249 +352,70 @@ pub enum DayCount {
     /// - **ISDA**: 2006 ISDA Definitions, Section 4.16(e)
     /// - **ISO 20022**: Day Count Fraction Code "Actual/365 Fixed" (A005)
     /// - **Also known as**: Act/365F, A/365F, English
-    ///
-    /// # Usage
-    ///
-    /// Standard for:
-    /// - GBP money markets (SONIA)
-    /// - Cable (GBP/USD) FX transactions
-    /// - Some Commonwealth bond markets
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
-    /// use time::Month;
-    ///
-    /// let start = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
-    /// let end = Date::from_calendar_date(2026, Month::January, 1).expect("Valid date");
-    ///
-    /// let yf = DayCount::Act365F.year_fraction(start, end, DayCountContext::default()).expect("Year fraction calculation should succeed");
-    /// assert!((yf - 1.0).abs() < 1e-9); // 365 days / 365 = 1.0
-    /// ```
     #[serde(rename = "act_365f")]
     Act365F,
 
-    /// Actual/365 Leap day count convention (Actual/365L) per ICMA Rule 251.
+    /// Actual/365 Leap day count convention (Actual/365L).
     ///
-    /// Year fraction = (actual days) / (365 or 366), where the denominator
-    /// rule depends on the coupon frequency supplied via [`DayCountContext`]:
-    ///
-    /// - **Annual** (or no frequency supplied): 366 if February 29 falls in
-    ///   the interval `(start, end]` (exclusive of start, inclusive of end),
-    ///   else 365.
-    /// - **Non-annual**: 366 if the period END date falls in a leap year,
-    ///   else 365.
+    /// Year fraction = (actual days) / (365 or 366). Annual or unspecified
+    /// frequency: 366 if February 29 falls in (start, end]. Other frequencies:
+    /// 366 if the end date falls in a leap year. Not Actual/Actual AFB.
     ///
     /// # Standards Reference
     ///
     /// - **ICMA**: ICMA Rule Book, Rule 251.1(i)(c)
     /// - **ISO 20022**: Day Count Fraction Code "Actual/365L" (A008)
     /// - **Also known as**: Act/365L, ISMA-Year
-    ///
-    /// Note: this is **not** ACT/ACT AFB (Association Française des Banques),
-    /// which uses a different (sub-period splitting) algorithm. The former
-    /// `act_365afb` parse alias was removed because it conflated the two
-    /// conventions. Use [`DayCount::ActActAfb`] for AFB / Actual/Actual Euro.
-    ///
-    /// # Usage
-    ///
-    /// Used in:
-    /// - GBP floating-rate notes
-    /// - Some European bond markets
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
-    /// use time::Month;
-    ///
-    /// // Period containing Feb 29, 2024 (leap year)
-    /// let start = Date::from_calendar_date(2024, Month::February, 1).expect("Valid date");
-    /// let end = Date::from_calendar_date(2024, Month::March, 1).expect("Valid date");
-    ///
-    /// let yf = DayCount::Act365L.year_fraction(start, end, DayCountContext::default()).expect("Year fraction calculation should succeed");
-    /// // 29 days / 366 (leap year denominator)
-    /// assert_eq!(yf, 29.0 / 366.0);
-    /// ```
     #[serde(rename = "act_365l")]
     Act365L,
 
     /// 30/360 US (Bond Basis) day count convention.
     ///
-    /// Assumes 30 days per month and 360 days per year with US market adjustments.
+    /// 30-day months over a 360-day year with the SIA/PSA adjustments,
+    /// including the February end-of-month rule that ISDA §4.16(f) omits.
     ///
     /// # Standards Reference
     ///
-    /// - **SIA/PSA**: Standard Securities Calculation Methods (SIA Standard Formulas)
-    ///   — primary reference for this implementation, including the February
-    ///   end-of-month rule
+    /// - **SIA/PSA**: Standard Securities Calculation Methods
     /// - **ISO 20022**: Day Count Fraction Code "30/360" (A001)
     /// - **Also known as**: 30U/360, 30/360 US, Bond Basis, 30/360 PSA
-    ///
-    /// # SIA/PSA vs ISDA
-    ///
-    /// This implementation follows the SIA/PSA convention, which includes a
-    /// February end-of-month rule: when both the start date and the end date
-    /// fall on the last day of February, D₂ is changed to 30. ISDA 2006
-    /// §4.16(f) specifies a slightly different set of adjustment rules that
-    /// omit this February-EOM logic. Both are commonly referred to as
-    /// "30/360 US", but they can produce different day counts for periods
-    /// that start or end on the last day of February.
-    ///
-    /// # Formula
-    ///
-    /// ```text
-    /// Days = 360(Y₂ - Y₁) + 30(M₂ - M₁) + (D₂' - D₁')
-    ///
-    /// where (SIA/PSA rules):
-    ///   D₁' = 30                       if D₁ is 31 or last day of February
-    ///   D₂' = 30                       if D₂ is 31 and D₁' = 30
-    ///   D₂' = 30                       if D₂ is last day of Feb and D₁ is last day of Feb
-    ///   otherwise D₁' = D₁, D₂' = D₂
-    /// ```
-    ///
-    /// # Usage
-    ///
-    /// Standard for:
-    /// - US corporate bonds
-    /// - US municipal bonds
-    /// - US agency debt
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
-    /// use time::Month;
-    ///
-    /// let start = Date::from_calendar_date(2025, Month::January, 31).expect("Valid date");
-    /// let end = Date::from_calendar_date(2025, Month::February, 28).expect("Valid date");
-    ///
-    /// let yf = DayCount::Thirty360.year_fraction(start, end, DayCountContext::default()).expect("Year fraction calculation should succeed");
-    /// // Treats Jan 31 as day 30, Feb 28 as day 28: 28 days / 360
-    /// assert_eq!(yf, 28.0 / 360.0);
-    /// ```
     #[serde(rename = "30_360")]
     Thirty360,
 
     /// 30E/360 (Eurobond Basis) day count convention.
     ///
-    /// Assumes 30 days per month and 360 days per year with European adjustments.
+    /// 30-day months over a 360-day year; day 31 becomes 30 at both ends, with
+    /// no February adjustment.
     ///
     /// # Standards Reference
     ///
     /// - **ISDA**: 2006 ISDA Definitions, Section 4.16(g) - "30E/360"
     /// - **ISO 20022**: Day Count Fraction Code "30E/360" (A002)
     /// - **Also known as**: 30/360 ISDA, 30/360 European, Eurobond Basis
-    ///
-    /// # Formula
-    ///
-    /// ```text
-    /// Days = 360(Y₂ - Y₁) + 30(M₂ - M₁) + (D₂' - D₁')
-    ///
-    /// where:
-    ///   D₁' = min(D₁, 30)
-    ///   D₂' = min(D₂, 30)
-    /// ```
-    ///
-    /// # Usage
-    ///
-    /// Standard for:
-    /// - Eurobonds
-    /// - International bonds
-    /// - Some interest rate swaps
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
-    /// use time::Month;
-    ///
-    /// let start = Date::from_calendar_date(2025, Month::January, 31).expect("Valid date");
-    /// let end = Date::from_calendar_date(2025, Month::March, 31).expect("Valid date");
-    ///
-    /// let yf = DayCount::ThirtyE360.year_fraction(start, end, DayCountContext::default()).expect("Year fraction calculation should succeed");
-    /// // Treats both 31st as day 30: 60 days / 360
-    /// assert_eq!(yf, 60.0 / 360.0);
-    /// ```
     #[serde(rename = "30e_360")]
     ThirtyE360,
 
     /// 30E/360 (ISDA) day count convention.
     ///
-    /// Assumes 30 days per month and 360 days per year with the ISDA 2006
-    /// §4.16(h) last-day-of-month adjustments (including end-of-February).
+    /// 30-day months over a 360-day year; the last day of any month, including
+    /// February, becomes 30, except an end date that is the termination date.
     ///
     /// # Standards Reference
     ///
     /// - **ISDA**: 2006 ISDA Definitions, Section 4.16(h) - "30E/360 (ISDA)"
     /// - **Also known as**: 30E/360 ISDA, German, Eurobond Basis (ISDA 2006)
-    ///
-    /// # Formula
-    ///
-    /// ```text
-    /// Days = 360(Y₂ - Y₁) + 30(M₂ - M₁) + (D₂' - D₁')
-    ///
-    /// where:
-    ///   D₁' = 30 if D₁ is the last day of its month (incl. end of February)
-    ///   D₂' = 30 if D₂ is 31, or if D₂ is the last day of February and the
-    ///         period does not end on the termination (maturity) date
-    /// ```
-    ///
-    /// # Termination-date exception
-    ///
-    /// ISDA §4.16(h) keeps D₂ unadjusted when the period ends on the
-    /// termination date and that date is the last day of February. Because
-    /// Set [`DayCountContext::end_is_termination_date`] for the final period
-    /// to maturity; ordinary coupon periods leave it false.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
-    /// use time::Month;
-    ///
-    /// // ISDA §4.16(h): both end-of-Feb and Aug 31 count as day 30.
-    /// let start = Date::from_calendar_date(2011, Month::August, 31).expect("Valid date");
-    /// let end = Date::from_calendar_date(2012, Month::February, 29).expect("Valid date");
-    ///
-    /// let yf = DayCount::ThirtyE360Isda.year_fraction(start, end, DayCountContext::default()).expect("Year fraction calculation should succeed");
-    /// assert_eq!(yf, 180.0 / 360.0);
-    /// ```
     #[serde(rename = "30e_360_isda")]
     ThirtyE360Isda,
 
     /// 30/360 Italian day count convention.
     ///
-    /// Assumes 30 days per month and 360 days per year. Day 31 becomes 30,
-    /// and any February day after the 27th becomes 30 (QuantLib
-    /// `Thirty360::Italian`).
+    /// 30-day months over a 360-day year; day 31 becomes 30, and any February
+    /// day after the 27th becomes 30.
     ///
-    /// # Formula
+    /// # Standards Reference
     ///
-    /// ```text
-    /// D1' = 30 if D1 == 31 or (month == Feb and D1 > 27)
-    /// D2' = 30 if D2 == 31 or (month == Feb and D2 > 27)
-    /// days = 360*(Y2-Y1) + 30*(M2-M1) + (D2'-D1')
-    /// year_fraction = days / 360
-    /// ```
-    ///
-    /// Distinct from US SIA (February EOM only when both ends are February
-    /// EOM) and 30E/360 (no February-after-27 rule).
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
-    /// use time::Month;
-    ///
-    /// let start = Date::from_calendar_date(2025, Month::January, 31).expect("Valid date");
-    /// let end = Date::from_calendar_date(2025, Month::February, 28).expect("Valid date");
-    ///
-    /// let yf = DayCount::Thirty360It.year_fraction(start, end, DayCountContext::default()).expect("Year fraction calculation should succeed");
-    /// // D1=31→30, Feb 28>27 → D2=30: 30 days / 360
-    /// assert_eq!(yf, 30.0 / 360.0);
-    /// ```
+    /// - **QuantLib**: `Thirty360::Italian`
+    /// - **Also known as**: 30/360 Italian
     #[serde(rename = "30_360_it")]
     Thirty360It,
 
@@ -482,201 +426,57 @@ pub enum DayCount {
     /// # Standards Reference
     ///
     /// - **Also known as**: Act/365 No Leap, NL365, Actual/365NL
-    /// - Counts the actual calendar days in `[start, end)` and removes every
-    ///   February 29 that falls in the period, so a full leap year still
-    ///   yields exactly 1.0.
-    ///
-    /// # Usage
-    ///
-    /// Used in:
-    /// - Some Canadian money-market and mortgage instruments
-    /// - Legacy systems that ignore leap days for accrual
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
-    /// use time::Month;
-    ///
-    /// // Full leap year 2024: 366 actual days, Feb 29 excluded → 365/365 = 1.0
-    /// let start = Date::from_calendar_date(2024, Month::January, 1).expect("Valid date");
-    /// let end = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
-    ///
-    /// let yf = DayCount::Nl365.year_fraction(start, end, DayCountContext::default()).expect("Year fraction calculation should succeed");
-    /// assert_eq!(yf, 1.0);
-    /// ```
     #[serde(rename = "nl_365")]
     Nl365,
 
     /// Actual/Actual (ISDA) day count convention.
     ///
-    /// Uses actual days in numerator and actual days in the containing year(s)
-    /// as denominator, splitting across year boundaries.
+    /// Actual days over the actual days in the containing calendar year,
+    /// split and summed across year boundaries.
     ///
     /// # Standards Reference
     ///
     /// - **ISDA**: 2006 ISDA Definitions, Section 4.16(b) - "Actual/Actual (ISDA)"
     /// - **ISO 20022**: Day Count Fraction Code "Actual/Actual ISDA" (A006)
     /// - **Also known as**: Act/Act (ISDA), Actual/Actual, Act/Act
-    ///
-    /// # Algorithm
-    ///
-    /// For a period spanning multiple calendar years:
-    /// 1. Split period at year boundaries
-    /// 2. For each year segment: (days in segment) / (days in that year)
-    /// 3. Sum the year fractions
-    ///
-    /// # Usage
-    ///
-    /// Standard for:
-    /// - US Treasury bonds
-    /// - Interest rate swaps (USD, EUR fixed legs)
-    /// - Government bonds in many markets
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
-    /// use time::Month;
-    ///
-    /// // Period spanning year boundary (leap year 2024)
-    /// let start = Date::from_calendar_date(2024, Month::July, 1).expect("Valid date");
-    /// let end = Date::from_calendar_date(2025, Month::July, 1).expect("Valid date");
-    ///
-    /// let yf = DayCount::ActAct.year_fraction(start, end, DayCountContext::default()).expect("Year fraction calculation should succeed");
-    /// // 184/366 (Jul-Dec 2024 in leap year) + 365/365 (all of 2025)
-    /// assert!((yf - 1.0).abs() < 0.01);
-    /// ```
-    ///
-    /// # References
-    ///
-    /// - ISDA (2006). "2006 ISDA Definitions." Section 4.16(b). `docs/REFERENCES.md#isda-2006-definitions`
     #[serde(rename = "act_act")]
     ActAct,
 
     /// Actual/Actual (ICMA) day count convention.
     ///
-    /// Uses actual days in numerator and actual days in the coupon period
-    /// as denominator, requiring knowledge of payment frequency.
+    /// Actual days over (actual days in the coupon period × coupons per year).
+    /// Requires a coupon frequency.
     ///
     /// # Standards Reference
     ///
     /// - **ICMA**: ICMA Rule Book, Rule 251 - "Actual/Actual (ICMA)"
     /// - **ISO 20022**: Day Count Fraction Code "Actual/Actual ICMA" (A007)
     /// - **Also known as**: Act/Act (ICMA), Act/Act (ISMA), ISMA-99
-    ///
-    /// # Algorithm
-    ///
-    /// 1. Determine quasi-coupon periods based on payment frequency
-    /// 2. For each period: (actual days) / (actual days in coupon period)
-    /// 3. Sum fractions across periods
-    ///
-    /// # Usage
-    ///
-    /// Standard for:
-    /// - International bonds with regular coupons
-    /// - Eurobonds with semi-annual or annual payments
-    /// - ICMA-governed securities
-    ///
-    /// # Requirements
-    ///
-    /// Requires `frequency` in [`DayCountContext`] to determine regular coupon periods.
-    /// For irregular first/last coupons, use
-    /// [`act_act_isma_year_fraction_with_reference_period`].
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
-    /// use time::Month;
-    ///
-    /// let start = Date::from_calendar_date(2025, Month::January, 15).expect("Valid date");
-    /// let end = Date::from_calendar_date(2025, Month::July, 15).expect("Valid date");
-    /// let frequency = Tenor::semi_annual(); // Semi-annual
-    ///
-    /// let yf = DayCount::ActActIsma.year_fraction(
-    ///     start,
-    ///     end,
-    ///     DayCountContext { frequency: Some(frequency), ..Default::default() }
-    /// ).expect("Year fraction calculation should succeed");
-    ///
-    /// // Full semi-annual period = 0.5 year fraction (6 months / 12 months)
-    /// assert!((yf - 0.5).abs() < 1e-6);
-    /// ```
-    ///
-    /// # References
-    ///
-    /// - ICMA (2010). "ICMA Rule Book." Rule 251. `docs/REFERENCES.md#icma-rule-book`
-    /// - ISMA (1999). "Recommendations for Accrued Interest Calculations."
     #[serde(rename = "act_act_isma")]
     ActActIsma,
 
-    /// Actual/Actual AFB (Association Française des Banques) day count.
+    /// Actual/Actual AFB day count convention.
     ///
-    /// Also known as Actual/Actual Euro. QuantLib `ActualActual::AFB`.
-    /// Walks whole years **backwards from `end`** until the candidate is
-    /// before `start`. Each accepted year-step adds `1.0`. A year-step that
-    /// lands on 28 February of a leap year is bumped to 29 February. The
-    /// residual fraction is `days(start, residual_end) / den`, where `den`
-    /// is 366 if 29 February lies in `[start, residual_end)`, else 365.
+    /// Whole years counted backwards from the end date, plus a residual of
+    /// actual days over 366 if it contains February 29, else 365.
     ///
-    /// No [`DayCountContext`] is required.
+    /// # Standards Reference
     ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
-    /// use time::Month;
-    ///
-    /// let start = Date::from_calendar_date(2024, Month::February, 1).expect("Valid date");
-    /// let end = Date::from_calendar_date(2024, Month::March, 1).expect("Valid date");
-    ///
-    /// let yf = DayCount::ActActAfb.year_fraction(start, end, DayCountContext::default()).expect("Year fraction calculation should succeed");
-    /// // 29 days / 366 (29 February lies in the residual period)
-    /// assert_eq!(yf, 29.0 / 366.0);
-    /// ```
+    /// - **QuantLib**: `ActualActual::AFB`
+    /// - **AFB**: Association Française des Banques master agreement definitions
+    /// - **Also known as**: Actual/Actual Euro, Act/Act AFB
     #[serde(rename = "act_act_afb")]
     ActActAfb,
 
     /// Business/252 day count convention.
     ///
-    /// Year fraction = (business days between dates) / 252
+    /// Year fraction = (business days between dates) / 252. Requires a holiday
+    /// calendar.
     ///
-    /// # Market Convention
+    /// # Standards Reference
     ///
-    /// - **Brazil**: Standard for BRL-denominated instruments (ANBIMA)
-    /// - **Also used**: Some equity derivatives and variance swaps
-    /// - **Basis**: 252 represents typical trading days per year
-    ///
-    /// # Requirements
-    ///
-    /// Requires `calendar` in [`DayCountContext`] to determine business days.
-    ///
-    /// # Performance
-    ///
-    /// Iterates each calendar day in the range to check business-day status,
-    /// giving O(n) cost where n is the number of calendar days between the
-    /// dates. For 30Y instruments this is ~11,000 iterations.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
-    /// use finstack_quant_core::dates::calendar::NYSE;
-    /// use time::Month;
-    ///
-    /// let start = Date::from_calendar_date(2025, Month::January, 6).expect("Valid date"); // Monday
-    /// let end = Date::from_calendar_date(2025, Month::January, 13).expect("Valid date"); // Next Monday
-    ///
-    /// let yf = DayCount::Bus252.year_fraction(
-    ///     start,
-    ///     end,
-    ///     DayCountContext { calendar: Some(&NYSE), ..Default::default() }
-    /// ).expect("Year fraction calculation should succeed");
-    ///
-    /// // 5 business days / 252
-    /// assert!((yf * 252.0 - 5.0).abs() < 0.1);
-    /// ```
+    /// - **ANBIMA**: standard for BRL-denominated instruments
+    /// - **Also known as**: BUS/252, Business/252
     #[serde(rename = "bus_252")]
     Bus252,
 }

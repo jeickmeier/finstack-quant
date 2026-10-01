@@ -565,7 +565,7 @@
           "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "pointer": "#",
           "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-          "sha256": "51d134fe545f10e42c960f30e10cb15cf7ef65b03600c14edddb04b7f1b4ce95",
+          "sha256": "65edf1f73407ef9957db7001c9619f4a37305d31025ac6f47c096f5ac598177b",
           "description": "Canonical v1 persisted snapshot of a complete market-data context."
         }
       ]
@@ -1164,7 +1164,7 @@
           "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "pointer": "#",
           "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-          "sha256": "51d134fe545f10e42c960f30e10cb15cf7ef65b03600c14edddb04b7f1b4ce95",
+          "sha256": "65edf1f73407ef9957db7001c9619f4a37305d31025ac6f47c096f5ac598177b",
           "description": "Canonical v1 persisted snapshot of a complete market-data context."
         }
       ]
