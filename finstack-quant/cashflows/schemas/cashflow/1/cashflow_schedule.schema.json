@@ -598,6 +598,94 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Canonical cashflow schedule.",
+  "examples": [
+    {
+      "day_count": "act_act_isma",
+      "flows": [
+        {
+          "accrual_factor": 0.0,
+          "amount": {
+            "amount": "-1000000",
+            "currency": "USD"
+          },
+          "date": "2025-01-15",
+          "kind": "notional",
+          "reset_date": null
+        },
+        {
+          "accrual": {
+            "calendar_id": "sifma",
+            "coupon_period": [
+              "2025-01-15",
+              "2025-07-15"
+            ],
+            "day_count": "act_act_isma",
+            "end": "2025-07-15",
+            "end_is_termination_date": false,
+            "start": "2025-01-15"
+          },
+          "accrual_factor": 0.5,
+          "amount": {
+            "amount": "21250",
+            "currency": "USD"
+          },
+          "date": "2025-07-15",
+          "kind": "fixed",
+          "rate": 0.0425,
+          "reset_date": null
+        },
+        {
+          "accrual": {
+            "calendar_id": "sifma",
+            "coupon_period": [
+              "2025-07-15",
+              "2026-01-15"
+            ],
+            "day_count": "act_act_isma",
+            "end": "2026-01-15",
+            "end_is_termination_date": true,
+            "start": "2025-07-15"
+          },
+          "accrual_factor": 0.5,
+          "amount": {
+            "amount": "21250",
+            "currency": "USD"
+          },
+          "date": "2026-01-15",
+          "kind": "fixed",
+          "rate": 0.0425,
+          "reset_date": null
+        },
+        {
+          "accrual_factor": 0.0,
+          "amount": {
+            "amount": "1000000",
+            "currency": "USD"
+          },
+          "date": "2026-01-15",
+          "kind": "notional",
+          "principal_date": "2026-01-15",
+          "reset_date": null
+        }
+      ],
+      "meta": {
+        "calendar_ids": [
+          "sifma"
+        ],
+        "commitment": null,
+        "issue_date": "2025-01-15",
+        "maturity": "2026-01-15",
+        "representation": "contractual"
+      },
+      "notional": {
+        "amort": "none",
+        "initial": {
+          "amount": "1000000",
+          "currency": "USD"
+        }
+      }
+    }
+  ],
   "properties": {
     "day_count": {
       "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",

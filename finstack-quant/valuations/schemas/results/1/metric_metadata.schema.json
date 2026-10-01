@@ -45,6 +45,19 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Canonical per-key metric interpretation for host presentation.",
+  "examples": [
+    {
+      "bucketed": true,
+      "components": [
+        "USD-OIS",
+        "10y"
+      ],
+      "group": "Sensitivity",
+      "key": "bucketed_dv01::USD-OIS::10y",
+      "metric": "bucketed_dv01",
+      "unit": "currency"
+    }
+  ],
   "properties": {
     "bucketed": {
       "description": "Whether this is a DV01/CS01 bucket with nonempty identifier and bucket coordinates.",

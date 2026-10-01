@@ -98,6 +98,28 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Step-up fixed coupon specification.",
+  "examples": [
+    {
+      "business_day_convention": "following",
+      "calendar_id": "sifma",
+      "coupon_type": "cash",
+      "day_count": "act_act_isma",
+      "end_of_month": false,
+      "frequency": {
+        "count": 6,
+        "unit": "months"
+      },
+      "initial_rate": "0.0425",
+      "payment_lag_days": 0,
+      "step_schedule": [
+        [
+          "2026-01-15",
+          "0.0525"
+        ]
+      ],
+      "stub": "none"
+    }
+  ],
   "properties": {
     "adjust_accrual_dates": {
       "description": "Whether accrual-period boundaries are business-day adjusted with\n`business_day_convention`.\n\n- `false` (default, bond convention): accrual periods run between the\n  unadjusted schedule anchors; only payment dates roll.\n- `true` (swap convention, ISDA 2006 §4.10 / ARRC SOFR conventions):\n  both accrual-period boundaries are rolled with `business_day_convention` before year\n  fractions and overnight observation windows are computed. The swap\n  presets ([`Self::usd_sofr_swap`], [`Self::eur_estr_swap`],\n  [`Self::gbp_sonia_swap`], [`Self::jpy_tona_swap`]) set this to\n  `true`.\n\nSerialized only when `true`, so existing wire payloads are unchanged.",

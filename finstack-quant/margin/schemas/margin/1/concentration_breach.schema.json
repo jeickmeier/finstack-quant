@@ -50,6 +50,14 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "A breach of a collateral concentration limit.",
+  "examples": [
+    {
+      "asset_class": "corporate_bonds",
+      "excess": 0.1,
+      "fraction": 0.35,
+      "limit": 0.25
+    }
+  ],
   "properties": {
     "asset_class": {
       "$ref": "#/$defs/CollateralAssetClass",

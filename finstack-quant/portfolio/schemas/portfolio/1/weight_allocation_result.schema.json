@@ -93,6 +93,29 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Strategy allocation result.",
+  "examples": [
+    {
+      "allocations": [
+        {
+          "capital": 7235196.33747,
+          "id": "carry",
+          "volatility": 0.00597215762239,
+          "weight": 0.723519633747
+        },
+        {
+          "capital": 2764803.66253,
+          "id": "trend",
+          "volatility": 0.0156284996081,
+          "weight": 0.276480366253
+        }
+      ],
+      "diagnostics": {
+        "leverage": 1.0,
+        "weights_sum": 1.0
+      },
+      "scheme": "inverse_volatility"
+    }
+  ],
   "properties": {
     "allocations": {
       "description": "Per-strategy allocation rows.",

@@ -195,6 +195,54 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Historical market scenarios for historical VaR and expected shortfall.",
+  "examples": [
+    {
+      "base_date": "2025-01-15",
+      "scenarios": [
+        {
+          "date": "2025-01-14",
+          "shifts": [
+            {
+              "factor": {
+                "curve_id": "USD-OIS",
+                "tenor_years": 5.0,
+                "type": "discount_rate"
+              },
+              "shift": 0.0004
+            },
+            {
+              "factor": {
+                "ticker": "SPX",
+                "type": "equity_spot"
+              },
+              "shift": -0.012
+            }
+          ]
+        },
+        {
+          "date": "2025-01-13",
+          "shifts": [
+            {
+              "factor": {
+                "curve_id": "USD-OIS",
+                "tenor_years": 5.0,
+                "type": "discount_rate"
+              },
+              "shift": -0.0002
+            },
+            {
+              "factor": {
+                "ticker": "SPX",
+                "type": "equity_spot"
+              },
+              "shift": 0.006
+            }
+          ]
+        }
+      ],
+      "window_days": 2
+    }
+  ],
   "properties": {
     "base_date": {
       "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",

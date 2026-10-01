@@ -242,6 +242,42 @@
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/stress_result.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Result of a factor-stress scenario.",
+  "examples": [
+    {
+      "position_pnl": [
+        [
+          "POS_001",
+          -4600.0
+        ],
+        [
+          "POS_002",
+          -7400.0
+        ]
+      ],
+      "stressed_decomposition": {
+        "factor_contributions": [
+          {
+            "absolute_risk": 0.000375,
+            "factor_id": "USD-RATES",
+            "marginal_risk": 0.01875,
+            "relative_risk": 0.625
+          },
+          {
+            "absolute_risk": 0.00015,
+            "factor_id": "IG-CREDIT",
+            "marginal_risk": 0.0075,
+            "relative_risk": 0.25
+          }
+        ],
+        "measure": "variance",
+        "position_factor_contributions": [],
+        "position_residual_contributions": [],
+        "residual_risk": 0.000075,
+        "total_risk": 0.0006
+      },
+      "total_pnl": -12000.0
+    }
+  ],
   "properties": {
     "position_pnl": {
       "description": "Per-position P&L contributions.",

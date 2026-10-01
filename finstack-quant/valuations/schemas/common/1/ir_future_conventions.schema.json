@@ -122,6 +122,24 @@
   "$id": "https://finstack_quant.dev/schemas/common/1/ir_future_conventions.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Contract conventions of one interest-rate future.",
+  "examples": [
+    {
+      "calendar_id": "usny",
+      "compounding": {
+        "compounded_in_arrears": {
+          "lookback_days": 0
+        }
+      },
+      "convexity_adjustment": null,
+      "delivery_months": 3,
+      "face_value": 1000000.0,
+      "index_id": "USD-SOFR-3M",
+      "reference_period": "imm_quarter_in_arrears",
+      "settlement_days": 0,
+      "tick_size": 0.0025,
+      "tick_value": 6.25
+    }
+  ],
   "properties": {
     "calendar_id": {
       "description": "Calendar for business day adjustments.",

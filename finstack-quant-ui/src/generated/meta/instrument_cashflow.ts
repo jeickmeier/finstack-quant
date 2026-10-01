@@ -4,6 +4,31 @@ export default [
     "path": "#",
     "source": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json#",
     "description": "Native cashflow rows, reporting-currency PV and reconciliation status.",
+    "examples": [
+      {
+        "as_of": "2025-01-15",
+        "currency": "USD",
+        "discount_curve_id": "USD-OIS",
+        "flows": [
+          {
+            "accrual_factor": 0.5,
+            "amount": 21250,
+            "currency": "USD",
+            "date": "2025-07-15",
+            "discount_curve_id": "USD-OIS",
+            "discount_factor": 0.9789,
+            "kind": "fixed",
+            "pv": 20801.625,
+            "rate": 0.0425,
+            "year_fraction": 0.495890410959
+          }
+        ],
+        "instrument_id": "US912828XG33",
+        "model": "discounting",
+        "reconciles_with_base_value": true,
+        "total_pv": 20801.625
+      }
+    ],
     "title": "Instrument Cashflow"
   },
   {

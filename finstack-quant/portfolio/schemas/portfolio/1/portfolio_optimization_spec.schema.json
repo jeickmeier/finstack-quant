@@ -1727,6 +1727,66 @@
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_optimization_spec.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "JSON-serializable specification for a portfolio optimization problem.",
+  "examples": [
+    {
+      "constraints": [
+        {
+          "budget": {
+            "rhs": 1.0
+          }
+        }
+      ],
+      "label": null,
+      "missing_metric_policy": "zero",
+      "objective": {
+        "maximize": {
+          "weighted_sum": {
+            "metric": "pv_base"
+          }
+        }
+      },
+      "portfolio": {
+        "as_of": "2024-01-01",
+        "base_currency": "USD",
+        "entities": {
+          "ACME_CORP": {
+            "id": "ACME_CORP",
+            "name": null
+          }
+        },
+        "id": "EXAMPLE_FUND",
+        "name": null,
+        "positions": [
+          {
+            "entity_id": "ACME_CORP",
+            "instrument_id": "DEP_1M",
+            "instrument_spec": {
+              "spec": {
+                "attributes": {},
+                "business_day_convention": "modified_following",
+                "calendar_id": null,
+                "day_count": "act_360",
+                "discount_curve_id": "USD-OIS",
+                "fixed_rate": null,
+                "id": "DEP_1M",
+                "maturity": "2024-02-01",
+                "notional": {
+                  "amount": "1000000",
+                  "currency": "USD"
+                },
+                "start_date": "2024-01-01"
+              },
+              "type": "deposit"
+            },
+            "position_id": "POS_001",
+            "quantity": 1.0,
+            "unit": "units"
+          }
+        ]
+      },
+      "weighting": "value_weight"
+    }
+  ],
   "properties": {
     "constraints": {
       "default": [],

@@ -1380,6 +1380,38 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Cashflow schedule build specification.",
+  "examples": [
+    {
+      "coupon_program": [
+        {
+          "kind": "fixed",
+          "spec": {
+            "business_day_convention": "following",
+            "calendar_id": "sifma",
+            "coupon_type": "cash",
+            "day_count": "act_act_isma",
+            "end_of_month": false,
+            "frequency": {
+              "count": 6,
+              "unit": "months"
+            },
+            "payment_lag_days": 0,
+            "rate": "0.0425",
+            "stub": "none"
+          }
+        }
+      ],
+      "issue_date": "2025-01-15",
+      "maturity": "2026-01-15",
+      "notional": {
+        "amort": "none",
+        "initial": {
+          "amount": "1000000",
+          "currency": "USD"
+        }
+      }
+    }
+  ],
   "properties": {
     "coupon_program": {
       "description": "Coupon instructions, applied in order through the canonical builder.",

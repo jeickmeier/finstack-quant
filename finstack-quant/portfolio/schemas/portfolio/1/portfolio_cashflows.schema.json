@@ -1533,6 +1533,65 @@
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_cashflows.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Rich portfolio cashflow ladder preserving event classifications.",
+  "examples": [
+    {
+      "by_date": {
+        "2024-02-01": {
+          "USD": {
+            "notional": {
+              "amount": "1004305.56",
+              "currency": "USD"
+            }
+          }
+        }
+      },
+      "by_position": {
+        "POS_001": [
+          {
+            "accrual_factor": 0.0,
+            "amount": {
+              "amount": "1004305.56",
+              "currency": "USD"
+            },
+            "date": "2024-02-01",
+            "instrument_id": "DEP_1M",
+            "instrument_type": "deposit",
+            "kind": "notional",
+            "position_id": "POS_001",
+            "rate": null,
+            "reset_date": null
+          }
+        ]
+      },
+      "events": [
+        {
+          "accrual_factor": 0.0,
+          "amount": {
+            "amount": "1004305.56",
+            "currency": "USD"
+          },
+          "date": "2024-02-01",
+          "instrument_id": "DEP_1M",
+          "instrument_type": "deposit",
+          "kind": "notional",
+          "position_id": "POS_001",
+          "rate": null,
+          "reset_date": null
+        }
+      ],
+      "fx_collapse_policy": "cip_forward",
+      "issues": [],
+      "position_summaries": {
+        "POS_001": {
+          "event_count": 1,
+          "instrument_id": "DEP_1M",
+          "instrument_type": "deposit",
+          "position_id": "POS_001",
+          "representation": "contractual"
+        }
+      }
+    }
+  ],
   "properties": {
     "by_date": {
       "additionalProperties": {

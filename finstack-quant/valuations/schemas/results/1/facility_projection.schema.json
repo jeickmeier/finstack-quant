@@ -744,6 +744,193 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Projected cashflows of an asset-backed facility and its residual.",
+  "examples": [
+    {
+      "commitment_fees": [
+        [
+          "2025-04-15",
+          {
+            "amount": "62500",
+            "currency": "USD"
+          }
+        ]
+      ],
+      "diagnostics": {
+        "draws_from_principal": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "draws_from_reserve": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "early_amortization_date": null,
+        "periods": [],
+        "reserve_balance_path": [],
+        "reserve_interest_paid": [],
+        "reserve_replenished": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "tranche_draws": [],
+        "unfunded_draws": {
+          "amount": "0",
+          "currency": "USD"
+        }
+      },
+      "draws": [],
+      "facility": {
+        "accrual_periods": [
+          {
+            "coupon_rate": 0.06,
+            "day_count": "act_360",
+            "end": "2025-04-15",
+            "opening_balance": {
+              "amount": "250000000",
+              "currency": "USD"
+            },
+            "payment_date": "2025-04-15",
+            "start": "2025-01-15"
+          }
+        ],
+        "cashflows": [
+          [
+            "2025-04-15",
+            {
+              "amount": "3750000",
+              "currency": "USD"
+            }
+          ]
+        ],
+        "deferred_flows": [],
+        "detailed_flows": [
+          {
+            "accrual_factor": 0.25,
+            "amount": {
+              "amount": "3750000",
+              "currency": "USD"
+            },
+            "date": "2025-04-15",
+            "kind": "float_reset",
+            "rate": 0.06,
+            "reset_date": null
+          }
+        ],
+        "final_balance": {
+          "amount": "250000000",
+          "currency": "USD"
+        },
+        "interest_flows": [
+          [
+            "2025-04-15",
+            {
+              "amount": "3750000",
+              "currency": "USD"
+            }
+          ]
+        ],
+        "pik_flows": [],
+        "principal_flows": [],
+        "total_deferred": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "total_interest": {
+          "amount": "3750000",
+          "currency": "USD"
+        },
+        "total_pik": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "total_principal": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "total_writedown": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "tranche_id": "FACILITY",
+        "writedown_flows": []
+      },
+      "residual": {
+        "accrual_periods": [
+          {
+            "coupon_rate": 0.06,
+            "day_count": "act_360",
+            "end": "2025-04-15",
+            "opening_balance": {
+              "amount": "250000000",
+              "currency": "USD"
+            },
+            "payment_date": "2025-04-15",
+            "start": "2025-01-15"
+          }
+        ],
+        "cashflows": [
+          [
+            "2025-04-15",
+            {
+              "amount": "3750000",
+              "currency": "USD"
+            }
+          ]
+        ],
+        "deferred_flows": [],
+        "detailed_flows": [
+          {
+            "accrual_factor": 0.25,
+            "amount": {
+              "amount": "3750000",
+              "currency": "USD"
+            },
+            "date": "2025-04-15",
+            "kind": "float_reset",
+            "rate": 0.06,
+            "reset_date": null
+          }
+        ],
+        "final_balance": {
+          "amount": "250000000",
+          "currency": "USD"
+        },
+        "interest_flows": [
+          [
+            "2025-04-15",
+            {
+              "amount": "3750000",
+              "currency": "USD"
+            }
+          ]
+        ],
+        "pik_flows": [],
+        "principal_flows": [],
+        "total_deferred": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "total_interest": {
+          "amount": "3750000",
+          "currency": "USD"
+        },
+        "total_pik": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "total_principal": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "total_writedown": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "tranche_id": "RESIDUAL",
+        "writedown_flows": []
+      }
+    }
+  ],
   "properties": {
     "commitment_fees": {
       "description": "Commitment fee accrued on `commitment − opening facility balance` per\naccrual period while the line revolves, paid on the period's payment\ndate.",

@@ -1448,6 +1448,68 @@
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_margin_result.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Portfolio-wide margin calculation results.",
+  "examples": [
+    {
+      "as_of": "2024-01-01",
+      "base_currency": "USD",
+      "by_csa": {},
+      "degraded_positions": [],
+      "netting_sets": [
+        {
+          "as_of": "2024-01-01",
+          "csa_id": "CSA-ACME-2024",
+          "im_breakdown": {},
+          "im_methodology": "simm",
+          "initial_margin": {
+            "amount": "2500000",
+            "currency": "USD"
+          },
+          "is_approximate": false,
+          "netting_set_id": {
+            "counterparty_id": "ACME-BANK",
+            "csa_id": "CSA-ACME-2024",
+            "kind": "bilateral"
+          },
+          "position_count": 1,
+          "sensitivities": null,
+          "total_margin": {
+            "amount": "3750000",
+            "currency": "USD"
+          },
+          "variation_margin": {
+            "amount": "1250000",
+            "currency": "USD"
+          }
+        }
+      ],
+      "positions_without_margin": 0,
+      "total_im_transfer": {
+        "amount": "0",
+        "currency": "USD"
+      },
+      "total_initial_margin": {
+        "amount": "2500000",
+        "currency": "USD"
+      },
+      "total_margin": {
+        "amount": "3750000",
+        "currency": "USD"
+      },
+      "total_positions": 1,
+      "total_required_im_collateral": {
+        "amount": "0",
+        "currency": "USD"
+      },
+      "total_segregated_im": {
+        "amount": "0",
+        "currency": "USD"
+      },
+      "total_variation_margin": {
+        "amount": "1250000",
+        "currency": "USD"
+      }
+    }
+  ],
   "properties": {
     "as_of": {
       "$ref": "#/$defs/DateWire"

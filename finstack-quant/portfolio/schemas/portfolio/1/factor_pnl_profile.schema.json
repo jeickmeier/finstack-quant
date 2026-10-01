@@ -808,6 +808,33 @@
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/factor_pnl_profile.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "P&L profile for one factor across a scenario grid.",
+  "examples": [
+    {
+      "base_currency": "USD",
+      "factor_id": "USD-RATES",
+      "position_ids": [
+        "POS_001",
+        "POS_002"
+      ],
+      "position_pnls": [
+        [
+          4612.0,
+          0.0,
+          -4588.0
+        ],
+        [
+          7431.0,
+          0.0,
+          -7369.0
+        ]
+      ],
+      "shifts": [
+        -1.0,
+        0.0,
+        1.0
+      ]
+    }
+  ],
   "properties": {
     "base_currency": {
       "$ref": "#/$defs/Currency",

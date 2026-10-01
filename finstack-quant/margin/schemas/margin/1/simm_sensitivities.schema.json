@@ -951,6 +951,28 @@
   "$id": "https://finstack_quant.dev/schemas/margin/1/simm_sensitivities.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "SIMM sensitivity inputs organized by risk class.",
+  "examples": [
+    {
+      "base_currency": "USD",
+      "commodity_delta": {},
+      "commodity_vega": {},
+      "credit_non_qualifying_delta": {},
+      "credit_non_qualifying_vega": {},
+      "credit_qualifying_delta": {},
+      "credit_qualifying_vega": {},
+      "curvature": [],
+      "equity_delta": {
+        "AAPL": 250000.0
+      },
+      "equity_vega": {},
+      "fx_delta": {
+        "EUR": 400000.0
+      },
+      "fx_vega": {},
+      "ir_delta": {},
+      "ir_vega": {}
+    }
+  ],
   "properties": {
     "base_currency": {
       "$ref": "#/$defs/Currency",

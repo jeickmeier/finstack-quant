@@ -3,6 +3,11 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Configuration for `cell_returns_from_reference`.",
+  "examples": [
+    {
+      "width": 1.0
+    }
+  ],
   "properties": {
     "width": {
       "description": "Width of each duration cell, in years. Must be finite and positive.",

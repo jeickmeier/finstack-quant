@@ -3,6 +3,14 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "One position (or pre-aggregated bucket) in a duration-cell x sector grid, for one period and one side (portfolio or benchmark).",
+  "examples": [
+    {
+      "cell": "0-5y",
+      "sector": "Industrials",
+      "total_return": 0.008,
+      "weight": 0.5
+    }
+  ],
   "properties": {
     "cell": {
       "description": "Duration-cell label. Cell labels may come from\n[`crate::excess_return::duration_cell_label`], but any string key is\naccepted — this module has no dependency on how cells were built.",

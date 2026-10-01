@@ -828,6 +828,22 @@
   "$id": "https://finstack_quant.dev/schemas/margin/1/excess_collateral.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Excess collateral result.",
+  "examples": [
+    {
+      "collateral_value": {
+        "amount": "1250000",
+        "currency": "USD"
+      },
+      "excess": {
+        "amount": "250000",
+        "currency": "USD"
+      },
+      "required_value": {
+        "amount": "1000000",
+        "currency": "USD"
+      }
+    }
+  ],
   "properties": {
     "collateral_value": {
       "$ref": "#/$defs/Money",

@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/accrual_config.schema.json",
-      "bytes": 3880,
+      "bytes": 4015,
       "kind": "input",
       "path": "schemas/cashflow/1/accrual_config.schema.json",
       "summary": "Accrual method, ex-coupon rule, PIK inclusion and coupon frequency for accrued interest.",
@@ -20,7 +20,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/cashflow_schedule.schema.json",
-      "bytes": 28396,
+      "bytes": 30560,
       "kind": "output",
       "path": "schemas/cashflow/1/cashflow_schedule.schema.json",
       "summary": "Ordered classified cashflows with their notional, day count and schedule metadata.",
@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/cashflow_schedule_build_spec.schema.json",
-      "bytes": 74356,
+      "bytes": 75102,
       "kind": "input",
       "path": "schemas/cashflow/1/cashflow_schedule_build_spec.schema.json",
       "summary": "Notional, dates, coupon program, fees and principal events that build a schedule.",
@@ -65,7 +65,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/floating_coupon_spec.schema.json",
-      "bytes": 28080,
+      "bytes": 28855,
       "kind": "component",
       "path": "schemas/cashflow/1/floating_coupon_spec.schema.json",
       "summary": "Index, spread, caps and floors, reset rules and schedule for one floating leg.",
@@ -74,7 +74,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/period_aggregation.schema.json",
-      "bytes": 451,
+      "bytes": 821,
       "kind": "output",
       "path": "schemas/cashflow/1/period_aggregation.schema.json",
       "summary": "Per-period, per-currency cashflow totals keyed by period code.",
@@ -101,7 +101,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/schedule_build_opts.schema.json",
-      "bytes": 5410,
+      "bytes": 5652,
       "kind": "input",
       "path": "schemas/cashflow/1/schedule_build_opts.schema.json",
       "summary": "Notional hint and metadata stamped on a schedule built from dated or classified flows.",
@@ -119,7 +119,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/step_up_coupon_spec.schema.json",
-      "bytes": 10867,
+      "bytes": 11323,
       "kind": "component",
       "path": "schemas/cashflow/1/step_up_coupon_spec.schema.json",
       "summary": "Initial coupon rate, dated rate steps and schedule for one step-up leg.",

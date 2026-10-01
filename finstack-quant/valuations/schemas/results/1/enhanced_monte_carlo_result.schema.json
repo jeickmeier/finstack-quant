@@ -1158,6 +1158,71 @@
   "$id": "https://finstack_quant.dev/schemas/results/1/enhanced_monte_carlo_result.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Revolving-credit Monte Carlo value with per-path details.",
+  "examples": [
+    {
+      "draw_option_cost": {
+        "ci_95": [
+          {
+            "amount": "30226",
+            "currency": "USD"
+          },
+          {
+            "amount": "32774",
+            "currency": "USD"
+          }
+        ],
+        "max": null,
+        "mean": {
+          "amount": "31500",
+          "currency": "USD"
+        },
+        "median": null,
+        "min": null,
+        "num_paths": 10000,
+        "num_simulated_paths": 10000,
+        "percentile_25": null,
+        "percentile_75": null,
+        "std_dev": 65000.0,
+        "stderr": 650.0
+      },
+      "mc_result": {
+        "estimate": {
+          "ci_95": [
+            {
+              "amount": "9866768",
+              "currency": "USD"
+            },
+            {
+              "amount": "9883232",
+              "currency": "USD"
+            }
+          ],
+          "max": null,
+          "mean": {
+            "amount": "9875000",
+            "currency": "USD"
+          },
+          "median": null,
+          "min": null,
+          "num_paths": 10000,
+          "num_simulated_paths": 10000,
+          "percentile_25": null,
+          "percentile_75": null,
+          "std_dev": 420000.0,
+          "stderr": 4200.0
+        },
+        "paths": null,
+        "run": {
+          "antithetic": false,
+          "chunk_size": 1000,
+          "num_steps": 20,
+          "seed": 42,
+          "use_parallel": true
+        }
+      },
+      "path_results": []
+    }
+  ],
   "properties": {
     "draw_option_cost": {
       "$ref": "#/$defs/MoneyEstimate",

@@ -2377,6 +2377,53 @@
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Scenario-and-revalue view returned by binding surfaces.",
+  "examples": [
+    {
+      "report": {
+        "changes": {
+          "all_dirty": true,
+          "as_of_changed": false,
+          "changed_instrument_indices": [],
+          "market_targets": [],
+          "portfolio_shape_changed": false
+        },
+        "expanded_operations": 1,
+        "operations_applied": 1,
+        "user_operations": 1,
+        "warnings": []
+      },
+      "valuation": {
+        "as_of": "2024-01-01",
+        "by_entity": {
+          "ACME_CORP": {
+            "amount": "1000125.50",
+            "currency": "USD"
+          }
+        },
+        "fx_collapse_policy": "cashflow_date",
+        "position_values": {
+          "POS_001": {
+            "entity_id": "ACME_CORP",
+            "metric_scale": 1.0,
+            "position_id": "POS_001",
+            "risk_metrics_complete": true,
+            "value_base": {
+              "amount": "1000125.50",
+              "currency": "USD"
+            },
+            "value_native": {
+              "amount": "1000125.50",
+              "currency": "USD"
+            }
+          }
+        },
+        "total_base_currency": {
+          "amount": "1000125.50",
+          "currency": "USD"
+        }
+      }
+    }
+  ],
   "properties": {
     "report": {
       "$ref": "#/$defs/ApplicationReport",

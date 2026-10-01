@@ -98,6 +98,22 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Market data an instrument needs to price: curves, spots, surfaces, FX pairs and fixings.",
+  "examples": [
+    {
+      "curves": {
+        "credit_curves": [],
+        "discount_curves": [
+          "USD-TREASURY"
+        ],
+        "forward_curves": [],
+        "inflation_curves": []
+      },
+      "fx_pairs": [],
+      "market_scalar_ids": [],
+      "series_ids": [],
+      "volatility_dependencies": []
+    }
+  ],
   "properties": {
     "credit_index_ids": {
       "description": "Credit-index aggregates resolved through `MarketContext::get_credit_index`.\n\nThese identifiers are distinct from direct hazard-curve IDs because a\ncredit index also carries base correlation and optional issuer curves.",

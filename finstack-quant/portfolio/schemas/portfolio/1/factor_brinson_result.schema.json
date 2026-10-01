@@ -69,6 +69,43 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Factor-Brinson unified attribution result.",
+  "examples": [
+    {
+      "active_return": 0.004,
+      "allocation": 0.0028,
+      "asset_contributions": [
+        {
+          "active_weight": 0.2,
+          "asset": "AAPL",
+          "contribution": 0.0006,
+          "specific_return": 0.003
+        },
+        {
+          "active_weight": -0.2,
+          "asset": "XOM",
+          "contribution": 0.0006,
+          "specific_return": -0.003
+        }
+      ],
+      "benchmark_return": 0.02,
+      "factor_contributions": [
+        {
+          "active_loading": 0.08,
+          "contribution": 0.0018,
+          "factor": "market",
+          "factor_return": 0.0225
+        },
+        {
+          "active_loading": -0.2,
+          "contribution": 0.001,
+          "factor": "energy",
+          "factor_return": -0.005
+        }
+      ],
+      "portfolio_return": 0.024,
+      "selection": 0.0012
+    }
+  ],
   "properties": {
     "active_return": {
       "description": "Active return, `portfolio_return − benchmark_return`.",

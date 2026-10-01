@@ -465,6 +465,23 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Listed-product catalog coverage for one exchange product.",
+  "examples": [
+    {
+      "asset_class": "rates",
+      "exchange": "cme",
+      "features": [
+        "compounded_overnight",
+        "imm_quarter",
+        "daily_margin"
+      ],
+      "instrument_type": "interest_rate_future",
+      "name": "Three-Month SOFR futures",
+      "product_kind": "future",
+      "source_url": "https://www.cmegroup.com/sofr",
+      "status": "native",
+      "symbols": "SR3"
+    }
+  ],
   "properties": {
     "asset_class": {
       "description": "Rates, fixed income, equity, FX, commodity, volatility, or digital assets.",

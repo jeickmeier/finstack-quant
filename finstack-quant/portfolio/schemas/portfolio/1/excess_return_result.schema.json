@@ -36,6 +36,28 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Per-position and portfolio-level duration-matched credit excess return result, produced by `excess_returns`.",
+  "examples": [
+    {
+      "base_label": "UST",
+      "portfolio_base_return": 0.0092,
+      "portfolio_excess_return": 0.00276,
+      "portfolio_total_return": 0.01196,
+      "positions": [
+        {
+          "base_return": 0.00733333333333,
+          "cell": "4.0-5.0",
+          "excess_return": 0.00386666666667,
+          "id": "ACME 4.25 2030"
+        },
+        {
+          "base_return": 0.012,
+          "cell": "7.0-8.0",
+          "excess_return": 0.0011,
+          "id": "GLOBEX 5.5 2034"
+        }
+      ]
+    }
+  ],
   "properties": {
     "base_label": {
       "description": "Label of the base curve the excess returns were measured against\n(mirrors [`DurationCellTable::base_label`]).",

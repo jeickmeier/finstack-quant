@@ -68,6 +68,42 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Margin constants a host needs to interpret inputs and results.",
+  "examples": [
+    {
+      "BCBS_IOSCO_SCHEDULE_ID": "bcbs_iosco",
+      "CALENDAR_DAYS_PER_YEAR": 365.0,
+      "DURATION_APPROXIMATION_FACTOR": 0.9,
+      "HAIRCUT_MPOR_DAYS": 2,
+      "ONE_BP": 0.0001,
+      "SIMM_COMMODITY_BUCKET_COUNT": 17,
+      "SIMM_TENORS": [
+        "2W",
+        "1M",
+        "3M",
+        "6M",
+        "1Y",
+        "2Y",
+        "3Y",
+        "5Y",
+        "10Y",
+        "15Y",
+        "20Y",
+        "30Y"
+      ],
+      "STANDARD_CDS_MATURITY_YEARS": 5.0,
+      "tenor_buckets": {
+        "BUCKET_10Y": 10.0,
+        "BUCKET_15Y": 15.0,
+        "BUCKET_1Y": 1.0,
+        "BUCKET_20Y": 20.0,
+        "BUCKET_2Y": 2.0,
+        "BUCKET_3M": 0.25,
+        "BUCKET_3Y": 3.0,
+        "BUCKET_5Y": 5.0,
+        "BUCKET_6M": 0.5
+      }
+    }
+  ],
   "properties": {
     "BCBS_IOSCO_SCHEDULE_ID": {
       "description": "Registry id of the BCBS-IOSCO regulatory IM schedule.",

@@ -20,7 +20,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/cds_convention_spec.schema.json",
-      "bytes": 5418,
+      "bytes": 5723,
       "kind": "component",
       "path": "schemas/common/1/cds_convention_spec.schema.json",
       "summary": "Market conventions of one CDS currency and documentation clause.",
@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/cds_index_params.schema.json",
-      "bytes": 2839,
+      "bytes": 3032,
       "kind": "component",
       "path": "schemas/common/1/cds_index_params.schema.json",
       "summary": "Preset identity, coupon and convention of a standard CDS index series.",
@@ -38,7 +38,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/cds_tranche_params.schema.json",
-      "bytes": 1659,
+      "bytes": 1965,
       "kind": "component",
       "path": "schemas/common/1/cds_tranche_params.schema.json",
       "summary": "Attachment, detachment, notional and coupon of a CDS index tranche.",
@@ -101,7 +101,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/inflation_swap_conventions.schema.json",
-      "bytes": 2660,
+      "bytes": 2946,
       "kind": "component",
       "path": "schemas/common/1/inflation_swap_conventions.schema.json",
       "summary": "Market conventions of one inflation-swap market.",
@@ -110,7 +110,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
-      "bytes": 990583,
+      "bytes": 991552,
       "kind": "component",
       "path": "schemas/common/1/instrument_json.schema.json",
       "summary": "The instrument union embedded by portfolio positions and candidates; the same branches as the instrument envelope's `instrument` field.",
@@ -128,7 +128,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/ir_future_conventions.schema.json",
-      "bytes": 8683,
+      "bytes": 9111,
       "kind": "component",
       "path": "schemas/common/1/ir_future_conventions.schema.json",
       "summary": "Contract conventions of one interest-rate future.",
@@ -137,7 +137,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/market_history.schema.json",
-      "bytes": 7283,
+      "bytes": 8353,
       "kind": "component",
       "path": "schemas/common/1/market_history.schema.json",
       "summary": "Historical market scenarios for historical VaR and expected shortfall.",
@@ -164,7 +164,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/rate_index_conventions.schema.json",
-      "bytes": 9323,
+      "bytes": 10007,
       "kind": "component",
       "path": "schemas/common/1/rate_index_conventions.schema.json",
       "summary": "Market conventions of one interest-rate index.",
@@ -182,7 +182,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/swaption_conventions.schema.json",
-      "bytes": 1369,
+      "bytes": 1678,
       "kind": "component",
       "path": "schemas/common/1/swaption_conventions.schema.json",
       "summary": "Market conventions of one swaption market.",
@@ -209,7 +209,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/xccy_conventions.schema.json",
-      "bytes": 5351,
+      "bytes": 5901,
       "kind": "component",
       "path": "schemas/common/1/xccy_conventions.schema.json",
       "summary": "Market conventions of one cross-currency swap pair.",
@@ -929,7 +929,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/borrowing_base_report.schema.json",
-      "bytes": 1066,
+      "bytes": 1382,
       "kind": "output",
       "path": "schemas/results/1/borrowing_base_report.schema.json",
       "summary": "Asset-backed facility borrowing base, availability and advance-rate test.",
@@ -938,7 +938,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/composite_history_row.schema.json",
-      "bytes": 7780,
+      "bytes": 8371,
       "kind": "output",
       "path": "schemas/results/1/composite_history_row.schema.json",
       "summary": "One dated composite holdings state and its accumulated trades.",
@@ -947,7 +947,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
-      "bytes": 998415,
+      "bytes": 1001073,
       "kind": "output",
       "path": "schemas/results/1/composite_rebalance_result.schema.json",
       "summary": "Result of resolving a new composite holdings state.",
@@ -956,7 +956,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/convertible_greeks.schema.json",
-      "bytes": 1186,
+      "bytes": 1342,
       "kind": "output",
       "path": "schemas/results/1/convertible_greeks.schema.json",
       "summary": "Tree price and Greeks of a convertible bond.",
@@ -965,7 +965,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/enhanced_monte_carlo_result.schema.json",
-      "bytes": 49067,
+      "bytes": 50536,
       "kind": "output",
       "path": "schemas/results/1/enhanced_monte_carlo_result.schema.json",
       "summary": "Revolving-credit Monte Carlo value with per-path details.",
@@ -974,7 +974,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/equity_metrics.schema.json",
-      "bytes": 1955,
+      "bytes": 2285,
       "kind": "output",
       "path": "schemas/results/1/equity_metrics.schema.json",
       "summary": "Equity-tranche return metrics: IRR, MOIC, NAV and cash-on-cash.",
@@ -983,7 +983,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/facility_projection.schema.json",
-      "bytes": 34594,
+      "bytes": 38978,
       "kind": "output",
       "path": "schemas/results/1/facility_projection.schema.json",
       "summary": "Projected cashflows of an asset-backed facility and its residual.",
@@ -992,7 +992,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/instrument_cashflow.schema.json",
-      "bytes": 16114,
+      "bytes": 16748,
       "kind": "output",
       "path": "schemas/results/1/instrument_cashflow.schema.json",
       "summary": "Native cashflow rows, reporting-currency PV and reconciliation status.",
@@ -1001,7 +1001,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/listed_product_coverage.schema.json",
-      "bytes": 17040,
+      "bytes": 17460,
       "kind": "output",
       "path": "schemas/results/1/listed_product_coverage.schema.json",
       "summary": "Listed-product catalog coverage for one exchange product.",
@@ -1010,7 +1010,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/market_dependencies.schema.json",
-      "bytes": 5080,
+      "bytes": 5408,
       "kind": "output",
       "path": "schemas/results/1/market_dependencies.schema.json",
       "summary": "Market data an instrument needs to price: curves, spots, surfaces, FX pairs and fixings.",
@@ -1019,7 +1019,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/merton_mc_result.schema.json",
-      "bytes": 3849,
+      "bytes": 4379,
       "kind": "output",
       "path": "schemas/results/1/merton_mc_result.schema.json",
       "summary": "Merton Monte Carlo price of a PIK or toggle bond with path statistics.",
@@ -1028,7 +1028,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/metric_metadata.schema.json",
-      "bytes": 3138,
+      "bytes": 3391,
       "kind": "output",
       "path": "schemas/results/1/metric_metadata.schema.json",
       "summary": "Canonical per-key metric interpretation for host presentation.",
@@ -1037,7 +1037,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/oas_result.schema.json",
-      "bytes": 1247,
+      "bytes": 1413,
       "kind": "output",
       "path": "schemas/results/1/oas_result.schema.json",
       "summary": "Structured-credit option-adjusted spread and its solver diagnostics.",
@@ -1046,7 +1046,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/scenario_table.schema.json",
-      "bytes": 2111,
+      "bytes": 2531,
       "kind": "output",
       "path": "schemas/results/1/scenario_table.schema.json",
       "summary": "Structured-credit scenario grid results for one tranche.",
@@ -1055,7 +1055,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/simulation_diagnostics.schema.json",
-      "bytes": 9428,
+      "bytes": 9967,
       "kind": "output",
       "path": "schemas/results/1/simulation_diagnostics.schema.json",
       "summary": "Deal-level accounting produced alongside the tranche cashflows.",
@@ -1064,7 +1064,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/tranche_cashflows.schema.json",
-      "bytes": 22429,
+      "bytes": 24074,
       "kind": "output",
       "path": "schemas/results/1/tranche_cashflows.schema.json",
       "summary": "Projected cashflows of one structured-credit tranche, by component.",
@@ -1073,7 +1073,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/tranche_metrics.schema.json",
-      "bytes": 4448,
+      "bytes": 4847,
       "kind": "output",
       "path": "schemas/results/1/tranche_metrics.schema.json",
       "summary": "Per-tranche risk and spread metrics from the tranche's own projected cashflows.",

@@ -2,6 +2,13 @@
   "$id": "https://finstack_quant.dev/schemas/margin/1/im_decay_profile.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Deterministic decay applied to today's SIMM IM to approximate `E[IM(t)]`.",
+  "examples": [
+    {
+      "linear_to_maturity": {
+        "maturity_years": 5.0
+      }
+    }
+  ],
   "oneOf": [
     {
       "const": "constant",

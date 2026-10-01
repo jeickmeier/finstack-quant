@@ -201,6 +201,99 @@ fn statement_result_examples() -> finstack_quant_core::Result<Vec<Value>> {
     Ok(vec![value])
 }
 
+/// A suite with one built-in articulation check and one formula check.
+fn check_suite_examples() -> finstack_quant_core::Result<Vec<Value>> {
+    finstack_quant_core::schema::example_from_json::<crate::checks::CheckSuiteSpec>(
+        serde_json::json!({
+            "name": "three_statement_integrity",
+            "description": "Balance sheet articulation and a leverage sanity bound.",
+            "builtin_checks": [{
+                "type": "balance_sheet_articulation",
+                "assets_nodes": ["total_assets"],
+                "liabilities_nodes": ["total_liabilities"],
+                "equity_nodes": ["total_equity"]
+            }],
+            "formula_checks": [{
+                "id": "leverage_bound",
+                "name": "Net leverage below 8x",
+                "category": "credit_reasonableness",
+                "severity": "warning",
+                "formula": "net_debt / ebitda < 8",
+                "message_template": "Net leverage exceeds 8x"
+            }]
+        }),
+    )
+}
+
+/// A one-metric registry in the `fin` namespace.
+fn metric_registry_examples() -> finstack_quant_core::Result<Vec<Value>> {
+    finstack_quant_core::schema::example_from_json::<crate::registry::MetricRegistry>(
+        serde_json::json!({
+            "namespace": "fin",
+            "schema_version": 1,
+            "metrics": [{
+                "id": "gross_margin",
+                "name": "Gross Margin",
+                "formula": "gross_profit / revenue",
+                "description": "Gross profit as a share of revenue.",
+                "category": "margins",
+                "unit_type": "percentage",
+                "requires": ["gross_profit", "revenue"]
+            }]
+        }),
+    )
+}
+
+/// A seeded 1,000-path run reporting the 5th, 50th and 95th percentiles.
+fn monte_carlo_config_examples() -> finstack_quant_core::Result<Vec<Value>> {
+    finstack_quant_core::schema::example_from_json::<crate::evaluator::MonteCarloConfig>(
+        serde_json::json!({
+            "n_paths": 1000,
+            "seed": 42,
+            "percentiles": [0.05, 0.5, 0.95]
+        }),
+    )
+}
+
+/// The percentile bands of one metric over two forecast quarters.
+fn monte_carlo_results_examples() -> finstack_quant_core::Result<Vec<Value>> {
+    finstack_quant_core::schema::example_from_json::<crate::evaluator::MonteCarloResults>(
+        serde_json::json!({
+            "percentile_results": {
+                "revenue": {
+                    "metric": "revenue",
+                    "values": {
+                        "2025Q1": [[0.05, 940_000.0], [0.5, 1_000_000.0], [0.95, 1_065_000.0]],
+                        "2025Q2": [[0.05, 925_000.0], [0.5, 1_020_000.0], [0.95, 1_120_000.0]]
+                    }
+                }
+            },
+            "n_paths": 1000,
+            "percentiles": [0.05, 0.5, 0.95],
+            "forecast_periods": ["2025Q1", "2025Q2"]
+        }),
+    )
+}
+
+/// One quarter of EBITDA with a single restructuring add-back.
+fn normalization_result_examples() -> finstack_quant_core::Result<Vec<Value>> {
+    finstack_quant_core::schema::example_from_json::<crate::adjustments::types::NormalizationResult>(
+        serde_json::json!({
+            "value_type": {"type": "monetary", "currency": "USD"},
+            "period": "2024Q1",
+            "base_value": 12_000_000.0,
+            "adjustments": [{
+                "adjustment_id": "restructuring",
+                "name": "Restructuring charges",
+                "raw_amount": 1_500_000.0,
+                "capped_amount": 1_500_000.0,
+                "is_capped": false
+            }],
+            "final_value": 13_500_000.0
+        }),
+    )
+}
+
 /// The crate's complete schema registry, sorted by artifact path.
 ///
 /// This lives in the library, not the generator binary, so the generator, the
@@ -213,7 +306,8 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         "CheckSuiteSpec",
         "Serializable check suite: built-in checks, formula checks and filtering configuration.",
     )
-    .with_kind(finstack_quant_core::schema::SchemaKind::Input),
+    .with_kind(finstack_quant_core::schema::SchemaKind::Input)
+    .with_examples(check_suite_examples),
     finstack_quant_core::schema::SchemaArtifact::new::<crate::FinancialModelSpec>(
         "schemas/statements/1/financial_model_spec.schema.json",
         "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
@@ -250,21 +344,24 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         "MetricRegistry",
         "Namespaced catalog of reusable metric definitions.",
     )
-    .with_kind(finstack_quant_core::schema::SchemaKind::Input),
+    .with_kind(finstack_quant_core::schema::SchemaKind::Input)
+    .with_examples(metric_registry_examples),
     finstack_quant_core::schema::SchemaArtifact::new::<crate::evaluator::MonteCarloConfig>(
         "schemas/statements/1/monte_carlo_config.schema.json",
         "https://finstack_quant.dev/schemas/statements/1/monte_carlo_config.schema.json",
         "MonteCarloConfig",
         "Path count, seed and reported percentiles of a Monte Carlo statement-model evaluation.",
     )
-    .with_kind(finstack_quant_core::schema::SchemaKind::Input),
+    .with_kind(finstack_quant_core::schema::SchemaKind::Input)
+    .with_examples(monte_carlo_config_examples),
     finstack_quant_core::schema::SchemaArtifact::new::<crate::evaluator::MonteCarloResults>(
         "schemas/statements/1/monte_carlo_results.schema.json",
         "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json",
         "MonteCarloResults",
         "Percentile summaries of a Monte Carlo statement-model evaluation.",
     )
-    .with_kind(finstack_quant_core::schema::SchemaKind::Output),
+    .with_kind(finstack_quant_core::schema::SchemaKind::Output)
+    .with_examples(monte_carlo_results_examples),
     finstack_quant_core::schema::SchemaArtifact::new::<
         crate::adjustments::types::NormalizationResult,
     >(
@@ -273,5 +370,6 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         "NormalizationResult",
         "Per-period normalization outcome: base value, applied adjustments and final value.",
     )
-    .with_kind(finstack_quant_core::schema::SchemaKind::Output),
+    .with_kind(finstack_quant_core::schema::SchemaKind::Output)
+    .with_examples(normalization_result_examples),
 ];

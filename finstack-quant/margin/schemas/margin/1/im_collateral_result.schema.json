@@ -829,6 +829,27 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "One-way IM collateral account after applying the CSA's allocated threshold.",
+  "examples": [
+    {
+      "current_collateral": {
+        "amount": "2000000",
+        "currency": "USD"
+      },
+      "gross_initial_margin": {
+        "amount": "2500000",
+        "currency": "USD"
+      },
+      "required_collateral": {
+        "amount": "2500000",
+        "currency": "USD"
+      },
+      "segregated": true,
+      "transfer": {
+        "amount": "500000",
+        "currency": "USD"
+      }
+    }
+  ],
   "properties": {
     "current_collateral": {
       "$ref": "#/$defs/Money",

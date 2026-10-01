@@ -46,6 +46,19 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Cross-currency basis swap quote.",
+  "examples": [
+    {
+      "basis_spread_bp": -12.5,
+      "convention": "EUR/USD-XCCY",
+      "far_pillar": {
+        "tenor": {
+          "count": 5,
+          "unit": "years"
+        }
+      },
+      "id": "EURUSD-XCCY-5Y"
+    }
+  ],
   "properties": {
     "basis_spread_bp": {
       "description": "Basis spread in basis points on the base-currency leg.",

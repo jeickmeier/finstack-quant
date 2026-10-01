@@ -8,6 +8,13 @@
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/position_change.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Position edits supported by `WhatIfEngine::position_what_if`.",
+  "examples": [
+    {
+      "kind": "resize",
+      "new_quantity": 0.5,
+      "position_id": "POS_001"
+    }
+  ],
   "oneOf": [
     {
       "additionalProperties": false,

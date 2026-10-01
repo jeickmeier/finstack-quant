@@ -241,6 +241,143 @@
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/fi_carino_linked_result.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Multi-period Carino-linked Campisi attribution.",
+  "examples": [
+    {
+      "benchmark_return_compounded": 0.018312161625,
+      "linked_active_carry": 0.000168249358012,
+      "linked_active_spread": 0.0000723588708098,
+      "linked_active_treasury": 0.001049875994,
+      "linked_allocation": 0.000247902916624,
+      "linked_sectors": [
+        {
+          "active_carry": 0.000100949614807,
+          "active_spread": 0.0000723588708098,
+          "active_treasury": 0.000726837226614,
+          "allocation": 0.000123951458312,
+          "sector": "Industrials",
+          "selection": 1.31486502141e-19,
+          "total_active": 0.00102409717054
+        },
+        {
+          "active_carry": 0.000067299743205,
+          "active_spread": 0.0,
+          "active_treasury": 0.000323038767384,
+          "allocation": 0.000123951458312,
+          "sector": "Financials",
+          "selection": -1.40095733358e-18,
+          "total_active": 0.000514289968901
+        }
+      ],
+      "linked_selection": -1.26947083144e-18,
+      "periods": [
+        {
+          "active_return": 0.00109833333333,
+          "benchmark_components": {
+            "carry": 0.004375,
+            "selection": 6.50521303491e-19,
+            "spread": 0.0012,
+            "total": 0.010075,
+            "treasury": 0.0045
+          },
+          "benchmark_return": 0.010075,
+          "portfolio_components": {
+            "carry": 0.00443333333333,
+            "selection": -8.67361737988e-20,
+            "spread": 0.00162,
+            "total": 0.0111733333333,
+            "treasury": 0.00512
+          },
+          "portfolio_return": 0.0111733333333,
+          "sectors": [
+            {
+              "active_carry": 0.00005,
+              "active_spread": 0.00018,
+              "active_treasury": 0.00036,
+              "allocation": 0.0001575,
+              "benchmark_return": 0.01165,
+              "benchmark_weight": 0.5,
+              "portfolio_return": 0.0126333333333,
+              "portfolio_weight": 0.6,
+              "sector": "Industrials",
+              "selection": 0.0,
+              "total_active": 0.0007475
+            },
+            {
+              "active_carry": 0.0000333333333333,
+              "active_spread": 0.0,
+              "active_treasury": 0.00016,
+              "allocation": 0.0001575,
+              "benchmark_return": 0.0085,
+              "benchmark_weight": 0.5,
+              "portfolio_return": 0.00898333333333,
+              "portfolio_weight": 0.4,
+              "sector": "Financials",
+              "selection": -6.93889390391e-19,
+              "total_active": 0.000350833333333
+            }
+          ],
+          "total_active_carry": 0.0000833333333333,
+          "total_active_spread": 0.00018,
+          "total_active_treasury": 0.00052,
+          "total_allocation": 0.000315,
+          "total_selection": -6.93889390391e-19
+        },
+        {
+          "active_return": 0.000426333333333,
+          "benchmark_components": {
+            "carry": 0.004375,
+            "selection": 6.50521303491e-19,
+            "spread": -0.00072,
+            "total": 0.008155,
+            "treasury": 0.0045
+          },
+          "benchmark_return": 0.008155,
+          "portfolio_components": {
+            "carry": 0.00443333333333,
+            "selection": 4.33680868994e-20,
+            "spread": -0.000972,
+            "total": 0.00858133333333,
+            "treasury": 0.00512
+          },
+          "portfolio_return": 0.00858133333333,
+          "sectors": [
+            {
+              "active_carry": 0.00005,
+              "active_spread": -0.000108,
+              "active_treasury": 0.00036,
+              "allocation": -0.0000345,
+              "benchmark_return": 0.00781,
+              "benchmark_weight": 0.5,
+              "portfolio_return": 0.00831333333333,
+              "portfolio_weight": 0.6,
+              "sector": "Industrials",
+              "selection": 1.30104260698e-19,
+              "total_active": 0.0002675
+            },
+            {
+              "active_carry": 0.0000333333333333,
+              "active_spread": 0.0,
+              "active_treasury": 0.00016,
+              "allocation": -0.0000345,
+              "benchmark_return": 0.0085,
+              "benchmark_weight": 0.5,
+              "portfolio_return": 0.00898333333333,
+              "portfolio_weight": 0.4,
+              "sector": "Financials",
+              "selection": -6.93889390391e-19,
+              "total_active": 0.000158833333333
+            }
+          ],
+          "total_active_carry": 0.0000833333333333,
+          "total_active_spread": -0.000108,
+          "total_active_treasury": 0.00052,
+          "total_allocation": -0.000069,
+          "total_selection": -5.63785129692e-19
+        }
+      ],
+      "portfolio_return_compounded": 0.0198505487644
+    }
+  ],
   "properties": {
     "benchmark_return_compounded": {
       "description": "Geometrically compounded benchmark return.",

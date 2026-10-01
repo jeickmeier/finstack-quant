@@ -244,6 +244,19 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Configuration for a replay run.",
+  "examples": [
+    {
+      "attribution_method": "parallel",
+      "mode": "pv_and_pnl",
+      "on_error": "strict",
+      "valuation_options": {
+        "metrics": {
+          "mode": "standard"
+        },
+        "strict_risk": true
+      }
+    }
+  ],
   "properties": {
     "attribution_method": {
       "$ref": "#/$defs/AttributionMethod",

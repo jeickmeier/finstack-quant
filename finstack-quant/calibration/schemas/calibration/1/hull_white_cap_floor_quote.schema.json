@@ -3,6 +3,15 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Cap or floor volatility quote in year fractions for the direct Hull-White calibrators.",
+  "examples": [
+    {
+      "is_cap": true,
+      "is_normal_vol": true,
+      "maturity": 5.0,
+      "strike": 0.03,
+      "volatility": 0.0088
+    }
+  ],
   "properties": {
     "is_cap": {
       "description": "`true` for a cap, `false` for a floor.",

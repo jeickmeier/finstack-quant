@@ -166,6 +166,33 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "One dated composite holdings state and its accumulated trades.",
+  "examples": [
+    {
+      "cashflows": {
+        "amount": "0",
+        "currency": "USD"
+      },
+      "date": "2025-01-31",
+      "exposures": {
+        "aggregates": [],
+        "paths": [],
+        "reporting_currency": "USD"
+      },
+      "held_state_effective_date": "2025-01-02",
+      "next_state_effective_date": null,
+      "period_return": 0.0125,
+      "pnl": {
+        "amount": "12500",
+        "currency": "USD"
+      },
+      "rebalance_trades": [],
+      "return_index": 1.0125,
+      "value": {
+        "amount": "1012500",
+        "currency": "USD"
+      }
+    }
+  ],
   "properties": {
     "cashflows": {
       "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",

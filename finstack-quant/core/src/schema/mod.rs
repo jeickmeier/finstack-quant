@@ -18,8 +18,8 @@ pub use generator::{
 };
 pub use llm::{project_llm, LlmProfile, DEFAULT_MAX_INLINE_BYTES, RESOLVES_FROM_KEYWORD};
 pub use registry::{
-    find_schema_artifact, generated_schema, SchemaArtifact, SchemaKind, SerdeSchema,
-    COMMON_SCHEMA_BASE, COMMON_SCHEMA_DEFINITIONS, JSON_SCHEMA_DIALECT,
+    example, example_from_json, find_schema_artifact, generated_schema, SchemaArtifact, SchemaKind,
+    SerdeSchema, COMMON_SCHEMA_BASE, COMMON_SCHEMA_DEFINITIONS, JSON_SCHEMA_DIALECT,
 };
 
 /// Register one schema artifact for a contract type under a crate's family.
@@ -86,17 +86,25 @@ fn market_context_state_examples() -> Result<Vec<Value>> {
     Ok(vec![value])
 }
 
-/// Serialize one example payload for a registered artifact.
-fn example_payload<T: serde::Serialize>(label: &str, value: &T) -> Result<Vec<Value>> {
-    serde_json::to_value(value)
-        .map(|example| vec![example])
-        .map_err(|error| Error::Internal(format!("serialize {label} example: {error}")))
+/// A two-row table: one string dimension and one float measure.
+fn table_envelope_examples() -> Result<Vec<Value>> {
+    use crate::table::{TableColumn, TableColumnData, TableColumnRole, TableEnvelope};
+    let table = TableEnvelope::new(vec![
+        TableColumn::new(
+            "ticker",
+            TableColumnData::String(vec!["AAPL".to_string(), "MSFT".to_string()]),
+        )
+        .with_role(TableColumnRole::Dimension),
+        TableColumn::new("weight", TableColumnData::Float64(vec![0.6, 0.4]))
+            .with_role(TableColumnRole::Measure),
+    ])?;
+    example(&table)
 }
 
 /// Two calendar quarters, the first marked actual.
 fn period_plan_examples() -> Result<Vec<Value>> {
     let plan = crate::dates::build_periods("2025Q1..Q2", Some("2025Q1"))?;
-    example_payload("period plan", &plan)
+    example(&plan)
 }
 
 /// A one-year schedule with the builder defaults.
@@ -108,21 +116,18 @@ fn schedule_spec_example() -> Result<crate::dates::ScheduleSpec> {
 
 /// The persisted inputs of [`schedule_examples`].
 fn schedule_spec_examples() -> Result<Vec<Value>> {
-    example_payload("schedule spec", &schedule_spec_example()?)
+    example(&schedule_spec_example()?)
 }
 
 /// The schedule generated from [`schedule_spec_example`].
 fn schedule_examples() -> Result<Vec<Value>> {
-    example_payload("schedule", &schedule_spec_example()?.build()?)
+    example(&schedule_spec_example()?.build()?)
 }
 
 /// The default scorecard scale of the rating-scale registry compiled into the library.
 fn scorecard_scale_examples() -> Result<Vec<Value>> {
     let registry = crate::rating_scales::embedded_registry()?;
-    example_payload(
-        "scorecard scale",
-        registry.rating_scale(registry.default_scale_id())?,
-    )
+    example(registry.rating_scale(registry.default_scale_id())?)
 }
 
 /// The core crate's schema registry.
@@ -149,7 +154,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "TableEnvelope",
         "Column-oriented table with a shared row count and typed column storage.",
     )
-    .with_kind(SchemaKind::Output),
+    .with_kind(SchemaKind::Output)
+    .with_examples(table_envelope_examples),
     SchemaArtifact::new::<crate::dates::PeriodPlan>(
         "schemas/dates/1/period_plan.schema.json",
         "https://finstack_quant.dev/schemas/dates/1/period_plan.schema.json",

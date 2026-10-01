@@ -3,6 +3,11 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Configuration for `campisi_attribution`.",
+  "examples": [
+    {
+      "period_years": 0.0833333333333
+    }
+  ],
   "properties": {
     "period_years": {
       "description": "Length of the attribution period in years (e.g. `0.25` for a\nquarter). Scales `yield_annual` into the period carry.",

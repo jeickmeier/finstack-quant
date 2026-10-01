@@ -3,6 +3,21 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Attachment, detachment, notional and coupon of a CDS index tranche.",
+  "examples": [
+    {
+      "attach_pct": 3.0,
+      "coupon_bp": 100.0,
+      "detach_pct": 7.0,
+      "index_name": "CDX.NA.IG",
+      "maturity": "2029-06-20",
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "realized_loss": 0.0,
+      "series": 42
+    }
+  ],
   "properties": {
     "attach_pct": {
       "description": "Attachment point as percentage",

@@ -65,6 +65,35 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Descriptive metadata of a built-in scenario template.",
+  "examples": [
+    {
+      "asset_classes": [
+        "rates",
+        "credit",
+        "equity",
+        "volatility",
+        "fx"
+      ],
+      "components": [
+        "gfc_2008_rates",
+        "gfc_2008_credit",
+        "gfc_2008_equity",
+        "gfc_2008_vol",
+        "gfc_2008_fx"
+      ],
+      "description": "Lehman Brothers collapse and ensuing global credit crisis. Severe flight-to-quality in rates, massive credit spread widening, equity crash, and volatility spike. Market-data identifiers in this template (e.g. USD-SOFR, USD-IG, SPX_VOL) are modern placeholders, not historical instruments; override them via ScenarioSpecBuilder::override_curve to match your market data.",
+      "event_date": "2008-09-15",
+      "id": "gfc_2008",
+      "name": "Global Financial Crisis 2008",
+      "severity": "severe",
+      "tags": [
+        "systemic",
+        "credit",
+        "liquidity",
+        "historical"
+      ]
+    }
+  ],
   "properties": {
     "asset_classes": {
       "description": "Asset classes materially affected by the scenario.",

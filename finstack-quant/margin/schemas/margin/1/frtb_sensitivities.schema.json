@@ -963,6 +963,60 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "FRTB sensitivity inputs organized by risk class.",
+  "examples": [
+    {
+      "base_currency": "USD",
+      "commodity_curvature": [],
+      "commodity_delta": [],
+      "commodity_vega": [],
+      "csr_nonsec_curvature": [],
+      "csr_nonsec_delta": [],
+      "csr_nonsec_vega": [],
+      "csr_sec_ctp_curvature": [],
+      "csr_sec_ctp_delta": [],
+      "csr_sec_ctp_vega": [],
+      "csr_sec_nonctp_curvature": [],
+      "csr_sec_nonctp_delta": [],
+      "csr_sec_nonctp_vega": [],
+      "drc_positions": [],
+      "equity_curvature": [],
+      "equity_delta": [
+        [
+          "AAPL",
+          8,
+          2500.0
+        ]
+      ],
+      "equity_repo_delta": [],
+      "equity_vega": [],
+      "fx_curvature": [],
+      "fx_delta": [
+        [
+          "EUR",
+          "USD",
+          4000.0
+        ]
+      ],
+      "fx_vega": [],
+      "girr_curvature": [],
+      "girr_delta": [
+        [
+          "USD",
+          "10Y",
+          -8000.0
+        ],
+        [
+          "USD",
+          "5Y",
+          12500.0
+        ]
+      ],
+      "girr_inflation_delta": [],
+      "girr_vega": [],
+      "girr_xccy_basis_delta": [],
+      "rrao_exotic_notionals": []
+    }
+  ],
   "properties": {
     "base_currency": {
       "$ref": "#/$defs/Currency"

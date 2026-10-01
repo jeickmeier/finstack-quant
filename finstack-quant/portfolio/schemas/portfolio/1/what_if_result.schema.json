@@ -263,6 +263,64 @@
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/what_if_result.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Result of a position what-if scenario.",
+  "examples": [
+    {
+      "after": {
+        "factor_contributions": [
+          {
+            "absolute_risk": 0.000125,
+            "factor_id": "USD-RATES",
+            "marginal_risk": 0.00625,
+            "relative_risk": 0.625
+          },
+          {
+            "absolute_risk": 0.00005,
+            "factor_id": "IG-CREDIT",
+            "marginal_risk": 0.0025,
+            "relative_risk": 0.25
+          }
+        ],
+        "measure": "variance",
+        "position_factor_contributions": [],
+        "position_residual_contributions": [],
+        "residual_risk": 0.000025,
+        "total_risk": 0.0002
+      },
+      "before": {
+        "factor_contributions": [
+          {
+            "absolute_risk": 0.00025,
+            "factor_id": "USD-RATES",
+            "marginal_risk": 0.0125,
+            "relative_risk": 0.625
+          },
+          {
+            "absolute_risk": 0.0001,
+            "factor_id": "IG-CREDIT",
+            "marginal_risk": 0.005,
+            "relative_risk": 0.25
+          }
+        ],
+        "measure": "variance",
+        "position_factor_contributions": [],
+        "position_residual_contributions": [],
+        "residual_risk": 0.00005,
+        "total_risk": 0.0004
+      },
+      "delta": [
+        {
+          "absolute_change": -0.000125,
+          "factor_id": "USD-RATES",
+          "relative_change": -0.5
+        },
+        {
+          "absolute_change": -0.00005,
+          "factor_id": "IG-CREDIT",
+          "relative_change": -0.5
+        }
+      ]
+    }
+  ],
   "properties": {
     "after": {
       "$ref": "#/$defs/RiskDecomposition",

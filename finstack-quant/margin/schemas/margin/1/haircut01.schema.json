@@ -828,6 +828,19 @@
   "$id": "https://finstack_quant.dev/schemas/margin/1/haircut01.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Haircut sensitivity (Haircut01) result.",
+  "examples": [
+    {
+      "collateral_value": {
+        "amount": "5000000",
+        "currency": "USD"
+      },
+      "current_haircut": 0.02,
+      "pv_change": {
+        "amount": "500.0000",
+        "currency": "USD"
+      }
+    }
+  ],
   "properties": {
     "collateral_value": {
       "$ref": "#/$defs/Money",

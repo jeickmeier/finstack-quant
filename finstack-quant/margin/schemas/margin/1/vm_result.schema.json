@@ -829,6 +829,28 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Variation margin calculation result.",
+  "examples": [
+    {
+      "collect_amount": {
+        "amount": "1250000",
+        "currency": "USD"
+      },
+      "date": "2025-01-15",
+      "gross_exposure": {
+        "amount": "1750000",
+        "currency": "USD"
+      },
+      "net_exposure": {
+        "amount": "1250000",
+        "currency": "USD"
+      },
+      "post_amount": {
+        "amount": "0",
+        "currency": "USD"
+      },
+      "settlement_date": "2025-01-16"
+    }
+  ],
   "properties": {
     "collect_amount": {
       "$ref": "#/$defs/Money",

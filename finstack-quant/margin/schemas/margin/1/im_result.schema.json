@@ -859,6 +859,28 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Initial margin calculation result.",
+  "examples": [
+    {
+      "amount": {
+        "amount": "2500000",
+        "currency": "USD"
+      },
+      "approximation": false,
+      "as_of": "2025-01-15",
+      "breakdown": {
+        "equity": {
+          "amount": "600000",
+          "currency": "USD"
+        },
+        "interest_rate": {
+          "amount": "1900000",
+          "currency": "USD"
+        }
+      },
+      "methodology": "simm",
+      "mpor_days": 10
+    }
+  ],
   "properties": {
     "amount": {
       "$ref": "#/$defs/Money",

@@ -3,6 +3,18 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Path count, seed and reported percentiles of a Monte Carlo statement-model evaluation.",
+  "examples": [
+    {
+      "include_path_data": false,
+      "n_paths": 1000,
+      "percentiles": [
+        0.05,
+        0.5,
+        0.95
+      ],
+      "seed": 42
+    }
+  ],
   "properties": {
     "include_path_data": {
       "default": false,

@@ -50,5 +50,8 @@
     }
   ],
   "description": "Asset class for schedule-based IM calculation.",
+  "examples": [
+    "interest_rate"
+  ],
   "title": "ScheduleAssetClass"
 }

@@ -61,6 +61,28 @@
   "$id": "https://finstack_quant.dev/schemas/common/1/xccy_conventions.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Market conventions of one cross-currency swap pair.",
+  "examples": [
+    {
+      "base_calendar_id": "target2",
+      "base_currency": "EUR",
+      "base_index_id": "EUR-ESTR-OIS",
+      "business_day_convention": "modified_following",
+      "day_count": "act_360",
+      "notional_exchange": {
+        "mtm_resetting": {
+          "resetting_side": "leg2"
+        }
+      },
+      "payment_frequency": {
+        "count": 3,
+        "unit": "months"
+      },
+      "quote_calendar_id": "usny",
+      "quote_currency": "USD",
+      "quote_index_id": "USD-SOFR-OIS",
+      "settlement_days": 2
+    }
+  ],
   "properties": {
     "base_calendar_id": {
       "description": "Base-currency calendar identifier for business day adjustments.",

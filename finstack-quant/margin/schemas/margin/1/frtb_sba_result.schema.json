@@ -169,6 +169,41 @@
   "$id": "https://finstack_quant.dev/schemas/margin/1/frtb_sba_result.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Complete FRTB SBA capital charge result.",
+  "examples": [
+    {
+      "binding_scenario": "low",
+      "curvature_by_risk_class": {},
+      "delta_by_risk_class": {
+        "equity": 125000.0,
+        "fx": 60000.0,
+        "girr": 6229.5153714
+      },
+      "drc": 0.0,
+      "meta": {
+        "fx_policy_applied": null,
+        "numeric_mode": "f64",
+        "rounding": {
+          "ingest_scale_by_currency": {},
+          "mode": "bankers",
+          "output_scale_by_currency": {},
+          "tolerances": {
+            "generic_epsilon": 1e-10,
+            "rate_epsilon": 1e-12
+          },
+          "version": 1
+        },
+        "version": "0.9.0"
+      },
+      "rrao": 0.0,
+      "scenario_charges": {
+        "high": 189950.0,
+        "low": 191229.515371,
+        "medium": 190626.249273
+      },
+      "total": 191229.515371,
+      "vega_by_risk_class": {}
+    }
+  ],
   "properties": {
     "binding_scenario": {
       "$ref": "#/$defs/CorrelationScenario",

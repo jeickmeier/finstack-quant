@@ -28,6 +28,8 @@ use finstack_quant_valuations::instruments::{InstrumentEnvelope, InstrumentJson}
 use finstack_quant_valuations::results::ValuationResult;
 use serde_json::Value;
 
+mod examples;
+
 const INSTRUMENT_SCHEMA_URI: &str =
     "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json";
 
@@ -64,13 +66,8 @@ pub fn package_materialization_schema(schema: &mut Value) -> Result<()> {
     externalize_schema_definitions(schema, EXTERNAL_DEFINITIONS)
 }
 
-/// A one-position portfolio bundle, materialized from the public builder.
-///
-/// Built from real constructors and then round-tripped through
-/// [`Portfolio::to_materialization`](crate::Portfolio::to_materialization), so
-/// the published example is a payload the loader actually accepts rather than
-/// hand-written JSON that can drift.
-fn materialization_examples() -> Result<Vec<Value>> {
+/// The one-deposit portfolio every portfolio example describes.
+fn example_portfolio() -> Result<crate::Portfolio> {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::money::Money;
     use finstack_quant_valuations::instruments::rates::deposit::Deposit;
@@ -112,7 +109,7 @@ fn materialization_examples() -> Result<Vec<Value>> {
         finstack_quant_core::Error::Internal(format!("build example position: {error}"))
     })?;
 
-    let portfolio = crate::Portfolio::builder("EXAMPLE_FUND")
+    crate::Portfolio::builder("EXAMPLE_FUND")
         .base_currency(Currency::USD)
         .as_of(as_of)
         .entity(crate::Entity::new("ACME_CORP"))
@@ -120,8 +117,17 @@ fn materialization_examples() -> Result<Vec<Value>> {
         .build()
         .map_err(|error| {
             finstack_quant_core::Error::Internal(format!("build example portfolio: {error}"))
-        })?;
+        })
+}
 
+/// A one-position portfolio bundle, materialized from the public builder.
+///
+/// Built from real constructors and then round-tripped through
+/// [`Portfolio::to_materialization`](crate::Portfolio::to_materialization), so
+/// the published example is a payload the loader actually accepts rather than
+/// hand-written JSON that can drift.
+fn materialization_examples() -> Result<Vec<Value>> {
+    let portfolio = example_portfolio()?;
     let envelope = portfolio.to_materialization().map_err(|error| {
         finstack_quant_core::Error::Internal(format!("materialize example portfolio: {error}"))
     })?;
@@ -193,7 +199,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "Outcome metadata for one successful portfolio materialization.",
     )
     .with_kind(SchemaKind::Output)
-    .with_summary("Retained diagnostics, bundle counts and phase timings from a portfolio load."),
+    .with_summary("Retained diagnostics, bundle counts and phase timings from a portfolio load.")
+    .with_examples(examples::materialization_report),
     SchemaArtifact::new::<crate::PortfolioMaterializationEnvelope>(
         "schemas/portfolio/1/portfolio_materialization.schema.json",
         "https://finstack_quant.dev/schemas/portfolio/1/portfolio_materialization.schema.json",
@@ -220,7 +227,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Output,
         "Compounded portfolio vs."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::carino_linked_attribution),
     finstack_quant_core::schema_artifact!(
         CashflowAggregationOptions,
         "portfolio",
@@ -228,7 +236,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Input,
         "Options for `aggregate_full_cashflows`."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::cashflow_aggregation_options),
     finstack_quant_core::schema_artifact!(
         CellConfig,
         "portfolio",
@@ -236,7 +245,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Input,
         "Configuration for `cell_returns_from_reference`."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::cell_config),
     finstack_quant_core::schema_artifact!(
         CreditVolReport,
         "portfolio",
@@ -244,7 +254,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Output,
         "Aggregated credit risk grouped by hierarchy level."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::credit_vol_report),
     finstack_quant_core::schema_artifact!(
         DatedCashflow,
         "portfolio",
@@ -252,7 +263,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Input,
         "A dated cashflow amount for money-weighted return calculations."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::dated_cashflow),
     finstack_quant_core::schema_artifact!(
         DurationCellTable,
         "portfolio",
@@ -260,7 +272,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Output,
         "A full duration-cell base-return curve built from a reference universe."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::duration_cell_table),
     finstack_quant_core::schema_artifact!(
         ExcessReturnPosition,
         "portfolio",
@@ -268,7 +281,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Input,
         "One position's beginning-of-period duration, weight and realized total return, the input to `excess_returns`."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::excess_return_position),
     finstack_quant_core::schema_artifact!(
         ExcessReturnResult,
         "portfolio",
@@ -276,7 +290,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Output,
         "Per-position and portfolio-level duration-matched credit excess return result, produced by `excess_returns`."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::excess_return_result),
     finstack_quant_core::schema_artifact!(
         FactorAssignmentReport,
         "portfolio",
@@ -284,7 +299,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Output,
         "Assignment results for a portfolio-level factor mapping pass."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::factor_assignment_report),
     finstack_quant_core::schema_artifact!(
         FactorBrinsonInput,
         "portfolio",
@@ -292,7 +308,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Input,
         "Inputs to `factor_brinson_attribution`: per-asset returns, a factor exposure matrix, and portfolio/benchmark weights."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::factor_brinson_input),
     finstack_quant_core::schema_artifact!(
         FactorBrinsonResult,
         "portfolio",
@@ -300,7 +317,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Output,
         "Factor-Brinson unified attribution result."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::factor_brinson_result),
     finstack_quant_core::schema_artifact!(
         FactorPnlProfile,
         "portfolio",
@@ -308,7 +326,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Output,
         "P&L profile for one factor across a scenario grid."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::factor_pnl_profile),
     finstack_quant_core::schema_artifact!(
         FiAttributionConfig,
         "portfolio",
@@ -316,7 +335,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Input,
         "Configuration for `campisi_attribution`."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::fi_attribution_config),
     finstack_quant_core::schema_artifact!(
         FiCarinoLinkedResult,
         "portfolio",
@@ -324,7 +344,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Output,
         "Multi-period Carino-linked Campisi attribution."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::fi_carino_linked_result),
     finstack_quant_core::schema_artifact!(
         FiPeriodInput,
         "portfolio",
@@ -332,7 +353,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Input,
         "One attribution period's raw inputs for multi-period linking."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::fi_period_input),
     finstack_quant_core::schema_artifact!(
         FiReconciliationReport,
         "portfolio",
@@ -340,7 +362,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Output,
         "Report from reconciling the five effect totals against the active return, mirroring `crate::attribution` reconciliation conventions."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::fi_reconciliation_report),
     finstack_quant_core::schema_artifact!(
         GridCarinoLinkedResult,
         "portfolio",
@@ -348,7 +371,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Output,
         "Multi-period Carino-linked hierarchical grid attribution."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::grid_carino_linked_result),
     finstack_quant_core::schema_artifact!(
         GridPosition,
         "portfolio",
@@ -356,7 +380,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Input,
         "One position (or pre-aggregated bucket) in a duration-cell x sector grid, for one period and one side (portfolio or benchmark)."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::grid_position),
     finstack_quant_core::schema_artifact!(
         LinkedReturn,
         "portfolio",
@@ -364,7 +389,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Output,
         "Result of geometrically linking sub-period returns."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::linked_return),
     finstack_quant_core::schema_artifact!(
         MarketFactorKey,
         "portfolio",
@@ -372,7 +398,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Component,
         "Normalized market factor key for portfolio-level dependency tracking."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::market_factor_key),
     finstack_quant_core::schema_artifact!(
         PortfolioCashflows,
         "portfolio",
@@ -380,7 +407,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Component,
         "Rich portfolio cashflow ladder preserving event classifications."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::portfolio_cashflows),
     finstack_quant_core::schema_artifact!(
         PortfolioMarginResult,
         "portfolio",
@@ -388,7 +416,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Output,
         "Portfolio-wide margin calculation results."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::portfolio_margin_result),
     finstack_quant_core::schema_artifact!(
         PortfolioOptimizationSpec,
         "portfolio",
@@ -396,7 +425,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Input,
         "JSON-serializable specification for a portfolio optimization problem."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::portfolio_optimization_spec),
     finstack_quant_core::schema_artifact!(
         PortfolioPrimitiveExposureReport,
         "portfolio",
@@ -404,7 +434,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Output,
         "Portfolio primitive decomposition retaining both path and concentration views."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::portfolio_primitive_exposure_report),
     finstack_quant_core::schema_artifact!(
         PortfolioResult,
         "portfolio",
@@ -412,7 +443,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Output,
         "Complete results from portfolio evaluation."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::portfolio_result),
     finstack_quant_core::schema_artifact!(
         PositionChange,
         "portfolio",
@@ -420,7 +452,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Output,
         "Position edits supported by `WhatIfEngine::position_what_if`."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::position_change),
     finstack_quant_core::schema_artifact!(
         ReconciliationReport,
         "portfolio",
@@ -428,7 +461,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Output,
         "Report from reconciling position-level P&L attribution against portfolio totals."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::reconciliation_report),
     finstack_quant_core::schema_artifact!(
         ReferenceReturn,
         "portfolio",
@@ -436,7 +470,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Input,
         "One reference (e.g."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::reference_return),
     finstack_quant_core::schema_artifact!(
         ReplayConfig,
         "portfolio",
@@ -444,7 +479,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Input,
         "Configuration for a replay run."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::replay_config),
     finstack_quant_core::schema_artifact!(
         ReplayResult,
         "portfolio",
@@ -452,7 +488,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Output,
         "Full output of a replay run."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::replay_result),
     finstack_quant_core::schema_artifact!(
         ScenarioPnlBatchItem,
         "portfolio",
@@ -460,7 +497,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Output,
         "One ordered result from `scenario_pnl_batch`."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::scenario_pnl_batch_item),
     finstack_quant_core::schema_artifact!(
         ScenarioPnlView,
         "portfolio",
@@ -468,7 +506,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Output,
         "Scenario-P&L view returned by binding surfaces."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::scenario_pnl_view),
     finstack_quant_core::schema_artifact!(
         ScenarioRevalueView,
         "portfolio",
@@ -476,7 +515,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Output,
         "Scenario-and-revalue view returned by binding surfaces."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::scenario_revalue_view),
     finstack_quant_core::schema_artifact!(
         SectorPeriod,
         "portfolio",
@@ -484,7 +524,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Input,
         "Per-sector portfolio and benchmark weights and returns for a single attribution period."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::sector_period),
     finstack_quant_core::schema_artifact!(
         SensitivityMatrixJson,
         "portfolio",
@@ -492,7 +533,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Output,
         "Canonical wire form of a factor-sensitivity matrix, shared by both hosts."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::sensitivity_matrix_json),
     finstack_quant_core::schema_artifact!(
         StressPnl,
         "portfolio",
@@ -500,7 +542,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Output,
         "P&L-only result of a factor-stress scenario."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::stress_pnl),
     finstack_quant_core::schema_artifact!(
         StressResult,
         "portfolio",
@@ -508,7 +551,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Output,
         "Result of a factor-stress scenario."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::stress_result),
     finstack_quant_core::schema_artifact!(
         TwrrPeriod,
         "portfolio",
@@ -516,7 +560,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Output,
         "A single sub-period of a portfolio, with the information needed to compute a Modified-Dietz return."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::twrr_period),
     finstack_quant_core::schema_artifact!(
         WeightAllocationResult,
         "portfolio",
@@ -524,7 +569,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Output,
         "Strategy allocation result."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::weight_allocation_result),
     finstack_quant_core::schema_artifact!(
         WeightAllocationSpec,
         "portfolio",
@@ -532,7 +578,8 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Input,
         "JSON specification for strategy-level allocation."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::weight_allocation_spec),
     finstack_quant_core::schema_artifact!(
         WhatIfResult,
         "portfolio",
@@ -540,5 +587,6 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         Output,
         "Result of a position what-if scenario."
     )
-    .with_packager(package_materialization_schema),
+    .with_packager(package_materialization_schema)
+    .with_examples(examples::what_if_result),
 ];

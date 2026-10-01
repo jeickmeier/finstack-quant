@@ -9,6 +9,12 @@
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/dated_cashflow.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "A dated cashflow amount for money-weighted return calculations.",
+  "examples": [
+    {
+      "amount": -1000000.0,
+      "date": "2024-01-01"
+    }
+  ],
   "properties": {
     "amount": {
       "description": "Signed amount from the investor's cash account: contributions are\nnegative; terminal value or distributions back to the investor are\npositive. Opposite of [`DietzFlow::amount`].",

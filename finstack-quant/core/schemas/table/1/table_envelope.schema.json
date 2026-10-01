@@ -248,6 +248,35 @@
   "$id": "https://finstack_quant.dev/schemas/table/1/table_envelope.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Column-oriented table with a shared row count and typed column storage.",
+  "examples": [
+    {
+      "columns": [
+        {
+          "data": {
+            "type": "string",
+            "values": [
+              "AAPL",
+              "MSFT"
+            ]
+          },
+          "name": "ticker",
+          "role": "dimension"
+        },
+        {
+          "data": {
+            "type": "float64",
+            "values": [
+              0.6,
+              0.4
+            ]
+          },
+          "name": "weight",
+          "role": "measure"
+        }
+      ],
+      "row_count": 2
+    }
+  ],
   "properties": {
     "columns": {
       "description": "Ordered set of columns.",

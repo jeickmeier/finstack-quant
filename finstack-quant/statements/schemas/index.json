@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
-      "bytes": 19474,
+      "bytes": 20434,
       "kind": "input",
       "path": "schemas/statements/1/check_suite_spec.schema.json",
       "summary": "Serializable check suite: built-in checks, formula checks and filtering configuration.",
@@ -20,7 +20,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/metric_registry.schema.json",
-      "bytes": 3901,
+      "bytes": 4367,
       "kind": "input",
       "path": "schemas/statements/1/metric_registry.schema.json",
       "summary": "Namespaced catalog of reusable metric definitions.",
@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_config.schema.json",
-      "bytes": 1185,
+      "bytes": 1364,
       "kind": "input",
       "path": "schemas/statements/1/monte_carlo_config.schema.json",
       "summary": "Path count, seed and reported percentiles of a Monte Carlo statement-model evaluation.",
@@ -38,7 +38,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json",
-      "bytes": 31334,
+      "bytes": 32225,
       "kind": "output",
       "path": "schemas/statements/1/monte_carlo_results.schema.json",
       "summary": "Percentile summaries of a Monte Carlo statement-model evaluation.",
@@ -56,7 +56,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json",
-      "bytes": 22691,
+      "bytes": 23140,
       "kind": "output",
       "path": "schemas/statements/1/normalization_result.schema.json",
       "summary": "Per-period normalization outcome: base value, applied adjustments and final value.",

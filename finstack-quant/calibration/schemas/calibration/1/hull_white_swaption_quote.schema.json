@@ -3,6 +3,14 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "ATM swaption volatility quote in year fractions for the direct Hull-White calibrator.",
+  "examples": [
+    {
+      "expiry": 5.0,
+      "is_normal_vol": true,
+      "tenor": 5.0,
+      "volatility": 0.0088
+    }
+  ],
   "properties": {
     "expiry": {
       "description": "Swaption expiry in years (T₀); finite and positive.",

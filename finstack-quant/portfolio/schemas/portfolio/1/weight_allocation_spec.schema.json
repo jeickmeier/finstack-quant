@@ -69,6 +69,38 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "JSON specification for strategy-level allocation.",
+  "examples": [
+    {
+      "covariance": null,
+      "money_decimal_places": 10,
+      "scheme": "inverse_volatility",
+      "strategies": [
+        {
+          "fixed_weight": null,
+          "id": "carry",
+          "returns": [
+            0.01,
+            -0.004,
+            0.006,
+            0.002
+          ],
+          "risk_budget": null
+        },
+        {
+          "fixed_weight": null,
+          "id": "trend",
+          "returns": [
+            0.02,
+            -0.012,
+            0.015,
+            -0.006
+          ],
+          "risk_budget": null
+        }
+      ],
+      "total_capital": 10000000.0
+    }
+  ],
   "properties": {
     "covariance": {
       "description": "Optional covariance matrix for `risk_budget`, row-major as nested lists.",

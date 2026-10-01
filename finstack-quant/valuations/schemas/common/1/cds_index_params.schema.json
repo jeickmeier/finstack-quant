@@ -30,6 +30,16 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Preset identity, coupon and convention of a standard CDS index series.",
+  "examples": [
+    {
+      "convention": "isda_na",
+      "coupon_bp": 100.0,
+      "index_name": "CDX.NA.IG",
+      "num_constituents": 125,
+      "series": 42,
+      "version": 1
+    }
+  ],
   "properties": {
     "convention": {
       "$ref": "#/$defs/CdsConvention",

@@ -44,6 +44,18 @@
   "$id": "https://finstack_quant.dev/schemas/market/1/vol_quote.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Option, swaption or cap/floor volatility quote.",
+  "examples": [
+    {
+      "option_vol": {
+        "expiry": "2026-01-16",
+        "id": "SPX-1Y-5000-C",
+        "option_type": "call",
+        "strike": 5000.0,
+        "underlying": "SPX",
+        "vol": 0.18
+      }
+    }
+  ],
   "oneOf": [
     {
       "additionalProperties": false,

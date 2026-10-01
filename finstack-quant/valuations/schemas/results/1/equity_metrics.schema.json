@@ -3,6 +3,26 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Equity-tranche return metrics: IRR, MOIC, NAV and cash-on-cash.",
+  "examples": [
+    {
+      "cash_on_cash": [
+        [
+          "2025-04-15",
+          0.045
+        ],
+        [
+          "2025-07-15",
+          0.047
+        ]
+      ],
+      "currency": "USD",
+      "invested": 40000000.0,
+      "irr": 0.142,
+      "moic": 1.85,
+      "nav_pct": 62.5,
+      "tranche_id": "EQ"
+    }
+  ],
   "properties": {
     "cash_on_cash": {
       "description": "Each distribution as a fraction of `invested`, by payment date.",

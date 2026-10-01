@@ -3012,6 +3012,85 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Canonical typed calibration result envelope.",
+  "examples": [
+    {
+      "result": {
+        "final_market": {
+          "collateral": {},
+          "credit_indices": [],
+          "curves": [],
+          "dividends": [],
+          "fx": null,
+          "fx_delta_vol_surfaces": [],
+          "hierarchy": null,
+          "inflation_indices": [],
+          "prices": {},
+          "schema_version": 1,
+          "series": [],
+          "surfaces": [],
+          "vol_cubes": []
+        },
+        "report": {
+          "convergence_reason": "Plan execution completed",
+          "iterations": 0,
+          "max_residual": 0.0,
+          "max_residual_ratio": 0.0,
+          "metadata": {
+            "bid_ask_validation": "not_applicable_single_side_quote_schema",
+            "market_freshness_status": "unverified",
+            "market_quote_side": "mid",
+            "method": "plan_execution",
+            "raw_residuals": "retained_in_step_reports",
+            "residual_units": "absolute_residual_over_step_tolerance",
+            "solver_tolerance": "1.00e-12",
+            "type": "plan_execution"
+          },
+          "objective_value": 0.0,
+          "residuals": {},
+          "results_meta": {
+            "fx_policy_applied": null,
+            "numeric_mode": "f64",
+            "rounding": {
+              "ingest_scale_by_currency": {},
+              "mode": "bankers",
+              "output_scale_by_currency": {},
+              "tolerances": {
+                "generic_epsilon": 1e-10,
+                "rate_epsilon": 1e-12
+              },
+              "version": 1
+            },
+            "version": "0.9.0"
+          },
+          "rmse": 0.0,
+          "rmse_ratio": 0.0,
+          "solver_config": {
+            "max_iterations": 100,
+            "tolerance": 1e-12
+          },
+          "success": true,
+          "validation_passed": true
+        },
+        "results_meta": {
+          "fx_policy_applied": null,
+          "numeric_mode": "f64",
+          "rounding": {
+            "ingest_scale_by_currency": {},
+            "mode": "bankers",
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "generic_epsilon": 1e-10,
+              "rate_epsilon": 1e-12
+            },
+            "version": 1
+          },
+          "version": "0.9.0"
+        },
+        "step_reports": {}
+      },
+      "schema": "finstack_quant.calibration/1"
+    }
+  ],
   "properties": {
     "result": {
       "$ref": "#/$defs/CalibrationResult",

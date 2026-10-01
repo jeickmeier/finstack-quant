@@ -2,6 +2,19 @@
   "$id": "https://finstack_quant.dev/schemas/common/1/swaption_conventions.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Market conventions of one swaption market.",
+  "examples": [
+    {
+      "business_day_convention": "modified_following",
+      "calendar_id": "nyse",
+      "fixed_leg_day_count": "act_360",
+      "fixed_leg_frequency": {
+        "count": 1,
+        "unit": "years"
+      },
+      "float_leg_index": "USD-SOFR-OIS",
+      "settlement_days": 2
+    }
+  ],
   "properties": {
     "business_day_convention": {
       "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",

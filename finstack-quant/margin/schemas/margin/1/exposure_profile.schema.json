@@ -35,6 +35,30 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Exposure profile computed at each time grid point.",
+  "examples": [
+    {
+      "ene": [
+        0.0,
+        -43000.0,
+        -33000.0
+      ],
+      "epe": [
+        0.0,
+        85000.0,
+        64000.0
+      ],
+      "mtm_values": [
+        0.0,
+        42000.0,
+        31000.0
+      ],
+      "times": [
+        0.0,
+        0.5,
+        1.0
+      ]
+    }
+  ],
   "properties": {
     "diagnostics": {
       "anyOf": [

@@ -809,6 +809,29 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Canonical wire form of a factor-sensitivity matrix, shared by both hosts.",
+  "examples": [
+    {
+      "base_currency": "USD",
+      "data": [
+        [
+          -4600.0,
+          0.0
+        ],
+        [
+          -7400.0,
+          -6900.0
+        ]
+      ],
+      "factor_ids": [
+        "USD-RATES",
+        "IG-CREDIT"
+      ],
+      "position_ids": [
+        "POS_001",
+        "POS_002"
+      ]
+    }
+  ],
   "properties": {
     "base_currency": {
       "$ref": "#/$defs/Currency",

@@ -879,6 +879,26 @@
   "$id": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Per-period normalization outcome: base value, applied adjustments and final value.",
+  "examples": [
+    {
+      "adjustments": [
+        {
+          "adjustment_id": "restructuring",
+          "capped_amount": 1500000.0,
+          "is_capped": false,
+          "name": "Restructuring charges",
+          "raw_amount": 1500000.0
+        }
+      ],
+      "base_value": 12000000.0,
+      "final_value": 13500000.0,
+      "period": "2024Q1",
+      "value_type": {
+        "currency": "USD",
+        "type": "monetary"
+      }
+    }
+  ],
   "properties": {
     "adjustments": {
       "description": "Detailed breakdown of applied adjustments",

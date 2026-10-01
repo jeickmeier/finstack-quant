@@ -2369,6 +2369,72 @@
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/replay_result.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Full output of a replay run.",
+  "examples": [
+    {
+      "steps": [
+        {
+          "attribution": null,
+          "cumulative_mtm_pnl": null,
+          "daily_mtm_pnl": null,
+          "date": "2024-01-01",
+          "valuation": {
+            "as_of": "2024-01-01",
+            "by_entity": {
+              "ACME_CORP": {
+                "amount": "1000125.50",
+                "currency": "USD"
+              }
+            },
+            "fx_collapse_policy": "cashflow_date",
+            "position_values": {
+              "POS_001": {
+                "entity_id": "ACME_CORP",
+                "metric_scale": 1.0,
+                "position_id": "POS_001",
+                "risk_metrics_complete": true,
+                "value_base": {
+                  "amount": "1000125.50",
+                  "currency": "USD"
+                },
+                "value_native": {
+                  "amount": "1000125.50",
+                  "currency": "USD"
+                }
+              }
+            },
+            "total_base_currency": {
+              "amount": "1000125.50",
+              "currency": "USD"
+            }
+          }
+        }
+      ],
+      "summary": {
+        "end_date": "2024-01-01",
+        "end_value": {
+          "amount": "1000125.50",
+          "currency": "USD"
+        },
+        "max_mtm_drawdown": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "max_mtm_drawdown_pct": 0.0,
+        "max_mtm_drawdown_peak_date": "2024-01-01",
+        "max_mtm_drawdown_trough_date": "2024-01-01",
+        "num_steps": 1,
+        "start_date": "2024-01-01",
+        "start_value": {
+          "amount": "1000125.50",
+          "currency": "USD"
+        },
+        "total_mtm_pnl": {
+          "amount": "0",
+          "currency": "USD"
+        }
+      }
+    }
+  ],
   "properties": {
     "skipped_dates": {
       "description": "Snapshots that were skipped because their valuation failed and the\nrun was configured for [`ReplayErrorPolicy::BestEffort`]. Empty in\nstrict mode (the run would have aborted instead).",

@@ -151,6 +151,31 @@
   "$id": "https://finstack_quant.dev/schemas/results/1/simulation_diagnostics.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Deal-level accounting produced alongside the tranche cashflows.",
+  "examples": [
+    {
+      "draws_from_principal": {
+        "amount": "0",
+        "currency": "USD"
+      },
+      "draws_from_reserve": {
+        "amount": "0",
+        "currency": "USD"
+      },
+      "early_amortization_date": null,
+      "periods": [],
+      "reserve_balance_path": [],
+      "reserve_interest_paid": [],
+      "reserve_replenished": {
+        "amount": "0",
+        "currency": "USD"
+      },
+      "tranche_draws": [],
+      "unfunded_draws": {
+        "amount": "0",
+        "currency": "USD"
+      }
+    }
+  ],
   "properties": {
     "draws_from_principal": {
       "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",

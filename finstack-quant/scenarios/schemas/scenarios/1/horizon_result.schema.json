@@ -3250,6 +3250,122 @@
   "$id": "https://finstack_quant.dev/schemas/scenarios/1/horizon_result.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Horizon total return: factor-decomposed P&L with scenario context.",
+  "examples": [
+    {
+      "attribution": {
+        "carry": {
+          "amount": "12500",
+          "currency": "USD"
+        },
+        "carry_detail": null,
+        "correlations_detail": null,
+        "correlations_pnl": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "credit_curves_pnl": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "credit_detail": null,
+        "cross_factor_detail": null,
+        "cross_factor_pnl": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "fx_detail": null,
+        "fx_pnl": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "fx_translation_pnl": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "inflation_curves_pnl": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "inflation_detail": null,
+        "mark_to_market_pnl": {
+          "amount": "12500",
+          "currency": "USD"
+        },
+        "market_scalars_pnl": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "meta": {
+          "instrument_id": "DEP_3M",
+          "method": "parallel",
+          "notes": [],
+          "num_repricings": 0,
+          "residual_pct": 100.0,
+          "rounding": {
+            "ingest_scale_by_currency": {},
+            "mode": "bankers",
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "generic_epsilon": 1e-10,
+              "rate_epsilon": 1e-12
+            },
+            "version": 1
+          },
+          "t0": "2024-01-01",
+          "t1": "2024-02-01",
+          "tolerance_abs": 1.0,
+          "tolerance_pct": 0.01
+        },
+        "model_params_detail": null,
+        "model_params_pnl": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "rates_curves_pnl": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "rates_detail": null,
+        "residual": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "result_invalid": false,
+        "scalars_detail": null,
+        "total_pnl": {
+          "amount": "12500",
+          "currency": "USD"
+        },
+        "vol_detail": null,
+        "vol_pnl": {
+          "amount": "0",
+          "currency": "USD"
+        }
+      },
+      "horizon_days": 31,
+      "initial_value": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "scenario_report": {
+        "changes": {
+          "all_dirty": false,
+          "as_of_changed": false,
+          "changed_instrument_indices": [],
+          "market_targets": [],
+          "portfolio_shape_changed": false
+        },
+        "expanded_operations": 1,
+        "operations_applied": 1,
+        "user_operations": 1,
+        "warnings": []
+      },
+      "terminal_value": {
+        "amount": "1012500",
+        "currency": "USD"
+      }
+    }
+  ],
   "properties": {
     "attribution": {
       "$ref": "#/$defs/PnlAttribution",

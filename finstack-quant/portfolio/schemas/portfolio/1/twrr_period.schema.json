@@ -26,6 +26,18 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "A single sub-period of a portfolio, with the information needed to compute a Modified-Dietz return.",
+  "examples": [
+    {
+      "beginning_market_value": 1000000.0,
+      "cashflows": [
+        {
+          "amount": 50000.0,
+          "fraction_of_period_remaining": 0.5
+        }
+      ],
+      "ending_market_value": 1062000.0
+    }
+  ],
   "properties": {
     "beginning_market_value": {
       "description": "PV at period start.",

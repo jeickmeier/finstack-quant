@@ -161,6 +161,133 @@
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/grid_carino_linked_result.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Multi-period Carino-linked hierarchical grid attribution.",
+  "examples": [
+    {
+      "benchmark_return_compounded": 0.02232321,
+      "linked_curve": -0.001253702,
+      "linked_sector": -0.000161768,
+      "linked_selection": 0.00121326,
+      "periods": [
+        {
+          "active_return": -0.0001,
+          "benchmark_return": 0.0111,
+          "curve_effects": [
+            {
+              "benchmark_cell_return": 0.008,
+              "benchmark_weight": 0.5,
+              "cell": "0-5y",
+              "curve_effect": -0.00031,
+              "portfolio_weight": 0.6
+            },
+            {
+              "benchmark_cell_return": 0.0142,
+              "benchmark_weight": 0.5,
+              "cell": "5-10y",
+              "curve_effect": -0.00031,
+              "portfolio_weight": 0.4
+            }
+          ],
+          "portfolio_return": 0.011,
+          "sector_effects": [
+            {
+              "allocation_effect": 0.0,
+              "cell": "0-5y",
+              "sector": "Industrials"
+            },
+            {
+              "allocation_effect": -0.000048,
+              "cell": "5-10y",
+              "sector": "Industrials"
+            },
+            {
+              "allocation_effect": -0.000032,
+              "cell": "5-10y",
+              "sector": "Financials"
+            }
+          ],
+          "selection_effects": [
+            {
+              "cell": "0-5y",
+              "sector": "Industrials",
+              "selection_effect": 0.0006
+            },
+            {
+              "cell": "5-10y",
+              "sector": "Industrials",
+              "selection_effect": 0.0
+            },
+            {
+              "cell": "5-10y",
+              "sector": "Financials",
+              "selection_effect": 0.0
+            }
+          ],
+          "total_curve": -0.00062,
+          "total_sector": -0.00008,
+          "total_selection": 0.0006
+        },
+        {
+          "active_return": -0.0001,
+          "benchmark_return": 0.0111,
+          "curve_effects": [
+            {
+              "benchmark_cell_return": 0.008,
+              "benchmark_weight": 0.5,
+              "cell": "0-5y",
+              "curve_effect": -0.00031,
+              "portfolio_weight": 0.6
+            },
+            {
+              "benchmark_cell_return": 0.0142,
+              "benchmark_weight": 0.5,
+              "cell": "5-10y",
+              "curve_effect": -0.00031,
+              "portfolio_weight": 0.4
+            }
+          ],
+          "portfolio_return": 0.011,
+          "sector_effects": [
+            {
+              "allocation_effect": 0.0,
+              "cell": "0-5y",
+              "sector": "Industrials"
+            },
+            {
+              "allocation_effect": -0.000048,
+              "cell": "5-10y",
+              "sector": "Industrials"
+            },
+            {
+              "allocation_effect": -0.000032,
+              "cell": "5-10y",
+              "sector": "Financials"
+            }
+          ],
+          "selection_effects": [
+            {
+              "cell": "0-5y",
+              "sector": "Industrials",
+              "selection_effect": 0.0006
+            },
+            {
+              "cell": "5-10y",
+              "sector": "Industrials",
+              "selection_effect": 0.0
+            },
+            {
+              "cell": "5-10y",
+              "sector": "Financials",
+              "selection_effect": 0.0
+            }
+          ],
+          "total_curve": -0.00062,
+          "total_sector": -0.00008,
+          "total_selection": 0.0006
+        }
+      ],
+      "portfolio_return_compounded": 0.022121
+    }
+  ],
   "properties": {
     "benchmark_return_compounded": {
       "description": "Geometrically compounded benchmark return, `∏_t (1 + r_b,t) − 1`.",

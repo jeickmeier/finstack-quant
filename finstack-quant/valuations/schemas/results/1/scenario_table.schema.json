@@ -50,6 +50,29 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Structured-credit scenario grid results for one tranche.",
+  "examples": [
+    {
+      "cells": [
+        {
+          "cdr": 0.02,
+          "cpr": 0.15,
+          "price": 99.1,
+          "severity": 0.4,
+          "wal": 5.8,
+          "writedown": 0.0
+        },
+        {
+          "cdr": 0.06,
+          "cpr": 0.15,
+          "price": 93.4,
+          "severity": 0.4,
+          "wal": 6.3,
+          "writedown": 0.035
+        }
+      ],
+      "tranche_id": "B"
+    }
+  ],
   "properties": {
     "cells": {
       "description": "Evaluated cells, in CPR-major, then CDR, then severity order.",

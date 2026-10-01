@@ -466,6 +466,42 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Serializable check suite: built-in checks, formula checks and filtering configuration.",
+  "examples": [
+    {
+      "builtin_checks": [
+        {
+          "assets_nodes": [
+            "total_assets"
+          ],
+          "equity_nodes": [
+            "total_equity"
+          ],
+          "liabilities_nodes": [
+            "total_liabilities"
+          ],
+          "type": "balance_sheet_articulation"
+        }
+      ],
+      "config": {
+        "default_relative_tolerance": 1e-9,
+        "default_tolerance": 0.01,
+        "materiality_threshold": 0.0,
+        "min_severity": "info"
+      },
+      "description": "Balance sheet articulation and a leverage sanity bound.",
+      "formula_checks": [
+        {
+          "category": "credit_reasonableness",
+          "formula": "net_debt / ebitda < 8",
+          "id": "leverage_bound",
+          "message_template": "Net leverage exceeds 8x",
+          "name": "Net leverage below 8x",
+          "severity": "warning"
+        }
+      ],
+      "name": "three_statement_integrity"
+    }
+  ],
   "properties": {
     "builtin_checks": {
       "default": [],

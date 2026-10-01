@@ -828,6 +828,20 @@
   "$id": "https://finstack_quant.dev/schemas/margin/1/margin_funding_cost.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Margin funding cost result.",
+  "examples": [
+    {
+      "annual_cost": {
+        "amount": "25000.000000000020000000",
+        "currency": "USD"
+      },
+      "collateral_rate": 0.0525,
+      "funding_rate": 0.055,
+      "margin_posted": {
+        "amount": "10000000",
+        "currency": "USD"
+      }
+    }
+  ],
   "properties": {
     "annual_cost": {
       "$ref": "#/$defs/Money",

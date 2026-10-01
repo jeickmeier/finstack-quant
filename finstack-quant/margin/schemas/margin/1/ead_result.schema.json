@@ -149,6 +149,35 @@
   "$id": "https://finstack_quant.dev/schemas/margin/1/ead_result.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "SA-CCR Exposure at Default result.",
+  "examples": [
+    {
+      "add_on_aggregate": 66391.7683982,
+      "add_on_by_asset_class": {
+        "interest_rate": 66391.7683982
+      },
+      "alpha": 1.4,
+      "ead": 162948.475757,
+      "maturity_factor": 0.3,
+      "meta": {
+        "fx_policy_applied": null,
+        "numeric_mode": "f64",
+        "rounding": {
+          "ingest_scale_by_currency": {},
+          "mode": "bankers",
+          "output_scale_by_currency": {},
+          "tolerances": {
+            "generic_epsilon": 1e-10,
+            "rate_epsilon": 1e-12
+          },
+          "version": 1
+        },
+        "version": "0.9.0"
+      },
+      "multiplier": 1.0,
+      "pfe": 66391.7683982,
+      "rc": 50000.0
+    }
+  ],
   "properties": {
     "add_on_aggregate": {
       "description": "Aggregate add-on before multiplier.",

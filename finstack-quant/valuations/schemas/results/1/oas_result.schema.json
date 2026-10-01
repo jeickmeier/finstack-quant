@@ -2,6 +2,15 @@
   "$id": "https://finstack_quant.dev/schemas/results/1/oas_result.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Structured-credit option-adjusted spread and its solver diagnostics.",
+  "examples": [
+    {
+      "market_price": 99.25,
+      "model_price": 99.25,
+      "num_paths": 2000,
+      "oas": 0.0145,
+      "price_std_error": 0.04
+    }
+  ],
   "properties": {
     "market_price": {
       "description": "Target clean settlement price (% of current balance).",

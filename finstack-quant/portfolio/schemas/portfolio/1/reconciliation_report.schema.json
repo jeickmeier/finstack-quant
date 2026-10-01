@@ -2,6 +2,13 @@
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/reconciliation_report.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Report from reconciling position-level P&L attribution against portfolio totals.",
+  "examples": [
+    {
+      "is_reconciled": true,
+      "tolerance": 0.01,
+      "total_residual": 0.0
+    }
+  ],
   "properties": {
     "is_reconciled": {
       "description": "Whether the reconciliation passes within tolerance.",

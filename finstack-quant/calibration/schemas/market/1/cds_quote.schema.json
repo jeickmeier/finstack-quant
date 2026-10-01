@@ -114,6 +114,25 @@
   "$id": "https://finstack_quant.dev/schemas/market/1/cds_quote.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Single-name CDS par-spread or upfront quote.",
+  "examples": [
+    {
+      "convention": {
+        "currency": "USD",
+        "doc_clause": "isda_na"
+      },
+      "entity": "ACME",
+      "id": "ACME-CDS-5Y",
+      "pillar": {
+        "tenor": {
+          "count": 5,
+          "unit": "years"
+        }
+      },
+      "recovery_rate": 0.4,
+      "spread_bp": 120.0,
+      "type": "cds_par_spread"
+    }
+  ],
   "oneOf": [
     {
       "additionalProperties": false,

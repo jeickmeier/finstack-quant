@@ -27714,6 +27714,51 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Scenario application result: mutated market, model and instruments with the report.",
+  "examples": [
+    {
+      "changes": {
+        "all_dirty": false,
+        "as_of_changed": false,
+        "changed_instrument_indices": [],
+        "market_targets": [],
+        "portfolio_shape_changed": false
+      },
+      "expanded_operations": 1,
+      "market": {
+        "collateral": {},
+        "credit_indices": [],
+        "curves": [],
+        "dividends": [],
+        "fx": null,
+        "fx_delta_vol_surfaces": [],
+        "hierarchy": null,
+        "inflation_indices": [],
+        "prices": {},
+        "schema_version": 1,
+        "series": [],
+        "surfaces": [],
+        "vol_cubes": []
+      },
+      "meta": {
+        "fx_policy_applied": null,
+        "numeric_mode": "f64",
+        "rounding": {
+          "ingest_scale_by_currency": {},
+          "mode": "bankers",
+          "output_scale_by_currency": {},
+          "tolerances": {
+            "generic_epsilon": 1e-10,
+            "rate_epsilon": 1e-12
+          },
+          "version": 1
+        },
+        "version": "0.9.0"
+      },
+      "operations_applied": 1,
+      "user_operations": 1,
+      "warnings": []
+    }
+  ],
   "properties": {
     "changes": {
       "$ref": "#/$defs/ScenarioChangeManifest",

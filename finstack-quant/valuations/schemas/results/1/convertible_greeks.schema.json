@@ -2,6 +2,16 @@
   "$id": "https://finstack_quant.dev/schemas/results/1/convertible_greeks.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Tree price and Greeks of a convertible bond.",
+  "examples": [
+    {
+      "delta": 6.2,
+      "gamma": 0.045,
+      "price": 1087.5,
+      "rho": 1.9,
+      "theta": -0.08,
+      "vega": 3.1
+    }
+  ],
   "properties": {
     "delta": {
       "description": "Delta (spot sensitivity per unit spot move)",

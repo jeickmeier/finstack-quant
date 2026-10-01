@@ -215,6 +215,27 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Outcome metadata for one successful portfolio materialization.",
+  "examples": [
+    {
+      "cache_hits": 0,
+      "dependencies": 1,
+      "input_bytes": 1024,
+      "phase_nanos": {
+        "build_positions": 0,
+        "decode_instruments": 0,
+        "index_build": 0,
+        "parse": 0,
+        "validate_versions": 0
+      },
+      "positions": 1,
+      "report": {
+        "diagnostics": [],
+        "truncated": false
+      },
+      "timing_available": false,
+      "unique_instruments": 1
+    }
+  ],
   "properties": {
     "cache_hits": {
       "description": "Number of unique artifacts served from the shared decode cache.",

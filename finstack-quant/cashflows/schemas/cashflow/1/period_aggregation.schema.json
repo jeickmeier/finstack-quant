@@ -8,6 +8,28 @@
     "type": "object"
   },
   "description": "Currency-preserving cashflow totals by reporting period.",
+  "examples": [
+    {
+      "2025Q1": {
+        "USD": {
+          "amount": "-1000000",
+          "currency": "USD"
+        }
+      },
+      "2025Q3": {
+        "USD": {
+          "amount": "21250",
+          "currency": "USD"
+        }
+      },
+      "2026Q1": {
+        "USD": {
+          "amount": "1021250",
+          "currency": "USD"
+        }
+      }
+    }
+  ],
   "title": "PeriodAggregation",
   "type": "object"
 }

@@ -1075,6 +1075,37 @@
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/factor_assignment_report.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Assignment results for a portfolio-level factor mapping pass.",
+  "examples": [
+    {
+      "assignments": [
+        {
+          "mappings": [
+            [
+              {
+                "curve": {
+                  "curve_type": "discount",
+                  "id": "USD-OIS"
+                }
+              },
+              "USD-RATES",
+              1.0
+            ]
+          ],
+          "position_id": "POS_001"
+        }
+      ],
+      "unmatched": [
+        {
+          "dependency": {
+            "spot": {
+              "id": "AAPL"
+            }
+          },
+          "position_id": "POS_002"
+        }
+      ]
+    }
+  ],
   "properties": {
     "assignments": {
       "description": "Per-position matched dependencies and factor identifiers.",

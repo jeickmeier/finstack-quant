@@ -833,6 +833,14 @@
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/market_factor_key.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Normalized market factor key for portfolio-level dependency tracking.",
+  "examples": [
+    {
+      "fx": {
+        "base": "EUR",
+        "quote": "USD"
+      }
+    }
+  ],
   "oneOf": [
     {
       "additionalProperties": false,

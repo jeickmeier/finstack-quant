@@ -47,6 +47,14 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Schedule-driven accrued-interest configuration.",
+  "examples": [
+    {
+      "ex_coupon": null,
+      "frequency": null,
+      "include_pik": true,
+      "method": "linear"
+    }
+  ],
   "properties": {
     "ex_coupon": {
       "anyOf": [

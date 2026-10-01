@@ -3,6 +3,12 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "One reference (e.g.",
+  "examples": [
+    {
+      "duration": 5.0,
+      "total_return": 0.009
+    }
+  ],
   "properties": {
     "duration": {
       "description": "Duration in years at period start. Must be finite and non-negative.",

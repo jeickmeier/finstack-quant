@@ -44,6 +44,26 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Merton Monte Carlo price of a PIK or toggle bond with path statistics.",
+  "examples": [
+    {
+      "average_pik_fraction": 0.22,
+      "clean_price_pct": 94.8,
+      "dirty_price_pct": 96.1,
+      "effective_spread_bp": 485.0,
+      "expected_loss": 0.031,
+      "expected_shortfall_95": 0.41,
+      "num_paths": 10000,
+      "path_statistics": {
+        "avg_default_time": 3.4,
+        "avg_recovery_rate": 0.42,
+        "avg_terminal_notional": 108.5,
+        "default_rate": 0.058,
+        "pik_exercise_rate": 0.22
+      },
+      "standard_error": 0.12,
+      "unexpected_loss": 0.094
+    }
+  ],
   "properties": {
     "average_pik_fraction": {
       "description": "Average PIK fraction across all coupon dates and paths.",

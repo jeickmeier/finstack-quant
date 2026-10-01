@@ -2,6 +2,13 @@
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/linked_return.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Result of geometrically linking sub-period returns.",
+  "examples": [
+    {
+      "annualised": 0.0515731520675,
+      "cumulative": 0.162836,
+      "num_periods": 3
+    }
+  ],
   "properties": {
     "annualised": {
       "description": "Annualised return assuming the supplied `horizon_years` covers\nthe full sequence of periods.",

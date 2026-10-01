@@ -43,6 +43,14 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Settings of the scalar Hull-White fit to cap/floor quotes.",
+  "examples": [
+    {
+      "fit_tolerance": 1e-6,
+      "fixed_kappa": null,
+      "frequency": "quarterly",
+      "initial_guess": null
+    }
+  ],
   "properties": {
     "fit_tolerance": {
       "description": "Required positive maximum implied-quote error in quoted volatility units.\nNormal quotes use decimal rate volatility; Black quotes use relative volatility.\nThis acceptance budget is independent of the numerical solver tolerance.",

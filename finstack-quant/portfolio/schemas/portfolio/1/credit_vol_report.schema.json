@@ -132,6 +132,25 @@
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/credit_vol_report.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Aggregated credit risk grouped by hierarchy level.",
+  "examples": [
+    {
+      "by_level": [
+        {
+          "by_bucket": {
+            "Financials": 0.0055,
+            "Industrials": 0.0035
+          },
+          "level_name": "sector",
+          "total": 0.009
+        }
+      ],
+      "by_position_optional": null,
+      "generic": 0.012,
+      "idiosyncratic_total": 0.0108,
+      "measure": "volatility",
+      "total": 0.0185
+    }
+  ],
   "properties": {
     "by_level": {
       "description": "Per-hierarchy-level rollups.",

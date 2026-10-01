@@ -58,6 +58,22 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Netting set configuration for SA-CCR.",
+  "examples": [
+    {
+      "as_of": "2025-01-15",
+      "collateral": 100000.0,
+      "is_margined": true,
+      "mpor_days": 10,
+      "mta": 50000.0,
+      "netting_set_id": {
+        "counterparty_id": "ACME-BANK",
+        "csa_id": "CSA-ACME-2024",
+        "kind": "bilateral"
+      },
+      "nica": 0.0,
+      "threshold": 0.0
+    }
+  ],
   "properties": {
     "as_of": {
       "$ref": "#/$defs/DateWire",

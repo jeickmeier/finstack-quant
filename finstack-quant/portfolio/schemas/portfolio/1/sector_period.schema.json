@@ -2,6 +2,15 @@
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/sector_period.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Per-sector portfolio and benchmark weights and returns for a single attribution period.",
+  "examples": [
+    {
+      "benchmark_return": 0.03,
+      "benchmark_weight": 0.5,
+      "portfolio_return": 0.04,
+      "portfolio_weight": 0.6,
+      "sector": "Technology"
+    }
+  ],
   "properties": {
     "benchmark_return": {
       "description": "Benchmark return for the sector over the period.\n\nIgnored when [`benchmark_weight`](Self::benchmark_weight) is zero:\n[`brinson_fachler`] substitutes the benchmark total `r_b` (Campisi\noff-benchmark convention).",

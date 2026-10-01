@@ -2,6 +2,11 @@
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/cashflow_aggregation_options.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Options for `aggregate_full_cashflows`.",
+  "examples": [
+    {
+      "allow_partial": false
+    }
+  ],
   "properties": {
     "allow_partial": {
       "description": "When `false` (default), a non-empty [`PortfolioCashflows::issues`]\nlist fails the call. When `true`, remaining positions still\ncontribute to the ladder and issues are returned on the result.",

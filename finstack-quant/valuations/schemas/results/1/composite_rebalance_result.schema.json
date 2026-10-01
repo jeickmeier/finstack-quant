@@ -23474,6 +23474,94 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Result of resolving a new composite holdings state.",
+  "examples": [
+    {
+      "instrument": {
+        "instrument": {
+          "spec": {
+            "spec": {
+              "attributes": {},
+              "capital": {
+                "amount": "100",
+                "currency": "USD"
+              },
+              "id": "COMPOSITE-EXAMPLE",
+              "legs": [
+                {
+                  "instrument": {
+                    "spec": {
+                      "attributes": {},
+                      "currency": "USD",
+                      "discount_curve_id": "USD",
+                      "discrete_dividends": [],
+                      "div_yield_id": null,
+                      "id": "COMPOSITE-LONG",
+                      "quantity": 1.0,
+                      "quoted_spot": 100.0,
+                      "spot_id": null,
+                      "ticker": "LONG"
+                    },
+                    "type": "equity"
+                  },
+                  "instrument_id": "COMPOSITE-LONG",
+                  "score": 1.0
+                },
+                {
+                  "instrument": {
+                    "spec": {
+                      "attributes": {},
+                      "currency": "USD",
+                      "discount_curve_id": "USD",
+                      "discrete_dividends": [],
+                      "div_yield_id": null,
+                      "id": "COMPOSITE-SHORT",
+                      "quantity": 1.0,
+                      "quoted_spot": 90.0,
+                      "spot_id": null,
+                      "ticker": "SHORT"
+                    },
+                    "type": "equity"
+                  },
+                  "instrument_id": "COMPOSITE-SHORT",
+                  "score": -1.0
+                }
+              ],
+              "rebalance_rule": {
+                "kind": "manual"
+              },
+              "reporting_currency": "USD",
+              "weighting_method": {
+                "kind": "fixed_quantity"
+              }
+            },
+            "state": {
+              "effective_date": "2025-01-01",
+              "resolved_legs": [
+                {
+                  "instrument_id": "COMPOSITE-LONG",
+                  "quantity": 1.0
+                },
+                {
+                  "instrument_id": "COMPOSITE-SHORT",
+                  "quantity": -1.0
+                }
+              ],
+              "weighting_inputs": {}
+            }
+          },
+          "type": "composite"
+        },
+        "schema": "finstack_quant.instrument/1"
+      },
+      "trades": [
+        {
+          "instrument_id": "AAPL",
+          "instrument_type": "equity",
+          "quantity_delta": 25.0
+        }
+      ]
+    }
+  ],
   "properties": {
     "instrument": {
       "$ref": "#/$defs/InstrumentEnvelope",

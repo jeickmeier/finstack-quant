@@ -3,6 +3,26 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Result of an MVA computation.",
+  "examples": [
+    {
+      "average_im": 1500000.0,
+      "im_profile": [
+        [
+          0.0,
+          2500000.0
+        ],
+        [
+          2.5,
+          1250000.0
+        ],
+        [
+          5.0,
+          0.0
+        ]
+      ],
+      "mva": 18750.0
+    }
+  ],
   "properties": {
     "average_im": {
       "description": "Time-weighted average IM over the profile horizon:\n`(1/T) ∫₀ᵀ IM(t) dt` under the same trapezoid convention as `mva`.",

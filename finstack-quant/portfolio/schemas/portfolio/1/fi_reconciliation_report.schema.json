@@ -3,6 +3,13 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Report from reconciling the five effect totals against the active return, mirroring `crate::attribution` reconciliation conventions.",
+  "examples": [
+    {
+      "is_reconciled": true,
+      "tolerance": 1e-9,
+      "total_residual": 6.50521303491e-19
+    }
+  ],
   "properties": {
     "is_reconciled": {
       "description": "Whether the residual is within tolerance.",

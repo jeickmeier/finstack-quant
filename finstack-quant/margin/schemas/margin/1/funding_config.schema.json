@@ -32,6 +32,12 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Funding cost/benefit configuration for FVA and MVA calculation.",
+  "examples": [
+    {
+      "funding_benefit_bp": 60.0,
+      "funding_spread_bp": 85.0
+    }
+  ],
   "properties": {
     "funding_benefit_bp": {
       "description": "Funding benefit spread in basis points (benefit on negative exposure).\n\nIf `None`, symmetric funding is assumed: `funding_benefit = funding_spread`.\nIn practice, the benefit spread may be lower than the cost spread\ndue to asymmetric funding conditions.",

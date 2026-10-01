@@ -119,6 +119,19 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Schedule-level inputs for building a schedule from existing flows.",
+  "examples": [
+    {
+      "meta": {
+        "calendar_ids": [],
+        "commitment": null,
+        "representation": "contractual"
+      },
+      "notional_hint": {
+        "amount": "1000000",
+        "currency": "USD"
+      }
+    }
+  ],
   "properties": {
     "meta": {
       "$ref": "#/$defs/CashFlowMeta",

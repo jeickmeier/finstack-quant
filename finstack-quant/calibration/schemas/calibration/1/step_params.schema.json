@@ -519,6 +519,23 @@
   "$id": "https://finstack_quant.dev/schemas/calibration/1/step_params.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Kind-tagged parameters of one calibration step, flattened into `CalibrationStep`.",
+  "examples": [
+    {
+      "base_date": "2025-01-15",
+      "conventions": {
+        "curve_day_count": null,
+        "ois_compounding": null
+      },
+      "currency": "USD",
+      "curve_id": "USD-OIS",
+      "extrapolation": "flat_forward",
+      "interpolation": "log_linear",
+      "kind": "discount",
+      "method": "bootstrap",
+      "pricing_discount_id": null,
+      "pricing_forward_id": null
+    }
+  ],
   "oneOf": [
     {
       "additionalProperties": false,

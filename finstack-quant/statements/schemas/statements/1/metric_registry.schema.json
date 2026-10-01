@@ -110,6 +110,26 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Namespaced catalog of reusable metric definitions.",
+  "examples": [
+    {
+      "metrics": [
+        {
+          "category": "margins",
+          "description": "Gross profit as a share of revenue.",
+          "formula": "gross_profit / revenue",
+          "id": "gross_margin",
+          "name": "Gross Margin",
+          "requires": [
+            "gross_profit",
+            "revenue"
+          ],
+          "unit_type": "percentage"
+        }
+      ],
+      "namespace": "fin",
+      "schema_version": 1
+    }
+  ],
   "properties": {
     "meta": {
       "additionalProperties": true,

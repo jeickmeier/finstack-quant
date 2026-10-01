@@ -3,6 +3,22 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Asset-backed facility borrowing base, availability and advance-rate test.",
+  "examples": [
+    {
+      "borrowing_base": {
+        "amount": "97750000",
+        "currency": "USD"
+      },
+      "concentration_excess": {
+        "amount": "5000000",
+        "currency": "USD"
+      },
+      "eligible_collateral": {
+        "amount": "120000000",
+        "currency": "USD"
+      }
+    }
+  ],
   "properties": {
     "borrowing_base": {
       "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",

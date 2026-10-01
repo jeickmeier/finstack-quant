@@ -112,6 +112,33 @@
   "$id": "https://finstack_quant.dev/schemas/common/1/rate_index_conventions.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Market conventions of one interest-rate index.",
+  "examples": [
+    {
+      "currency": "USD",
+      "day_count": "act_360",
+      "default_fixed_leg_day_count": "act_360",
+      "default_fixed_leg_frequency": {
+        "count": 1,
+        "unit": "years"
+      },
+      "default_payment_frequency": {
+        "count": 1,
+        "unit": "years"
+      },
+      "default_payment_lag_days": 2,
+      "default_reset_lag_days": 0,
+      "kind": "overnight_rfr",
+      "market_business_day_convention": "modified_following",
+      "market_calendar_id": "usny",
+      "market_settlement_days": 2,
+      "ois_compounding": {
+        "compounded_in_arrears": {
+          "lookback_days": 0
+        }
+      },
+      "tenor": null
+    }
+  ],
   "properties": {
     "currency": {
       "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",

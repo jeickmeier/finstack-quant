@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
-      "bytes": 1118312,
+      "bytes": 1119424,
       "kind": "output",
       "path": "schemas/scenarios/1/application_envelope.schema.json",
       "summary": "Scenario application result: mutated market, model and instruments with the report.",
@@ -11,7 +11,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/scenarios/1/horizon_result.schema.json",
-      "bytes": 116196,
+      "bytes": 119094,
       "kind": "output",
       "path": "schemas/scenarios/1/horizon_result.schema.json",
       "summary": "Horizon total return: factor-decomposed P&L with scenario context.",
@@ -20,7 +20,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/scenarios/1/horizon_summary.schema.json",
-      "bytes": 20691,
+      "bytes": 21117,
       "kind": "output",
       "path": "schemas/scenarios/1/horizon_summary.schema.json",
       "summary": "Derived total, annualized and per-factor returns of a horizon result.",
@@ -38,7 +38,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/scenarios/1/template_metadata.schema.json",
-      "bytes": 3880,
+      "bytes": 4822,
       "kind": "output",
       "path": "schemas/scenarios/1/template_metadata.schema.json",
       "summary": "Descriptive metadata of a built-in scenario template.",

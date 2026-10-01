@@ -45,6 +45,20 @@
   "$id": "https://finstack_quant.dev/schemas/market/1/rate_quote.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Deposit, FRA, futures or swap rate quote.",
+  "examples": [
+    {
+      "id": "USD-SOFR-DEP-1M",
+      "index": "USD-SOFR",
+      "pillar": {
+        "tenor": {
+          "count": 1,
+          "unit": "months"
+        }
+      },
+      "rate": 0.0525,
+      "type": "deposit"
+    }
+  ],
   "oneOf": [
     {
       "additionalProperties": false,

@@ -948,6 +948,51 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Portfolio primitive decomposition retaining both path and concentration views.",
+  "examples": [
+    {
+      "aggregates": [
+        {
+          "gross_measures": {
+            "dv01": 8.5
+          },
+          "gross_quantity": 1.0,
+          "gross_value": {
+            "amount": "1000125.50",
+            "currency": "USD"
+          },
+          "instrument_id": "DEP_1M",
+          "instrument_type": "deposit",
+          "net_measures": {
+            "dv01": -8.5
+          },
+          "net_quantity": 1.0,
+          "net_value": {
+            "amount": "1000125.50",
+            "currency": "USD"
+          }
+        }
+      ],
+      "base_currency": "USD",
+      "paths": [
+        {
+          "instrument_id": "DEP_1M",
+          "instrument_type": "deposit",
+          "measures": {
+            "dv01": -8.5
+          },
+          "path": [
+            "DEP_1M"
+          ],
+          "position_id": "POS_001",
+          "quantity": 1.0,
+          "value": {
+            "amount": "1000125.50",
+            "currency": "USD"
+          }
+        }
+      ]
+    }
+  ],
   "properties": {
     "aggregates": {
       "description": "Net and gross aggregates ordered by primitive identifier.",

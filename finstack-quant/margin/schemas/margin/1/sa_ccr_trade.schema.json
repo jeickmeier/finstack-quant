@@ -130,6 +130,24 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "A single derivative trade for SA-CCR EAD computation.",
+  "examples": [
+    {
+      "asset_class": "interest_rate",
+      "direction": 1.0,
+      "end_date": "2030-01-15",
+      "hedging_set": "USD",
+      "is_option": false,
+      "mtm": 125000.0,
+      "notional": 10000000.0,
+      "option_maturity_date": null,
+      "option_type": null,
+      "start_date": "2025-01-15",
+      "supervisory_category": null,
+      "supervisory_delta": 1.0,
+      "trade_id": "IRS-USD-5Y",
+      "underlier": "USD"
+    }
+  ],
   "properties": {
     "asset_class": {
       "$ref": "#/$defs/SaCcrAssetClass",

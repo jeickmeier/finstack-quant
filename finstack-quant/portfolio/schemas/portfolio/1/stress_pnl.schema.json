@@ -8,6 +8,21 @@
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/stress_pnl.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "P&L-only result of a factor-stress scenario.",
+  "examples": [
+    {
+      "position_pnl": [
+        [
+          "POS_001",
+          -4600.0
+        ],
+        [
+          "POS_002",
+          -7400.0
+        ]
+      ],
+      "total_pnl": -12000.0
+    }
+  ],
   "properties": {
     "position_pnl": {
       "description": "Per-position P&L contributions.",

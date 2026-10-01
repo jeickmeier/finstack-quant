@@ -11,7 +11,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration_result.schema.json",
-      "bytes": 114098,
+      "bytes": 116464,
       "kind": "output",
       "path": "schemas/calibration/1/calibration_result.schema.json",
       "summary": "The calibrated market snapshot with the plan-level and per-step fit reports.",
@@ -20,7 +20,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration_validation_report.schema.json",
-      "bytes": 15690,
+      "bytes": 15826,
       "kind": "output",
       "path": "schemas/calibration/1/calibration_validation_report.schema.json",
       "summary": "Dry-run findings for a calibration envelope; nothing is solved.",
@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/calibration/1/hull_white_cap_floor_calibration_config.schema.json",
-      "bytes": 2807,
+      "bytes": 2956,
       "kind": "component",
       "path": "schemas/calibration/1/hull_white_cap_floor_calibration_config.schema.json",
       "summary": "Settings of the scalar Hull-White fit to cap/floor quotes.",
@@ -38,7 +38,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/calibration/1/hull_white_cap_floor_quote.schema.json",
-      "bytes": 1286,
+      "bytes": 1442,
       "kind": "component",
       "path": "schemas/calibration/1/hull_white_cap_floor_quote.schema.json",
       "summary": "Cap or floor volatility quote in year fractions for the direct Hull-White calibrators.",
@@ -47,7 +47,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/calibration/1/hull_white_piecewise_sigma_calibration_config.schema.json",
-      "bytes": 2161,
+      "bytes": 2333,
       "kind": "component",
       "path": "schemas/calibration/1/hull_white_piecewise_sigma_calibration_config.schema.json",
       "summary": "Settings of the piecewise-constant Hull-White sigma bootstrap to cap/floor quotes.",
@@ -56,7 +56,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/calibration/1/hull_white_swaption_quote.schema.json",
-      "bytes": 1188,
+      "bytes": 1318,
       "kind": "component",
       "path": "schemas/calibration/1/hull_white_swaption_quote.schema.json",
       "summary": "ATM swaption volatility quote in year fractions for the direct Hull-White calibrator.",
@@ -65,7 +65,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/calibration/1/step_params.schema.json",
-      "bytes": 62424,
+      "bytes": 62840,
       "kind": "component",
       "path": "schemas/calibration/1/step_params.schema.json",
       "summary": "Kind-tagged parameters of one calibration step, flattened into `CalibrationStep`.",
@@ -74,7 +74,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/market/1/cds_quote.schema.json",
-      "bytes": 8828,
+      "bytes": 9191,
       "kind": "component",
       "path": "schemas/market/1/cds_quote.schema.json",
       "summary": "Single-name CDS par-spread or upfront quote.",
@@ -83,7 +83,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/market/1/cds_tranche_quote.schema.json",
-      "bytes": 5556,
+      "bytes": 5895,
       "kind": "component",
       "path": "schemas/market/1/cds_tranche_quote.schema.json",
       "summary": "Index tranche upfront quote.",
@@ -92,7 +92,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/market/1/inflation_quote.schema.json",
-      "bytes": 4195,
+      "bytes": 4408,
       "kind": "component",
       "path": "schemas/market/1/inflation_quote.schema.json",
       "summary": "Zero-coupon or year-on-year inflation swap quote.",
@@ -110,7 +110,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/market/1/rate_quote.schema.json",
-      "bytes": 8502,
+      "bytes": 8744,
       "kind": "component",
       "path": "schemas/market/1/rate_quote.schema.json",
       "summary": "Deposit, FRA, futures or swap rate quote.",
@@ -119,7 +119,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/market/1/vol_quote.schema.json",
-      "bytes": 7702,
+      "bytes": 7934,
       "kind": "component",
       "path": "schemas/market/1/vol_quote.schema.json",
       "summary": "Option, swaption or cap/floor volatility quote.",
@@ -128,7 +128,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/market/1/xccy_quote.schema.json",
-      "bytes": 4279,
+      "bytes": 4517,
       "kind": "component",
       "path": "schemas/market/1/xccy_quote.schema.json",
       "summary": "Cross-currency basis swap quote.",

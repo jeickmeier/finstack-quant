@@ -2256,6 +2256,35 @@
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_view.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Scenario-P&L view returned by binding surfaces.",
+  "examples": [
+    {
+      "pnl": {
+        "by_position": {
+          "POS_001": {
+            "amount": "-425.25",
+            "currency": "USD"
+          }
+        },
+        "total": {
+          "amount": "-425.25",
+          "currency": "USD"
+        }
+      },
+      "report": {
+        "changes": {
+          "all_dirty": true,
+          "as_of_changed": false,
+          "changed_instrument_indices": [],
+          "market_targets": [],
+          "portfolio_shape_changed": false
+        },
+        "expanded_operations": 1,
+        "operations_applied": 1,
+        "user_operations": 1,
+        "warnings": []
+      }
+    }
+  ],
   "properties": {
     "pnl": {
       "$ref": "#/$defs/ScenarioPnl",

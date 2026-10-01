@@ -829,6 +829,18 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Margin utilization result.",
+  "examples": [
+    {
+      "posted": {
+        "amount": "1250000",
+        "currency": "USD"
+      },
+      "required": {
+        "amount": "1000000",
+        "currency": "USD"
+      }
+    }
+  ],
   "properties": {
     "posted": {
       "$ref": "#/$defs/Money"

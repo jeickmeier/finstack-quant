@@ -805,6 +805,24 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Derived total, annualized and per-factor returns of a horizon result.",
+  "examples": [
+    {
+      "annualized_return": 0.157503064883,
+      "currency": "USD",
+      "factor_contributions": {
+        "carry": 0.0125,
+        "correlations": 0.0,
+        "credit_curves": 0.0,
+        "fx": 0.0,
+        "inflation_curves": 0.0,
+        "market_scalars": 0.0,
+        "model_parameters": 0.0,
+        "rates_curves": 0.0,
+        "volatility": 0.0
+      },
+      "total_return": 0.0125
+    }
+  ],
   "properties": {
     "annualized_return": {
       "description": "Annualized total return as a decimal fraction; `None` without a time\nroll or when the total return is undefined.",

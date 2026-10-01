@@ -93,6 +93,81 @@
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/carino_linked_attribution.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Compounded portfolio vs.",
+  "examples": [
+    {
+      "benchmark_return_compounded": 0.03528125,
+      "linked_allocation": 0.00100875127582,
+      "linked_interaction": 0.00305924952157,
+      "linked_sectors": [
+        {
+          "allocation": 0.000504375637909,
+          "interaction": 0.00203949968105,
+          "sector": "Technology",
+          "selection": 0.0101974984052,
+          "total": 0.0127413737242
+        },
+        {
+          "allocation": 0.000504375637909,
+          "interaction": 0.00101974984052,
+          "sector": "Utilities",
+          "selection": -0.00509874920261,
+          "total": -0.00357462372418
+        }
+      ],
+      "linked_selection": 0.00509874920261,
+      "periods": [
+        {
+          "benchmark_return": 0.0225,
+          "portfolio_return": 0.028,
+          "sectors": [
+            {
+              "allocation": 0.00075,
+              "interaction": 0.001,
+              "sector": "Technology",
+              "selection": 0.005,
+              "total": 0.00675
+            },
+            {
+              "allocation": 0.00075,
+              "interaction": 0.0005,
+              "sector": "Utilities",
+              "selection": -0.0025,
+              "total": -0.00125
+            }
+          ],
+          "total_allocation": 0.0015,
+          "total_excess_return": 0.0055,
+          "total_interaction": 0.0015,
+          "total_selection": 0.0025
+        },
+        {
+          "benchmark_return": 0.0125,
+          "portfolio_return": 0.016,
+          "sectors": [
+            {
+              "allocation": -0.00025,
+              "interaction": 0.001,
+              "sector": "Technology",
+              "selection": 0.005,
+              "total": 0.00575
+            },
+            {
+              "allocation": -0.00025,
+              "interaction": 0.0005,
+              "sector": "Utilities",
+              "selection": -0.0025,
+              "total": -0.00225
+            }
+          ],
+          "total_allocation": -0.0005,
+          "total_excess_return": 0.0035,
+          "total_interaction": 0.0015,
+          "total_selection": 0.0025
+        }
+      ],
+      "portfolio_return_compounded": 0.044448
+    }
+  ],
   "properties": {
     "benchmark_return_compounded": {
       "description": "Geometrically compounded benchmark return.",

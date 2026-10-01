@@ -469,6 +469,15 @@
   "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration_validation_report.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Structural validation findings and the static step dependency graph.",
+  "examples": [
+    {
+      "dependency_graph": {
+        "initial_ids": [],
+        "nodes": []
+      },
+      "errors": []
+    }
+  ],
   "properties": {
     "dependency_graph": {
       "$ref": "#/$defs/DependencyGraph",
