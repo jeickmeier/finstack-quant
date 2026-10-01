@@ -477,6 +477,122 @@ export type ReplayResult = WithFields<generated.portfolio.ReplayResult, { steps:
 export type PortfolioOptimizationResult = generated.portfolio.PortfolioOptimizationResultWire;
 
 /**
+ * A dated amount (Rust `DatedFlowJson`); in `cashflows.scheduleOutstandingByDate`
+ * the amount is the outstanding balance after that date's flows.
+ */
+export interface DatedFlowJson {
+  /**
+   * ISO-8601 date at which the requested value or market quote applies.
+   */
+  date: string;
+  /**
+   * Amount with its currency.
+   */
+  amount: MoneyValue;
+}
+
+/**
+ * Calendar-year cashflow totals (Rust `CalendarYearLadderRow`).
+ */
+export interface CalendarYearLadderRow {
+  /**
+   * Calendar year of the grouped flows.
+   */
+  year: number;
+  /**
+   * Sum of non-principal amounts (interest, fees, recovery, ...) in that year.
+   */
+  non_principal: number;
+  /**
+   * Sum of principal-like amounts in that year.
+   */
+  principal: number;
+  /**
+   * Sum of present values in that year.
+   */
+  pv: number;
+}
+
+/**
+ * Projected facility and residual cashflows of an asset-backed facility
+ * (Rust `FacilityProjection`).
+ */
+export interface FacilityProjection {
+  /**
+   * Interest and principal paid to the facility note.
+   */
+  facility: Record<string, unknown>;
+  /**
+   * Cash paid to the residual class.
+   */
+  residual: Record<string, unknown>;
+  /**
+   * Commitment fees as `[isoDate, Money]` pairs.
+   */
+  commitment_fees: [string, MoneyValue][];
+  /**
+   * Lender draws (scheduled draws and re-advances) as `[isoDate, Money]` pairs.
+   */
+  draws: [string, MoneyValue][];
+  /**
+   * Per-period record of the synthetic structured-credit deal.
+   */
+  diagnostics: Record<string, unknown>;
+}
+
+/**
+ * Return-contribution attribution result (Rust `ReturnContributionResult`).
+ */
+export interface ReturnContributionResult {
+  /**
+   * Total portfolio return, equal to the summed instrument contributions.
+   */
+  portfolio_return: number;
+  /**
+   * Per-instrument contribution rows.
+   */
+  instrument_contribution: Record<string, unknown>[];
+  /**
+   * Contribution rows by group dimension.
+   */
+  group_contribution: Record<string, Record<string, unknown>[]>;
+  /**
+   * Factor contribution rows.
+   */
+  factor_contribution: Record<string, unknown>[];
+  /**
+   * Idiosyncratic residual when factors are supplied.
+   */
+  specific_return?: number;
+  /**
+   * Benchmark-relative (Brinson) attribution when a benchmark is supplied.
+   */
+  benchmark_relative?: Record<string, unknown>;
+  /**
+   * Diagnostic warnings.
+   */
+  warnings?: string[];
+}
+
+/**
+ * One decoded series entry of `portfolio.portfolioMetricsSeries`.
+ */
+export interface PortfolioMetricSeriesEntry {
+  /**
+   * Decoded key components after the base metric (e.g. `["USD-OIS", "10y"]`).
+   */
+  components: string[];
+  /**
+   * Portfolio total for this entry.
+   */
+  total: number;
+  /**
+   * Totals by entity id.
+   */
+  by_entity: Record<string, number>;
+}
+
+/**
  * Horizon total return (Rust `HorizonReport`): the `HorizonResult` fields plus its derived `summary`.
  */
 export type HorizonReport = HorizonResult & { summary: HorizonSummary };
@@ -5366,6 +5482,45 @@ export interface CashflowsNamespace {
    * @throws If `mdr` is negative, non-finite, or above 1.0.
    */
   mdrToCdr(mdr: number): number;
+
+  /**
+   * Convert an ABS speed to the single-month mortality for a seasoning month.
+   *
+   * @param speed - Monthly prepayment as a decimal fraction of the original balance (`0.015` = 1.5% ABS), in `[0, 1]`.
+   * @param month - Seasoning month counted from origination (non-negative integer).
+   * @returns Single-month mortality as a decimal in `[0, 1]`.
+   * @throws If `speed` is non-finite or outside `[0, 1]` (kind `validation`), or `month` is not a non-negative integer (kind `invalid_type`).
+   */
+  absToSmm(speed: number, month: number): number;
+
+  /**
+   * Weighted average life of a schedule, in years from `asOf`.
+   *
+   * @param scheduleJson - `CashFlowSchedule` (object or JSON).
+   * @param asOf - ISO-8601 measurement date; only principal flows strictly after it count.
+   * @returns WAL in years; `0` when no principal flow falls after `asOf`.
+   * @throws If the schedule or date is malformed or the schedule fails validation (kind `validation`).
+   */
+  scheduleWal(scheduleJson: JsonInput, asOf: string): number;
+
+  /**
+   * Outstanding principal balance after each unique date of a schedule.
+   *
+   * @param scheduleJson - `CashFlowSchedule` (object or JSON) with `meta.issue_date` set.
+   * @returns `{ date, amount }` entries in date order; `amount` is the outstanding balance after that date's flows.
+   * @throws If the schedule is malformed or fails validation, `meta.issue_date` is unset, or principal flows mix currencies (kind `validation`).
+   */
+  scheduleOutstandingByDate(scheduleJson: JsonInput): DatedFlowJson[];
+
+  /**
+   * Calendar-year non-principal / principal / PV ladder of a schedule.
+   *
+   * @param scheduleJson - `CashFlowSchedule` (object or JSON).
+   * @param pvs - Present value of each schedule flow, one per flow in schedule order, in flow-amount units.
+   * @returns `{ year, non_principal, principal, pv }` rows in ascending year order.
+   * @throws If the schedule is malformed or fails validation, `pvs` does not have one entry per flow, or a value is non-finite (kind `validation`).
+   */
+  scheduleCalendarYearLadder(scheduleJson: JsonInput, pvs: number[] | Float64Array): CalendarYearLadderRow[];
 }
 
 /**
@@ -5510,6 +5665,23 @@ export interface Bond extends WasmOwned {
    * @throws Error - Throws with kind `validation` if `stub` is not a known stub policy.
    */
   withStub(stub: 'none' | 'short_front' | 'short_back' | 'long_front' | 'long_back'): Bond;
+  /**
+   * Return a copy of this bond with a minimum-MOIC return floor.
+   *
+   * Mirrors Rust `Bond::min_moic`; the receiver is not modified.
+   * @param multiple - Minimum multiple of invested capital the holder receives (e.g. `1.3` for 1.3x), validated by the bond on use.
+   * @returns A new bond carrying the return floor.
+   * @throws Error - Throws with kind `invalid_type` if `multiple` is not a number.
+   */
+  minMoic(multiple: number): Bond;
+  /**
+   * Return a copy of this bond with a minimum-IRR (XIRR) return floor.
+   *
+   * Mirrors Rust `Bond::min_xirr`; the receiver is not modified.
+   * @param rate - Target annualized IRR (e.g. `Rate.fromPercent(12)`).
+   * @returns A new bond carrying the return floor.
+   */
+  minXirr(rate: Rate): Bond;
 }
 
 /**
@@ -5625,6 +5797,79 @@ export interface BondConstructor {
    * @throws If the JSON is malformed, has a different instrument type, or fails validation.
    */
   fromJson(json: JsonInput): Bond;
+  /**
+   * Create a floating-rate bond (FRN) from a named market convention preset.
+   *
+   * Mirrors Rust `Bond::floating_with_convention`: calendar, business-day
+   * convention, settlement lag and stub rule come from the preset.
+   * @param id - Unique instrument identifier.
+   * @param notional - Principal amount of the bond.
+   * @param forwardCurveId - Forward curve identifier (e.g. `"USD-SOFR-3M"`).
+   * @param spreadBp - Spread over the index in whole basis points.
+   * @param issueDate - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
+   * @param maturity - Maturity date as an ISO-8601 string (`"YYYY-MM-DD"`).
+   * @param frequency - Payment frequency (e.g. `Tenor.quarterly()`).
+   * @param dayCount - Day count convention (e.g. `DayCount.act360()`).
+   * @param convention - Bond convention preset: `us_treasury`, `us_agency`, `german_bund`, `uk_gilt`, `french_oat`, `jgb`, `us_corporate`, or `eur_corporate`.
+   * @param discountCurveId - Discount curve identifier used for pricing.
+   * @returns The validated floating-rate note.
+   * @throws Error - Throws with kind `validation` if `convention` is not a known preset, a date is malformed, or bond validation fails.
+   */
+  floatingWithConvention(
+    id: string,
+    notional: Money,
+    forwardCurveId: string,
+    spreadBp: Bps,
+    issueDate: string,
+    maturity: string,
+    frequency: Tenor,
+    dayCount: DayCount,
+    convention:
+      | 'us_treasury'
+      | 'us_agency'
+      | 'german_bund'
+      | 'uk_gilt'
+      | 'french_oat'
+      | 'jgb'
+      | 'us_corporate'
+      | 'eur_corporate',
+    discountCurveId: string
+  ): Bond;
+  /**
+   * Create a zero-coupon bond that pays `notional` at maturity (mirrors Rust `Bond::zero_coupon`).
+   * @param id - Unique instrument identifier.
+   * @param notional - Principal repaid at maturity.
+   * @param issueDate - Issue date as an ISO-8601 string (`"YYYY-MM-DD"`).
+   * @param maturity - Maturity date as an ISO-8601 string (`"YYYY-MM-DD"`).
+   * @param discountCurveId - Discount curve identifier used for pricing.
+   * @returns The validated zero-coupon bond.
+   * @throws Error - Throws with kind `validation` if a date is malformed or bond validation fails (e.g. maturity not after issue_date).
+   */
+  zeroCoupon(id: string, notional: Money, issueDate: string, maturity: string, discountCurveId: string): Bond;
+  /**
+   * Canonical example bond (mirrors Rust `Bond::example`): a 10-year US Treasury, USD 1,000,000 at 4.25%.
+   * @returns The example bond.
+   * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+   */
+  example(): Bond;
+  /**
+   * Canonical example floating-rate note (mirrors Rust `Bond::example_floating`): USD SOFR 3M + 150bp.
+   * @returns The example floating-rate note.
+   * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+   */
+  exampleFloating(): Bond;
+  /**
+   * Canonical example callable bond (mirrors Rust `Bond::example_callable`).
+   * @returns The example callable bond.
+   * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+   */
+  exampleCallable(): Bond;
+  /**
+   * Canonical example amortizing bond (mirrors Rust `Bond::example_amortizing`).
+   * @returns The example amortizing bond.
+   * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+   */
+  exampleAmortizing(): Bond;
 }
 
 /**
@@ -5688,6 +5933,18 @@ export interface TermLoanConstructor {
    * @throws If construction fails (should not occur).
    */
   example(): TermLoan;
+  /**
+   * Canonical example floating-rate term loan with a delayed-draw tranche (mirrors Rust `TermLoan::example_floating_with_ddtl`).
+   * @returns The example loan.
+   * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+   */
+  exampleFloatingWithDdtl(): TermLoan;
+  /**
+   * Canonical example callable term loan (mirrors Rust `TermLoan::example_callable`).
+   * @returns The example loan.
+   * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+   */
+  exampleCallable(): TermLoan;
 }
 
 /**
@@ -5718,6 +5975,39 @@ export interface AssetBackedFacility extends WasmOwned {
    * @throws If the borrowing-base rules are malformed.
    */
   borrowingBase(): BorrowingBaseReport;
+  /**
+   * The two-class structured-credit deal the engine runs for this facility (mirrors Rust `AssetBackedFacility::synthesized_deal`): facility note plus residual, borrowing-base test, reinvestment window, early-amortization rules and the term-out call.
+   * @returns Canonical `finstack_quant.instrument/1` envelope JSON of type `structured_credit`, accepted by `priceInstrument`.
+   * @throws Error - Throws with kind `validation` if the facility or the synthetic deal fails validation.
+   */
+  synthesizedDealJson(): string;
+  /**
+   * Undrawn commitment at closing: `commitment - drawn`.
+   * @returns Undrawn amount in the commitment currency.
+   * @throws Error - Throws with kind `validation` if commitment and drawn amounts differ in currency.
+   */
+  readonly undrawn: Money;
+  /**
+   * Effective end of revolving: the scheduled `revolving_end` or the earliest scheduled date amortization event, whichever is first.
+   * @returns ISO-8601 date string (`"YYYY-MM-DD"`).
+   */
+  readonly effectiveRevolvingEnd: string;
+  /**
+   * Project the facility and residual cashflows through the synthetic two-class structured-credit deal (mirrors Rust `AssetBackedFacility::project`).
+   * @param marketJson - Serialized `MarketContext` with the curves and fixings the collateral and facility coupon project from.
+   * @param asOf - Valuation date as an ISO-8601 string; the projection starts here.
+   * @returns Plain `FacilityProjection` object: `facility` and `residual` tranche cashflows, `commitment_fees` and `draws` as `[date, Money]` pairs, and the per-period `diagnostics`.
+   * @throws Error - Throws with kind `validation` if the facility fails validation or an input is malformed, and kind `not_found` if market data is missing.
+   */
+  project(marketJson: JsonInput, asOf: string): FacilityProjection;
+  /**
+   * Lender IRR: XIRR of `-drawn` on `asOf` against every projected interest, principal and fee receipt (mirrors Rust `AssetBackedFacility::facility_irr`).
+   * @param marketJson - Serialized `MarketContext` with the curves and fixings for the projection.
+   * @param asOf - Valuation date as an ISO-8601 string; the investment is dated here.
+   * @returns Annual IRR as a decimal (`0.08` = 8%).
+   * @throws Error - Throws with kind `validation` if an input is malformed, kind `not_found` if market data is missing, and kind `computation` if the XIRR does not converge.
+   */
+  facilityIrr(marketJson: JsonInput, asOf: string): number;
 }
 
 /**
@@ -5791,6 +6081,18 @@ export interface RevolvingCredit extends WasmOwned {
    * @throws If the market JSON or date is malformed, a required curve or fixing is missing, or the facility has a deterministic draw schedule (only stochastic facilities simulate paths).
    */
   priceWithPaths(marketJson: JsonInput, asOf: string): EnhancedMonteCarloResult;
+  /**
+   * Whether the draw/repay schedule is stochastic (Monte Carlo) rather than deterministic (mirrors Rust `RevolvingCredit::is_stochastic`).
+   */
+  readonly isStochastic: boolean;
+  /**
+   * Cashflow schedule of the facility: the contractual schedule for a deterministic draw/repay spec, the path-averaged schedule for a stochastic one.
+   * @param marketJson - Serialized `MarketContext` with the curves the schedule projects from.
+   * @param asOf - Valuation date as an ISO-8601 string; flows are projected from here.
+   * @returns Plain `CashFlowSchedule` object with dated interest, fee and principal flows from the lender's perspective (draws negative, repayments positive).
+   * @throws Error - Throws with kind `validation` if the facility fails validation or an input is malformed, and kind `not_found` if a required curve is missing.
+   */
+  expectedCashflows(marketJson: JsonInput, asOf: string): generated.valuations.CashFlowSchedule;
 }
 
 /**
@@ -6017,6 +6319,36 @@ export interface ValuationInstrumentsNamespace {
     model: string
   ): string;
   /**
+   * Per-flow cashflow envelope for an instrument, as a plain object (typed twin of `instrumentCashflowsJson`; `JSON.stringify` of the result equals that string).
+   * @param instrumentJson - Required `finstack_quant.instrument/1` envelope.
+   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param model - Must be `"discounting"` or `"hazard_rate"`; `"default"` is not accepted.
+   * @returns `InstrumentCashflowEnvelope` with one row per flow and the total PV.
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON or `asOf` is invalid, `model` is unsupported or incompatible with the instrument, a bond with embedded exercise rights is requested under a static cashflow model, required curves are missing, the schedule mixes currencies, or canonical pricing fails.
+   */
+  instrumentCashflows(
+    instrumentJson: JsonInput,
+    marketJson: JsonInput,
+    asOf: string,
+    model: string
+  ): generated.valuations.InstrumentCashflowEnvelope;
+  /**
+   * Per-flow cashflow envelope using a pre-parsed `core.MarketContext` handle, as a plain object (typed twin of `instrumentCashflowsWithMarketJson`).
+   * @param instrumentJson - Canonical instrument envelope JSON in the Finstack v1 schema.
+   * @param market - Pre-parsed `core.MarketContext` handle supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param model - Must be `"discounting"` or `"hazard_rate"`; `"default"` is not accepted.
+   * @returns `InstrumentCashflowEnvelope` with one row per flow and the total PV.
+   * @throws Error - Throws a JavaScript exception if `instrumentJson` or `asOf` is invalid, `model` is unsupported or incompatible with the instrument, a bond with embedded exercise rights is requested under a static cashflow model, required curves are missing, the schedule mixes currencies, or canonical pricing fails.
+   */
+  instrumentCashflowsWithMarket(
+    instrumentJson: JsonInput,
+    market: MarketContext,
+    asOf: string,
+    model: string
+  ): generated.valuations.InstrumentCashflowEnvelope;
+  /**
    * List every pricing model key registered in the standard pricer registry.
    *
    * The list is registry-derived rather than enum-derived, so it reflects real
@@ -6229,6 +6561,87 @@ export interface FxInstrument extends WasmOwned {
     metricPricingOverrides?: JsonInput | null,
     marketHistory?: JsonInput | null
   ): ValuationResult;
+  /**
+   * Compute one metric of this FX instrument against the supplied market.
+   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param metricId - Fully qualified metric identifier, e.g. `"delta"` or `"dv01"`.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @returns The metric value in the metric's documented unit.
+   * @throws Error - Throws if an input is invalid, the metric is not defined for this instrument, required market data is missing (kind `not_found`), or the computation fails.
+   */
+  metric(marketJson: JsonInput, asOf: string, metricId: string, model?: string | null): number;
+}
+
+/**
+ * FX forward handle with the Rust forward-rate helpers.
+ */
+export interface FxForwardInstrument extends FxInstrument {
+  /**
+   * Return a copy whose contract rate is `spotRate + forwardPoints` (mirrors Rust `FxForward::with_forward_points`).
+   * @param spotRate - Spot rate, quote currency per unit of base currency; must be positive.
+   * @param forwardPoints - Forward points in rate units, added to `spotRate`.
+   * @returns A new forward with the contract rate set.
+   * @throws Error - Throws with kind `validation` if `spotRate` is not positive and finite or the resulting rate is not positive.
+   */
+  withForwardPoints(spotRate: number, forwardPoints: number): FxForwardInstrument;
+  /**
+   * Return a copy whose contract rate is `spotRate + pips * pipSize` (mirrors Rust `FxForward::with_forward_pips`).
+   * @param spotRate - Spot rate, quote currency per unit of base currency; must be positive.
+   * @param pips - Forward points quoted in pips.
+   * @returns A new forward with the contract rate set.
+   * @throws Error - Throws with kind `validation` if `pips` or `spotRate` is not finite or the resulting rate is not positive.
+   */
+  withForwardPips(spotRate: number, pips: number): FxForwardInstrument;
+  /**
+   * Covered-interest-parity forward rate implied by the market (mirrors Rust `FxForward::market_forward_rate`).
+   * @param marketJson - Serialized `MarketContext` carrying both discount curves and the FX spot.
+   * @param asOf - Valuation date as an ISO-8601 string.
+   * @returns Forward rate, quote currency per unit of base currency.
+   * @throws Error - Throws with kind `not_found` if a discount curve or the FX spot is missing, and kind `validation` if an input is malformed.
+   */
+  marketForwardRate(marketJson: JsonInput, asOf: string): number;
+}
+
+/**
+ * Optional arguments of `FxForward.fromTradeDate`; omitted fields take the Rust defaults.
+ */
+export interface FxForwardFromTradeDateOptions {
+  /**
+   * Base-currency holiday calendar; omitted uses weekends only.
+   */
+  base_calendar_id?: string | null;
+  /**
+   * Quote-currency holiday calendar; omitted uses weekends only.
+   */
+  quote_calendar_id?: string | null;
+  /**
+   * T+N spot lag in business days; omitted uses the pair's market standard.
+   */
+  settlement_days?: number | null;
+  /**
+   * Maturity roll rule (serde name, e.g. `"modified_following"`); omitted uses Modified Following.
+   */
+  business_day_convention?: string | null;
+  /**
+   * Apply the FX end-of-month rule when spot falls on month end (default `false`).
+   */
+  end_of_month?: boolean;
+}
+
+/**
+ * Vanilla FX option handle: the option Greeks plus implied volatility.
+ */
+export interface FxVanillaOptionInstrument extends FxOptionInstrument {
+  /**
+   * Implied volatility that reproduces `targetPrice` (mirrors Rust `FxOption::implied_vol`, Garman–Kohlhagen inversion).
+   * @param marketJson - Serialized `MarketContext` carrying both discount curves and the FX spot.
+   * @param asOf - Valuation date as an ISO-8601 string.
+   * @param targetPrice - Observed option PV in quote currency, on the same scale as `price`.
+   * @returns Annualized lognormal volatility as a decimal (`0.10` = 10%).
+   * @throws Error - Throws with kind `not_found` if a curve or the spot is missing, kind `validation` if an input is malformed, and kind `computation` if the root search does not converge.
+   */
+  impliedVol(marketJson: JsonInput, asOf: string, targetPrice: number): number;
 }
 
 /**
@@ -6475,6 +6888,108 @@ export interface FxInstrumentConstructor<T extends FxInstrument> {
 }
 
 /**
+ * Constructor surface of `FxForward`: the FX constructors plus the Rust presets.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const forward = valuations.fx.FxForward.example().withForwardPoints(1.1, 0.002);
+ * console.log(valuations.fx.FxForward.standardSettlementDays("EUR", "USD"), forward.id);
+ * forward.free();
+ * ```
+ */
+export interface FxForwardConstructor extends FxInstrumentConstructor<FxForwardInstrument> {
+  /**
+   * Canonical example forward (mirrors Rust `FxForward::example`): EUR/USD, EUR 1,000,000 at 1.12.
+   * @returns The example forward.
+   * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+   */
+  example(): FxForwardInstrument;
+  /**
+   * Market-standard spot lag in business days for a currency pair (mirrors Rust `FxForward::standard_settlement_days`).
+   * @param base - Base (foreign) currency ISO code.
+   * @param quote - Quote (domestic) currency ISO code.
+   * @returns Spot lag in business days (1 or 2).
+   * @throws Error - Throws with kind `validation` if a currency code is not ISO-4217.
+   */
+  standardSettlementDays(base: string, quote: string): number;
+  /**
+   * Build an at-market forward from a trade date and a standard FX tenor (mirrors Rust `FxForward::from_trade_date`).
+   * @param id - Unique instrument identifier.
+   * @param baseCurrency - Base (foreign) currency ISO code; the notional currency.
+   * @param quoteCurrency - Quote (domestic) currency ISO code.
+   * @param tradeDate - Trade date as an ISO-8601 string (`"YYYY-MM-DD"`).
+   * @param tenor - Standard FX tenor from spot (e.g. `Tenor.parse("3M")`).
+   * @param notional - Notional in `baseCurrency`.
+   * @param domesticDiscountCurveId - Quote-currency discount curve identifier.
+   * @param foreignDiscountCurveId - Base-currency discount curve identifier.
+   * @param options - Optional `{ base_calendar_id?, quote_calendar_id?, settlement_days?, business_day_convention?, end_of_month? }`; `business_day_convention` uses the serde names (e.g. `"modified_following"`).
+   * @returns The validated forward without a contract rate; chain `withForwardPoints` / `withForwardPips` to fix it.
+   * @throws Error - Throws with kind `validation` if a currency, date or option is malformed, the currencies coincide, or the notional currency differs from `baseCurrency`; kind `not_found` if a calendar identifier is unknown.
+   */
+  fromTradeDate(
+    id: string,
+    baseCurrency: string,
+    quoteCurrency: string,
+    tradeDate: string,
+    tenor: Tenor,
+    notional: Money,
+    domesticDiscountCurveId: string,
+    foreignDiscountCurveId: string,
+    options?: FxForwardFromTradeDateOptions | null
+  ): FxForwardInstrument;
+}
+
+/**
+ * Constructor surface of `FxOption`: the FX constructors plus the Rust presets.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const option = valuations.fx.FxOption.example();
+ * console.log(option.id, JSON.parse(option.toJson()).instrument.type);
+ * option.free();
+ * ```
+ */
+export interface FxOptionConstructor extends FxInstrumentConstructor<FxVanillaOptionInstrument> {
+  /**
+   * Canonical example option (mirrors Rust `FxOption::example`): EUR/USD call, strike 1.12, EUR 1,000,000.
+   * @returns The example option.
+   * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+   */
+  example(): FxVanillaOptionInstrument;
+  /**
+   * Build a European FX option with currency-derived OIS curves (mirrors Rust `FxOption::european`).
+   * @param id - Unique instrument identifier.
+   * @param baseCurrency - Base (foreign) currency ISO code; the notional currency.
+   * @param quoteCurrency - Quote (domestic) currency ISO code.
+   * @param strike - Strike, quote currency per unit of base currency.
+   * @param expiry - Expiry date as an ISO-8601 string.
+   * @param notional - Notional in `baseCurrency`.
+   * @param volSurfaceId - FX volatility surface identifier.
+   * @param optionType - `"call"` or `"put"` on the base currency.
+   * @param deltaConventionKind - `"spot"`, `"forward"`, `"premium_adjusted_spot"` or `"premium_adjusted_forward"`.
+   * @param premiumCurrency - ISO code of the premium currency (base or quote).
+   * @param venue - Non-empty market venue or quoting-source identifier.
+   * @returns The validated option.
+   * @throws Error - Throws with kind `validation` if a code, date or enum is malformed, the currencies coincide, the premium currency is neither leg, the venue is blank, or the notional is not positive.
+   */
+  european(
+    id: string,
+    baseCurrency: string,
+    quoteCurrency: string,
+    strike: number,
+    expiry: string,
+    notional: Money,
+    volSurfaceId: string,
+    optionType: 'call' | 'put',
+    deltaConventionKind: 'spot' | 'forward' | 'premium_adjusted_spot' | 'premium_adjusted_forward',
+    premiumCurrency: string,
+    venue: string
+  ): FxVanillaOptionInstrument;
+}
+
+/**
  * Namespaced TypeScript entry points for fx calculations and types.
  * @example
  * ```typescript
@@ -6502,7 +7017,7 @@ export interface FxNamespace {
   /**
    * FX forward instrument constructor.
    */
-  FxForward: FxInstrumentConstructor<FxInstrument>;
+  FxForward: FxForwardConstructor;
   /**
    * FX swap instrument constructor.
    */
@@ -6514,7 +7029,7 @@ export interface FxNamespace {
   /**
    * Vanilla FX option constructor.
    */
-  FxOption: FxInstrumentConstructor<FxOptionInstrument>;
+  FxOption: FxOptionConstructor;
   /**
    * Digital FX option constructor.
    */
@@ -8304,6 +8819,20 @@ export interface CalibrationNamespace {
     market: MarketContext,
     asOf: string
   ): number;
+  /**
+   * Canonical content hash of a calibration envelope (twin of Python `CalibrationEnvelope.content_hash`).
+   * @param envelopeJson - `CalibrationEnvelope` (object or JSON).
+   * @returns `"sha256:<hex>"` content hash.
+   * @throws Error - Throws a `CalibrationEnvelopeError` if the envelope is malformed, its schema marker is missing or unsupported, or it contains a non-finite number.
+   */
+  calibrationEnvelopeContentHash(envelopeJson: CalibrationEnvelope | string): string;
+  /**
+   * Canonical content hash of a calibration result envelope (twin of Python `CalibrationResult.content_hash`).
+   * @param resultJson - `CalibrationResultEnvelope` returned by `calibrate` (object or JSON).
+   * @returns `"sha256:<hex>"` content hash.
+   * @throws Error - Throws a `CalibrationEnvelopeError` if the result is malformed, exceeds the default load limits, its schema marker is missing or unsupported, or it contains a non-finite number.
+   */
+  calibrationResultContentHash(resultJson: CalibrationResultEnvelope | string): string;
 }
 
 /**
@@ -8366,6 +8895,14 @@ export interface ValuationsNamespace {
    * @throws Error - Throws a JavaScript exception if `result` does not match the `ValuationResult` schema (for example a seed given as a string) or the canonical result cannot be serialized.
    */
   valuationResultToJson(result: ValuationResult): string;
+  /**
+   * Decoded series of one composite base metric from a valuation result (twin of Python `ValuationResult.metric_series`).
+   * @param result - `ValuationResult` object returned by `priceInstrument` (or its canonical JSON); 64-bit fields may be `BigInt`.
+   * @param base - Canonical base metric identifier (e.g. `"bucketed_dv01"`).
+   * @returns `[components, value]` pairs in measure order.
+   * @throws Error - Throws with kind `validation` if `result` does not match the `ValuationResult` schema or `base` is not a canonically encoded metric key.
+   */
+  valuationResultMetricSeries(result: ValuationResult | string, base: string): [string[], number][];
   /**
    * Simulated TARN coupon profile along a deterministic floating-rate path.
    *
@@ -8614,6 +9151,94 @@ export interface AttributionNamespace {
    * @throws Error - Rejects if the default metric identifiers cannot be serialized to JavaScript.
    */
   defaultAttributionMetrics(): string[];
+  /**
+   * Headline P&L bridge: `value(T1) - value(T0)` in one currency (mirrors Python `pnl_bridge`).
+   * @param instrumentJson - Canonical `finstack_quant.instrument/1` envelope (object or JSON).
+   * @param marketT0Json - Canonical MarketContext at the opening date.
+   * @param marketT1Json - Canonical MarketContext at the closing date.
+   * @param asOfT0 - Opening valuation date as an ISO-8601 string.
+   * @param asOfT1 - Closing valuation date as an ISO-8601 string.
+   * @param targetCurrency - ISO-4217 currency of the returned P&L.
+   * @returns The P&L as a `Money` handle in `targetCurrency`.
+   * @throws Error - Throws with kind `validation` if an input is malformed, kind `not_found` if a curve, market item or FX leg is missing, and kind `computation` if pricing fails.
+   */
+  pnlBridge(
+    instrumentJson: JsonInput,
+    marketT0Json: JsonInput,
+    marketT1Json: JsonInput,
+    asOfT0: string,
+    asOfT1: string,
+    targetCurrency: string
+  ): Money;
+  /**
+   * Run one attribution configuration against many instruments (mirrors Python `attribute_pnl_many`).
+   * @param params - AttributionJsonInputs carrying the shared markets, dates, method and configuration.
+   * @param instruments - Array of canonical instrument envelopes (objects or JSON), in output order.
+   * @returns One `PnlAttribution` object per instrument, in input order.
+   * @throws Error - Throws a `FinstackError` with the Rust classification for the first failing instrument (see `attributePnl`), or kind `validation` if an instrument envelope is malformed.
+   */
+  attributePnlMany(params: AttributionJsonInputs, instruments: JsonInput[]): PnlAttribution[];
+  /**
+   * Compute return-contribution attribution from a specification (mirrors Python `attribute_return_contribution`).
+   * @param spec - `ReturnContributionSpec` (object or JSON): positions with weights and returns, weighting scheme and optional benchmark.
+   * @returns Plain `ReturnContributionResult` object.
+   * @throws Error - Throws with kind `validation` if the spec is malformed or violates the weighting/benchmark invariants (including a Brinson group with zero net weight but nonzero contribution).
+   */
+  attributeReturnContribution(spec: JsonInput): ReturnContributionResult;
+  /**
+   * Compute return-contribution attribution and return wire JSON (wire twin of `attributeReturnContribution`).
+   * @param specJson - `ReturnContributionSpec` (object or JSON).
+   * @returns Canonical `ReturnContributionResult` JSON text.
+   * @throws Error - Throws with kind `validation` if the spec is malformed or violates the weighting/benchmark invariants.
+   */
+  attributeReturnContributionJson(specJson: JsonInput): string;
+  /**
+   * Validate a return-contribution specification and return its canonical JSON (mirrors Python `validate_return_contribution_json`).
+   * @param specJson - `ReturnContributionSpec` (object or JSON).
+   * @returns Canonical compact spec JSON.
+   * @throws Error - Throws with kind `validation` if the spec is malformed or violates the weighting/benchmark invariants.
+   */
+  validateReturnContributionJson(specJson: JsonInput): string;
+  /**
+   * Human-readable tree explanation of an attribution, non-zero factors only (twin of Python `PnlAttribution.explain`).
+   * @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
+   * @returns Multi-line tree text.
+   * @throws Error - Throws with kind `validation` if `pnl` is not a `PnlAttribution`.
+   */
+  pnlAttributionExplainText(pnl: PnlAttribution | string): string;
+  /**
+   * Verbose tree explanation of an attribution, including zero-valued factors (twin of Python `PnlAttribution.explain_verbose`).
+   * @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
+   * @returns Multi-line tree text.
+   * @throws Error - Throws with kind `validation` if `pnl` is not a `PnlAttribution`.
+   */
+  pnlAttributionExplainVerboseText(pnl: PnlAttribution | string): string;
+  /**
+   * Whether the attribution residual is within tolerance (twin of Python `PnlAttribution.residual_within_tolerance`).
+   * @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
+   * @param pctTolerance - Optional percentage tolerance (`0.1` = 0.1%); omitted uses the run's `meta.tolerance_pct`.
+   * @param absTolerance - Optional absolute tolerance in `total_pnl` currency units; omitted uses `meta.tolerance_abs`.
+   * @returns `true` when the residual is within tolerance.
+   * @throws Error - Throws with kind `validation` if `pnl` is not a `PnlAttribution`, and kind `invalid_type` if a tolerance is not a number.
+   */
+  pnlAttributionResidualWithinTolerance(
+    pnl: PnlAttribution | string,
+    pctTolerance?: number | null,
+    absTolerance?: number | null
+  ): boolean;
+  /**
+   * Check that every factor's currency matches the total P&L currency (twin of Python `PnlAttribution.validate_currencies`).
+   * @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
+   * @throws Error - Throws with kind `validation` if `pnl` is not a `PnlAttribution` or a factor is denominated in another currency.
+   */
+  pnlAttributionValidateCurrencies(pnl: PnlAttribution | string): void;
+  /**
+   * Metric identifiers the attribution's method needs pre-computed (twin of Python `PnlAttribution.required_metrics`).
+   * @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
+   * @returns Canonical metric identifiers.
+   * @throws Error - Throws with kind `validation` if `pnl` is not a `PnlAttribution`.
+   */
+  pnlAttributionRequiredMetrics(pnl: PnlAttribution | string): string[];
 }
 
 /**
@@ -8735,6 +9360,68 @@ export interface StatementsNamespace {
    */
   evaluateMonteCarlo(modelJson: JsonInput, configJson: JsonInput): MonteCarloResults;
   /**
+   * Export one evaluated node as a dated schedule (twin of Python `StatementResult.to_dated_schedule`).
+   * @param modelJson - The `FinancialModelSpec` that produced the result (its periods supply the dates).
+   * @param resultJson - The `StatementResult` returned by `evaluateModel` / `evaluateModelWithMarket` (object or JSON).
+   * @param nodeId - Node identifier to export.
+   * @param convention - Optional `"end"` (default: the period's last inclusive day, `end - 1 day`, since periods are half-open `[start, end)`) or `"start"`.
+   * @returns `[isoDate, value]` pairs in timeline order, in the node's own units.
+   * @throws Error - Throws with kind `not_found` if `nodeId` has no values in the result, and kind `validation` if an input is malformed or `convention` is not `"start"` / `"end"`.
+   */
+  nodeToDatedSchedule(
+    modelJson: JsonInput,
+    resultJson: StatementResult | string,
+    nodeId: string,
+    convention?: 'end' | 'start' | null
+  ): [string, number][];
+  /**
+   * Probability that a metric exceeds a threshold in any forecast period (twin of Python `MonteCarloResults.breach_probability`).
+   * @param resultsJson - `MonteCarloResults` returned by `evaluateMonteCarlo` (object or JSON).
+   * @param metric - Node identifier to test.
+   * @param threshold - Breach level in the metric's own units.
+   * @returns Fraction of paths that breach in at least one forecast period, or `undefined` when the metric has no path data (including results run without `include_path_data`), there are no forecast periods, or the simulation is incomplete.
+   * @throws Error - Throws with kind `validation` if the results input is malformed, and kind `invalid_type` if `threshold` is not a number.
+   */
+  monteCarloBreachProbability(
+    resultsJson: MonteCarloResults | string,
+    metric: string,
+    threshold: number
+  ): number | undefined;
+  /**
+   * Percentile time series of one metric across the forecast periods (twin of Python `MonteCarloResults.percentile_by_period`).
+   * @param resultsJson - `MonteCarloResults` returned by `evaluateMonteCarlo` (object or JSON).
+   * @param metric - Node identifier to read.
+   * @param percentile - Percentile as a fraction in `[0, 1]` (e.g. `0.95`); must be one of the configured percentiles.
+   * @returns Object mapping period id (e.g. `"2025Q1"`) to the percentile value in the metric's own units, or `undefined` when the metric or percentile is not in the results.
+   * @throws Error - Throws with kind `validation` if the results input is malformed, and kind `invalid_type` if `percentile` is not a number.
+   */
+  monteCarloPercentileByPeriod(
+    resultsJson: MonteCarloResults | string,
+    metric: string,
+    percentile: number
+  ): Record<string, number> | undefined;
+  /**
+   * Export a statement result as a long-format table (twin of Python `StatementResult.to_arrow_long`, Rust `StatementResult::to_table_long`).
+   * @param resultJson - The `StatementResult` returned by `evaluateModel` / `evaluateModelWithMarket` (object or JSON).
+   * @returns `TableEnvelope` with columns `node_id`, `period_id`, `value`, `value_money`, `currency`, `value_type`; monetary nodes repeat their value in `value_money` and set `currency`, scalar nodes leave both null.
+   * @throws Error - Throws with kind `validation` if the result input is malformed or table construction fails.
+   */
+  statementResultToTableLong(resultJson: StatementResult | string): TableEnvelope;
+  /**
+   * Export a statement result as a wide-format table (twin of Python `StatementResult.to_arrow_wide`, Rust `StatementResult::to_table_wide`).
+   * @param resultJson - The `StatementResult` returned by `evaluateModel` / `evaluateModelWithMarket` (object or JSON).
+   * @returns `TableEnvelope` with a `period_id` column followed by one value column per node; a node with no value in a period holds `NaN` (serialized as `null`), not zero.
+   * @throws Error - Throws with kind `validation` if the result input is malformed or table construction fails.
+   */
+  statementResultToTableWide(resultJson: StatementResult | string): TableEnvelope;
+  /**
+   * Canonical content hash of a financial model (twin of Python `FinancialModelSpec.content_hash`).
+   * @param modelJson - `FinancialModelSpec` (object or JSON).
+   * @returns `"sha256:<hex>"` content hash.
+   * @throws Error - Throws with kind `validation` if the model is malformed or fails semantic validation, or contains a non-finite number.
+   */
+  financialModelContentHash(modelJson: JsonInput): string;
+  /**
    * Parse a DSL formula and return its canonical source text.
    *
    * The formula is parsed into the statements AST and rendered back through
@@ -8819,6 +9506,29 @@ export interface StatementsAnalyticsNamespace {
    * @throws Error - Rejects malformed model or scenario-set JSON, an empty scenario set, invalid parent chains, overrides of missing nodes, failure to evaluate any scenario, or failure to serialize the result map to JavaScript.
    */
   evaluateScenarioSet(modelJson: JsonInput, scenarioSetJson: JsonInput): ScenarioResults;
+  /**
+   * Scenario comparison table with a `<scenario>_vs_<baseline>_frac` column per non-baseline scenario (twin of Python `ScenarioResults.to_comparison_table`). The baseline is `"base"` when present, otherwise the first scenario.
+   * @param scenarioResultsJson - The scenario map returned by `evaluateScenarioSet` (object or JSON).
+   * @param metrics - Node identifiers to include, in row order within each period.
+   * @returns `TableEnvelope` with `period` and `metric` columns, one value column per scenario and the `_frac` change columns.
+   * @throws Error - Throws with kind `validation` if the results input is malformed, the result set or metric list is empty, or table construction fails.
+   */
+  scenarioComparisonTable(scenarioResultsJson: ScenarioResults | string, metrics: string[]): TableEnvelope;
+  /**
+   * Sensitivity parameter whose perturbations are percentage moves of a base value (twin of Python `ParameterSpec.with_percentages`).
+   * @param nodeId - Node identifier to vary.
+   * @param periodId - Period to vary, e.g. `"2025Q1"`.
+   * @param baseValue - Base value of the node in its own units.
+   * @param pctRange - Percentage moves, e.g. `[-10, 0, 10]` for ±10%.
+   * @returns Plain `ParameterSpec` object (`node_id`, `period_id`, `base_value`, absolute `perturbations`) for a `SensitivityConfig`.
+   * @throws Error - Throws with kind `validation` if `periodId` is not a valid period, and kind `invalid_type` if a number argument is not a number.
+   */
+  parameterSpecWithPercentages(
+    nodeId: string,
+    periodId: string,
+    baseValue: number,
+    pctRange: number[] | Float64Array
+  ): generated.statements_analytics.ParameterSpec;
   /**
    * Compute forecast accuracy metrics (MAE, MAPE, sMAPE, RMSE).
    *
@@ -9367,6 +10077,28 @@ declare class Portfolio {
    */
   readonly baseCurrency: string;
   /**
+   * Human-readable portfolio name, or `null` when unset.
+   */
+  readonly name: string | null;
+  /**
+   * Portfolio-level tags.
+   * @throws Error - Throws a JavaScript exception if the tags cannot be converted to a JavaScript value.
+   */
+  readonly tags: Record<string, string>;
+  /**
+   * Portfolio-level metadata as a JSON-shaped object.
+   * @throws Error - Throws a JavaScript exception if the metadata cannot be converted to a JavaScript value.
+   */
+  readonly meta: Record<string, unknown>;
+  /**
+   * Entity identifiers in registration order.
+   */
+  readonly entityIds: string[];
+  /**
+   * Position identifiers in portfolio order.
+   */
+  readonly positionIds: string[];
+  /**
    * Return the number of positions.
    * @returns Non-negative position count.
    */
@@ -9709,6 +10441,14 @@ export interface PortfolioNamespace {
     asOf: string
   ): PortfolioMetrics;
   /**
+   * Decoded series of one base metric from aggregated portfolio metrics (twin of Python `PortfolioMetrics.metric_series`).
+   * @param metricsJson - `PortfolioMetrics` from `aggregateMetrics` (object or JSON).
+   * @param base - Canonical base metric identifier (e.g. `"bucketed_dv01"`).
+   * @returns `{ components, total, by_entity }` entries in aggregation order.
+   * @throws Error - Throws with kind `validation` if the metrics input is malformed or `base` is not a canonically encoded metric key.
+   */
+  portfolioMetricsSeries(metricsJson: PortfolioMetrics | string, base: string): PortfolioMetricSeriesEntry[];
+  /**
    * Value a portfolio from its spec and market context.
    * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
    * @param specJson - Canonical portfolio specification JSON defining positions, quantities, and base currency.
@@ -9772,6 +10512,31 @@ export interface PortfolioNamespace {
     marketJson: JsonInput,
     allowPartial?: boolean
   ): PortfolioCashflows;
+  /**
+   * Net same-currency cashflow amounts per date from a cashflow ladder (mirrors Python `net_in_currency_by_date`).
+   * @param cashflowsJson - `PortfolioCashflows` from `aggregateFullCashflows` (object or JSON), or a bare `{date: {ccy: {kind: money}}}` map.
+   * @param currency - ISO-4217 code selecting which per-date currency bucket to net.
+   * @returns `[isoDate, netAmount]` pairs sorted by date; dates with no flows in `currency` are omitted.
+   * @throws Error - Throws with kind `validation` if the input is not JSON, `currency` is not a known ISO code, or `by_date` is not an object.
+   */
+  netInCurrencyByDate(cashflowsJson: PortfolioCashflows | string, currency: string): [string, number][];
+  /**
+   * Collapse a multi-currency cashflow ladder into the base currency per date and kind (twin of Python `PortfolioCashflows.collapse_to_base_by_date_kind_json`), converting at the CIP forward from the `asOf` spot.
+   * @param cashflowsJson - `PortfolioCashflows` from `aggregateFullCashflows` (object or JSON).
+   * @param marketJson - Canonical market-context JSON supplying the FX matrix and discount curves.
+   * @param baseCurrency - ISO-4217 reporting currency.
+   * @param asOf - ISO-8601 valuation date for spot FX and the start of each discount interval.
+   * @param discountCurves - Optional `{ currency: curveId }` map; a missing entry uses the ISO code as the curve id.
+   * @returns Nested `{ isoDate: { kind: Money } }` ladder in the base currency.
+   * @throws Error - Throws if an input is malformed, an FX rate or discount factor needed for a conversion is missing or invalid, or monetary aggregation fails.
+   */
+  collapseToBaseByDateKind(
+    cashflowsJson: PortfolioCashflows | string,
+    marketJson: JsonInput,
+    baseCurrency: string,
+    asOf: string,
+    discountCurves?: Record<string, string> | null
+  ): Record<string, Record<string, MoneyValue>>;
   /**
    * Apply a scenario to a portfolio and revalue.
    *
@@ -9846,6 +10611,14 @@ export interface PortfolioNamespace {
    * @throws Error - Throws a JavaScript exception if either JSON input is malformed, the portfolio, objective, constraints, weighting, or missing-metric policy is invalid, a required market-dependent valuation fails, the solver cannot produce a result, or the result cannot be converted to a JavaScript value.
    */
   optimizePortfolio(specJson: JsonInput, marketJson: JsonInput): PortfolioOptimizationResult;
+  /**
+   * Rebalance a spec's portfolio to an optimization result (mirrors Python `rebalance_from_spec`).
+   * @param specJson - The `PortfolioOptimizationSpec` JSON passed to `optimizePortfolio`.
+   * @param resultJson - The `PortfolioOptimizationResult` that `optimizePortfolio` returned for that spec (object or JSON).
+   * @returns The rebalanced, validated `Portfolio` handle.
+   * @throws Error - Throws with kind `validation` if either input is malformed, the solution is infeasible, or the result names a position that is neither in the spec portfolio nor a trade-universe candidate (a result paired with the wrong spec), and propagates portfolio validation failures.
+   */
+  rebalanceFromSpec(specJson: JsonInput, resultJson: PortfolioOptimizationResult | string): Portfolio;
   /**
    * Replay a portfolio through dated market snapshots.
    *

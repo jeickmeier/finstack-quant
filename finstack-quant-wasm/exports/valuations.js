@@ -13,6 +13,7 @@ export const valuations = {
   market,
   validateValuationResultJson: wasm.validateValuationResultJson,
   valuationResultToJson: wasm.valuationResultToJson,
+  valuationResultMetricSeries: wasm.valuationResultMetricSeries,
   tarnCouponProfile: wasm.tarnCouponProfile,
   snowballCouponProfile: wasm.snowballCouponProfile,
   inverseFloaterCouponProfile: wasm.inverseFloaterCouponProfile,

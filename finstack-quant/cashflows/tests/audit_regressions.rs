@@ -480,3 +480,44 @@ fn accrued_interest_preserves_february_termination_on_roundtrip() {
         0.0,
     );
 }
+
+#[test]
+fn schedule_json_analytics_match_typed_schedule_methods() {
+    let schedule = build(spec("2025-01-01", "2026-01-01"));
+    let raw = serde_json::to_string(&schedule).expect("serialize");
+    let as_of = date("2025-01-01");
+
+    close(
+        cf::schedule_wal(&raw, "2025-01-01").expect("wal"),
+        schedule.wal(as_of).expect("typed wal"),
+    );
+
+    let typed = schedule.outstanding_by_date().expect("typed balances");
+    let bridged = cf::schedule_outstanding_by_date(&raw).expect("balances");
+    assert_eq!(bridged.len(), typed.len());
+    for (row, (day, balance)) in bridged.iter().zip(&typed) {
+        assert_eq!(row.date, *day);
+        assert_eq!(row.amount, *balance);
+    }
+
+    let pvs: Vec<f64> = schedule
+        .get_flows()
+        .iter()
+        .map(|f| f.amount.amount())
+        .collect();
+    assert_eq!(
+        cf::schedule_calendar_year_ladder(&raw, &pvs).expect("ladder"),
+        schedule.calendar_year_ladder(&pvs).expect("typed ladder"),
+    );
+    assert!(cf::schedule_calendar_year_ladder(&raw, &pvs[1..]).is_err());
+    assert!(cf::schedule_wal(&raw, "not-a-date").is_err());
+}
+
+#[test]
+fn abs_to_smm_is_reexported_at_the_crate_root() {
+    close(cf::abs_to_smm(0.015, 1).expect("month 1"), 0.015);
+    close(
+        cf::abs_to_smm(0.015, 11).expect("month 11"),
+        0.015 / (1.0 - 0.015 * 10.0),
+    );
+}

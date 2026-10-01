@@ -134,6 +134,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "allocate_weights",
         "allocate_weights_json",
         "optimize_portfolio",
+        "rebalance_from_spec",
         "replay_portfolio",
         "replay_portfolio_json",
         "brinson_fachler",

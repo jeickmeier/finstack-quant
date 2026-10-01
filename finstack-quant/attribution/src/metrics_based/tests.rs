@@ -159,7 +159,7 @@ fn test_metrics_based_carry_matches_theta() {
 
     assert!((attribution.carry.amount() + 5.0).abs() < 1e-9);
     assert!((attribution.total_pnl.amount() + 5.0).abs() < 1e-9);
-    assert!(attribution.residual_within_tolerance(0.01, 0.01));
+    assert!(attribution.residual_within_tolerance(Some(0.01), Some(0.01)));
 }
 
 /// A multi-day window without `ThetaPeriodDays` must fail closed: linear
@@ -566,7 +566,7 @@ fn test_metrics_based_rates_bucketed_dv01() {
     .expect("metrics-based attribution should succeed");
 
     assert!((attribution.rates_curves_pnl.amount() + 400.0).abs() < 1e-6);
-    assert!(attribution.residual_within_tolerance(0.1, 1.0));
+    assert!(attribution.residual_within_tolerance(Some(0.1), Some(1.0)));
 }
 
 #[test]

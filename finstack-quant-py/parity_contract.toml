@@ -347,9 +347,8 @@ python_package = "finstack_quant.cashflows.builder"
 # CashflowRepresentation / PvCreditAdjustment / PvDiscountSource (enum metadata
 # carried inside schedule JSON); evaluate_fee_tiers / FeeTier / DefaultCurve /
 # PrepaymentCurve (spec internals reachable through the spec types); and the
-# credit-rate helpers abs_to_smm / psa_cpr / PSA_RAMP_MONTHS / PSA_TERMINAL_CPR
-# (abs_to_smm is a host-parity gap bound by remediation slice S21).
-note = "cdr_to_mdr/cpr_to_smm/mdr_to_cdr/smm_to_cpr are also re-exported at the Rust crate root and bound flat on finstack_quant.cashflows (their WASM twins are accounted in the [parity] ledger). Typed CashFlowBuilder matches the Rust coupon-program methods (including fixed_to_float and float_margin_steps); WASM remains JSON-only via CouponLegSpec."
+# credit-rate helpers psa_cpr / PSA_RAMP_MONTHS / PSA_TERMINAL_CPR.
+note = "abs_to_smm/cdr_to_mdr/cpr_to_smm/mdr_to_cdr/smm_to_cpr are also re-exported at the Rust crate root and bound flat on finstack_quant.cashflows (their WASM twins are accounted in the [parity] ledger). Typed CashFlowBuilder matches the Rust coupon-program methods (including fixed_to_float and float_margin_steps); WASM remains JSON-only via CouponLegSpec."
 public = [
     "AmortizationSpec", "CashFlowBuilder", "CashFlowMeta", "CashFlowSchedule", "CouponType",
     "DefaultModelSpec", "FeeAccrualBasis", "FeeBase",
@@ -358,7 +357,7 @@ public = [
     "OvernightIndexConstraintApplication", "PrepaymentModelSpec", "PrincipalEvent",
     "PrincipalExchange",
     "RecoveryModelSpec", "RollRule", "ScheduleParams", "StepUpCouponSpec",
-    "cdr_to_mdr", "cpr_to_smm", "mdr_to_cdr",
+    "abs_to_smm", "cdr_to_mdr", "cpr_to_smm", "mdr_to_cdr",
     "merge_cashflow_schedules", "smm_to_cpr",
 ]
 
@@ -1673,6 +1672,7 @@ public = [
     "optimize_portfolio",
     "parse_portfolio_spec_json",
     "position_what_if",
+    "rebalance_from_spec",
     "replay_portfolio",
     "replay_portfolio_json",
     "scenario_pnl",
@@ -1852,7 +1852,7 @@ js_rule_members = { free = "wasm ownership: releases the wasm-bindgen handle", t
 # Ratchet: remaining backlog sizes. Lower these as names are bound; never raise them.
 # S16 moved MarketContext from the module backlog to a bound WASM class: its 29
 # unbound methods now count as member backlog (a reclassification, not growth).
-backlog_ceiling = { modules = 825, members = 327 }
+backlog_ceiling = { modules = 819, members = 286 }
 
 [parity.modules."finstack_quant"]
 js = ""
@@ -1871,10 +1871,6 @@ js = "attribution"
 types = { AttributionResultEnvelope = "AttributionResultEnvelope", PnlAttribution = "PnlAttribution" }
 backlog = [
     "ReturnContributionResult",
-    "attribute_pnl_many",
-    "attribute_return_contribution",
-    "pnl_bridge",
-    "validate_return_contribution_json",
 ]
 
 [parity.modules."finstack_quant.attribution.schema"]
@@ -2726,7 +2722,6 @@ backlog = [
     "factor_stress",
     "grid_attribution_json",
     "grid_carino_link_json",
-    "net_in_currency_by_date",
     "position_what_if",
     "replay_portfolio_json",
     "scenario_pnl_batch",
@@ -2911,9 +2906,7 @@ backlog = [
 [parity.modules."finstack_quant.valuations"]
 js = "valuations"
 types = { ValuationResult = "ValuationResult" }
-backlog = [
-    "instrument_cashflows",
-]
+renames = { instrument_cashflows = { js = "valuations.instruments.instrumentCashflows", reason = "the WASM twin lives with the other instrument entry points and returns the InstrumentCashflowEnvelope plain object; Python returns (envelope dict, DataFrame)" } }
 
 [parity.modules."finstack_quant.valuations.composite"]
 js = "valuations.composite"
@@ -3035,6 +3028,21 @@ backlog = [
 [parity.js."attribution".wasm_only]
 AttributionJsonInputs = "the Rust AttributionJsonInputs fragments as a class (JS has no keyword arguments; Python passes the same fields as attribute_pnl kwargs)"
 attributePnlJson = "JSON wire twin of attribute_pnl (Python returns the typed PnlAttribution)"
+attributeReturnContributionJson = "JSON wire twin of attribute_return_contribution (Rust attribute_return_contribution_json; Python returns the typed ReturnContributionResult)"
+pnlAttributionExplainText = "free-function twin of Python PnlAttribution.explain (member rename)"
+pnlAttributionExplainVerboseText = "free-function twin of Python PnlAttribution.explain_verbose (member rename)"
+pnlAttributionRequiredMetrics = "free-function twin of Python PnlAttribution.required_metrics (member rename)"
+pnlAttributionResidualWithinTolerance = "free-function twin of Python PnlAttribution.residual_within_tolerance (member rename)"
+pnlAttributionValidateCurrencies = "free-function twin of Python PnlAttribution.validate_currencies (member rename)"
+
+[parity.js."calibration".wasm_only]
+calibrationEnvelopeContentHash = "free-function twin of Python CalibrationEnvelope.content_hash (member rename)"
+calibrationResultContentHash = "free-function twin of Python CalibrationResult.content_hash (member rename)"
+
+[parity.js."cashflows".wasm_only]
+scheduleCalendarYearLadder = "JSON-first twin of Python CashFlowSchedule.calendar_year_ladder (Rust schedule_calendar_year_ladder); P2 binds CashFlowSchedule"
+scheduleOutstandingByDate = "JSON-first twin of Python CashFlowSchedule.outstanding_by_date (Rust schedule_outstanding_by_date); P2 binds CashFlowSchedule"
+scheduleWal = "JSON-first twin of Python CashFlowSchedule.wal (Rust schedule_wal); P2 binds CashFlowSchedule"
 
 # WASM has no CsaSpec / VmCalculator class (P4 binds them); these JSON-first
 # free functions are the WASM authoring path. Each is a renamed twin of a Rust
@@ -3076,6 +3084,8 @@ toggleExerciseThresholdJson = "JSON-first twin of Python ToggleExerciseModel.thr
 sviImpliedVol = "JSON-first twin of Python SviParams.implied_vol (P6 binds SviParams)"
 
 [parity.js."portfolio".wasm_only]
+collapseToBaseByDateKind = "free-function twin of Python PortfolioCashflows.collapse_to_base_by_date_kind_json (Rust PortfolioCashflows::collapse_to_base_by_date_kind); P8 binds PortfolioCashflows"
+portfolioMetricsSeries = "free-function twin of Python PortfolioMetrics.metric_series (Rust PortfolioMetrics::metric_series); P8 binds PortfolioMetrics"
 aggregateFullCashflowsBuilt = "WASM handle variant: takes a built Portfolio so repeated calls skip re-parsing"
 applyScenarioAndRevalueBuilt = "WASM handle variant: takes a built Portfolio so repeated calls skip re-parsing"
 computeFactorSensitivitiesWithMarket = "WASM handle variant: takes a parsed core.MarketContext handle"
@@ -3088,6 +3098,12 @@ buildScenarioSpec = "constructor twin of Python ScenarioSpec(...)"
 parseScenarioSpec = "twin of Python ScenarioSpec.from_json (Rust ScenarioSpec::from_json)"
 
 [parity.js."statements".wasm_only]
+financialModelContentHash = "free-function twin of Python FinancialModelSpec.content_hash (Rust FinancialModelSpec::content_hash); P9 binds FinancialModelSpec"
+monteCarloBreachProbability = "free-function twin of Python MonteCarloResults.breach_probability (Rust MonteCarloResults::breach_probability); P9 binds MonteCarloResults"
+monteCarloPercentileByPeriod = "free-function twin of Python MonteCarloResults.percentile_by_period (Rust MonteCarloResults::percentile_by_period); P9 binds MonteCarloResults"
+statementResultToTableLong = "free-function twin of Python StatementResult.to_arrow_long (Rust StatementResult::to_table_long); P9 binds StatementResult"
+statementResultToTableWide = "free-function twin of Python StatementResult.to_arrow_wide (Rust StatementResult::to_table_wide); P9 binds StatementResult"
+nodeToDatedSchedule = "free-function twin of Python StatementResult.to_dated_schedule (Rust evaluator::node_to_dated_schedule); P9 binds StatementResult"
 evaluateModel = "twin of Python Evaluator.evaluate"
 evaluateModelWithMarket = "twin of Python Evaluator.evaluate_with_market"
 evaluateMonteCarlo = "twin of Python Evaluator.evaluate_monte_carlo"
@@ -3100,11 +3116,14 @@ validatePikToggleSpecJson = "JSON wire validation twin of Python PikToggleSpec.f
 validateWaterfallSpecJson = "JSON wire validation twin of the Python typed spec class from_json"
 
 [parity.js."statements_analytics".wasm_only]
+parameterSpecWithPercentages = "free-function twin of Python ParameterSpec.with_percentages (Rust ParameterSpec::with_percentages); P9 binds ParameterSpec"
+scenarioComparisonTable = "free-function twin of Python ScenarioResults.to_comparison_table (Rust ScenarioResults::to_comparison_table); P9 binds ScenarioResults"
 dependencyTree = "free-function twin of Python DependencyTracer.dependency_tree (Rust DependencyTracer::dependency_tree); P9 binds the DependencyTracer class"
 dependencyTreeText = "free-function twin of Python DependencyTracer.dependency_tree_text (Rust DependencyTracer::dependency_tree_text); P9 binds the DependencyTracer class"
 
 [parity.js."valuations".wasm_only]
 validateValuationResultJson = "JSON wire twin of Python ValuationResult.from_json"
+valuationResultMetricSeries = "free-function twin of Python ValuationResult.metric_series (member rename)"
 valuationResultToJson = "twin of Python ValuationResult.to_json (WASM results are plain objects)"
 
 [parity.js."valuations.composite".wasm_only]
@@ -3124,6 +3143,7 @@ Ndf = "typed WASM class; Python has no typed twin yet and prices it through the 
 QuantoOption = "typed WASM class; Python has no typed twin yet and prices it through the instrument JSON"
 
 [parity.js."valuations.instruments".wasm_only]
+instrumentCashflowsWithMarket = "WASM core.MarketContext-handle variant of instrumentCashflows"
 instrumentCashflowsWithMarketJson = "WASM core.MarketContext-handle variant of instrumentCashflowsJson"
 priceInstrumentWithMarket = "WASM core.MarketContext-handle variant of priceInstrument (Python price_instrument takes a MarketContext directly)"
 
@@ -3277,16 +3297,12 @@ backlog = [
 excluded = { positions_to_dataframe = "pandas" }
 backlog = [
     "builder",
-    "entity_ids",
-    "meta",
-    "name",
-    "position_ids",
-    "tags",
     "to_spec_json",
 ]
 wasm_only = { numPositions = "Python twin not yet bound (python backlog)", toJson = "Python twin not yet bound (python backlog)" }
 
 [parity.members."finstack_quant.valuations.instruments.AssetBackedFacility"]
+renames = { synthesized_deal = { js = "synthesizedDealJson", reason = "WASM has no typed StructuredCredit class, so the Rust AssetBackedFacility::synthesized_deal result is returned as its canonical instrument envelope JSON" } }
 backlog = [
     "amortization_events",
     "attributes",
@@ -3304,8 +3320,6 @@ backlog = [
     "discount_curve_id",
     "drawn",
     "draws",
-    "effective_revolving_end",
-    "facility_irr",
     "fees",
     "frequency",
     "liquidation_price_pct",
@@ -3314,16 +3328,13 @@ backlog = [
     "metric",
     "prepayment_spec",
     "price",
-    "project",
     "rate",
     "readvance_to_borrowing_base",
     "recovery_spec",
     "repayment_date",
     "revolving_end",
-    "synthesized_deal",
     "term_out",
     "to_dict",
-    "undrawn",
 ]
 
 [parity.members."finstack_quant.valuations.instruments.Bond"]
@@ -3338,19 +3349,12 @@ backlog = [
     "default_model",
     "discount_curve_id",
     "ex_coupon_days",
-    "example",
-    "example_amortizing",
-    "example_callable",
-    "example_floating",
     "expiry",
-    "floating_with_convention",
     "has_floating_coupons",
     "issue_date",
     "market_dependencies",
     "maturity",
     "metric",
-    "min_moic",
-    "min_xirr",
     "notional",
     "price",
     "price_merton_mc",
@@ -3359,7 +3363,6 @@ backlog = [
     "settlement_convention",
     "settlement_days",
     "to_dict",
-    "zero_coupon",
 ]
 
 [parity.members."finstack_quant.valuations.instruments.FxForward"]
@@ -3371,22 +3374,15 @@ backlog = [
     "contract_rate",
     "default_model",
     "domestic_discount_curve_id",
-    "example",
     "expiry",
     "foreign_discount_curve_id",
-    "from_trade_date",
     "market_dependencies",
-    "market_forward_rate",
     "maturity",
-    "metric",
     "notional",
     "quote_calendar_id",
     "quote_currency",
     "quoted_spot",
-    "standard_settlement_days",
     "to_dict",
-    "with_forward_pips",
-    "with_forward_points",
 ]
 
 [parity.members."finstack_quant.valuations.instruments.FxOption"]
@@ -3398,13 +3394,9 @@ backlog = [
     "default_model",
     "delta_convention",
     "domestic_discount_curve_id",
-    "european",
-    "example",
     "expiry",
     "foreign_discount_curve_id",
-    "implied_vol",
     "market_dependencies",
-    "metric",
     "notional",
     "option_type",
     "quote_currency",
@@ -3427,11 +3419,9 @@ backlog = [
     "discount_curve_id",
     "draw_repay_spec",
     "drawn",
-    "expected_cashflows",
     "expiry",
     "fees",
     "frequency",
-    "is_stochastic",
     "issue_date",
     "lc",
     "leq",
@@ -3466,8 +3456,6 @@ backlog = [
     "ddtl",
     "default_model",
     "discount_curve_id",
-    "example_callable",
-    "example_floating_with_ddtl",
     "expiry",
     "frequency",
     "issue_date",
@@ -3485,23 +3473,17 @@ backlog = [
 ]
 
 [parity.members."finstack_quant.attribution.PnlAttribution"]
-backlog = [
-    "explain",
-    "explain_verbose",
-    "required_metrics",
-    "residual_within_tolerance",
-    "validate_currencies",
-]
+renames = { explain = { js = "attribution.pnlAttributionExplainText", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::explain method is a free function taking the object" }, explain_verbose = { js = "attribution.pnlAttributionExplainVerboseText", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::explain_verbose method is a free function taking the object" }, required_metrics = { js = "attribution.pnlAttributionRequiredMetrics", reason = "WASM attribution results are plain objects; Rust AttributionMethod::required_metrics of meta.method is a free function taking the object" }, residual_within_tolerance = { js = "attribution.pnlAttributionResidualWithinTolerance", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::residual_within_tolerance method is a free function taking the object" }, validate_currencies = { js = "attribution.pnlAttributionValidateCurrencies", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::validate_currencies method is a free function taking the object" } }
 
 [parity.members."finstack_quant.calibration.CalibrationEnvelope"]
+renames = { content_hash = { js = "calibration.calibrationEnvelopeContentHash", reason = "WASM envelopes are plain objects; the Rust CalibrationEnvelope::content_hash method is a free function taking the envelope" } }
 backlog = [
-    "content_hash",
     "dry_run",
 ]
 
 [parity.members."finstack_quant.calibration.CalibrationResult"]
+renames = { content_hash = { js = "calibration.calibrationResultContentHash", reason = "WASM calibration results are plain objects; the Rust CalibrationResultEnvelope::content_hash method is a free function taking the result" } }
 backlog = [
-    "content_hash",
     "residuals",
     "step_report",
     "step_report_json",
@@ -3606,8 +3588,8 @@ backlog = [
 
 [parity.members."finstack_quant.valuations.ValuationResult"]
 excluded = { metric_series_dataframe = "pandas" }
+renames = { metric_series = { js = "valuations.valuationResultMetricSeries", reason = "WASM valuation results are plain objects; the Rust ValuationResult::metric_series method is a free function taking the result" } }
 backlog = [
-    "metric_series",
     "all_covenants_passed",
     "failed_covenants",
     "get_metric",

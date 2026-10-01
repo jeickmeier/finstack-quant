@@ -1,8 +1,10 @@
 //! JSON-serializable helpers for portfolio optimization bindings.
 
+use super::result::rebalance_portfolio;
 use super::{
-    Constraint, DefaultLpOptimizer, MissingMetricPolicy, Objective, PortfolioOptimizationProblem,
-    PortfolioOptimizationResult, TradeUniverse, WeightingScheme,
+    CandidatePosition, Constraint, DefaultLpOptimizer, MissingMetricPolicy, Objective,
+    PortfolioOptimizationProblem, PortfolioOptimizationResult, PortfolioOptimizationResultWire,
+    TradeUniverse, WeightingScheme,
 };
 use crate::error::Result;
 use crate::portfolio::{Portfolio, PortfolioSpec};
@@ -125,4 +127,67 @@ pub fn optimize_from_spec(
 
     let optimizer = DefaultLpOptimizer;
     optimizer.optimize(&problem, market, config)
+}
+
+/// Rebalance a spec's portfolio to a serialized optimization solution.
+///
+/// Wire twin of [`PortfolioOptimizationResult::to_rebalanced_portfolio`] for
+/// results that crossed a host boundary (the wire result does not carry the
+/// live problem): the portfolio is rebuilt from `spec.portfolio`, candidates
+/// come from `spec.trade_universe`, and the same rebalancing rules apply.
+///
+/// # Arguments
+///
+/// * `spec` - The optimization specification that produced `result`; its
+///   portfolio is the starting point and its trade-universe candidates may be
+///   added as new positions.
+/// * `result` - The solver outcome for `spec` (the wire form returned by the
+///   bindings), whose `status`, `implied_quantities` and `optimal_weights`
+///   are applied.
+///
+/// # Returns
+///
+/// A validated portfolio with held quantities set to the implied quantities
+/// and candidates with a non-negligible target weight and quantity added.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::InvalidInput`] if the solution is infeasible or a
+/// key of `result.implied_quantities` / `result.optimal_weights` is neither a
+/// position of `spec.portfolio` nor a trade-universe candidate (a result
+/// paired with the wrong spec), and propagates portfolio-spec and position
+/// validation failures.
+pub fn rebalance_from_spec(
+    spec: &PortfolioOptimizationSpec,
+    result: &PortfolioOptimizationResultWire,
+) -> Result<Portfolio> {
+    let candidates: &[CandidatePosition] = spec
+        .trade_universe
+        .as_ref()
+        .map_or(&[], |universe| universe.candidates.as_slice());
+    let known = |id: &crate::types::PositionId| {
+        spec.portfolio
+            .positions
+            .iter()
+            .any(|p| &p.position_id == id)
+            || candidates.iter().any(|c| &c.id == id)
+    };
+    if let Some(unknown) = result
+        .implied_quantities
+        .keys()
+        .chain(result.optimal_weights.keys())
+        .find(|id| !known(id))
+    {
+        return Err(crate::Error::invalid_input(format!(
+            "optimization result names position '{unknown}', which is neither in the spec \
+             portfolio nor a trade-universe candidate"
+        )));
+    }
+    rebalance_portfolio(
+        Portfolio::from_spec(spec.portfolio.clone())?,
+        candidates,
+        &result.status,
+        &result.implied_quantities,
+        &result.optimal_weights,
+    )
 }

@@ -11,6 +11,12 @@ export const statements = {
   evaluateModel: wasm.evaluateModel,
   evaluateModelWithMarket: wasm.evaluateModelWithMarket,
   evaluateMonteCarlo: wasm.evaluateMonteCarlo,
+  nodeToDatedSchedule: wasm.nodeToDatedSchedule,
+  monteCarloBreachProbability: wasm.monteCarloBreachProbability,
+  monteCarloPercentileByPeriod: wasm.monteCarloPercentileByPeriod,
+  statementResultToTableLong: wasm.statementResultToTableLong,
+  statementResultToTableWide: wasm.statementResultToTableWide,
+  financialModelContentHash: wasm.financialModelContentHash,
   parseFormula: wasm.parseFormula,
   parseAndCompile: wasm.parseAndCompile,
 };

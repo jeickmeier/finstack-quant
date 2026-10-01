@@ -511,7 +511,8 @@ impl<'a> DateContext<'a> {
 }
 
 /// Calendar-year non-principal / principal / PV totals for one reporting year.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CalendarYearLadderRow {
     /// Calendar year of the grouped cashflows (Gregorian, as on `Date::year`).
     pub year: i32,

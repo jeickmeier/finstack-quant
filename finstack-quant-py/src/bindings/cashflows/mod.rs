@@ -449,12 +449,14 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     // re-exports these from `builder::credit_rates`, so they are exposed both
     // flat here (mirroring the crate root, and the WASM facade) and on the
     // typed `builder` submodule (mirroring `builder::`).
+    m.add_function(wrap_pyfunction!(builder::abs_to_smm, &m)?)?;
     m.add_function(wrap_pyfunction!(builder::cdr_to_mdr, &m)?)?;
     m.add_function(wrap_pyfunction!(builder::cpr_to_smm, &m)?)?;
     m.add_function(wrap_pyfunction!(builder::mdr_to_cdr, &m)?)?;
     m.add_function(wrap_pyfunction!(builder::smm_to_cpr, &m)?)?;
 
     for name in [
+        "abs_to_smm",
         "accrued_interest",
         "build_cashflow_schedule",
         "build_cashflow_schedule_json",
@@ -476,6 +478,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         py,
         [
             "ScheduleBuildOpts",
+            "abs_to_smm",
             "accrual",
             "accrued_interest",
             "aggregation",

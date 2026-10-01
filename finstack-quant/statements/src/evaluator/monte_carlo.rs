@@ -149,10 +149,21 @@ impl MonteCarloResults {
     /// breaches (e.g. DSCR falling below a floor), negate both the metric values
     /// and the threshold, or use a derived metric that flips the sign.
     ///
-    /// Returns `None` if the metric has no data, no forecast periods, or if any
-    /// period's path vector is shorter than `n_paths` (incomplete simulation).
+    /// Path values come from the in-memory simulation store or, for results
+    /// restored from JSON (where that store is not serialized), from the
+    /// long-format `path_data` table (`MonteCarloConfig::with_path_data`).
+    ///
+    /// Returns `None` if the metric has no data (including restored results
+    /// without `path_data`), no forecast periods, or if any period's path
+    /// vector is shorter than `n_paths` (incomplete simulation).
     pub fn breach_probability(&self, metric: &str, threshold: f64) -> Option<f64> {
-        let metric_map = self.path_values.get(metric)?;
+        let restored;
+        let metric_map = if self.path_values.is_empty() {
+            restored = metric_path_values(self.path_data.as_ref()?, metric)?;
+            &restored
+        } else {
+            self.path_values.get(metric)?
+        };
         if metric_map.is_empty() || self.n_paths == 0 {
             return None;
         }
@@ -192,6 +203,48 @@ impl MonteCarloResults {
         let breached_paths = breached.values().filter(|b| **b).count();
         Some(breached_paths as f64 / self.n_paths as f64)
     }
+}
+
+/// Rebuild one metric's `period -> [(path_id, value)]` store from the
+/// long-format path table written by [`MonteCarloAccumulator::finish`].
+///
+/// Returns `None` when the table lacks the expected columns or a period label
+/// does not parse.
+fn metric_path_values(
+    table: &TableEnvelope,
+    metric: &str,
+) -> Option<IndexMap<PeriodId, Vec<(u32, f64)>>> {
+    let column = |name: &str| {
+        table
+            .columns
+            .iter()
+            .find(|c| c.name == name)
+            .map(|c| &c.data)
+    };
+    let (
+        Some(TableColumnData::UInt32(path_ids)),
+        Some(TableColumnData::String(periods)),
+        Some(TableColumnData::String(metrics)),
+        Some(TableColumnData::Float64(values)),
+    ) = (
+        column("path_id"),
+        column("period"),
+        column("metric"),
+        column("value"),
+    )
+    else {
+        return None;
+    };
+    let mut out: IndexMap<PeriodId, Vec<(u32, f64)>> = IndexMap::new();
+    for (((path_id, period), row_metric), value) in
+        path_ids.iter().zip(periods).zip(metrics).zip(values)
+    {
+        if row_metric == metric {
+            let period: PeriodId = period.parse().ok()?;
+            out.entry(period).or_default().push((*path_id, *value));
+        }
+    }
+    (!out.is_empty()).then_some(out)
 }
 
 fn normalize_percentiles(raw: &[f64]) -> Result<Vec<f64>> {
@@ -548,6 +601,45 @@ mod tests {
                 "breach probability must be 0.5 regardless of insertion order, got {p}"
             );
         }
+    }
+
+    #[test]
+    fn breach_probability_survives_a_json_round_trip_with_path_data() {
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let model = ModelBuilder::new("mc-breach-json")
+            .periods("2025Q1..Q1", None)
+            .expect("valid periods")
+            .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
+            .build()
+            .expect("valid model");
+        let paths: Vec<PathResult> = [200.0, 50.0, 150.0, 80.0]
+            .into_iter()
+            .map(|value| {
+                let mut path = IndexMap::new();
+                path.insert(
+                    "revenue".to_string(),
+                    [(period, value)].into_iter().collect(),
+                );
+                (path, Vec::new())
+            })
+            .collect();
+
+        let with_paths = MonteCarloConfig::new(4, 7).with_path_data(true);
+        let live = aggregate_monte_carlo_paths(&model, &with_paths, &paths).expect("finish");
+        let restored: MonteCarloResults =
+            serde_json::from_str(&serde_json::to_string(&live).expect("serialize"))
+                .expect("deserialize");
+        assert!(restored.path_values.is_empty());
+        assert_eq!(live.breach_probability("revenue", 100.0), Some(0.5));
+        assert_eq!(restored.breach_probability("revenue", 100.0), Some(0.5));
+        assert_eq!(restored.breach_probability("missing", 100.0), None);
+
+        let without_paths = MonteCarloConfig::new(4, 7);
+        let live = aggregate_monte_carlo_paths(&model, &without_paths, &paths).expect("finish");
+        let restored: MonteCarloResults =
+            serde_json::from_str(&serde_json::to_string(&live).expect("serialize"))
+                .expect("deserialize");
+        assert_eq!(restored.breach_probability("revenue", 100.0), None);
     }
 
     #[test]

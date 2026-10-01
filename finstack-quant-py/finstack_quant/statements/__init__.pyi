@@ -1548,6 +1548,35 @@ class FinancialModelSpec:
         """
         ...
 
+    def content_hash(self) -> str:
+        """
+        Versioned SHA-256 content hash of the canonical model JSON.
+
+        Mirrors Rust ``FinancialModelSpec::content_hash`` (WASM
+        ``statements.financialModelContentHash``). The hash is taken over the
+        canonical JSON, so it does not depend on key order or on how typed
+        numbers were spelled in the source document.
+
+        Returns
+        -------
+        str
+            ``"sha256:<hex>"`` content hash.
+
+        Raises
+        ------
+        ValueError
+            If the model contains a non-finite number.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import ModelBuilder
+        >>> builder = ModelBuilder("demo")
+        >>> _ = builder.periods("2025Q1..Q1")
+        >>> builder.build().content_hash().startswith("sha256:")
+        True
+        """
+        ...
+
     @property
     def id(self) -> str:
         """
@@ -2886,6 +2915,55 @@ class StatementResult:
         >>> _ = builder.value("revenue", [("2025Q1", 100.0)])
         >>> Evaluator().evaluate(builder.build()).all_periods("revenue")
         [('2025Q1', 100.0)]
+        """
+        ...
+
+    def to_dated_schedule(
+        self,
+        model: FinancialModelSpec | str,
+        node_id: str,
+        convention: Literal["end", "start"] | None = None,
+    ) -> list[tuple[date, float]]:
+        """
+        Export one node as a dated cashflow schedule.
+
+        Mirrors Rust ``evaluator::node_to_dated_schedule`` (WASM
+        ``statements.nodeToDatedSchedule``). Periods are taken in ``model``
+        timeline order; periods without a value are skipped.
+
+        Parameters
+        ----------
+        model : FinancialModelSpec | str
+            The model that produced this result (its periods supply the
+            dates); a typed model or its JSON.
+        node_id : str
+            Node identifier to export.
+        convention : {"end", "start"}, optional
+            ``"end"`` (the Rust default when omitted) dates each period on its
+            last inclusive day (``end - 1 day``, since periods are half-open
+            ``[start, end)``); ``"start"`` uses the period start date.
+
+        Returns
+        -------
+        list[tuple[datetime.date, float]]
+            ``(date, value)`` pairs in timeline order, in the node's own units.
+
+        Raises
+        ------
+        KeyError
+            If ``node_id`` has no values in the result.
+        ValueError
+            If ``convention`` is not ``"end"`` or ``"start"``.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import Evaluator, ModelBuilder
+        >>> builder = ModelBuilder("demo")
+        >>> _ = builder.periods("2025Q1..Q1")
+        >>> _ = builder.value("revenue", [("2025Q1", 100.0)])
+        >>> model = builder.build()
+        >>> Evaluator().evaluate(model).to_dated_schedule(model, "revenue")
+        [(datetime.date(2025, 3, 31), 100.0)]
         """
         ...
 

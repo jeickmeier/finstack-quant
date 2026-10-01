@@ -205,6 +205,28 @@ pub fn valuation_result_to_json(result: JsValue) -> Result<String, JsValue> {
     valuation_result_json(result)
 }
 
+/// Decoded series of one composite base metric from a valuation result.
+///
+/// Free-function twin of Python `ValuationResult.metric_series` (Rust
+/// `ValuationResult::metric_series`): every measure key that encodes a series
+/// of `base` (e.g. `bucketed_dv01::USD-OIS::10y`) is decoded into its
+/// components; scalar entries stored directly under `base` are excluded.
+/// @param result - `ValuationResult` object returned by `priceInstrument` (or its canonical JSON); 64-bit fields may be `BigInt`.
+/// @param base - Canonical base metric identifier (e.g. `"bucketed_dv01"`).
+/// @returns `[components, value]` pairs in measure order.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if `result` does not match the
+/// `ValuationResult` schema or `base` is not a canonically encoded metric key.
+#[wasm_bindgen(js_name = valuationResultMetricSeries)]
+pub fn valuation_result_metric_series(result: JsValue, base: JsValue) -> Result<JsValue, JsValue> {
+    let result: ValuationResult = from_js_json(&result, "result")?;
+    let base: finstack_quant_valuations::metrics::MetricId =
+        js_string(&base, "base")?.parse().map_err(to_js_err)?;
+    to_js_value(&result.metric_series(&base))
+}
+
 /// Validate a canonical v1 instrument envelope after optional metric-pricing
 /// overrides are merged by the canonical pricing path.
 ///
@@ -426,24 +448,80 @@ pub fn instrument_cashflows_json(
     let market_json: &str = &json_text(&market_json, "marketJson")?;
     let as_of: &str = &js_string(&as_of, "asOf")?;
     let model: &str = &js_string(&model, "model")?;
-    let instrument = parse_pricing_instrument_json(instrument_json, None)?;
-    let market = parse_market_json(market_json)?;
-    cashflows_json(&instrument, &market, as_of, model)
+    let envelope = cashflows_envelope_from_json(instrument_json, market_json, as_of, model)?;
+    serde_json::to_string(&envelope).map_err(to_js_err)
 }
 
-/// The cash-flow envelope JSON shared by the `instrumentCashflows*Json` entry
-/// points; the instrument is parsed before the market is used.
-fn cashflows_json(
+/// Per-flow cashflow envelope for an instrument, as a plain object.
+///
+/// Typed twin of `instrumentCashflowsJson`: the same Rust
+/// `instrument_cashflows` call, returned as the `InstrumentCashflowEnvelope`
+/// object instead of JSON text (`JSON.stringify` of the result equals the
+/// `*Json` string). Hazard-rate export rejects bonds with call, put, or
+/// return-floor rights because static rows cannot represent
+/// exercise-contingent value.
+/// @param instrument_json - Required `finstack_quant.instrument/1` envelope.
+/// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+/// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+/// @param model - Must be `"discounting"` or `"hazard_rate"`; `"default"` is not accepted.
+/// @returns `InstrumentCashflowEnvelope` with one row per flow and the total PV.
+///
+/// # Errors
+///
+/// Throws a JavaScript exception if the instrument or market JSON or `asOf` is
+/// invalid, `model` is unsupported or incompatible with the instrument, a
+/// bond with embedded exercise rights is requested under a static cashflow
+/// model, required curves are missing, the schedule mixes currencies, or
+/// canonical pricing fails.
+#[wasm_bindgen(js_name = instrumentCashflows)]
+pub fn instrument_cashflows(
+    instrument_json: JsValue,
+    market_json: JsValue,
+    as_of: JsValue,
+    model: JsValue,
+) -> Result<JsValue, JsValue> {
+    let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
+    let market_json: &str = &json_text(&market_json, "marketJson")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
+    let model: &str = &js_string(&model, "model")?;
+    to_js_value(&cashflows_envelope_from_json(
+        instrument_json,
+        market_json,
+        as_of,
+        model,
+    )?)
+}
+
+/// Parse the instrument (before the market) and run the Rust
+/// `instrument_cashflows` export for the JSON-market entry points.
+fn cashflows_envelope_from_json(
+    instrument_json: &str,
+    market_json: &str,
+    as_of: &str,
+    model: &str,
+) -> Result<
+    finstack_quant_valuations::instruments::cashflow_export::InstrumentCashflowEnvelope,
+    JsValue,
+> {
+    let instrument = parse_pricing_instrument_json(instrument_json, None)?;
+    let market = parse_market_json(market_json)?;
+    cashflows_envelope(&instrument, &market, as_of, model)
+}
+
+/// The cash-flow envelope shared by the `instrumentCashflows*` entry points.
+fn cashflows_envelope(
     instrument: &finstack_quant_valuations::pricer::ParsedInstrument,
     market: &MarketContext,
     as_of: &str,
     model: &str,
-) -> Result<String, JsValue> {
-    let envelope = finstack_quant_valuations::instruments::cashflow_export::instrument_cashflows(
+) -> Result<
+    finstack_quant_valuations::instruments::cashflow_export::InstrumentCashflowEnvelope,
+    JsValue,
+> {
+    finstack_quant_valuations::instruments::cashflow_export::instrument_cashflows(
         instrument, market, as_of, model,
     )
-    .map_err(to_js_err)?;
-    serde_json::to_string(&envelope).map_err(to_js_err)
+    .map_err(to_js_err)
 }
 
 /// List all metric IDs in the standard metric registry.
@@ -635,7 +713,51 @@ pub fn instrument_cashflows_with_market_json(
     let as_of: &str = &js_string(&as_of, "asOf")?;
     let model: &str = &js_string(&model, "model")?;
     let instrument = parse_pricing_instrument_json(instrument_json, None)?;
-    cashflows_json(&instrument, market.inner(), as_of, model)
+    serde_json::to_string(&cashflows_envelope(
+        &instrument,
+        market.inner(),
+        as_of,
+        model,
+    )?)
+    .map_err(to_js_err)
+}
+
+/// Per-flow cashflow envelope using a pre-parsed `MarketContext` handle, as a
+/// plain object.
+///
+/// Typed twin of `instrumentCashflowsWithMarketJson`. Hazard-rate export
+/// rejects bonds with call, put, or return-floor rights because static rows
+/// cannot represent exercise-contingent value.
+/// @param instrument_json - Canonical instrument envelope JSON in the Finstack v1 schema.
+/// @param market - Pre-parsed `core.MarketContext` handle supplying curves, quotes, and FX data.
+/// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
+/// @param model - Must be `"discounting"` or `"hazard_rate"`; `"default"` is not accepted.
+/// @returns `InstrumentCashflowEnvelope` with one row per flow and the total PV.
+///
+/// # Errors
+///
+/// Throws a JavaScript exception if `instrumentJson` or `asOf` is invalid,
+/// `model` is unsupported or incompatible with the instrument, a bond with
+/// embedded exercise rights is requested under a static cashflow model,
+/// required curves are missing, the schedule mixes currencies, or canonical
+/// pricing fails.
+#[wasm_bindgen(js_name = instrumentCashflowsWithMarket)]
+pub fn instrument_cashflows_with_market(
+    instrument_json: JsValue,
+    market: &JsMarketContext,
+    as_of: JsValue,
+    model: JsValue,
+) -> Result<JsValue, JsValue> {
+    let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
+    let model: &str = &js_string(&model, "model")?;
+    let instrument = parse_pricing_instrument_json(instrument_json, None)?;
+    to_js_value(&cashflows_envelope(
+        &instrument,
+        market.inner(),
+        as_of,
+        model,
+    )?)
 }
 
 #[cfg(test)]
@@ -1178,7 +1300,7 @@ pub(super) mod tests {
         let credit_instrument =
             parse_pricing_instrument_json(&revolving_credit_json(false, true), None)
                 .expect("credit instrument");
-        assert!(cashflows_json(
+        assert!(cashflows_envelope(
             &credit_instrument,
             &revolving_credit_market(true),
             "2024-01-01",
@@ -1217,10 +1339,9 @@ pub(super) mod tests {
         let parsed = serde_json::to_value(&priced).expect("price json");
         assert!(parsed.is_object());
 
-        let cashflows =
-            cashflows_json(&instrument, &market, "2024-01-01", "discounting").expect("cashflows");
-        let parsed_cashflows: serde_json::Value =
-            serde_json::from_str(&cashflows).expect("cashflow json");
+        let cashflows = cashflows_envelope(&instrument, &market, "2024-01-01", "discounting")
+            .expect("cashflows");
+        let parsed_cashflows = serde_json::to_value(&cashflows).expect("cashflow json");
         assert!(parsed_cashflows.is_object());
     }
 

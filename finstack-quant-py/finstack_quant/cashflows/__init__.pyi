@@ -35,6 +35,7 @@ from finstack_quant.cashflows import schema as schema
 
 __all__ = [
     "ScheduleBuildOpts",
+    "abs_to_smm",
     "accrual",
     "accrued_interest",
     "aggregation",
@@ -482,6 +483,44 @@ def accrued_interest(schedule_json: str, as_of: datetime.date | str, config_json
     True
 
     """
+
+def abs_to_smm(speed: float, month: int) -> float:
+    """
+    Convert an ABS speed to the single-month mortality for a seasoning month.
+
+    Flat re-export of :func:`finstack_quant.cashflows.builder.abs_to_smm`,
+    mirroring the Rust crate-root re-export. The ABS convention prepays a
+    constant share of the *original* balance each month:
+    ``SMM_t = speed / (1 - speed * (t - 1))``, capped at ``1.0`` once the
+    original balance is exhausted; month 0 is treated as month 1.
+
+    Parameters
+    ----------
+    speed : float
+        Monthly prepayment as a decimal fraction of the original balance
+        (``0.015`` = 1.5% ABS), in ``[0, 1]``.
+    month : int
+        Seasoning month counted from origination (non-negative).
+
+    Returns
+    -------
+    float
+        Single-month mortality as a decimal in ``[0, 1]``.
+
+    Raises
+    ------
+    ValueError
+        If ``speed`` is non-finite or outside ``[0, 1]``.
+    OverflowError
+        If ``month`` is negative.
+
+    Examples
+    --------
+    >>> from finstack_quant.cashflows import abs_to_smm
+    >>> round(abs_to_smm(0.015, 11), 6)
+    0.017647
+    """
+    ...
 
 def cpr_to_smm(cpr: float) -> float:
     """

@@ -12,6 +12,36 @@ use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
 use pyo3::wrap_pyfunction;
 
+/// Convert an ABS speed to the single-month mortality for a seasoning month.
+///
+/// The ABS convention (auto-loan and consumer ABS) prepays a constant share
+/// ``speed`` of the *original* balance each month, so
+/// ``SMM_t = speed / (1 - speed * (t - 1))``. Month 0 is treated as month 1;
+/// once the original balance is exhausted the result is capped at ``1.0``.
+///
+/// Parameters
+/// ----------
+/// speed : float
+///     Monthly prepayment as a decimal fraction of the original balance
+///     (``0.015`` = 1.5% ABS), in ``[0, 1]``.
+/// month : int
+///     Seasoning month counted from origination (non-negative).
+///
+/// Returns
+/// -------
+/// float
+///     Single-month mortality as a decimal in ``[0, 1]``.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If ``speed`` is non-finite or outside ``[0, 1]``.
+#[pyfunction]
+#[pyo3(text_signature = "(speed, month)")]
+pub(crate) fn abs_to_smm(speed: f64, month: u32) -> PyResult<f64> {
+    finstack_quant_cashflows::builder::abs_to_smm(speed, month).map_err(crate::errors::core_to_py)
+}
+
 /// Convert an annual CPR (constant prepayment rate) to a monthly SMM.
 ///
 /// Uses the standard relationship ``SMM = 1 - (1 - CPR)^(1/12)`` (Fabozzi's
@@ -127,6 +157,7 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
         schedule::py_merge_cashflow_schedules,
         &module
     )?)?;
+    module.add_function(wrap_pyfunction!(abs_to_smm, &module)?)?;
     module.add_function(wrap_pyfunction!(cdr_to_mdr, &module)?)?;
     module.add_function(wrap_pyfunction!(cpr_to_smm, &module)?)?;
     module.add_function(wrap_pyfunction!(mdr_to_cdr, &module)?)?;
@@ -158,6 +189,7 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
             "RollRule",
             "ScheduleParams",
             "StepUpCouponSpec",
+            "abs_to_smm",
             "cdr_to_mdr",
             "cpr_to_smm",
             "mdr_to_cdr",

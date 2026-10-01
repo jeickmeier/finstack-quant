@@ -44,12 +44,14 @@ validate_cashflow_schedule_json = _cashflows.validate_cashflow_schedule_json
 dated_flows_json = _cashflows.dated_flows_json
 accrued_interest = _cashflows.accrued_interest
 
+abs_to_smm = _cashflows.abs_to_smm
 cpr_to_smm = _cashflows.cpr_to_smm
 smm_to_cpr = _cashflows.smm_to_cpr
 cdr_to_mdr = _cashflows.cdr_to_mdr
 mdr_to_cdr = _cashflows.mdr_to_cdr
 
 for _fn in (
+    "abs_to_smm",
     "accrued_interest",
     "build_cashflow_schedule",
     "build_cashflow_schedule_json",
@@ -67,6 +69,7 @@ for _fn in (
 
 __all__: list[str] = [
     "ScheduleBuildOpts",
+    "abs_to_smm",
     "accrual",
     "accrued_interest",
     "aggregation",

@@ -15,7 +15,7 @@
 //! no separate builder surface on this side because JS assembles JSON
 //! natively.
 
-use crate::utils::input::{js_string, json_text};
+use crate::utils::input::{js_opt_string, js_string, json_text};
 use crate::utils::to_js_err;
 use finstack_quant_statements::FinancialModelSpec;
 use wasm_bindgen::prelude::*;
@@ -249,6 +249,170 @@ pub fn evaluate_monte_carlo(model_json: JsValue, config_json: JsValue) -> Result
         .evaluate_monte_carlo(&model, &config)
         .map_err(to_js_err)?;
     crate::utils::to_js_value(&results)
+}
+
+/// Export one evaluated node as a dated schedule.
+///
+/// Free-function twin of Python `StatementResult.to_dated_schedule` (Rust
+/// `evaluator::node_to_dated_schedule`): periods are taken in model timeline
+/// order, periods without a value are skipped, and each period is dated by
+/// `convention`.
+/// @param model_json - The `FinancialModelSpec` that produced the result (its periods supply the dates).
+/// @param result_json - The `StatementResult` returned by `evaluateModel` / `evaluateModelWithMarket` (object or JSON).
+/// @param node_id - Node identifier to export.
+/// @param convention - Optional `"end"` (default: the period's last inclusive day, `end - 1 day`, since periods are half-open `[start, end)`) or `"start"`.
+/// @returns `[isoDate, value]` pairs in timeline order, in the node's own units.
+///
+/// # Errors
+///
+/// Throws with kind `not_found` if `nodeId` has no values in the result, and
+/// kind `validation` if an input is malformed or `convention` is not
+/// `"start"` / `"end"`.
+#[wasm_bindgen(js_name = nodeToDatedSchedule)]
+pub fn node_to_dated_schedule(
+    model_json: JsValue,
+    result_json: JsValue,
+    node_id: JsValue,
+    convention: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    let model =
+        FinancialModelSpec::from_json(&json_text(&model_json, "modelJson")?).map_err(to_js_err)?;
+    let result: finstack_quant_statements::evaluator::StatementResult =
+        serde_json::from_str(&json_text(&result_json, "resultJson")?).map_err(to_js_err)?;
+    let node_id = js_string(&node_id, "nodeId")?;
+    let convention = match js_opt_string(convention.as_ref(), "convention")? {
+        Some(convention) => convention.parse().map_err(to_js_err)?,
+        None => finstack_quant_statements::evaluator::PeriodDateConvention::default(),
+    };
+    let rows: Vec<(String, f64)> = finstack_quant_statements::evaluator::node_to_dated_schedule(
+        &model, &result, &node_id, convention,
+    )
+    .map_err(to_js_err)?
+    .into_iter()
+    .map(|(date, value)| (crate::utils::date_to_iso(date), value))
+    .collect();
+    crate::utils::to_js_value(&rows)
+}
+
+/// Probability that a metric exceeds a threshold in any forecast period.
+///
+/// Free-function twin of Python `MonteCarloResults.breach_probability` (Rust
+/// `MonteCarloResults::breach_probability`). Checks upside breaches only
+/// (`value > threshold`); negate values and threshold for a downside test.
+/// Per-path values come from the result's `path_data` table, so the
+/// simulation must run with `include_path_data: true`.
+/// @param results_json - `MonteCarloResults` returned by `evaluateMonteCarlo` (object or JSON).
+/// @param metric - Node identifier to test.
+/// @param threshold - Breach level in the metric's own units.
+/// @returns Fraction of paths that breach in at least one forecast period, or `undefined` when the metric has no path data (including results run without `include_path_data`), there are no forecast periods, or the simulation is incomplete.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if the results input is malformed, and kind
+/// `invalid_type` if `threshold` is not a number.
+#[wasm_bindgen(js_name = monteCarloBreachProbability)]
+pub fn monte_carlo_breach_probability(
+    results_json: JsValue,
+    metric: JsValue,
+    threshold: JsValue,
+) -> Result<Option<f64>, JsValue> {
+    let results: finstack_quant_statements::evaluator::MonteCarloResults =
+        serde_json::from_str(&json_text(&results_json, "resultsJson")?).map_err(to_js_err)?;
+    Ok(results.breach_probability(
+        &js_string(&metric, "metric")?,
+        crate::utils::input::js_f64(&threshold, "threshold")?,
+    ))
+}
+
+/// Percentile time series of one metric across the forecast periods.
+///
+/// Free-function twin of Python `MonteCarloResults.percentile_by_period` (Rust
+/// `MonteCarloResults::percentile_by_period`): looks up a percentile that the
+/// simulation was configured to report.
+/// @param results_json - `MonteCarloResults` returned by `evaluateMonteCarlo` (object or JSON).
+/// @param metric - Node identifier to read.
+/// @param percentile - Percentile as a fraction in `[0, 1]` (e.g. `0.95`); must be one of the configured percentiles.
+/// @returns Object mapping period id (e.g. `"2025Q1"`) to the percentile value in the metric's own units, or `undefined` when the metric or percentile is not in the results.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if the results input is malformed, and kind
+/// `invalid_type` if `percentile` is not a number.
+#[wasm_bindgen(js_name = monteCarloPercentileByPeriod)]
+pub fn monte_carlo_percentile_by_period(
+    results_json: JsValue,
+    metric: JsValue,
+    percentile: JsValue,
+) -> Result<JsValue, JsValue> {
+    let results: finstack_quant_statements::evaluator::MonteCarloResults =
+        serde_json::from_str(&json_text(&results_json, "resultsJson")?).map_err(to_js_err)?;
+    match results.percentile_by_period(
+        &js_string(&metric, "metric")?,
+        crate::utils::input::js_f64(&percentile, "percentile")?,
+    ) {
+        Some(series) => crate::utils::to_js_value(&series),
+        None => Ok(JsValue::UNDEFINED),
+    }
+}
+
+/// Export a statement result as a long-format table.
+///
+/// Free-function twin of Python `StatementResult.to_arrow_long`
+/// (Rust `StatementResult::to_table_long`): one row per `(node, period)` in
+/// the result's node and period declaration order.
+/// @param result_json - The `StatementResult` returned by `evaluateModel` / `evaluateModelWithMarket` (object or JSON).
+/// @returns `TableEnvelope` with columns `node_id`, `period_id`, `value`, `value_money`, `currency`, `value_type`; monetary nodes repeat their value in `value_money` and set `currency`, scalar nodes leave both null.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if the result input is malformed or table
+/// construction fails.
+#[wasm_bindgen(js_name = statementResultToTableLong)]
+pub fn statement_result_to_table_long(result_json: JsValue) -> Result<JsValue, JsValue> {
+    let result: finstack_quant_statements::evaluator::StatementResult =
+        serde_json::from_str(&json_text(&result_json, "resultJson")?).map_err(to_js_err)?;
+    crate::utils::to_js_value(&result.to_table_long().map_err(to_js_err)?)
+}
+
+/// Export a statement result as a wide-format table.
+///
+/// Free-function twin of Python `StatementResult.to_arrow_wide`
+/// (Rust `StatementResult::to_table_wide`): one row per period in
+/// chronological order and one column per node in declaration order.
+/// @param result_json - The `StatementResult` returned by `evaluateModel` / `evaluateModelWithMarket` (object or JSON).
+/// @returns `TableEnvelope` with a `period_id` column followed by one value column per node; a node with no value in a period holds `NaN` (serialized as `null`), not zero.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if the result input is malformed or table
+/// construction fails.
+#[wasm_bindgen(js_name = statementResultToTableWide)]
+pub fn statement_result_to_table_wide(result_json: JsValue) -> Result<JsValue, JsValue> {
+    let result: finstack_quant_statements::evaluator::StatementResult =
+        serde_json::from_str(&json_text(&result_json, "resultJson")?).map_err(to_js_err)?;
+    crate::utils::to_js_value(&result.to_table_wide().map_err(to_js_err)?)
+}
+
+/// Canonical content hash of a financial model.
+///
+/// Free-function twin of Python `FinancialModelSpec.content_hash` (Rust
+/// `FinancialModelSpec::content_hash`): the model is loaded and validated
+/// through `FinancialModelSpec::from_json`, then hashed over its canonical
+/// JSON, so the hash does not depend on key order or number spelling of the
+/// typed fields. Free-form `meta`/`params` maps keep their JSON spelling.
+/// @param model_json - `FinancialModelSpec` (object or JSON).
+/// @returns `"sha256:<hex>"` content hash.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if the model is malformed or fails semantic
+/// validation, or contains a non-finite number.
+#[wasm_bindgen(js_name = financialModelContentHash)]
+pub fn financial_model_content_hash(model_json: JsValue) -> Result<String, JsValue> {
+    FinancialModelSpec::from_json(&json_text(&model_json, "modelJson")?)
+        .map_err(to_js_err)?
+        .content_hash()
+        .map_err(to_js_err)
 }
 
 /// Parse a DSL formula and return its canonical source text.

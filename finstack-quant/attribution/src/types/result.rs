@@ -860,13 +860,21 @@ impl PnlAttribution {
     ///
     /// # Arguments
     ///
-    /// * `pct_tolerance` - Percentage tolerance (e.g., 0.1 for 0.1%)
-    /// * `abs_tolerance` - Absolute tolerance (e.g., 100.0 for $100)
+    /// * `pct_tolerance` - Percentage tolerance (e.g., `Some(0.1)` for 0.1%);
+    ///   `None` uses the run's configured `meta.tolerance_pct`.
+    /// * `abs_tolerance` - Absolute tolerance in `total_pnl` currency units
+    ///   (e.g., `Some(100.0)` for $100); `None` uses `meta.tolerance_abs`.
     ///
     /// # Returns
     ///
     /// `true` if residual is within tolerance.
-    pub fn residual_within_tolerance(&self, pct_tolerance: f64, abs_tolerance: f64) -> bool {
+    pub fn residual_within_tolerance(
+        &self,
+        pct_tolerance: Option<f64>,
+        abs_tolerance: Option<f64>,
+    ) -> bool {
+        let pct_tolerance = pct_tolerance.unwrap_or(self.meta.tolerance_pct);
+        let abs_tolerance = abs_tolerance.unwrap_or(self.meta.tolerance_abs);
         // If residual computation failed, `residual` was reset to 0
         // and a clean tolerance check would falsely succeed. Refuse to claim
         // "within tolerance" when the attribution is flagged invalid.
@@ -1317,11 +1325,11 @@ mod tests {
         // tolerance check below would falsely succeed.
         assert_eq!(attr.residual.amount(), 0.0);
         assert!(
-            !attr.residual_within_tolerance(0.1, 1.0),
+            !attr.residual_within_tolerance(Some(0.1), Some(1.0)),
             "tolerance check MUST fail when result_invalid is set, regardless of residual value"
         );
         assert!(
-            !attr.residual_within_tolerance(attr.meta.tolerance_pct, attr.meta.tolerance_abs),
+            !attr.residual_within_tolerance(None, None),
             "stored-tolerance check MUST also fail when result_invalid is set"
         );
     }

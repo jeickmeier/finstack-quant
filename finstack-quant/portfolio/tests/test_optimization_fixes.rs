@@ -1929,3 +1929,60 @@ fn notional_weights_convert_native_currencies_before_normalizing() {
     .unwrap();
     assert_eq!(from_spec.implied_quantities, result.implied_quantities);
 }
+
+#[test]
+fn rebalance_from_spec_matches_the_live_result_and_rejects_foreign_results() {
+    use finstack_quant_portfolio::optimization::{
+        optimize_from_spec, rebalance_from_spec, Constraint, PortfolioOptimizationResultWire,
+        PortfolioOptimizationSpec,
+    };
+    let as_of = create_date(2024, Month::January, 1).unwrap();
+    let usd = test_deposit("USD", 1_000_000.0, as_of).unwrap();
+    let other = test_deposit("USD", 500_000.0, as_of).unwrap();
+    let portfolio = PortfolioBuilder::new("REBALANCE")
+        .base_currency(Currency::USD)
+        .as_of(as_of)
+        .entity(Entity::new("ENT_A"))
+        .position(
+            Position::new("A", "ENT_A", "A", Arc::new(usd), 1.0, PositionUnit::Units).unwrap(),
+        )
+        .position(
+            Position::new("B", "ENT_A", "B", Arc::new(other), 1.0, PositionUnit::Units).unwrap(),
+        )
+        .build()
+        .unwrap();
+    let mut spec = PortfolioOptimizationSpec::new(
+        portfolio.to_spec(),
+        Objective::Maximize(MetricExpr::WeightedSum {
+            metric: PerPositionMetric::Constant(1.0),
+            filter: None,
+        }),
+    );
+    spec.weighting = WeightingScheme::NotionalWeight;
+    spec.constraints = vec![Constraint::Budget { rhs: 1.0 }];
+    let market = build_multi_currency_market();
+    let live = optimize_from_spec(&spec, &market, &FinstackConfig::default()).unwrap();
+    let wire: PortfolioOptimizationResultWire =
+        serde_json::from_str(&serde_json::to_string(&live).unwrap()).unwrap();
+
+    let expected = live.to_rebalanced_portfolio().unwrap();
+    let rebuilt = rebalance_from_spec(&spec, &wire).unwrap();
+    for id in ["A", "B"] {
+        assert_eq!(
+            rebuilt.get_position(id).map(|p| p.quantity),
+            expected.get_position(id).map(|p| p.quantity),
+            "position {id}"
+        );
+    }
+
+    let mut foreign = wire.clone();
+    foreign.implied_quantities.insert("ZZZ".into(), 1.0);
+    let err = rebalance_from_spec(&spec, &foreign).expect_err("foreign key");
+    assert!(err.to_string().contains("ZZZ"), "{err}");
+
+    let mut infeasible = wire;
+    infeasible.status = finstack_quant_portfolio::optimization::OptimizationStatus::Infeasible {
+        conflicting_constraints: Vec::new(),
+    };
+    assert!(rebalance_from_spec(&spec, &infeasible).is_err());
+}

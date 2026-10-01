@@ -104,6 +104,64 @@ pub fn calibrate(envelope_json: JsValue) -> Result<JsValue, JsValue> {
     to_js_value(&result)
 }
 
+/// Native-testable core of [`calibration_envelope_content_hash`].
+fn calibration_envelope_content_hash_inner(json: &str) -> Result<String, ExecuteError> {
+    Ok(validate::parse_envelope(json)?.content_hash()?)
+}
+
+/// Native-testable core of [`calibration_result_content_hash`].
+fn calibration_result_content_hash_inner(json: &str) -> Result<String, ExecuteError> {
+    let (result, _report) = CalibrationResultEnvelope::from_slice_strict(
+        json.as_bytes(),
+        &finstack_quant_core::contract::LoadLimits::default(),
+    )
+    .map_err(|error| {
+        ExecuteError::from(
+            finstack_quant_calibration::api::errors::EnvelopeError::strict_load(&error),
+        )
+    })?;
+    Ok(result.content_hash()?)
+}
+
+/// Canonical content hash of a calibration envelope.
+///
+/// Free-function twin of Python `CalibrationEnvelope.content_hash` (Rust
+/// `CalibrationEnvelope::content_hash`): the envelope is strict-loaded through
+/// the same Rust parser `calibrate` uses, then hashed over its canonical JSON,
+/// so the hash does not depend on key order or number spelling.
+/// @param envelope_json - `CalibrationEnvelope` (object or JSON).
+/// @returns `"sha256:<hex>"` content hash.
+///
+/// # Errors
+///
+/// Throws a `CalibrationEnvelopeError` if the envelope is malformed, its
+/// schema marker is missing or unsupported, or it contains a non-finite
+/// number.
+#[wasm_bindgen(js_name = calibrationEnvelopeContentHash)]
+pub fn calibration_envelope_content_hash(envelope_json: JsValue) -> Result<String, JsValue> {
+    let envelope_json: &str = &json_text(&envelope_json, "envelopeJson")?;
+    calibration_envelope_content_hash_inner(envelope_json).map_err(execute_error_to_js)
+}
+
+/// Canonical content hash of a calibration result envelope.
+///
+/// Free-function twin of Python `CalibrationResult.content_hash` (Rust
+/// `CalibrationResultEnvelope::content_hash`): the result is strict-loaded
+/// (default load limits), then hashed over its canonical JSON.
+/// @param result_json - `CalibrationResultEnvelope` returned by `calibrate` (object or JSON).
+/// @returns `"sha256:<hex>"` content hash.
+///
+/// # Errors
+///
+/// Throws a `CalibrationEnvelopeError` if the result is malformed, exceeds the
+/// default load limits, its schema marker is missing or unsupported, or it
+/// contains a non-finite number.
+#[wasm_bindgen(js_name = calibrationResultContentHash)]
+pub fn calibration_result_content_hash(result_json: JsValue) -> Result<String, JsValue> {
+    let result_json: &str = &json_text(&result_json, "resultJson")?;
+    calibration_result_content_hash_inner(result_json).map_err(execute_error_to_js)
+}
+
 /// Pre-flight envelope validation without invoking the solver.
 ///
 /// Returns the `CalibrationValidationReport` as a plain object listing every
@@ -332,6 +390,22 @@ mod tests {
         )
         .expect("canonical JSON must round-trip strictly");
         assert_eq!(reparsed.schema, CalibrationSchema::Calibration);
+    }
+
+    #[test]
+    fn content_hashes_match_the_rust_typed_hashes() {
+        let json = empty_envelope_json();
+        let (envelope, _report) = CalibrationEnvelope::from_slice_strict(
+            json.as_bytes(),
+            &finstack_quant_core::contract::LoadLimits::default(),
+        )
+        .expect("envelope");
+        assert_eq!(
+            calibration_envelope_content_hash_inner(&json).expect("hash"),
+            envelope.content_hash().expect("typed hash"),
+        );
+        assert!(calibration_envelope_content_hash_inner("{ not json").is_err());
+        assert!(calibration_result_content_hash_inner("{ not json").is_err());
     }
 
     #[test]

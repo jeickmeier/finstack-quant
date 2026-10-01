@@ -81,7 +81,7 @@ fn test_fx_forward_from_trade_date() {
         "EUR-OIS",
         None,
         None,
-        2, // T+2 spot
+        Some(2), // T+2 spot
         Some(BusinessDayConvention::ModifiedFollowing),
         false,
     )
@@ -92,7 +92,8 @@ fn test_fx_forward_from_trade_date() {
         Date::from_calendar_date(2024, Month::April, 17).expect("valid date")
     );
 
-    // `None` selects the Rust-owned Modified Following default.
+    // `None` selects the Rust-owned Modified Following default and the
+    // pair's standard spot lag (T+2 for EUR/USD).
     let defaulted = FxForward::from_trade_date(
         "EURUSD-3M",
         Currency::EUR,
@@ -104,7 +105,7 @@ fn test_fx_forward_from_trade_date() {
         "EUR-OIS",
         None,
         None,
-        2,
+        None,
         None,
         false,
     )
@@ -125,7 +126,7 @@ fn standard_forward_tenor_preserves_explicit_end_of_month_policy() {
         "EUR-OIS",
         None,
         None,
-        2,
+        Some(2),
         Some(BusinessDayConvention::Unadjusted),
         true,
     )

@@ -308,8 +308,8 @@ impl FxForward {
     /// * `base_calendar_id` - Optional base currency calendar
     /// * `quote_calendar_id` - Optional quote currency calendar
     /// * `settlement_days` - T+N spot lag in business days (typically 2, or 1 for
-    ///   USD/CAD). Use [`standard_settlement_days`](Self::standard_settlement_days)
-    ///   to determine it automatically.
+    ///   USD/CAD). `None` selects the pair's market-standard lag from
+    ///   [`standard_settlement_days`](Self::standard_settlement_days).
     /// * `business_day_convention` - Business day convention used to roll the
     ///   maturity on the joint calendar. `None` selects Modified Following,
     ///   the ISDA FX settlement convention (and the `FxSpot` builder default).
@@ -326,13 +326,15 @@ impl FxForward {
         foreign_discount_curve_id: impl Into<CurveId>,
         base_calendar_id: Option<String>,
         quote_calendar_id: Option<String>,
-        settlement_days: u32,
+        settlement_days: Option<u32>,
         business_day_convention: Option<finstack_quant_core::dates::BusinessDayConvention>,
         end_of_month: bool,
     ) -> finstack_quant_core::Result<Self> {
         use crate::instruments::common_impl::fx_dates::{
             add_fx_standard_tenor, fx_spot_date_for_pair,
         };
+        let settlement_days = settlement_days
+            .unwrap_or_else(|| Self::standard_settlement_days(base_currency, quote_currency));
         let business_day_convention =
             business_day_convention.unwrap_or_else(crate::serde_defaults::bdc_modified_following);
 

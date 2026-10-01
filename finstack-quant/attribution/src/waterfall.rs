@@ -158,7 +158,7 @@ pub fn default_waterfall_order() -> Vec<AttributionFactor> {
 /// )?;
 ///
 /// // Residual should be minimal
-/// assert!(attribution.residual_within_tolerance(0.01, 1.0));
+/// assert!(attribution.residual_within_tolerance(Some(0.01), Some(1.0)));
 /// # Ok(())
 /// # }
 /// ```

@@ -260,10 +260,10 @@ impl PyStatementResult {
     ///     dates); a typed model or its JSON.
     /// node_id : str
     ///     Node identifier to export.
-    /// convention : {"end", "start"}, default "end"
-    ///     ``"end"`` dates each period on its last inclusive day
-    ///     (``end - 1 day``, since periods are half-open ``[start, end)``);
-    ///     ``"start"`` uses the period start date.
+    /// convention : {"end", "start"}, optional
+    ///     ``"end"`` (the Rust default when omitted) dates each period on its
+    ///     last inclusive day (``end - 1 day``, since periods are half-open
+    ///     ``[start, end)``); ``"start"`` uses the period start date.
     ///
     /// Returns
     /// -------
@@ -277,26 +277,20 @@ impl PyStatementResult {
     ///     If ``node_id`` is not in the result.
     /// ValueError
     ///     If ``convention`` is not ``"end"`` or ``"start"``.
-    #[pyo3(signature = (model, node_id, convention="end"), text_signature = "($self, model, node_id, convention='end')")]
+    #[pyo3(signature = (model, node_id, convention=None), text_signature = "($self, model, node_id, convention=None)")]
     fn to_dated_schedule<'py>(
         &self,
         py: Python<'py>,
         model: &Bound<'py, PyAny>,
         node_id: &str,
-        convention: &str,
+        convention: Option<&str>,
     ) -> PyResult<Vec<(Bound<'py, PyAny>, f64)>> {
         let convention = match convention {
-            "end" => PeriodDateConvention::End,
-            "start" => PeriodDateConvention::Start,
-            other => {
-                return Err(crate::errors::value_error(format!(
-                    "convention must be 'end' or 'start', got {other:?}"
-                )))
-            }
+            Some(convention) => convention
+                .parse::<PeriodDateConvention>()
+                .map_err(statements_to_py)?,
+            None => PeriodDateConvention::default(),
         };
-        if !self.inner.nodes.contains_key(node_id) {
-            return Err(PyKeyError::new_err(format!("unknown node: {node_id:?}")));
-        }
         let model = extract_model_ref(model)?;
         let schedule = finstack_quant_statements::evaluator::node_to_dated_schedule(
             &model,

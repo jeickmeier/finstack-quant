@@ -61,6 +61,7 @@ __all__ = [
     "RollRule",
     "ScheduleParams",
     "StepUpCouponSpec",
+    "abs_to_smm",
     "cdr_to_mdr",
     "cpr_to_smm",
     "mdr_to_cdr",
@@ -5294,6 +5295,44 @@ def merge_cashflow_schedules(
     >>> merged = merge_cashflow_schedules([schedule], Notional.par(1_000_000.0, "USD"), DayCount.ACT_360)
     >>> len(merged.get_flows())
     6
+    """
+    ...
+
+def abs_to_smm(speed: float, month: int) -> float:
+    """
+    Convert an ABS speed to the single-month mortality for a seasoning month.
+
+    Mirrors Rust ``builder::abs_to_smm`` (the kernel behind
+    ``PrepaymentModelSpec.abs``). The ABS convention prepays a
+    constant share of the *original* balance each month:
+    ``SMM_t = speed / (1 - speed * (t - 1))``, capped at ``1.0`` once the
+    original balance is exhausted; month 0 is treated as month 1.
+
+    Parameters
+    ----------
+    speed : float
+        Monthly prepayment as a decimal fraction of the original balance
+        (``0.015`` = 1.5% ABS), in ``[0, 1]``.
+    month : int
+        Seasoning month counted from origination (non-negative).
+
+    Returns
+    -------
+    float
+        Single-month mortality as a decimal in ``[0, 1]``.
+
+    Raises
+    ------
+    ValueError
+        If ``speed`` is non-finite or outside ``[0, 1]``.
+    OverflowError
+        If ``month`` is negative.
+
+    Examples
+    --------
+    >>> from finstack_quant.cashflows.builder import abs_to_smm
+    >>> round(abs_to_smm(0.015, 11), 6)
+    0.017647
     """
     ...
 

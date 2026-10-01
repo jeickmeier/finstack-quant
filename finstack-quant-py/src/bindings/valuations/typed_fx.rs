@@ -576,9 +576,6 @@ end_of_month=False)"
             .filter(|value| !value.is_none())
             .map(|value| bdc_from_py(value, "business_day_convention"))
             .transpose()?;
-        let settlement_days = settlement_days.unwrap_or_else(|| {
-            finstack_quant_valuations::instruments::FxForward::standard_settlement_days(base, quote)
-        });
         let inner = finstack_quant_valuations::instruments::FxForward::from_trade_date(
             InstrumentId::new(id.to_string()),
             base,

@@ -120,9 +120,10 @@ pub use accrual::{
 };
 pub use aggregation::PeriodAggregation;
 pub use builder::CashFlowBuilder;
-pub use builder::{cdr_to_mdr, cpr_to_smm, mdr_to_cdr, smm_to_cpr};
+pub use builder::{abs_to_smm, cdr_to_mdr, cpr_to_smm, mdr_to_cdr, smm_to_cpr};
 pub use json::{
     accrued_interest, build_cashflow_schedule_json, dated_flows, dated_flows_json,
+    schedule_calendar_year_ladder, schedule_outstanding_by_date, schedule_wal,
     validate_cashflow_schedule_json, CashflowScheduleBuildSpec, CouponLegSpec, DatedFlowJson,
     PaymentProgramSpec,
 };

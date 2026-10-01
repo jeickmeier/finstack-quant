@@ -4,6 +4,8 @@ export const statements_analytics = {
   runSensitivity: wasm.runSensitivity,
   runVariance: wasm.runVariance,
   evaluateScenarioSet: wasm.evaluateScenarioSet,
+  scenarioComparisonTable: wasm.scenarioComparisonTable,
+  parameterSpecWithPercentages: wasm.parameterSpecWithPercentages,
   backtestForecast: wasm.backtestForecast,
   generateTornadoEntries: wasm.generateTornadoEntries,
   goalSeek: wasm.goalSeek,

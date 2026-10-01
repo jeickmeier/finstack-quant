@@ -108,6 +108,7 @@ allocate_weights = _portfolio.allocate_weights
 allocate_weights_json = _portfolio.allocate_weights_json
 validate_allocation_json = _portfolio.validate_allocation_json
 optimize_portfolio = _portfolio.optimize_portfolio
+rebalance_from_spec = _portfolio.rebalance_from_spec
 replay_portfolio = _portfolio.replay_portfolio
 replay_portfolio_json = _portfolio.replay_portfolio_json
 brinson_fachler = _portfolio.brinson_fachler
@@ -291,6 +292,7 @@ __all__ = [
     "optimize_portfolio",
     "parse_portfolio_spec_json",
     "position_what_if",
+    "rebalance_from_spec",
     "replay_portfolio",
     "replay_portfolio_json",
     "scenario_pnl",

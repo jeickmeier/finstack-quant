@@ -116,6 +116,71 @@ pub fn evaluate_scenario_set(
     to_js_value(&results)
 }
 
+/// Scenario comparison table: one row per `(period, metric)` and one column
+/// per scenario, plus a `<scenario>_vs_<baseline>_frac` change column for
+/// every non-baseline scenario.
+///
+/// Free-function twin of Python `ScenarioResults.to_comparison_table` (Rust
+/// `ScenarioResults::to_comparison_table`). The baseline is the scenario named
+/// `"base"` when present, otherwise the first scenario; the fractional change
+/// is `(scenario - baseline) / baseline`, `0.0` when the baseline is
+/// effectively zero.
+/// @param scenario_results_json - The scenario map returned by `evaluateScenarioSet` (object or JSON).
+/// @param metrics - Node identifiers to include, in row order within each period.
+/// @returns `TableEnvelope` with `period` and `metric` columns, one value column per scenario and the `_frac` change columns.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if the results input is malformed, the
+/// result set or metric list is empty, or table construction fails.
+#[wasm_bindgen(js_name = scenarioComparisonTable)]
+pub fn scenario_comparison_table(
+    scenario_results_json: JsValue,
+    metrics: JsValue,
+) -> Result<JsValue, JsValue> {
+    let results: finstack_quant_statements_analytics::analysis::ScenarioResults =
+        serde_json::from_str(&json_text(&scenario_results_json, "scenarioResultsJson")?)
+            .map_err(to_js_err)?;
+    let metrics = js_string_seq(&metrics, "metrics")?;
+    let metrics: Vec<&str> = metrics.iter().map(String::as_str).collect();
+    to_js_value(&results.to_comparison_table(&metrics).map_err(to_js_err)?)
+}
+
+/// Sensitivity parameter whose perturbations are percentage moves of a base value.
+///
+/// Free-function twin of Python `ParameterSpec.with_percentages` (Rust
+/// `ParameterSpec::with_percentages`): each perturbation is
+/// `baseValue * (1 + pct / 100)`.
+/// @param node_id - Node identifier to vary.
+/// @param period_id - Period to vary, e.g. `"2025Q1"`.
+/// @param base_value - Base value of the node in its own units.
+/// @param pct_range - Percentage moves, e.g. `[-10, 0, 10]` for ±10%.
+/// @returns Plain `ParameterSpec` object (`node_id`, `period_id`, `base_value`, absolute `perturbations`) for a `SensitivityConfig`.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if `periodId` is not a valid period, and kind
+/// `invalid_type` if a number argument is not a number.
+#[wasm_bindgen(js_name = parameterSpecWithPercentages)]
+pub fn parameter_spec_with_percentages(
+    node_id: JsValue,
+    period_id: JsValue,
+    base_value: JsValue,
+    pct_range: JsValue,
+) -> Result<JsValue, JsValue> {
+    let period_id: finstack_quant_core::dates::PeriodId = js_string(&period_id, "periodId")?
+        .parse()
+        .map_err(to_js_err)?;
+    to_js_value(
+        &finstack_quant_statements_analytics::analysis::ParameterSpec::with_percentages(
+            js_string(&node_id, "nodeId")?,
+            period_id,
+            js_f64(&base_value, "baseValue")?,
+            js_f64_seq(&pct_range, "pctRange")?,
+        ),
+    )
+}
+
 /// Compute forecast accuracy metrics (MAE, MAPE, sMAPE, RMSE).
 ///
 /// Takes two float arrays (actual, forecast) and returns the serde form of

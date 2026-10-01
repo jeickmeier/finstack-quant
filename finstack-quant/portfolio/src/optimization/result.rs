@@ -2,6 +2,7 @@
 //!
 use super::problem::PortfolioOptimizationProblem;
 use super::types::{SLACK_TOL, WEIGHT_TOL};
+use super::universe::CandidatePosition;
 use crate::error::{Error, Result};
 use crate::portfolio::Portfolio;
 use crate::position::Position;
@@ -164,50 +165,13 @@ impl PortfolioOptimizationResult {
     /// Returns [`Error::InvalidInput`] if the optimization did not
     /// find a feasible solution.
     pub fn to_rebalanced_portfolio(&self) -> Result<Portfolio> {
-        if !self.status.is_feasible() {
-            return Err(Error::invalid_input(
-                "cannot generate rebalanced portfolio from infeasible solution",
-            ));
-        }
-
-        let mut portfolio = self.problem.portfolio.clone();
-
-        for position in &mut portfolio.positions {
-            if let Some(qty) = self.implied_quantities.get(&position.position_id) {
-                position.quantity = *qty;
-            }
-        }
-        for candidate in &self.problem.trade_universe.candidates {
-            let Some(target_qty) = self.implied_quantities.get(&candidate.id).copied() else {
-                continue;
-            };
-            let target_weight = self
-                .optimal_weights
-                .get(&candidate.id)
-                .copied()
-                .unwrap_or(0.0);
-            if target_weight.abs() < WEIGHT_TOL || target_qty.abs() < WEIGHT_TOL {
-                continue;
-            }
-
-            portfolio
-                .entities
-                .entry(candidate.entity_id.clone())
-                .or_insert_with(|| Entity::new(candidate.entity_id.clone()));
-            let mut position = Position::new(
-                candidate.id.clone(),
-                candidate.entity_id.clone(),
-                candidate.instrument.id(),
-                std::sync::Arc::clone(&candidate.instrument),
-                target_qty,
-                candidate.unit,
-            )?;
-            position.attributes = candidate.attributes.clone();
-            portfolio.add_position(position)?;
-        }
-
-        portfolio.validate()?;
-        Ok(portfolio)
+        rebalance_portfolio(
+            self.problem.portfolio.clone(),
+            &self.problem.trade_universe.candidates,
+            &self.status,
+            &self.implied_quantities,
+            &self.optimal_weights,
+        )
     }
 
     /// Generate trade list (delta from current to target).
@@ -388,6 +352,61 @@ pub struct PortfolioOptimizationResultWire {
     /// Optional user-supplied problem label.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
+}
+
+/// Apply an optimization solution to a portfolio: the single owner of the
+/// rebalancing rules shared by [`PortfolioOptimizationResult::to_rebalanced_portfolio`]
+/// and [`super::rebalance_from_spec`].
+///
+/// Held positions take their `implied_quantities`; a candidate is added (with
+/// its entity created when missing) only when both its target weight and its
+/// target quantity are at least `WEIGHT_TOL` in magnitude; the result is
+/// validated.
+pub(crate) fn rebalance_portfolio(
+    mut portfolio: Portfolio,
+    candidates: &[CandidatePosition],
+    status: &OptimizationStatus,
+    implied_quantities: &IndexMap<PositionId, f64>,
+    optimal_weights: &IndexMap<PositionId, f64>,
+) -> Result<Portfolio> {
+    if !status.is_feasible() {
+        return Err(Error::invalid_input(
+            "cannot generate rebalanced portfolio from infeasible solution",
+        ));
+    }
+
+    for position in &mut portfolio.positions {
+        if let Some(qty) = implied_quantities.get(&position.position_id) {
+            position.quantity = *qty;
+        }
+    }
+    for candidate in candidates {
+        let Some(target_qty) = implied_quantities.get(&candidate.id).copied() else {
+            continue;
+        };
+        let target_weight = optimal_weights.get(&candidate.id).copied().unwrap_or(0.0);
+        if target_weight.abs() < WEIGHT_TOL || target_qty.abs() < WEIGHT_TOL {
+            continue;
+        }
+
+        portfolio
+            .entities
+            .entry(candidate.entity_id.clone())
+            .or_insert_with(|| Entity::new(candidate.entity_id.clone()));
+        let mut position = Position::new(
+            candidate.id.clone(),
+            candidate.entity_id.clone(),
+            candidate.instrument.id(),
+            std::sync::Arc::clone(&candidate.instrument),
+            target_qty,
+            candidate.unit,
+        )?;
+        position.attributes = candidate.attributes.clone();
+        portfolio.add_position(position)?;
+    }
+
+    portfolio.validate()?;
+    Ok(portfolio)
 }
 
 /// Constraints whose slack is approximately zero, with that slack, in slack

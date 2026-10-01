@@ -472,10 +472,10 @@ fn valuations_dts_exposes_direct_fx_instruments() {
 
     assert!(dts.contains("export interface FxNamespace"));
     assert!(dts.contains("FxSpot: FxInstrumentConstructor<FxInstrument>;"));
-    assert!(dts.contains("FxForward: FxInstrumentConstructor<FxInstrument>;"));
+    assert!(dts.contains("FxForward: FxForwardConstructor;"));
     assert!(dts.contains("FxSwap: FxInstrumentConstructor<FxInstrument>;"));
     assert!(dts.contains("Ndf: FxInstrumentConstructor<FxInstrument>;"));
-    assert!(dts.contains("FxOption: FxInstrumentConstructor<FxOptionInstrument>;"));
+    assert!(dts.contains("FxOption: FxOptionConstructor;"));
     assert!(dts.contains("FxBarrierOption: FxInstrumentConstructor<FxBarrierOptionInstrument>;"));
     assert!(dts.contains("FxDigitalOption: FxInstrumentConstructor<FxDigitalOptionInstrument>;"));
     assert!(dts.contains("FxTouchOption: FxInstrumentConstructor<FxTouchOptionInstrument>;"));
@@ -1778,4 +1778,46 @@ fn error_types_are_declared() {
     }
     assert!(declares_type(&dts, "ContractValidationError"));
     assert!(!dts.contains("AttributionError"));
+}
+
+/// S21: Rust computations that were reachable only from Python are declared
+/// on the facade with their Rust-canonical names and structured returns.
+#[test]
+fn rust_computation_twins_are_declared() {
+    let dts = index_dts();
+    for sig in [
+        "absToSmm(speed: number, month: number): number;",
+        "scheduleWal(scheduleJson: JsonInput, asOf: string): number;",
+        "scheduleOutstandingByDate(scheduleJson: JsonInput): DatedFlowJson[];",
+        "scheduleCalendarYearLadder(scheduleJson: JsonInput, pvs: number[] | Float64Array): CalendarYearLadderRow[];",
+        "instrumentCashflows(instrumentJson: JsonInput, marketJson: JsonInput, asOf: string, model: string): generated.valuations.InstrumentCashflowEnvelope;",
+        "valuationResultMetricSeries(result: ValuationResult | string, base: string): [string[], number][];",
+        "calibrationEnvelopeContentHash(envelopeJson: CalibrationEnvelope | string): string;",
+        "calibrationResultContentHash(resultJson: CalibrationResultEnvelope | string): string;",
+        "attributePnlMany(params: AttributionJsonInputs, instruments: JsonInput[]): PnlAttribution[];",
+        "attributeReturnContribution(spec: JsonInput): ReturnContributionResult;",
+        "pnlAttributionExplainText(pnl: PnlAttribution | string): string;",
+        "financialModelContentHash(modelJson: JsonInput): string;",
+        "nodeToDatedSchedule(modelJson: JsonInput, resultJson: StatementResult | string, nodeId: string, convention?: 'end' | 'start' | null): [string, number][];",
+        "scenarioComparisonTable(scenarioResultsJson: ScenarioResults | string, metrics: string[]): TableEnvelope;",
+        "monteCarloPercentileByPeriod(resultsJson: MonteCarloResults | string, metric: string, percentile: number): Record<string, number> | undefined;",
+        "statementResultToTableLong(resultJson: StatementResult | string): TableEnvelope;",
+        "statementResultToTableWide(resultJson: StatementResult | string): TableEnvelope;",
+        "synthesizedDealJson(): string;",
+        "rebalanceFromSpec(specJson: JsonInput, resultJson: PortfolioOptimizationResult | string): Portfolio;",
+        "netInCurrencyByDate(cashflowsJson: PortfolioCashflows | string, currency: string): [string, number][];",
+        "portfolioMetricsSeries(metricsJson: PortfolioMetrics | string, base: string): PortfolioMetricSeriesEntry[];",
+        "readonly entityIds: string[];",
+        "readonly positionIds: string[];",
+        "zeroCoupon(id: string, notional: Money, issueDate: string, maturity: string, discountCurveId: string): Bond;",
+        "exampleFloatingWithDdtl(): TermLoan;",
+        "facilityIrr(marketJson: JsonInput, asOf: string): number;",
+        "expectedCashflows(marketJson: JsonInput, asOf: string): generated.valuations.CashFlowSchedule;",
+        "marketForwardRate(marketJson: JsonInput, asOf: string): number;",
+        "impliedVol(marketJson: JsonInput, asOf: string, targetPrice: number): number;",
+        "FxForward: FxForwardConstructor;",
+        "FxOption: FxOptionConstructor;",
+    ] {
+        assert!(contains_signature(&dts, sig), "index.d.ts is missing `{sig}`");
+    }
 }

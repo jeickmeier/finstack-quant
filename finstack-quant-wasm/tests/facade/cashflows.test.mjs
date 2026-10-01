@@ -63,12 +63,16 @@ const cashflowSpec = JSON.stringify({
 });
 
 const EXPORTED_KEYS = [
+  'absToSmm',
   'accruedInterest',
   'buildCashflowScheduleJson',
   'cdrToMdr',
   'cprToSmm',
   'datedFlowsJson',
   'mdrToCdr',
+  'scheduleCalendarYearLadder',
+  'scheduleOutstandingByDate',
+  'scheduleWal',
   'smmToCpr',
   'validateCashflowScheduleJson',
 ];

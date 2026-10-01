@@ -29,8 +29,9 @@
 //! contract about how disruptive future changes are likely to be.
 //!
 //! **Stable** — golden-tested, signatures preserved across releases:
-//! - `Portfolio` (typed handle: `fromSpec`, `toJson`, `id`, `asOf`,
-//!   `baseCurrency`, `numPositions`)
+//! - `Portfolio` (typed handle: `fromSpec`, `toJson`, `id`, `name`, `asOf`,
+//!   `baseCurrency`, `tags`, `meta`, `entityIds`, `positionIds`,
+//!   `numPositions`)
 //! - `parsePortfolioSpecJson`, `buildPortfolioFromSpecJson`
 //! - `valuePortfolio`, `valuePortfolioBuilt`,
 //!   `aggregateFullCashflows`, `aggregateFullCashflowsBuilt`,
@@ -116,6 +117,55 @@ impl JsPortfolio {
     #[wasm_bindgen(getter, js_name = baseCurrency)]
     pub fn base_currency(&self) -> String {
         self.inner.base_currency.to_string()
+    }
+
+    /// Human-readable portfolio name, or `null` when unset.
+    #[wasm_bindgen(getter)]
+    pub fn name(&self) -> Option<String> {
+        self.inner.name.clone()
+    }
+
+    /// Portfolio-level tags as a plain `{ key: value }` object.
+    ///
+    /// # Errors
+    ///
+    /// Throws a JavaScript exception if the tags cannot be converted to a
+    /// JavaScript value.
+    #[wasm_bindgen(getter)]
+    pub fn tags(&self) -> Result<JsValue, JsValue> {
+        to_js_value(&self.inner.tags)
+    }
+
+    /// Portfolio-level metadata as a plain JSON-shaped object.
+    ///
+    /// # Errors
+    ///
+    /// Throws a JavaScript exception if the metadata cannot be converted to a
+    /// JavaScript value.
+    #[wasm_bindgen(getter)]
+    pub fn meta(&self) -> Result<JsValue, JsValue> {
+        to_js_value(&self.inner.meta)
+    }
+
+    /// Entity identifiers in registration order (includes the auto-created
+    /// standalone entity when any position uses it).
+    #[wasm_bindgen(getter, js_name = entityIds)]
+    pub fn entity_ids(&self) -> Vec<String> {
+        self.inner
+            .entities
+            .keys()
+            .map(|id| id.as_str().to_owned())
+            .collect()
+    }
+
+    /// Position identifiers in portfolio order.
+    #[wasm_bindgen(getter, js_name = positionIds)]
+    pub fn position_ids(&self) -> Vec<String> {
+        self.inner
+            .positions()
+            .iter()
+            .map(|p| p.position_id.as_str().to_owned())
+            .collect()
     }
 
     /// Number of positions in the portfolio.
@@ -1040,6 +1090,154 @@ pub fn optimize_portfolio(spec_json: JsValue, market_json: JsValue) -> Result<Js
         finstack_quant_portfolio::optimization::optimize_from_spec(&spec, &market, &config)
             .map_err(to_js_err)?;
     to_js_value(&result)
+}
+
+/// Rebalance a spec's portfolio to an optimization result.
+///
+/// Wire twin of Python `PortfolioOptimizationResult.to_rebalanced_portfolio`
+/// (Rust `optimization::rebalance_from_spec`): held positions take the
+/// result's implied quantities and trade-universe candidates with a
+/// non-negligible target weight and quantity are added as new positions.
+/// @param spec_json - The `PortfolioOptimizationSpec` JSON passed to `optimizePortfolio`.
+/// @param result_json - The `PortfolioOptimizationResult` that `optimizePortfolio` returned for that spec (object or JSON).
+/// @returns The rebalanced, validated `Portfolio` handle.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if either input is malformed, the solution is
+/// infeasible, or the result names a position that is neither in the spec
+/// portfolio nor a trade-universe candidate (a result paired with the wrong
+/// spec), and propagates portfolio validation failures.
+#[wasm_bindgen(js_name = rebalanceFromSpec)]
+pub fn rebalance_from_spec(
+    spec_json: JsValue,
+    result_json: JsValue,
+) -> Result<JsPortfolio, JsValue> {
+    let spec: finstack_quant_portfolio::optimization::PortfolioOptimizationSpec =
+        serde_json::from_str(&json_text(&spec_json, "specJson")?).map_err(to_js_err)?;
+    let result: finstack_quant_portfolio::optimization::PortfolioOptimizationResultWire =
+        serde_json::from_str(&json_text(&result_json, "resultJson")?).map_err(to_js_err)?;
+    let portfolio = finstack_quant_portfolio::optimization::rebalance_from_spec(&spec, &result)
+        .map_err(to_js_err)?;
+    Ok(JsPortfolio {
+        inner: Arc::new(portfolio),
+    })
+}
+
+/// Net same-currency cashflow amounts per date from a cashflow ladder.
+///
+/// Mirrors Python `net_in_currency_by_date` (Rust
+/// `cashflows::net_in_currency_by_date_json`).
+/// @param cashflows_json - `PortfolioCashflows` from `aggregateFullCashflows` (object or JSON), or a bare `{date: {ccy: {kind: money}}}` map.
+/// @param currency - ISO-4217 code selecting which per-date currency bucket to net.
+/// @returns `[isoDate, netAmount]` pairs sorted by date; dates with no flows in `currency` are omitted.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if the input is not JSON, `currency` is not
+/// a known ISO code, or `by_date` is not an object.
+#[wasm_bindgen(js_name = netInCurrencyByDate)]
+pub fn net_in_currency_by_date(
+    cashflows_json: JsValue,
+    currency: JsValue,
+) -> Result<JsValue, JsValue> {
+    let rows = finstack_quant_portfolio::cashflows::net_in_currency_by_date_json(
+        &json_text(&cashflows_json, "cashflowsJson")?,
+        &js_string(&currency, "currency")?,
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&rows)
+}
+
+/// Collapse a multi-currency cashflow ladder into the base currency per date and kind.
+///
+/// Free-function twin of Python `PortfolioCashflows.collapse_to_base_by_date_kind_json`
+/// (Rust `PortfolioCashflows::collapse_to_base_by_date_kind`): each flow is
+/// converted at the CIP forward `F(T) = S × DF_from(T) / DF_base(T)` from the
+/// `asOf` spot.
+/// @param cashflows_json - `PortfolioCashflows` from `aggregateFullCashflows` (object or JSON).
+/// @param market_json - Canonical market-context JSON supplying the FX matrix and discount curves.
+/// @param base_currency - ISO-4217 reporting currency.
+/// @param as_of - ISO-8601 valuation date for spot FX and the start of each discount interval.
+/// @param discount_curves - Optional `{ currency: curveId }` map; a missing entry uses the ISO code as the curve id.
+/// @returns Nested `{ isoDate: { kind: Money } }` ladder in the base currency.
+///
+/// # Errors
+///
+/// Throws if an input is malformed, an FX rate or discount factor needed for a
+/// conversion is missing or invalid, or monetary aggregation fails.
+#[wasm_bindgen(js_name = collapseToBaseByDateKind)]
+pub fn collapse_to_base_by_date_kind(
+    cashflows_json: JsValue,
+    market_json: JsValue,
+    base_currency: JsValue,
+    as_of: JsValue,
+    discount_curves: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    let cashflows: finstack_quant_portfolio::cashflows::PortfolioCashflows =
+        serde_json::from_str(&json_text(&cashflows_json, "cashflowsJson")?).map_err(to_js_err)?;
+    let market: finstack_quant_core::market_data::context::MarketContext =
+        serde_json::from_str(&json_text(&market_json, "marketJson")?).map_err(to_js_err)?;
+    let base_currency: finstack_quant_core::currency::Currency =
+        js_string(&base_currency, "baseCurrency")?
+            .parse()
+            .map_err(to_js_err)?;
+    let as_of = crate::utils::parse_iso_date(&js_string(&as_of, "asOf")?)?;
+    let discount_curves: Option<
+        std::collections::HashMap<
+            finstack_quant_core::currency::Currency,
+            finstack_quant_core::types::CurveId,
+        >,
+    > = match discount_curves.as_ref() {
+        Some(value) if !value.is_undefined() && !value.is_null() => {
+            Some(crate::utils::input::from_js_json(value, "discountCurves")?)
+        }
+        _ => None,
+    };
+    let collapsed = cashflows
+        .collapse_to_base_by_date_kind(&market, base_currency, as_of, discount_curves.as_ref())
+        .map_err(to_js_err)?;
+    to_js_value(&collapsed)
+}
+
+/// Decoded series of one base metric from aggregated portfolio metrics.
+///
+/// Free-function twin of Python `PortfolioMetrics.metric_series` (Rust
+/// `PortfolioMetrics::metric_series`): every aggregated key that encodes a
+/// series of `base` (e.g. `bucketed_dv01::USD-OIS::10y`) is decoded into its
+/// components.
+/// @param metrics_json - `PortfolioMetrics` from `aggregateMetrics` (object or JSON).
+/// @param base - Canonical base metric identifier (e.g. `"bucketed_dv01"`).
+/// @returns `{ components, total, by_entity }` entries in aggregation order.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if the metrics input is malformed or `base`
+/// is not a canonically encoded metric key.
+#[wasm_bindgen(js_name = portfolioMetricsSeries)]
+pub fn portfolio_metrics_series(metrics_json: JsValue, base: JsValue) -> Result<JsValue, JsValue> {
+    let metrics: finstack_quant_portfolio::metrics::PortfolioMetrics =
+        serde_json::from_str(&json_text(&metrics_json, "metricsJson")?).map_err(to_js_err)?;
+    let base: finstack_quant_valuations::metrics::MetricId =
+        js_string(&base, "base")?.parse().map_err(to_js_err)?;
+    let entries: Vec<MetricSeriesEntry<'_>> = metrics
+        .metric_series(&base)
+        .into_iter()
+        .map(|(components, aggregate)| MetricSeriesEntry {
+            components,
+            total: aggregate.total,
+            by_entity: &aggregate.by_entity,
+        })
+        .collect();
+    to_js_value(&entries)
+}
+
+/// One decoded series entry returned by `portfolioMetricsSeries`.
+#[derive(serde::Serialize)]
+struct MetricSeriesEntry<'a> {
+    components: Vec<String>,
+    total: f64,
+    by_entity: &'a indexmap::IndexMap<finstack_quant_portfolio::types::EntityId, f64>,
 }
 
 /// Replay a portfolio through dated market snapshots.

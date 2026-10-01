@@ -182,10 +182,7 @@ fn negative_rates_regime_attribution_succeeds() {
         "carry must be finite in a negative-rate regime"
     );
     assert!(
-        attribution.residual_within_tolerance(
-            attribution.meta.tolerance_pct,
-            attribution.meta.tolerance_abs,
-        ),
+        attribution.residual_within_tolerance(None, None),
         "residual must stay within the parallel-method tolerance, got {}",
         attribution.residual.amount()
     );

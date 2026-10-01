@@ -158,7 +158,16 @@ impl JsAttributionJsonInputs {
 fn run_attribute_pnl(
     params: &JsAttributionJsonInputs,
 ) -> Result<finstack_quant_attribution::AttributionResult, JsValue> {
-    let spec = finstack_quant_attribution::AttributionSpec::from_json_inputs(
+    attribution_spec(params)?
+        .execute_contained()
+        .map_err(to_js_err)
+}
+
+/// Build the Rust `AttributionSpec` from the bundled JSON inputs.
+fn attribution_spec(
+    params: &JsAttributionJsonInputs,
+) -> Result<finstack_quant_attribution::AttributionSpec, JsValue> {
+    finstack_quant_attribution::AttributionSpec::from_json_inputs(
         finstack_quant_attribution::AttributionJsonInputs {
             instrument_json: &params.instrument_json,
             market_t0_json: &params.market_t0_json,
@@ -172,8 +181,7 @@ fn run_attribute_pnl(
             full_cross_attribution: params.full_cross_attribution.unwrap_or(false),
         },
     )
-    .map_err(to_js_err)?;
-    spec.execute_contained().map_err(to_js_err)
+    .map_err(to_js_err)
 }
 
 /// Run P&L attribution for a single instrument.
@@ -314,4 +322,265 @@ pub fn default_attribution_metrics() -> Result<JsValue, JsValue> {
         .map(|m| m.to_string())
         .collect();
     crate::utils::to_js_value(&metrics)
+}
+
+/// Headline P&L bridge: `value(T₁) − value(T₀)` in one currency.
+///
+/// Mirrors Python `pnl_bridge` (Rust `pnl_bridge`): two repricings and no
+/// factor loop. The T₀ value converts into `targetCurrency` with the T₀
+/// market's FX and the T₁ value with the T₁ market's FX. Use `attributePnl`
+/// when the factor decomposition matters.
+/// @param instrument_json - Canonical `finstack_quant.instrument/1` envelope (object or JSON).
+/// @param market_t0_json - Canonical MarketContext at the opening date.
+/// @param market_t1_json - Canonical MarketContext at the closing date.
+/// @param as_of_t0 - Opening valuation date as an ISO-8601 string.
+/// @param as_of_t1 - Closing valuation date as an ISO-8601 string.
+/// @param target_currency - ISO-4217 currency of the returned P&L.
+/// @returns The P&L as a `Money` handle in `targetCurrency`.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if an input is malformed, kind `not_found`
+/// if a curve, market item or FX leg is missing, and kind `computation` if
+/// pricing fails.
+#[wasm_bindgen(js_name = pnlBridge)]
+pub fn pnl_bridge(
+    instrument_json: JsValue,
+    market_t0_json: JsValue,
+    market_t1_json: JsValue,
+    as_of_t0: JsValue,
+    as_of_t1: JsValue,
+    target_currency: JsValue,
+) -> Result<crate::api::core::money::JsMoney, JsValue> {
+    let instrument = parse_instrument(&instrument_json, "instrumentJson")?;
+    let instrument: std::sync::Arc<dyn finstack_quant_valuations::instruments::Instrument> =
+        std::sync::Arc::from(instrument.into_boxed().map_err(to_js_err)?);
+    let market_t0: finstack_quant_core::market_data::context::MarketContext =
+        serde_json::from_str(&json_text(&market_t0_json, "marketT0Json")?).map_err(to_js_err)?;
+    let market_t1: finstack_quant_core::market_data::context::MarketContext =
+        serde_json::from_str(&json_text(&market_t1_json, "marketT1Json")?).map_err(to_js_err)?;
+    let target_currency: finstack_quant_core::currency::Currency =
+        js_string(&target_currency, "targetCurrency")?
+            .parse()
+            .map_err(to_js_err)?;
+    let inner = finstack_quant_attribution::pnl_bridge(
+        &instrument,
+        &market_t0,
+        &market_t1,
+        crate::utils::parse_iso_date(&js_string(&as_of_t0, "asOfT0")?)?,
+        crate::utils::parse_iso_date(&js_string(&as_of_t1, "asOfT1")?)?,
+        target_currency,
+    )
+    .map_err(to_js_err)?;
+    Ok(crate::api::core::money::JsMoney { inner })
+}
+
+/// Parse a canonical instrument envelope (object or JSON) into its payload.
+fn parse_instrument(
+    value: &JsValue,
+    label: &str,
+) -> Result<finstack_quant_valuations::instruments::InstrumentJson, JsValue> {
+    let envelope: finstack_quant_valuations::instruments::InstrumentEnvelope =
+        serde_json::from_str(&json_text(value, label)?).map_err(to_js_err)?;
+    Ok(envelope.instrument)
+}
+
+/// Run one attribution configuration against many instruments.
+///
+/// Mirrors Python `attribute_pnl_many` (Rust `attribute_pnl_many`): every
+/// instrument is attributed with the markets, dates, method and configuration
+/// in `params` (whose own `instrumentJson` is replaced by each entry of
+/// `instruments`). Results come back in input order; the first failing
+/// instrument aborts the batch. Python returns the same attributions as a
+/// wide DataFrame.
+/// @param params - AttributionJsonInputs carrying the shared markets, dates, method and configuration.
+/// @param instruments - Array of canonical instrument envelopes (objects or JSON), in output order.
+/// @returns One `PnlAttribution` object per instrument, in input order.
+///
+/// # Errors
+///
+/// Throws a `FinstackError` with the Rust classification for the first
+/// failing instrument (see `attributePnl`), or kind `validation` if an
+/// instrument envelope is malformed.
+#[wasm_bindgen(js_name = attributePnlMany)]
+pub fn attribute_pnl_many(
+    params: &JsAttributionJsonInputs,
+    instruments: JsValue,
+) -> Result<JsValue, JsValue> {
+    let instruments: Vec<serde_json::Value> =
+        crate::utils::input::from_js_json(&instruments, "instruments")?;
+    let instruments = instruments
+        .into_iter()
+        .map(|value| {
+            serde_json::from_value::<finstack_quant_valuations::instruments::InstrumentEnvelope>(
+                value,
+            )
+            .map(|envelope| envelope.instrument)
+            .map_err(to_js_err)
+        })
+        .collect::<Result<Vec<_>, JsValue>>()?;
+    let template = attribution_spec(params)?;
+    let attributions = finstack_quant_attribution::attribute_pnl_many(&template, instruments)
+        .map_err(to_js_err)?;
+    crate::utils::to_js_value(&attributions)
+}
+
+/// Compute return-contribution attribution from a specification.
+///
+/// Mirrors Python `attribute_return_contribution` (Rust
+/// `attribute_return_contribution`): per-position contributions, group and
+/// factor roll-ups and, with a benchmark, Brinson-style allocation and
+/// selection effects.
+/// @param spec - `ReturnContributionSpec` (object or JSON): positions with weights and returns, weighting scheme and optional benchmark.
+/// @returns Plain `ReturnContributionResult` object.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if the spec is malformed or violates the
+/// weighting/benchmark invariants (including a Brinson group with zero net
+/// weight but nonzero contribution).
+#[wasm_bindgen(js_name = attributeReturnContribution)]
+pub fn attribute_return_contribution(spec: JsValue) -> Result<JsValue, JsValue> {
+    let spec: finstack_quant_attribution::ReturnContributionSpec =
+        crate::utils::input::from_js_json(&spec, "spec")?;
+    let result =
+        finstack_quant_attribution::attribute_return_contribution(&spec).map_err(to_js_err)?;
+    crate::utils::to_js_value(&result)
+}
+
+/// Compute return-contribution attribution and return wire JSON.
+///
+/// Wire twin of `attributeReturnContribution` (Rust
+/// `attribute_return_contribution_json`).
+/// @param spec_json - `ReturnContributionSpec` (object or JSON).
+/// @returns Canonical `ReturnContributionResult` JSON text.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if the spec is malformed or violates the
+/// weighting/benchmark invariants.
+#[wasm_bindgen(js_name = attributeReturnContributionJson)]
+pub fn attribute_return_contribution_json(spec_json: JsValue) -> Result<String, JsValue> {
+    finstack_quant_attribution::attribute_return_contribution_json(&json_text(
+        &spec_json, "specJson",
+    )?)
+    .map_err(to_js_err)
+}
+
+/// Validate a return-contribution specification and return its canonical JSON.
+///
+/// Mirrors Python `validate_return_contribution_json`: the spec is parsed and
+/// executed, so a spec that validates here also computes.
+/// @param spec_json - `ReturnContributionSpec` (object or JSON).
+/// @returns Canonical compact spec JSON.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if the spec is malformed or violates the
+/// weighting/benchmark invariants.
+#[wasm_bindgen(js_name = validateReturnContributionJson)]
+pub fn validate_return_contribution_json(spec_json: JsValue) -> Result<String, JsValue> {
+    finstack_quant_attribution::validate_return_contribution_json(&json_text(
+        &spec_json, "specJson",
+    )?)
+    .map_err(to_js_err)
+}
+
+fn parse_pnl(value: &JsValue) -> Result<finstack_quant_attribution::PnlAttribution, JsValue> {
+    crate::utils::input::from_js_json(value, "pnl")
+}
+
+/// Human-readable tree explanation of an attribution (non-zero factors only).
+///
+/// Free-function twin of Python `PnlAttribution.explain` (Rust
+/// `PnlAttribution::explain`).
+/// @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
+/// @returns Multi-line tree text.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if `pnl` is not a `PnlAttribution`.
+#[wasm_bindgen(js_name = pnlAttributionExplainText)]
+pub fn pnl_attribution_explain(pnl: JsValue) -> Result<String, JsValue> {
+    Ok(parse_pnl(&pnl)?.explain())
+}
+
+/// Verbose tree explanation of an attribution, including zero-valued factors.
+///
+/// Free-function twin of Python `PnlAttribution.explain_verbose` (Rust
+/// `PnlAttribution::explain_verbose`).
+/// @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
+/// @returns Multi-line tree text.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if `pnl` is not a `PnlAttribution`.
+#[wasm_bindgen(js_name = pnlAttributionExplainVerboseText)]
+pub fn pnl_attribution_explain_verbose(pnl: JsValue) -> Result<String, JsValue> {
+    Ok(parse_pnl(&pnl)?.explain_verbose())
+}
+
+/// Whether the attribution residual is within tolerance.
+///
+/// Free-function twin of Python `PnlAttribution.residual_within_tolerance`
+/// (Rust `PnlAttribution::residual_within_tolerance`): the tolerance is the
+/// larger of `pctTolerance`% of |total P&L| and `absTolerance`; an
+/// attribution flagged `result_invalid` is never within tolerance.
+/// @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
+/// @param pct_tolerance - Optional percentage tolerance (`0.1` = 0.1%); omitted uses the run's `meta.tolerance_pct`.
+/// @param abs_tolerance - Optional absolute tolerance in `total_pnl` currency units; omitted uses `meta.tolerance_abs`.
+/// @returns `true` when the residual is within tolerance.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if `pnl` is not a `PnlAttribution`, and kind
+/// `invalid_type` if a tolerance is not a number.
+#[wasm_bindgen(js_name = pnlAttributionResidualWithinTolerance)]
+pub fn pnl_attribution_residual_within_tolerance(
+    pnl: JsValue,
+    pct_tolerance: Option<JsValue>,
+    abs_tolerance: Option<JsValue>,
+) -> Result<bool, JsValue> {
+    let pnl = parse_pnl(&pnl)?;
+    Ok(pnl.residual_within_tolerance(
+        crate::utils::input::js_opt_f64(pct_tolerance.as_ref(), "pctTolerance")?,
+        crate::utils::input::js_opt_f64(abs_tolerance.as_ref(), "absTolerance")?,
+    ))
+}
+
+/// Check that every factor's currency matches the total P&L currency.
+///
+/// Free-function twin of Python `PnlAttribution.validate_currencies` (Rust
+/// `PnlAttribution::validate_currencies`); run it before summing factors.
+/// @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
+///
+/// # Errors
+///
+/// Throws with kind `validation` if `pnl` is not a `PnlAttribution` or a
+/// factor is denominated in another currency.
+#[wasm_bindgen(js_name = pnlAttributionValidateCurrencies)]
+pub fn pnl_attribution_validate_currencies(pnl: JsValue) -> Result<(), JsValue> {
+    parse_pnl(&pnl)?.validate_currencies().map_err(to_js_err)
+}
+
+/// Metric identifiers the attribution's method needs pre-computed.
+///
+/// Free-function twin of Python `PnlAttribution.required_metrics` (Rust
+/// `AttributionMethod::required_metrics` of `meta.method`): the metrics-based
+/// method lists its sensitivities; repricing methods return an empty array.
+/// @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
+/// @returns Canonical metric identifiers.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if `pnl` is not a `PnlAttribution`.
+#[wasm_bindgen(js_name = pnlAttributionRequiredMetrics)]
+pub fn pnl_attribution_required_metrics(pnl: JsValue) -> Result<Vec<String>, JsValue> {
+    Ok(parse_pnl(&pnl)?
+        .meta
+        .method
+        .required_metrics()
+        .iter()
+        .map(ToString::to_string)
+        .collect())
 }

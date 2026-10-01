@@ -36,7 +36,7 @@ use enums::{
     PyInequality, PyMissingMetricPolicy, PyTradeDirection, PyTradeType, PyWeightingScheme,
 };
 use expressions::{PyConstraint, PyMetricExpr, PyObjective, PyPerPositionMetric, PyPositionFilter};
-use optimize::optimize_portfolio;
+use optimize::{optimize_portfolio, rebalance_from_spec};
 use spec_result::{
     PyCandidatePosition, PyPortfolioOptimizationResult, PyPortfolioOptimizationSpec,
     PyTradeUniverse,
@@ -63,6 +63,7 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyPortfolioOptimizationResult>()?;
 
     m.add_function(wrap_pyfunction!(optimize_portfolio, m)?)?;
+    m.add_function(wrap_pyfunction!(rebalance_from_spec, m)?)?;
 
     Ok(())
 }

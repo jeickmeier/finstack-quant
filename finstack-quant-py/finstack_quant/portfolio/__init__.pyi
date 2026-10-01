@@ -134,6 +134,7 @@ __all__ = [
     "optimize_portfolio",
     "parse_portfolio_spec_json",
     "position_what_if",
+    "rebalance_from_spec",
     "replay_portfolio",
     "replay_portfolio_json",
     "scenario_pnl",
@@ -13170,6 +13171,67 @@ def optimize_portfolio(
     ...     optimize_portfolio(spec, MarketContext())
     ... except PortfolioError as exc:
     ...     print("no decision variables" in str(exc))
+    True
+    """
+    ...
+
+def rebalance_from_spec(
+    spec: PortfolioOptimizationSpec,
+    result: PortfolioOptimizationResult,
+) -> Portfolio:
+    """
+    Rebalance a spec's portfolio to an optimization result.
+
+    Mirrors Rust ``optimization::rebalance_from_spec`` (WASM
+    ``rebalanceFromSpec``): held positions take ``result.implied_quantities``
+    and trade-universe candidates with a non-negligible target weight and
+    quantity are added as new positions. Unlike
+    :meth:`PortfolioOptimizationResult.to_rebalanced_portfolio`, it also works
+    on a result rebuilt with ``from_json`` or unpickled.
+
+    Parameters
+    ----------
+    spec : PortfolioOptimizationSpec
+        The specification passed to :func:`optimize_portfolio`.
+    result : PortfolioOptimizationResult
+        The result :func:`optimize_portfolio` returned for ``spec``.
+
+    Returns
+    -------
+    Portfolio
+        The rebalanced, validated portfolio.
+
+    Raises
+    ------
+    PortfolioError
+        If the solution is infeasible, the result names a position that is
+        neither in the spec portfolio nor a trade-universe candidate (a result
+        paired with the wrong spec), or portfolio validation fails.
+
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import (
+    ...     MetricExpr,
+    ...     Objective,
+    ...     PerPositionMetric,
+    ...     PortfolioError,
+    ...     PortfolioOptimizationResult,
+    ...     PortfolioOptimizationSpec,
+    ...     rebalance_from_spec,
+    ... )
+    >>> objective = Objective.maximize(MetricExpr.weighted_sum(PerPositionMetric.pv_base()))
+    >>> portfolio = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
+    >>> spec = PortfolioOptimizationSpec.new(portfolio, objective)
+    >>> foreign = PortfolioOptimizationResult.from_json(
+    ...     '{"schema_version":1,"status":"optimal","status_label":"optimal","is_feasible":true,'
+    ...     '"objective_value":0.0,"turnover":0.0,"optimal_weights":{"X":1.0},"current_weights":{},'
+    ...     '"weight_deltas":{},"implied_quantities":{"X":1.0},"metric_values":{},"trades":[],'
+    ...     '"constraint_slacks":{},"binding_constraints":[]}'
+    ... )
+    >>> try:
+    ...     rebalance_from_spec(spec, foreign)
+    ... except PortfolioError as exc:
+    ...     print("neither in the spec portfolio" in str(exc))
     True
     """
     ...

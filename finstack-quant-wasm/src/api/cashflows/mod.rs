@@ -1,6 +1,6 @@
 //! WASM bindings for the `finstack-quant-cashflows` crate.
 
-use crate::utils::input::{js_f64, js_string, json_text, opt_json_text};
+use crate::utils::input::{js_f64, js_f64_seq, js_string, js_uint, json_text, opt_json_text};
 use crate::utils::to_js_err;
 use wasm_bindgen::prelude::*;
 
@@ -124,4 +124,82 @@ pub fn cdr_to_mdr(cdr: JsValue) -> Result<f64, JsValue> {
 pub fn mdr_to_cdr(mdr: JsValue) -> Result<f64, JsValue> {
     let mdr = js_f64(&mdr, "mdr")?;
     finstack_quant_cashflows::builder::mdr_to_cdr(mdr).map_err(to_js_err)
+}
+
+/// Convert an ABS speed to the single-month mortality for a seasoning month.
+///
+/// Mirrors Rust `abs_to_smm`: the ABS convention (auto-loan and consumer
+/// ABS) prepays a constant share of the *original* balance each month, so
+/// `SMM_t = speed / (1 − speed · (t − 1))`. Month 0 is treated as month 1;
+/// once the original balance is exhausted the result is capped at 1.0.
+///
+/// @param speed - Monthly prepayment as a decimal fraction of the original balance (`0.015` = 1.5% ABS), in `[0, 1]`.
+/// @param month - Seasoning month counted from origination (non-negative integer).
+/// @returns Single-month mortality as a decimal in `[0, 1]`.
+/// @throws If `speed` is non-finite or outside `[0, 1]` (kind `validation`), or `month` is not a non-negative integer (kind `invalid_type`).
+#[wasm_bindgen(js_name = absToSmm)]
+pub fn abs_to_smm(speed: JsValue, month: JsValue) -> Result<f64, JsValue> {
+    let speed = js_f64(&speed, "speed")?;
+    let month: u32 = js_uint(&month, "month")?;
+    finstack_quant_cashflows::abs_to_smm(speed, month).map_err(to_js_err)
+}
+
+/// Weighted average life of a schedule, in years from `asOf`.
+///
+/// JSON-first twin of Python `CashFlowSchedule.wal` (Rust
+/// `schedule_wal`): WAL over the positive principal flows (amortization,
+/// notional and prepayment) dated after `asOf`.
+///
+/// @param schedule_json - `CashFlowSchedule` (object or JSON).
+/// @param as_of - ISO-8601 measurement date; only principal flows strictly after it count.
+/// @returns WAL in years; `0` when no principal flow falls after `asOf`.
+/// @throws If the schedule or date is malformed or the schedule fails validation (kind `validation`).
+#[wasm_bindgen(js_name = scheduleWal)]
+pub fn schedule_wal(schedule_json: JsValue, as_of: JsValue) -> Result<f64, JsValue> {
+    finstack_quant_cashflows::schedule_wal(
+        &json_text(&schedule_json, "scheduleJson")?,
+        &js_string(&as_of, "asOf")?,
+    )
+    .map_err(to_js_err)
+}
+
+/// Outstanding principal balance after each unique date of a schedule.
+///
+/// JSON-first twin of Python `CashFlowSchedule.outstanding_by_date` (Rust
+/// `schedule_outstanding_by_date`): principal flows (amortization, PIK,
+/// draws and repayments) replayed from the initial notional.
+///
+/// @param schedule_json - `CashFlowSchedule` (object or JSON) with `meta.issue_date` set.
+/// @returns `{ date, amount }` entries in date order; `amount` is the outstanding balance after that date's flows.
+/// @throws If the schedule is malformed or fails validation, `meta.issue_date` is unset, or principal flows mix currencies (kind `validation`).
+#[wasm_bindgen(js_name = scheduleOutstandingByDate)]
+pub fn schedule_outstanding_by_date(schedule_json: JsValue) -> Result<JsValue, JsValue> {
+    let rows = finstack_quant_cashflows::schedule_outstanding_by_date(&json_text(
+        &schedule_json,
+        "scheduleJson",
+    )?)
+    .map_err(to_js_err)?;
+    crate::utils::to_js_value(&rows)
+}
+
+/// Calendar-year non-principal / principal / PV ladder of a schedule.
+///
+/// JSON-first twin of Python `CashFlowSchedule.calendar_year_ladder` (Rust
+/// `schedule_calendar_year_ladder`).
+///
+/// @param schedule_json - `CashFlowSchedule` (object or JSON).
+/// @param pvs - Present value of each schedule flow, one per flow in schedule order, in flow-amount units.
+/// @returns `{ year, non_principal, principal, pv }` rows in ascending year order.
+/// @throws If the schedule is malformed or fails validation, `pvs` does not have one entry per flow, or a value is non-finite (kind `validation`).
+#[wasm_bindgen(js_name = scheduleCalendarYearLadder)]
+pub fn schedule_calendar_year_ladder(
+    schedule_json: JsValue,
+    pvs: JsValue,
+) -> Result<JsValue, JsValue> {
+    let rows = finstack_quant_cashflows::schedule_calendar_year_ladder(
+        &json_text(&schedule_json, "scheduleJson")?,
+        &js_f64_seq(&pvs, "pvs")?,
+    )
+    .map_err(to_js_err)?;
+    crate::utils::to_js_value(&rows)
 }

@@ -220,6 +220,23 @@ fn computation_results_are_structured_not_strings() {
         ("FactorCovarianceForecast", "covarianceAt"),
         ("FactorCovarianceForecast", "factorModelAt"),
         ("FxInstrument", "price"),
+        ("ValuationInstrumentsNamespace", "instrumentCashflows"),
+        (
+            "ValuationInstrumentsNamespace",
+            "instrumentCashflowsWithMarket",
+        ),
+        ("AttributionNamespace", "attributePnlMany"),
+        ("AttributionNamespace", "attributeReturnContribution"),
+        ("PortfolioNamespace", "collapseToBaseByDateKind"),
+        ("PortfolioNamespace", "portfolioMetricsSeries"),
+        ("StatementsNamespace", "nodeToDatedSchedule"),
+        ("StatementsNamespace", "statementResultToTableLong"),
+        ("StatementsNamespace", "statementResultToTableWide"),
+        ("StatementsAnalyticsNamespace", "scenarioComparisonTable"),
+        ("CashflowsNamespace", "scheduleOutstandingByDate"),
+        ("CashflowsNamespace", "scheduleCalendarYearLadder"),
+        ("AssetBackedFacility", "project"),
+        ("RevolvingCredit", "expectedCashflows"),
     ] {
         let ret = declared(&dts, owner, export);
         assert_ne!(
@@ -253,6 +270,10 @@ fn bare_string_returns_are_named_or_allowlisted() {
         ("LiquidityNamespace", "liquidityTier"),
         // Canonical formula text (re-parseable), the Python `parse_formula` twin.
         ("StatementsNamespace", "parseFormula"),
+        // Canonical "sha256:<hex>" content hashes.
+        ("CalibrationNamespace", "calibrationEnvelopeContentHash"),
+        ("CalibrationNamespace", "calibrationResultContentHash"),
+        ("StatementsNamespace", "financialModelContentHash"),
     ];
     let dts = index_dts();
     let offenders: Vec<String> = members(&dts)

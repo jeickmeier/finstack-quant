@@ -435,10 +435,8 @@ impl PyPnlAttribution {
         pct_tolerance: Option<f64>,
         abs_tolerance: Option<f64>,
     ) -> bool {
-        self.inner.residual_within_tolerance(
-            pct_tolerance.unwrap_or(self.inner.meta.tolerance_pct),
-            abs_tolerance.unwrap_or(self.inner.meta.tolerance_abs),
-        )
+        self.inner
+            .residual_within_tolerance(pct_tolerance, abs_tolerance)
     }
 
     /// Validate that every factor's currency matches ``total_pnl.currency``.

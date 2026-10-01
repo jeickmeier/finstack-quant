@@ -59,7 +59,7 @@ mod types;
 mod universe;
 
 pub use constraints::{Constraint, Inequality};
-pub use helpers::{optimize_from_spec, PortfolioOptimizationSpec};
+pub use helpers::{optimize_from_spec, rebalance_from_spec, PortfolioOptimizationSpec};
 pub use lp_solver::DefaultLpOptimizer;
 pub use problem::PortfolioOptimizationProblem;
 pub use result::{
