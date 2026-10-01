@@ -43,8 +43,8 @@ for (const forecast of [
     const baseline = model({ '2025Q1': 80 }, forecast);
     const overridden = structuredClone(baseline);
     overridden.nodes.revenue.values['2025Q2'] = 999;
-    const expected = statements.evaluateModel(JSON.stringify(baseline)).nodes.revenue;
-    const actual = statements.evaluateModel(JSON.stringify(overridden)).nodes.revenue;
+    const expected = new statements.Evaluator().evaluate(JSON.stringify(baseline)).nodes.revenue;
+    const actual = new statements.Evaluator().evaluate(JSON.stringify(overridden)).nodes.revenue;
     assert.equal(actual['2025Q2'], 999);
     assert.equal(actual['2025Q3'], expected['2025Q3']);
     assert.equal(actual['2025Q4'], expected['2025Q4']);

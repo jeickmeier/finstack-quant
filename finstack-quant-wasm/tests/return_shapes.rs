@@ -236,6 +236,11 @@ fn computation_results_are_structured_not_strings() {
         ("StatementsNamespace", "statementResultToTableLong"),
         ("StatementsNamespace", "statementResultToTableWide"),
         ("StatementsAnalyticsNamespace", "scenarioComparisonTable"),
+        ("StatementsAnalyticsNamespace", "plSummaryReport"),
+        ("StatementsNamespace", "normalize"),
+        ("Evaluator", "evaluate"),
+        ("Evaluator", "evaluateMonteCarlo"),
+        ("DependencyTracer", "dependencyTree"),
         ("CashflowsNamespace", "scheduleOutstandingByDate"),
         ("CashflowsNamespace", "scheduleCalendarYearLadder"),
         ("AssetBackedFacility", "project"),
@@ -344,12 +349,10 @@ fn prose_returning_exports_are_named_text() {
              carry the Text suffix so they are not mistaken for JSON"
         );
     }
-    // The pre-refactor names must be gone, not aliased.
-    for stale in [
-        "parseFormulaText(",
-        "plSummaryReport(",
-        "creditAssessmentReport(",
-    ] {
+    // The pre-refactor names must be gone, not aliased. (`plSummaryReport` is
+    // now the structured table twin of Python `pl_summary_report`, pinned as a
+    // non-string return above.)
+    for stale in ["parseFormulaText(", "creditAssessmentReport("] {
         assert!(
             !dts.contains(stale),
             "the pre-refactor export {stale:?} is still declared; renames \

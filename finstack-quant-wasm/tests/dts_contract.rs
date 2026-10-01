@@ -997,15 +997,20 @@ fn statements_dts_matches_runtime_exports() {
     assert!(dts.contains("validateCheckSuiteSpecJson(json: JsonInput): string;"));
     // Computation results are structured objects, not JSON strings: a string
     // return here would put JS out of step with the typed Python result.
-    assert!(dts.contains("evaluateModel(modelJson: JsonInput): StatementResult;"));
+    assert!(dts.contains("export interface Evaluator extends WasmOwned {"));
+    assert!(dts.contains("Evaluator: EvaluatorConstructor;"));
+    assert!(dts.contains("evaluate(model: JsonInput): StatementResult;"));
     assert!(contains_ignoring_ws(
         &dts,
-        "evaluateModelWithMarket(modelJson: JsonInput, marketJson: JsonInput, asOf: string): StatementResult;",
+        "evaluateWithMarket(model: JsonInput, market: JsonInput, asOf: string): StatementResult;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "evaluateMonteCarlo(modelJson: JsonInput, configJson: JsonInput): MonteCarloResults;",
+        "evaluateMonteCarlo(model: JsonInput, config: generated.statements.MonteCarloConfig | string): MonteCarloResults;",
     ));
+    // The free-function evaluators were replaced by the `Evaluator` class.
+    assert!(!dts.contains("evaluateModel("));
+    assert!(!dts.contains("evaluateModelWithMarket("));
     assert!(declares_type(&dts, "StatementResult"));
     assert!(dts.contains("export declare const statements: StatementsNamespace;"));
 }
@@ -1053,13 +1058,14 @@ fn statements_analytics_dts_matches_runtime_exports() {
     // The dependency tree is the Rust `DependencyTree`; the ASCII rendering
     // says so in its name.
     assert!(declares_type(&dts, "DependencyTree"));
+    assert!(dts.contains("DependencyTracer: DependencyTracerConstructor;"));
     assert!(contains_ignoring_ws(
         &dts,
-        "dependencyTree(modelJson: JsonInput, nodeId: string): DependencyTree;"
+        "dependencyTree(nodeId: string): DependencyTree;"
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "dependencyTreeText(modelJson: JsonInput, nodeId: string): string;"
+        "dependencyTreeText(nodeId: string): string;"
     ));
     assert!(!dts.contains("traceDependencies"));
     assert!(declares_type(&dts, "Explanation"));

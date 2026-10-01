@@ -5,7 +5,7 @@ use crate::bindings::pandas_utils::{
     serde_rows_to_dataframe_with_schema, table_to_dataframe, ColumnSchema,
 };
 use crate::bindings::statements::evaluator::PyStatementResult;
-use crate::errors::{core_to_py, display_to_py, serde_json_to_py};
+use crate::errors::{core_to_py, display_to_py, serde_json_to_py, statements_to_py};
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::types::AmountOrScalar;
 use finstack_quant_statements_analytics::analysis::{
@@ -17,7 +17,6 @@ use finstack_quant_statements_analytics::analysis::{
     VarianceRow as RustVarianceRow,
 };
 use indexmap::IndexMap;
-use pyo3::exceptions::PyIndexError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -833,12 +832,9 @@ impl PySensitivityResult {
     }
 
     fn get_parameter_value(&self, scenario_index: usize, parameter: &str) -> PyResult<Option<f64>> {
-        let scenario = self
-            .inner
-            .scenarios
-            .get(scenario_index)
-            .ok_or_else(|| PyIndexError::new_err("scenario index out of range"))?;
-        Ok(scenario.parameter_values.get(parameter).copied())
+        self.inner
+            .get_parameter_value(scenario_index, parameter)
+            .map_err(statements_to_py)
     }
 
     fn get_value(
@@ -847,12 +843,9 @@ impl PySensitivityResult {
         node_id: &str,
         period: &str,
     ) -> PyResult<Option<f64>> {
-        let scenario = self
-            .inner
-            .scenarios
-            .get(scenario_index)
-            .ok_or_else(|| PyIndexError::new_err("scenario index out of range"))?;
-        Ok(scenario.results.get(node_id, &parse_period(period)?))
+        self.inner
+            .get_value(scenario_index, node_id, &parse_period(period)?)
+            .map_err(statements_to_py)
     }
 
     /// Render as an HTML table in Jupyter notebooks.

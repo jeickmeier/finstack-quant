@@ -45,14 +45,13 @@ export function createService(native: {
     | "validateCheckSuiteSpecJson"
     | "parseAndCompile"
     | "parseFormula"
-    | "evaluateModel"
-    | "evaluateModelWithMarket"
+    | "Evaluator"
   >;
   statements_analytics: Pick<
     typeof statements_analytics,
     | "explainFormula"
     | "explainFormulaText"
-    | "dependencyTreeText"
+    | "DependencyTracer"
     | "runChecks"
     | "runThreeStatementChecks"
     | "runCreditUnderwritingChecks"
@@ -156,18 +155,23 @@ export function createService(native: {
     },
     evaluateStatement(request) {
       return result(() => {
-        if (request.marketJson !== undefined || request.asOf !== undefined) {
-          if (request.marketJson === undefined || request.asOf === undefined)
-            throw new TypeError(
-              "Statement market JSON and as-of date must be supplied together",
+        const evaluator = new native.statements.Evaluator();
+        try {
+          if (request.marketJson !== undefined || request.asOf !== undefined) {
+            if (request.marketJson === undefined || request.asOf === undefined)
+              throw new TypeError(
+                "Statement market JSON and as-of date must be supplied together",
+              );
+            return evaluator.evaluateWithMarket(
+              request.modelJson,
+              request.marketJson,
+              request.asOf,
             );
-          return native.statements.evaluateModelWithMarket(
-            request.modelJson,
-            request.marketJson,
-            request.asOf,
-          );
+          }
+          return evaluator.evaluate(request.modelJson);
+        } finally {
+          evaluator.free();
         }
-        return native.statements.evaluateModel(request.modelJson);
       });
     },
     explainStatement(request) {
@@ -191,9 +195,16 @@ export function createService(native: {
       );
     },
     traceStatement(modelJson, nodeId) {
-      return result(() =>
-        native.statements_analytics.dependencyTreeText(modelJson, nodeId),
-      );
+      return result(() => {
+        const tracer = new native.statements_analytics.DependencyTracer(
+          modelJson,
+        );
+        try {
+          return tracer.dependencyTreeText(nodeId);
+        } finally {
+          tracer.free();
+        }
+      });
     },
     runStatementChecks(request) {
       return result(() => {

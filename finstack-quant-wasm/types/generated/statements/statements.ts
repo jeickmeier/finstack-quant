@@ -337,6 +337,13 @@ export type AssetDynamics =
       };
     };
 /**
+ * Type-safe identifier for a node in a financial model.
+ *
+ * Serializes as a plain string and is interoperable with `&str` via
+ * [`Borrow`] and [`AsRef`].
+ */
+export type NodeId = string;
+/**
  * Barrier-crossing detection policy for first-passage default simulation.
  *
  * `Discrete` only checks the barrier at grid points (fast but biased for
@@ -1153,6 +1160,67 @@ export type ProtectionWindow =
       };
     };
 /**
+ * Tagged enum describing any built-in check in a serializable form.
+ *
+ * Each variant wraps its check struct, so the struct is the single schema;
+ * the JSON shape is the struct's fields plus a `type` tag. Convert into a
+ * boxed [`Check`] via [`BuiltinCheckSpec::to_check`].
+ */
+export type BuiltinCheckSpec =
+  | (BalanceSheetArticulation & {
+      type: "balance_sheet_articulation";
+      [k: string]: unknown;
+    })
+  | (RetainedEarningsReconciliation & {
+      type: "retained_earnings_reconciliation";
+      [k: string]: unknown;
+    })
+  | (CashReconciliation & {
+      type: "cash_reconciliation";
+      [k: string]: unknown;
+    })
+  | (MissingValueCheck & {
+      type: "missing_value";
+      [k: string]: unknown;
+    })
+  | (SignConventionCheck & {
+      type: "sign_convention";
+      [k: string]: unknown;
+    })
+  | (NonFiniteCheck & {
+      type: "non_finite";
+      [k: string]: unknown;
+    });
+/**
+ * Declared sign convention for a flow / magnitude input to a reconciliation
+ * check.
+ *
+ * Each reconciliation declares its input expectation so callers can
+ * validate data at construction time rather than at P&L
+ * reconciliation. Previously each reconciliation embedded its sign
+ * assumptions implicitly (e.g. `CapexReconciliation` expected
+ * `capex_cf` to be a positive magnitude while INVARIANTS.md §3
+ * documented the CFS convention as negative), which produced silent
+ * cross-check failures on any model that used the other convention.
+ *
+ * # Variants
+ *
+ * * [`Self::MagnitudePositive`] — the value is a non-negative magnitude;
+ *   direction (inflow vs outflow) is encoded in the reconciliation's
+ *   formula via `+` / `-` operators. Used by capex, depreciation,
+ *   dividends, and disposal magnitudes across the cross-statement
+ *   reconciliations.
+ * * [`Self::InflowPositive`] — the value is a signed flow where positive
+ *   means "inflow" / "addition" and negative means "outflow" /
+ *   "reduction". Used by `total_cash_flow` in `CashReconciliation` and
+ *   `net_income` in `RetainedEarningsReconciliation`.
+ */
+export type SignConventionPolicy = "magnitude_positive" | "inflow_positive";
+/**
+ * Scope that determines which periods a check applies to.
+ */
+export type PeriodScope = "all_periods" | "actuals_only" | "forecast_only";
+/**
  * Exercise schedule convention for option models.
  */
 export type ExerciseStyle = "european" | "american" | "bermudan";
@@ -1793,13 +1861,6 @@ export type CheckCategory =
   | "credit_reasonableness"
   | "data_quality";
 /**
- * Type-safe identifier for a node in a financial model.
- *
- * Serializes as a plain string and is interoperable with `&str` via
- * [`Borrow`] and [`AsRef`].
- */
-export type NodeId = string;
-/**
  * Severity level for a check finding, ordered from least to most severe.
  */
 export type CheckSeverity = "info" | "warning" | "error";
@@ -1938,6 +1999,10 @@ export type PeriodId = string;
  */
 export type SchemaVersion = number;
 /**
+ * Unit type for metric values.
+ */
+export type UnitType = "percentage" | "currency" | "ratio" | "count" | "time_period";
+/**
  * Column storage variants supported by the table envelope.
  */
 export type TableColumnData =
@@ -2070,6 +2135,32 @@ export interface Money {
   currency: Currency;
 }
 /**
+ * Details of a single applied adjustment.
+ */
+export interface AppliedAdjustment {
+  /**
+   * ID of the adjustment
+   */
+  adjustment_id: string;
+  /**
+   * The final amount after applying any caps
+   */
+  capped_amount: number;
+  /**
+   * Whether the amount was capped
+   */
+  is_capped: boolean;
+  /**
+   * Name of the adjustment
+   */
+  name: string;
+  /**
+   * The raw calculated amount before capping
+   */
+  raw_amount: number;
+  [k: string]: unknown;
+}
+/**
  * User-defined tags and key-value metadata for instrument classification.
  */
 export interface Attributes {
@@ -2083,6 +2174,29 @@ export interface Attributes {
    * User-defined tags for categorization.
    */
   tags?: string[];
+}
+/**
+ * Verifies that Assets = Liabilities + Equity for every period.
+ */
+export interface BalanceSheetArticulation {
+  /**
+   * Node IDs whose values represent total assets.
+   */
+  assets_nodes: NodeId[];
+  /**
+   * Node IDs whose values represent total equity.
+   */
+  equity_nodes: NodeId[];
+  /**
+   * Node IDs whose values represent total liabilities.
+   */
+  liabilities_nodes: NodeId[];
+  /**
+   * Tolerance override; falls back to
+   * [`CheckConfig::default_tolerance`](crate::checks::CheckConfig::default_tolerance).
+   */
+  tolerance?: number | null;
+  [k: string]: unknown;
 }
 /**
  * Bond instrument with fixed, floating, or amortizing cashflows.
@@ -3963,6 +4077,135 @@ export interface ScenarioPricingOverrides {
    * curve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).
    */
   scenario_spread_shock_bp?: number | null;
+}
+/**
+ * Checks that retained earnings flow correctly across periods:
+ * RE(t) = RE(t−1) + NI(t) − Dividends(t) ± Adjustments(t).
+ *
+ * # Sign convention
+ *
+ * * `net_income_node` carries the [`SignConventionPolicy::InflowPositive`]
+ *   convention — positive values increase RE (profit), negative values
+ *   decrease it (loss). No validation is emitted for NI since both signs
+ *   are meaningful.
+ * * `dividends_node` carries the [`SignConventionPolicy::MagnitudePositive`]
+ *   convention by default — the formula subtracts dividends explicitly.
+ * * `other_adjustments` carry
+ *   [`SignConventionPolicy::InflowPositive`] — they are signed amounts
+ *   added directly.
+ */
+export interface RetainedEarningsReconciliation {
+  /**
+   * Optional node for dividends paid.
+   */
+  dividends_node?: NodeId | null;
+  /**
+   * Sign convention applied to the `dividends_node` input. Defaults
+   * to [`SignConventionPolicy::MagnitudePositive`].
+   * `net_income_node` and `other_adjustments` always use
+   * `InflowPositive` by construction.
+   */
+  dividends_sign_convention?: SignConventionPolicy;
+  /**
+   * Node for net income.
+   */
+  net_income_node: NodeId;
+  /**
+   * Additional adjustment nodes (buybacks, AOCI, etc.).
+   */
+  other_adjustments?: NodeId[];
+  /**
+   * Node for retained earnings balance.
+   */
+  retained_earnings_node: NodeId;
+  /**
+   * Tolerance override; falls back to
+   * [`CheckConfig::default_tolerance`](crate::checks::CheckConfig::default_tolerance).
+   */
+  tolerance?: number | null;
+  [k: string]: unknown;
+}
+/**
+ * Checks Cash(t) = Cash(t−1) + TotalCF(t) and optionally
+ * TotalCF = CFO + CFI + CFF.
+ */
+export interface CashReconciliation {
+  /**
+   * Node for cash balance.
+   */
+  cash_balance_node: NodeId;
+  /**
+   * Optional node for cash from financing.
+   */
+  cff_node?: NodeId | null;
+  /**
+   * Optional node for cash from investing.
+   */
+  cfi_node?: NodeId | null;
+  /**
+   * Optional node for cash from operations.
+   */
+  cfo_node?: NodeId | null;
+  /**
+   * Tolerance override; falls back to
+   * [`CheckConfig::default_tolerance`](crate::checks::CheckConfig::default_tolerance).
+   */
+  tolerance?: number | null;
+  /**
+   * Node for total cash flow.
+   */
+  total_cash_flow_node: NodeId;
+  [k: string]: unknown;
+}
+/**
+ * Flags required nodes that lack values in applicable periods.
+ *
+ * **Advisory-only**: findings are `Severity::Warning`, so
+ * `CheckResult::passed` is always `true`; the check surfaces gaps without
+ * failing a pipeline gate.
+ */
+export interface MissingValueCheck {
+  /**
+   * Nodes that must have values in every in-scope period.
+   */
+  required_nodes: NodeId[];
+  /**
+   * Which periods to inspect.
+   */
+  scope: PeriodScope;
+  [k: string]: unknown;
+}
+/**
+ * Flags values with unexpected signs (e.g., revenue < 0 or expense > 0).
+ *
+ * **Advisory-only**: every finding is `Severity::Warning`, so this check's
+ * `CheckResult::passed` is always `true` and it never fails a pipeline gate.
+ * Treat its findings as review prompts, not assertions.
+ */
+export interface SignConventionCheck {
+  /**
+   * Nodes expected to carry negative values.
+   */
+  negative_nodes?: NodeId[];
+  /**
+   * Nodes expected to carry positive values.
+   */
+  positive_nodes?: NodeId[];
+  [k: string]: unknown;
+}
+/**
+ * Detects NaN or infinite values in node results.
+ *
+ * **Gating**: findings are `Severity::Error`, so any non-finite cell sets
+ * `CheckResult::passed` to `false` and fails a pipeline gate. Non-finite
+ * values poison every downstream calculation, so they are never advisory.
+ */
+export interface NonFiniteCheck {
+  /**
+   * Specific nodes to check; if empty, all nodes in results are inspected.
+   */
+  nodes?: NodeId[];
+  [k: string]: unknown;
 }
 /**
  * Interest rate option instrument.
@@ -6478,6 +6721,49 @@ export interface PikToggleSpec {
   threshold: number;
 }
 /**
+ * Configuration parameters that govern check execution.
+ *
+ * Identity checks trigger a finding when
+ * `|diff| > max(default_tolerance, default_relative_tolerance * |reference|)`,
+ * so an analyst can set an absolute floor (currency units) that catches
+ * micro-errors on small balances plus a relative ceiling that scales with
+ * larger balance sheets. A per-check tolerance override bypasses both
+ * defaults and is applied verbatim.
+ *
+ * All four fields are part of the public configuration surface and are
+ * intended to be tuned per-deployment via JSON / serde overrides — e.g.,
+ * raising `default_relative_tolerance` to `1e-4` (1 bp) when a downstream
+ * process is known to round to the nearest hundred. The defaults
+ * (`default_tolerance = 0.01`, `default_relative_tolerance = 1e-9`,
+ * `materiality_threshold = 0.0`, `min_severity = Info`) are conservative:
+ * the absolute cent floor catches micro-errors on small balances while the
+ * relative component absorbs f64 accumulation noise on large ones.
+ */
+export interface CheckConfig {
+  /**
+   * Default **relative** tolerance as a fraction of the reference
+   * denominator (e.g. 1e-6 ≈ "one basis point of a basis point"). Zero
+   * disables relative tolerance.
+   */
+  default_relative_tolerance?: number;
+  /**
+   * Default **absolute** tolerance for equality comparisons, expressed in
+   * the same currency units as the node values being compared (e.g. 0.01
+   * means one cent when nodes are in whole dollars).
+   */
+  default_tolerance?: number;
+  /**
+   * Findings below this absolute materiality threshold are excluded from
+   * reports. Error-severity findings are exempt: materiality filters
+   * advisory noise, it never changes a check's pass/fail verdict.
+   */
+  materiality_threshold?: number;
+  /**
+   * Minimum severity a finding must have to appear in the report.
+   */
+  min_severity?: CheckSeverity;
+}
+/**
  * A single finding produced by a check for a specific period or node.
  */
 export interface CheckFinding {
@@ -6599,6 +6885,70 @@ export interface CheckSummary {
    */
   warnings: number;
   [k: string]: unknown;
+}
+/**
+ * Serializable check suite: built-in checks, formula checks and filtering configuration.
+ */
+export interface CheckSuiteSpec {
+  /**
+   * Built-in checks to include.
+   */
+  builtin_checks?: BuiltinCheckSpec[];
+  /**
+   * Suite configuration.
+   */
+  config?: CheckConfig;
+  /**
+   * Suite description.
+   */
+  description?: string | null;
+  /**
+   * User-defined formula checks.
+   */
+  formula_checks?: FormulaCheckSpec[];
+  /**
+   * Suite name.
+   */
+  name: string;
+}
+/**
+ * Serializable, runnable user-defined formula-check specification.
+ *
+ * Full suite definitions (built-in + formula) can be stored as a single JSON
+ * document and resolved directly with [`CheckSuiteSpec::resolve`].
+ */
+export interface FormulaCheckSpec {
+  /**
+   * Category grouping.
+   */
+  category: CheckCategory;
+  /**
+   * Statements DSL expression to evaluate (e.g. `"revenue > 0"`).
+   *
+   * Formula checks use the same evaluator as calculated statement nodes,
+   * including time-series functions and `cs.*` capital-structure references.
+   */
+  formula: string;
+  /**
+   * Unique identifier for this check instance.
+   */
+  id: string;
+  /**
+   * Template for the finding message (`{period}` is replaced at runtime).
+   */
+  message_template: string;
+  /**
+   * Human-readable name shown in reports.
+   */
+  name: string;
+  /**
+   * Severity assigned to findings when the formula fails.
+   */
+  severity: CheckSeverity;
+  /**
+   * Numeric tolerance for floating-point comparisons.
+   */
+  tolerance?: number | null;
 }
 /**
  * Versioned financial statement model specification.
@@ -6741,6 +7091,96 @@ export interface Period {
   start: string;
 }
 /**
+ * Individual metric definition.
+ *
+ * Each definition maps directly to a JSON object in a registry file and is
+ * converted into a [`NodeSpec`](crate::types::NodeSpec) when registered.
+ */
+export interface MetricDefinition {
+  /**
+   * Category for grouping (e.g., "margins", "returns", "leverage")
+   */
+  category?: string | null;
+  /**
+   * Description of what this metric represents
+   */
+  description?: string | null;
+  /**
+   * Formula text (in statements DSL)
+   */
+  formula: string;
+  /**
+   * Unique identifier within the namespace
+   */
+  id: string;
+  /**
+   * Additional metadata
+   */
+  meta?: {
+    [k: string]: unknown;
+  };
+  /**
+   * Human-readable name
+   */
+  name: string;
+  /**
+   * List of required node dependencies
+   */
+  requires?: string[];
+  /**
+   * Tags for filtering/searching
+   */
+  tags?: string[];
+  /**
+   * Unit type (percentage, currency, ratio, count)
+   */
+  unit_type?: UnitType | null;
+}
+/**
+ * Namespaced catalog of reusable metric definitions.
+ */
+export interface MetricRegistry {
+  /**
+   * Additional metadata
+   */
+  meta?: {
+    [k: string]: unknown;
+  };
+  /**
+   * List of metric definitions contained in the registry
+   */
+  metrics: MetricDefinition[];
+  /**
+   * Namespace for all metrics in this registry (e.g., "fin", "custom")
+   */
+  namespace: string;
+  /**
+   * Required schema version. Only numeric `1` is accepted.
+   */
+  schema_version: SchemaVersion;
+}
+/**
+ * Path count, seed and reported percentiles of a Monte Carlo statement-model evaluation.
+ */
+export interface MonteCarloConfig {
+  /**
+   * Whether to include the long-format path table in serialized results.
+   */
+  include_path_data?: boolean;
+  /**
+   * Number of Monte Carlo paths to simulate.
+   */
+  n_paths: number;
+  /**
+   * Percentiles to compute in the closed interval [0, 1].
+   */
+  percentiles?: number[];
+  /**
+   * Base random seed used to derive per-path seeds.
+   */
+  seed: number;
+}
+/**
  * Percentile summaries of a Monte Carlo statement-model evaluation.
  */
 export interface MonteCarloResults {
@@ -6849,6 +7289,32 @@ export interface NormalizationConfig {
    * The target node to normalize (e.g., "EBITDA")
    */
   target_node: string;
+}
+/**
+ * Per-period normalization outcome: base value, applied adjustments and final value.
+ */
+export interface NormalizationResult {
+  /**
+   * Detailed breakdown of applied adjustments
+   */
+  adjustments: AppliedAdjustment[];
+  /**
+   * The original raw value of the target node
+   */
+  base_value: number;
+  /**
+   * The final adjusted value
+   */
+  final_value: number;
+  /**
+   * The period this result applies to
+   */
+  period: PeriodId;
+  /**
+   * Unit and currency shared by the base, adjustments, and final value.
+   */
+  value_type: NodeValueType;
+  [k: string]: unknown;
 }
 /**
  * Execution statistics for a statement-model evaluation.

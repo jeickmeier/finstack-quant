@@ -1,19 +1,24 @@
 //! WASM bindings for the `finstack-quant-statements` crate.
 //!
-//! Inputs are JSON strings or plain objects. The `validate*Json` helpers
-//! return canonical JSON strings; the evaluators return structured JavaScript
-//! objects. Covers:
-//! - `FinancialModelSpec` validation and node enumeration
-//! - `CheckSuiteSpec`, `WaterfallSpec`, `EcfSweepSpec`, `PikToggleSpec`,
-//!   `CapitalStructureSpec` validation
-//! - DSL formula parsing and validation
-//! - Full `Evaluator` execution, including Monte Carlo paths
+//! Data crosses the boundary as JSON strings or plain objects; the stateful
+//! pieces are classes:
+//! - `Evaluator` evaluates a `FinancialModelSpec` (optionally with a market
+//!   or under Monte Carlo) and can carry a check suite.
+//! - `ModelBuilder` / `MixedNodeBuilder` assemble a model step by step, and
+//!   `Registry` holds reusable metric definitions.
 //!
-//! The evaluator runs a fresh `Evaluator::new()` per call; WASM clients
-//! hold no live handles. Capital-structure models are configured by
-//! embedding the spec directly in the `FinancialModelSpec` JSON — there is
-//! no separate builder surface on this side because JS assembles JSON
-//! natively.
+//! Everything else is a function: spec validation (`validate*Json`), DSL
+//! formula parsing, and the free-function twins of the Python result and
+//! spec methods (`statementResult*`, `capitalStructureCashflows*`,
+//! `forecastSpec*`, `adjustment*`, `normalize`).
+
+mod builder;
+mod handles;
+mod results;
+mod specs;
+
+pub use builder::{JsMixedNodeBuilder, JsModelBuilder};
+pub use handles::{JsEvaluator, JsRegistry};
 
 use crate::utils::input::{js_opt_string, js_string, json_text};
 use crate::utils::to_js_err;
@@ -165,92 +170,6 @@ pub fn validate_pik_toggle_spec_json(json: JsValue) -> Result<String, JsValue> {
     serde_json::to_string(&spec).map_err(to_js_err)
 }
 
-/// Evaluate a `FinancialModelSpec` and return the `StatementResult`.
-///
-/// Returns a structured JavaScript object (the Python binding returns a typed
-/// `StatementResult` from the same Rust evaluator). Non-finite node values and
-/// warning values use canonical strings `"nan"`, `"inf"`, and `"-inf"`, so a
-/// `JSON.stringify`/parse round trip preserves missing-data semantics.
-///
-/// # Errors
-///
-/// Rejects malformed `model_json`, model semantic failures, invalid formula or
-/// dependency graphs, missing evaluation inputs, unsupported capital-structure
-/// requirements, or failure to serialize the statement result to JavaScript.
-/// @param model_json - JSON-serialized FinancialModelSpec to evaluate across its statement periods.
-#[wasm_bindgen(js_name = evaluateModel)]
-pub fn evaluate_model(model_json: JsValue) -> Result<JsValue, JsValue> {
-    let model_json: &str = &json_text(&model_json, "modelJson")?;
-    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
-    let mut evaluator = finstack_quant_statements::evaluator::Evaluator::new();
-    let result = evaluator.evaluate(&model).map_err(to_js_err)?;
-    crate::utils::to_js_value(&result)
-}
-
-/// Evaluate a `FinancialModelSpec` against a `MarketContext` as of a given date.
-///
-/// Required for capital-structure-aware models. The `as_of` argument is an
-/// ISO 8601 date string (e.g. `"2025-01-15"`). Returns a structured
-/// JavaScript object, matching [`evaluate_model`].
-///
-/// # Errors
-///
-/// Rejects malformed model or market JSON, model semantic failures, an invalid
-/// ISO `as_of` date, invalid formulas or dependencies, missing market data, or
-/// failure to serialize the statement result to JavaScript.
-/// @param model_json - JSON-serialized FinancialModelSpec to evaluate across its statement periods.
-/// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-/// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
-#[wasm_bindgen(js_name = evaluateModelWithMarket)]
-pub fn evaluate_model_with_market(
-    model_json: JsValue,
-    market_json: JsValue,
-    as_of: JsValue,
-) -> Result<JsValue, JsValue> {
-    let model_json: &str = &json_text(&model_json, "modelJson")?;
-    let market_json: &str = &json_text(&market_json, "marketJson")?;
-    let as_of: &str = &js_string(&as_of, "asOf")?;
-    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
-    let market: finstack_quant_core::market_data::context::MarketContext =
-        serde_json::from_str(market_json).map_err(to_js_err)?;
-    // Use the shared ISO date parser for a consistent `YYYY-MM-DD` grammar and
-    // error message across all wasm namespaces.
-    let date = crate::utils::parse_iso_date(as_of)?;
-    let mut evaluator = finstack_quant_statements::evaluator::Evaluator::new();
-    let result = evaluator
-        .evaluate_with_market(&model, &market, date)
-        .map_err(to_js_err)?;
-    crate::utils::to_js_value(&result)
-}
-
-/// Evaluate a financial model under Monte Carlo simulation.
-///
-/// Takes JSON inputs and returns a structured JavaScript object; the Python
-/// twin is the `Evaluator.evaluate_monte_carlo` method, which returns a typed
-/// `MonteCarloResults` from the same Rust `Evaluator::evaluate_monte_carlo`.
-///
-/// # Errors
-///
-/// Rejects malformed model or configuration JSON, model semantic failures,
-/// zero simulation paths, a model containing capital structure, model
-/// compilation or dependency failures, any path-evaluation failure, or failure
-/// to serialize the results to JavaScript.
-/// @param model_json - Financial-model specification JSON.
-/// @param config_json - Monte Carlo configuration JSON.
-#[wasm_bindgen(js_name = evaluateMonteCarlo)]
-pub fn evaluate_monte_carlo(model_json: JsValue, config_json: JsValue) -> Result<JsValue, JsValue> {
-    let model_json: &str = &json_text(&model_json, "modelJson")?;
-    let config_json: &str = &json_text(&config_json, "configJson")?;
-    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
-    let config: finstack_quant_statements::evaluator::MonteCarloConfig =
-        serde_json::from_str(config_json).map_err(to_js_err)?;
-    let mut evaluator = finstack_quant_statements::evaluator::Evaluator::new();
-    let results = evaluator
-        .evaluate_monte_carlo(&model, &config)
-        .map_err(to_js_err)?;
-    crate::utils::to_js_value(&results)
-}
-
 /// Export one evaluated node as a dated schedule.
 ///
 /// Free-function twin of Python `StatementResult.to_dated_schedule` (Rust
@@ -258,7 +177,7 @@ pub fn evaluate_monte_carlo(model_json: JsValue, config_json: JsValue) -> Result
 /// order, periods without a value are skipped, and each period is dated by
 /// `convention`.
 /// @param model_json - The `FinancialModelSpec` that produced the result (its periods supply the dates).
-/// @param result_json - The `StatementResult` returned by `evaluateModel` / `evaluateModelWithMarket` (object or JSON).
+/// @param result_json - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
 /// @param node_id - Node identifier to export.
 /// @param convention - Optional `"end"` (default: the period's last inclusive day, `end - 1 day`, since periods are half-open `[start, end)`) or `"start"`.
 /// @returns `[isoDate, value]` pairs in timeline order, in the node's own units.
@@ -301,7 +220,7 @@ pub fn node_to_dated_schedule(
 /// (`value > threshold`); negate values and threshold for a downside test.
 /// Per-path values come from the result's `path_data` table, so the
 /// simulation must run with `include_path_data: true`.
-/// @param results_json - `MonteCarloResults` returned by `evaluateMonteCarlo` (object or JSON).
+/// @param results_json - `MonteCarloResults` returned by `Evaluator.evaluateMonteCarlo` (object or JSON).
 /// @param metric - Node identifier to test.
 /// @param threshold - Breach level in the metric's own units.
 /// @returns Fraction of paths that breach in at least one forecast period, or `undefined` when the metric has no path data (including results run without `include_path_data`), there are no forecast periods, or the simulation is incomplete.
@@ -329,7 +248,7 @@ pub fn monte_carlo_breach_probability(
 /// Free-function twin of Python `MonteCarloResults.percentile_by_period` (Rust
 /// `MonteCarloResults::percentile_by_period`): looks up a percentile that the
 /// simulation was configured to report.
-/// @param results_json - `MonteCarloResults` returned by `evaluateMonteCarlo` (object or JSON).
+/// @param results_json - `MonteCarloResults` returned by `Evaluator.evaluateMonteCarlo` (object or JSON).
 /// @param metric - Node identifier to read.
 /// @param percentile - Percentile as a fraction in `[0, 1]` (e.g. `0.95`); must be one of the configured percentiles.
 /// @returns Object mapping period id (e.g. `"2025Q1"`) to the percentile value in the metric's own units, or `undefined` when the metric or percentile is not in the results.
@@ -360,7 +279,7 @@ pub fn monte_carlo_percentile_by_period(
 /// Free-function twin of Python `StatementResult.to_arrow_long`
 /// (Rust `StatementResult::to_table_long`): one row per `(node, period)` in
 /// the result's node and period declaration order.
-/// @param result_json - The `StatementResult` returned by `evaluateModel` / `evaluateModelWithMarket` (object or JSON).
+/// @param result_json - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
 /// @returns `TableEnvelope` with columns `node_id`, `period_id`, `value`, `value_money`, `currency`, `value_type`; monetary nodes repeat their value in `value_money` and set `currency`, scalar nodes leave both null.
 ///
 /// # Errors
@@ -379,7 +298,7 @@ pub fn statement_result_to_table_long(result_json: JsValue) -> Result<JsValue, J
 /// Free-function twin of Python `StatementResult.to_arrow_wide`
 /// (Rust `StatementResult::to_table_wide`): one row per period in
 /// chronological order and one column per node in declaration order.
-/// @param result_json - The `StatementResult` returned by `evaluateModel` / `evaluateModelWithMarket` (object or JSON).
+/// @param result_json - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
 /// @returns `TableEnvelope` with a `period_id` column followed by one value column per node; a node with no value in a period holds `NaN` (serialized as `null`), not zero.
 ///
 /// # Errors
@@ -523,7 +442,7 @@ mod tests {
             .expect("compute")
             .build()
             .expect("build");
-        // `evaluate_model` now returns a `JsValue`, which cannot be constructed
+        // `Evaluator.evaluate` returns a `JsValue`, which cannot be constructed
         // off wasm32; exercise the evaluator it delegates to instead, and let
         // tests/facade/statements.test.mjs assert the JS object shape.
         let mut evaluator = finstack_quant_statements::evaluator::Evaluator::new();
@@ -559,8 +478,8 @@ mod tests {
             .expect("build");
         let config = finstack_quant_statements::evaluator::MonteCarloConfig::new(10, 42);
 
-        // `evaluate_monte_carlo` returns a `JsValue` (unconstructible off
-        // wasm32); assert the underlying engine and its serializable shape.
+        // `Evaluator.evaluateMonteCarlo` returns a `JsValue` (unconstructible
+        // off wasm32); assert the underlying engine and its serializable shape.
         let mut evaluator = finstack_quant_statements::evaluator::Evaluator::new();
         let results = evaluator
             .evaluate_monte_carlo(&model, &config)

@@ -1,6 +1,15 @@
 {
   "artifacts": [
     {
+      "$id": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
+      "bytes": 19474,
+      "kind": "input",
+      "path": "schemas/statements/1/check_suite_spec.schema.json",
+      "summary": "Serializable check suite: built-in checks, formula checks and filtering configuration.",
+      "title": "CheckSuiteSpec",
+      "type_name": "CheckSuiteSpec"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
       "bytes": 378616,
       "kind": "input",
@@ -8,6 +17,24 @@
       "summary": "Statement model graph: periods, nodes and the Value > Forecast > Formula precedence.",
       "title": "FinancialModelSpec",
       "type_name": "FinancialModelSpec"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements/1/metric_registry.schema.json",
+      "bytes": 3901,
+      "kind": "input",
+      "path": "schemas/statements/1/metric_registry.schema.json",
+      "summary": "Namespaced catalog of reusable metric definitions.",
+      "title": "MetricRegistry",
+      "type_name": "MetricRegistry"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_config.schema.json",
+      "bytes": 1185,
+      "kind": "input",
+      "path": "schemas/statements/1/monte_carlo_config.schema.json",
+      "summary": "Path count, seed and reported percentiles of a Monte Carlo statement-model evaluation.",
+      "title": "MonteCarloConfig",
+      "type_name": "MonteCarloConfig"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json",
@@ -26,6 +53,15 @@
       "summary": "Add-back and deduction catalog applied to a target metric such as EBITDA.",
       "title": "NormalizationConfig",
       "type_name": "NormalizationConfig"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json",
+      "bytes": 22691,
+      "kind": "output",
+      "path": "schemas/statements/1/normalization_result.schema.json",
+      "summary": "Per-period normalization outcome: base value, applied adjustments and final value.",
+      "title": "NormalizationResult",
+      "type_name": "NormalizationResult"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",

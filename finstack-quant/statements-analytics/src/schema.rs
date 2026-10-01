@@ -65,16 +65,16 @@ use crate::{
     analysis::checks::LeverageRangeCheck, analysis::checks::LiquidityRunwayCheck,
     analysis::checks::TrendCheck, analysis::checks::WorkingCapitalConsistency,
     analysis::BridgeChart, analysis::CeclConfig, analysis::CeclResult, analysis::CorporateAnalysis,
-    analysis::CreditAssessment, analysis::DcfOptions, analysis::DcfSensitivityResult,
-    analysis::DependencyTree, analysis::EclConfig, analysis::EclRequest, analysis::EclStageRequest,
-    analysis::Explanation, analysis::Exposure, analysis::ForecastMetrics, analysis::GoalSeekResult,
-    analysis::LboConfig, analysis::LboResult, analysis::PeerFilter, analysis::PeerSet,
-    analysis::PeerStats, analysis::PortfolioEclResult, analysis::ProvisionWaterfall,
-    analysis::RatingPdMap, analysis::RegressionResult, analysis::RelativeValueResult,
-    analysis::ScenarioDiff, analysis::ScenarioResults, analysis::ScenarioSet,
-    analysis::ScoringDimension, analysis::SensitivityResult, analysis::VarianceConfig,
-    extensions::CorkscrewConfig, extensions::CorkscrewReport, extensions::ScorecardConfig,
-    extensions::ScorecardReport, templates::real_estate::LeaseSpec,
+    analysis::CorporateAnalysisOptions, analysis::CreditAssessment, analysis::DcfOptions,
+    analysis::DcfSensitivityResult, analysis::DependencyTree, analysis::EclConfig,
+    analysis::EclRequest, analysis::EclStageRequest, analysis::Explanation, analysis::Exposure,
+    analysis::ForecastMetrics, analysis::GoalSeekResult, analysis::LboConfig, analysis::LboResult,
+    analysis::PeerFilter, analysis::PeerSet, analysis::PeerStats, analysis::PortfolioEclResult,
+    analysis::ProvisionWaterfall, analysis::RatingPdMap, analysis::RegressionResult,
+    analysis::RelativeValueResult, analysis::ScenarioDiff, analysis::ScenarioResults,
+    analysis::ScenarioSet, analysis::ScoringDimension, analysis::SensitivityResult,
+    analysis::VarianceConfig, extensions::CorkscrewConfig, extensions::CorkscrewReport,
+    extensions::ScorecardConfig, extensions::ScorecardReport, templates::real_estate::LeaseSpec,
     templates::real_estate::ManagementFeeSpec, templates::real_estate::PropertyTemplateNodes,
 };
 
@@ -134,6 +134,14 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "corporate_analysis",
         Output,
         "Unified analysis result combining statement, equity, and credit perspectives."
+    )
+    .with_packager(package_schema),
+    finstack_quant_core::schema_artifact!(
+        CorporateAnalysisOptions,
+        "statements_analytics",
+        "corporate_analysis_options",
+        Input,
+        "Optional DCF, coverage, check-suite, valuation-date and LTV settings of the corporate analysis pipeline."
     )
     .with_packager(package_schema),
     finstack_quant_core::schema_artifact!(

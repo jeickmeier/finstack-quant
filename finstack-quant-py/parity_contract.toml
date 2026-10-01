@@ -1273,7 +1273,8 @@ utils            = { python = "finstack_quant.statements.utils",             sta
 # instrument cashflow plumbing), evaluator internals (DependencyGraph,
 # EvalWarning, forecast engine types), dsl AST types, registry metric-spec
 # types are deliberately unbound in both hosts. NormalizationResult is typed
-# in Python and carries value_type/currency; normalization remains Python-only.
+# in Python and carries value_type/currency; WASM `normalize` returns the same
+# Rust NormalizationResult as plain objects.
 # StatementResult JSON cells and NonFiniteValue warnings use the core
 # number-or-sentinel contract ("nan", "inf", "-inf") in Rust, Python, and WASM.
 # Hosts reach capital structure by embedding CapitalStructureSpec in the model
@@ -1346,7 +1347,7 @@ status = "exists"
 analysis                    = { python = "finstack_quant.statements_analytics.analysis",         status = "missing", note = "Bindings are currently exported from finstack_quant.statements_analytics root" }
 comps                       = { python = "finstack_quant.statements_analytics",                  status = "flattened", note = "analysis::comps is pub(crate) in Rust — not a crate-boundary module — reached only via the flattened comparable-company functions/types re-exported through analysis and bound flat on finstack_quant.statements_analytics" }
 extensions                  = { python = "finstack_quant.statements_analytics",                  status = "flattened", note = "Credit-scorecard and corkscrew extensions exposed flat on finstack_quant.statements_analytics (ScorecardMetric/Config/Report, CreditScorecardExtension, AccountType, CorkscrewAccount/Config/Report, CorkscrewExtension, validate_scorecard_config)" }
-templates                   = { python = "finstack_quant.statements_analytics",                  status = "flattened", note = "Python-only typed authoring surface: vintage, roll-forward, and real-estate template mutators return FinancialModelSpec directly and are exported flat with their typed spec classes. WASM intentionally leaves these builder-oriented templates unbound; browser callers consume completed model JSON through the statements APIs." }
+templates                   = { python = "finstack_quant.statements_analytics",                  status = "flattened", note = "Vintage, roll-forward, and real-estate template mutators return FinancialModelSpec directly and are exported flat with their typed spec classes. WASM binds the same seven add* functions (model in, extended model out) with the spec types as plain objects." }
 
 # Rust-only surfaces (categories, not every name), deliberately unbound in
 # both hosts for now:
@@ -1355,7 +1356,10 @@ templates                   = { python = "finstack_quant.statements_analytics", 
 #   aggregation remain Rust-only. Python binds StagingConfig, Exposure,
 #   qualitative flags, stage triggers and full bucket/result envelopes;
 #   classify_exposure reaches the full staging waterfall and compute_ecl
-#   prices drawn EAD plus undrawn * CCF. ECL is not exposed by WASM.
+#   prices drawn EAD plus undrawn * CCF. WASM binds the same three entry
+#   points (classifyStage, computeEcl, computeEclWeighted); the two PDs are
+#   arguments there because the Python Exposure carries them, and `stage` is
+#   required.
 # - analysis::credit covenant forecasting (forecast_breaches,
 #   forecast_covenant, compute_credit_context with per-period
 #   reference_values, CreditContextMetrics including dscr_incl_fees,
@@ -1864,7 +1868,7 @@ js_rule_members = { free = "wasm ownership: releases the wasm-bindgen handle", t
 # now recorded as TypeScript types, so their 68 unbound methods (variant
 # constructors, `with_*` setters, single-field `*_json` exits) moved to the
 # member backlog; 7 portfolio member entries were cleared (286 - 7 + 68).
-backlog_ceiling = { modules = 149, members = 71 }
+backlog_ceiling = { modules = 55, members = 68 }
 
 [parity.modules."finstack_quant"]
 js = ""
@@ -2164,37 +2168,16 @@ backlog = [
 
 [parity.modules."finstack_quant.statements"]
 js = "statements"
-types = { CheckFinding = "CheckFinding", CheckReport = "CheckReport" }
+types = { Adjustment = "Adjustment", AppliedAdjustment = "AppliedAdjustment", CapitalStructureCashflows = "CapitalStructureCashflows", CheckConfig = "CheckConfig", CheckFinding = "CheckFinding", CheckReport = "CheckReport", CheckSuiteSpec = "CheckSuiteSpec", EcfSweepSpec = "EcfSweepSpec", FinancialModelSpec = "FinancialModelSpec", ForecastSpec = "ForecastSpec", FormulaCheckSpec = "FormulaCheckSpec", MetricDefinition = "MetricDefinition", MonteCarloConfig = "MonteCarloConfig", MonteCarloResults = "MonteCarloResults", NodeSpec = "NodeSpec", NormalizationConfig = "NormalizationConfig", NormalizationResult = "NormalizationResult", PaymentClassSpec = "PaymentClassSpec", PikToggleSpec = "PikToggleSpec", StatementResult = "StatementResult", WaterfallSpec = "WaterfallSpec" }
+# Left for a ledger decision (reported by P9): each is typed in WASM (NodeId is
+# a string; the enums are string-literal unions), but its Python members are
+# enum-variant static constructors or `as_str`, which have no WASM twin and no
+# exclusion reason in the fixed vocabulary.
 backlog = [
-    "Adjustment",
-    "AppliedAdjustment",
-    "CapitalStructureCashflows",
-    "CheckConfig",
-    "CheckSuiteSpec",
-    "EcfSweepSpec",
-    "Evaluator",
-    "FinancialModelSpec",
     "ForecastMethod",
-    "ForecastSpec",
-    "FormulaCheckSpec",
-    "MetricDefinition",
-    "MixedNodeBuilder",
-    "ModelBuilder",
-    "MonteCarloConfig",
-    "MonteCarloResults",
     "NodeId",
-    "NodeSpec",
     "NodeType",
-    "NormalizationConfig",
-    "NormalizationResult",
     "NumericMode",
-    "PaymentClassSpec",
-    "PikToggleSpec",
-    "Registry",
-    "StatementResult",
-    "WaterfallSpec",
-    "normalize",
-    "normalize_json",
 ]
 
 [parity.modules."finstack_quant.statements.schema"]
@@ -2210,84 +2193,20 @@ backlog = [
 
 [parity.modules."finstack_quant.statements_analytics"]
 js = "statements_analytics"
-types = { DcfSensitivityResult = "DcfSensitivityResult", DependencyTree = "DependencyTree", GoalSeekResult = "GoalSeekResult", LboResult = "LboResult", TornadoEntry = "TornadoEntry" }
+renames = { PLSummaryReport = { js = "statements_analytics.plSummaryReport", reason = "the Rust PLSummaryReport borrows the statement result, so it is not a WASM handle; plSummaryReport returns its to_table TableEnvelope and plSummaryReportText its text rendering" } }
+types = { BridgeChart = "BridgeChart", BridgeStep = "BridgeStep", CompanyMetrics = "CompanyMetrics", CorkscrewAccount = "CorkscrewAccount", CorkscrewConfig = "CorkscrewConfig", CorporateAnalysis = "CorporateAnalysis", CorporateValuationResult = "CorporateValuationResult", CreditAssessment = "CreditAssessment", CreditAssessmentPoint = "CreditAssessmentPoint", CreditMapping = "CreditMapping", DcfSensitivityResult = "DcfSensitivityResult", DependencyTree = "DependencyTree", DimensionScore = "DimensionScore", EclBucket = "EclBucket", EclResult = "EclResult", EquityBridge = "EquityBridge", Explanation = "Explanation", ExplanationStep = "ExplanationStep", Exposure = "Exposure", ForecastMetrics = "ForecastMetrics", FreeRentWindowSpec = "FreeRentWindowSpec", GoalSeekResult = "GoalSeekResult", LboCheckMappings = "LboCheckMappings", LboResult = "LboResult", LeaseSpec = "LeaseSpec", ManagementFeeSpec = "ManagementFeeSpec", ParameterSpec = "ParameterSpec", PeerFilter = "PeerFilter", PeerSet = "PeerSet", PeerStats = "PeerStats", PropertyTemplateNodes = "PropertyTemplateNodes", QualitativeFlags = "QualitativeFlags", RegressionResult = "RegressionResult", RelativeValueResult = "RelativeValueResult", RenewalSpec = "RenewalSpec", RentRollOutputNodes = "RentRollOutputNodes", RentStepSpec = "RentStepSpec", ScenarioDiff = "ScenarioDiff", ScenarioResults = "ScenarioResults", ScenarioSet = "ScenarioSet", ScorecardConfig = "ScorecardConfig", ScoringDimension = "ScoringDimension", SensitivityConfig = "SensitivityConfig", SensitivityResult = "SensitivityResult", StageResult = "StageResult", StagingConfig = "StagingConfig", TerminalValueSpec = "TerminalValueSpec", ThreeStatementMapping = "ThreeStatementMapping", TornadoEntry = "TornadoEntry", ValuationDiscounts = "ValuationDiscounts", VarianceConfig = "VarianceConfig", VarianceReport = "VarianceReport", VarianceRow = "VarianceRow", WeightedEclResult = "WeightedEclResult" }
+# Left for a ledger decision (reported by P9): each is typed in WASM, but its
+# Python members are enum `from_str` / `value` helpers or `*_json` string
+# views of a field (`data_json`, `thresholds_json`), which have no WASM twin
+# and no exclusion reason in the fixed vocabulary.
 backlog = [
     "AccountType",
-    "BridgeChart",
-    "BridgeStep",
-    "CompanyMetrics",
-    "CorkscrewAccount",
-    "CorkscrewConfig",
-    "CorkscrewExtension",
     "CorkscrewReport",
-    "CorporateAnalysis",
-    "CorporateValuationResult",
-    "CreditAssessment",
-    "CreditAssessmentPoint",
-    "CreditMapping",
-    "CreditScorecardExtension",
-    "DependencyTracer",
-    "DimensionScore",
-    "EclBucket",
-    "EclResult",
-    "EquityBridge",
-    "Explanation",
-    "ExplanationStep",
-    "Exposure",
-    "ForecastMetrics",
-    "FreeRentWindowSpec",
-    "LboCheckMappings",
     "LeaseGrowthConvention",
-    "LeaseSpec",
     "ManagementFeeBase",
-    "ManagementFeeSpec",
-    "PLSummaryReport",
-    "ParameterSpec",
-    "PeerFilter",
-    "PeerSet",
-    "PeerStats",
-    "PropertyTemplateNodes",
-    "QualitativeFlags",
-    "RegressionResult",
-    "RelativeValueResult",
-    "RenewalSpec",
-    "RentRollOutputNodes",
-    "RentStepSpec",
-    "ScenarioDiff",
-    "ScenarioResults",
-    "ScenarioSet",
-    "ScorecardConfig",
     "ScorecardMetric",
     "ScorecardReport",
-    "ScoringDimension",
-    "SensitivityConfig",
-    "SensitivityResult",
     "Stage",
-    "StageResult",
-    "StagingConfig",
-    "TerminalValueSpec",
-    "ThreeStatementMapping",
-    "ValuationDiscounts",
-    "VarianceConfig",
-    "VarianceReport",
-    "VarianceRow",
-    "WeightedEclResult",
-    "add_ncf_buildup",
-    "add_noi_buildup",
-    "add_property_operating_statement",
-    "add_rent_roll",
-    "add_roll_forward",
-    "add_roll_forward_with_opening",
-    "add_vintage_buildup",
-    "classify_stage",
-    "compute_ecl",
-    "compute_ecl_weighted",
-    "evaluate_dcf",
-    "pl_summary_report",
-    "run_corporate_analysis",
-    "scenario_diff",
-    "validate_scorecard_config",
-    "variance_bridge",
 ]
 
 [parity.modules."finstack_quant.valuations"]
@@ -2648,28 +2567,81 @@ scenarioSpecRequiresInstruments = "free-function twin of Python ScenarioSpec.req
 scenarioSpecWithHazardBumpMode = "free-function twin of Python ScenarioSpec.with_hazard_bump_mode (Rust ScenarioSpec::with_hazard_bump_mode)"
 
 [parity.js."statements".wasm_only]
-financialModelContentHash = "free-function twin of Python FinancialModelSpec.content_hash (Rust FinancialModelSpec::content_hash); P9 binds FinancialModelSpec"
-monteCarloBreachProbability = "free-function twin of Python MonteCarloResults.breach_probability (Rust MonteCarloResults::breach_probability); P9 binds MonteCarloResults"
-monteCarloPercentileByPeriod = "free-function twin of Python MonteCarloResults.percentile_by_period (Rust MonteCarloResults::percentile_by_period); P9 binds MonteCarloResults"
-statementResultToTableLong = "free-function twin of Python StatementResult.to_arrow_long (Rust StatementResult::to_table_long); P9 binds StatementResult"
-statementResultToTableWide = "free-function twin of Python StatementResult.to_arrow_wide (Rust StatementResult::to_table_wide); P9 binds StatementResult"
-nodeToDatedSchedule = "free-function twin of Python StatementResult.to_dated_schedule (Rust evaluator::node_to_dated_schedule); P9 binds StatementResult"
-evaluateModel = "twin of Python Evaluator.evaluate"
-evaluateModelWithMarket = "twin of Python Evaluator.evaluate_with_market"
-evaluateMonteCarlo = "twin of Python Evaluator.evaluate_monte_carlo"
-modelNodeIds = "twin of the Python FinancialModelSpec node ids"
-validateCapitalStructureSpecJson = "JSON wire validation through Rust CapitalStructureSpec::validate; Python has no CapitalStructureSpec class and runs the same check inside FinancialModelSpec.from_json"
-validateCheckSuiteSpecJson = "JSON wire validation twin of the Python typed spec class from_json"
-validateEcfSweepSpecJson = "JSON wire validation twin of Python EcfSweepSpec.from_json + validate() (Rust EcfSweepSpec::validate)"
 validateFinancialModelJson = "JSON wire validation twin of Python FinancialModelSpec.from_json (both call Rust FinancialModelSpec::from_json)"
-validatePikToggleSpecJson = "JSON wire validation twin of Python PikToggleSpec.from_json + validate() (Rust PikToggleSpec::validate)"
-validateWaterfallSpecJson = "JSON wire validation twin of the Python typed spec class from_json"
+modelNodeIds = "free-function twin of Python FinancialModelSpec.node_ids (WASM data types are plain objects)"
+validateCheckSuiteSpecJson = "JSON wire validation twin of the Python typed spec class from_json"
+validateCapitalStructureSpecJson = "JSON wire validation through Rust CapitalStructureSpec::validate; Python has no CapitalStructureSpec class and runs the same check inside FinancialModelSpec.from_json"
+validateWaterfallSpecJson = "free-function twin of Python WaterfallSpec.validate (WASM data types are plain objects)"
+validateEcfSweepSpecJson = "free-function twin of Python EcfSweepSpec.validate (WASM data types are plain objects)"
+validatePikToggleSpecJson = "free-function twin of Python PikToggleSpec.validate (WASM data types are plain objects)"
+nodeToDatedSchedule = "free-function twin of Python StatementResult.to_dated_schedule (WASM data types are plain objects)"
+monteCarloBreachProbability = "free-function twin of Python MonteCarloResults.breach_probability (WASM data types are plain objects)"
+monteCarloPercentileByPeriod = "free-function twin of Python MonteCarloResults.percentile_by_period (WASM data types are plain objects)"
+statementResultToTableLong = "free-function twin of Python StatementResult.to_arrow_long (WASM data types are plain objects)"
+statementResultToTableWide = "free-function twin of Python StatementResult.to_arrow_wide (WASM data types are plain objects)"
+financialModelContentHash = "free-function twin of Python FinancialModelSpec.content_hash (WASM data types are plain objects)"
+financialModelBuilder = "free-function twin of Python FinancialModelSpec.builder (WASM data types are plain objects)"
+statementResultGet = "free-function twin of Python StatementResult.get (WASM data types are plain objects)"
+statementResultGetMoney = "free-function twin of Python StatementResult.get_money (WASM data types are plain objects)"
+statementResultGetScalar = "free-function twin of Python StatementResult.get_scalar (WASM data types are plain objects)"
+statementResultGetOr = "free-function twin of Python StatementResult.get_or (WASM data types are plain objects)"
+statementResultAllPeriods = "free-function twin of Python StatementResult.all_periods (WASM data types are plain objects)"
+statementResultGetNode = "free-function twin of Python StatementResult.get_node (WASM data types are plain objects)"
+statementResultNodeIds = "free-function twin of Python StatementResult.node_ids (WASM data types are plain objects)"
+financialModelHasNode = "free-function twin of Python FinancialModelSpec.has_node (WASM data types are plain objects)"
+financialModelGetNode = "free-function twin of Python FinancialModelSpec.get_node (WASM data types are plain objects)"
+checkReportHasErrors = "free-function twin of Python CheckReport.has_errors (WASM data types are plain objects)"
+checkReportHasWarnings = "free-function twin of Python CheckReport.has_warnings (WASM data types are plain objects)"
+checkReportFindingsBySeverity = "free-function twin of Python CheckReport.findings_by_severity (WASM data types are plain objects)"
+capitalStructureCashflowsGetInterest = "free-function twin of Python CapitalStructureCashflows.get_interest (WASM data types are plain objects)"
+capitalStructureCashflowsGetInterestCash = "free-function twin of Python CapitalStructureCashflows.get_interest_cash (WASM data types are plain objects)"
+capitalStructureCashflowsGetInterestPik = "free-function twin of Python CapitalStructureCashflows.get_interest_pik (WASM data types are plain objects)"
+capitalStructureCashflowsGetPrincipal = "free-function twin of Python CapitalStructureCashflows.get_principal (WASM data types are plain objects)"
+capitalStructureCashflowsGetDebtBalance = "free-function twin of Python CapitalStructureCashflows.get_debt_balance (WASM data types are plain objects)"
+capitalStructureCashflowsGetFees = "free-function twin of Python CapitalStructureCashflows.get_fees (WASM data types are plain objects)"
+capitalStructureCashflowsGetAccruedInterest = "free-function twin of Python CapitalStructureCashflows.get_accrued_interest (WASM data types are plain objects)"
+capitalStructureCashflowsGetTotalInterest = "free-function twin of Python CapitalStructureCashflows.get_total_interest (WASM data types are plain objects)"
+capitalStructureCashflowsGetTotalPrincipal = "free-function twin of Python CapitalStructureCashflows.get_total_principal (WASM data types are plain objects)"
+capitalStructureCashflowsGetTotalDebtBalance = "free-function twin of Python CapitalStructureCashflows.get_total_debt_balance (WASM data types are plain objects)"
+capitalStructureCashflowsGetTotalFees = "free-function twin of Python CapitalStructureCashflows.get_total_fees (WASM data types are plain objects)"
+forecastSpecForwardFill = "free-function twin of Python ForecastSpec.forward_fill (WASM data types are plain objects)"
+forecastSpecGrowth = "free-function twin of Python ForecastSpec.growth (WASM data types are plain objects)"
+forecastSpecCurve = "free-function twin of Python ForecastSpec.curve (WASM data types are plain objects)"
+forecastSpecNormal = "free-function twin of Python ForecastSpec.normal (WASM data types are plain objects)"
+forecastSpecLogNormal = "free-function twin of Python ForecastSpec.log_normal (WASM data types are plain objects)"
+forecastSpecOverride = "free-function twin of Python ForecastSpec.override (WASM data types are plain objects)"
+forecastSpecSeasonal = "free-function twin of Python ForecastSpec.seasonal (WASM data types are plain objects)"
+forecastSpecTimeSeries = "free-function twin of Python ForecastSpec.time_series (WASM data types are plain objects)"
+forecastSpecFadeToTarget = "free-function twin of Python ForecastSpec.fade_to_target (WASM data types are plain objects)"
+forecastSpecMeanReverting = "free-function twin of Python ForecastSpec.mean_reverting (WASM data types are plain objects)"
+forecastSpecBootstrap = "free-function twin of Python ForecastSpec.bootstrap (WASM data types are plain objects)"
+adjustmentFixed = "free-function twin of Python Adjustment.fixed (WASM data types are plain objects)"
+adjustmentPercentage = "free-function twin of Python Adjustment.percentage (WASM data types are plain objects)"
+adjustmentWithCap = "free-function twin of Python Adjustment.with_cap (WASM data types are plain objects)"
+adjustmentWithCapMode = "free-function twin of Python Adjustment.with_cap_mode (WASM data types are plain objects)"
+adjustmentWithCategory = "free-function twin of Python Adjustment.with_category (WASM data types are plain objects)"
+normalizationConfigAddAdjustment = "free-function twin of Python NormalizationConfig.add_adjustment (WASM data types are plain objects)"
+validateNormalizationConfigJson = "free-function twin of Python NormalizationConfig.validate (WASM data types are plain objects)"
+checkSuiteSpecBuiltinCheckNames = "free-function twin of Python CheckSuiteSpec.builtin_check_names (WASM data types are plain objects)"
 
 [parity.js."statements_analytics".wasm_only]
-parameterSpecWithPercentages = "free-function twin of Python ParameterSpec.with_percentages (Rust ParameterSpec::with_percentages); P9 binds ParameterSpec"
-scenarioComparisonTable = "free-function twin of Python ScenarioResults.to_comparison_table (Rust ScenarioResults::to_comparison_table); P9 binds ScenarioResults"
-dependencyTree = "free-function twin of Python DependencyTracer.dependency_tree (Rust DependencyTracer::dependency_tree); P9 binds the DependencyTracer class"
-dependencyTreeText = "free-function twin of Python DependencyTracer.dependency_tree_text (Rust DependencyTracer::dependency_tree_text); P9 binds the DependencyTracer class"
+scenarioComparisonTable = "free-function twin of Python ScenarioResults.to_comparison_table (WASM data types are plain objects)"
+parameterSpecWithPercentages = "free-function twin of Python ParameterSpec.with_percentages (WASM data types are plain objects)"
+validateLeaseSpecJson = "free-function twin of Python LeaseSpec.validate (WASM data types are plain objects)"
+validateRenewalSpecJson = "free-function twin of Python RenewalSpec.validate (WASM data types are plain objects)"
+terminalValueSpecGordonGrowth = "free-function twin of Python TerminalValueSpec.gordon_growth (WASM data types are plain objects)"
+terminalValueSpecExitMultiple = "free-function twin of Python TerminalValueSpec.exit_multiple (WASM data types are plain objects)"
+terminalValueSpecHModel = "free-function twin of Python TerminalValueSpec.h_model (WASM data types are plain objects)"
+companyMetricsGet = "free-function twin of Python CompanyMetrics.get (WASM data types are plain objects)"
+peerFilterAccepts = "free-function twin of Python PeerFilter.accepts (WASM data types are plain objects)"
+peerSetFromUniverse = "free-function twin of Python PeerSet.from_universe (WASM data types are plain objects)"
+scenarioResultsGet = "free-function twin of Python ScenarioResults.get (WASM data types are plain objects)"
+scenarioSetTrace = "free-function twin of Python ScenarioSet.trace (WASM data types are plain objects)"
+sensitivityConfigAddParameter = "free-function twin of Python SensitivityConfig.add_parameter (WASM data types are plain objects)"
+sensitivityResultGetParameterValue = "free-function twin of Python SensitivityResult.get_parameter_value (WASM data types are plain objects)"
+sensitivityResultGetValue = "free-function twin of Python SensitivityResult.get_value (WASM data types are plain objects)"
+explanationToText = "free-function twin of Python Explanation.to_text (WASM data types are plain objects)"
+forecastMetricsSummaryText = "free-function twin of Python ForecastMetrics.summary (WASM data types are plain objects)"
 
 [parity.js."valuations".wasm_only]
 validateValuationResultJson = "JSON wire twin of Python ValuationResult.from_json"
@@ -3009,12 +2981,86 @@ renames = { exact = { js = "scenarios.tenorMatchModeExact", reason = "WASM Tenor
 [parity.members."finstack_quant.scenarios.TimeRollMode"]
 renames = { approximate = { js = "scenarios.timeRollModeApproximate", reason = "WASM TimeRollMode is its wire label; Rust TimeRollMode::Approximate is a free function returning it" }, business_days = { js = "scenarios.timeRollModeBusinessDays", reason = "WASM TimeRollMode is its wire label; Rust TimeRollMode::BusinessDays is a free function returning it" }, calendar_days = { js = "scenarios.timeRollModeCalendarDays", reason = "WASM TimeRollMode is its wire label; Rust TimeRollMode::CalendarDays is a free function returning it" } }
 
+[parity.members."finstack_quant.statements.Adjustment"]
+renames = { fixed = { js = "statements.adjustmentFixed", reason = "WASM adjustments are plain objects; the Rust Adjustment::fixed constructor is a free function returning the object" }, percentage = { js = "statements.adjustmentPercentage", reason = "WASM adjustments are plain objects; the Rust Adjustment::percentage constructor is a free function returning the object" }, with_cap = { js = "statements.adjustmentWithCap", reason = "WASM adjustments are plain objects; the Rust Adjustment::with_cap method is a free function taking the object" }, with_cap_mode = { js = "statements.adjustmentWithCapMode", reason = "WASM adjustments are plain objects; the Rust Adjustment::with_cap_mode method is a free function taking the object" }, with_category = { js = "statements.adjustmentWithCategory", reason = "WASM adjustments are plain objects; the Rust Adjustment::with_category method is a free function taking the object" } }
+
+[parity.members."finstack_quant.statements.CapitalStructureCashflows"]
+renames = { get_interest = { js = "statements.capitalStructureCashflowsGetInterest", reason = "WASM capital-structure cashflows are plain objects; the Rust CapitalStructureCashflows::get_interest method is a free function taking the object" }, get_interest_cash = { js = "statements.capitalStructureCashflowsGetInterestCash", reason = "WASM capital-structure cashflows are plain objects; the Rust CapitalStructureCashflows::get_interest_cash method is a free function taking the object" }, get_interest_pik = { js = "statements.capitalStructureCashflowsGetInterestPik", reason = "WASM capital-structure cashflows are plain objects; the Rust CapitalStructureCashflows::get_interest_pik method is a free function taking the object" }, get_principal = { js = "statements.capitalStructureCashflowsGetPrincipal", reason = "WASM capital-structure cashflows are plain objects; the Rust CapitalStructureCashflows::get_principal method is a free function taking the object" }, get_debt_balance = { js = "statements.capitalStructureCashflowsGetDebtBalance", reason = "WASM capital-structure cashflows are plain objects; the Rust CapitalStructureCashflows::get_debt_balance method is a free function taking the object" }, get_fees = { js = "statements.capitalStructureCashflowsGetFees", reason = "WASM capital-structure cashflows are plain objects; the Rust CapitalStructureCashflows::get_fees method is a free function taking the object" }, get_accrued_interest = { js = "statements.capitalStructureCashflowsGetAccruedInterest", reason = "WASM capital-structure cashflows are plain objects; the Rust CapitalStructureCashflows::get_accrued_interest method is a free function taking the object" }, get_total_interest = { js = "statements.capitalStructureCashflowsGetTotalInterest", reason = "WASM capital-structure cashflows are plain objects; the Rust CapitalStructureCashflows::get_total_interest method is a free function taking the object" }, get_total_principal = { js = "statements.capitalStructureCashflowsGetTotalPrincipal", reason = "WASM capital-structure cashflows are plain objects; the Rust CapitalStructureCashflows::get_total_principal method is a free function taking the object" }, get_total_debt_balance = { js = "statements.capitalStructureCashflowsGetTotalDebtBalance", reason = "WASM capital-structure cashflows are plain objects; the Rust CapitalStructureCashflows::get_total_debt_balance method is a free function taking the object" }, get_total_fees = { js = "statements.capitalStructureCashflowsGetTotalFees", reason = "WASM capital-structure cashflows are plain objects; the Rust CapitalStructureCashflows::get_total_fees method is a free function taking the object" } }
+
 [parity.members."finstack_quant.statements.CheckReport"]
-backlog = [
-    "findings_by_severity",
-    "has_errors",
-    "has_warnings",
-]
+renames = { findings_by_severity = { js = "statements.checkReportFindingsBySeverity", reason = "WASM check reports are plain objects; the Rust CheckReport::findings_by_severity method is a free function taking the object" }, has_errors = { js = "statements.checkReportHasErrors", reason = "WASM check reports are plain objects; the Rust CheckReport::has_errors method is a free function taking the object" }, has_warnings = { js = "statements.checkReportHasWarnings", reason = "WASM check reports are plain objects; the Rust CheckReport::has_warnings method is a free function taking the object" } }
+
+[parity.members."finstack_quant.statements.CheckSuiteSpec"]
+renames = { builtin_check_names = { js = "statements.checkSuiteSpecBuiltinCheckNames", reason = "WASM check-suite specs are plain objects; the Rust BuiltinCheckSpec::names catalog is a free function" } }
+
+[parity.members."finstack_quant.statements.EcfSweepSpec"]
+renames = { validate = { js = "statements.validateEcfSweepSpecJson", reason = "WASM specs are plain objects; the Rust EcfSweepSpec::validate method runs inside the JSON validation function" } }
+
+[parity.members."finstack_quant.statements.FinancialModelSpec"]
+renames = { builder = { js = "statements.financialModelBuilder", reason = "WASM models are plain objects; the Rust FinancialModelSpec::builder entry point is a free function returning the ModelBuilder class" }, content_hash = { js = "statements.financialModelContentHash", reason = "WASM models are plain objects; the Rust FinancialModelSpec::content_hash method is a free function taking the object" }, get_node = { js = "statements.financialModelGetNode", reason = "WASM models are plain objects; the Rust FinancialModelSpec::get_node method is a free function taking the object" }, has_node = { js = "statements.financialModelHasNode", reason = "WASM models are plain objects; the Rust FinancialModelSpec::has_node method is a free function taking the object" }, node_ids = { js = "statements.modelNodeIds", reason = "WASM models are plain objects; the node-id accessor is a free function taking the model" } }
+
+[parity.members."finstack_quant.statements.ForecastSpec"]
+renames = { forward_fill = { js = "statements.forecastSpecForwardFill", reason = "WASM forecast specs are plain objects; the Rust ForecastSpec::forward_fill constructor is a free function returning the object" }, growth = { js = "statements.forecastSpecGrowth", reason = "WASM forecast specs are plain objects; the Rust ForecastSpec::growth constructor is a free function returning the object" }, curve = { js = "statements.forecastSpecCurve", reason = "WASM forecast specs are plain objects; the Rust ForecastSpec::curve constructor is a free function returning the object" }, normal = { js = "statements.forecastSpecNormal", reason = "WASM forecast specs are plain objects; the Rust ForecastSpec::normal constructor is a free function returning the object" }, log_normal = { js = "statements.forecastSpecLogNormal", reason = "WASM forecast specs are plain objects; the Rust ForecastSpec::log_normal constructor is a free function returning the object" }, override = { js = "statements.forecastSpecOverride", reason = "WASM forecast specs are plain objects; the Rust ForecastSpec::overrides constructor is a free function returning the object" }, seasonal = { js = "statements.forecastSpecSeasonal", reason = "WASM forecast specs are plain objects; the Rust ForecastSpec::seasonal constructor is a free function returning the object" }, time_series = { js = "statements.forecastSpecTimeSeries", reason = "WASM forecast specs are plain objects; the Rust ForecastSpec::time_series constructor is a free function returning the object" }, fade_to_target = { js = "statements.forecastSpecFadeToTarget", reason = "WASM forecast specs are plain objects; the Rust ForecastSpec::fade_to_target constructor is a free function returning the object" }, mean_reverting = { js = "statements.forecastSpecMeanReverting", reason = "WASM forecast specs are plain objects; the Rust ForecastSpec::mean_reverting constructor is a free function returning the object" }, bootstrap = { js = "statements.forecastSpecBootstrap", reason = "WASM forecast specs are plain objects; the Rust ForecastSpec::bootstrap constructor is a free function returning the object" } }
+
+[parity.members."finstack_quant.statements.MonteCarloResults"]
+renames = { breach_probability = { js = "statements.monteCarloBreachProbability", reason = "WASM Monte Carlo results are plain objects; the Rust MonteCarloResults::breach_probability method is a free function taking the object" }, percentile_by_period = { js = "statements.monteCarloPercentileByPeriod", reason = "WASM Monte Carlo results are plain objects; the Rust MonteCarloResults::percentile_by_period method is a free function taking the object" } }
+
+[parity.members."finstack_quant.statements.NormalizationConfig"]
+renames = { add_adjustment = { js = "statements.normalizationConfigAddAdjustment", reason = "WASM normalization configs are plain objects; the Rust NormalizationConfig::add_adjustment method is a free function taking the object" }, validate = { js = "statements.validateNormalizationConfigJson", reason = "WASM normalization configs are plain objects; the Rust NormalizationConfig::validate method runs inside the JSON validation function" } }
+
+[parity.members."finstack_quant.statements.PikToggleSpec"]
+renames = { validate = { js = "statements.validatePikToggleSpecJson", reason = "WASM specs are plain objects; the Rust PikToggleSpec::validate method runs inside the JSON validation function" } }
+
+[parity.members."finstack_quant.statements.StatementResult"]
+renames = { get = { js = "statements.statementResultGet", reason = "WASM statement results are plain objects; the Rust StatementResult::get method is a free function taking the object" }, get_money = { js = "statements.statementResultGetMoney", reason = "WASM statement results are plain objects; the Rust StatementResult::get_money method is a free function taking the object" }, get_scalar = { js = "statements.statementResultGetScalar", reason = "WASM statement results are plain objects; the Rust StatementResult::get_scalar method is a free function taking the object" }, get_or = { js = "statements.statementResultGetOr", reason = "WASM statement results are plain objects; the Rust StatementResult::get_or method is a free function taking the object" }, all_periods = { js = "statements.statementResultAllPeriods", reason = "WASM statement results are plain objects; the Rust StatementResult::all_periods method is a free function taking the object" }, get_node = { js = "statements.statementResultGetNode", reason = "WASM statement results are plain objects; the Rust StatementResult::get_node method is a free function taking the object" }, node_ids = { js = "statements.statementResultNodeIds", reason = "WASM statement results are plain objects; the Rust StatementResult node-id accessor is a free function taking the object" }, to_dated_schedule = { js = "statements.nodeToDatedSchedule", reason = "WASM statement results are plain objects; the Rust evaluator::node_to_dated_schedule function is a free function taking the object" }, to_arrow_long = { js = "statements.statementResultToTableLong", reason = "WASM statement results are plain objects; Rust StatementResult::to_table_long returns the TableEnvelope that Python wraps as an Arrow table" }, to_arrow_wide = { js = "statements.statementResultToTableWide", reason = "WASM statement results are plain objects; Rust StatementResult::to_table_wide returns the TableEnvelope that Python wraps as an Arrow table" } }
+
+[parity.members."finstack_quant.statements.WaterfallSpec"]
+renames = { validate = { js = "statements.validateWaterfallSpecJson", reason = "WASM specs are plain objects; the Rust WaterfallSpec::validate method runs inside the JSON validation function" } }
+
+[parity.members."finstack_quant.statements_analytics.CompanyMetrics"]
+renames = { get = { js = "statements_analytics.companyMetricsGet", reason = "WASM company metrics are plain objects; the Rust CompanyMetrics::get method is a free function taking the object" } }
+
+[parity.members."finstack_quant.statements_analytics.DependencyTracer"]
+renames = { dependency_tree_detailed = { js = "dependencyTreeDetailedText", reason = "prose-returning WASM members carry the Text suffix (Rust render_tree_detailed over DependencyTracer::dependency_tree)" } }
+
+[parity.members."finstack_quant.statements_analytics.Explanation"]
+renames = { to_text = { js = "statements_analytics.explanationToText", reason = "WASM formula explanations are plain objects; the Rust Explanation::to_string_detailed method is a free function taking the object" } }
+
+[parity.members."finstack_quant.statements_analytics.ForecastMetrics"]
+renames = { summary = { js = "statements_analytics.forecastMetricsSummaryText", reason = "WASM forecast metrics are plain objects; the Rust ForecastMetrics::summary method is a free function taking the object, named Text because it returns prose" } }
+
+[parity.members."finstack_quant.statements_analytics.LeaseSpec"]
+renames = { validate = { js = "statements_analytics.validateLeaseSpecJson", reason = "WASM lease specs are plain objects; the Rust LeaseSpec::validate method runs inside the JSON validation function" } }
+
+[parity.members."finstack_quant.statements_analytics.ParameterSpec"]
+renames = { with_percentages = { js = "statements_analytics.parameterSpecWithPercentages", reason = "WASM parameter specs are plain objects; the Rust ParameterSpec::with_percentages constructor is a free function returning the object" } }
+
+[parity.members."finstack_quant.statements_analytics.PeerFilter"]
+renames = { accepts = { js = "statements_analytics.peerFilterAccepts", reason = "WASM peer filters are plain objects; the Rust PeerFilter::accepts method is a free function taking the object" } }
+
+[parity.members."finstack_quant.statements_analytics.PeerSet"]
+renames = { from_universe = { js = "statements_analytics.peerSetFromUniverse", reason = "WASM peer sets are plain objects; the Rust PeerSet::from_universe constructor is a free function returning the object" } }
+
+[parity.members."finstack_quant.statements_analytics.RenewalSpec"]
+renames = { validate = { js = "statements_analytics.validateRenewalSpecJson", reason = "WASM renewal specs are plain objects; the Rust RenewalSpec::validate method runs inside the JSON validation function" } }
+
+[parity.members."finstack_quant.statements_analytics.ScenarioResults"]
+renames = { get = { js = "statements_analytics.scenarioResultsGet", reason = "WASM scenario results are plain objects; the per-scenario lookup is a free function taking the object" }, to_comparison_table = { js = "statements_analytics.scenarioComparisonTable", reason = "WASM scenario results are plain objects; the Rust ScenarioResults::to_comparison_table method is a free function taking the object" } }
+
+[parity.members."finstack_quant.statements_analytics.ScenarioSet"]
+renames = { trace = { js = "statements_analytics.scenarioSetTrace", reason = "WASM scenario sets are plain objects; the Rust ScenarioSet::trace method is a free function taking the object" } }
+
+[parity.members."finstack_quant.statements_analytics.ScorecardConfig"]
+renames = { validate = { js = "statements_analytics.validateScorecardConfig", reason = "WASM scorecard configs are plain objects; Rust CreditScorecardExtension::validate_config is a free function taking the object" } }
+
+[parity.members."finstack_quant.statements_analytics.SensitivityConfig"]
+renames = { add_parameter = { js = "statements_analytics.sensitivityConfigAddParameter", reason = "WASM sensitivity configs are plain objects; the Rust SensitivityConfig::add_parameter method is a free function taking the object" } }
+
+[parity.members."finstack_quant.statements_analytics.SensitivityResult"]
+renames = { get_parameter_value = { js = "statements_analytics.sensitivityResultGetParameterValue", reason = "WASM sensitivity results are plain objects; the Rust SensitivityResult::get_parameter_value method is a free function taking the object" }, get_value = { js = "statements_analytics.sensitivityResultGetValue", reason = "WASM sensitivity results are plain objects; the Rust SensitivityResult::get_value method is a free function taking the object" } }
+
+[parity.members."finstack_quant.statements_analytics.TerminalValueSpec"]
+renames = { gordon_growth = { js = "statements_analytics.terminalValueSpecGordonGrowth", reason = "WASM terminal-value specs are plain objects; the Rust TerminalValueSpec::GordonGrowth variant constructor is a free function returning the object" }, exit_multiple = { js = "statements_analytics.terminalValueSpecExitMultiple", reason = "WASM terminal-value specs are plain objects; the Rust TerminalValueSpec::ExitMultiple variant constructor is a free function returning the object" }, h_model = { js = "statements_analytics.terminalValueSpecHModel", reason = "WASM terminal-value specs are plain objects; the Rust TerminalValueSpec::HModel variant constructor is a free function returning the object" } }
 
 [parity.members."finstack_quant.portfolio.Constraint"]
 backlog = [

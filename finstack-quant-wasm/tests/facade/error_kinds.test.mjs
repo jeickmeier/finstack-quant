@@ -79,7 +79,7 @@ function performance() {
 test('a statements dependency cycle is a computation failure', () => {
   assert.throws(
     () =>
-      statements.evaluateModel(
+      new statements.Evaluator().evaluate(
         model([
           ['a', 'b + 1'],
           ['b', 'a + 1'],
@@ -91,14 +91,14 @@ test('a statements dependency cycle is a computation failure', () => {
 
 test('an unknown statements identifier is a validation failure', () => {
   assert.throws(
-    () => statements.evaluateModel(model([['x', 'revenue + nope']])),
+    () => new statements.Evaluator().evaluate(model([['x', 'revenue + nope']])),
     kind('validation', /nope/)
   );
 });
 
 test('explaining a missing period is not found', () => {
   const spec = model([['x', 'revenue * 2']]);
-  const result = statements.evaluateModel(spec);
+  const result = new statements.Evaluator().evaluate(spec);
   assert.throws(
     () => statements_analytics.explainFormula(spec, result, 'x', '2030Q1'),
     kind('not_found')

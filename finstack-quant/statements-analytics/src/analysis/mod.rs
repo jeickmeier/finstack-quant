@@ -69,9 +69,10 @@ pub use scenarios::{
     VarianceReport, VarianceRow,
 };
 pub use valuation::{
-    dcf_sensitivity, evaluate_dcf_with_market, evaluate_lbo, wacc, CorporateAnalysis,
-    CorporateAnalysisBuilder, CorporateValuationResult, DcfOptions, DcfSensitivityResult,
-    ExitMultipleBump, LboCheckMappings, LboConfig, LboResult, LboTranche, DEFAULT_UFCF_NODE,
+    dcf_sensitivity, evaluate_dcf_with_market, evaluate_lbo, run_corporate_analysis, wacc,
+    CorporateAnalysis, CorporateAnalysisBuilder, CorporateAnalysisOptions,
+    CorporateValuationResult, DcfOptions, DcfSensitivityResult, ExitMultipleBump, LboCheckMappings,
+    LboConfig, LboResult, LboTranche, DEFAULT_UFCF_NODE,
 };
 
 pub use checks::{

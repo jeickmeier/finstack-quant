@@ -108,6 +108,7 @@ fn is_default_cap_base_mode(mode: &CapBaseMode) -> bool {
 
 /// Result of a normalization process for a single period.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct NormalizationResult {
     /// Unit and currency shared by the base, adjustments, and final value.
     pub value_type: crate::types::NodeValueType,
@@ -127,6 +128,7 @@ pub struct NormalizationResult {
 
 /// Details of a single applied adjustment.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct AppliedAdjustment {
     /// ID of the adjustment
     pub adjustment_id: String,
@@ -269,5 +271,48 @@ impl Adjustment {
             base_mode,
         });
         self
+    }
+
+    /// Set the grouping category used by reports.
+    ///
+    /// # Arguments
+    ///
+    /// * `category` - Free-form grouping label such as `"one_time"` or
+    ///   `"run_rate"`; it replaces any category already set and does not
+    ///   affect the adjustment amount.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use finstack_quant_statements::adjustments::types::Adjustment;
+    ///
+    /// let adjustment =
+    ///     Adjustment::percentage("synergies", "Synergies", "revenue", 0.05).with_category("run_rate");
+    /// assert_eq!(adjustment.category.as_deref(), Some("run_rate"));
+    /// ```
+    #[must_use]
+    pub fn with_category(mut self, category: impl Into<String>) -> Self {
+        self.category = Some(category.into());
+        self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn with_category_sets_the_category_and_keeps_the_amount() {
+        let adjustment = Adjustment::percentage("synergies", "Synergies", "revenue", 0.05);
+        assert_eq!(adjustment.category, None);
+
+        let tagged = adjustment.clone().with_category("run_rate");
+
+        assert_eq!(tagged.category.as_deref(), Some("run_rate"));
+        assert_eq!(tagged.value, adjustment.value);
+        assert_eq!(
+            tagged.with_category("one_time").category.as_deref(),
+            Some("one_time")
+        );
     }
 }

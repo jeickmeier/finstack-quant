@@ -13,6 +13,7 @@ use crate::Result;
 /// `CheckResult::passed` is always `true` and it never fails a pipeline gate.
 /// Treat its findings as review prompts, not assertions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct SignConventionCheck {
     /// Nodes expected to carry positive values.
     #[serde(default)]

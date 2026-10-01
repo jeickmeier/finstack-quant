@@ -308,9 +308,12 @@ policy.
   `EcfSweepSpec`/`PikToggleSpec`, `parse_formula`, `validate_formula`,
   `NormalizationConfig`/`normalize`, `CheckSuiteSpec`/`CheckReport`, `schema`.
 - **WASM** — `statements` namespace in `finstack-quant-wasm/exports/statements.js`:
-  `evaluateModel`, `evaluateModelWithMarket`, `runMonteCarlo`,
-  `parseFormulaText`, `validateFormula`, `modelNodeIds`, and the
-  `validate*Json` validators.
+  the `Evaluator`, `ModelBuilder`, `MixedNodeBuilder` and `Registry` classes,
+  `parseFormula`, `parseAndCompile`, `normalize`, `modelNodeIds`, the
+  `validate*Json` validators, and free-function twins of the Python result and
+  spec methods (`statementResult*`, `capitalStructureCashflows*`,
+  `forecastSpec*`, `adjustment*`). Data types are plain objects typed from the
+  JSON Schemas.
 
 ## Verification
 

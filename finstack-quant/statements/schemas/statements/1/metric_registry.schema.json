@@ -1,0 +1,142 @@
+{
+  "$defs": {
+    "MetricDefinition": {
+      "additionalProperties": false,
+      "description": "Individual metric definition.\n\nEach definition maps directly to a JSON object in a registry file and is\nconverted into a [`NodeSpec`](crate::types::NodeSpec) when registered.",
+      "properties": {
+        "category": {
+          "description": "Category for grouping (e.g., \"margins\", \"returns\", \"leverage\")",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "description": "Description of what this metric represents",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "formula": {
+          "description": "Formula text (in statements DSL)",
+          "type": "string"
+        },
+        "id": {
+          "description": "Unique identifier within the namespace",
+          "type": "string"
+        },
+        "meta": {
+          "additionalProperties": true,
+          "description": "Additional metadata",
+          "type": "object"
+        },
+        "name": {
+          "description": "Human-readable name",
+          "type": "string"
+        },
+        "requires": {
+          "description": "List of required node dependencies",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "tags": {
+          "description": "Tags for filtering/searching",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "unit_type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UnitType"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Unit type (percentage, currency, ratio, count)"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "formula"
+      ],
+      "type": "object"
+    },
+    "SchemaVersion": {
+      "description": "Numeric schema revision for contracts whose sole supported revision is v1.",
+      "format": "uint32",
+      "maximum": 1,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "UnitType": {
+      "description": "Unit type for metric values.",
+      "oneOf": [
+        {
+          "const": "percentage",
+          "description": "Percentage (0.15 = 15%)",
+          "type": "string"
+        },
+        {
+          "const": "currency",
+          "description": "Currency amount",
+          "type": "string"
+        },
+        {
+          "const": "ratio",
+          "description": "Ratio (dimensionless)",
+          "type": "string"
+        },
+        {
+          "const": "count",
+          "description": "Count (integer-like)",
+          "type": "string"
+        },
+        {
+          "const": "time_period",
+          "description": "Time period (days, months, years)",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements/1/metric_registry.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Namespaced catalog of reusable metric definitions.",
+  "properties": {
+    "meta": {
+      "additionalProperties": true,
+      "description": "Additional metadata",
+      "type": "object"
+    },
+    "metrics": {
+      "description": "List of metric definitions contained in the registry",
+      "items": {
+        "$ref": "#/$defs/MetricDefinition"
+      },
+      "type": "array"
+    },
+    "namespace": {
+      "description": "Namespace for all metrics in this registry (e.g., \"fin\", \"custom\")",
+      "type": "string"
+    },
+    "schema_version": {
+      "$ref": "#/$defs/SchemaVersion",
+      "description": "Required schema version. Only numeric `1` is accepted."
+    }
+  },
+  "required": [
+    "namespace",
+    "schema_version",
+    "metrics"
+  ],
+  "title": "MetricRegistry",
+  "type": "object"
+}

@@ -4064,25 +4064,128 @@
   "statements": {
     "kind": "namespace",
     "keys": [
-      "evaluateModel",
-      "evaluateModelWithMarket",
-      "evaluateMonteCarlo",
+      "Evaluator",
+      "MixedNodeBuilder",
+      "ModelBuilder",
+      "Registry",
+      "adjustmentFixed",
+      "adjustmentPercentage",
+      "adjustmentWithCap",
+      "adjustmentWithCapMode",
+      "adjustmentWithCategory",
+      "capitalStructureCashflowsGetAccruedInterest",
+      "capitalStructureCashflowsGetDebtBalance",
+      "capitalStructureCashflowsGetFees",
+      "capitalStructureCashflowsGetInterest",
+      "capitalStructureCashflowsGetInterestCash",
+      "capitalStructureCashflowsGetInterestPik",
+      "capitalStructureCashflowsGetPrincipal",
+      "capitalStructureCashflowsGetTotalDebtBalance",
+      "capitalStructureCashflowsGetTotalFees",
+      "capitalStructureCashflowsGetTotalInterest",
+      "capitalStructureCashflowsGetTotalPrincipal",
+      "checkReportFindingsBySeverity",
+      "checkReportHasErrors",
+      "checkReportHasWarnings",
+      "checkSuiteSpecBuiltinCheckNames",
+      "financialModelBuilder",
       "financialModelContentHash",
+      "financialModelGetNode",
+      "financialModelHasNode",
+      "forecastSpecBootstrap",
+      "forecastSpecCurve",
+      "forecastSpecFadeToTarget",
+      "forecastSpecForwardFill",
+      "forecastSpecGrowth",
+      "forecastSpecLogNormal",
+      "forecastSpecMeanReverting",
+      "forecastSpecNormal",
+      "forecastSpecOverride",
+      "forecastSpecSeasonal",
+      "forecastSpecTimeSeries",
       "modelNodeIds",
       "monteCarloBreachProbability",
       "monteCarloPercentileByPeriod",
       "nodeToDatedSchedule",
+      "normalizationConfigAddAdjustment",
+      "normalize",
+      "normalizeJson",
       "parseAndCompile",
       "parseFormula",
+      "statementResultAllPeriods",
+      "statementResultGet",
+      "statementResultGetMoney",
+      "statementResultGetNode",
+      "statementResultGetOr",
+      "statementResultGetScalar",
+      "statementResultNodeIds",
       "statementResultToTableLong",
       "statementResultToTableWide",
       "validateCapitalStructureSpecJson",
       "validateCheckSuiteSpecJson",
       "validateEcfSweepSpecJson",
       "validateFinancialModelJson",
+      "validateNormalizationConfigJson",
       "validatePikToggleSpecJson",
       "validateWaterfallSpecJson"
     ]
+  },
+  "statements.Evaluator": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["evaluate", "evaluateMonteCarlo", "evaluateWithMarket", "free", "withChecks"],
+    "getters": []
+  },
+  "statements.Registry": {
+    "kind": "class",
+    "statics": ["withBuiltins"],
+    "methods": [
+      "dependencies",
+      "free",
+      "get",
+      "has",
+      "loadBuiltins",
+      "loadFromJsonStr",
+      "metricIds"
+    ],
+    "getters": []
+  },
+  "statements.ModelBuilder": {
+    "kind": "class",
+    "statics": ["fromSpec"],
+    "methods": [
+      "addBond",
+      "addBondWithConvention",
+      "addDebt",
+      "addMetricFromRegistry",
+      "addSwap",
+      "addSwapWithConventions",
+      "availabilityDates",
+      "build",
+      "compute",
+      "forecast",
+      "free",
+      "fxPolicy",
+      "insertNode",
+      "mixed",
+      "periods",
+      "periodsExplicit",
+      "reportingCurrency",
+      "value",
+      "valueMoney",
+      "valueScalar",
+      "waterfall",
+      "whereClause",
+      "withBuiltinMetrics",
+      "withMeta"
+    ],
+    "getters": []
+  },
+  "statements.MixedNodeBuilder": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["build", "forecast", "formula", "free", "name", "values", "valuesMoney"],
+    "getters": []
   },
   "statements.validateFinancialModelJson": {
     "kind": "function"
@@ -4103,15 +4206,6 @@
     "kind": "function"
   },
   "statements.validatePikToggleSpecJson": {
-    "kind": "function"
-  },
-  "statements.evaluateModel": {
-    "kind": "function"
-  },
-  "statements.evaluateModelWithMarket": {
-    "kind": "function"
-  },
-  "statements.evaluateMonteCarlo": {
     "kind": "function"
   },
   "statements.nodeToDatedSchedule": {
@@ -4138,39 +4232,232 @@
   "statements.parseAndCompile": {
     "kind": "function"
   },
+  "statements.financialModelBuilder": {
+    "kind": "function"
+  },
+  "statements.statementResultGet": {
+    "kind": "function"
+  },
+  "statements.statementResultGetMoney": {
+    "kind": "function"
+  },
+  "statements.statementResultGetScalar": {
+    "kind": "function"
+  },
+  "statements.statementResultGetOr": {
+    "kind": "function"
+  },
+  "statements.statementResultAllPeriods": {
+    "kind": "function"
+  },
+  "statements.statementResultGetNode": {
+    "kind": "function"
+  },
+  "statements.statementResultNodeIds": {
+    "kind": "function"
+  },
+  "statements.financialModelHasNode": {
+    "kind": "function"
+  },
+  "statements.financialModelGetNode": {
+    "kind": "function"
+  },
+  "statements.checkReportHasErrors": {
+    "kind": "function"
+  },
+  "statements.checkReportHasWarnings": {
+    "kind": "function"
+  },
+  "statements.checkReportFindingsBySeverity": {
+    "kind": "function"
+  },
+  "statements.capitalStructureCashflowsGetInterest": {
+    "kind": "function"
+  },
+  "statements.capitalStructureCashflowsGetInterestCash": {
+    "kind": "function"
+  },
+  "statements.capitalStructureCashflowsGetInterestPik": {
+    "kind": "function"
+  },
+  "statements.capitalStructureCashflowsGetPrincipal": {
+    "kind": "function"
+  },
+  "statements.capitalStructureCashflowsGetDebtBalance": {
+    "kind": "function"
+  },
+  "statements.capitalStructureCashflowsGetFees": {
+    "kind": "function"
+  },
+  "statements.capitalStructureCashflowsGetAccruedInterest": {
+    "kind": "function"
+  },
+  "statements.capitalStructureCashflowsGetTotalInterest": {
+    "kind": "function"
+  },
+  "statements.capitalStructureCashflowsGetTotalPrincipal": {
+    "kind": "function"
+  },
+  "statements.capitalStructureCashflowsGetTotalDebtBalance": {
+    "kind": "function"
+  },
+  "statements.capitalStructureCashflowsGetTotalFees": {
+    "kind": "function"
+  },
+  "statements.forecastSpecForwardFill": {
+    "kind": "function"
+  },
+  "statements.forecastSpecGrowth": {
+    "kind": "function"
+  },
+  "statements.forecastSpecCurve": {
+    "kind": "function"
+  },
+  "statements.forecastSpecNormal": {
+    "kind": "function"
+  },
+  "statements.forecastSpecLogNormal": {
+    "kind": "function"
+  },
+  "statements.forecastSpecOverride": {
+    "kind": "function"
+  },
+  "statements.forecastSpecSeasonal": {
+    "kind": "function"
+  },
+  "statements.forecastSpecTimeSeries": {
+    "kind": "function"
+  },
+  "statements.forecastSpecFadeToTarget": {
+    "kind": "function"
+  },
+  "statements.forecastSpecMeanReverting": {
+    "kind": "function"
+  },
+  "statements.forecastSpecBootstrap": {
+    "kind": "function"
+  },
+  "statements.adjustmentFixed": {
+    "kind": "function"
+  },
+  "statements.adjustmentPercentage": {
+    "kind": "function"
+  },
+  "statements.adjustmentWithCap": {
+    "kind": "function"
+  },
+  "statements.adjustmentWithCapMode": {
+    "kind": "function"
+  },
+  "statements.adjustmentWithCategory": {
+    "kind": "function"
+  },
+  "statements.normalizationConfigAddAdjustment": {
+    "kind": "function"
+  },
+  "statements.validateNormalizationConfigJson": {
+    "kind": "function"
+  },
+  "statements.normalize": {
+    "kind": "function"
+  },
+  "statements.normalizeJson": {
+    "kind": "function"
+  },
+  "statements.checkSuiteSpecBuiltinCheckNames": {
+    "kind": "function"
+  },
   "statements_analytics": {
     "kind": "namespace",
     "keys": [
+      "CorkscrewExtension",
+      "CreditScorecardExtension",
+      "DependencyTracer",
+      "addNcfBuildup",
+      "addNoiBuildup",
+      "addPropertyOperatingStatement",
+      "addRentRoll",
+      "addRollForward",
+      "addRollForwardWithOpening",
+      "addVintageBuildup",
       "backtestForecast",
+      "classifyStage",
+      "companyMetricsGet",
+      "computeEcl",
+      "computeEclWeighted",
       "computeMultiple",
       "creditAssessment",
       "creditAssessmentReportText",
       "dcfSensitivity",
-      "dependencyTree",
-      "dependencyTreeText",
+      "evaluateDcf",
       "evaluateLbo",
       "evaluateScenarioSet",
       "explainFormula",
       "explainFormulaText",
+      "explanationToText",
+      "forecastMetricsSummaryText",
       "generateTornadoEntries",
       "goalSeek",
       "parameterSpecWithPercentages",
+      "peerFilterAccepts",
+      "peerSetFromUniverse",
       "peerStats",
       "percentileRank",
+      "plSummaryReport",
       "plSummaryReportText",
       "regressionFairValue",
       "renderCheckReportHtml",
       "renderCheckReportText",
       "runChecks",
+      "runCorporateAnalysis",
       "runCreditUnderwritingChecks",
       "runSensitivity",
       "runThreeStatementChecks",
       "runVariance",
       "scenarioComparisonTable",
+      "scenarioDiff",
+      "scenarioResultsGet",
+      "scenarioSetTrace",
       "scoreRelativeValue",
+      "sensitivityConfigAddParameter",
+      "sensitivityResultGetParameterValue",
+      "sensitivityResultGetValue",
+      "terminalValueSpecExitMultiple",
+      "terminalValueSpecGordonGrowth",
+      "terminalValueSpecHModel",
+      "validateLeaseSpecJson",
+      "validateRenewalSpecJson",
+      "validateScorecardConfig",
+      "varianceBridge",
       "wacc",
       "zScore"
     ]
+  },
+  "statements_analytics.DependencyTracer": {
+    "kind": "class",
+    "statics": [],
+    "methods": [
+      "allDependencies",
+      "dependencyTree",
+      "dependencyTreeDetailedText",
+      "dependencyTreeText",
+      "dependents",
+      "directDependencies",
+      "free"
+    ],
+    "getters": []
+  },
+  "statements_analytics.CorkscrewExtension": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["config", "execute", "free"],
+    "getters": []
+  },
+  "statements_analytics.CreditScorecardExtension": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["config", "execute", "free"],
+    "getters": []
   },
   "statements_analytics.runSensitivity": {
     "kind": "function"
@@ -4193,9 +4480,6 @@
   "statements_analytics.generateTornadoEntries": {
     "kind": "function"
   },
-  "statements_analytics.goalSeek": {
-    "kind": "function"
-  },
   "statements_analytics.dcfSensitivity": {
     "kind": "function"
   },
@@ -4205,10 +4489,7 @@
   "statements_analytics.wacc": {
     "kind": "function"
   },
-  "statements_analytics.dependencyTree": {
-    "kind": "function"
-  },
-  "statements_analytics.dependencyTreeText": {
+  "statements_analytics.goalSeek": {
     "kind": "function"
   },
   "statements_analytics.explainFormula": {
@@ -4257,6 +4538,99 @@
     "kind": "function"
   },
   "statements_analytics.scoreRelativeValue": {
+    "kind": "function"
+  },
+  "statements_analytics.validateScorecardConfig": {
+    "kind": "function"
+  },
+  "statements_analytics.classifyStage": {
+    "kind": "function"
+  },
+  "statements_analytics.computeEcl": {
+    "kind": "function"
+  },
+  "statements_analytics.computeEclWeighted": {
+    "kind": "function"
+  },
+  "statements_analytics.addVintageBuildup": {
+    "kind": "function"
+  },
+  "statements_analytics.addRollForward": {
+    "kind": "function"
+  },
+  "statements_analytics.addRollForwardWithOpening": {
+    "kind": "function"
+  },
+  "statements_analytics.addNoiBuildup": {
+    "kind": "function"
+  },
+  "statements_analytics.addNcfBuildup": {
+    "kind": "function"
+  },
+  "statements_analytics.addRentRoll": {
+    "kind": "function"
+  },
+  "statements_analytics.addPropertyOperatingStatement": {
+    "kind": "function"
+  },
+  "statements_analytics.validateLeaseSpecJson": {
+    "kind": "function"
+  },
+  "statements_analytics.validateRenewalSpecJson": {
+    "kind": "function"
+  },
+  "statements_analytics.evaluateDcf": {
+    "kind": "function"
+  },
+  "statements_analytics.runCorporateAnalysis": {
+    "kind": "function"
+  },
+  "statements_analytics.terminalValueSpecGordonGrowth": {
+    "kind": "function"
+  },
+  "statements_analytics.terminalValueSpecExitMultiple": {
+    "kind": "function"
+  },
+  "statements_analytics.terminalValueSpecHModel": {
+    "kind": "function"
+  },
+  "statements_analytics.scenarioDiff": {
+    "kind": "function"
+  },
+  "statements_analytics.varianceBridge": {
+    "kind": "function"
+  },
+  "statements_analytics.plSummaryReport": {
+    "kind": "function"
+  },
+  "statements_analytics.companyMetricsGet": {
+    "kind": "function"
+  },
+  "statements_analytics.peerFilterAccepts": {
+    "kind": "function"
+  },
+  "statements_analytics.peerSetFromUniverse": {
+    "kind": "function"
+  },
+  "statements_analytics.scenarioResultsGet": {
+    "kind": "function"
+  },
+  "statements_analytics.scenarioSetTrace": {
+    "kind": "function"
+  },
+  "statements_analytics.sensitivityConfigAddParameter": {
+    "kind": "function"
+  },
+  "statements_analytics.sensitivityResultGetParameterValue": {
+    "kind": "function"
+  },
+  "statements_analytics.sensitivityResultGetValue": {
+    "kind": "function"
+  },
+  "statements_analytics.explanationToText": {
+    "kind": "function"
+  },
+  "statements_analytics.forecastMetricsSummaryText": {
     "kind": "function"
   },
   "valuations": {

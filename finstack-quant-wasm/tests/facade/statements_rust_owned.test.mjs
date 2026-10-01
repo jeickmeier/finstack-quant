@@ -117,7 +117,9 @@ test('goalSeek returns the Rust GoalSeekResult with the model as an object', () 
   assert.equal(typeof updated.model, 'object');
   assert.ok(Math.abs(updated.model.nodes.revenue.values['2025Q1'] - 120) < 1e-6);
   // The updated model chains straight back into another call.
-  assert.ok(Math.abs(statements.evaluateModel(updated.model).nodes.profit['2025Q1'] - 60) < 1e-6);
+  assert.ok(
+    Math.abs(new statements.Evaluator().evaluate(updated.model).nodes.profit['2025Q1'] - 60) < 1e-6
+  );
 
   const bare = sa.goalSeek(
     goalSeekModel(),
@@ -214,7 +216,7 @@ test('every model entry point applies the Rust semantic validation', () => {
   for (const call of [
     () => statements.validateFinancialModelJson(empty),
     () => statements.modelNodeIds(empty),
-    () => sa.dependencyTree(empty, 'x'),
+    () => new sa.DependencyTracer(empty).dependencyTree('x'),
     () => scenarios.applyScenario(spec, EMPTY_MARKET, empty, '2025-01-01'),
   ]) {
     assert.throws(call, (e) => e.kind === 'validation' && /at least one period/.test(e.message));
@@ -274,7 +276,7 @@ test('non-finite forecast and explanation values are JavaScript numbers', () => 
       lagged: { node_id: 'lagged', node_type: 'calculated', formula_text: 'lag(revenue, 1)' },
     },
   };
-  const results = statements.evaluateModel(model);
+  const results = new statements.Evaluator().evaluate(model);
   const explanation = sa.explainFormula(model, JSON.stringify(results), 'lagged', '2025Q1');
   assert.ok(Number.isNaN(explanation.final_value));
   // The statement result itself keeps the JSON sentinel for its nested node map.
@@ -293,7 +295,7 @@ test('mappings and variance config reject unknown keys', () => {
       }),
     (e) => e.kind === 'validation' && /fcf_nodes/.test(e.message)
   );
-  const results = JSON.stringify(statements.evaluateModel(model));
+  const results = JSON.stringify(new statements.Evaluator().evaluate(model));
   assert.throws(
     () =>
       sa.runVariance(results, results, {
@@ -307,15 +309,18 @@ test('mappings and variance config reject unknown keys', () => {
   );
 });
 
-test('dependencyTree returns the Rust DependencyTree and dependencyTreeText renders it', () => {
+test('DependencyTracer.dependencyTree returns the Rust DependencyTree and dependencyTreeText renders it', () => {
   const model = goalSeekModel();
-  const tree = sa.dependencyTree(model, 'profit');
+  const tree = new sa.DependencyTracer(model).dependencyTree('profit');
   assert.deepEqual(tree, {
     node_id: 'profit',
     formula: 'revenue * 0.5',
     children: [{ node_id: 'revenue', formula: null, children: [] }],
   });
-  assert.equal(sa.dependencyTreeText(model, 'profit'), 'profit (revenue * 0.5)\n└── revenue\n');
+  assert.equal(
+    new sa.DependencyTracer(model).dependencyTreeText('profit'),
+    'profit (revenue * 0.5)\n└── revenue\n'
+  );
   assert.equal(sa.traceDependencies, undefined);
 });
 

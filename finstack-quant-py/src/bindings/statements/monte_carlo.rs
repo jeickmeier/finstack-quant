@@ -237,7 +237,7 @@ impl PyMonteCarloResults {
     /// (``"division_by_zero"``, ``"non_finite_value"``, ...) whose value holds
     /// the variant fields (periods as ``"2025Q1"``-style ids, non-finite
     /// numbers as ``"nan"`` / ``"inf"`` / ``"-inf"``), identical to the WASM
-    /// ``evaluateMonteCarlo`` result. Empty when every path evaluated cleanly.
+    /// ``Evaluator.evaluateMonteCarlo`` result. Empty when every path evaluated cleanly.
     #[getter]
     fn warnings<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner.warnings)

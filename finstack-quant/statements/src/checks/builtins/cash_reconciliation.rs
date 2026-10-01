@@ -13,6 +13,7 @@ use crate::Result;
 /// Checks Cash(t) = Cash(t−1) + TotalCF(t) and optionally
 /// TotalCF = CFO + CFI + CFF.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CashReconciliation {
     /// Node for cash balance.
     pub cash_balance_node: NodeId,

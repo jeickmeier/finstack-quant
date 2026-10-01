@@ -227,6 +227,7 @@ fn default_relative_tolerance() -> f64 {
 /// the absolute cent floor catches micro-errors on small balances while the
 /// relative component absorbs f64 accumulation noise on large ones.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CheckConfig {
     /// Default **absolute** tolerance for equality comparisons, expressed in

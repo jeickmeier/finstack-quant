@@ -89,9 +89,11 @@ fn evaluate_model_produces_computed_nodes() {
         .unwrap();
     let model_json = serde_json::to_string(&model).unwrap();
 
-    // `evaluate_model` returns a structured JS object; decode it back into the
-    // canonical Rust type to assert the evaluated values.
-    let out = evaluate_model(JsValue::from(&model_json)).unwrap();
+    // `Evaluator.evaluate` returns a structured JS object; decode it back into
+    // the canonical Rust type to assert the evaluated values.
+    let out = JsEvaluator::new()
+        .evaluate(JsValue::from(&model_json))
+        .unwrap();
     let result: finstack_quant_statements::evaluator::StatementResult =
         serde_wasm_bindgen::from_value(out).unwrap();
     assert!(result.nodes.contains_key("revenue"));

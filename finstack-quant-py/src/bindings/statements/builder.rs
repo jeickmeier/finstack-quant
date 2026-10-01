@@ -1237,7 +1237,7 @@ impl PyModelBuilder {
             Some(obj) => {
                 crate::bindings::core::dates::calendar::extract_business_day_convention(obj)?
             }
-            None => finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing,
+            None => finstack_quant_core::dates::BusinessDayConvention::default(),
         };
         let state = slf.take_any()?;
         let next = match state {

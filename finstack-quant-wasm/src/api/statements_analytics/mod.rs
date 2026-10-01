@@ -2,9 +2,17 @@
 //!
 //! Exposes financial statement analysis functions. Inputs are JSON strings
 //! or plain objects; results are structured JavaScript objects, except the
-//! `*Text` functions, which return formatted text.
+//! `*Text` functions, which return formatted text. The stateful pieces are
+//! classes: `DependencyTracer`, `CorkscrewExtension` and
+//! `CreditScorecardExtension`.
 
 mod comps;
+mod ecl;
+mod handles;
+mod members;
+mod templates;
+
+pub use handles::{JsCorkscrewExtension, JsCreditScorecardExtension, JsDependencyTracer};
 
 pub use comps::{
     compute_multiple, peer_stats, percentile_rank, regression_fair_value, score_relative_value,
@@ -441,63 +449,6 @@ pub fn goal_seek(
     )
     .map_err(to_js_err)?;
     to_js_value(&result)
-}
-
-/// Build a node's dependency tree.
-///
-/// Returns the serde form of the Rust `DependencyTree`: `node_id`, `formula`
-/// (the node's formula text, or `null` for a value node) and `children`, one
-/// tree per direct dependency. A dependency already on the current path
-/// appears once more as a leaf named `"<id> (cycle)"`. Twin of Python
-/// `DependencyTracer.dependency_tree`.
-///
-/// # Errors
-///
-/// Rejects malformed `model_json`, a model that fails semantic validation,
-/// formulas or clauses whose dependencies cannot be parsed, unknown formula
-/// references, a missing `node_id` or reachable dependency, or a dependency
-/// cycle.
-/// @param model_json - Financial-model specification JSON.
-/// @param node_id - Root node whose dependencies are traced.
-#[wasm_bindgen(js_name = dependencyTree)]
-pub fn dependency_tree(model_json: JsValue, node_id: JsValue) -> Result<JsValue, JsValue> {
-    let model_json: &str = &json_text(&model_json, "modelJson")?;
-    let node_id: &str = &js_string(&node_id, "nodeId")?;
-    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
-    let graph = finstack_quant_statements::evaluator::DependencyGraph::from_model(&model)
-        .map_err(to_js_err)?;
-    let tree = finstack_quant_statements_analytics::analysis::DependencyTracer::new(&model, &graph)
-        .dependency_tree(node_id)
-        .map_err(to_js_err)?;
-    to_js_value(&tree)
-}
-
-/// Render a node's dependency tree as ASCII text.
-///
-/// The root on the first line, then one line per dependency drawn with
-/// `├──` / `└──` connectors and indented by depth, each followed by its
-/// formula in parentheses. Twin of Python
-/// `DependencyTracer.dependency_tree_text` (Rust
-/// `DependencyTracer::dependency_tree_text`).
-///
-/// # Errors
-///
-/// Rejects malformed `model_json`, a model that fails semantic validation,
-/// formulas or clauses whose dependencies cannot be parsed, unknown formula
-/// references, a missing `node_id` or reachable dependency, or a dependency
-/// cycle.
-/// @param model_json - Financial-model specification JSON.
-/// @param node_id - Root node whose dependencies are traced.
-#[wasm_bindgen(js_name = dependencyTreeText)]
-pub fn dependency_tree_text(model_json: JsValue, node_id: JsValue) -> Result<String, JsValue> {
-    let model_json: &str = &json_text(&model_json, "modelJson")?;
-    let node_id: &str = &js_string(&node_id, "nodeId")?;
-    let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
-    let graph = finstack_quant_statements::evaluator::DependencyGraph::from_model(&model)
-        .map_err(to_js_err)?;
-    finstack_quant_statements_analytics::analysis::DependencyTracer::new(&model, &graph)
-        .dependency_tree_text(node_id)
-        .map_err(to_js_err)
 }
 
 /// Explain a formula for a specific node and period (JSON in, structured

@@ -284,13 +284,16 @@ fn credit_assessment_report_accepts_minimal_results() {
 #[wasm_bindgen_test]
 fn dependency_tree_returns_the_rust_tree_and_its_text() {
     let model_json = test_model_json();
-    let tree =
-        dependency_tree(JsValue::from(&model_json), JsValue::from("gross_profit")).expect("tree");
+    let tracer = JsDependencyTracer::new(JsValue::from(&model_json)).expect("tracer");
+    let tree = tracer
+        .dependency_tree(JsValue::from("gross_profit"))
+        .expect("tree");
     let tree: finstack_quant_statements_analytics::analysis::DependencyTree =
         serde_wasm_bindgen::from_value(tree).expect("DependencyTree shape");
     assert_eq!(tree.node_id, "gross_profit");
     assert_eq!(tree.children.len(), 2);
-    let text = dependency_tree_text(JsValue::from(&model_json), JsValue::from("gross_profit"))
+    let text = tracer
+        .dependency_tree_text(JsValue::from("gross_profit"))
         .expect("text");
     assert_eq!(
         text,

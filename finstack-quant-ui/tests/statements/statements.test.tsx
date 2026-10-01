@@ -48,7 +48,7 @@ it("validates and evaluates the canonical model through the real worker", async 
   const result = unwrap(
     await harness.proxy.evaluateStatement({ modelJson: canonical }),
   );
-  expect(result).toEqual(native.evaluateModel(canonical));
+  expect(result).toEqual(new native.Evaluator().evaluate(canonical));
   const checked = adaptStatementResult(result);
   const model = financialModelModule.codec.parse(
     canonical,
@@ -75,7 +75,7 @@ it("preserves money precision, absent cells, and nonfinite sentinels", async () 
   };
   const modelJson = JSON.stringify(model);
   const result = unwrap(await harness.proxy.evaluateStatement({ modelJson }));
-  expect(result).toEqual(native.evaluateModel(modelJson));
+  expect(result).toEqual(new native.Evaluator().evaluate(modelJson));
   const checked = adaptStatementResult(result);
   const rows = statementRows(model, checked);
   expect(rows.find((row) => row.nodeId === "cash")?.cells["2025Q1"]?.text).toBe(
@@ -100,7 +100,7 @@ it("uses exact market and date inputs and rejects incomplete requests", async ()
   const request = { modelJson, marketJson: market, asOf: "2025-04-02" };
   const actual = unwrap(await harness.proxy.evaluateStatement(request));
   expect(actual).toEqual(
-    native.evaluateModelWithMarket(modelJson, market, request.asOf),
+    new native.Evaluator().evaluateWithMarket(modelJson, market, request.asOf),
   );
   const incomplete = await harness.proxy.evaluateStatement({
     modelJson,
@@ -140,7 +140,7 @@ it("routes formula, explanation and check semantics to WASM", async () => {
     native.explainFormula(modelJson, resultsJson, "margin", "2025Q1"),
   );
   expect(unwrap(await harness.proxy.traceStatement(modelJson, "margin"))).toBe(
-    native.dependencyTreeText(modelJson, "margin"),
+    new native.DependencyTracer(modelJson).dependencyTreeText("margin"),
   );
   const configJson = JSON.stringify({
     name: "empty",
@@ -172,7 +172,7 @@ it("evaluates the complete analyst example, returned ratios, checks and supplied
   const result = unwrap(
     await harness.proxy.evaluateStatement({ modelJson: canonical }),
   );
-  expect(result).toEqual(native.evaluateModel(canonical));
+  expect(result).toEqual(new native.Evaluator().evaluate(canonical));
   expect(result.meta?.num_nodes).toBe(24);
   expect(result.meta?.num_periods).toBe(8);
   expect(result.nodes.leverage?.["2025Q4"]).toBeDefined();
@@ -206,6 +206,6 @@ it("evaluates the complete analyst example, returned ratios, checks and supplied
     const evaluated = unwrap(
       await harness.proxy.evaluateStatement({ modelJson: updated }),
     );
-    expect(evaluated).toEqual(native.evaluateModel(updated));
+    expect(evaluated).toEqual(new native.Evaluator().evaluate(updated));
   }
 });

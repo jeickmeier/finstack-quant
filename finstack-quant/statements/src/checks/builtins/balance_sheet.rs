@@ -13,6 +13,7 @@ use crate::Result;
 
 /// Verifies that Assets = Liabilities + Equity for every period.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BalanceSheetArticulation {
     /// Node IDs whose values represent total assets.
     pub assets_nodes: Vec<NodeId>,

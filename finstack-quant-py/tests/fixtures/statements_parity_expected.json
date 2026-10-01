@@ -1,0 +1,722 @@
+{
+  "statements": {
+    "adjustments": [
+      {
+        "id": "one_off",
+        "name": "One-off cost",
+        "value": {
+          "amounts": {
+            "2025Q1": 5.0
+          },
+          "type": "fixed"
+        }
+      },
+      {
+        "id": "synergy",
+        "name": "Synergies",
+        "value": {
+          "node_id": "revenue",
+          "percentage": 0.1,
+          "type": "percentage_of_node"
+        }
+      },
+      {
+        "cap": {
+          "base_node": "revenue",
+          "value": 0.05
+        },
+        "id": "synergy",
+        "name": "Synergies",
+        "value": {
+          "node_id": "revenue",
+          "percentage": 0.1,
+          "type": "percentage_of_node"
+        }
+      },
+      {
+        "cap": {
+          "base_mode": "progressive",
+          "base_node": null,
+          "value": 3.0
+        },
+        "id": "synergy",
+        "name": "Synergies",
+        "value": {
+          "node_id": "revenue",
+          "percentage": 0.1,
+          "type": "percentage_of_node"
+        }
+      },
+      {
+        "category": "non_recurring",
+        "id": "one_off",
+        "name": "One-off cost",
+        "value": {
+          "amounts": {
+            "2025Q1": 5.0
+          },
+          "type": "fixed"
+        }
+      }
+    ],
+    "builder.content_hash": "sha256:4a2d50207da7e299a2dfc1f7f5e32d0b2c1418efd606256458f52add409760d3",
+    "builder.node_ids": [
+      "revenue",
+      "profit",
+      "cash",
+      "capex"
+    ],
+    "builder.values": [
+      105.0,
+      52.5,
+      10.0,
+      10.5
+    ],
+    "builtin_check_names": [
+      "balance_sheet_articulation",
+      "retained_earnings_reconciliation",
+      "cash_reconciliation",
+      "missing_value",
+      "sign_convention",
+      "non_finite"
+    ],
+    "check_report": {
+      "errors": [
+        [
+          "revenue_large",
+          "2025Q1"
+        ]
+      ],
+      "has_errors": true,
+      "has_warnings": false,
+      "warnings": 0
+    },
+    "cs": {
+      "accrued_interest": 1.5,
+      "debt_balance": 900.0,
+      "fees": 2.0,
+      "interest": 35.0,
+      "interest_cash": 30.0,
+      "interest_pik": 5.0,
+      "principal": 100.0,
+      "total_debt_balance": 900.0,
+      "total_fees": 2.0,
+      "total_interest": 35.0,
+      "total_principal": 100.0
+    },
+    "forecast_specs": [
+      {
+        "method": "forward_fill"
+      },
+      {
+        "method": "growth_pct",
+        "params": {
+          "rate": 0.05
+        }
+      },
+      {
+        "method": "curve_pct",
+        "params": {
+          "curve": [
+            0.05,
+            0.04
+          ]
+        }
+      },
+      {
+        "method": "normal",
+        "params": {
+          "mean": 100.0,
+          "seed": 7,
+          "std_dev": 10.0
+        }
+      },
+      {
+        "method": "log_normal",
+        "params": {
+          "mean": 0.0,
+          "seed": 7,
+          "std_dev": 0.2
+        }
+      },
+      {
+        "method": "override",
+        "params": {
+          "overrides": {
+            "2025Q2": 125.0
+          }
+        }
+      },
+      {
+        "method": "seasonal",
+        "params": {
+          "historical": [
+            1.0,
+            2.0,
+            3.0,
+            4.0
+          ],
+          "mode": "additive",
+          "season_length": 4
+        }
+      },
+      {
+        "method": "time_series",
+        "params": {
+          "historical": [
+            1.0,
+            2.0,
+            3.0
+          ]
+        }
+      },
+      {
+        "method": "fade_to_target",
+        "params": {
+          "target": 50.0
+        }
+      },
+      {
+        "method": "mean_reverting",
+        "params": {
+          "long_run_mean": 100.0,
+          "reversion_speed": 0.5,
+          "seed": 11,
+          "std_dev": 5.0
+        }
+      },
+      {
+        "method": "bootstrap",
+        "params": {
+          "historical": [
+            1.0,
+            2.0,
+            3.0
+          ],
+          "seed": 13
+        }
+      }
+    ],
+    "model.get_node": {
+      "formula_text": "revenue - cogs",
+      "node_id": "profit",
+      "node_type": "calculated",
+      "value_type": {
+        "type": "scalar"
+      }
+    },
+    "model.has_node": [
+      true,
+      false
+    ],
+    "model.node_ids": [
+      "revenue",
+      "cogs",
+      "profit",
+      "margin"
+    ],
+    "normalization_config.add_adjustment": {
+      "adjustments": [
+        {
+          "id": "one_off",
+          "name": "One-off cost",
+          "value": {
+            "amounts": {
+              "2025Q1": 5.0
+            },
+            "type": "fixed"
+          }
+        },
+        {
+          "cap": {
+            "base_node": "revenue",
+            "value": 0.05
+          },
+          "id": "synergy",
+          "name": "Synergies",
+          "value": {
+            "node_id": "revenue",
+            "percentage": 0.1,
+            "type": "percentage_of_node"
+          }
+        }
+      ],
+      "target_node": "profit"
+    },
+    "normalize": [
+      {
+        "adjustments": [
+          {
+            "adjustment_id": "one_off",
+            "capped_amount": 5.0,
+            "is_capped": false,
+            "name": "One-off cost",
+            "raw_amount": 5.0
+          },
+          {
+            "adjustment_id": "synergy",
+            "capped_amount": 10.0,
+            "is_capped": false,
+            "name": "Synergies",
+            "raw_amount": 10.0
+          }
+        ],
+        "base_value": 60.0,
+        "final_value": 75.0,
+        "period": "2025Q1",
+        "value_type": {
+          "type": "scalar"
+        }
+      },
+      {
+        "adjustments": [
+          {
+            "adjustment_id": "one_off",
+            "capped_amount": 0.0,
+            "is_capped": false,
+            "name": "One-off cost",
+            "raw_amount": 0.0
+          },
+          {
+            "adjustment_id": "synergy",
+            "capped_amount": 12.0,
+            "is_capped": false,
+            "name": "Synergies",
+            "raw_amount": 12.0
+          }
+        ],
+        "base_value": 70.0,
+        "final_value": 82.0,
+        "period": "2025Q2",
+        "value_type": {
+          "type": "scalar"
+        }
+      }
+    ],
+    "normalize_json": [
+      {
+        "adjustments": [
+          {
+            "adjustment_id": "one_off",
+            "capped_amount": 5.0,
+            "is_capped": false,
+            "name": "One-off cost",
+            "raw_amount": 5.0
+          },
+          {
+            "adjustment_id": "synergy",
+            "capped_amount": 10.0,
+            "is_capped": false,
+            "name": "Synergies",
+            "raw_amount": 10.0
+          }
+        ],
+        "base_value": 60.0,
+        "final_value": 75.0,
+        "period": "2025Q1",
+        "value_type": {
+          "type": "scalar"
+        }
+      },
+      {
+        "adjustments": [
+          {
+            "adjustment_id": "one_off",
+            "capped_amount": 0.0,
+            "is_capped": false,
+            "name": "One-off cost",
+            "raw_amount": 0.0
+          },
+          {
+            "adjustment_id": "synergy",
+            "capped_amount": 12.0,
+            "is_capped": false,
+            "name": "Synergies",
+            "raw_amount": 12.0
+          }
+        ],
+        "base_value": 70.0,
+        "final_value": 82.0,
+        "period": "2025Q2",
+        "value_type": {
+          "type": "scalar"
+        }
+      }
+    ],
+    "registry": {
+      "count": 22,
+      "definition": {
+        "category": "income_statement",
+        "description": "Earnings after all expenses and taxes. CONVENTION: `opex` excludes depreciation and amortization.",
+        "formula": "revenue - cogs - opex - depreciation - amortization - interest_expense - tax_expense",
+        "id": "net_income",
+        "name": "Net Income",
+        "requires": [
+          "revenue",
+          "cogs",
+          "opex",
+          "depreciation",
+          "amortization",
+          "interest_expense",
+          "tax_expense"
+        ],
+        "tags": [
+          "income_statement",
+          "profitability",
+          "bottom_line"
+        ],
+        "unit_type": "currency"
+      },
+      "dependencies": [],
+      "first": "fin.net_income",
+      "has": [
+        true,
+        false
+      ]
+    },
+    "result.all_periods": [
+      [
+        "2025Q1",
+        60.0
+      ],
+      [
+        "2025Q2",
+        70.0
+      ]
+    ],
+    "result.get": 70.0,
+    "result.get_missing": null,
+    "result.get_money": {
+      "amount": 110.0,
+      "currency": "USD"
+    },
+    "result.get_money_of_scalar": null,
+    "result.get_node": {
+      "2025Q1": 60.0,
+      "2025Q2": 70.0
+    },
+    "result.get_node_missing": null,
+    "result.get_or": -1.0,
+    "result.get_scalar": 0.6,
+    "result.get_scalar_of_money": null,
+    "result.node_ids": [
+      "cogs",
+      "revenue",
+      "profit",
+      "margin"
+    ]
+  },
+  "statements_analytics": {
+    "company_get": [
+      100.0,
+      42.0,
+      null
+    ],
+    "corkscrew": {
+      "config": {
+        "accounts": [
+          {
+            "account_type": "asset",
+            "changes": [
+              "inflow"
+            ],
+            "node_id": "cash"
+          }
+        ],
+        "fail_on_error": false,
+        "tolerance": 0.01
+      },
+      "report": {
+        "data": {
+          "validations": [
+            {
+              "account": "cash",
+              "is_valid": true,
+              "max_error": 0.0,
+              "periods_validated": 1,
+              "type": "asset"
+            }
+          ]
+        },
+        "message": "Corkscrew validation complete. 1 accounts validated.",
+        "status": "success",
+        "warnings": [
+          "Balance sheet not articulated. Total imbalance: 120.00"
+        ]
+      }
+    },
+    "corporate": {
+      "equity": null,
+      "node_count": 4
+    },
+    "dcf": {
+      "currency": "USD",
+      "enterprise_value": 1341.428116329968,
+      "equity_value": 1341.428116329968
+    },
+    "ecl": {
+      "lifetime": 33.126146531106,
+      "single": 7.807926574140965,
+      "stage": "stage1",
+      "weighted": 39.7513758373272
+    },
+    "explanation_text": "profit [2025Q1] = 60.00\nFormula: revenue - cogs\nType: Calculated\n\nComponents:\n  revenue = 100.00\n  cogs = 40.00\n",
+    "forecast_summary": "MAE: 2.00, MAPE: 1.91% (eff_n=2), sMAPE: 1.91%, RMSE: 2.00 (n=2)",
+    "peer_accepts": [
+      true,
+      false
+    ],
+    "peer_set": [
+      "PEER1"
+    ],
+    "pl_summary_text": "P&L Summary\n\n\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510\n\u2502 Line Item \u2502 2025Q1 \u2502 2025Q2 \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524\n\u2502 revenue   \u2502 100.00 \u2502 120.00 \u2502\n\u2502 profit    \u2502  60.00 \u2502  70.00 \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518",
+    "scenario_diff": {
+      "baseline": "base",
+      "comparison": "down",
+      "variance": {
+        "baseline_label": "base",
+        "comparison_label": "down",
+        "rows": [
+          {
+            "abs_var": -30.0,
+            "baseline": 70.0,
+            "comparison": 40.0,
+            "metric": "profit",
+            "pct_var": -0.42857142857142855,
+            "period": "2025Q2"
+          }
+        ]
+      }
+    },
+    "scenario_get": [
+      40.0,
+      true
+    ],
+    "scenario_trace": [
+      "base",
+      "down"
+    ],
+    "scorecard": {
+      "config": {
+        "metrics": [
+          {
+            "formula": "profit / revenue",
+            "name": "margin",
+            "thresholds": {
+              "AAA": [
+                0.5,
+                1.0
+              ],
+              "BBB": [
+                0.0,
+                0.5
+              ]
+            },
+            "weight": 1.0
+          }
+        ],
+        "rating_scale": "S&P"
+      },
+      "report": {
+        "data": {
+          "metric_scores": [
+            {
+              "metric": "margin",
+              "score": 100.0,
+              "value": 0.6,
+              "weight": 1.0,
+              "weighted_score": 100.0
+            }
+          ],
+          "partial": false,
+          "period": "2025Q1",
+          "rating": "AAA",
+          "rating_scale": "S&P",
+          "total_score": 100.0,
+          "weight_coverage": 1.0
+        },
+        "message": "Credit scorecard complete. Rating: AAA (Score: 100.00)",
+        "status": "success"
+      }
+    },
+    "sensitivity": {
+      "config": {
+        "mode": "diagonal",
+        "parameters": [
+          {
+            "base_value": 120.0,
+            "node_id": "revenue",
+            "period_id": "2025Q2",
+            "perturbations": [
+              110.0,
+              130.0
+            ]
+          },
+          {
+            "base_value": 50.0,
+            "node_id": "cogs",
+            "period_id": "2025Q2",
+            "perturbations": [
+              45.0,
+              55.0
+            ]
+          }
+        ],
+        "target_metrics": [
+          "profit"
+        ]
+      },
+      "parameter_missing": null,
+      "parameter_value": 110.0,
+      "value": 60.0
+    },
+    "templates": {
+      "ncf": [
+        20.0,
+        20.0
+      ],
+      "noi": [
+        60.0,
+        70.0
+      ],
+      "property.node_ids": [
+        "revenue",
+        "cogs",
+        "profit",
+        "margin",
+        "lease_a.pgi",
+        "lease_a.free_rent",
+        "lease_a.vacancy_loss",
+        "lease_a.vacancy_loss_physical",
+        "lease_a.renewal_prob_loss",
+        "lease_a.effective_rent",
+        "rent_pgi",
+        "free_rent",
+        "vacancy_loss",
+        "vacancy_loss_physical",
+        "renewal_prob_loss",
+        "rent_effective",
+        "other_income_total",
+        "egi",
+        "opex_total",
+        "noi",
+        "capex_total",
+        "ncf"
+      ],
+      "property.noi": [
+        -30.0,
+        -40.0
+      ],
+      "rent_roll.node_ids": [
+        "revenue",
+        "cogs",
+        "profit",
+        "margin",
+        "lease_a.pgi",
+        "lease_a.free_rent",
+        "lease_a.vacancy_loss",
+        "lease_a.vacancy_loss_physical",
+        "lease_a.renewal_prob_loss",
+        "lease_a.effective_rent",
+        "rent_pgi",
+        "free_rent",
+        "vacancy_loss",
+        "vacancy_loss_physical",
+        "renewal_prob_loss",
+        "rent_effective"
+      ],
+      "roll_forward.end": [
+        70.0,
+        140.0
+      ],
+      "roll_forward.node_ids": [
+        "revenue",
+        "cogs",
+        "profit",
+        "margin",
+        "debt_beg",
+        "debt_end"
+      ],
+      "vintage.book": [
+        100.0,
+        170.0
+      ]
+    },
+    "terminal_specs": [
+      {
+        "stable_growth_rate": 0.02,
+        "type": "gordon_growth"
+      },
+      {
+        "multiple": 8.5,
+        "terminal_metric": 0.0,
+        "type": "exit_multiple"
+      },
+      {
+        "half_life_years": 5.0,
+        "high_growth_rate": 0.08,
+        "stable_growth_rate": 0.02,
+        "type": "h_model"
+      }
+    ],
+    "tracer": {
+      "all": [
+        "revenue",
+        "cogs",
+        "profit"
+      ],
+      "dependents": [
+        "profit",
+        "margin"
+      ],
+      "detailed": "margin = 0.60\n\u251c\u2500\u2500 profit = 60.00\n\u2502   \u251c\u2500\u2500 revenue = 100.00\n\u2502   \u2514\u2500\u2500 cogs = 40.00\n\u2514\u2500\u2500 revenue = 100.00\n",
+      "direct": [
+        "profit",
+        "revenue"
+      ],
+      "text": "margin (profit / revenue)\n\u251c\u2500\u2500 profit (revenue - cogs)\n\u2502   \u251c\u2500\u2500 revenue\n\u2502   \u2514\u2500\u2500 cogs\n\u2514\u2500\u2500 revenue\n",
+      "tree": {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [],
+                "formula": null,
+                "node_id": "revenue"
+              },
+              {
+                "children": [],
+                "formula": null,
+                "node_id": "cogs"
+              }
+            ],
+            "formula": "revenue - cogs",
+            "node_id": "profit"
+          },
+          {
+            "children": [],
+            "formula": null,
+            "node_id": "revenue"
+          }
+        ],
+        "formula": "profit / revenue",
+        "node_id": "margin"
+      }
+    },
+    "variance_bridge": {
+      "baseline_label": "base",
+      "baseline_value": 70.0,
+      "comparison_label": "down",
+      "comparison_value": 40.0,
+      "period": "2025Q2",
+      "steps": [
+        {
+          "contribution": -30.0,
+          "driver": "revenue"
+        }
+      ],
+      "target_metric": "profit",
+      "unexplained": 0.0
+    }
+  }
+}

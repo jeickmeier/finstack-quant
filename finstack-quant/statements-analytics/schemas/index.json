@@ -64,6 +64,15 @@
       "type_name": "CorporateAnalysis"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/corporate_analysis_options.schema.json",
+      "bytes": 25298,
+      "kind": "input",
+      "path": "schemas/statements_analytics/1/corporate_analysis_options.schema.json",
+      "summary": "Optional DCF, coverage, check-suite, valuation-date and LTV settings of the corporate analysis pipeline.",
+      "title": "CorporateAnalysisOptions",
+      "type_name": "CorporateAnalysisOptions"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/coverage_floor_check.schema.json",
       "bytes": 1231,
       "kind": "component",

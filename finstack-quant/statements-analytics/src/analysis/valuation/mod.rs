@@ -13,4 +13,6 @@ pub use corporate::{
     DcfSensitivityResult, ExitMultipleBump, DEFAULT_UFCF_NODE,
 };
 pub use lbo::{evaluate_lbo, LboCheckMappings, LboConfig, LboResult, LboTranche};
-pub use orchestrator::{CorporateAnalysis, CorporateAnalysisBuilder};
+pub use orchestrator::{
+    run_corporate_analysis, CorporateAnalysis, CorporateAnalysisBuilder, CorporateAnalysisOptions,
+};

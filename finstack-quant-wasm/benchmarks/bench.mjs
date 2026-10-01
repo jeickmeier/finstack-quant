@@ -890,7 +890,9 @@ async function main() {
   }
 
   benchTry('statements_analytics', 'evaluateMonteCarlo', 30, () => {
-    w.evaluateMonteCarlo(MONTE_CARLO_MODEL_JSON, MONTE_CARLO_CONFIG_JSON);
+    const evaluator = new w.Evaluator();
+    evaluator.evaluateMonteCarlo(MONTE_CARLO_MODEL_JSON, MONTE_CARLO_CONFIG_JSON);
+    evaluator.free();
   });
 
   benchTry('statements_analytics', 'goalSeek', 400, () => {
@@ -898,7 +900,9 @@ async function main() {
   });
 
   benchTry('statements_analytics', 'dependencyTree', 2000, () => {
-    w.dependencyTree(FINANCIAL_MODEL_JSON, 'revenue');
+    const tracer = new w.DependencyTracer(FINANCIAL_MODEL_JSON);
+    tracer.dependencyTree('revenue');
+    tracer.free();
   });
 
   benchTry('statements_analytics', 'explainFormula', 1500, () => {
