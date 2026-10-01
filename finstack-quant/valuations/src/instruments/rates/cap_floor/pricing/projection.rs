@@ -102,6 +102,7 @@ pub(crate) fn resolve_optioned_coupon(
             accrual_end: period.accrual_end,
             day_count: cap_floor.day_count,
             coupon_frequency: Some(cap_floor.frequency),
+            coupon_period: (period.accrual_start, period.accrual_end),
             compounding: &overnight.compounding,
             fixing_calendar: calendar,
             compounded_spread,
@@ -143,6 +144,7 @@ pub(crate) fn resolve_optioned_coupon(
             forward_curve.as_ref(),
             period.accrual_start,
             period.accrual_end,
+            period.accrual_year_fraction,
         )?
     };
 
@@ -283,6 +285,7 @@ mod tests {
                 .as_ref(),
             period.accrual_start,
             period.accrual_end,
+            period.accrual_year_fraction,
         )
         .expect("simple forward");
 
@@ -389,6 +392,7 @@ mod tests {
                 .as_ref(),
             period.accrual_start,
             period.accrual_end,
+            period.accrual_year_fraction,
         )
         .expect("simple forward");
 

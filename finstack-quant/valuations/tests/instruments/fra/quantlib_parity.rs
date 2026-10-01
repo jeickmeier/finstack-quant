@@ -66,7 +66,7 @@ fn create_flat_forward_curve(
             DayCount::Act360
                 .year_fraction(
                     base_date,
-                    base_date.add_months(quarter * 3),
+                    base_date.add_months(quarter * 3).expect("valid date shift"),
                     DayCountContext::default(),
                 )
                 .expect("valid quarterly projection boundary")
@@ -692,9 +692,29 @@ fn quantlib_parity_fra_day_count_act360_vs_act365() {
         pv_365.amount()
     );
 
-    // Difference should be approximately (365-360)/360 ≈ 1.39%
+    // Both contracts use the same projection growth. Changing the contractual
+    // basis changes F = growth / tau as well as the fixed coupon K * tau;
+    // the settlement denominator 1 + F * tau therefore remains invariant.
+    let tau_360 = DayCount::Act360
+        .year_fraction(start, end, DayCountContext::default())
+        .unwrap();
+    let tau_365 = DayCount::Act365F
+        .year_fraction(start, end, DayCountContext::default())
+        .unwrap();
+    // These dates are adjacent nodes on the fixture's quarterly projection
+    // grid, so growth is exactly the flat curve-basis rate times ACT/360.
+    let growth = 0.05 * tau_360;
+    let discount = market
+        .get_discount("USD_OIS")
+        .unwrap()
+        .df_on_date_curve(start)
+        .unwrap();
+    for (pv, accrual) in [(pv_360.amount(), tau_360), (pv_365.amount(), tau_365)] {
+        let expected = 1_000_000.0 * discount * (0.06 * accrual - growth) / (1.0 + growth);
+        assert!((pv - expected).abs() < 1e-8, "PV={pv}, expected={expected}");
+    }
     let ratio = pv_360.amount() / pv_365.amount();
-    let expected_ratio = 365.0 / 360.0; // ≈ 1.0139
+    let expected_ratio = (0.06 * tau_360 - growth) / (0.06 * tau_365 - growth);
 
     assert_parity!(
         ratio,

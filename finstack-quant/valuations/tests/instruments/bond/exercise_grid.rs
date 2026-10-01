@@ -3,13 +3,12 @@
 //! Callable, puttable and return-floor bonds used to be exercisable on every
 //! calendar day of their windows. The exercise set is now the window ends,
 //! schedule dates and month-ends inside the window (plus protection and
-//! contractual-call breakpoints for return floors). These fixtures pin that
+//! contractual-call breakpoints for return floors). These fixtures verify that
 //! the candidate set prices within 0.01 per 100 of the daily set.
 //!
-//! The references are the daily-enumeration prices measured on commit
-//! a4e5cc95e (the last commit with daily exercise). Without month-end anchors
-//! (window ends and coupon dates only) the same fixtures moved by
-//! +0.031, +0.034, -0.034, +0.078, +0.051 and +0.094 per 100.
+//! Daily references use the same current curve and pricing kernels as the
+//! candidate prices. Expanding rights into one-date windows preserves daily
+//! exercise without pinning unrelated historical interpolation/model behavior.
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
@@ -133,22 +132,69 @@ fn fixtures() -> Vec<(&'static str, Bond)> {
     ]
 }
 
+/// Expand a contractual window into explicit daily rights. Each singleton is
+/// retained by the exercise-grid builder because it is a window endpoint.
+fn daily_rights(rights: &[CallPut]) -> Vec<CallPut> {
+    let mut expanded = Vec::new();
+    for right in rights {
+        let mut date = right.start;
+        while date <= right.end {
+            expanded.push(CallPut {
+                start: date,
+                end: date,
+                price_pct_of_par: right.price_pct_of_par,
+                make_whole: right.make_whole.clone(),
+            });
+            if date == right.end {
+                break;
+            }
+            date = date.next_day().expect("fixture date range");
+        }
+    }
+    expanded
+}
+
+fn with_daily_exercise(mut bond: Bond) -> Bond {
+    if let Some(schedule) = &mut bond.call_put {
+        schedule.calls = daily_rights(&schedule.calls);
+        schedule.puts = daily_rights(&schedule.puts);
+    }
+    if let Some(floor) = &bond.return_floor {
+        // These fixtures have only synthetic return-floor calls. Adding par
+        // calls cannot lower the floor (which is itself at least par), and
+        // their endpoints force floor lowering to evaluate every day.
+        assert!(bond
+            .call_put
+            .as_ref()
+            .is_none_or(|schedule| schedule.calls.is_empty()));
+        let first = bond.issue_date.next_day().expect("fixture issue date");
+        let last = bond.maturity.previous_day().expect("fixture maturity");
+        let (start, end) = match floor.window {
+            ProtectionWindow::Full => (first, last),
+            ProtectionWindow::From(start) => (start.max(first), last),
+            ProtectionWindow::Between { start, end } => (start.max(first), end.min(last)),
+            unexpected => {
+                panic!("unsupported daily-exercise fixture protection window: {unexpected:?}")
+            }
+        };
+        bond.call_put
+            .get_or_insert_with(CallPutSchedule::default)
+            .calls = daily_rights(&[right(start, end, 100.0)]);
+    }
+    bond
+}
+
 #[test]
 fn exercise_candidate_grid_prices_within_one_cent_of_daily_exercise() {
     let market = market();
     // Mid-coupon valuation date so window starts and accrued are non-trivial.
     let as_of = date!(2025 - 03 - 17);
-    let daily = [
-        ("par_call", 109.6201800332),
-        ("step_down", 109.6190775850),
-        ("put", 105.0235559707),
-        ("moic_floor", 101.7835213357),
-        ("xirr_floor", 105.2871011458),
-        ("rates_credit", 102.9137436949),
-    ];
-    for ((name, bond), (reference_name, reference)) in fixtures().into_iter().zip(daily) {
-        assert_eq!(name, reference_name);
+    for (name, bond) in fixtures() {
         let pv = bond.value(&market, as_of).expect("price").amount();
+        let reference = with_daily_exercise(bond)
+            .value(&market, as_of)
+            .expect("daily exercise price")
+            .amount();
         assert!(
             (pv - reference).abs() < 0.01,
             "{name}: candidate-grid price {pv} vs daily-exercise {reference}"

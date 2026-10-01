@@ -737,7 +737,10 @@ mod production_credit_audit {
             .issuer_curves(issuers)
             .build()
             .expect("index");
-        market.insert_credit_index("CDX.NA.IG.42", index)
+        market
+            .insert(Arc::clone(&index.base_correlation_curve))
+            .insert_credit_index("CDX.NA.IG.42", index)
+            .expect("dispersed credit index dependencies should exist")
     }
 
     #[test]

@@ -10,9 +10,10 @@
 
 use crate::error::Result;
 use crate::evaluator::context::EvaluationContext;
-use crate::evaluator::formula::{eval_error, evaluate_formula, require_args, require_min_args};
+use crate::evaluator::formula::{
+    collect_expression_values_sorted, eval_error, evaluate_formula, require_args, require_min_args,
+};
 use crate::evaluator::formula_aggregates::evaluate_historical_function;
-use crate::evaluator::formula_helpers::collect_all_historical_values;
 use finstack_quant_core::expr::{Expr, ExprNode, Function};
 use finstack_quant_core::math::{kahan_sum, quantile_linear_or_nan, ZERO_TOLERANCE};
 
@@ -218,17 +219,14 @@ pub(crate) fn evaluate_function(
         Function::Coalesce => {
             require_min_args("coalesce", args, 2, node_id)?;
 
-            let mut last_value = f64::NAN;
             for arg in args {
                 let value = evaluate_formula(arg, context, node_id)?;
-                last_value = value;
-                if !value.is_nan() {
+                if value.is_finite() {
                     return Ok(value);
                 }
             }
 
-            // If all values are NaN, return the last one.
-            Ok(last_value)
+            Ok(f64::NAN)
         }
     }
 }
@@ -266,33 +264,56 @@ fn finite_arg_values(
 
 /// Rank of `args[0]` among its historical observations.
 ///
-/// 1-based, ascending; ties share the minimum rank
-/// (`rank = 1 + count(historical < current)`). Non-finite current values or
+/// 1-based; ascending by default, descending when `args[1]` is zero.
+/// A supplied direction must be finite; any non-zero value selects ascending.
+/// Ties share the minimum rank in the selected direction. Non-finite current values or
 /// empty histories return `NaN` so callers can distinguish "no data" from
 /// "best observation" — `unwrap_or(1.0)` would lose that distinction.
 fn eval_rank(args: &[Expr], context: &mut EvaluationContext, node_id: Option<&str>) -> Result<f64> {
-    require_min_args("rank", args, 1, node_id)?;
+    if args.is_empty() || args.len() > 2 {
+        return Err(eval_error(
+            node_id,
+            "rank() requires 1 or 2 arguments (series, [ascending])",
+        ));
+    }
+
+    let ascending = if args.len() == 2 {
+        let direction = evaluate_formula(&args[1], context, node_id)?;
+        if !direction.is_finite() {
+            return Err(eval_error(node_id, "rank() ascending flag must be finite"));
+        }
+        direction != 0.0
+    } else {
+        true
+    };
 
     let current_value = evaluate_formula(&args[0], context, node_id)?;
 
-    let ExprNode::Column(node_name) = &args[0].node else {
+    if !matches!(args[0].node, ExprNode::Column(_) | ExprNode::CsRef { .. }) {
         return Err(eval_error(
             node_id,
-            "rank() requires a column reference as its argument",
+            "rank() requires a statement-node or capital-structure reference",
         ));
-    };
+    }
 
-    let all_values = collect_all_historical_values(node_name, context)?;
+    let all_values = collect_expression_values_sorted(&args[0], context, node_id)?;
 
     if !current_value.is_finite() || all_values.is_empty() {
         return Ok(f64::NAN);
     }
 
-    let strictly_less = all_values
-        .iter()
-        .filter(|&&v| v.is_finite() && v < current_value - ZERO_TOLERANCE)
+    let preceding = all_values
+        .values()
+        .filter(|&&v| {
+            v.is_finite()
+                && if ascending {
+                    v < current_value - ZERO_TOLERANCE
+                } else {
+                    v > current_value + ZERO_TOLERANCE
+                }
+        })
         .count();
-    Ok((strictly_less + 1) as f64)
+    Ok((preceding + 1) as f64)
 }
 
 /// Quantile of `args[0]`'s historical observations using linear interpolation
@@ -312,15 +333,19 @@ fn eval_quantile(
         return Err(eval_error(node_id, "quantile must be between 0 and 1"));
     }
 
-    let ExprNode::Column(node_name) = &args[0].node else {
+    if !matches!(args[0].node, ExprNode::Column(_) | ExprNode::CsRef { .. }) {
         return Err(eval_error(
             node_id,
-            "quantile() requires a column reference",
+            "quantile() requires a statement-node or capital-structure reference",
         ));
-    };
+    }
 
-    let mut values = collect_all_historical_values(node_name, context)?;
-    values.retain(|v| v.is_finite());
+    let sorted = collect_expression_values_sorted(&args[0], context, node_id)?;
+    let values: Vec<_> = sorted
+        .values()
+        .copied()
+        .filter(|value| value.is_finite())
+        .collect();
     if values.is_empty() {
         return Ok(f64::NAN);
     }

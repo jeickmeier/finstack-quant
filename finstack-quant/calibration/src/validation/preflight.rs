@@ -60,22 +60,7 @@ fn validate_student_t_step(
     quotes: &[MarketQuote],
     context: &MarketContext,
 ) -> Result<()> {
-    if !p.initial_df.is_finite() || p.initial_df <= 2.0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "Student-t initial_df must be finite and > 2.0; got {}",
-            p.initial_df
-        )));
-    }
-    if !p.df_bounds.0.is_finite()
-        || !p.df_bounds.1.is_finite()
-        || p.df_bounds.0 <= 2.0
-        || p.df_bounds.0 >= p.df_bounds.1
-    {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "Student-t df_bounds must satisfy 2.0 < lo < hi; got ({}, {})",
-            p.df_bounds.0, p.df_bounds.1
-        )));
-    }
+    crate::targets::student_t::StudentTTarget::validate_params(p)?;
 
     let tranche_quotes: Vec<CdsTrancheQuote> = quotes.extract_quotes();
     let tranche_quote = tranche_quotes
@@ -544,7 +529,8 @@ mod tests {
             .insert(build_flat_discount_curve(0.03, base_date, "USD-OIS"))
             .insert(hazard)
             .insert(base_corr)
-            .insert_credit_index("CDX.NA.IG", credit_index);
+            .insert_credit_index("CDX.NA.IG", credit_index)
+            .expect("credit index dependencies");
         let quotes = vec![MarketQuote::CdsTranche(CdsTrancheQuote {
             id: QuoteId::new("TRANCHE-1"),
             index: "CDX.NA.IG".to_string(),
@@ -603,7 +589,8 @@ mod tests {
             .insert(build_flat_discount_curve(0.025, base_date, "USD-ALT"))
             .insert(hazard)
             .insert(base_corr)
-            .insert_credit_index("CDX.NA.IG", credit_index);
+            .insert_credit_index("CDX.NA.IG", credit_index)
+            .expect("credit index dependencies");
         let quotes = vec![MarketQuote::CdsTranche(CdsTrancheQuote {
             id: QuoteId::new("TRANCHE-1"),
             index: "CDX.NA.IG".to_string(),

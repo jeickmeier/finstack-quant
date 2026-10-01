@@ -33,7 +33,7 @@ use wasm_bindgen::prelude::*;
 /// Throws a JavaScript exception if `currency` is unknown; embedded defaults cannot be
 /// loaded when `num_steps` is omitted; `rate` or `div_yield` is non-finite;
 /// `kappa`, `theta`, `vol_of_vol`, or `v0` is non-finite or non-positive;
-/// `rho` is outside `[-1, 1]`; the expiry, step count, path count, or computed
+/// `rho` is outside `[-1, 1]`; a count is fractional or exceeds the wasm32 integer range; the expiry, step count, path count, or computed
 /// discount factor fails validation; a simulated discounted payoff is
 /// non-finite; or the result cannot be serialized.
 /// @returns The Rust `MoneyEstimate` serde object: `mean` and `ci_95` as
@@ -49,11 +49,12 @@ use wasm_bindgen::prelude::*;
 /// @param rho - Instantaneous correlation between the asset and variance shocks.
 /// @param v0 - Initial instantaneous variance in the Heston stochastic-volatility model.
 /// @param expiry - Time to option expiry in years on the model's annual time basis.
-/// @param num_paths - Number of simulated stochastic paths; omitted or `null` uses the Rust
-/// registry European-pricer default (100 000).
+/// @param num_paths - Integer number of independent path estimators in [2, 10000000]; each
+/// antithetic pair counts once. Omitted or `null` uses the Rust registry European-pricer
+/// default (100 000).
 /// @param seed - Deterministic random-number seed (number or BigInt); omitted or `null` uses
 /// the Rust registry default seed, so results stay reproducible.
-/// @param num_steps - Optional time steps per simulated path; omitted uses the Rust registry default.
+/// @param num_steps - Optional positive integer number of time steps per simulated path; omitted uses the Rust registry default.
 /// @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the Rust registry default currency.
 #[wasm_bindgen(js_name = priceHestonCall)]
 pub fn price_heston_call(
@@ -100,7 +101,7 @@ pub fn price_heston_call(
 /// Throws a JavaScript exception if `currency` is unknown; embedded defaults cannot be
 /// loaded when `num_steps` is omitted; `rate` or `div_yield` is non-finite;
 /// `kappa`, `theta`, `vol_of_vol`, or `v0` is non-finite or non-positive;
-/// `rho` is outside `[-1, 1]`; the expiry, step count, path count, or computed
+/// `rho` is outside `[-1, 1]`; a count is fractional or exceeds the wasm32 integer range; the expiry, step count, path count, or computed
 /// discount factor fails validation; a simulated discounted payoff is
 /// non-finite; or the result cannot be serialized.
 /// @returns The Rust `MoneyEstimate` serde object: `mean` and `ci_95` as
@@ -116,11 +117,12 @@ pub fn price_heston_call(
 /// @param rho - Instantaneous correlation between the asset and variance shocks.
 /// @param v0 - Initial instantaneous variance in the Heston stochastic-volatility model.
 /// @param expiry - Time to option expiry in years on the model's annual time basis.
-/// @param num_paths - Number of simulated stochastic paths; omitted or `null` uses the Rust
-/// registry European-pricer default (100 000).
+/// @param num_paths - Integer number of independent path estimators in [2, 10000000]; each
+/// antithetic pair counts once. Omitted or `null` uses the Rust registry European-pricer
+/// default (100 000).
 /// @param seed - Deterministic random-number seed (number or BigInt); omitted or `null` uses
 /// the Rust registry default seed, so results stay reproducible.
-/// @param num_steps - Optional time steps per simulated path; omitted uses the Rust registry default.
+/// @param num_steps - Optional positive integer number of time steps per simulated path; omitted uses the Rust registry default.
 /// @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the Rust registry default currency.
 #[wasm_bindgen(js_name = priceHestonPut)]
 pub fn price_heston_put(

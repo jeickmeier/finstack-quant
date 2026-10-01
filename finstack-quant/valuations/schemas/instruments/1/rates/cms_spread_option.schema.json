@@ -2,7 +2,7 @@
   "$defs": {
     "CmsSpreadOption": {
       "additionalProperties": false,
-      "description": "CMS Spread Option.\n\nOption on the spread between two CMS rates of different tenors.\n\n```text\nPayoff = max(CMS_long - CMS_short - strike, 0) * notional    [for a call]\nPayoff = max(strike - (CMS_long - CMS_short), 0) * notional   [for a put]\n```\n\nTypically: long tenor = 10Y or 30Y CMS, short tenor = 2Y CMS.\n\n# Pricing Approach\n\n1. Each CMS rate has SABR marginal distribution (reuses CMS option SABR calibration)\n2. Joint distribution via Gaussian copula with rank correlation\n3. CMS convexity adjustment applied to each leg via static replication\n\n# References\n\n- Hagan, P. S. (2003). \"Convexity Conundrums.\" *Wilmott Magazine*. `docs/REFERENCES.md#hagan-2003-cms-convexity`\n- Antonov, A., Konikov, M., & Spector, M. (2013). \"SABR Spreads.\" *Risk*. `docs/REFERENCES.md#hagan-2002-sabr`",
+      "description": "CMS Spread Option.\n\nOption on the spread between two CMS rates of different tenors.\n\n```text\nPayoff = max(CMS_long - CMS_short - strike, 0) * notional    [for a call]\nPayoff = max(strike - (CMS_long - CMS_short), 0) * notional   [for a put]\n```\n\nTypically: long tenor = 10Y or 30Y CMS, short tenor = 2Y CMS.\n\n# Pricing Approach\n\n1. Each CMS rate has a lognormal payment-measure marginal from a flat-strike\n   Black volatility surface (or a tenor-axis ATM surface).\n2. A Gaussian copula couples the two rates.\n3. The shared first-order CMS convexity approximation sets each marginal mean.\n\nNonflat smiles and SABR cubes are unsupported and return a validation error.\nThe registered `StaticReplication` model key selects this approximation;\nit does not implement SABR smile replication.\n\n# References\n\n- Hagan, P. S. (2003). \"Convexity Conundrums.\" *Wilmott Magazine*. `docs/REFERENCES.md#hagan-2003-cms-convexity`\n- Antonov, A., Konikov, M., & Spector, M. (2013). \"SABR Spreads.\" *Risk*. `docs/REFERENCES.md#hagan-2002-sabr`",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -41,7 +41,7 @@
               "type": "null"
             }
           ],
-          "description": "Rate-index convention-registry key of the underlying CMS swaps (e.g. `EUR-ESTR-OIS`).\n\nWhen set, provides default values for the fixed/float frequency and\nday count. Individual fields still override the convention when set."
+          "description": "Rate-index convention-registry key of the underlying CMS swaps (e.g. `EUR-ESTR-OIS`).\n\nRequired for USD CMS; other supported currencies use their registered\novernight-index default when omitted. Supplies calendar, settlement lag\nand default leg conventions. Individual leg fields override the index."
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
@@ -53,7 +53,7 @@
         },
         "long_vol_surface_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Swaption volatility surface for long tenor."
+          "description": "Black swaption volatility surface for the long tenor. The selected\nexpiry slice must be flat across strikes; tenor-axis ATM surfaces are valid."
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
@@ -81,7 +81,7 @@
         },
         "short_vol_surface_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Swaption volatility surface for short tenor."
+          "description": "Black swaption volatility surface for the short tenor, subject to the\nsame flat-strike restriction as the long-tenor surface."
         },
         "strike": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",

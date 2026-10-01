@@ -8,8 +8,9 @@ import { checkGraph } from "../../scripts/check-registry.mjs";
 import {
   itemMetadata,
   metadataInputs,
+  pinWasm,
 } from "../../scripts/registry-metadata.mjs";
-it("derives canonical IDs and versions from the owned contracts", async () => {
+it("derives canonical IDs and registry versions", async () => {
   const cwd = fileURLToPath(new URL("../../", import.meta.url));
   const { items } = await loadRegistry({ cwd });
   const graph = checkGraph(items),
@@ -45,7 +46,7 @@ it("derives canonical IDs and versions from the owned contracts", async () => {
     schemaIds: ["https://example.test/canonical-bond"],
   });
 });
-it("pins the registry to the workspace WASM package version", async () => {
+it("pins registry items to the sibling workspace WASM package", async () => {
   const directory = await mkdtemp(
     path.join(tmpdir(), "finstack-registry-metadata-"),
   );
@@ -61,10 +62,7 @@ it("pins the registry to the workspace WASM package version", async () => {
       ],
       [
         path.join(packageDirectory, "package.json"),
-        {
-          name: "finstack-quant-wasm",
-          version: "4.5.6",
-        },
+        { name: "finstack-quant-wasm", version: "4.5.6" },
       ],
       [path.join(cwd, "src/generated/roots.json"), []],
       [path.join(cwd, "src/contract-provenance.json"), { entries: [] }],
@@ -81,4 +79,10 @@ it("pins the registry to the workspace WASM package version", async () => {
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+it("repins WASM dependencies and leaves others untouched", () => {
+  expect(
+    pinWasm(["react@19.2.8", "finstack-quant-wasm@0.0.1"], "4.5.6"),
+  ).toEqual(["react@19.2.8", "finstack-quant-wasm@4.5.6"]);
+  expect(pinWasm(undefined, "4.5.6")).toBeUndefined();
 });

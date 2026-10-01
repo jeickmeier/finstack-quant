@@ -76,7 +76,7 @@ STEPS = {
     "student_t": lambda: CalibrationStep.student_t("T", "TRANCHE-1", "CDX.NA.IG_CORR"),
     "hull_white": lambda: CalibrationStep.hull_white("HW", "USD-OIS", "USD", BASE, fit_tolerance=1e-4),
     "cap_floor_hull_white": lambda: CalibrationStep.cap_floor_hull_white(
-        "HWCF", "USD-OIS", "USD-SOFR-3M", "USD", BASE, fit_tolerance=1e-4
+        "HWCF", "USD-OIS", "USD-SOFR-3M", "USD-SOFR-3M", "USD", BASE, fit_tolerance=1e-4
     ),
     "svi_surface": lambda: CalibrationStep.svi_surface("AAPL-SVI", BASE, "AAPL"),
     "xccy_basis": lambda: CalibrationStep.xccy_basis("EUR-XCCY", "EUR", BASE, 1.1, "USD-OIS"),

@@ -58,8 +58,8 @@ come from `finstack-quant-margin`.
 - **Failures are recorded, not dropped.** A position whose sensitivities or VM
   mark-to-market cannot be computed lands in
   `PortfolioMarginResult::degraded_positions`.
-  `positions_without_margin` counts non-marginable *plus* degraded positions;
-  subtract `degraded_positions.len()` to recover the truly non-marginable count.
+  `positions_without_margin` counts the distinct union of unregistered and
+  degraded positions. A position present in both groups is counted once.
 - **Determinism.** Sensitivity extraction fans out over positions with Rayon
   and collects positionally, so the downstream merge order matches the serial
   path. `NettingSetMargin` and `PortfolioMarginResult` serialize through

@@ -5,11 +5,15 @@
 //! sequential evaluation and is therefore the runtime counterpart to the
 //! static [`WaterfallSpec`](super::WaterfallSpec).
 
+use crate::capital_structure::principal::{
+    PeriodPrincipalFlows, PrincipalAllocation, PrincipalClaim,
+};
 use crate::capital_structure::residual_schedule::rebuild_residual_interest;
+use crate::capital_structure::CashflowBreakdown;
 use crate::error::Result;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{Date, Period};
 use finstack_quant_core::money::Money;
 use indexmap::IndexMap;
 
@@ -57,10 +61,15 @@ pub struct CapitalStructureState {
     /// interest category and re-recorded if it remains unpaid.
     pub interest_shortfall: IndexMap<String, Money>,
 
-    /// Unpaid scheduled-principal shortfall per instrument from the prior
-    /// period's available-cash cap. Carried forward as a claim in the next
-    /// period's amortization category and re-recorded if it remains unpaid.
-    pub principal_shortfall: IndexMap<String, Money>,
+    /// Unpaid scheduled-principal claims from prior available-cash caps.
+    /// Original payment and economic principal dates survive each carry so
+    /// early and delayed settlements affect outstanding exactly once.
+    pub principal_shortfall: IndexMap<String, Vec<PrincipalClaim>>,
+
+    /// Principal cash already paid whose economic reduction occurs in a
+    /// future period. These lots reserve repayment capacity until that date;
+    /// otherwise an intermediate reporting period could repay the same debt twice.
+    pub principal_advance_payments: IndexMap<String, Vec<PrincipalClaim>>,
 
     /// Unpaid fee shortfall per instrument from the prior period's
     /// available-cash cap. Carried forward as a claim in the next period's
@@ -68,9 +77,10 @@ pub struct CapitalStructureState {
     /// are not demoted into the interest rung) and re-recorded if unpaid.
     pub fee_shortfall: IndexMap<String, Money>,
 
-    /// Net new funding (revolver draws + initial-exchange notional) per
+    /// Newly funded principal (draws plus explicit or implicit issuance face) per
     /// instrument for the *current* period, computed by
-    /// `calculate_period_flows`. The waterfall consumes it to recover the
+    /// `calculate_period_flows`. Explicit principal deltas keep withheld OID
+    /// separate from cash proceeds. The waterfall consumes it to recover the
     /// payable balance (`opening + funding`) and the draw-aware closing
     /// balance. Overwritten each period; instruments with no draw record zero.
     pub period_new_funding: IndexMap<String, Money>,
@@ -79,6 +89,10 @@ pub struct CapitalStructureState {
     /// outstanding change so the next coupon is `outstanding × rate ×
     /// accrual_factor` rather than a scale of the original schedule.
     pub residual_schedules: IndexMap<String, CashFlowSchedule>,
+
+    /// Dated current-period claims, supplied by market-aware evaluation or
+    /// explicitly by callers allocating schedules with separate cash dates.
+    pub(crate) period_principal_flows: IndexMap<String, PeriodPrincipalFlows>,
 }
 
 impl CapitalStructureState {
@@ -123,6 +137,64 @@ impl CapitalStructureState {
     /// (balance == 0) do not carry stale data into the next evaluation cycle.
     pub fn advance_period(&mut self) {
         self.opening_balances = std::mem::take(&mut self.closing_balances);
+        self.period_principal_flows.clear();
+    }
+
+    /// Set dated principal claims for the current waterfall period.
+    ///
+    /// Market-aware evaluation supplies these from the residual schedule.
+    /// Aggregate-only `execute_waterfall` callers may omit this input only
+    /// when cash settlement and economic principal movements belong to the
+    /// same allocation period. When supplied, the contractual breakdown's
+    /// debt balance must be its economic closing balance before cash allocation.
+    ///
+    /// # Arguments
+    ///
+    /// * `instrument_id` - Exact instrument key in the contractual flow map.
+    /// * `period` - Actual half-open reporting interval, including fiscal dates.
+    /// * `claims` - Nonnegative current cash-principal claims in native currency;
+    ///   payment dates must lie in `period`, while economic dates may precede
+    ///   or follow it. Their amounts must sum to contractual principal cash.
+    ///
+    /// # Errors
+    ///
+    /// Returns a capital-structure error for an empty/reversed period,
+    /// negative claims, or cash dates outside the reporting interval.
+    pub fn set_period_principal_flows(
+        &mut self,
+        instrument_id: impl Into<String>,
+        period: &Period,
+        claims: Vec<PrincipalClaim>,
+    ) -> Result<()> {
+        let flows = PeriodPrincipalFlows::new(period, claims)?;
+        self.period_principal_flows
+            .insert(instrument_id.into(), flows);
+        Ok(())
+    }
+
+    pub(crate) fn stage_principal(
+        &mut self,
+        instrument_id: &str,
+        contractual: &CashflowBreakdown,
+    ) -> Result<PrincipalAllocation> {
+        let currency = contractual.debt_balance.currency();
+        let allocation = PrincipalAllocation::new(
+            self.period_principal_flows.get(instrument_id),
+            self.get_opening_balance(instrument_id, currency),
+            self.get_period_new_funding(instrument_id, currency),
+            contractual,
+            self.principal_shortfall
+                .get(instrument_id)
+                .cloned()
+                .unwrap_or_default(),
+            self.principal_advance_payments
+                .get(instrument_id)
+                .cloned()
+                .unwrap_or_default(),
+        )?;
+        self.principal_shortfall.shift_remove(instrument_id);
+        self.principal_advance_payments.shift_remove(instrument_id);
+        Ok(allocation)
     }
 
     /// Reproject future interest only when closing outstanding differs from
@@ -148,7 +220,16 @@ impl CapitalStructureState {
             .collect();
         for (id, closing) in updates {
             if let Some(schedule) = self.residual_schedules.get(&id) {
-                let rebuilt = rebuild_residual_interest(schedule, closing, from_date)?;
+                let preserved_claims: Vec<_> = self
+                    .principal_advance_payments
+                    .get(&id)
+                    .into_iter()
+                    .chain(self.principal_shortfall.get(&id))
+                    .flatten()
+                    .cloned()
+                    .collect();
+                let rebuilt =
+                    rebuild_residual_interest(schedule, closing, from_date, &preserved_claims)?;
                 self.residual_schedules.insert(id, rebuilt);
             }
         }

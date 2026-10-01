@@ -107,12 +107,14 @@ impl ShortRateTree {
                     p_model_base_cont += q_next * (-r_base * dt).exp();
                 }
 
-                if p_model_base > 0.0 && p_target > 0.0 {
-                    let theta_cont = if p_model_base_cont > 0.0 {
-                        -(p_target / p_model_base_cont).ln() / dt
-                    } else {
-                        0.0
-                    };
+                if p_model_base.is_finite()
+                    && p_model_base > 0.0
+                    && p_model_base_cont.is_finite()
+                    && p_model_base_cont > 0.0
+                    && p_target.is_finite()
+                    && p_target > 0.0
+                {
+                    let theta_cont = (p_model_base_cont.ln() - p_target.ln()) / dt;
                     if comp == Compounding::Continuous {
                         theta_cont
                     } else {
@@ -134,7 +136,9 @@ impl ShortRateTree {
                         }
                     }
                 } else {
-                    0.0
+                    return Err(Error::Validation(format!(
+                        "Ho-Lee calibration requires finite positive model and target discount factors at step {step}: model={p_model_base}, continuous_model={p_model_base_cont}, target={p_target}"
+                    )));
                 }
             } else {
                 0.0
@@ -172,12 +176,15 @@ impl ShortRateTree {
                 let model_df: f64 = next_q[..next_nodes].iter().sum();
                 let t_next = self.time_steps[step + 1];
                 let target_df = discount_curve.df(t_next);
-                if target_df > 0.0 {
-                    let err = ((model_df - target_df) / target_df).abs() * 10_000.0;
-                    if err > max_error_bp {
-                        max_error_bp = err;
-                        max_error_step = step;
-                    }
+                let err = ((model_df - target_df) / target_df).abs() * 10_000.0;
+                if !err.is_finite() {
+                    return Err(Error::Validation(format!(
+                        "Ho-Lee calibration produced a non-finite repricing error at step {step}"
+                    )));
+                }
+                if err > max_error_bp {
+                    max_error_bp = err;
+                    max_error_step = step;
                 }
                 std::mem::swap(&mut q, &mut next_q);
             }
@@ -221,6 +228,13 @@ impl ShortRateTree {
                     )));
                 }
             }
+        }
+
+        if max_error_bp > self.config.curve_fit_tolerance_bp {
+            return Err(Error::Validation(format!(
+                "Ho-Lee calibration did not reprice the discount curve: max error {max_error_bp:.4} bp at step {max_error_step}, tolerance {:.4} bp",
+                self.config.curve_fit_tolerance_bp
+            )));
         }
 
         self.calibration_quality = Some(TreeCalibrationResult {

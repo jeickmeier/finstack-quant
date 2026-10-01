@@ -478,10 +478,10 @@ impl RevolvingCreditPricer {
             dates.extend(events.iter().map(|e| e.date));
         }
 
-        let mut d = as_of.add_months(1);
+        let mut d = as_of.add_months(1)?;
         while d < facility.maturity {
             dates.insert(d);
-            d = d.add_months(1);
+            d = d.add_months(1)?;
         }
         dates.insert(facility.maturity);
 

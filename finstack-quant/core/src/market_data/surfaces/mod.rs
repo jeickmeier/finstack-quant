@@ -50,11 +50,13 @@
 pub mod fx_delta_vol_surface;
 mod sabr_parameter_data;
 mod vol_cube;
+mod vol_cube_expiry_slice;
 mod vol_surface;
 
 pub use fx_delta_vol_surface::FxDeltaVolSurface;
 pub use sabr_parameter_data::SabrParameterData;
 pub use vol_cube::{VolCube, VolCubeBuilder};
+pub use vol_cube_expiry_slice::VolCubeExpirySlice;
 pub use vol_surface::{
     VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis, VolSurfaceBuilder,
 };

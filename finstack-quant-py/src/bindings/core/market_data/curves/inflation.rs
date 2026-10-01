@@ -57,6 +57,8 @@ impl PyInflationCurve {
     ///     Valuation date anchoring ``t = 0``.
     /// base_cpi : float
     ///     Reference CPI level at ``t = 0`` used by ``index_ratio``.
+    ///     Inserted as the zero-time knot if absent; must match any supplied
+    ///     zero-time knot.
     /// knots : list[tuple[float, float]]
     ///     ``(time_years, cpi_level)`` pairs; levels must be positive.
     /// day_count : str, optional
@@ -66,13 +68,13 @@ impl PyInflationCurve {
     /// interp : str, optional
     ///     Interpolation style; default ``"log_linear"``.
     /// extrapolation : str, optional
-    ///     Extrapolation policy; default ``"flat_forward"``.
+    ///     Extrapolation policy; default ``"flat_zero"``.
     ///
     /// Raises
     /// ------
     /// ValueError
     ///     If no knots are given, a knot is non-finite, duplicated or
-    ///     non-positive, or a label is unknown.
+    ///     non-positive, base CPI differs from a zero-time knot, or a label is unknown.
     ///
     /// Example
     /// -------

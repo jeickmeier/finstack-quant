@@ -116,14 +116,19 @@ impl PyPeriodKind {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``first`` is not a valid calendar date or ISO string.
+    ///     If ``first`` is invalid or the prior observation date underflows the supported calendar.
     #[pyo3(text_signature = "(self, first)")]
     fn prior_observation_date<'py>(
         &self,
         py: Python<'py>,
         first: &Bound<'py, PyAny>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        date_to_py(py, self.inner.prior_observation_date(py_to_date(first)?))
+        date_to_py(
+            py,
+            self.inner
+                .prior_observation_date(py_to_date(first)?)
+                .map_err(core_to_py)?,
+        )
     }
 
     /// Support ``pickle`` by reconstructing through ``from_name``.
@@ -647,7 +652,8 @@ impl PyFiscalConfig {
 ///     ``2024..2026``, ``2025W01..W52``, ``FY2024Q1..Q4``.
 /// actuals_cutoff : str | None
 ///     Period code up to and including which periods are flagged
-///     ``is_actual``; ``None`` marks every period as forecast.
+///     ``is_actual``; must match the range's period kind and calendar.
+///     ``None`` marks every period as forecast.
 ///
 /// Returns
 /// -------
@@ -658,7 +664,9 @@ impl PyFiscalConfig {
 /// ------
 /// ValueError
 ///     If ``spec`` or ``actuals_cutoff`` is malformed; the message names the
-///     offending value and the accepted grammar.
+///     offending value and the accepted grammar. Also raised for incompatible
+///     endpoint/cutoff identifiers, dates outside the supported range, or more than
+///     100,000 periods. The period list is allocated only after these checks.
 #[pyfunction]
 #[pyo3(
     name = "build_periods",
@@ -680,7 +688,8 @@ fn py_build_periods(spec: &str, actuals_cutoff: Option<&str>) -> PyResult<PyPeri
 /// fiscal_config : FiscalConfig
 ///     Fiscal-year start used to bound each period.
 /// actuals_cutoff : str | None
-///     Period code up to and including which periods are flagged ``is_actual``.
+///     Period code up to and including which periods are flagged ``is_actual``;
+///     must match the range's period kind. Unprefixed codes are fiscal.
 ///
 /// Returns
 /// -------
@@ -690,7 +699,10 @@ fn py_build_periods(spec: &str, actuals_cutoff: Option<&str>) -> PyResult<PyPeri
 /// Raises
 /// ------
 /// ValueError
-///     If ``spec`` or ``actuals_cutoff`` is malformed.
+///     If ``spec`` or ``actuals_cutoff`` is malformed or uses different period
+///     kinds, fiscal boundaries are
+///     outside the supported date range, or the range exceeds 100,000 periods.
+///     The period list is allocated only after these checks.
 #[pyfunction]
 #[pyo3(
     name = "build_fiscal_periods",

@@ -28,13 +28,8 @@ pub enum UnmatchedPolicy {
     ///
     /// Use this in production risk runs where dropping unmapped risk would be a
     /// control failure.
-    Strict,
-    /// Roll unmatched risk into a residual bucket.
-    ///
-    /// Use this when the engine should preserve total exposure while making the
-    /// unmatched component explicit as residual risk.
     #[default]
-    Residual,
+    Strict,
     /// Continue but surface a warning to the caller.
     ///
     /// Suitable for exploratory workflows where visibility matters but a hard
@@ -46,7 +41,6 @@ impl fmt::Display for UnmatchedPolicy {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Strict => write!(f, "strict"),
-            Self::Residual => write!(f, "residual"),
             Self::Warn => write!(f, "warn"),
         }
     }
@@ -64,10 +58,10 @@ pub enum PricingMode {
     /// small symmetric bumps and the risk report only needs first-order factor
     /// sensitivities.
     DeltaBased,
-    /// Reprice across a scenario grid and derive deltas from the P&L profile.
+    /// Select the engine that can also compute explicit scenario P&L profiles.
     ///
-    /// Use this when the portfolio workflow needs richer scenario behavior than
-    /// a single small bump can capture, at the cost of more repricing work.
+    /// Sensitivity extraction uses the same two central endpoints as
+    /// `DeltaBased`; full grids are evaluated only when P&L profiles are requested.
     FullRepricing,
 }
 
@@ -314,6 +308,8 @@ pub struct FactorModelConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bump_config: Option<BumpSizeConfig>,
     /// Policy used when a dependency does not map to a configured factor.
+    /// `None` selects `Strict`, which fails the run. Select `Warn` explicitly
+    /// to continue with unmatched dependencies reported to the caller.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unmatched_policy: Option<UnmatchedPolicy>,
 }
@@ -424,7 +420,12 @@ mod tests {
 
     #[test]
     fn test_unmatched_policy_default() {
-        assert_eq!(UnmatchedPolicy::default(), UnmatchedPolicy::Residual);
+        assert_eq!(UnmatchedPolicy::default(), UnmatchedPolicy::Strict);
+    }
+
+    #[test]
+    fn unsupported_residual_policy_is_rejected() {
+        assert!(serde_json::from_str::<UnmatchedPolicy>("\"residual\"").is_err());
     }
 
     #[test]
@@ -617,7 +618,7 @@ mod tests {
             pricing_mode: PricingMode::DeltaBased,
             risk_measure: RiskMeasure::Variance,
             bump_config: None,
-            unmatched_policy: Some(UnmatchedPolicy::Residual),
+            unmatched_policy: Some(UnmatchedPolicy::Warn),
         };
 
         let json_result = serde_json::to_string_pretty(&config);
@@ -634,7 +635,7 @@ mod tests {
         assert_eq!(back.factors.len(), 1);
         assert_eq!(back.pricing_mode, PricingMode::DeltaBased);
         assert_eq!(back.risk_measure, RiskMeasure::Variance);
-        assert_eq!(back.unmatched_policy, Some(UnmatchedPolicy::Residual));
+        assert_eq!(back.unmatched_policy, Some(UnmatchedPolicy::Warn));
     }
 
     #[test]

@@ -611,13 +611,13 @@ pub fn barrier_put(
 /// @param div_yield - Continuous dividend yield or foreign rate, expressed as a decimal.
 /// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
 /// @param expiry - Time to expiry in years.
-/// @param num_fixings - Positive number of equally spaced averaging observations before expiry.
+/// @param num_fixings - Non-negative integer number of equally spaced averaging observations, at most 4294967295; zero selects continuous monitoring.
 /// @param averaging - Asian averaging convention: `"arithmetic"` (default) or `"geometric"`.
 /// @param is_call - Whether to value a call (`true`, default) or put (`false`).
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `numFixings` is not a positive whole
+/// Throws a JavaScript exception if `numFixings` is not a non-negative whole
 /// number, `averaging` is not `"arithmetic"` or `"geometric"`, or the supplied
 /// model inputs produce a non-finite option price.
 #[wasm_bindgen(js_name = asianOptionPrice)]

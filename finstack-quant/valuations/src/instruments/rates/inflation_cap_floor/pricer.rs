@@ -58,4 +58,22 @@ impl Pricer for SimpleInflationCapFloorPricer {
 
         Ok(ValuationResult::stamped(option.id(), as_of, pv))
     }
+
+    fn price_raw_dyn(
+        &self,
+        instrument: &dyn Instrument,
+        market: &MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> std::result::Result<f64, PricingError> {
+        let option =
+            expect_inst::<InflationCapFloor>(instrument, InstrumentType::InflationCapFloor)?;
+        option
+            .npv_raw_with_model(market, as_of, self.model)
+            .map_err(|error| {
+                PricingError::model_failure_with_context(
+                    error.to_string(),
+                    PricingErrorContext::default(),
+                )
+            })
+    }
 }

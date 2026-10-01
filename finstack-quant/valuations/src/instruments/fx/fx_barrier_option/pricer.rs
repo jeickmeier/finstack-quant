@@ -312,7 +312,9 @@ fn expired_barrier_value_per_unit(
     let rebate_due = if is_knock_in {
         !barrier_hit
     } else {
-        barrier_hit
+        // A recorded hit includes settlement of an at-hit rebate. The same
+        // claim is extinguished before, on, and after expiry.
+        barrier_hit && inst.rebate_timing == PayoutTiming::AtExpiry
     };
     let rebate = if rebate_due {
         inst.rebate_per_unit().unwrap_or(0.0)
@@ -761,6 +763,67 @@ mod tests {
     }
 
     #[test]
+    fn processed_knockout_rebate_is_paid_exactly_once_across_expiry() {
+        let mut inst = FxBarrierOption::example().expect("example");
+        inst.barrier_type = BarrierType::UpAndOut;
+        inst.observed_barrier_breached = Some(true);
+        inst.rebate = Some(Money::from((50_000_i64, Currency::USD)));
+        inst.monitoring = Monitoring::Continuous;
+        inst.instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(0.15);
+        let before = inst.expiry - finstack_quant_core::dates::Duration::days(1);
+        let after = inst.expiry + finstack_quant_core::dates::Duration::days(1);
+        let mut market =
+            MarketContext::new().insert_price("EURUSD-SPOT", MarketScalar::Unitless(1.25));
+        for id in ["USD-OIS", "EUR-OIS"] {
+            market = market.insert(
+                DiscountCurve::builder(id)
+                    .base_date(before)
+                    .knots([(0.0, 1.0), (1.0, 1.0)])
+                    .build()
+                    .expect("curve"),
+            );
+        }
+        for timing in [PayoutTiming::AtHit, PayoutTiming::AtExpiry] {
+            inst.rebate_timing = timing;
+            for as_of in [before, inst.expiry, after] {
+                let remaining = if timing == PayoutTiming::AtExpiry && as_of <= inst.expiry {
+                    50_000.0
+                } else {
+                    0.0
+                };
+                let booked = 50_000.0 - remaining;
+                for result in [
+                    FxBarrierOptionAnalyticalPricer::new().price_dyn(&inst, &market, as_of),
+                    FxBarrierOptionMcPricer::new().price_dyn(&inst, &market, as_of),
+                ] {
+                    let pv = result.expect("processed hit value").value.amount();
+                    assert!((pv - remaining).abs() < 1e-8);
+                    assert!((booked + pv - 50_000.0).abs() < 1e-8);
+                }
+            }
+        }
+        // A same-day processed hit uses the same settled-event state; the
+        // boolean does not introduce another unpaid at-hit receivable.
+        inst.rebate_timing = PayoutTiming::AtHit;
+        assert_eq!(
+            expired_barrier_value_per_unit(&inst, 1.25).expect("settled"),
+            0.0
+        );
+        // Knock-in no-hit rebates still mature regardless of knockout timing.
+        inst.barrier_type = BarrierType::UpAndIn;
+        inst.observed_barrier_breached = Some(false);
+        assert!(
+            (expired_barrier_value_per_unit(&inst, 1.15).expect("KI rebate")
+                * inst.notional.amount()
+                - 50_000.0)
+                .abs()
+                < 1e-8
+        );
+    }
+
+    #[test]
     fn expired_up_and_out_with_hit_pays_rebate_only() {
         let mut inst = FxBarrierOption::example().expect("example");
         inst.option_type = OptionType::Call;
@@ -771,7 +834,8 @@ mod tests {
         inst.rebate = Some(Money::from((20_000_i64, Currency::USD)));
         inst.observed_barrier_breached = Some(true);
 
-        // Barrier hit at expiry => knocked out. With rebate, no intrinsic and rebate paid.
+        inst.rebate_timing = PayoutTiming::AtExpiry;
+        // A recorded hit leaves only the explicitly deferred rebate unpaid.
         let per_unit = expired_barrier_value_per_unit(&inst, 1.25).expect("expired value");
         assert!((per_unit - 0.02).abs() < 1e-12);
     }

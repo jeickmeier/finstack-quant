@@ -228,8 +228,8 @@ pub struct ShortRateTreeConfig {
 
     /// Maximum permitted initial-curve repricing error, in basis points.
     ///
-    /// BDT calibration fails rather than returning a tree when this tolerance
-    /// is exceeded. The default is 0.1 bp.
+    /// Calibration fails rather than returning a tree when this tolerance is
+    /// exceeded. Applies to Ho-Lee, BDT and Black-Karasinski; default 0.1 bp.
     pub curve_fit_tolerance_bp: f64,
 }
 

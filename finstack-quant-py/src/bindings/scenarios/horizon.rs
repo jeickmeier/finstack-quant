@@ -30,11 +30,14 @@ use super::extract::{extract_config, extract_scenario_spec};
 /// method : str | None, default None
 ///     Attribution method: ``"parallel"``, ``"waterfall"``,
 ///     ``"metrics_based"``, or ``"taylor"``. ``None`` selects the Rust default
-///     (``AttributionMethod::default()``, currently ``"parallel"``). ``"metrics_based"`` re-prices
-///     the instrument with the default attribution metric set (DV01, CS01,
-///     vega, ...) under the same configuration and recalibration provider
-///     the scenario engine uses; instruments lacking a metric raise
-///     ``RuntimeError`` rather than silently dropping the factor.
+///     (``AttributionMethod::default()``, currently ``"parallel"``).
+///     ``"metrics_based"`` calculates the instrument's applicable subset of
+///     the default attribution metrics (DV01, CS01, vega, ...) at the opening
+///     snapshot, using the same configuration and recalibration provider as
+///     the scenario engine. The canonical Rust registry omits metrics
+///     unsupported by that instrument type. Selected metric failures raise
+///     ``ValueError`` for invalid inputs, ``KeyError`` for missing data, or
+///     ``RuntimeError`` for computation failures.
 /// config : FinstackConfig | str | None, default None
 ///     Library configuration (rounding, tolerances, bump sizes) threaded
 ///     into both the scenario engine and the attribution pricing.
@@ -53,11 +56,11 @@ use super::extract::{extract_config, extract_scenario_spec};
 /// ------
 /// ValueError
 ///     If an input fails to parse or validate, ``method`` is unknown,
-///     ``calendar_id`` is not a built-in calendar, or the scenario contains
-///     an instrument-scoped operation (horizon analysis prices one instrument
-///     instance at both dates).
+///     or the scenario contains an instrument-scoped operation (horizon
+///     analysis prices one instrument instance at both dates).
 /// KeyError
-///     If the scenario references market data or tenors that do not exist.
+///     If ``calendar_id`` is not a built-in calendar, or the scenario references
+///     market data or tenors that do not exist.
 /// RuntimeError
 ///     If pricing or attribution fails.
 ///
@@ -65,9 +68,10 @@ use super::extract::{extract_config, extract_scenario_spec};
 /// -----
 /// ``total_return`` is a decimal fraction (``0.05`` = +5%) and is ``nan``
 /// when the initial value and total P&L are denominated in different
-/// currencies (no implicit FX conversion); ``annualized_return`` is ``None``
-/// in that case. The GIL is released while the scenario and attribution
-/// computations run.
+/// currencies (no implicit FX conversion), or the initial value is zero or
+/// negative; ``annualized_return`` is ``None`` in those cases and when total
+/// return is below -100%. The GIL is released while the scenario and
+/// attribution computations run.
 #[pyfunction]
 #[pyo3(signature = (instrument, market, as_of, scenario, method = None, config = None, calendar_id = None))]
 // Arity is fixed by the documented Python keyword signature; grouping into a
@@ -196,8 +200,10 @@ impl PyHorizonResult {
         self.inner.total_return()
     }
 
-    /// Annualized return as a decimal fraction (``None`` if no time-roll or
-    /// ``total_return`` is not finite).
+    /// Annualized return as a decimal fraction using a 365-day year.
+    ///
+    /// ``None`` when the horizon is absent or nonpositive, ``total_return`` is
+    /// nonfinite or below -100%, or compounding produces a nonfinite value.
     #[getter]
     fn annualized_return(&self) -> Option<f64> {
         self.inner.annualized_return()
@@ -245,9 +251,11 @@ impl PyHorizonResult {
         Ok(self.inner.factor_contribution(&f))
     }
 
-    /// Serialize to JSON.
+    /// Serialize the canonical horizon result with Rust-computed decimal total
+    /// return, annualized return, and factor contributions. Undefined derived
+    /// values are JSON ``null``.
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serde_json::to_string(&self.inner.to_json()).map_err(display_to_py)
     }
 
     /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
@@ -256,7 +264,8 @@ impl PyHorizonResult {
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Deserialize from JSON produced by ``to_json``.
+    /// Deserialize from JSON produced by ``to_json``. Derived return fields
+    /// are recomputed from the underlying values rather than trusted as inputs.
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {

@@ -25,7 +25,7 @@
         },
         {
           "const": "periodic",
-          "description": "Settle periodically (quarterly/annually)",
+          "description": "Settle at configured period ends before subsequent distributions.\nEuropean settlements update fund allocation balances. American settlements\nstay at fund level and do not rewrite individual deal entitlements.",
           "type": "string"
         }
       ]
@@ -168,7 +168,7 @@
               "additionalProperties": false,
               "properties": {
                 "hurdle_irr": {
-                  "description": "LP preferred-return hurdle as an annual decimal IRR (`0.08` = 8%),\ncompounded on the spec's `day_count`.",
+                  "description": "LP preferred-return hurdle as an annual decimal IRR (`0.08` = 8%),\ncompounded on the spec's `day_count`; must be finite and greater than -1.",
                   "format": "double",
                   "type": "number"
                 }
@@ -221,7 +221,7 @@
                   "type": "number"
                 },
                 "hurdle_irr": {
-                  "description": "Annual decimal IRR hurdle (`0.12` = 12%) the LP must reach (at\n100% payout) before this tier's split activates.",
+                  "description": "Annual decimal IRR hurdle (`0.12` = 12%) the LP must reach (at\n100% payout) before this tier's split activates; must be finite and greater than -1.",
                   "format": "double",
                   "type": "number"
                 },
@@ -327,7 +327,7 @@
         },
         {
           "const": "american",
-          "description": "American style: deal-by-deal allocation. Every event must carry a\nnon-empty `deal_id`; capital, preferred return, catch-up, and carry are\ntracked independently for each deal, while clawback remains a fund-level\nlifetime reconciliation.",
+          "description": "American style: deal-by-deal allocation. Every event must carry a\nnon-empty `deal_id`; capital, preferred return, catch-up, and carry are\ntracked independently for each deal, while clawback remains a fund-level\nlifetime reconciliation. Periodic fund settlements do not reinstate an\nindividual deal's gross carry capacity or reassign returned capital to a\ndeal; later distributions continue to use that deal's original history.",
           "type": "string"
         }
       ]

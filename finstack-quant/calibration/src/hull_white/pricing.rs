@@ -1,6 +1,7 @@
 use super::*;
 
 /// Price a full cap/floor with a flat normal volatility quote.
+#[cfg(test)]
 pub(crate) fn bachelier_cap_floor_price(
     discount_df: &(dyn Fn(f64) -> f64 + Sync),
     forward_df: &(dyn Fn(f64) -> f64 + Sync),
@@ -10,38 +11,110 @@ pub(crate) fn bachelier_cap_floor_price(
     is_cap: bool,
     frequency: SwapFrequency,
 ) -> f64 {
-    cap_floor_periods(maturity, frequency)
-        .map(|(t_start, t_end, accrual)| {
-            let forward = forward_rate_from_df(forward_df, t_start, t_end);
-            let df = discount_df(t_end);
-            // Option expiry is the fixing time `t_start`, not the payment
-            // time `t_end`: the caplet's rate is fixed at the period start
-            // and accrues no vol afterwards.
-            normal_caplet_price(forward, strike, normal_vol, t_start, accrual, df, is_cap)
+    scheduled_bachelier_cap_floor_price(
+        discount_df,
+        forward_df,
+        &CapFloorSchedule::synthetic(maturity, frequency),
+        strike,
+        normal_vol,
+        is_cap,
+    )
+}
+
+pub(super) fn scheduled_bachelier_cap_floor_price(
+    discount_df: &(dyn Fn(f64) -> f64 + Sync),
+    forward_df: &(dyn Fn(f64) -> f64 + Sync),
+    schedule: &CapFloorSchedule,
+    strike: f64,
+    normal_vol: f64,
+    is_cap: bool,
+) -> f64 {
+    schedule
+        .periods
+        .iter()
+        .map(|period| {
+            normal_caplet_price(
+                scheduled_forward_rate(forward_df, period),
+                strike,
+                normal_vol,
+                period.fixing_time,
+                period.accrual,
+                discount_df(period.payment_time),
+                is_cap,
+            )
         })
         .sum()
 }
 
-pub(super) fn cap_floor_bachelier_vega(
+pub(super) fn scheduled_cap_floor_bachelier_vega(
     discount_df: &(dyn Fn(f64) -> f64 + Sync),
     forward_df: &(dyn Fn(f64) -> f64 + Sync),
-    maturity: f64,
+    schedule: &CapFloorSchedule,
     strike: f64,
     normal_vol: f64,
-    frequency: SwapFrequency,
 ) -> f64 {
-    cap_floor_periods(maturity, frequency)
-        .map(|(t_start, t_end, accrual)| {
-            let forward = forward_rate_from_df(forward_df, t_start, t_end);
-            let df = discount_df(t_end);
-            // Vol accrues only to the fixing time `t_start` (see
-            // `bachelier_cap_floor_price`).
-            normal_caplet_vega(forward, strike, normal_vol, t_start) * accrual * df
+    schedule
+        .periods
+        .iter()
+        .map(|period| {
+            normal_caplet_vega(
+                scheduled_forward_rate(forward_df, period),
+                strike,
+                normal_vol,
+                period.fixing_time,
+            ) * period.accrual
+                * discount_df(period.payment_time)
+        })
+        .sum()
+}
+
+pub(super) fn scheduled_forward_rate(
+    forward_df: &(dyn Fn(f64) -> f64 + Sync),
+    period: &CapletSchedule,
+) -> f64 {
+    let p_start = forward_df(period.start_time);
+    let p_end = forward_df(period.end_time);
+    if !p_start.is_finite() || !p_end.is_finite() || p_start <= 0.0 || p_end <= 0.0 {
+        return f64::NAN;
+    }
+    (p_start / p_end - 1.0) / period.accrual
+}
+
+/// Price contractual term-index coupons with the same scheduled-HW kernel as
+/// production cap/floor valuation. Projection/discount basis is deterministic,
+/// while payment delays retain their discount factors and payment-measure
+/// convexity adjustment without changing the projected accrual-period end.
+pub(crate) fn scheduled_cap_floor_price(
+    params: &HullWhiteParams,
+    discount_df: &(dyn Fn(f64) -> f64 + Sync),
+    forward_df: &(dyn Fn(f64) -> f64 + Sync),
+    schedule: &CapFloorSchedule,
+    strike: f64,
+    is_cap: bool,
+) -> finstack_quant_core::Result<f64> {
+    schedule
+        .periods
+        .iter()
+        .map(|period| {
+            finstack_quant_models::rates::hull_white::hw1f_term_caplet_price_from_dfs_with_model(
+                params,
+                forward_df(period.start_time),
+                forward_df(period.end_time),
+                discount_df(period.payment_time),
+                period.fixing_time,
+                period.start_time,
+                period.end_time,
+                period.payment_time,
+                period.accrual,
+                strike,
+                is_cap,
+            )
         })
         .sum()
 }
 
 /// Cap/floor shape used by HW1F pricing helpers.
+#[cfg(test)]
 #[derive(Clone, Copy)]
 pub(crate) struct CapFloorPriceSpec {
     pub(super) maturity: f64,
@@ -50,6 +123,7 @@ pub(crate) struct CapFloorPriceSpec {
     pub(super) frequency: SwapFrequency,
 }
 
+#[cfg(test)]
 impl CapFloorPriceSpec {
     pub(crate) fn new(maturity: f64, strike: f64, is_cap: bool, frequency: SwapFrequency) -> Self {
         Self {
@@ -81,6 +155,7 @@ impl CapFloorPriceSpec {
 /// (projection) curve and scaled by the deterministic discount/projection
 /// basis `P_d(0,S)/P_f(0,S)`; for single-curve calibration the factor is 1
 /// and the price is exact.
+#[cfg(test)]
 pub(crate) fn hw1f_cap_floor_price(
     kappa: f64,
     sigma: f64,
@@ -100,6 +175,7 @@ pub(crate) fn hw1f_cap_floor_price(
 }
 
 /// Price a full cap/floor under a scheduled HW1F short-rate volatility.
+#[cfg(test)]
 pub(crate) fn hw1f_cap_floor_price_with_model(
     params: &HullWhiteParams,
     discount_df: &(dyn Fn(f64) -> f64 + Sync),
@@ -132,11 +208,30 @@ pub(crate) fn hw1f_cap_floor_implied_normal_vol(
     cap_floor_implied_normal_vol(target, discount_df, forward_df, spec)
 }
 
+#[cfg(test)]
 pub(super) fn cap_floor_implied_normal_vol(
     target: f64,
     discount_df: &(dyn Fn(f64) -> f64 + Sync),
     forward_df: &(dyn Fn(f64) -> f64 + Sync),
     spec: CapFloorPriceSpec,
+) -> finstack_quant_core::Result<f64> {
+    scheduled_cap_floor_implied_normal_vol(
+        target,
+        discount_df,
+        forward_df,
+        &CapFloorSchedule::synthetic(spec.maturity, spec.frequency),
+        spec.strike,
+        spec.is_cap,
+    )
+}
+
+pub(crate) fn scheduled_cap_floor_implied_normal_vol(
+    target: f64,
+    discount_df: &(dyn Fn(f64) -> f64 + Sync),
+    forward_df: &(dyn Fn(f64) -> f64 + Sync),
+    schedule: &CapFloorSchedule,
+    strike: f64,
+    is_cap: bool,
 ) -> finstack_quant_core::Result<f64> {
     if !target.is_finite() || target < 0.0 {
         return Err(finstack_quant_core::Error::Validation(
@@ -144,15 +239,8 @@ pub(super) fn cap_floor_implied_normal_vol(
         ));
     }
     let residual = |vol: f64| {
-        bachelier_cap_floor_price(
-            discount_df,
-            forward_df,
-            spec.maturity,
-            spec.strike,
-            vol,
-            spec.is_cap,
-            spec.frequency,
-        ) - target
+        scheduled_bachelier_cap_floor_price(discount_df, forward_df, schedule, strike, vol, is_cap)
+            - target
     };
     let mut hi = 0.01;
     while residual(hi) < 0.0 && hi < 100.0 {
@@ -192,6 +280,7 @@ pub(super) fn cap_floor_periods(
 /// `solve_cap_floor_sigma_for_fixed_kappa`) rely on the non-finite-price
 /// check to detect broken curves, and `f64::max` would silently absorb a NaN
 /// (`NaN.max(1e-12) == 1e-12`), defeating that error contract.
+#[cfg(test)]
 pub(super) fn forward_rate_from_df(df: &(dyn Fn(f64) -> f64 + Sync), start: f64, end: f64) -> f64 {
     let accrual = (end - start).max(1e-12);
     let p_start = df(start);

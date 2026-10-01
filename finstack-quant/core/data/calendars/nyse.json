@@ -3,7 +3,7 @@
   "name": "New York Stock Exchange (NYSE) Holidays",
   "ignore_weekends": false,
   "rules": [
-    { "type": "fixed", "name": "New Year's Day", "month": "january", "day": 1, "observed": "fri_if_sat_mon_if_sun" },
+    { "type": "fixed", "name": "New Year's Day", "month": "january", "day": 1, "observed": "mon_if_sun" },
     { "type": "fixed", "name": "Juneteenth National Independence Day", "month": "june", "day": 19, "observed": "fri_if_sat_mon_if_sun", "from_year": 2022 },
     { "type": "fixed", "name": "Independence Day", "month": "july", "day": 4, "observed": "fri_if_sat_mon_if_sun" },
     { "type": "fixed", "name": "Christmas Day", "month": "december", "day": 25, "observed": "fri_if_sat_mon_if_sun" },
@@ -12,6 +12,8 @@
     { "type": "nth_weekday", "name": "Memorial Day", "n": -1, "weekday": "monday", "month": "may" },
     { "type": "nth_weekday", "name": "Labor Day", "n": 1, "weekday": "monday", "month": "september" },
     { "type": "nth_weekday", "name": "Thanksgiving Day", "n": 4, "weekday": "thursday", "month": "november" },
-    { "type": "easter_offset", "name": "Good Friday", "days": -3 }
-  ]
+    { "type": "easter_offset", "name": "Good Friday", "days": -3 },
+    { "type": "exact_date", "name": "National Day of Mourning for President Jimmy Carter", "year": 2025, "month": "january", "day": 9 }
+  ],
+  "notes": "NYSE cash equity calendar. Saturday New Year has no preceding-Friday closure; other fixed holidays retain nearest-weekday observance. Includes the announced 2025-01-09 mourning closure. Annual fixtures cover 2025-2028; other historical exceptional closures are not exhaustively recorded. <https://www.nyse.com/trade/hours-calendars>"
 }

@@ -32,10 +32,10 @@ use crate::quotes::xccy::XccyQuote;
 use crate::solver::bootstrap::SequentialBootstrapper;
 use crate::solver::traits::BootstrapTarget;
 use crate::targets::util::{
-    discount_only_curve_ids, prepare_rate_calibration_quotes, ContextScratch,
+    discount_and_forward_curve_ids, prepare_rate_calibration_quotes, ContextScratch,
 };
 use crate::CalibrationReport;
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{BasisSpreadCurve, DiscountCurve};
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
@@ -51,6 +51,8 @@ const XCCY_RESIDUAL_NOTIONAL: f64 = 1_000_000.0;
 pub(crate) struct XccyBasisTargetParams {
     /// Base date for the calibration.
     pub(crate) base_date: Date,
+    /// Day count for the foreign and basis-spread curve time axes.
+    pub(crate) curve_day_count: DayCount,
     /// ID for the foreign discount curve being built.
     pub(crate) curve_id: CurveId,
     /// Pre-calibrated domestic discount curve.
@@ -86,6 +88,11 @@ impl XccyBasisTarget {
         context: &MarketContext,
         global_config: &CalibrationConfig,
     ) -> Result<(MarketContext, CalibrationReport)> {
+        if schema_params.method != crate::config::CalibrationMethod::Bootstrap {
+            return Err(finstack_quant_core::Error::Validation(
+                "XCCY basis calibration supports only Bootstrap; GlobalSolve is unsupported".into(),
+            ));
+        }
         let domestic_discount = context.get_discount(&schema_params.domestic_discount_id)?;
 
         let mut config = global_config.clone();
@@ -120,8 +127,11 @@ impl XccyBasisTarget {
             let prepared = prepare_rate_calibration_quotes(
                 quotes,
                 schema_params.base_date,
-                discount_only_curve_ids(schema_params.curve_id.as_ref()),
-                schema_params.conventions.curve_day_count,
+                discount_and_forward_curve_ids(
+                    schema_params.curve_id.as_ref(),
+                    schema_params.curve_id.as_ref(),
+                ),
+                Some(curve_day_count),
                 XCCY_RESIDUAL_NOTIONAL,
             )?;
             prepared_quotes.extend(prepared.quotes);
@@ -161,6 +171,7 @@ impl XccyBasisTarget {
 
         let target = Self::new(XccyBasisTargetParams {
             base_date: schema_params.base_date,
+            curve_day_count,
             curve_id: schema_params.curve_id.clone(),
             domestic_discount: Arc::clone(&domestic_discount),
             solve_interp: schema_params.interpolation,
@@ -182,17 +193,20 @@ impl XccyBasisTarget {
 
         // Extract basis spread curve as byproduct if requested.
         if let Some(spread_id) = &schema_params.basis_spread_curve_id {
-            let knots = curve.knots();
-            let foreign_dfs = curve.dfs();
-
-            let mut spread_knots = Vec::with_capacity(knots.len());
-            for (i, &t) in knots.iter().enumerate() {
-                if t <= 0.0 {
-                    spread_knots.push((t, 0.0));
-                    continue;
-                }
-                let df_foreign = foreign_dfs[i];
-                let df_domestic = domestic_discount.df(t);
+            let mut spread_knots = Vec::with_capacity(prepared_quotes.len() + 1);
+            spread_knots.push((0.0, 0.0));
+            for quote in &prepared_quotes {
+                let t = quote.pillar_time();
+                let pillar_date = match quote {
+                    CalibrationQuote::Rates(prepared) => prepared.pillar_date,
+                    CalibrationQuote::XccyBasis(prepared) => prepared.pillar_date,
+                    _ => {
+                        return Err(finstack_quant_core::InputError::Invalid.into());
+                    }
+                };
+                let df_foreign = curve.df_between_dates(schema_params.base_date, pillar_date)?;
+                let df_domestic =
+                    domestic_discount.df_between_dates(schema_params.base_date, pillar_date)?;
                 if !df_foreign.is_finite() || df_foreign <= 0.0 {
                     return Err(finstack_quant_core::Error::Calibration {
                         message: format!(
@@ -216,8 +230,10 @@ impl XccyBasisTarget {
 
             let spread_curve = BasisSpreadCurve::builder(spread_id.clone())
                 .base_date(schema_params.base_date)
+                .day_count(curve_day_count)
                 .knots(spread_knots)
-                .interp(schema_params.interpolation)
+                // Spreads include zero and may be negative, unlike discount factors.
+                .interp(InterpStyle::Linear)
                 .extrapolation(schema_params.extrapolation)
                 .build()
                 .map_err(|e| finstack_quant_core::Error::Calibration {
@@ -246,6 +262,7 @@ impl BootstrapTarget for XccyBasisTarget {
     fn build_curve(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
         DiscountCurve::builder(self.params.curve_id.clone())
             .base_date(self.params.base_date)
+            .day_count(self.params.curve_day_count)
             .knots(knots.to_vec())
             .interp(self.params.solve_interp)
             .extrapolation(self.params.extrapolation)
@@ -255,6 +272,7 @@ impl BootstrapTarget for XccyBasisTarget {
     fn build_curve_for_solver(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
         DiscountCurve::builder(self.params.curve_id.clone())
             .base_date(self.params.base_date)
+            .day_count(self.params.curve_day_count)
             .knots(knots.to_vec())
             .interp(self.params.solve_interp)
             .extrapolation(self.params.extrapolation)
@@ -410,6 +428,7 @@ mod xccy_quote_calibration_tests {
             "calibration should succeed: max_residual={}",
             report.max_residual
         );
+        assert!(report.residuals["EURUSD-XCCY-5Y"].is_finite());
 
         let calibrated = new_ctx
             .get_discount(CurveId::new("EUR-OIS"))

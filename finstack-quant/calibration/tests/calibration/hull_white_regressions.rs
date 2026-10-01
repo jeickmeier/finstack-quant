@@ -1,7 +1,6 @@
 use finstack_quant_calibration::api::{
     engine, market_datum::MarketDatum, prior_market::PriorMarketObject, schema::*,
 };
-use finstack_quant_calibration::hull_white::SwapFrequency;
 use finstack_quant_calibration::quotes::{ids::QuoteId, vol::VolQuote};
 use finstack_quant_core::{
     currency::Currency,
@@ -36,7 +35,7 @@ fn cap_envelope(prior_market: Vec<PriorMarketObject>, dual_curve: bool) -> Calib
                     fixed_kappa: Some(0.0342),
                     initial_kappa: None,
                     initial_sigma: None,
-                    payment_frequency: SwapFrequency::Quarterly,
+                    index_id: "USD-SOFR-3M".into(),
                     volatility_mode: HullWhiteVolatilityMode::Scalar,
                 }),
             }],

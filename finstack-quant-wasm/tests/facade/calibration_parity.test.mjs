@@ -199,6 +199,7 @@ const STEPS = {
       'HWCF',
       'USD-OIS',
       'USD-SOFR-3M',
+      'USD-SOFR-3M',
       'USD',
       BASE,
       undefined,

@@ -1,18 +1,21 @@
 //! Curve transformations and market bumps.
 
 use super::*;
+use crate::dates::DateExt;
 use crate::error::InputError;
 use crate::market_data::bumps::{BumpMode, BumpSpec, BumpType, BumpUnits, Bumpable};
 
 impl ForwardCurve {
     /// Create a builder pre-populated with this curve's data but a new ID.
     pub fn to_builder_with_id(&self, new_id: impl Into<CurveId>) -> ForwardCurveBuilder {
-        self.metadata_builder(new_id).knots(
+        let mut builder = self.metadata_builder(new_id).knots(
             self.knots
                 .iter()
                 .copied()
                 .zip(self.forwards.iter().copied()),
-        )
+        );
+        builder.transform = self.transform.clone();
+        builder
     }
 
     /// Builder pre-populated with this curve's full metadata but **no** knots.
@@ -127,7 +130,7 @@ impl ForwardCurve {
         Ok(bumped)
     }
 
-    /// Apply a bump specification in-place, mutating values and rebuilding the interpolator.
+    /// Apply a continuous rate shock while preserving the source interpolator.
     pub(crate) fn bump_in_place(&mut self, spec: &BumpSpec) -> crate::Result<()> {
         use BumpType;
 
@@ -141,59 +144,52 @@ impl ForwardCurve {
             }
         })?;
 
-        // Clone the value array only, not the whole curve -- the interpolator
-        // rebuild below discards any cloned interpolator anyway. Nothing is
-        // written to `self` until the fallible rebuild succeeds, so failure
-        // atomicity is unchanged.
-        let mut forwards = self.forwards.clone();
-        match spec.bump_type {
-            BumpType::Parallel => {
-                if is_multiplicative {
-                    for fwd in forwards.iter_mut() {
-                        *fwd *= val;
-                    }
-                } else {
-                    for fwd in forwards.iter_mut() {
-                        *fwd += val;
-                    }
-                }
-            }
-            BumpType::TriangularKeyRate {
+        if let BumpType::TriangularKeyRate {
+            prev_bucket,
+            target_bucket,
+            next_bucket,
+        } = spec.bump_type
+        {
+            crate::market_data::term_structures::common::validate_triangular_bucket_grid(
                 prev_bucket,
                 target_bucket,
                 next_bucket,
-            } => {
-                // Reject malformed bucket grids (e.g. infinite sentinels)
-                // before mutating: a non-finite neighbour yields NaN weights
-                // and corrupts the curve.
-                crate::market_data::term_structures::common::validate_triangular_bucket_grid(
-                    prev_bucket,
-                    target_bucket,
-                    next_bucket,
-                )?;
-                for (fwd, &t) in forwards.iter_mut().zip(self.knots.iter()) {
-                    let weight = crate::market_data::term_structures::common::triangular_weight(
-                        t,
-                        prev_bucket,
-                        target_bucket,
-                        next_bucket,
-                    );
-                    if is_multiplicative {
-                        *fwd *= 1.0 + (val - 1.0) * weight;
-                    } else {
-                        *fwd += val * weight;
-                    }
+            )?;
+            if is_multiplicative {
+                return Err(crate::error::InputError::UnsupportedBump {
+                    reason: "ForwardCurve key-rate shocks require additive rate units".into(),
                 }
+                .into());
             }
         }
-        let interp = crate::market_data::term_structures::common::build_interp_allow_any_values(
-            self.interp.style(),
-            self.knots.clone(),
-            forwards.clone(),
-            self.interp.extrapolation(),
-        )?;
+        if (!is_multiplicative && val == 0.0) || (is_multiplicative && val.total_cmp(&1.0).is_eq())
+        {
+            return Ok(());
+        }
+        let mut transform = self
+            .transform
+            .clone()
+            .unwrap_or_else(|| super::evaluation::CurveTransform::from_curve(self));
+        transform.bump(val, is_multiplicative, spec.bump_type)?;
+        let forwards: Box<[f64]> = self
+            .knots
+            .iter()
+            .map(|&time| transform.rate(&self.interp, time))
+            .collect();
+        if forwards.iter().any(|value| !value.is_finite()) {
+            return Err(crate::Error::Validation(
+                "forward-curve shock produced non-finite rates".into(),
+            ));
+        }
+        if let BumpType::TriangularKeyRate { target_bucket, .. } = spec.bump_type {
+            if !transform.rate(&self.interp, target_bucket).is_finite() {
+                return Err(crate::Error::Validation(
+                    "forward-curve shock produced a non-finite peak rate".into(),
+                ));
+            }
+        }
         self.forwards = forwards;
-        self.interp = interp;
+        self.transform = Some(transform);
         Ok(())
     }
 
@@ -233,7 +229,7 @@ impl ForwardCurve {
     /// re-measured from the new base date.
     ///
     /// # Arguments
-    /// * `days` - Number of days to roll forward
+    /// * `days` - Signed calendar-day shift; negative values move the base date backward.
     ///
     /// # Returns
     /// A new forward curve with updated base date and shifted knots.
@@ -265,11 +261,13 @@ impl ForwardCurve {
     /// # Ok(())
     /// # }
     /// ```
+    /// Returns a validation error if the rolled base date exceeds the supported calendar range.
     pub fn roll_forward(&self, days: i64) -> crate::Result<Self> {
-        let new_base = self.base + time::Duration::days(days);
-        let dt_years =
-            self.day_count
-                .year_fraction(self.base, new_base, DayCountContext::default())?;
+        if days == 0 {
+            return Ok(self.clone());
+        }
+        let new_base = self.base.add_days(days)?;
+        let dt_years = super::super::common::year_fraction_to(self.base, new_base, self.day_count)?;
 
         // Preserve the live forward at the new origin. Merely shifting and
         // dropping expired knots loses the interpolation segment containing
@@ -294,11 +292,19 @@ impl ForwardCurve {
             rolled
         });
 
-        self.metadata_builder(self.id.clone())
+        let mut transform = self
+            .transform
+            .clone()
+            .unwrap_or_else(|| super::evaluation::CurveTransform::from_curve(self));
+        transform.offset += dt_years;
+        transform.validate()?;
+        let mut builder = self
+            .metadata_builder(self.id.clone())
             .base_date(new_base)
             .projection_grid_opt(projection_grid)
-            .knots(rolled_points)
-            .build()
+            .knots(rolled_points);
+        builder.transform = Some(transform);
+        builder.build()
     }
 }
 

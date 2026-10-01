@@ -9,7 +9,6 @@
 //! future cash dividends while preserving dates.
 
 use crate::constants::ONE_BASIS_POINT;
-use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::equity::dividend01::dividend01_central_diff;
 use crate::instruments::equity::equity_option::EquityOption;
 use crate::metrics::{MetricCalculator, MetricContext};
@@ -72,7 +71,7 @@ impl MetricCalculator for DividendRiskCalculator {
             bumped.discrete_dividends.retain(|(date, amount)| {
                 *date <= context.as_of || *date > option.expiry || *amount > 0.0
             });
-            Ok(bumped.value(&context.curves, context.as_of)?.amount())
+            context.reprice_instrument_raw(&bumped, &context.curves, context.as_of)
         };
         crate::metrics::scaled_central_diff_by_width(
             price(q_up)?,

@@ -4,11 +4,13 @@
   "ignore_weekends": false,
   "rules": [
     { "type": "fixed", "name": "New Year's Day", "month": "january", "day": 1, "observed": "next_monday" },
-    { "type": "weekday_shift", "name": "Australia Day", "weekday": "monday", "month": "january", "day": 26, "dir": "after" },
+    { "type": "fixed", "name": "Australia Day", "month": "january", "day": 26, "observed": "next_monday" },
     { "type": "easter_offset", "name": "Good Friday", "days": -3 },
     { "type": "easter_offset", "name": "Easter Monday", "days": 0 },
     { "type": "fixed", "name": "ANZAC Day", "month": "april", "day": 25 },
-    { "type": "fixed", "name": "Christmas Day", "month": "december", "day": 25, "observed": "next_monday" },
-    { "type": "fixed", "name": "Boxing Day", "month": "december", "day": 26, "observed": "next_monday" }
-  ]
+    { "type": "nth_weekday", "name": "King's Birthday", "n": 2, "weekday": "monday", "month": "june" },
+    { "type": "fixed", "name": "Christmas Day", "month": "december", "day": 25, "observed": "mon_if_sat_tue_if_sun" },
+    { "type": "fixed", "name": "Boxing Day", "month": "december", "day": 26, "observed": "mon_if_sat_tue_if_sun" }
+  ],
+  "notes": "ASX cash-market trading and CHESS settlement calendar. Early-close sessions remain business days. Annual published-date fixtures cover 2024, 2026 and 2027; recurring rules are not certification of all historical or future exchange notices. <https://www.asx.com.au/markets/market-resources/trading-hours-calendar/cash-market-trading-hours/trading-calendar>"
 }

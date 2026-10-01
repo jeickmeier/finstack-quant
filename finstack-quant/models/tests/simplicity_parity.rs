@@ -165,7 +165,8 @@ fn sample_grid() -> (Vec<f64>, Vec<f64>, Vec<f64>) {
 fn from_grid_opts_default_matches_from_grid() {
     let (exp, strikes, vols) = sample_grid();
     let a = VolSurface::from_grid("S", &exp, &strikes, &vols).unwrap();
-    let b = VolSurface::from_grid_opts("S", &exp, &strikes, &vols, VolGridOpts::default()).unwrap();
+    let b = VolSurface::from_grid_opts("S", &exp, &strikes, &vols, VolGridOpts::default(), None)
+        .unwrap();
 
     for &e in &exp {
         for &k in &strikes {
@@ -202,6 +203,7 @@ fn vol_surface_builder_matches_grid_constructor() {
             quote_type: VolQuoteType::Normal,
             interpolation_mode: VolInterpolationMode::TotalVariance,
         },
+        None,
     )
     .expect("direct surface");
 
@@ -235,6 +237,7 @@ fn from_grid_opts_preserves_axis_and_interpolation_mode() {
             quote_type: VolQuoteType::Normal,
             interpolation_mode: VolInterpolationMode::TotalVariance,
         },
+        None,
     )
     .unwrap();
 

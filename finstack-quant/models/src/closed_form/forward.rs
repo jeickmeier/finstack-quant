@@ -166,6 +166,8 @@ fn validate_black_shifted(
             ("vol", vol),
             ("expiry", expiry),
             ("shift", shift),
+            ("forward + shift", forward + shift),
+            ("strike + shift", strike + shift),
         ],
     )?;
     require_positive(MODEL, "forward + shift", forward + shift)?;
@@ -508,5 +510,72 @@ mod tests {
         assert!(black_shifted_price(-0.005, 0.01, 0.25, 1.0, 0.004, OptionType::Put).is_err());
         assert!(black_shifted_vega(0.01, -0.02, 0.25, 1.0, 0.01).is_err());
         assert!(black_shifted_vega(-0.005, -0.005, 0.25, 1.0, 0.03).unwrap() > 0.0);
+    }
+
+    #[test]
+    fn checked_forward_models_reject_bad_data_before_intrinsic_branches() {
+        for expiry in [0.0, 1.0] {
+            for vol in [0.0, 0.2] {
+                for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+                    assert!(
+                        black76_price(invalid, 100.0, 1.0, expiry, vol, OptionType::Call).is_err()
+                    );
+                    assert!(
+                        black76_price(100.0, invalid, 1.0, expiry, vol, OptionType::Call).is_err()
+                    );
+                    assert!(black76_greeks(invalid, 100.0, expiry, vol, OptionType::Call).is_err());
+                    assert!(
+                        bachelier_price(invalid, 100.0, vol, expiry, OptionType::Call).is_err()
+                    );
+                    assert!(
+                        bachelier_greeks(100.0, invalid, vol, expiry, OptionType::Call).is_err()
+                    );
+                    assert!(black_shifted_price(
+                        0.02,
+                        0.03,
+                        vol,
+                        expiry,
+                        invalid,
+                        OptionType::Call
+                    )
+                    .is_err());
+                    assert!(black_shifted_vega(0.02, 0.03, vol, expiry, invalid).is_err());
+                }
+            }
+        }
+        assert!(black76_price(100.0, 100.0, -1.0, 1.0, 0.2, OptionType::Call).is_err());
+        assert!(black76_price(-0.01, 0.01, 1.0, 1.0, 0.2, OptionType::Put).is_err());
+        assert!(black76_greeks(100.0, 100.0, 1.0, -0.2, OptionType::Call).is_err());
+        assert!(bachelier_price(0.03, 0.03, -0.01, 1.0, OptionType::Call).is_err());
+        assert!(bachelier_greeks(0.03, 0.03, 0.01, -1.0, OptionType::Call).is_err());
+        assert!(black_shifted_price(-0.04, -0.02, 0.0, 0.0, 0.03, OptionType::Call).is_err());
+        assert!(black_shifted_vega(f64::MAX, 1.0, 0.0, 0.0, f64::MAX).is_err());
+    }
+
+    #[test]
+    fn checked_forward_models_preserve_valid_boundaries_and_negative_normal_rates() {
+        assert_eq!(
+            black76_price(110.0, 100.0, 0.95, 1.0, 0.0, OptionType::Call).unwrap(),
+            9.5
+        );
+        assert_eq!(
+            black76_price(110.0, 100.0, 0.95, 0.0, 0.2, OptionType::Put).unwrap(),
+            0.0
+        );
+        let call = bachelier_price(-0.02, -0.03, 0.01, 2.0, OptionType::Call).unwrap();
+        let put = bachelier_price(-0.02, -0.03, 0.01, 2.0, OptionType::Put).unwrap();
+        assert!((call - put - 0.01).abs() < 1e-14);
+        let greeks = black76_greeks(110.0, 100.0, 0.0, 0.2, OptionType::Call).unwrap();
+        assert_eq!(
+            greeks,
+            ForwardGreeks {
+                delta: 1.0,
+                gamma: 0.0,
+                vega: 0.0
+            }
+        );
+        assert!(
+            black_shifted_price(-0.01, -0.005, 0.2, 1.0, 0.03, OptionType::Call).unwrap() > 0.0
+        );
     }
 }

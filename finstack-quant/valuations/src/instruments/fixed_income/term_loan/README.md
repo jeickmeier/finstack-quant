@@ -129,6 +129,13 @@ date, where a quoted price applies.
 **Call settlement**: hard/soft calls redeem dirty — clean strike times
 pre-exercise outstanding plus cash accrued at the exercise step. Coupon-date
 accrued is zero, so the coupon booked in the schedule is not double-counted.
+Make-whole calls use the reference-curve PV of remaining cashflows plus the
+configured continuously compounded spread, subject to the clean call-price
+floor. Accrued cash interest is included exactly once. The tree and YTC/YTW
+use the same redemption rule. The tree supports these calls with zero rate
+volatility; positive rate volatility is rejected because an exercise-date
+reference-curve process is not modeled. Make-whole provisions are not removed
+from the call schedule.
 
 **Floating + rates-only tree**: a positive `hw1f_sigma` without
 `credit_curve_id` is rejected. An unset volatility uses a frozen projection;

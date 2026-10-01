@@ -253,10 +253,11 @@ impl JsFinstackConfig {
     /// # Arguments
     ///
     /// * `currency` - ISO-4217 alphabetic code, such as `"JPY"`.
-    /// * `scale` - Number of decimal places, a non-negative integer.
+    /// * `scale` - Number of decimal places, an integer in `0..=28`.
     ///
     /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-    /// `validation`) if `currency` is not a supported currency code.
+    /// `validation`) if `currency` is not a supported currency code or `scale`
+    /// exceeds 28.
     #[wasm_bindgen(js_name = setOutputScale)]
     pub fn set_output_scale(&mut self, currency: JsValue, scale: JsValue) -> Result<(), JsValue> {
         let currency = currency_arg(&currency, "currency")?;
@@ -264,9 +265,8 @@ impl JsFinstackConfig {
         self.inner
             .rounding
             .output_scale
-            .overrides
-            .insert(currency, scale);
-        Ok(())
+            .set_scale(currency, scale)
+            .map_err(to_js_err)
     }
 
     /// Override the ingest decimal places of one currency.
@@ -274,10 +274,11 @@ impl JsFinstackConfig {
     /// # Arguments
     ///
     /// * `currency` - ISO-4217 alphabetic code, such as `"JPY"`.
-    /// * `scale` - Number of decimal places, a non-negative integer.
+    /// * `scale` - Number of decimal places, an integer in `0..=28`.
     ///
     /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-    /// `validation`) if `currency` is not a supported currency code.
+    /// `validation`) if `currency` is not a supported currency code or `scale`
+    /// exceeds 28.
     #[wasm_bindgen(js_name = setIngestScale)]
     pub fn set_ingest_scale(&mut self, currency: JsValue, scale: JsValue) -> Result<(), JsValue> {
         let currency = currency_arg(&currency, "currency")?;
@@ -285,9 +286,8 @@ impl JsFinstackConfig {
         self.inner
             .rounding
             .ingest_scale
-            .overrides
-            .insert(currency, scale);
-        Ok(())
+            .set_scale(currency, scale)
+            .map_err(to_js_err)
     }
 
     /// Per-currency output-scale overrides.
@@ -297,7 +297,7 @@ impl JsFinstackConfig {
     /// @throws If the map cannot be converted (not expected).
     #[wasm_bindgen(js_name = outputScaleOverrides)]
     pub fn output_scale_overrides(&self) -> Result<JsValue, JsValue> {
-        scale_overrides(&self.inner.rounding.output_scale.overrides)
+        scale_overrides(&self.inner.rounding.output_scale.get_overrides())
     }
 
     /// Per-currency ingest-scale overrides.
@@ -307,7 +307,7 @@ impl JsFinstackConfig {
     /// @throws If the map cannot be converted (not expected).
     #[wasm_bindgen(js_name = ingestScaleOverrides)]
     pub fn ingest_scale_overrides(&self) -> Result<JsValue, JsValue> {
-        scale_overrides(&self.inner.rounding.ingest_scale.overrides)
+        scale_overrides(&self.inner.rounding.ingest_scale.get_overrides())
     }
 
     /// Store a versioned extension section (Rust `ConfigExtensions::insert`).

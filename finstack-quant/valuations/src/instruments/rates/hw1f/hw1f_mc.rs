@@ -8,7 +8,8 @@
 //!
 //! The pricer handles: time-grid construction aligned to event dates,
 //! HW1F process + exact discretization, RNG streams with antithetic
-//! variates, and cross-path averaging with 95% CIs.
+//! variates, and cross-path averaging with Student-t 95% CIs based on at least
+//! two independent pricing estimators.
 //!
 //! At every step the pricer also accumulates the pathwise money-market
 //! numeraire `B(t) = exp(∫₀ᵗ r ds)` (trapezoidal rule, see
@@ -61,15 +62,33 @@ impl RateExoticHw1fMcPricer {
     /// Run the simulation, invoking `payoff_factory` once per path to obtain a
     /// fresh payoff accumulator.
     ///
+    /// # Arguments
+    ///
+    /// * `payoff_factory` - Creates a fresh payoff accumulator for each simulated
+    ///   path, including a separate accumulator for each antithetic leg.
+    ///
     /// # Errors
     ///
     /// Returns a validation error if `event_times` is empty or is not strictly
-    /// increasing and positive, or if the internal time grid cannot be built.
+    /// increasing and positive, if fewer than two independent pricing
+    /// estimators remain after any split-sample partition, or if the internal
+    /// time grid cannot be built.
     pub fn price<F, P>(&self, payoff_factory: F) -> Result<MoneyEstimate>
     where
         F: Fn() -> P + Sync,
         P: Payoff + 'static,
     {
+        let pricing_estimators = if self.config.oos_lsmc {
+            self.config.num_paths / 2
+        } else {
+            self.config.num_paths
+        };
+        if pricing_estimators < 2 {
+            return Err(finstack_quant_core::Error::Validation(
+                "HW1F Monte Carlo pricing requires at least 2 independent pricing estimators"
+                    .into(),
+            ));
+        }
         let Some(&maturity) = self.event_times.last() else {
             return Err(finstack_quant_core::Error::Validation(
                 "RateExoticHw1fMcPricer requires at least one event time".into(),
@@ -166,6 +185,21 @@ impl RateExoticHw1fMcPricer {
 /// contributes to the estimate. `scale` multiplies every sample (e.g. the
 /// terminal-measure `P(0, T_N)` of the LMM engine); pass `1.0` when the values
 /// are already time-0 present values.
+///
+/// # Arguments
+///
+/// * `path_values` - Complete scalar paths or adjacent antithetic pairs, in
+///   `currency` units before applying `scale`.
+/// * `split` - Paths per independent estimator and the training/pricing
+///   partition; only complete pricing estimators enter the sample statistics.
+/// * `scale` - Multiplier converting each path value to its reported PV units.
+/// * `currency` - Currency attached to the resulting mean and confidence bounds.
+///
+/// # Errors
+///
+/// Returns a validation error for incomplete path groups or fewer than two
+/// independent pricing estimators. The 95% mean interval uses Student-t
+/// critical values with one fewer degree of freedom than the estimator count.
 pub(crate) fn money_estimate_from_pairs(
     path_values: &[f64],
     split: SampleSplit,
@@ -173,6 +207,11 @@ pub(crate) fn money_estimate_from_pairs(
     currency: Currency,
 ) -> finstack_quant_core::Result<MoneyEstimate> {
     let multiplicity = split.multiplicity;
+    if !matches!(multiplicity, 1 | 2) || !path_values.len().is_multiple_of(multiplicity) {
+        return Err(finstack_quant_core::Error::Validation(
+            "Monte Carlo estimates require complete scalar paths or antithetic pairs".into(),
+        ));
+    }
     let mut stats = OnlineStats::new();
     for (pair_idx, chunk) in path_values.chunks(multiplicity).enumerate() {
         if !split.is_price(pair_idx * multiplicity) {
@@ -182,12 +221,15 @@ pub(crate) fn money_estimate_from_pairs(
         stats.update(pair_avg * scale);
     }
 
-    let n = stats.count().max(1) as f64;
     let estimators = stats.count();
+    if estimators < 2 {
+        return Err(finstack_quant_core::Error::Validation(
+            "Monte Carlo estimates require at least 2 independent pricing estimators".into(),
+        ));
+    }
     let mean = stats.mean();
-    let stderr = stats.std_dev() / n.sqrt();
-    let lo = mean - 1.96 * stderr;
-    let hi = mean + 1.96 * stderr;
+    let stderr = stats.stderr();
+    let (lo, hi) = stats.confidence_interval(0.05);
     Ok(MoneyEstimate {
         mean: finstack_quant_core::money::Money::new(mean, currency)?,
         stderr,
@@ -301,6 +343,75 @@ mod tests {
         }
         fn reset(&mut self) {
             self.pv = 0.0;
+        }
+    }
+
+    #[test]
+    fn pair_estimate_requires_two_complete_pricing_estimators() {
+        for (values, multiplicity, oos_lsmc) in [
+            (vec![], 1, false),
+            (vec![1.0], 1, false),
+            (vec![0.0, 2.0], 2, false),
+            (vec![0.0, 2.0, 3.0], 2, false),
+            (vec![0.0, 2.0, 2.0, 4.0], 2, true),
+        ] {
+            let split = SampleSplit {
+                multiplicity,
+                oos_lsmc,
+            };
+            assert!(money_estimate_from_pairs(&values, split, 1.0, Currency::USD).is_err());
+        }
+    }
+
+    #[test]
+    fn pair_estimate_uses_sample_stderr_and_student_t_interval() {
+        // Both inputs represent the same two independent observations: 1 and 3.
+        // Their mean is 2, sample variance is 2, and mean standard error is 1.
+        for (values, multiplicity) in [(vec![1.0, 3.0], 1), (vec![0.0, 2.0, 2.0, 4.0], 2)] {
+            let estimate = money_estimate_from_pairs(
+                &values,
+                SampleSplit {
+                    multiplicity,
+                    oos_lsmc: false,
+                },
+                1.0,
+                Currency::USD,
+            )
+            .expect("two complete estimators");
+            assert!((estimate.mean.amount() - 2.0).abs() < 1e-12);
+            assert!((estimate.stderr - 1.0).abs() < 1e-12);
+            let margin = 12.706_204_736_174_7; // t(1) 97.5th percentile
+            assert!((estimate.ci_95.0.amount() - (2.0 - margin)).abs() < 1e-7);
+            assert!((estimate.ci_95.1.amount() - (2.0 + margin)).abs() < 1e-7);
+            assert_eq!(estimate.num_paths, 2);
+            assert_eq!(estimate.num_simulated_paths, values.len());
+        }
+    }
+
+    #[test]
+    fn singleton_hw1f_run_is_rejected_before_simulation() {
+        for (num_paths, antithetic, oos_lsmc) in [
+            (0, false, false),
+            (1, false, false),
+            (1, true, false),
+            (3, true, true),
+        ] {
+            let pricer = RateExoticHw1fMcPricer {
+                process_params: HullWhite1FParams::new(0.05, 0.01, 0.03)
+                    .expect("valid Hull-White parameters"),
+                r0: 0.03,
+                event_times: vec![1.0],
+                config: RateExoticMcConfig {
+                    num_paths,
+                    antithetic,
+                    oos_lsmc,
+                    ..Default::default()
+                },
+                currency: Currency::USD,
+            };
+            assert!(pricer
+                .price(|| -> ZcbPayoff { panic!("invalid run must not create a payoff") })
+                .is_err());
         }
     }
 

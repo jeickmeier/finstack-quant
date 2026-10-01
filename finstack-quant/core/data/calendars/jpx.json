@@ -3,25 +3,9 @@
   "name": "Japan Exchange Group (JPX) Holidays",
   "ignore_weekends": false,
   "rules": [
-    { "type": "fixed", "name": "Exchange Holiday", "month": "december", "day": 31 },
-    { "type": "fixed", "name": "Ganjitsu (New Year's Day)", "month": "january", "day": 1 },
+    { "type": "japan_public_holidays", "name": "National holidays, Sunday substitutes and citizens' holidays" },
     { "type": "fixed", "name": "New Year Holiday", "month": "january", "day": 2 },
     { "type": "fixed", "name": "New Year Holiday", "month": "january", "day": 3 },
-    { "type": "fixed", "name": "Ganjitsu Observed", "month": "january", "day": 1, "observed": "next_monday" },
-    { "type": "nth_weekday", "name": "Coming of Age Day", "n": 2, "weekday": "monday", "month": "january" },
-    { "type": "nth_weekday", "name": "Marine Day", "n": 3, "weekday": "monday", "month": "july" },
-    { "type": "nth_weekday", "name": "Respect for the Aged Day", "n": 3, "weekday": "monday", "month": "september" },
-    { "type": "nth_weekday", "name": "Sports Day", "n": 2, "weekday": "monday", "month": "october" },
-    { "type": "fixed", "name": "National Foundation Day", "month": "february", "day": 11, "observed": "fri_if_sat_mon_if_sun" },
-    { "type": "fixed", "name": "Emperor's Birthday", "month": "february", "day": 23, "observed": "fri_if_sat_mon_if_sun" },
-    { "type": "fixed", "name": "Shōwa Day", "month": "april", "day": 29, "observed": "fri_if_sat_mon_if_sun" },
-    { "type": "fixed", "name": "Constitution Memorial Day", "month": "may", "day": 3, "observed": "fri_if_sat_mon_if_sun" },
-    { "type": "fixed", "name": "Greenery Day", "month": "may", "day": 4, "observed": "fri_if_sat_mon_if_sun" },
-    { "type": "fixed", "name": "Children's Day", "month": "may", "day": 5, "observed": "fri_if_sat_mon_if_sun" },
-    { "type": "fixed", "name": "Mountain Day", "month": "august", "day": 11, "observed": "fri_if_sat_mon_if_sun" },
-    { "type": "fixed", "name": "Culture Day", "month": "november", "day": 3, "observed": "fri_if_sat_mon_if_sun" },
-    { "type": "fixed", "name": "Labour Thanksgiving Day", "month": "november", "day": 23, "observed": "fri_if_sat_mon_if_sun" },
-    { "type": "vernal_equinox_jp", "name": "Vernal Equinox Day" },
-    { "type": "autumnal_equinox_jp", "name": "Autumnal Equinox Day" }
+    { "type": "fixed", "name": "Bank and Exchange Holiday", "month": "december", "day": 31 }
   ]
 }

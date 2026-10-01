@@ -37,10 +37,18 @@ fn credit_workflow_maps_migration_and_loss_modules_together() {
     let generator = GeneratorMatrix::from_transition_matrix(&annual).unwrap();
     let half_year = projection::project(&generator, 0.5).unwrap();
 
-    // Cumulative default probability over one year, built from two projected
-    // half-year steps: P(default by 1y) = 1 - P(survive both half-years).
+    // Propagate all surviving rating states across both half-year periods.
     let pd_half = half_year.probability("BBB", "D").unwrap();
-    let pd_1y = 1.0 - (1.0 - pd_half).powi(2);
+    let pd_1y = half_year
+        .compose(&half_year)
+        .unwrap()
+        .probability("BBB", "D")
+        .unwrap();
+    let direct_pd = projection::project(&generator, 1.0)
+        .unwrap()
+        .probability("BBB", "D")
+        .unwrap();
+    assert!((pd_1y - direct_pd).abs() < 1e-12);
     assert!(pd_1y > 0.0);
     assert!(pd_1y > pd_half, "one-year PD must exceed the half-year PD");
 

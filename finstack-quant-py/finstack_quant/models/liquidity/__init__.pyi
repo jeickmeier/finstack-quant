@@ -1353,7 +1353,8 @@ class AlmgrenChrissModel:
         Raises
         ------
         ValueError
-            If the payload is malformed.
+            If the payload is malformed or the impact parameters violate the
+            constructor's finiteness and range requirements.
 
         Examples
         --------
@@ -1546,7 +1547,7 @@ class KyleLambdaModel:
         Raises
         ------
         ValueError
-            If the payload is malformed.
+            If the payload is malformed or ``lambda`` is negative or non-finite.
 
         Examples
         --------

@@ -10,7 +10,7 @@
         },
         {
           "const": "compounded",
-          "description": "Compounded accrual.\n\n`Accrued = N × expm1(f × ln1p(r))`\n\nwhich is the numerically stable form of\n`N × [(1 + r)^f − 1]`, where `r = coupon_amount / notional`\nand `f = elapsed / period` (time fraction within the current\ncoupon period).\n\n**Note:** ICMA Rule 251.1 prescribes *linear* accrual for bond\nAI calculations. This variant uses true exponential compounding\nand should not be cited as ICMA-style. It is intended for\ninstruments that genuinely compound within a coupon period\n(e.g. some leveraged loans).\n\n**Ex-coupon window convention:** inside an ex-coupon window the\naccrued interest is the negative rebate of the *remaining* stub,\ncompounded on the same basis:\n\n`Accrued = −N × expm1((1 − f) × ln1p(r))`\n\nwhere `f = elapsed / period`. ICMA Rule 251.1 (and the UK DMO\ngilt convention) prescribe a *linear* ex-coupon rebate\n(`−C × (1 − f)`); use [`AccrualMethod::Linear`] for those markets.",
+          "description": "Compounded accrual.\n\n`Accrued = N × expm1(f × ln1p(r))`\n\nwhich is the numerically stable form of\n`N × [(1 + r)^f − 1]`, where `r = coupon_amount / notional`\nand `f = elapsed / period` (time fraction within the current\ncoupon period).\n\nThe period rate must be finite and greater than `-1`; valid negative\nrates in `(-1, 0)` remain supported.\n\n**Note:** ICMA Rule 251.1 prescribes *linear* accrual for bond\nAI calculations. This variant uses true exponential compounding\nand should not be cited as ICMA-style. It is intended for\ninstruments that genuinely compound within a coupon period\n(e.g. some leveraged loans).\n\n**Ex-coupon window convention:** inside an ex-coupon window the\naccrued interest is the negative rebate of the *remaining* stub,\ncompounded on the same basis:\n\n`Accrued = −N × expm1((1 − f) × ln1p(r))`\n\nwhere `f = elapsed / period`. ICMA Rule 251.1 (and the UK DMO\ngilt convention) prescribe a *linear* ex-coupon rebate\n(`−C × (1 − f)`); use [`AccrualMethod::Linear`] for those markets.",
           "type": "string"
         }
       ]
@@ -616,7 +616,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Explicit schedule of remaining principal amounts after given dates.\nEach pair stores `(date, remaining_principal_after_date)`.",
+          "description": "Explicit schedule of remaining principal amounts after given economic dates.\nTargets include PIK capitalized and principal events effective on that date.\nA target may exceed initial or earlier remaining principal when funded by\nintervening draws or PIK, but must not exceed the live balance on its date.\nEach pair stores `(date, remaining_principal_after_date)`.",
           "properties": {
             "step_remaining": {
               "additionalProperties": false,
@@ -700,18 +700,18 @@
         },
         {
           "additionalProperties": false,
-          "description": "Equal principal installments on every payment date in `(start, end]`,\nrepaying the outstanding principal in full by `end`.",
+          "description": "Equal principal installments on coupon accrual boundaries in `(start, end]`.\nThe installment is fixed from outstanding after all start-date movements,\nincluding PIK and explicit principal events. The final installment pays\nthe live remaining balance, including subsequent PIK or principal changes.\nPrincipal changes economically on each accrual boundary; cash settles on\nthat coupon's adjusted, lagged payment date.",
           "properties": {
             "linear_between": {
               "additionalProperties": false,
               "properties": {
                 "end": {
                   "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-                  "description": "Amortization end (full repayment), on or before maturity."
+                  "description": "Economic end of amortization (full repayment), which must be an\nactual coupon accrual boundary on or before the effective terminal\naccrual date. Cash settlement may follow this date due to payment lag."
                 },
                 "start": {
                   "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-                  "description": "Amortization start; installments fall on payment dates strictly\nafter it."
+                  "description": "Economic amortization start, on or after issue; installments fall\non coupon accrual boundaries strictly after it."
                 }
               },
               "required": [
@@ -728,7 +728,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Custom principal exchanges on specific dates (absolute cash amounts).\nPositive amounts reduce outstanding (i.e., principal paid by issuer).",
+          "description": "Custom principal exchanges on specific dates (absolute cash amounts).\nPositive amounts reduce outstanding (i.e., principal paid by issuer).\nEach payment must be covered by the live balance, including prior draws\nand PIK. Lifetime repayments may therefore exceed initial principal.",
           "properties": {
             "custom_principal": {
               "additionalProperties": false,
@@ -3648,7 +3648,7 @@
           "description": "Explicit change in outstanding principal, in the cashflow currency.\nPositive increases outstanding. When absent, the flow kind and amount\ndetermine the balance movement. Initial funding remains represented by\nthe schedule's initial notional rather than being counted twice."
         },
         "rate": {
-          "description": "Effective rate used to calculate this cashflow (None if not rate-based or unknown).\n\nFor interest/fees: the annual rate used in the calculation\nFor notional/amortization/PIK: typically None\n\nThis is stored at cashflow creation time when available.\nFor instruments with intra-period events (e.g., revolving credit with draws/repays),\nthis may represent a time-weighted average rate across sub-periods.",
+          "description": "Effective rate used to calculate this cashflow (None if not rate-based or unknown).\n\nFor interest/fees: the annual rate used in the calculation\nFor notional/amortization/PIK: typically None\n\nThis is stored at cashflow creation time when available.\nFor instruments with intra-period events (e.g., revolving credit with draws/repays),\nthis may represent a time-weighted average rate across sub-periods.\nSerialization rejects non-finite rates instead of encoding them as absent.",
           "format": "double",
           "type": [
             "number",
@@ -3688,7 +3688,7 @@
           ]
         },
         "coupon_period": {
-          "description": "Regular reference coupon period for ACT/ACT ICMA, including stub accrual.\n`None` leaves reference-period selection to the schedule accrual caller.",
+          "description": "Unadjusted regular reference coupon period for ACT/ACT ICMA, or the\nactual full contractual coupon period for ACT/365L, including when\nthis flow represents only a rate or balance subinterval.\nACT/365L metadata must retain these boundaries to select the original\ncoupon's denominator; other conventions may leave this field `None`.",
           "maxItems": 2,
           "minItems": 2,
           "prefixItems": [
@@ -3718,7 +3718,7 @@
           "type": "boolean"
         },
         "projected_index_rate": {
-          "description": "Projected index rate before spread, gearing, caps, or floors.",
+          "description": "Projected index rate before spread, gearing, caps, or floors.\nSerialization rejects non-finite rates instead of encoding them as absent.",
           "format": "double",
           "type": [
             "number",
@@ -4617,7 +4617,7 @@
         },
         {
           "const": "bloomberg_cdsw_clean",
-          "description": "Bloomberg CDSW clean principal presentation and premium-leg policy.\n\nThis is the industry-standard convention used by Bloomberg CDSW and\nthe ISDA Standard Upfront Model. It is the default for new\n`CreditDefaultSwap` instances:\n\n- Premium cashflows accrue between business-day-adjusted dates that\n  match the Bloomberg CDSW cashflow schedule.\n- The final coupon period is inclusive of the maturity date (extra\n  day) per CDSW convention.\n- The reported NPV is the clean principal value (Bloomberg\n  \"Principal\" line). Cash settlement is `Principal + Accrued`.\n- Par spread uses the risky annuity denominator (matches the CDSW\n  screen for investment-grade credits).\n- Hazard rebootstrap inside risk metrics (CS01, recovery01, etc.)\n  inherits the same CDSW pricer convention so sensitivities are\n  self-consistent with the base PV.",
+          "description": "Bloomberg CDSW clean principal presentation and premium-leg policy.\n\nThis is the industry-standard convention used by Bloomberg CDSW and\nthe ISDA Standard Upfront Model. It is the default for new\n`CreditDefaultSwap` instances:\n\n- Intermediate premium cashflows accrue between business-day-adjusted\n  dates. Final accrual ends on unadjusted maturity; the final payment\n  follows the business-day convention independently.\n- The final coupon period is inclusive of the maturity date (extra\n  day) per CDSW convention.\n- The reported NPV is the clean principal value (Bloomberg\n  \"Principal\" line). Cash settlement is `Principal + Accrued`.\n- Par spread uses the risky annuity denominator (matches the CDSW\n  screen for investment-grade credits).\n- Hazard rebootstrap inside risk metrics (CS01, recovery01, etc.)\n  inherits the same CDSW pricer convention so sensitivities are\n  self-consistent with the base PV.",
           "type": "string"
         },
         {
@@ -4642,7 +4642,7 @@
         },
         {
           "const": "periodic",
-          "description": "Settle periodically (quarterly/annually)",
+          "description": "Settle at configured period ends before subsequent distributions.\nEuropean settlements update fund allocation balances. American settlements\nstay at fund level and do not rewrite individual deal entitlements.",
           "type": "string"
         }
       ]
@@ -4991,7 +4991,7 @@
       "description": "CMS option instrument (cap/floor on CMS rates).",
       "properties": {
         "accrual_fractions": {
-          "description": "Accrual fractions for each period",
+          "description": "Finite nonnegative accrual fractions for each period; zero gives a zero coupon.",
           "items": {
             "format": "double",
             "type": "number"
@@ -5039,7 +5039,7 @@
               "type": "null"
             }
           ],
-          "description": "Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`).\n\nWhen set, provides default values for `swap_fixed_frequency`, `swap_float_frequency`,\n`swap_fixed_day_count`, and `swap_float_day_count`. Individual fields still\noverride the convention when explicitly set."
+          "description": "Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`).\n\nWhen set, provides default values for `swap_fixed_frequency`, `swap_float_frequency`,\n`swap_fixed_day_count`, and `swap_float_day_count`. Individual fields still\noverride the convention when explicitly set. Required for USD CMS."
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
@@ -5139,7 +5139,7 @@
     },
     "CmsSpreadOption": {
       "additionalProperties": false,
-      "description": "CMS Spread Option.\n\nOption on the spread between two CMS rates of different tenors.\n\n```text\nPayoff = max(CMS_long - CMS_short - strike, 0) * notional    [for a call]\nPayoff = max(strike - (CMS_long - CMS_short), 0) * notional   [for a put]\n```\n\nTypically: long tenor = 10Y or 30Y CMS, short tenor = 2Y CMS.\n\n# Pricing Approach\n\n1. Each CMS rate has SABR marginal distribution (reuses CMS option SABR calibration)\n2. Joint distribution via Gaussian copula with rank correlation\n3. CMS convexity adjustment applied to each leg via static replication\n\n# References\n\n- Hagan, P. S. (2003). \"Convexity Conundrums.\" *Wilmott Magazine*. `docs/REFERENCES.md#hagan-2003-cms-convexity`\n- Antonov, A., Konikov, M., & Spector, M. (2013). \"SABR Spreads.\" *Risk*. `docs/REFERENCES.md#hagan-2002-sabr`",
+      "description": "CMS Spread Option.\n\nOption on the spread between two CMS rates of different tenors.\n\n```text\nPayoff = max(CMS_long - CMS_short - strike, 0) * notional    [for a call]\nPayoff = max(strike - (CMS_long - CMS_short), 0) * notional   [for a put]\n```\n\nTypically: long tenor = 10Y or 30Y CMS, short tenor = 2Y CMS.\n\n# Pricing Approach\n\n1. Each CMS rate has a lognormal payment-measure marginal from a flat-strike\n   Black volatility surface (or a tenor-axis ATM surface).\n2. A Gaussian copula couples the two rates.\n3. The shared first-order CMS convexity approximation sets each marginal mean.\n\nNonflat smiles and SABR cubes are unsupported and return a validation error.\nThe registered `StaticReplication` model key selects this approximation;\nit does not implement SABR smile replication.\n\n# References\n\n- Hagan, P. S. (2003). \"Convexity Conundrums.\" *Wilmott Magazine*. `docs/REFERENCES.md#hagan-2003-cms-convexity`\n- Antonov, A., Konikov, M., & Spector, M. (2013). \"SABR Spreads.\" *Risk*. `docs/REFERENCES.md#hagan-2002-sabr`",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -5178,7 +5178,7 @@
               "type": "null"
             }
           ],
-          "description": "Rate-index convention-registry key of the underlying CMS swaps (e.g. `EUR-ESTR-OIS`).\n\nWhen set, provides default values for the fixed/float frequency and\nday count. Individual fields still override the convention when set."
+          "description": "Rate-index convention-registry key of the underlying CMS swaps (e.g. `EUR-ESTR-OIS`).\n\nRequired for USD CMS; other supported currencies use their registered\novernight-index default when omitted. Supplies calendar, settlement lag\nand default leg conventions. Individual leg fields override the index."
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
@@ -5190,7 +5190,7 @@
         },
         "long_vol_surface_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Swaption volatility surface for long tenor."
+          "description": "Black swaption volatility surface for the long tenor. The selected\nexpiry slice must be flat across strikes; tenor-axis ATM surfaces are valid."
         },
         "metric_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
@@ -5218,7 +5218,7 @@
         },
         "short_vol_surface_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Swaption volatility surface for short tenor."
+          "description": "Black swaption volatility surface for the short tenor, subject to the\nsame flat-strike restriction as the long-tenor surface."
         },
         "strike": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
@@ -5366,7 +5366,7 @@
               "type": "null"
             }
           ],
-          "description": "Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`)."
+          "description": "Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`).\nRequired for USD CMS; legacy contracts must name their legacy index explicitly."
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
@@ -6165,7 +6165,7 @@
     },
     "CommodityOption": {
       "additionalProperties": false,
-      "description": "Commodity option (option on commodity forward or spot).\n\n# Pricing\n\n- **European options**: Black-76 model using the forward price from the `PriceCurve`\n- **American options**: Binomial tree (Leisen-Reimer) with cost-of-carry derived from\n  the forward/spot relationship\n\n# American Option Assumptions\n\nFor American exercise, the model requires a spot price to build the binomial tree.\nIf `spot_id` is provided, it uses that spot price. Otherwise, the forward\nprice is used as a proxy for spot, which may underestimate early exercise value.\nThe convenience yield (cost-of-carry) is implied from the forward/spot ratio:\n`q = r - ln(F/S)/T`\n\nBermudan exercise uses the configured exercise schedule and a binomial\ntree. The schedule must contain at least one strictly future date when the\noption is priced before expiry.\n\n# Forward Price Retrieval\n\nForward prices are retrieved from a `PriceCurve` (not a `ForwardCurve`).\nThe curve must be added via `MarketContext::insert_price_curve()`.\nIf `quoted_forward` is provided, it overrides the curve lookup.",
+      "description": "Commodity option (option on commodity forward or spot).\n\n# Pricing\n\n- **European options**: Black-76 model using the forward price from the `PriceCurve`\n- **American options**: Binomial tree (Leisen-Reimer) with cost-of-carry derived from\n  the forward/spot relationship\n\nAnalytical delta measures currency per unit change in the resolved forward,\nholding discount factors and volatility fixed. At zero volatility or expiry,\nthe intrinsic-payoff derivative is used; delta is defined as zero exactly at\nthe strike, where the mathematical derivative does not exist.\n\n# American Option Assumptions\n\nFor American exercise, the model requires a spot price to build the binomial tree.\nIf `spot_id` is provided, it uses that spot price. Otherwise, the forward\nprice is used as a proxy for spot, which may underestimate early exercise value.\nThe convenience yield (cost-of-carry) is implied from the forward/spot ratio:\n`q = r - ln(F/S)/T`\n\nBermudan exercise uses the configured exercise schedule and a binomial\ntree. The schedule must contain at least one strictly future date when the\noption is priced before expiry.\n\n# Forward Price Retrieval\n\nForward prices are retrieved from a `PriceCurve` (not a `ForwardCurve`).\nThe curve must be added via `MarketContext::insert_price_curve()`.\nIf `quoted_forward` is provided, it overrides the curve lookup.",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -6547,7 +6547,7 @@
     },
     "CommoditySwaption": {
       "additionalProperties": false,
-      "description": "Commodity swaption (option on a fixed-for-floating commodity swap).\n\nThe holder has the right to enter a commodity swap at expiry, paying\n(or receiving) a fixed price in exchange for floating commodity prices.\n\n# Pricing\n\nBlack-76 model on the forward swap rate:\n- Forward swap rate is the weighted average of forward commodity prices\n  over the swap period\n- Annuity factor captures the present value of a unit payment stream\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::commodity::commodity_swaption::CommoditySwaption;\nuse finstack_quant_valuations::instruments::CommodityUnderlyingParams;\nuse finstack_quant_valuations::instruments::OptionType;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::{Date, Tenor, TenorUnit};\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet swaption = CommoditySwaption::builder()\n    .id(InstrumentId::new(\"NG-SWAPTION-2025\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"NG\", \"MMBTU\", Currency::USD))\n    .option_type(OptionType::Call)\n    .expiry(Date::from_calendar_date(2025, Month::June, 15).unwrap())\n    .underlying_start_date(Date::from_calendar_date(2025, Month::July, 1).unwrap())\n    .underlying_maturity(Date::from_calendar_date(2026, Month::June, 30).unwrap())\n    .swap_frequency(Tenor::new(1, TenorUnit::Months).expect(\"valid tenor fixture\"))\n    .fixed_price(3.50)\n    .quantity(10000.0)\n    .forward_curve_id(CurveId::new(\"NG-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .vol_surface_id(CurveId::new(\"NG-VOL\"))\n    .build()\n    .expect(\"Valid swaption\");\n```",
+      "description": "Commodity swaption (option on a fixed-for-floating commodity swap).\n\nThe holder has the right to enter a commodity swap at expiry, paying\n(or receiving) a fixed price in exchange for floating commodity prices.\n\n# Pricing\n\nBlack-76 model on the forward swap rate:\n- Forward swap rate is the weighted average of forward commodity prices\n  over the swap period\n- Annuity factor captures the present value of a unit payment stream\n\nAnalytical delta measures currency per unit change in the annuity-weighted\nforward price, holding rates and volatility fixed. At zero volatility or\nexpiry, delta uses the intrinsic-payoff derivative and is defined as zero\nexactly at the strike, where that derivative does not exist.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::commodity::commodity_swaption::CommoditySwaption;\nuse finstack_quant_valuations::instruments::CommodityUnderlyingParams;\nuse finstack_quant_valuations::instruments::OptionType;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::{Date, Tenor, TenorUnit};\nuse finstack_quant_core::types::{CurveId, InstrumentId};\nuse time::Month;\n\nlet swaption = CommoditySwaption::builder()\n    .id(InstrumentId::new(\"NG-SWAPTION-2025\"))\n    .underlying(CommodityUnderlyingParams::new(\"Energy\", \"NG\", \"MMBTU\", Currency::USD))\n    .option_type(OptionType::Call)\n    .expiry(Date::from_calendar_date(2025, Month::June, 15).unwrap())\n    .underlying_start_date(Date::from_calendar_date(2025, Month::July, 1).unwrap())\n    .underlying_maturity(Date::from_calendar_date(2026, Month::June, 30).unwrap())\n    .swap_frequency(Tenor::new(1, TenorUnit::Months).expect(\"valid tenor fixture\"))\n    .fixed_price(3.50)\n    .quantity(10000.0)\n    .forward_curve_id(CurveId::new(\"NG-FORWARD\"))\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .vol_surface_id(CurveId::new(\"NG-VOL\"))\n    .build()\n    .expect(\"Valid swaption\");\n```",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -6669,7 +6669,7 @@
     },
     "CompositeInstrument": {
       "additionalProperties": false,
-      "description": "Priceable composite instrument containing an unresolved policy and immutable state.\n\nValuation and risk use `state` exactly as stored. Call [`Self::rebalance`]\nto obtain a distinct instrument; this type does not mutate in place.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::{CompositeInstrument, Instrument};\n\nlet composite = CompositeInstrument::example()?;\nassert_eq!(composite.id(), \"COMPOSITE-EXAMPLE\");\nassert_eq!(composite.state.resolved_legs.len(), 2);\n# Ok::<(), finstack_quant_core::Error>(())\n```",
+      "description": "Priceable composite instrument containing an unresolved policy and resolved state.\n\nValuation and risk use the current `spec` and `state` exactly as stored.\nCall [`Self::rebalance`] to obtain a distinct instrument with newly resolved\nquantities. Direct field edits must preserve the specification/state invariants.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::{CompositeInstrument, Instrument};\n\nlet composite = CompositeInstrument::example()?;\nassert_eq!(composite.id(), \"COMPOSITE-EXAMPLE\");\nassert_eq!(composite.state.resolved_legs.len(), 2);\n# Ok::<(), finstack_quant_core::Error>(())\n```",
       "properties": {
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
@@ -6954,7 +6954,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Bond will mandatorily convert on the specified date.\n\n**Modeling scope**: the tree pricer models conversion only at the\nsingle step mapped from this date; early voluntary conversion before\nthe mandatory date is not modeled.",
+          "description": "Bond will mandatorily convert on the specified date.\n\n**Modeling scope**: the tree pricer models conversion only at the\nsingle step mapped from this date; early voluntary conversion before\nthe mandatory date is not modeled. Forced conversion takes precedence\nover coincident call/put rights, and the scheduled coupon remains payable.",
           "properties": {
             "mandatory_on": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
@@ -7007,7 +7007,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Mandatory conversion with variable delivery ratio (PERCS / DECS / ACES).\n\nAt `conversion_date`, the delivery ratio depends on the stock price:\n- If `spot <= lower_conversion_price`: ratio = face / lower_price (max shares, loss)\n- If `lower < spot <= upper`: ratio = face / spot (variable, delivers face value)\n- If `spot > upper_conversion_price`: ratio = face / upper_price (min shares, capped)\n\n# Industry Practice\n\nPERCS (Preference Equity Redemption Cumulative Stock) cap the upside.\nDECS (Dividend Enhanced Convertible Stock) have a dead zone between prices.\nACES (Automatically Convertible Equity Securities) are similar to DECS.\n\n**Modeling scope**: the tree pricer models conversion only at the\nsingle step mapped from `conversion_date`; early voluntary conversion\nbefore that date (offered by some mandatory structures) is not modeled.",
+          "description": "Mandatory conversion with variable delivery ratio (PERCS / DECS / ACES).\n\nAt `conversion_date`, the delivery ratio depends on the stock price:\n- If `spot <= lower_conversion_price`: ratio = face / lower_price (max shares, loss)\n- If `lower < spot <= upper`: ratio = face / spot (variable, delivers face value)\n- If `spot > upper_conversion_price`: ratio = face / upper_price (min shares, capped)\n\n# Industry Practice\n\nPERCS (Preference Equity Redemption Cumulative Stock) cap the upside.\nDECS (Dividend Enhanced Convertible Stock) have a dead zone between prices.\nACES (Automatically Convertible Equity Securities) are similar to DECS.\n\n**Modeling scope**: the tree pricer models conversion only at the\nsingle step mapped from `conversion_date`; early voluntary conversion\nbefore that date (offered by some mandatory structures) is not modeled.\nForced conversion takes precedence over coincident call/put rights,\nand the scheduled coupon remains payable.",
           "properties": {
             "mandatory_variable": {
               "properties": {
@@ -8302,7 +8302,7 @@
           "type": "object"
         },
         {
-          "description": "Cumulative net loss curve (rating-agency ABS convention): losses as a\npercent of the original pool balance by month of seasoning, with a\nconstant loss severity. Defaults in month `t` are\n`Δloss_t / severity` of the original balance; see\n[`DefaultModelSpec::mdr_with_survival`] for the conversion to a\nmonthly rate on the surviving balance. The `cdr` field is ignored.",
+          "description": "Cumulative net loss curve (rating-agency ABS convention): losses as a\npercent of the original pool balance by month of seasoning, with a\nconstant loss severity. Defaults in month `t` are\n`Δloss_t / severity` of the original balance; see\n[`DefaultModelSpec::mdr_with_survival`] for the conversion to a\nmonthly rate on the surviving balance. Cumulative defaults may exceed\nthe original balance after replenishment or par build. The `cdr`\nfield is ignored.",
           "properties": {
             "cumulative_net_loss_pct": {
               "description": "Cumulative net loss in percent of the original balance per month\nof seasoning (`1.5` = 1.5%), non-decreasing, month 1 first; the\nlast value is held.",
@@ -10554,7 +10554,7 @@
         },
         "end_of_month": {
           "default": false,
-          "description": "Whether end-of-month rolling should be preserved when generating the\nschedule.",
+          "description": "Whether end-of-month rolling should be preserved when generating the\nschedule.\n\nIncompatible with explicit IMM roll rules. With ACT/ACT ICMA, the\nregular grid anchor must be month-end: maturity for front stubs, or\nstart for back stubs and schedules without stubs. An irregular opposite\nendpoint remains supported.",
           "type": "boolean"
         },
         "frequency": {
@@ -10712,7 +10712,7 @@
     },
     "FloatingRateSpec": {
       "additionalProperties": false,
-      "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `forward_curve_id` curve for the accrual period\n2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread\n3. Add `spread_bp` to get base rate\n4. Multiply by `gearing` (typically 1.0)\n5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing\n\nFormula: `cap(gearing * (floor(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see\n`finstack_quant_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the forward curve base\ndate then resolve from that series instead of the curve:\n\n- **Overnight observations** (compounded/averaged paths) use LOCF lookup\n  (last observation carried forward), matching RFR publication\n  conventions where a fixing carries over non-publication days\n  (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 §7.1(g)). A partially\n  seasoned compounding window seamlessly mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date — a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the curve base date prefers a published\nsame-day fixing when the series has one, otherwise projects from `t = 0`.\n\nThe [`FloatingRateFallback`] policy applies only when **no** fixing\nseries is provided: `Error` (the default) fails the build with a\ndescriptive message naming the date, index, and expected series id;\n`FixedRate(r)` uses `r` as the index rate for the affected coupon;\n`SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    forward_curve_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: OvernightIndexConstraintApplication::Daily,\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```",
+      "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `forward_curve_id` curve for the accrual period\n2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread\n3. Add `spread_bp` to get base rate\n4. Multiply by `gearing` (typically 1.0)\n5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing\n\nFormula: `cap(gearing * (floor(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see\n`finstack_quant_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the forward curve base\ndate then resolve from that series instead of the curve:\n\n- **Overnight observations** (compounded/averaged paths) use exact-date\n  lookup on the index's fixing business days. Weekend and holiday carry\n  comes from each observation's accrual-day weight, so a missing required\n  business-day fixing is an error rather than reuse of an older fixing.\n  A partially seasoned compounding window mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date — a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the curve base date prefers a published\nsame-day fixing when the series has one, otherwise projects from `t = 0`.\n\nThe [`FloatingRateFallback`] policy applies only when **no** fixing\nseries is provided: `Error` (the default) fails the build with a\ndescriptive message naming the date, index, and expected series id;\n`FixedRate(r)` uses `r` as the index rate for the affected coupon;\n`SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    forward_curve_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: OvernightIndexConstraintApplication::Daily,\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```",
       "properties": {
         "all_in_cap_bp": {
           "anyOf": [
@@ -10812,7 +10812,7 @@
               "type": "null"
             }
           ],
-          "description": "Diagnostic tenor for term-index projection error context.\n\nThe named forward curve is already the term index (for example a 3M\nEURIBOR curve). Projection is `fwd.rate(reset_date)`, not a FRA-style\naverage over `[reset, reset + tenor]`. This field (or\n[`Self::reset_frequency`] when `None`) is used only to compute\n`index_maturity` for error messages. Ignored for overnight-compounded\nlegs. When set, the builder warns at build time if it disagrees with\nthe resolved curve's tenor by more than 10% — the curve remains\nauthoritative."
+          "description": "Explicit term-index tenor when no forward curve resolves.\n\nThe named forward curve is already the term index (for example a 3M\nEURIBOR curve). Projection is `fwd.rate(reset_date)`, not a FRA-style\naverage over `[reset, reset + tenor]`. This field (or\n[`Self::reset_frequency`] when `None`) supplies the compiled term tenor\nwhen no forward curve resolves. Ignored for overnight-compounded\nlegs. When set, the builder warns at build time if it disagrees with\nthe resolved curve's tenor by more than 10% — the curve remains\nauthoritative."
         },
         "overnight_basis": {
           "anyOf": [
@@ -10827,11 +10827,11 @@
         },
         "overnight_index_constraints": {
           "$ref": "#/$defs/OvernightIndexConstraintApplication",
-          "description": "Index floor/cap application policy for overnight-compounded coupons."
+          "description": "Index floor/cap application policy for overnight-compounded coupons.\n\nWith changing principal, the builder retains daily compounded-rate\nincrements. Any bound applied to the final period index or all-in\nrate contributes a uniform annual-rate adjustment over the coupon's\ncontractual accrual time; interim cumulative prefixes are not bounded."
         },
         "reset_frequency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
-          "description": "Reset frequency for rate fixings.\n\nThis is the cadence at which the rate refixes. When\n[`Self::index_tenor`] is `None`, it is also the tenor used only to\nbuild the diagnostic index-maturity date in projection error context."
+          "description": "Fallback term-index tenor when [`Self::index_tenor`] is absent.\n\nThe bare cashflow builder observes one term fixing at each coupon\nperiod's accrual start, with the configured reset lag. This field does\nnot create additional resets inside a payment period. The resolved\nforward curve owns the quoted index tenor; overnight methods observe\ntheir compiled daily fixing schedule independently of this field."
         },
         "reset_lag_days": {
           "default": 2,
@@ -11029,12 +11029,12 @@
         },
         {
           "const": "std",
-          "description": "Sample standard deviation (n−1, Bessel's correction; pandas `ddof=1`).",
+          "description": "Population standard deviation (denominator `n`, pandas `ddof=0`),\nbroadcast over the input length. NaNs are excluded; fewer than two\nnon-NaN observations produce NaN.",
           "type": "string"
         },
         {
           "const": "var",
-          "description": "Sample variance (n−1, Bessel's correction; pandas `ddof=1`).",
+          "description": "Population variance (denominator `n`, pandas `ddof=0`), broadcast over\nthe input length. NaNs are excluded; fewer than two non-NaN\nobservations produce NaN.",
           "type": "string"
         },
         {
@@ -11044,12 +11044,12 @@
         },
         {
           "const": "rolling_std",
-          "description": "Rolling standard deviation over a fixed row window size.",
+          "description": "Rolling population standard deviation (`ddof=0`) over a fixed row\nwindow size. Incomplete windows and windows containing NaN return NaN.",
           "type": "string"
         },
         {
           "const": "rolling_var",
-          "description": "Rolling variance over a fixed row window size.",
+          "description": "Rolling population variance (`ddof=0`) over a fixed row window size.\nIncomplete windows and windows containing NaN return NaN.",
           "type": "string"
         },
         {
@@ -11089,12 +11089,12 @@
         },
         {
           "const": "ewm_std",
-          "description": "`ewm_std(series, alpha, adjust?)`, with `alpha` normalized to\n`[1e-12, 1]`. An omitted or positive `adjust` uses adjusted weights;\nzero or a negative value selects the recursive form. Leading and interior\nNaNs are preserved, and the recursion starts at the first non-NaN value.",
+          "description": "`ewm_std(series, alpha, adjust?)`, with `alpha` normalized to\n`[1e-12, 1]`. An omitted or positive `adjust` uses adjusted weights;\nzero or a negative value selects the recursive form. Leading and interior\nNaNs are preserved, and the recursion starts at the first non-NaN value.\nReturns weighted population standard deviation without a sample-bias\ncorrection; the first non-NaN observation has standard deviation zero.",
           "type": "string"
         },
         {
           "const": "ewm_var",
-          "description": "`ewm_var(series, alpha, adjust?)`, with `alpha` normalized to\n`[1e-12, 1]`. An omitted or positive `adjust` uses adjusted weights;\nzero or a negative value selects the recursive form. Leading and interior\nNaNs are preserved, and the recursion starts at the first non-NaN value.",
+          "description": "`ewm_var(series, alpha, adjust?)`, with `alpha` normalized to\n`[1e-12, 1]`. An omitted or positive `adjust` uses adjusted weights;\nzero or a negative value selects the recursive form. Leading and interior\nNaNs are preserved, and the recursion starts at the first non-NaN value.\nReturns weighted population variance without a sample-bias correction;\nthe first non-NaN observation has variance zero.",
           "type": "string"
         },
         {
@@ -11275,24 +11275,16 @@
       "oneOf": [
         {
           "additionalProperties": false,
-          "description": "Fixed rate funding leg.",
+          "description": "Fixed rate funding leg with explicit contractual periods.",
           "properties": {
-            "accrual_fractions": {
-              "description": "Accrual fractions for each period.",
-              "items": {
-                "format": "double",
-                "type": "number"
-              },
-              "type": "array"
-            },
             "day_count": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-              "description": "Day count convention."
+              "description": "Day count convention used to calculate period year fractions."
             },
-            "payment_dates": {
-              "description": "Payment dates for each period.",
+            "periods": {
+              "description": "Funding accrual and payment schedule, in chronological order.",
               "items": {
-                "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+                "$ref": "#/$defs/FundingPeriod"
               },
               "type": "array"
             },
@@ -11308,36 +11300,27 @@
           "required": [
             "type",
             "rate",
-            "payment_dates",
-            "accrual_fractions",
+            "periods",
             "day_count"
           ],
           "type": "object"
         },
         {
           "additionalProperties": false,
-          "description": "Floating rate funding leg.\n\n# Convention: no payment lag\n\nThis leg models each period by its `payment_dates` only and assumes the\n**accrual end equals the payment date** (no payment lag, no\naccrual-vs-pay adjustment). The pricer projects the floating forward over\n`[previous payment date, payment date]` and discounts to the payment\ndate. For funding with a genuine payment lag or accrual end ≠ payment\ndate, model the floating side as a full IRS float leg (which carries\nexplicit accrual start/end and payment dates) instead of this simplified\nfunding leg.",
+          "description": "Simple floating funding coupons with independent reset/accrual/payment dates.",
           "properties": {
-            "accrual_fractions": {
-              "description": "Accrual fractions for each period.",
-              "items": {
-                "format": "double",
-                "type": "number"
-              },
-              "type": "array"
-            },
             "day_count": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-              "description": "Day count convention."
+              "description": "Day count convention used to calculate period year fractions."
             },
             "forward_curve_id": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
               "description": "Forward curve for floating rate projection."
             },
-            "payment_dates": {
-              "description": "Payment dates for each period. Each is also treated as the period's\naccrual-end date (no payment lag — see the variant docs).",
+            "periods": {
+              "description": "Funding accrual, reset and payment schedule, in chronological order.",
               "items": {
-                "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+                "$ref": "#/$defs/FundingPeriod"
               },
               "type": "array"
             },
@@ -11353,14 +11336,48 @@
           "required": [
             "type",
             "spread_bp",
-            "payment_dates",
-            "accrual_fractions",
+            "periods",
             "day_count",
             "forward_curve_id"
           ],
           "type": "object"
         }
       ]
+    },
+    "FundingPeriod": {
+      "additionalProperties": false,
+      "description": "Contractual dates and accrual fraction of one CMS funding coupon.",
+      "properties": {
+        "accrual_end": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Exclusive accrual end, independent of payment-date adjustment."
+        },
+        "accrual_start": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Inclusive accrual start, independent of the CMS observation date."
+        },
+        "accrual_year_fraction": {
+          "description": "Positive year fraction measured using the funding leg day count.",
+          "format": "double",
+          "type": "number"
+        },
+        "payment_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Contractual payment date after business-day adjustment."
+        },
+        "reset_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Floating index observation date; ignored for fixed funding."
+        }
+      },
+      "required": [
+        "accrual_start",
+        "accrual_end",
+        "payment_date",
+        "reset_date",
+        "accrual_year_fraction"
+      ],
+      "type": "object"
     },
     "FundingSource": {
       "description": "Collection account(s) a waterfall tier draws on.\n\nInterest and principal proceeds are separate accounts in the executor.\nA tier normally draws on the account matching its [`PaymentType`]; a\n`Fee` or `Interest` tier may instead be allowed to top up from principal\nproceeds (the CLO principal-waterfall convention that senior fees and\nsenior note interest shortfalls are paid from principal before any note\nis redeemed). Cash taken from principal this way is reported as\n[`WaterfallDistribution::principal_used_for_interest`].",
@@ -11478,7 +11495,7 @@
           "properties": {
             "payment_date": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-              "description": "Date on which the fixed exercise payoff is paid."
+              "description": "Date on which the fixed exercise payoff is paid, including after\nearly exercise; this date is not relative to the exercise date."
             },
             "type": {
               "const": "cash",
@@ -11724,7 +11741,7 @@
           "description": "Notional amount in foreign currency"
         },
         "observed_barrier_breached": {
-          "description": "Observed barrier state for expired options.\n\nHistorical monitoring must be supplied explicitly for expired contracts.",
+          "description": "Processed barrier-monitoring state through the valuation date.\n\n`Some(true)` records a breach whose at-hit rebate has already settled,\nincluding a hit processed on the valuation date. That rebate is not a\nremaining claim at expiry. An at-expiry rebate remains due on expiry.\n`Some(false)` records no breach in the processed monitoring history.\nHistorical monitoring must be supplied explicitly for seasoned and\nexpired contracts. Same-day unpaid at-hit claims require a separate\ncash receivable; this boolean does not represent pending settlement.",
           "type": [
             "boolean",
             "null"
@@ -12369,7 +12386,7 @@
         },
         "far_rate": {
           "default": null,
-          "description": "Optional far leg FX rate (quote per base). If None, source from forwards.",
+          "description": "Optional far leg FX rate (quote per base). If absent, use the market\noutright forward from the valuation date to far settlement.",
           "format": "double",
           "type": [
             "number",
@@ -12402,7 +12419,7 @@
         },
         "near_rate": {
           "default": null,
-          "description": "Optional near leg FX rate (quote per base). If None, source from market.",
+          "description": "Optional near leg FX rate (quote per base). If absent, use the market\noutright forward from the valuation date to near settlement.",
           "format": "double",
           "type": [
             "number",
@@ -12556,7 +12573,7 @@
     },
     "FxVarianceSwap": {
       "additionalProperties": false,
-      "description": "FX variance swap instrument.\n\nPayoff: Notional * (Realized Variance - Strike Variance)",
+      "description": "FX variance swap instrument.\n\nPayoff: Notional * (Realized Variance - Strike Variance).\n\nBefore the final observation, close-to-close pricing projects Gaussian\nindependent log-return increments using deterministic domestic/foreign\nrates and smile-replicated cumulative quadratic variation. It includes\neach return's conditional-mean square and applies the contractual\nannualization factor divided by the full scheduled return count. This\nprojection is exact for deterministic instantaneous variance in the\nlimit of exact smile integration; it does not model general stochastic\nvolatility/rate joint dynamics. OHLC estimators support fully observed\nsettlement only, because their future path statistics need a separate\nestimator-specific forecast model.",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -12955,7 +12972,7 @@
         },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-          "description": "Day count convention for accrual and option time."
+          "description": "Day count convention for accrual. Option quote time always uses ACT/365F."
         },
         "discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -12972,14 +12989,6 @@
         "inflation_index_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Inflation index/curve identifier (e.g., US-CPI-U)."
-        },
-        "inflation_nominal_correlation": {
-          "description": "Correlation between the inflation index and the nominal short rate,\nused in the YoY convexity/timing adjustment. `None` ⇒ treated as 0\n(the timing term vanishes; the pure inflation-vol Jensen convexity\n`σ_I²·τ` is still applied).",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
@@ -13015,14 +13024,6 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
           "description": "Metric-time pricing configuration."
         },
-        "nominal_rate_volatility": {
-          "description": "Nominal short-rate volatility `σ_n` (annualized, absolute), used in the\nYoY timing term. `None` ⇒ the `ρ·σ_n` timing term is dropped.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
         "notional": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Notional amount in quote currency."
@@ -13051,6 +13052,11 @@
         "vol_surface_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Volatility surface identifier."
+        },
+        "volatility_expiry": {
+          "$ref": "#/$defs/InflationVolatilityExpiry",
+          "default": "reference_date",
+          "description": "Clock used by the volatility surface's annualized quotes. This is\nindependent of CPI publication policy; changing it requires matching\nquotes, not merely relabelling the old surface."
         }
       },
       "required": [
@@ -13085,7 +13091,7 @@
       ]
     },
     "InflationLag": {
-      "description": "Publication lag for inflation index reference dates.\n\nInflation indices are published with a delay (typically 2-4 weeks). Securities\nusing these indices incorporate a lag to ensure the reference index is published\nby the settlement date.\n\n# Standard Lags by Market\n\n- **US TIPS**: 3-month lag (reference index from 3 months prior)\n- **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)\n- **French OATi**: 3-month lag\n- **German index-linked**: 3-month lag\n\n# Rationale\n\nThe lag ensures:\n1. Reference index is published before settlement\n2. Index value is known at coupon payment date\n3. No estimation or forecasting required for payment calculation\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationLag;\n\nlet tips_lag = InflationLag::Months(3);  // US TIPS standard\nlet gilt_lag = InflationLag::Months(3);  // UK modern gilts\nlet no_lag = InflationLag::None;         // Inflation swaps (forecast-based)\n```",
+      "description": "Contractual observation lag for inflation index reference dates.\n\nInflation indices are published with a delay (typically 2-4 weeks). Securities\nusing these indices incorporate an observation lag to ensure the reference\nindex is published by settlement. This lag does not specify the actual\npublication date; use [`InflationIndex::with_publication_dates`] for that.\n\n# Standard Lags by Market\n\n- **US TIPS**: 3-month lag (reference index from 3 months prior)\n- **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)\n- **French OATi**: 3-month lag\n- **German index-linked**: 3-month lag\n\n# Rationale\n\nThe lag ensures:\n1. Reference index is published before settlement\n2. Index value is known at coupon payment date\n3. No estimation or forecasting required for payment calculation\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationLag;\n\nlet tips_lag = InflationLag::Months(3);  // US TIPS standard\nlet gilt_lag = InflationLag::Months(3);  // UK modern gilts\nlet no_lag = InflationLag::None;         // Inflation swaps (forecast-based)\n```",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -13360,6 +13366,21 @@
         "attributes"
       ],
       "type": "object"
+    },
+    "InflationVolatilityExpiry": {
+      "description": "Expiry convention of the annualized inflation-option volatility surface.",
+      "oneOf": [
+        {
+          "const": "reference_date",
+          "description": "ACT/365F time to the lagged contractual end date. If CPI is still\nunpublished after this date, the quote clock is inconsistent and pricing\nfails instead of treating the unknown payoff as deterministic.",
+          "type": "string"
+        },
+        {
+          "const": "publication_date",
+          "description": "ACT/365F time to publication of the final required CPI anchor. Requires\nexplicit publication dates for every outstanding monthly anchor and\na volatility surface quoted on this publication-expiry clock.",
+          "type": "string"
+        }
+      ]
     },
     "InstrumentCollateral": {
       "additionalProperties": false,
@@ -15502,7 +15523,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Make-whole call: borrower pays PV of remaining cashflows at the\nreference curve plus spread of the shared [`MakeWholeSpec`] (the same\ntype bonds use). The term-loan tree pricer and yield-to-call metrics\nnever exercise it: paying at least the make-whole amount leaves the\nlender indifferent, so the loan is not economically callable.",
+          "description": "Make-whole call: borrower pays PV of remaining cashflows at the\nreference curve plus spread of the shared [`MakeWholeSpec`] (the same\ntype bonds use), floored at the contractual clean call price. Tree\npricing supports a deterministic reference curve with zero rate\nvolatility; stochastic-rate make-whole pricing is rejected explicitly.\nYield-to-call metrics use the same dated reference-curve redemption.",
           "properties": {
             "make_whole": {
               "$ref": "#/$defs/MakeWholeSpec"
@@ -17022,7 +17043,7 @@
               "additionalProperties": false,
               "properties": {
                 "hurdle_irr": {
-                  "description": "LP preferred-return hurdle as an annual decimal IRR (`0.08` = 8%),\ncompounded on the spec's `day_count`.",
+                  "description": "LP preferred-return hurdle as an annual decimal IRR (`0.08` = 8%),\ncompounded on the spec's `day_count`; must be finite and greater than -1.",
                   "format": "double",
                   "type": "number"
                 }
@@ -17075,7 +17096,7 @@
                   "type": "number"
                 },
                 "hurdle_irr": {
-                  "description": "Annual decimal IRR hurdle (`0.12` = 12%) the LP must reach (at\n100% payout) before this tier's split activates.",
+                  "description": "Annual decimal IRR hurdle (`0.12` = 12%) the LP must reach (at\n100% payout) before this tier's split activates; must be finite and greater than -1.",
                   "format": "double",
                   "type": "number"
                 },
@@ -20216,7 +20237,7 @@
       "type": "object"
     },
     "RollRule": {
-      "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode. The IMM modes\nforce a quarterly grid: the schedule frequency and stub rule configured on\n[`ScheduleParams`] are overridden with quarterly / short-back, matching\n`ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates\n  for rate, currency, and equity index futures).\n- **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll\n  dates). When the start date is not itself a roll date, the first period\n  accrues from the roll date immediately **preceding** the start (standard\n  front accrual per the ISDA Big Bang Protocol, April 2009).\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::specs::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)",
+      "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode. The IMM modes\nforce a quarterly grid: the schedule frequency and stub rule configured on\n[`ScheduleParams`] are overridden with quarterly / short-back, matching\n`ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates\n  for rate, currency, and equity index futures). Cashflow schedules retain\n  the contractual maturity as a short final stub when it is off-grid.\n- **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll\n  dates). When the start date is not itself a roll date, the first period\n  accrues from the roll date immediately **preceding** the start (standard\n  front accrual per the ISDA Big Bang Protocol, April 2009).\n  Interior coupon or payment-program windows start at their declared\n  boundary; front accrual is applied only once at the instrument start.\n\nExplicit roll grids cannot be combined with `end_of_month`. ACT/ACT ICMA\nsupports the CDS twentieth grid; third-Wednesday IMM with ACT/ACT ICMA is\nrejected because the available ICMA reference calculation requires nominal\nmonth-grid coupons.\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::specs::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)",
       "oneOf": [
         {
           "const": "none",
@@ -20801,7 +20822,7 @@
         },
         "end_of_month": {
           "default": false,
-          "description": "Whether end-of-month rolling should be preserved when generating the\nschedule.",
+          "description": "Whether end-of-month rolling should be preserved when generating the\nschedule.\n\nIncompatible with explicit IMM roll rules. With ACT/ACT ICMA, the\nregular grid anchor must be month-end: maturity for front stubs, or\nstart for back stubs and schedules without stubs. An irregular opposite\nendpoint remains supported.",
           "type": "boolean"
         },
         "frequency": {
@@ -21115,7 +21136,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Regime-switching prepayment model.\n\nTwo-state Markov model for prepayment regimes (high/low).",
+          "description": "Regime-switching prepayment model.\n\nTwo-state Markov model, initially in the low regime at origination.\nEvery simulated month transitions before computing its monthly rate.\nLatent transition draws are independent of the systematic CPR shock.",
           "properties": {
             "cpr_volatility": {
               "default": 0.2,
@@ -23007,7 +23028,7 @@
         },
         {
           "const": "american",
-          "description": "American style: deal-by-deal allocation. Every event must carry a\nnon-empty `deal_id`; capital, preferred return, catch-up, and carry are\ntracked independently for each deal, while clawback remains a fund-level\nlifetime reconciliation.",
+          "description": "American style: deal-by-deal allocation. Every event must carry a\nnon-empty `deal_id`; capital, preferred return, catch-up, and carry are\ntracked independently for each deal, while clawback remains a fund-level\nlifetime reconciliation. Periodic fund settlements do not reinstate an\nindividual deal's gross carry capacity or reassign returned capital to a\ndeal; later distributions continue to use that deal's original history.",
           "type": "string"
         }
       ]

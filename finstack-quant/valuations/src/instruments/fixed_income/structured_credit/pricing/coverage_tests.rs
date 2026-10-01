@@ -420,16 +420,31 @@ fn rate_and_accrual(tranche: &Tranche, context: &TestContext<'_>) -> Result<(f64
     // Use the contractual all-in rate when market context is available.
     // Missing historical fixings invalidate the coverage test rather than
     // silently reverting to spread-only.
+    let period_start = context.period_start.unwrap_or(context.as_of);
+    let period_end = if context.period_start.is_some() {
+        context.as_of
+    } else {
+        // Point-in-time IC uses the next configured coupon interval to express
+        // the projected annual index in the tranche's contractual convention.
+        tranche.frequency.add_to_date(
+            period_start,
+            None,
+            finstack_quant_core::dates::BusinessDayConvention::Unadjusted,
+        )?
+    };
+    let projection_accrual = tranche.day_count.year_fraction(
+        period_start,
+        period_end,
+        finstack_quant_core::dates::DayCountContext::default(),
+    )?;
     let rate = if let Some(market) = context.market {
-        if let Some(period_start) = context.period_start {
-            tranche
-                .coupon
-                .try_rate_for_period(period_start, context.valuation_date, market)?
-        } else {
-            tranche
-                .coupon
-                .try_rate_for_period(context.as_of, context.valuation_date, market)?
-        }
+        tranche.coupon.try_rate_for_period(
+            period_start,
+            period_end,
+            projection_accrual,
+            context.valuation_date,
+            market,
+        )?
     } else {
         tranche.coupon.current_rate(context.as_of)
     };
@@ -451,15 +466,8 @@ fn rate_and_accrual(tranche: &Tranche, context: &TestContext<'_>) -> Result<(f64
     };
     // Use actual day-count accrual when period_start is available (m3 fix);
     // fall back to periods-per-year approximation as default behavior.
-    let accrual = if let Some(period_start) = context.period_start {
-        tranche
-            .day_count
-            .year_fraction(
-                period_start,
-                context.as_of,
-                finstack_quant_core::dates::DayCountContext::default(),
-            )
-            .unwrap_or_else(|_| 1.0 / frequency_periods_per_year(tranche.frequency))
+    let accrual = if context.period_start.is_some() {
+        projection_accrual
     } else {
         1.0 / frequency_periods_per_year(tranche.frequency)
     };
@@ -1585,9 +1593,25 @@ mod haircut_tests {
             .evaluate(&ctx)
             .expect("IC test");
         let actual = result.cure_amount.expect("breach cure").amount();
+        let coupon_end = tranches.tranches[0]
+            .frequency
+            .add_to_date(
+                as_of,
+                None,
+                finstack_quant_core::dates::BusinessDayConvention::Unadjusted,
+            )
+            .expect("next coupon boundary");
+        let coupon_accrual = tranches.tranches[0]
+            .day_count
+            .year_fraction(
+                as_of,
+                coupon_end,
+                finstack_quant_core::dates::DayCountContext::default(),
+            )
+            .expect("coupon accrual");
         let all_in_rate = tranches.tranches[0]
             .coupon
-            .try_current_rate_with_index(as_of, &market)
+            .try_current_rate_with_index(as_of, coupon_end, coupon_accrual, &market)
             .expect("market-aware coupon");
         let tau = 1.0 / frequency_periods_per_year(tranches.tranches[0].frequency);
         let total_due = 100_000.0 * all_in_rate * tau;
@@ -1610,10 +1634,6 @@ mod haircut_tests {
         let result = CoverageTestSpec::ic("A", trigger_level)
             .evaluate(&projected)
             .expect("future coverage dates must not require future fixings");
-        let rate = tranches.tranches[0]
-            .coupon
-            .try_rate_for_period(start, as_of, &market)
-            .unwrap();
         let accrual = tranches.tranches[0]
             .day_count
             .year_fraction(
@@ -1621,6 +1641,10 @@ mod haircut_tests {
                 payment,
                 finstack_quant_core::dates::DayCountContext::default(),
             )
+            .unwrap();
+        let rate = tranches.tranches[0]
+            .coupon
+            .try_rate_for_period(start, payment, accrual, as_of, &market)
             .unwrap();
         assert!((result.ratio - collections / (100_000.0 * rate * accrual)).abs() < 1e-12);
         let expected_cure = 100_000.0 - collections / (trigger_level * rate * accrual);

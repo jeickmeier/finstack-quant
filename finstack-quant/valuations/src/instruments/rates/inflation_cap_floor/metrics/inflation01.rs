@@ -16,7 +16,6 @@
 //! workspace (see `sensitivity_central_diff` where the divisor is 2·1 = 2 for
 //! a ±1bp bump expressed in bp-units).
 
-use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::inflation_cap_floor::InflationCapFloor;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
@@ -42,7 +41,7 @@ impl MetricCalculator for Inflation01Calculator {
             id: option.inflation_index_id.clone(),
             spec: bump_spec_up,
         }])?;
-        let pv_up = option.value(&curves_up, as_of)?.amount();
+        let pv_up = context.reprice_raw(&curves_up, as_of)?;
 
         // Bump down by 1bp (-0.01%)
         let bump_spec_down = BumpSpec::inflation_shift_pct(-INFLATION_BUMP_PCT);
@@ -50,7 +49,7 @@ impl MetricCalculator for Inflation01Calculator {
             id: option.inflation_index_id.clone(),
             spec: bump_spec_down,
         }])?;
-        let pv_down = option.value(&curves_down, as_of)?.amount();
+        let pv_down = context.reprice_raw(&curves_down, as_of)?;
 
         // Central difference: Inflation01 = (PV_up - PV_down) / 2.
         //

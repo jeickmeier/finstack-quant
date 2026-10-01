@@ -15,6 +15,7 @@ use crate::instruments::fixed_income::revolving_credit::types::{
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::math::stats::OnlineStats;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{HashMap, Result};
 use finstack_quant_models::monte_carlo::estimate::Estimate;
@@ -34,29 +35,28 @@ struct ExpectedFlow {
 /// correlated by construction. Treating the `2N` pathwise values as
 /// independent overstates the effective sample size and misstates the
 /// standard error, so each adjacent antithetic pair is averaged into ONE
-/// i.i.d. sample first. The 95% interval assumes asymptotic normality.
-fn path_estimate(values: &[f64], antithetic: bool) -> Estimate {
-    let samples: Vec<f64> = if antithetic {
-        values
-            .chunks(2)
-            .map(|pair| pair.iter().sum::<f64>() / pair.len() as f64)
-            .collect()
-    } else {
-        values.to_vec()
-    };
-    let (mean, variance) = finstack_quant_core::math::stats::mean_var(&samples);
-    let stderr = if samples.is_empty() {
-        0.0
-    } else {
-        (variance / samples.len() as f64).sqrt()
-    };
-    let z_95 = 1.96;
-    Estimate::new(
-        mean,
-        stderr,
-        (mean - z_95 * stderr, mean + z_95 * stderr),
-        samples.len(),
+/// i.i.d. sample first. At least two complete estimators are required; the
+/// 95% mean interval uses Student-t critical values with `n - 1` degrees of
+/// freedom and assumes approximately Gaussian estimator means.
+fn path_estimate(values: &[f64], antithetic: bool) -> Result<Estimate> {
+    let multiplicity = if antithetic { 2 } else { 1 };
+    if !values.len().is_multiple_of(multiplicity) || values.len() / multiplicity < 2 {
+        return Err(finstack_quant_core::Error::Validation(
+            "stochastic revolving-credit pricing requires at least 2 complete independent estimators"
+                .into(),
+        ));
+    }
+    let mut stats = OnlineStats::new();
+    for paths in values.chunks_exact(multiplicity) {
+        stats.update(paths.iter().sum::<f64>() / multiplicity as f64);
+    }
+    Ok(Estimate::new(
+        stats.mean(),
+        stats.stderr(),
+        stats.confidence_interval(0.05),
+        stats.count(),
     )
+    .with_num_simulated_paths(values.len()))
 }
 
 impl RevolvingCreditPricer {
@@ -78,6 +78,12 @@ impl RevolvingCreditPricer {
     ///   draw/repay spec.
     /// * `market` - Curves used to generate and project each path.
     /// * `as_of` - Valuation date; flows paid on or before it are excluded.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for fewer than two independent estimators or
+    /// Sobol sampling: this pricing path does not provide the independent
+    /// randomized replicates needed to estimate uncertainty from Sobol paths.
     pub fn expected_cashflows(
         facility: &RevolvingCredit,
         market: &MarketContext,
@@ -152,6 +158,13 @@ impl RevolvingCreditPricer {
     /// * `facility` - Revolving credit facility; must carry a stochastic draw/repay spec.
     /// * `market` - Curves used to generate and discount each path.
     /// * `as_of` - Valuation date for the simulation.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error unless the facility has a stochastic spec
+    /// with at least two independent pseudorandom estimators. Sobol pricing
+    /// requires independent randomized replicates, which this path does not
+    /// provide.
     pub fn price_with_paths(
         facility: &RevolvingCredit,
         market: &MarketContext,
@@ -193,7 +206,8 @@ impl RevolvingCreditPricer {
     /// * `facility` - Revolving credit facility with a stochastic draw/repay spec.
     /// * `market` - Curves used to generate and discount each path.
     /// * `as_of` - Valuation date for the simulation.
-    /// * `run` - Estimator count, seed and antithetic flag.
+    /// * `run` - At least two independent estimators, a deterministic seed and
+    ///   the antithetic flag; each complete pair counts as one estimator.
     pub(crate) fn price_monte_carlo_with_run(
         facility: &RevolvingCredit,
         market: &MarketContext,
@@ -208,6 +222,20 @@ impl RevolvingCreditPricer {
                 ))
             }
         };
+        if run.num_paths < 2 {
+            return Err(finstack_quant_core::Error::Validation(
+                "stochastic revolving-credit pricing requires at least 2 independent estimators"
+                    .into(),
+            ));
+        }
+        if stoch_spec.use_sobol_qmc {
+            return Err(finstack_quant_core::Error::Validation(
+                "use_sobol_qmc cannot produce revolving-credit pricing confidence intervals \
+                 from one dependent Sobol net; independent randomized replicates are required \
+                 and are not provided by this pricing path"
+                    .into(),
+            ));
+        }
 
         use super::super::types::{CreditSpreadProcessSpec, McConfig};
         let mc_config_to_use;
@@ -312,9 +340,10 @@ impl RevolvingCreditPricer {
             .collect();
         let use_antithetic = run.antithetic && !stoch_spec.use_sobol_qmc;
         let currency = facility.commitment.currency();
-        let estimate = MoneyEstimate::from_estimate(path_estimate(&pvs, use_antithetic), currency)?;
+        let estimate =
+            MoneyEstimate::from_estimate(path_estimate(&pvs, use_antithetic)?, currency)?;
         let draw_option_cost =
-            MoneyEstimate::from_estimate(path_estimate(&costs, use_antithetic), currency)?;
+            MoneyEstimate::from_estimate(path_estimate(&costs, use_antithetic)?, currency)?;
 
         Ok(EnhancedMonteCarloResult {
             mc_result: MonteCarloResult {
@@ -325,5 +354,74 @@ impl RevolvingCreditPricer {
             path_results,
             draw_option_cost,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stochastic_pricing_rejects_sobol_without_independent_replicates() {
+        use crate::instruments::fixed_income::revolving_credit::types::{
+            StochasticUtilizationSpec, UtilizationProcess,
+        };
+
+        let mut facility = RevolvingCredit::example().expect("facility");
+        // A short grid fits the Sobol dimension table; dependence, not grid
+        // size, must prevent this pricing path from reporting a mean CI.
+        facility.maturity = facility.issue_date + time::Duration::days(7);
+        facility.draw_repay_spec = DrawRepaySpec::Stochastic(Box::new(StochasticUtilizationSpec {
+            utilization_process: UtilizationProcess::MeanReverting {
+                theta: 0.5,
+                kappa: 0.75,
+                sigma: 0.05,
+                spread_sensitivity: 0.0,
+            },
+            use_sobol_qmc: true,
+            mc_config: None,
+        }));
+        let run = RevolvingCreditMcRun {
+            num_paths: 8,
+            seed: 42,
+            antithetic: false,
+        };
+        let error = RevolvingCreditPricer::price_monte_carlo_with_run(
+            &facility,
+            &MarketContext::new(),
+            facility.issue_date,
+            &run,
+        )
+        .expect_err("dependent Sobol points do not estimate mean uncertainty");
+        assert!(error
+            .to_string()
+            .contains("independent randomized replicates"));
+    }
+
+    #[test]
+    fn path_estimate_requires_two_complete_independent_estimators() {
+        for (values, antithetic) in [
+            (vec![], false),
+            (vec![1.0], false),
+            (vec![0.0, 2.0], true),
+            (vec![0.0, 2.0, 3.0], true),
+        ] {
+            assert!(path_estimate(&values, antithetic).is_err());
+        }
+    }
+
+    #[test]
+    fn path_estimate_uses_sample_stderr_and_student_t_interval() {
+        // Scalar samples and paired path values both produce observations 1,3.
+        for (values, antithetic) in [(vec![1.0, 3.0], false), (vec![0.0, 2.0, 2.0, 4.0], true)] {
+            let estimate = path_estimate(&values, antithetic).expect("two independent estimators");
+            assert!((estimate.mean - 2.0).abs() < 1e-12);
+            assert!((estimate.stderr - 1.0).abs() < 1e-12);
+            let margin = 12.706_204_736_174_7; // t(1) 97.5th percentile
+            assert!((estimate.ci_95.0 - (2.0 - margin)).abs() < 1e-7);
+            assert!((estimate.ci_95.1 - (2.0 + margin)).abs() < 1e-7);
+            assert_eq!(estimate.num_paths, 2);
+            assert_eq!(estimate.num_simulated_paths, values.len());
+        }
     }
 }

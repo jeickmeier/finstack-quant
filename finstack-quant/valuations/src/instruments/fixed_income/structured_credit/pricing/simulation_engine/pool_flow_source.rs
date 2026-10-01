@@ -610,18 +610,24 @@ impl PerNameDefaultEngine {
     /// * `systematic_z` - Period systematic factor shared by every name.
     /// * `marginal_pd` - Unconditional period default probability per live name.
     /// * `defaults` - Filled with one realized indicator per name.
-    fn realize(&mut self, systematic_z: f64, marginal_pd: &[f64], defaults: &mut Vec<bool>) {
+    fn realize(
+        &mut self,
+        systematic_z: f64,
+        marginal_pd: &[f64],
+        defaults: &mut Vec<bool>,
+    ) -> Result<()> {
         if self.antithetic {
             self.simulator.simulate_period_antithetic(
                 systematic_z,
                 marginal_pd,
                 &mut self.rng,
                 defaults,
-            );
+            )?;
         } else {
             self.simulator
-                .simulate_period(systematic_z, marginal_pd, &mut self.rng, defaults);
+                .simulate_period(systematic_z, marginal_pd, &mut self.rng, defaults)?;
         }
+        Ok(())
     }
 
     /// Resolve one period's defaults for names with their own marginals.
@@ -643,11 +649,11 @@ impl PerNameDefaultEngine {
         marginal_pd: &[f64],
         defaults: &mut Vec<bool>,
         conditional: &mut Vec<f64>,
-    ) -> PerNameResolution {
+    ) -> Result<PerNameResolution> {
         match self.granularity {
             PoolGranularity::PerName => {
-                self.realize(systematic_z, marginal_pd, defaults);
-                PerNameResolution::Realized
+                self.realize(systematic_z, marginal_pd, defaults)?;
+                Ok(PerNameResolution::Realized)
             }
             PoolGranularity::LargeHomogeneous => {
                 self.simulator.conditional_default_probs(
@@ -655,8 +661,8 @@ impl PerNameDefaultEngine {
                     marginal_pd,
                     &mut self.rng,
                     conditional,
-                );
-                PerNameResolution::Conditional
+                )?;
+                Ok(PerNameResolution::Conditional)
             }
         }
     }
@@ -753,7 +759,7 @@ impl PoolFlowSource for StochasticPathFlowSource {
                         plan.systematic_z,
                         &self.marginal_scratch,
                         &mut self.default_scratch,
-                    );
+                    )?;
 
                     // Per-name idiosyncratic recovery dispersion: each name
                     // recovers at its own rate, scattered around the period
@@ -792,7 +798,7 @@ impl PoolFlowSource for StochasticPathFlowSource {
                         plan.systematic_z,
                         plan.marginal_pd,
                         &mut engine.rng,
-                    );
+                    )?;
                     Some(PeriodDefaultOutcome::PoolWidePeriodRate(rate))
                 }
             },

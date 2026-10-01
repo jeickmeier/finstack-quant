@@ -1,7 +1,7 @@
 """Behavioral tests for the core value-type ergonomics added to the Python bindings.
 
 Covers ``Rate``/``Bps``/``Percentage`` conversions and string parsing,
-``CreditRating`` ordering and string equality, ``Attributes`` mapping dunders,
+``CreditRating`` ordering and typed equality, ``Attributes`` mapping dunders,
 ``Money`` formatting/division/rounding, ``FinstackConfig`` scale overrides,
 ``ScorecardScale`` validation and the ``core.math`` additions.
 """
@@ -66,10 +66,10 @@ class TestCreditRating:
         assert CreditRating.D.is_default()
         assert CreditRating.BBB_PLUS.to_moodys_string() == "Baa1"
 
-    def test_ordering_and_string_equality(self) -> None:
+    def test_ordering_and_typed_equality(self) -> None:
         assert CreditRating.AAA < CreditRating.BBB < CreditRating.C < CreditRating.NR < CreditRating.D
-        assert CreditRating.BBB == "BBB"
-        assert CreditRating.BBB == "baa2"
+        assert CreditRating("BBB") == CreditRating.BBB
+        assert CreditRating("baa2") == CreditRating.BBB
         assert CreditRating.BBB != "not a rating"
         assert CreditRating.BBB.notches_to(CreditRating.BB) == 3
         assert CreditRating.BB.notches_to("BBB") == -3
@@ -215,5 +215,8 @@ class TestMathAdditions:
         with pytest.raises(ValueError, match="square nested list"):
             linalg.cholesky_decomposition([1.0, 2.0])
         assert special_functions.norm_cdf_with_params(1.0, 1.0, 2.0) == pytest.approx(0.5)
+        assert special_functions.log_norm_cdf(-40.0) == pytest.approx(-804.6084420137538, abs=1e-12)
+        assert special_functions.log_norm_cdf(float("-inf")) == float("-inf")
+        assert special_functions.log_norm_cdf(float("inf")) == 0.0
         with pytest.raises(ValueError, match=r"std_dev must be finite and positive"):
             special_functions.norm_pdf_with_params(0.0, 0.0, -1.0)

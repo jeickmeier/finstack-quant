@@ -134,17 +134,9 @@ pub(crate) fn tranche_cashflows_on(
     let mut tranche_cfs = Vec::new();
     let ref_id = &cmo.reference_tranche_id;
 
-    let ref_tranche = waterfall.get_tranche(ref_id).ok_or_else(|| {
+    waterfall.get_tranche(ref_id).ok_or_else(|| {
         finstack_quant_core::Error::Validation(format!("Tranche {} not found", ref_id))
     })?;
-
-    let is_io = ref_tranche.tranche_type == CmoTrancheType::InterestOnly;
-    let io_tranche = is_io.then(|| ref_tranche.clone());
-
-    // IO notionals reference the collateral balance: an IO with current
-    // notional N on collateral of current face F accrues on
-    // `N × beginning_balance / F` each period.
-    let collateral_face = collateral.current_face.amount();
 
     for (period_idx, cf) in collateral_cfs.iter().enumerate() {
         // Run waterfall for this period
@@ -156,54 +148,32 @@ pub(crate) fn tranche_cashflows_on(
             ctx.period_index = period_idx;
         }
 
-        if let Some(io_tranche) = io_tranche.as_ref() {
-            // Interest accrues on the balance at the start of the period,
-            // before principal payments.
-            let io_notional =
-                io_tranche.current_face.amount() * cf.beginning_balance / collateral_face;
-            // Interest conservation: the IO can never receive more than
-            // the collateral interest delivered this period, so
-            // IO + PO PV stays bounded by collateral PV.
-            let io_payment =
-                (io_notional * io_tranche.coupon * cf.accrual_fraction).min(cf.interest);
+        // Every reference class consumes the same priority waterfall. In
+        // particular, IO coupons compete with other current-pay coupons for
+        // collateral interest; they are not a separate claim on the full pool.
+        // The waterfall accrues on beginning IO notional and applies collateral
+        // survival to that notional only after allocating this period's cash.
+        let collateral_survival = collateral_survival(cf.beginning_balance, cf.ending_balance);
+        let result = execute_waterfall_with_principal_breakdown(
+            &mut waterfall,
+            cf.scheduled_principal,
+            cf.prepayment,
+            total_interest,
+            collateral_survival,
+            cf.accrual_fraction,
+            pac_context.as_ref(),
+        )?;
 
+        if let Some(alloc) = result.allocations.iter().find(|a| a.tranche_id == *ref_id) {
             tranche_cfs.push(TrancheCashflow {
                 payment_date: cf.payment_date,
-                scheduled_principal: 0.0,
-                prepayment_principal: 0.0,
-                interest: io_payment,
-                total: io_payment,
+                scheduled_principal: alloc.scheduled_principal,
+                prepayment_principal: alloc.prepayment_principal,
+                interest: alloc.interest,
+                total: alloc.principal + alloc.interest,
                 #[cfg(test)]
-                ending_balance: io_tranche.current_face.amount() * cf.ending_balance
-                    / collateral_face,
+                ending_balance: alloc.ending_balance,
             });
-        } else {
-            // Regular waterfall execution. For PAC deals `pac_context` is
-            // `Some`, so PAC tranches amortize on their collateral-derived
-            // schedule/collar via `allocate_pac_support` instead of falling
-            // through to balance-limited sequential allocation.
-            let collateral_survival = collateral_survival(cf.beginning_balance, cf.ending_balance);
-            let result = execute_waterfall_with_principal_breakdown(
-                &mut waterfall,
-                cf.scheduled_principal,
-                cf.prepayment,
-                total_interest,
-                collateral_survival,
-                cf.accrual_fraction,
-                pac_context.as_ref(),
-            )?;
-
-            if let Some(alloc) = result.allocations.iter().find(|a| a.tranche_id == *ref_id) {
-                tranche_cfs.push(TrancheCashflow {
-                    payment_date: cf.payment_date,
-                    scheduled_principal: alloc.scheduled_principal,
-                    prepayment_principal: alloc.prepayment_principal,
-                    interest: alloc.interest,
-                    total: alloc.principal + alloc.interest,
-                    #[cfg(test)]
-                    ending_balance: alloc.ending_balance,
-                });
-            }
         }
     }
 
@@ -307,7 +277,11 @@ fn create_assumed_collateral(cmo: &AgencyCmo, as_of: Date) -> Result<AgencyMbsPa
     let guarantee_fee = defaults.guarantee_fee_bp;
     let pass_through = wac - servicing_fee / 10_000.0 - guarantee_fee / 10_000.0;
 
-    let maturity = as_of.add_months(wam as i32);
+    let maturity = as_of.add_months(i32::try_from(wam).map_err(|_| {
+        finstack_quant_core::Error::Validation(
+            "collateral WAM months exceed supported range".into(),
+        )
+    })?)?;
 
     AgencyMbsPassthrough::builder()
         .id(InstrumentId::new(format!("{}-COLLATERAL", cmo.id.as_str())))
@@ -545,6 +519,94 @@ mod tests {
         assert!(pv.amount() > 0.0);
     }
 
+    #[test]
+    fn mixed_io_references_match_waterfall_and_conserve_collateral_cash() {
+        use super::super::types::CmoWaterfall;
+        use crate::instruments::Instrument;
+
+        let face = |amount| Money::new(amount, Currency::USD).expect("money");
+        for io_count in [1, 2] {
+            let mut cmo = AgencyCmo::example_io_po().expect("CMO");
+            let mut po = CmoTranche::po_strip("PO", face(50_000_000.0));
+            po.priority = 1;
+            let mut tranches = vec![
+                po,
+                CmoTranche::sequential("SEQ", face(50_000_000.0), 0.035, 2),
+            ];
+            for i in 0..io_count {
+                let mut io = CmoTranche::io_strip(
+                    &format!("IO{i}"),
+                    face(100_000_000.0),
+                    0.0175 / f64::from(io_count),
+                );
+                io.priority = 3 + i as u32;
+                tranches.push(io);
+            }
+            cmo.waterfall = CmoWaterfall::new(tranches);
+            cmo.reference_tranche_id = "IO0".into();
+            let mut pool = AgencyMbsPassthrough::example().expect("pool");
+            pool.original_face = face(100_000_000.0);
+            pool.current_face = pool.original_face;
+            pool.issue_date = cmo.issue_date;
+            pool.maturity = pool.issue_date.add_months(12).expect("maturity");
+            pool.wam_months = 12;
+            pool.wac = 0.04;
+            pool.coupon = 0.035;
+            pool.servicing_fee_bp = 25.0;
+            pool.guarantee_fee_bp = 25.0;
+            pool.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
+            cmo.collateral = Some(Box::new(pool.clone()));
+            cmo.validate_invariants().expect("accepted deal");
+            let as_of = cmo.issue_date;
+            let collateral = generate_cashflows(&pool, as_of, None).expect("cashflows");
+            let reference_flows: Vec<_> = cmo
+                .waterfall
+                .tranches
+                .iter()
+                .map(|tranche| {
+                    let mut reference = cmo.clone();
+                    reference.reference_tranche_id = tranche.id.clone();
+                    generate_tranche_cashflows(&reference, as_of, None).expect("reference")
+                })
+                .collect();
+            let mut waterfall = cmo.waterfall.clone();
+            for (period, cf) in collateral.iter().enumerate() {
+                let result = execute_waterfall_with_principal_breakdown(
+                    &mut waterfall,
+                    cf.scheduled_principal,
+                    cf.prepayment,
+                    cf.interest,
+                    collateral_survival(cf.beginning_balance, cf.ending_balance),
+                    cf.accrual_fraction,
+                    None,
+                )
+                .expect("waterfall");
+                let mut total = 0.0;
+                for (tranche, flows) in cmo.waterfall.tranches.iter().zip(&reference_flows) {
+                    let allocation = result
+                        .allocations
+                        .iter()
+                        .find(|a| a.tranche_id == tranche.id)
+                        .expect("allocation");
+                    assert!((flows[period].interest - allocation.interest).abs() < 1e-7);
+                    assert!(
+                        (flows[period].total - allocation.principal - allocation.interest).abs()
+                            < 1e-7
+                    );
+                    assert!(
+                        (flows[period].ending_balance - allocation.ending_balance).abs() < 1e-7
+                    );
+                    total += flows[period].total;
+                }
+                assert!(
+                    (total + result.residual_interest + result.residual_principal - cf.total).abs()
+                        < 1e-6,
+                    "all reference classes must conserve collateral cash in period {period}"
+                );
+            }
+        }
+    }
+
     /// Interest conservation (finding 17): the IO strip's interest is capped
     /// at the collateral interest each period, so IO + PO PV cannot exceed
     /// the PV of the collateral's total cashflows.
@@ -776,6 +838,14 @@ mod tests {
 mod production_mortgage_audit {
     use super::*;
     use time::macros::date;
+
+    #[test]
+    fn date_offset_rejects_assumed_collateral_overflow() {
+        let mut cmo = AgencyCmo::example_io_po().expect("cmo");
+        assert!(create_assumed_collateral(&cmo, Date::MAX).is_err());
+        cmo.collateral_wam_months = Some(u32::MAX);
+        assert!(create_assumed_collateral(&cmo, date!(2025 - 01 - 01)).is_err());
+    }
 
     #[test]
     fn seasoned_io_uses_current_reference_balance() {

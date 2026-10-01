@@ -38,9 +38,11 @@ pub struct ProjectedFixing {
 ///   take precedence over every projection and are retained unchanged.
 /// * `schedules` - Canonical schedules projected on `market` at `old_date`.
 ///   Their metadata carries the raw observations used by the coupon engines.
-/// * `old_date` - Exclusive start of the fixing window; earlier observations
+/// * `old_date` - Inclusive start of an advancing fixing window. Same-day
+///   projections become historical when curves advance; earlier observations
 ///   are never invented by this operation.
-/// * `new_date` - Inclusive horizon; must be on or after `old_date`.
+/// * `new_date` - Inclusive horizon; must be on or after `old_date`. An equal
+///   date returns an unchanged market clone without materializing observations.
 ///
 /// # Errors
 ///
@@ -58,10 +60,13 @@ pub fn materialize_fixings<'a>(
             "fixing materialization requires a forward date window".into(),
         ));
     }
+    if new_date == old_date {
+        return Ok(market.clone());
+    }
     let mut crossed: BTreeMap<(String, Date), Option<f64>> = BTreeMap::new();
     for schedule in schedules {
         for fixing in &schedule.get_meta().projected_fixings {
-            if fixing.date <= old_date || fixing.date > new_date {
+            if fixing.date < old_date || fixing.date > new_date {
                 continue;
             }
             if !fixing.series_id.starts_with("FIXING:") || fixing.series_id.len() == 7 {

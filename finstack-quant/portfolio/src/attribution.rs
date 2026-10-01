@@ -444,7 +444,7 @@ fn attribute_composite_primitives(
             )
             .map_err(Error::Core)?
         };
-        primitive.scale(exposure.quantity);
+        primitive.scale(exposure.quantity)?;
         translate_primitive_attribution(
             &mut primitive,
             value_t0.amount() * exposure.quantity,
@@ -637,7 +637,13 @@ fn attribute_single_position_method_owned(
             request.config,
             request.method,
         )?;
-        pos_attr.scale(position.scale_factor());
+        pos_attr
+            .scale(position.scale_factor())
+            .map_err(|error| Error::ValuationError {
+                position_id: position.position_id.clone(),
+                message: format!("Attribution scaling failed: {error}"),
+                kind: error.kind(),
+            })?;
         return Ok(PositionAttributionData {
             position_id: position.position_id.clone(),
             pos_attr,
@@ -666,7 +672,13 @@ fn attribute_single_position_method_owned(
         kind: error.kind(),
     })?;
 
-    pos_attr.scale(position.scale_factor());
+    pos_attr
+        .scale(position.scale_factor())
+        .map_err(|error| Error::ValuationError {
+            position_id: position.position_id.clone(),
+            message: format!("Attribution scaling failed: {error}"),
+            kind: error.kind(),
+        })?;
     let inst_currency = pos_attr.total_pnl.currency();
 
     Ok(PositionAttributionData {
@@ -863,7 +875,13 @@ pub(crate) fn reduce_metrics_based_prepared(
                 })?
             };
 
-            pos_attr.scale(position.scale_factor());
+            pos_attr
+                .scale(position.scale_factor())
+                .map_err(|error| Error::ValuationError {
+                    position_id: position.position_id.clone(),
+                    message: format!("Attribution scaling failed: {error}"),
+                    kind: error.kind(),
+                })?;
             let inst_currency = pos_attr.total_pnl.currency();
             Ok(PositionAttributionData {
                 position_id: position.position_id.clone(),
@@ -1499,7 +1517,13 @@ mod tests {
                     "attribution pricing did not receive FinstackConfig".to_string(),
                 )
             })?;
-            if config.rounding.output_scale.overrides.get(&Currency::USD) != Some(&4) {
+            if config
+                .rounding
+                .output_scale
+                .get_overrides()
+                .get(&Currency::USD)
+                != Some(&4)
+            {
                 return Err(finstack_quant_core::Error::Validation(
                     "attribution pricing received the wrong FinstackConfig".to_string(),
                 )
@@ -1656,8 +1680,8 @@ mod tests {
         config
             .rounding
             .output_scale
-            .overrides
-            .insert(Currency::USD, 4);
+            .set_scale(Currency::USD, 4)
+            .expect("valid decimal scale");
 
         let portfolio = Portfolio::builder("CONFIG_PORTFOLIO")
             .base_currency(Currency::USD)
@@ -1747,8 +1771,8 @@ mod tests {
             config
                 .rounding
                 .output_scale
-                .overrides
-                .insert(Currency::USD, 4);
+                .set_scale(Currency::USD, 4)
+                .expect("valid decimal scale");
             let market_t0 = MarketContext::new();
             let market_t1 = MarketContext::new();
 

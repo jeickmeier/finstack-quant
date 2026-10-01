@@ -69,6 +69,7 @@ fn cmbs(pool: AssetPool, maturity: Date) -> StructuredCredit {
     .expect("structure");
     let mut deal =
         StructuredCredit::new_cmbs("CMBS-TERM", pool, tranches, close(), maturity, "USD-OIS")
+            .expect("valid structured-credit dates")
             .with_calendar_id("nyse");
     deal.fees = None;
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
@@ -183,4 +184,106 @@ fn a_seasoned_rep_line_amortizes_over_the_remaining_term() {
         run_simulation_with_diagnostics(&cmbs(short, maturity), &market(), close()).is_err(),
         "an amortization term inside the loan's life is rejected"
     );
+}
+
+fn zero_rate_deal(explicit_payment: bool, io_months: Option<u32>) -> StructuredCredit {
+    let maturity = d(2025, 1, 1);
+    let mut pool = AssetPool::new("ZERO", DealType::Cmbs, Currency::USD);
+    let mut loan = PoolAsset::fixed_rate_bond(
+        "ZERO",
+        usd(12_000_000.0),
+        0.0,
+        maturity,
+        DayCount::Thirty360,
+    );
+    loan.asset_type = AssetType::CommercialMortgage { ltv: None };
+    loan.amortization_term_months = Some(12);
+    loan.io_months = io_months;
+    loan.contractual_payment = explicit_payment.then(|| usd(1_000_000.0));
+    pool.assets.push(loan);
+    cmbs(pool, maturity)
+}
+
+#[test]
+fn zero_rate_explicit_and_inferred_payments_amortize_and_converge() {
+    for explicit in [false, true] {
+        let deal = zero_rate_deal(explicit, None);
+        let zero = simulate(&deal);
+        assert_eq!(zero.diagnostics.periods.len(), 12);
+        let mut total = 0.0;
+        for (i, period) in zero.diagnostics.periods.iter().enumerate() {
+            let principal = period.principal_collections.amount();
+            assert!(
+                (principal - 1_000_000.0).abs() < 1e-6,
+                "month {i}: {principal}"
+            );
+            assert!((period.pool_balance.amount() - (11 - i) as f64 * 1_000_000.0).abs() < 1e-6);
+            total += principal;
+        }
+        assert!((total - 12_000_000.0).abs() < 1e-6);
+        // The same dates/discount factors and nearly identical principal
+        // imply continuity of principal PV and weighted average life.
+        let mut small_rate_deal = deal;
+        small_rate_deal.pool.assets[0].rate = 1e-10;
+        let small = simulate(&small_rate_deal);
+        for (zero_period, small_period) in zero
+            .diagnostics
+            .periods
+            .iter()
+            .zip(&small.diagnostics.periods)
+        {
+            assert!(
+                (zero_period.principal_collections.amount()
+                    - small_period.principal_collections.amount())
+                .abs()
+                    < 0.01
+            );
+            assert!(
+                (zero_period.pool_balance.amount() - small_period.pool_balance.amount()).abs()
+                    < 0.01
+            );
+        }
+    }
+}
+
+#[test]
+fn zero_rate_interest_only_window_defers_amortization() {
+    let run = simulate(&zero_rate_deal(false, Some(3)));
+    for (i, period) in run.diagnostics.periods.iter().enumerate() {
+        let expected = if i < 3 { 0.0 } else { 12_000_000.0 / 9.0 };
+        assert!(
+            (period.principal_collections.amount() - expected).abs() < 1e-6,
+            "month {i}: {} vs {expected}",
+            period.principal_collections.amount()
+        );
+    }
+}
+
+#[test]
+fn zero_rate_payment_scales_with_default_and_prepayment_survival() {
+    let mut deal = zero_rate_deal(true, None);
+    deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(1.0 - 0.99_f64.powi(12));
+    deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(1.0 - 0.98_f64.powi(12));
+    let run = simulate(&deal);
+    let mut balance = 12_000_000.0;
+    let mut payment = 1_000_000.0;
+    for (i, period) in run.diagnostics.periods.iter().take(11).enumerate() {
+        let default = balance * 0.01;
+        let scheduled = payment * 0.99;
+        let prepayment = (balance - default - scheduled) * 0.02;
+        balance -= default + scheduled + prepayment;
+        payment *= 0.99 * 0.98;
+        assert!(
+            (period.defaults.amount() - default).abs() < 1e-6,
+            "default month {i}"
+        );
+        assert!(
+            (period.principal_collections.amount() - scheduled - prepayment).abs() < 1e-6,
+            "principal month {i}"
+        );
+        assert!(
+            (period.pool_balance.amount() - balance).abs() < 1e-6,
+            "balance month {i}"
+        );
+    }
 }

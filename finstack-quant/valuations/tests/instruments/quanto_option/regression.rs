@@ -311,3 +311,64 @@ fn vanna_is_reported_per_vol_point() {
         "quanto vanna must be per vol point: expected {vanna_ref}, got {vanna}"
     );
 }
+
+#[test]
+fn quanto_vega_is_per_volatility_percentage_point() {
+    let option = build_option(-0.35);
+    let market = build_market(0.20, 0.10);
+    let vol_bump = 0.01;
+    let expected = (option
+        .value(&build_market(0.20 + vol_bump, 0.10), AS_OF)
+        .expect("bumped PV")
+        .amount()
+        - option.value(&market, AS_OF).expect("base PV").amount())
+        / (vol_bump * 100.0);
+    let result = option
+        .price_with_metrics(&market, AS_OF, &[MetricId::Vega], PricingOptions::default())
+        .expect("vega result");
+    let vega = result.metric(MetricId::Vega).expect("vega");
+    assert!(
+        (vega - expected).abs() < 1e-9 * expected.abs().max(1.0),
+        "currency per 0.01 volatility move: expected {expected}, got {vega}"
+    );
+}
+
+#[test]
+fn quanto_generic_theta_horizon_caps_at_expiry() {
+    let mut option = build_option(-0.35);
+    option.expiry = AS_OF + time::Duration::days(2);
+    option.metric_pricing_overrides.theta_period =
+        Some(finstack_quant_core::dates::Tenor::weekly());
+    let market = build_market(0.20, 0.10);
+    let base_pv = option.value(&market, AS_OF).expect("base PV").amount();
+    let result = option
+        .price_with_metrics(
+            &market,
+            AS_OF,
+            &[
+                MetricId::Theta,
+                MetricId::ThetaCarry,
+                MetricId::ThetaPeriodDays,
+            ],
+            PricingOptions::default(),
+        )
+        .expect("generic theta");
+    assert_eq!(Instrument::expiry(&option), Some(option.expiry));
+    assert_eq!(result.metric(MetricId::ThetaPeriodDays), Some(2.0));
+    // The fixture remains at the strike, so its terminal intrinsic value and
+    // intervening cash are zero. Theta is the loss of its remaining time value.
+    assert_eq!(result.metric(MetricId::ThetaCarry), Some(0.0));
+    assert!((result.metric(MetricId::Theta).expect("theta") + base_pv).abs() < 1e-8);
+
+    let after_expiry = option.expiry + time::Duration::days(1);
+    let expired = option
+        .price_with_metrics(
+            &market,
+            after_expiry,
+            &[MetricId::Theta, MetricId::ThetaPeriodDays],
+            PricingOptions::default(),
+        )
+        .expect("expired theta");
+    assert_eq!(expired.metric(MetricId::Theta), Some(0.0));
+    assert_eq!(expired.metric(MetricId::ThetaPeriodDays), Some(0.0));
+}

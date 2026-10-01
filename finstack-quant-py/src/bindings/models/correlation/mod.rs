@@ -82,6 +82,9 @@ impl PyCopulaSpec {
     }
 
     /// Build a concrete `Copula` from this specification.
+    ///
+    /// Raises ``ValueError`` for invalid Student-t degrees of freedom or
+    /// non-finite/out-of-range random-loading volatility in a deserialized spec.
     fn build(&self) -> PyResult<PyCopula> {
         self.inner
             .build()
@@ -181,10 +184,9 @@ impl PyCopula {
     /// Strict lower-tail dependence coefficient ``λ_L`` at the given
     /// correlation.
     ///
-    /// Returns ``nan`` when the model has no closed-form ``λ_L`` (Random
-    /// Factor Loading); check ``math.isnan()`` before using the result. For
-    /// the RFL heuristic stress gauge use
-    /// :meth:`stress_correlation_proxy` instead.
+    /// Random Factor Loading returns the probability mass at unit loading
+    /// under its calibrated clipped-normal loading distribution. Gaussian
+    /// models have zero tail dependence except at perfect correlation.
     #[pyo3(text_signature = "(self, correlation)")]
     fn tail_dependence(&self, correlation: f64) -> f64 {
         self.inner.tail_dependence(correlation)
@@ -194,8 +196,7 @@ impl PyCopula {
     /// copula.
     ///
     /// This is **not** the strict copula lower-tail-dependence coefficient
-    /// ``λ_L`` (which has no closed form for RFL — ``tail_dependence``
-    /// returns ``nan``). It gauges the extra correlation mass in the
+    /// ``λ_L`` returned by ``tail_dependence``. It gauges the extra correlation mass in the
     /// high-loading tail and vanishes in the Gaussian (``loading_vol = 0``)
     /// limit.
     ///
@@ -1517,8 +1518,11 @@ fn joint_probabilities(p1: f64, p2: f64, correlation: f64) -> PyResult<(f64, f64
 /// ``matrix`` is either flat row-major (length ``n * n``) or a 2-D
 /// ``n x n`` list/array of rows.
 ///
-/// Raises ``ValueError`` if the shape does not match ``n`` or the matrix is
-/// not a valid correlation matrix (diagonal, bounds, symmetry, PSD).
+/// Raises ``ValueError`` if ``n * n`` overflows the platform's ``usize``
+/// range, the shape does not match ``n``, or the matrix is not a valid
+/// correlation matrix (diagonal, bounds, symmetry, PSD).
+/// Raises ``OverflowError`` if ``n`` is negative or exceeds the platform's
+/// ``usize`` range, and ``TypeError`` if ``n`` is not an integer.
 #[pyfunction]
 #[pyo3(text_signature = "(matrix, n)")]
 fn validate_correlation_matrix(
@@ -1549,9 +1553,11 @@ fn validate_correlation_matrix(
 /// matrix : list[float] | list[list[float]]
 ///     Flat row-major ``n x n`` input matrix, or a 2-D ``n x n`` list/array.
 /// n : int
-///     Matrix dimension.
+///     Non-negative matrix dimension representable as the platform's
+///     unsigned pointer-sized integer; ``n * n`` must also fit that range.
 /// max_iter : int, optional
-///     Maximum alternating-projection iterations. Defaults to the Rust
+///     Non-negative maximum alternating-projection iterations, representable
+///     as the platform's unsigned pointer-sized integer. Defaults to the Rust
 ///     ``NearestCorrelationOpts::default()`` value (currently ``200``).
 /// tol : float, optional
 ///     Frobenius-norm tolerance between successive iterates. Defaults to
@@ -1567,8 +1573,14 @@ fn validate_correlation_matrix(
 /// Raises
 /// ------
 /// ValueError
-///     If the input shape does not match ``n``, is grossly asymmetric, or
-///     the diagonal is far from 1.
+///     If ``n * n`` overflows the platform's ``usize`` range, the input shape
+///     does not match ``n``, is grossly asymmetric, or the diagonal is far
+///     from 1.
+/// OverflowError
+///     If ``n`` or ``max_iter`` is negative or exceeds the platform's
+///     unsigned pointer-sized integer range.
+/// TypeError
+///     If ``n`` or a supplied ``max_iter`` is not an integer.
 /// RuntimeError
 ///     If the projection does not converge within ``max_iter`` iterations.
 #[pyfunction]
@@ -1605,9 +1617,12 @@ fn nearest_correlation(
 /// ``matrix`` is either flat row-major (length ``n * n``) or a 2-D
 /// ``n x n`` list/array of rows.
 ///
-/// Raises ``ValueError`` if the matrix shape is wrong, an entry is non-finite,
-/// or the matrix is indefinite. The message preserves the core Cholesky
-/// diagnostic, including dimensions or the offending position and value.
+/// Raises ``ValueError`` if ``n * n`` overflows the platform's ``usize``
+/// range, the matrix shape is wrong, an entry is non-finite, or the matrix
+/// is indefinite. The message preserves the core Cholesky diagnostic,
+/// including dimensions or the offending position and value.
+/// Raises ``OverflowError`` if ``n`` is negative or exceeds the platform's
+/// ``usize`` range, and ``TypeError`` if ``n`` is not an integer.
 #[pyfunction]
 #[pyo3(text_signature = "(matrix, n)")]
 fn cholesky_decompose(py: Python<'_>, matrix: &Bound<'_, PyAny>, n: usize) -> PyResult<Vec<f64>> {
@@ -1618,7 +1633,7 @@ fn cholesky_decompose(py: Python<'_>, matrix: &Bound<'_, PyAny>, n: usize) -> Py
 
 /// Register the `correlation` submodule on the parent module.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "correlation")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "correlation")?;
     m.setattr(
         "__doc__",
         "Correlation infrastructure: copulas, factor models, recovery models.",
@@ -1674,13 +1689,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
     m.setattr("__all__", all)?;
 
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "correlation",
-        "finstack_quant.models",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Python,
     )?;
 
     Ok(())

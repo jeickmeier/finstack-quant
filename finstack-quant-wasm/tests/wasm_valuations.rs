@@ -107,6 +107,7 @@ fn structured_credit_instrument_json() -> String {
     .unwrap();
     let mut sc =
         StructuredCredit::new_abs("ABS-STOCH-PV", pool, tranches, closing, maturity, "USD-OIS")
+            .expect("valid structured-credit dates")
             .with_calendar_id("nyse");
     sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
@@ -117,7 +118,9 @@ fn structured_credit_instrument_json() -> String {
     sc.credit_model.stochastic_default_spec = Some(StochasticDefaultSpec::deterministic(
         sc.credit_model.default_spec.clone(),
     ));
-    sc.instrument_pricing_overrides = InstrumentPricingOverrides::default().with_mc_paths(1);
+    // Sampling diagnostics require two independent estimators. Default
+    // antithetic pairing prices four identical paths for this deterministic deal.
+    sc.instrument_pricing_overrides = InstrumentPricingOverrides::default().with_mc_paths(2);
 
     serde_json::to_string(&InstrumentEnvelope::new(InstrumentJson::StructuredCredit(
         Box::new(sc),
@@ -378,11 +381,26 @@ fn price_instrument_structured_credit_stochastic_returns_details() {
     )
     .expect("price");
     let parsed = valuation_object(result);
-    assert_eq!(parsed["details"]["type"], "structured_credit_stochastic");
+    assert_deterministic_structured_credit_details(&parsed);
     let tranches = parsed["details"]["data"]["tranche_results"]
         .as_array()
         .expect("tranche_results array");
     assert_eq!(tranches.len(), 2);
+}
+
+fn assert_deterministic_structured_credit_details(parsed: &serde_json::Value) {
+    assert_eq!(parsed["details"]["type"], "structured_credit_stochastic");
+    let details = &parsed["details"]["data"];
+    // usize counts cross the pricing boundary as BigInt; valuation_object
+    // preserves them as decimal strings when round-tripping through JSON.
+    assert_eq!(details["pricing_mode"]["monte_carlo"]["num_paths"], "2");
+    assert_eq!(details["pricing_mode"]["monte_carlo"]["antithetic"], true);
+    assert_eq!(details["num_paths"], "4", "two antithetic estimator pairs");
+    assert_eq!(
+        details["pv_std_error"].as_f64(),
+        Some(0.0),
+        "identical deterministic paths have zero sampling uncertainty"
+    );
 }
 
 #[wasm_bindgen_test]
@@ -408,7 +426,7 @@ fn price_instrument_structured_credit_waterfall_rules() {
     )
     .expect("price");
     let parsed = valuation_object(result);
-    assert_eq!(parsed["details"]["type"], "structured_credit_stochastic");
+    assert_deterministic_structured_credit_details(&parsed);
 }
 
 /// Round a typed JS object result through `JSON.stringify` for assertions.

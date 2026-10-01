@@ -325,26 +325,52 @@ fn day_count_context_supports_context_dependent_conventions() {
 fn day_count_exposes_act365l_and_signed_fraction() {
     let start = create_date(JsValue::from(2024), JsValue::from(1), JsValue::from(1)).unwrap();
     let end = create_date(JsValue::from(2025), JsValue::from(1), JsValue::from(1)).unwrap();
+    let empty = JsDayCountContext::new(None, None, None, None, None).expect("empty context");
+    let ctx = JsDayCountContext::new(
+        None,
+        Some(JsValue::from("1Y")),
+        None,
+        Some(js_sys::Array::of2(&JsValue::from(start), &JsValue::from(end)).into()),
+        None,
+    )
+    .expect("coupon context");
     assert_eq!(
         JsDayCount::act365l()
-            .signed_year_fraction(
-                JsValue::from(start),
-                JsValue::from(end),
-                &JsDayCountContext::new(None, None, None, None, None).expect("empty context")
-            )
+            .year_fraction(JsValue::from(start), JsValue::from(end), &ctx)
             .unwrap(),
         1.0
     );
+    assert!(JsDayCount::act365l()
+        .year_fraction(JsValue::from(start), JsValue::from(end), &empty)
+        .is_err());
+    assert!(JsDayCount::act365l()
+        .signed_year_fraction(JsValue::from(start), JsValue::from(end), &empty)
+        .is_err());
     assert_eq!(
-        JsDayCount::act365l()
-            .signed_year_fraction(
-                JsValue::from(end),
-                JsValue::from(start),
-                &JsDayCountContext::new(None, None, None, None, None).expect("empty context")
-            )
+        JsDayCount::act_act()
+            .signed_year_fraction(JsValue::from(end), JsValue::from(start), &empty)
             .unwrap(),
         -1.0
     );
+}
+
+#[wasm_bindgen_test]
+fn act365l_partial_fraction_uses_enclosing_coupon_year() {
+    let start = create_date(JsValue::from(2023), JsValue::from(10), JsValue::from(15)).unwrap();
+    let query = create_date(JsValue::from(2023), JsValue::from(12), JsValue::from(15)).unwrap();
+    let end = create_date(JsValue::from(2024), JsValue::from(4), JsValue::from(15)).unwrap();
+    let ctx = JsDayCountContext::new(
+        None,
+        Some(JsValue::from("6M")),
+        None,
+        Some(js_sys::Array::of2(&JsValue::from(start), &JsValue::from(end)).into()),
+        None,
+    )
+    .expect("coupon context");
+    let accrued = JsDayCount::act365l()
+        .year_fraction(JsValue::from(start), JsValue::from(query), &ctx)
+        .unwrap();
+    assert!((accrued - 61.0 / 366.0).abs() < 1e-14);
 }
 
 #[wasm_bindgen_test]

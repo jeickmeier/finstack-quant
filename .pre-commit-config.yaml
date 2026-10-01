@@ -86,10 +86,11 @@ repos:
         # Lib/bins/tests/examples only — Criterion benches are compiled by
         # `mise run rust-bench`, not by fmt or lint.
         # Keep in step with `mise run rust-lint`.
+        # `--keep-going` reports every crate error instead of stopping at the first.
         # Incremental codegen comes from the dev/test profiles. Do not force
         # CARGO_INCREMENTAL here: CI sets it to 0 because the build cache does
         # not restore target/incremental.
-        entry: bash -c 'cargo clippy --workspace --lib --bins --tests --examples --all-features -- -D warnings'
+        entry: bash -c 'cargo clippy --workspace --lib --bins --tests --examples --all-features --keep-going -- -D warnings'
         language: system
         types: [rust]
         pass_filenames: false

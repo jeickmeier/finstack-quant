@@ -1,4 +1,4 @@
-use super::swaption::{hw1f_swaption_price_inner, Hw1fSwaptionPriceInput};
+use super::swaption::hw1f_swaption_price_prepared;
 use super::*;
 
 // HW1F mean-reversion bounds.
@@ -138,25 +138,46 @@ pub(super) fn quote_fit_report(
 }
 
 /// Pre-computed market data for one swaption quote, captured once before
-/// LM iteration so that the residual loop is a pure numeric computation.
-///
-/// `schedule` is the contractual fixed-leg schedule. When `None` the
-/// calibrator uses the legacy constant-`tenor/n_periods` schedule preserved
-/// for the float-only public API and existing tests.
+/// LM iteration. Contractual cashflows are prepared once and shared by all
+/// independent optimizer restarts.
 pub(super) struct PreparedSwaption {
     pub(super) market_price: f64,
+    pub(super) annuity: f64,
     pub(super) fwd_swap_rate: f64,
     pub(super) vega: f64,
+    pub(super) swap_start_time: f64,
+    pub(super) cashflows: Vec<(f64, f64)>,
     pub(super) schedule: Option<SwaptionSchedule>,
 }
 
+impl PreparedSwaption {
+    pub(super) fn model_price(
+        &self,
+        params: HullWhiteCalibrationParams,
+        df: &(dyn Fn(f64) -> f64 + Sync),
+        expiry: f64,
+    ) -> finstack_quant_core::Result<f64> {
+        if let Some(schedule) = &self.schedule {
+            super::contractual_swaption::price(params, df, expiry, self.fwd_swap_rate, schedule)
+        } else {
+            Ok(hw1f_swaption_price_prepared(
+                params.kappa,
+                params.sigma,
+                df,
+                expiry,
+                self.swap_start_time,
+                &self.cashflows,
+            ))
+        }
+    }
+}
+
 /// `GlobalSolveTarget` impl carrying everything HW1F swaption calibration
-/// needs to evaluate residuals. The borrowed `df` keeps the target zero-
-/// allocation per residual call; the pre-computed market data avoids re-
-/// pricing from quotes inside the LM hot loop.
+/// needs to evaluate residuals. Cashflow and schedule construction stays
+/// outside the hot loop; parameter-dependent coefficients remain local to
+/// each evaluation so parallel restarts do not share mutable scratch space.
 pub(super) struct HullWhiteSwaptionTarget<'a> {
     pub(super) df: &'a (dyn Fn(f64) -> f64 + Sync),
-    pub(super) ppy: usize,
     pub(super) initial_x0: [f64; 2],
     pub(super) prepared: Vec<PreparedSwaption>,
 }
@@ -200,16 +221,7 @@ impl<'a> GlobalSolveTarget for HullWhiteSwaptionTarget<'a> {
     ) -> finstack_quant_core::Result<()> {
         for (idx, q) in quotes.iter().enumerate() {
             let pre = &self.prepared[idx];
-            let model_price = hw1f_swaption_price_inner(Hw1fSwaptionPriceInput {
-                kappa: curve.kappa,
-                sigma: curve.sigma,
-                df: self.df,
-                t0: q.expiry,
-                tenor: q.tenor,
-                swap_rate: pre.fwd_swap_rate,
-                periods_per_year: self.ppy,
-                schedule: pre.schedule.as_ref(),
-            });
+            let model_price = pre.model_price(*curve, self.df, q.expiry)?;
             if !model_price.is_finite() {
                 // Signal infeasibility to the LM solver instead of injecting a
                 // magic sentinel as a real residual: a hard-coded literal here
@@ -272,6 +284,7 @@ impl<'a> GlobalSolveTarget for HullWhiteSwaptionTarget<'a> {
 pub(super) struct PreparedCapFloor {
     pub(super) market_price: f64,
     pub(super) vega: f64,
+    pub(super) schedule: CapFloorSchedule,
 }
 
 /// `GlobalSolveTarget` impl for HW1F cap/floor calibration. Used only on
@@ -281,7 +294,6 @@ pub(super) struct PreparedCapFloor {
 pub(super) struct HullWhiteCapFloorTarget<'a> {
     pub(super) discount_df: &'a (dyn Fn(f64) -> f64 + Sync),
     pub(super) forward_df: &'a (dyn Fn(f64) -> f64 + Sync),
-    pub(super) frequency: SwapFrequency,
     pub(super) initial_x0: [f64; 2],
     pub(super) prepared: Vec<PreparedCapFloor>,
 }
@@ -313,16 +325,17 @@ impl<'a> GlobalSolveTarget for HullWhiteCapFloorTarget<'a> {
         quotes: &[Self::Quote],
         residuals: &mut [f64],
     ) -> finstack_quant_core::Result<()> {
+        let model = HullWhiteParams::constant(curve.kappa, curve.sigma)?;
         for (idx, quote) in quotes.iter().enumerate() {
             let pre = &self.prepared[idx];
-            let spec = CapFloorPriceSpec::from_quote(quote, self.frequency);
-            let model_price = hw1f_cap_floor_price(
-                curve.kappa,
-                curve.sigma,
+            let model_price = super::pricing::scheduled_cap_floor_price(
+                &model,
                 self.discount_df,
                 self.forward_df,
-                spec,
-            );
+                &pre.schedule,
+                quote.strike,
+                quote.is_cap,
+            )?;
             if !model_price.is_finite() {
                 // Signal infeasibility to the LM solver instead of injecting a
                 // magic sentinel as a real residual: a hard-coded literal here

@@ -4,7 +4,10 @@ import {
   features,
   models,
   portfolio,
+  scenarios,
+  type AttributionFactor,
   type FactorBrinsonResult,
+  type HorizonReport,
   type MaterializationPhases,
   type MaterializationReport,
   type WasmOwned,
@@ -133,3 +136,30 @@ valuation.covenants = undefined;
 // @ts-expect-error Metadata is a complete canonical structure.
 valuation.meta = {};
 void [roundingMode, covenantReports, explanation];
+
+const scenarioSpec = scenarios.buildScenarioSpec('metadata', []);
+const scenarioName: string | null | undefined = scenarioSpec.name;
+scenarioSpec.name = null;
+scenarioSpec.description = null;
+const horizon: HorizonReport = scenarios.computeHorizonReturn('{}', '{}', '2025-01-15', '{}');
+const horizonReturn: number | null | undefined = horizon.summary.total_return;
+const horizonAnnualized: number | null | undefined = horizon.summary.annualized_return;
+const horizonInitialAmount: string = horizon.initial_value.amount;
+const horizonDays: number | null | undefined = horizon.horizon_days;
+const horizonFactor: AttributionFactor = 'carry';
+const carryContribution: number | null = horizon.summary.factor_contributions[horizonFactor];
+const horizonOperations: number = horizon.scenario_report.operations_applied;
+// @ts-expect-error Undefined compounded returns must be handled by the caller.
+const requiredAnnualized: number = horizon.summary.annualized_return;
+// @ts-expect-error Factor keys use canonical Rust attribution names.
+void horizon.factor_contributions.rates;
+void [
+  scenarioName,
+  horizonReturn,
+  horizonAnnualized,
+  horizonInitialAmount,
+  horizonDays,
+  carryContribution,
+  horizonOperations,
+  requiredAnnualized,
+];

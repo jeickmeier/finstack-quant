@@ -357,12 +357,12 @@ mod tests {
         });
         let market = MarketContext::new();
 
-        // Trade 8 days before the coupon: trade date is cum-coupon, but T+1
-        // settlement lands inside the 7-day ex-window.
-        let as_of = coupon_date - time::Duration::days(8);
+        // Trade on the record date: the trade-date view retains the coupon,
+        // but T+1 settlement falls after the record date and forfeits it.
+        let as_of = coupon_date - time::Duration::days(7);
         let quote_ctx = QuoteDateContext::new(&bond, &market, as_of).expect("quote ctx");
         assert!(
-            quote_ctx.quote_date >= coupon_date - time::Duration::days(7),
+            quote_ctx.quote_date > coupon_date - time::Duration::days(7),
             "settlement must be inside the ex-window for this scenario"
         );
 

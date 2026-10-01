@@ -22,8 +22,8 @@ impl Performance {
     ///
     /// # Arguments
     ///
-    /// * `panel` - Per-ticker value series, one entry per active date of that
-    ///   ticker, in [`Self::ticker_names`] order.
+    /// * `panel` - Exactly one value series per ticker in [`Self::ticker_names`]
+    ///   order, each containing exactly one entry per active date of that ticker.
     ///
     /// # Returns
     ///
@@ -32,12 +32,37 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns an error if `panel` has more series than tickers.
+    /// Returns [`crate::error::InputError::InvalidReturnSeries`] if the ticker
+    /// count differs or a series length does not match its ticker's active dates.
     pub fn aligned_panel(&self, panel: Vec<Vec<f64>>) -> crate::Result<(Vec<Date>, Vec<Vec<f64>>)> {
+        if panel.len() != self.ticker_names().len() {
+            return Err(super::invalid_return_series(
+                "<panel>",
+                panel.len(),
+                format!(
+                    "panel contains {} series but {} tickers are loaded",
+                    panel.len(),
+                    self.ticker_names().len()
+                ),
+            )
+            .into());
+        }
         let dates = self.active_dates();
         let mut columns = Vec::with_capacity(panel.len());
         for (ticker_idx, series) in panel.into_iter().enumerate() {
             let ticker_dates = self.active_dates_for_ticker(ticker_idx)?;
+            if series.len() != ticker_dates.len() {
+                return Err(super::invalid_return_series(
+                    &self.ticker_names()[ticker_idx],
+                    series.len().min(ticker_dates.len()),
+                    format!(
+                        "panel series contains {} values but {} active dates are required",
+                        series.len(),
+                        ticker_dates.len()
+                    ),
+                )
+                .into());
+            }
             let mut padded = vec![f64::NAN; dates.len()];
             let mut global_idx = 0usize;
             for (&date, &value) in ticker_dates.iter().zip(series.iter()) {

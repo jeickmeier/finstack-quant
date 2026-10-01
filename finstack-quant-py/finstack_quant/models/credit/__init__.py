@@ -10,8 +10,6 @@ Examples:
 
 """
 
-import sys as _sys
-
 from finstack_quant.finstack_quant import models as _models
 
 MertonModel = _models.credit.MertonModel
@@ -30,16 +28,6 @@ migration = _models.credit.migration
 pd = _models.credit.pd
 recovery_waterfall = _models.credit.recovery_waterfall
 scoring = _models.credit.scoring
-
-for _name, _module in {
-    "lgd": lgd,
-    "liability_management": liability_management,
-    "migration": migration,
-    "pd": pd,
-    "recovery_waterfall": recovery_waterfall,
-    "scoring": scoring,
-}.items():
-    _sys.modules.setdefault(f"finstack_quant.models.credit.{_name}", _module)
 
 __all__ = [
     "AssetDynamics",

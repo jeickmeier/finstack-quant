@@ -11,7 +11,7 @@ use crate::monte_carlo::traits::Payoff;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{Error, Result};
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 fn validate_fixing_schedule(fixing_steps: &[usize], initial_count: usize) -> Result<()> {
     if fixing_steps.is_empty() && initial_count == 0 {
@@ -75,6 +75,43 @@ impl std::str::FromStr for AveragingMethod {
     }
 }
 
+/// Aggregated contractual observations at a single simulated time.
+#[derive(Debug, Clone, Default)]
+struct FixingWeight {
+    count: usize,
+    total_multiplier: f64,
+    log_multiplier: f64,
+}
+
+fn fixing_weights(steps: &[usize], multipliers: &[f64]) -> Result<HashMap<usize, FixingWeight>> {
+    if steps.len() != multipliers.len()
+        || multipliers
+            .iter()
+            .any(|&scale| !scale.is_finite() || scale <= 0.0)
+    {
+        return Err(Error::Validation(
+            "Asian fixing multipliers must be finite, positive, and match the fixing count"
+                .to_owned(),
+        ));
+    }
+    let mut weights: HashMap<usize, FixingWeight> = HashMap::new();
+    for (&step, &scale) in steps.iter().zip(multipliers) {
+        let weight = weights.entry(step).or_default();
+        weight.count += 1;
+        weight.total_multiplier += scale;
+        weight.log_multiplier += scale.ln();
+    }
+    if weights
+        .values()
+        .any(|weight| !weight.total_multiplier.is_finite() || !weight.log_multiplier.is_finite())
+    {
+        return Err(Error::Validation(
+            "Asian fixing multiplier aggregates must be finite".to_owned(),
+        ));
+    }
+    Ok(weights)
+}
+
 /// Asian call option.
 ///
 /// Payoff: max(Avg - K, 0) × N
@@ -91,10 +128,10 @@ pub struct AsianCall {
     pub notional: f64,
     /// Averaging method
     pub averaging: AveragingMethod,
-    /// Fixing steps (indices where we sample the spot)
+    /// Fixing indices; each entry contributes one observation, including repeats.
     pub fixing_steps: Vec<usize>,
-    /// O(1) lookup set derived from fixing_steps
-    fixing_set: HashSet<usize>,
+    /// Observation multiplicity at each simulated event.
+    fixing_weights: HashMap<usize, FixingWeight>,
 
     sum_spots: f64,     // For arithmetic
     kahan_comp: f64,    // Kahan summation compensation for arithmetic
@@ -110,8 +147,9 @@ pub struct AsianCall {
 impl AsianCall {
     /// Create an Asian call with at least one scheduled fixing and no history.
     ///
-    /// Fixing indices may be unsorted or repeated. Each scheduled path event
-    /// contributes once; the original vector is retained as contract metadata.
+    /// Fixing indices may be unsorted or repeated. Each vector entry
+    /// contributes once, including repeated indices. The original vector is retained as contract
+    /// metadata.
     ///
     /// # Arguments
     ///
@@ -160,8 +198,8 @@ impl AsianCall {
     ///   using `initial_product_log`, combined with future simulated fixings.
     /// * `fixing_steps` - Owned indices of future path events to observe. Step
     ///   `0` includes the initial spot; indices may be unsorted or repeated,
-    ///   but each scheduled event contributes once. An empty vector is valid
-    ///   only when `initial_count` is positive, for a fully observed contract.
+    ///   and every entry contributes once, including repeated indices. An empty
+    ///   vector is valid only when `initial_count` is positive, for a fully observed contract.
     /// * `initial_sum` - Sum of historical spot levels in spot-price units,
     ///   used for arithmetic averaging and restored before every new path.
     /// * `initial_product_log` - Sum of the natural logarithms of positive
@@ -184,13 +222,13 @@ impl AsianCall {
         initial_count: usize,
     ) -> Result<Self> {
         validate_fixing_schedule(&fixing_steps, initial_count)?;
-        let fixing_set: HashSet<usize> = fixing_steps.iter().copied().collect();
+        let fixing_weights = fixing_weights(&fixing_steps, &vec![1.0; fixing_steps.len()])?;
         Ok(Self {
             strike,
             notional,
             averaging,
             fixing_steps,
-            fixing_set,
+            fixing_weights,
             sum_spots: initial_sum,
             kahan_comp: 0.0,
             product_spots: initial_product_log,
@@ -200,6 +238,27 @@ impl AsianCall {
             initial_product_spots: initial_product_log,
             initial_count,
         })
+    }
+
+    /// Apply deterministic scaling to each future fixing's simulated spot.
+    ///
+    /// This represents distinct dated forwards sharing one diffusion time.
+    /// Each observation retains unit weight in the contractual average; only
+    /// its observed level is scaled. Historical observations are unchanged.
+    ///
+    /// # Arguments
+    ///
+    /// * `multipliers` - Finite positive spot multipliers, in the same order
+    ///   and length as `fixing_steps`. Repeated indices may have different
+    ///   multipliers while sharing the same simulated random state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for non-positive or non-finite multipliers, a length
+    /// mismatch, or non-finite aggregated weights.
+    pub fn with_fixing_multipliers(mut self, multipliers: &[f64]) -> Result<Self> {
+        self.fixing_weights = fixing_weights(&self.fixing_steps, multipliers)?;
+        Ok(self)
     }
 
     /// Compute the average based on accumulated samples.
@@ -232,24 +291,30 @@ impl AsianCall {
 }
 
 impl Payoff for AsianCall {
+    fn supports_lrm_greeks(&self) -> bool {
+        !self.fixing_weights.contains_key(&0)
+    }
+
     /// Accumulate the spot fixing when the current step is a fixing step.
     ///
     /// # Errors
     /// Returns an error if `SPOT` is missing or non-finite at a fixing step.
     fn on_event(&mut self, state: &mut PathState) -> finstack_quant_core::Result<()> {
-        if self.fixing_set.contains(&state.step) {
+        if let Some(weight) = self.fixing_weights.get(&state.step) {
+            let (count, total_multiplier, log_multiplier) =
+                (weight.count, weight.total_multiplier, weight.log_multiplier);
             let spot = super::require_finite_state(state.spot(), "SPOT", state.step)?;
             match self.averaging {
                 AveragingMethod::Arithmetic => {
                     // Use Kahan summation for numerical stability
-                    self.kahan_add(spot);
+                    self.kahan_add(spot * total_multiplier);
                 }
                 AveragingMethod::Geometric => {
                     // Store as log-sum for numerical stability
-                    self.product_spots += spot.ln();
+                    self.product_spots += spot.ln() * count as f64 + log_multiplier;
                 }
             }
-            self.num_fixings_seen += 1;
+            self.num_fixings_seen += count;
         }
         Ok(())
     }
@@ -289,10 +354,10 @@ pub struct AsianPut {
     pub notional: f64,
     /// Averaging method (arithmetic or geometric)
     pub averaging: AveragingMethod,
-    /// Time step indices for averaging observations
+    /// Fixing indices; each entry contributes one observation, including repeats.
     pub fixing_steps: Vec<usize>,
-    /// O(1) lookup set derived from fixing_steps
-    fixing_set: HashSet<usize>,
+    /// Observation multiplicity at each simulated event.
+    fixing_weights: HashMap<usize, FixingWeight>,
 
     sum_spots: f64,
     kahan_comp: f64,
@@ -361,8 +426,8 @@ impl AsianPut {
     ///   using `initial_product_log`, combined with future simulated fixings.
     /// * `fixing_steps` - Owned indices of future path events to observe. Step
     ///   `0` includes the initial spot; indices may be unsorted or repeated,
-    ///   but each scheduled event contributes once. An empty vector is valid
-    ///   only when `initial_count` is positive, for a fully observed contract.
+    ///   and every entry contributes once, including repeated indices. An empty
+    ///   vector is valid only when `initial_count` is positive, for a fully observed contract.
     /// * `initial_sum` - Sum of historical spot levels in spot-price units,
     ///   used for arithmetic averaging and restored before every new path.
     /// * `initial_product_log` - Sum of the natural logarithms of positive
@@ -385,13 +450,13 @@ impl AsianPut {
         initial_count: usize,
     ) -> Result<Self> {
         validate_fixing_schedule(&fixing_steps, initial_count)?;
-        let fixing_set: HashSet<usize> = fixing_steps.iter().copied().collect();
+        let fixing_weights = fixing_weights(&fixing_steps, &vec![1.0; fixing_steps.len()])?;
         Ok(Self {
             strike,
             notional,
             averaging,
             fixing_steps,
-            fixing_set,
+            fixing_weights,
             sum_spots: initial_sum,
             kahan_comp: 0.0,
             product_spots: initial_product_log,
@@ -401,6 +466,27 @@ impl AsianPut {
             initial_product_spots: initial_product_log,
             initial_count,
         })
+    }
+
+    /// Apply deterministic scaling to each future fixing's simulated spot.
+    ///
+    /// This represents distinct dated forwards sharing one diffusion time.
+    /// Each observation retains unit weight in the contractual average; only
+    /// its observed level is scaled. Historical observations are unchanged.
+    ///
+    /// # Arguments
+    ///
+    /// * `multipliers` - Finite positive spot multipliers, in the same order
+    ///   and length as `fixing_steps`. Repeated indices may have different
+    ///   multipliers while sharing the same simulated random state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for non-positive or non-finite multipliers, a length
+    /// mismatch, or non-finite aggregated weights.
+    pub fn with_fixing_multipliers(mut self, multipliers: &[f64]) -> Result<Self> {
+        self.fixing_weights = fixing_weights(&self.fixing_steps, multipliers)?;
+        Ok(self)
     }
 
     fn compute_average(&self) -> f64 {
@@ -425,23 +511,29 @@ impl AsianPut {
 }
 
 impl Payoff for AsianPut {
+    fn supports_lrm_greeks(&self) -> bool {
+        !self.fixing_weights.contains_key(&0)
+    }
+
     /// Accumulate the spot fixing when the current step is a fixing step.
     ///
     /// # Errors
     /// Returns an error if `SPOT` is missing or non-finite at a fixing step.
     fn on_event(&mut self, state: &mut PathState) -> finstack_quant_core::Result<()> {
-        if self.fixing_set.contains(&state.step) {
+        if let Some(weight) = self.fixing_weights.get(&state.step) {
+            let (count, total_multiplier, log_multiplier) =
+                (weight.count, weight.total_multiplier, weight.log_multiplier);
             let spot = super::require_finite_state(state.spot(), "SPOT", state.step)?;
             match self.averaging {
                 AveragingMethod::Arithmetic => {
                     // Use Kahan summation for numerical stability
-                    self.kahan_add(spot);
+                    self.kahan_add(spot * total_multiplier);
                 }
                 AveragingMethod::Geometric => {
-                    self.product_spots += spot.ln();
+                    self.product_spots += spot.ln() * count as f64 + log_multiplier;
                 }
             }
-            self.num_fixings_seen += 1;
+            self.num_fixings_seen += count;
         }
         Ok(())
     }
@@ -578,15 +670,15 @@ mod tests {
                 call.on_event(&mut state).expect("valid call fixing");
                 put.on_event(&mut state).expect("valid put fixing");
             }
-            assert_eq!(call.num_fixings_seen, 3);
-            assert_eq!(put.num_fixings_seen, 3);
+            assert_eq!(call.num_fixings_seen, 4);
+            assert_eq!(put.num_fixings_seen, 4);
             assert_eq!(
                 call.value(Currency::USD).expect("valid payoff").amount(),
-                10.0
+                17.5
             );
             assert_eq!(
                 put.value(Currency::USD).expect("valid payoff").amount(),
-                10.0
+                2.5
             );
         }
     }
@@ -691,5 +783,49 @@ mod tests {
 
         assert!(price > 0.0);
         assert!(price < 10.0);
+    }
+
+    #[test]
+    fn repeated_asian_fixings_allow_distinct_forward_multipliers() {
+        for averaging in [AveragingMethod::Arithmetic, AveragingMethod::Geometric] {
+            let mut call =
+                AsianCall::with_history(95.0, 1.0, averaging, vec![2, 2], 90.0, 90.0_f64.ln(), 1)
+                    .expect("call")
+                    .with_fixing_multipliers(&[1.0, 1.1])
+                    .expect("scales");
+            let average = match averaging {
+                AveragingMethod::Arithmetic => 100.0,
+                AveragingMethod::Geometric => {
+                    ((90.0_f64.ln() + 100.0_f64.ln() + 110.0_f64.ln()) / 3.0).exp()
+                }
+            };
+            for _ in 0..2 {
+                call.reset();
+                call.on_event(&mut create_state(2, 100.0)).expect("fixings");
+                assert_eq!(call.num_fixings_seen, 3);
+                assert!(
+                    (call.value(Currency::USD).expect("payoff").amount() - (average - 95.0)).abs()
+                        < 1e-12
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn asian_fixing_multipliers_reject_malformed_vectors() {
+        for multipliers in [
+            vec![],
+            vec![0.0],
+            vec![-1.0],
+            vec![f64::NAN],
+            vec![f64::INFINITY],
+        ] {
+            assert!(
+                AsianCall::new(100.0, 1.0, AveragingMethod::Arithmetic, vec![1])
+                    .expect("call")
+                    .with_fixing_multipliers(&multipliers)
+                    .is_err()
+            );
+        }
     }
 }

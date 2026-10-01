@@ -4,6 +4,7 @@ mod model;
 mod node;
 mod value;
 
+pub(crate) use model::validated_explicit_value_type;
 pub use model::{
     CapitalStructureSpec, DebtInstrumentSpec, FinancialModelSpec, FinancialStatementInstrument,
     FINANCIAL_MODEL_CONTRACT,

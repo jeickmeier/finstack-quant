@@ -126,7 +126,8 @@ from the tridiagonal system and folding its contribution into an RHS correction.
 |---------|-------------|
 | `Dirichlet(g)` | `u_bnd = g`; correction `lower[0]·g` (resp. `upper[last]·g`), coupling zeroed |
 | `Neumann(g)` | **One-sided at the boundary node**: `u[0] = u[1] − h·g` with `h = h_left(1)`; `main[0] += lower[0]`, correction `−lower[0]·h·g` |
-| `Linear` | `d²u/dx² = 0` ⇒ `u[0] = 2u[1] − u[2]`; `main[0] += 2·lower[0]`, `upper[0] −= lower[0]`, no correction |
+| `Linear` | `d²u/dx² = 0` ⇒ `u[0] = (1 + q)u[1] − q·u[2]`, with `q = (x[1] − x[0])/(x[2] − x[1])`; the upper edge is analogous |
+| `LinearInExp` | Zero gamma in `S = exp(x)` ⇒ `u[0] = (1 + q)u[1] − q·u[2]`, with `q = (exp(x[1]) − exp(x[0]))/(exp(x[2]) − exp(x[1]))`; the upper edge is analogous |
 
 The Neumann form is deliberately one-sided rather than a centered ghost node: a
 centered ghost imposes the derivative at a different location and is wrong on a
@@ -135,9 +136,9 @@ non-uniform grid. It must stay identical to the reconstruction in
 the reported boundary value disagree. `solver::tests::neumann_preserves_linear_profile_on_nonuniform_grid`
 is the guard.
 
-`Linear` (vanishing gamma) is the standard far-field condition for option
-pricing and is what both bridges use on their deep-ITM edges; the deep-OTM edges
-use `Dirichlet(0.0)`.
+Both option bridges use `LinearInExp` on their deep-ITM log-spot edges to make
+the option value affine in spot, with zero spot gamma. `Linear` instead makes
+the value affine in the grid coordinate. The deep-OTM edges use `Dirichlet(0.0)`.
 
 ## 1D solver
 
@@ -150,9 +151,21 @@ u'   →  [ −b·h_p/(h_m·h_s) ,  b(h_p − h_m)/(h_m·h_p) ,  b·h_m/(h_p·h_
 h_m = h_left(i),  h_p = h_right(i),  h_s = h_m + h_p
 ```
 
-There is **no upwind switch in 1D.** The convection term is always centered, so
-a 1D problem with a strongly convection-dominated cell can lose monotonicity.
-The monotone fallback exists only in the 2D operator assembly (see below).
+Both 1D and 2D assembly use the centered stencil when its off-diagonal
+coefficients are nonnegative. In convection-dominated cells where either
+coefficient would be negative, a first-order one-sided convection stencil
+preserves their nonnegativity (see below).
+
+The one-sided branch adds about `|b|·h/2` numerical diffusion, so positivity
+does not establish pricing accuracy on a fixed mesh. Near-deterministic
+payoffs need spatial refinement. For example, the call with `S=109.7`, `K=100`,
+`r=0`, `q=0.10`, `sigma=0.001`, and `T=1` has an analytical value below
+`1e-10`, but the production 200-node/100-step grid returns about `0.183114`.
+Refining to 400/200, 800/400, and 1600/800 reduces the values to `0.079615`,
+`0.026986`, and `0.005956`. Increasing only the time steps to 400 leaves
+`0.179620`; spatial resolution is the limiting factor. The regression checks
+nonnegative prices and decreasing absolute errors under joint refinement;
+the default mesh carries no uniform accuracy guarantee in this regime.
 
 `ThetaStepper` advances
 
@@ -220,18 +233,19 @@ u ← (u + λ·dt·payoff) / (1 + λ·dt),    λ = penalty_factor / dt
 ```
 
 With the default `penalty_factor = 1e8`, `λ·dt = 1e8 ≫ 1` and the update is
-effectively a hard clamp to the payoff. That is why the Forsyth-Vetzal (2002)
-"post-exercise smoothing" step is not needed here: the penalty fully overwrites
-the kinked nodes, leaving no high-frequency residual for the following CN step
-to amplify. `solver::tests::w08_rannacher_american_put_price_matches_implicit_within_discretisation_error`
-pins Rannacher+penalty against Implicit+penalty.
+effectively a hard clamp to the payoff. American exercise is approximated by
+exercise at every time level; projection does not replace time-grid convergence
+or eliminate a newly introduced exercise kink.
 
-`apply` returns the early-exercise boundary as the leftmost index where the
-constraint is slack, read from the **converged** solution after all penalty
-iterations using a strict `u > payoff` test. Recording it inside the iteration
-loop is wrong for `iterations ≥ 2`: the penalty pulls an exercised node so close
-to `payoff` that the `u < payoff` test can flip on round-off and misclassify it
-as the boundary.
+`apply` returns `Result<Vec<usize>, ExerciseError>` containing every transition
+between a binding obstacle and strictly better continuation. Each index is the
+higher-coordinate node of the adjacent pair crossing a boundary. This handles
+calls, puts, and multiple exercise regions; an entirely continuing or exercised
+grid has no interior transition. The classification uses the unconstrained
+continuation values so rounding during repeated penalty updates cannot change
+it. Payoff dimensions, finite values, penalty settings and the step width are
+validated before mutation. The solver builder also rejects malformed payoff
+vectors before pricing starts.
 
 `iterations` defaults to 1 and both builder methods (`american`, `bermudan`)
 hard-code it; the field is `pub`, so raising it requires constructing
@@ -309,14 +323,21 @@ to plain Craig-Sneyd — the type name is historical.
 and with no mixed term present. The MCS corrector lowers the admissible bound to
 θ ≥ ⅓ (pure 2D diffusion) and θ ≥ ⅖ (general convection-diffusion). The stepper
 runs `MCS_THETA = 1/3`, the standard literature choice for the Heston PDE; the
-⅖ bound is a worst case, and ⅓ holds here because the Rannacher start damps the
+⅖ bound is a worst case, and ⅓ holds here because the implicit start damps the
 non-smooth payoff, the Heston convection terms (`r − q − v/2`, `κ(θ − v)`) are
 mild, and the mixed term is diffusion-like. The corrector does not "stabilize
 the mixed term" — it lowers the admissible θ. `bridge2d::tests::heston_pde_mcs_vs_douglas_high_correlation`
-states and pins all three claims.
+checks pricing, stability, and second-order time convergence on a fixed spatial
+grid. It uses differences between successive time refinements to cancel spatial
+bias; the absolute Fourier errors of different schemes have no guaranteed
+ordering because spatial and time errors can cancel.
 
-`CraigSneydStepper::with_rannacher(implicit_start, n_steps)` runs the first
-`implicit_start` steps at θ = 1.0. Note it does **not** implement `TimeStepper`
+`CraigSneydStepper::with_damping(implicit_start, n_steps)` replaces the first
+`implicit_start` intervals with pairs of factorized implicit-Euler halfsteps.
+Each halfstep solves the x and y directional operators implicitly and keeps
+the mixed derivative explicit. This first-order directional split damps stiff
+payoff modes; it is not a fully coupled backward-Euler solve, nor MCS with θ=1.
+Note the stepper does **not** implement `TimeStepper`
 (that trait is 1D-only); it carries its own inherent `step`,
 `step_with_buffers`, `n_steps`, and `time_levels`. `Solver2D` holds it
 concretely, so there is no 2D stepper polymorphism.
@@ -326,13 +347,13 @@ concretely, so there is no 2D stepper polymorphism.
 time march; the allocating `step` is a convenience wrapper that builds fresh
 buffers per call.
 
-`fill_boundaries` writes the interior into `u_full`, then fills the two x-edges
-across all `j` (which also sets the four corners) and the two y-edges across
-interior `i` only. It runs after each MCS step — the mixed corrector needs a
+`fill_boundaries` writes the interior into `u_full`, then fills the two y-edges
+across interior `i`, followed by the x-edges across all `j`. The corners thus
+use current y-edge values. It runs after each MCS step — the mixed corrector needs a
 boundary-inclusive `Y₂` for its four-point stencil — and again at `t = 0`.
 
 **`Solver2D` has no early exercise.** `Solver2D::new` takes only a grid and a
-`CraigSneydStepper` (plain or `with_rannacher`), and the `Solver2D` struct has
+`CraigSneydStepper` (plain or `with_damping`), and the `Solver2D` struct has
 no exercise field. `PdeSolution2D` likewise exposes only `interpolate`,
 `delta_x`, and `gamma_x` — there is no variance-direction sensitivity.
 
@@ -348,7 +369,7 @@ no exercise field. `PdeSolution2D` likewise exposes only `interpolate`,
 ∂u/∂t = ½σ²·∂²u/∂x² + (r − q − ½σ²)·∂u/∂x − r·u
 ```
 
-with `Dirichlet(0)` on the deep-OTM edge and `Linear` on the deep-ITM edge, and
+with `Dirichlet(0)` on the deep-OTM edge and `LinearInExp` on the deep-ITM edge, and
 reports `is_time_homogeneous() == true`. `bridge::tests` grades it against
 `finstack_quant_core::math::norm_cdf`-based Black-Scholes at 301 sinh points and
 300 CN steps: relative error below 1e-3 for both a call and a put.
@@ -362,7 +383,8 @@ reports `is_time_homogeneous() == true`. `bridge::tests` grades it against
 
 Variance is floored with `y.max(0.0)` in every diffusion and in `convection_x`,
 but not in `convection_y`, so the mean-reversion drift stays signed. Both `v`
-edges use `Linear`: the PDE degenerates at `v → 0`, and the option value is
+edges use `Linear`; log-spot far fields use `LinearInExp` to impose zero spot
+gamma (`u_xx = u_x`). The PDE degenerates at `v → 0`, and the option value is
 insensitive at `v → ∞`.
 
 The documented anchor is against
@@ -370,7 +392,7 @@ The documented anchor is against
 
 | Test | Runs by default | Configuration | Tolerance |
 |------|-----------------|---------------|-----------|
-| `heston_pde_vs_fourier_coarse_anchor` | yes | K ∈ {100, 120}, 141 × 61 grid, MCS + Rannacher(4), 150 steps, ρ = −0.7 | 2.5% |
+| `heston_pde_vs_fourier_coarse_anchor` | yes | K ∈ {100, 120}, 141 × 61 grid, MCS + implicit damping(4), 150 steps, ρ = −0.7 | 2.5% |
 | `heston_pde_high_kappa_solves_via_upwinding` | yes | κ = 10, same grid | 2.5% |
 | `heston_pde_put_call_parity` | yes | 121 × 51 grid, 200 MCS steps | 2% |
 | `heston_pde_vs_fourier_atm` | `#[ignore]` | 201 × 81 grid, 400 steps | 2% |
@@ -393,7 +415,7 @@ For reference when reading a PDE price, the defaults the three pricers use:
 | Pricer | Grid | Steps | Notes |
 |--------|------|-------|-------|
 | Equity option 1D | 200 sinh points, centered on `ln K`, intensity 0.1, domain `[min(ln S, ln K) − 5σ√t, max(ln S, ln K) + 5σ√t]` | 100, Rannacher(4) | Rannacher on both European and American; American adds `PenaltyExercise`; Bermudan is rejected |
-| Equity option 2D Heston | 200 x-points (sinh on `ln S`, intensity 0.1) × 80 v-points (sinh on `theta_v`, intensity 0.15) | 100, MCS + Rannacher(2) | European only; future discrete dividends rejected |
+| Equity option 2D Heston | 200 x-points (sinh on `ln S`, intensity 0.1) × 80 v-points (sinh on `theta_v`, intensity 0.15) | 100, MCS + implicit damping(2) | European only; future discrete dividends rejected |
 | Barrier option 1D | 200 sinh points, centered on `ln K`, intensity 0.1, domain truncated so the barrier lands on the edge node | 100, Rannacher(2) | Knock-out via `Dirichlet(0)` at the barrier; knock-in as `Vanilla − KO` on a vanilla grid that *extends* the KO grid, so shared nodes cancel discretization error rather than summing two independent grid errors |
 
 ## Verification
@@ -436,7 +458,8 @@ unmeasured. See [`../../../benches/README.md`](../../../benches/README.md).
    `true` from `is_time_homogeneous` whenever the coefficients are static — it
    halves the per-step operator assembly.
 2. Pick boundaries deliberately: `Dirichlet(0)` where the value genuinely
-   vanishes, `Linear` for a far field where gamma vanishes, `Neumann` only if you
+   vanishes, `Linear` for zero curvature in the grid coordinate, `LinearInExp`
+   for zero spot gamma on log-spot grids, and `Neumann` only if you
    know the derivative — and remember the one-sided discretization above.
 3. **A new 1D time scheme**: implement `TimeStepper`. Return
    `StepperError::NonPositiveStep` on a non-positive or non-finite `dt`, and gate

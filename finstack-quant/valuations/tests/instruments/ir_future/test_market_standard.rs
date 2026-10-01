@@ -4,7 +4,7 @@
 //! and produces results consistent with standard methodologies.
 
 use super::utils::*;
-use finstack_quant_core::dates::DayCount;
+use finstack_quant_core::dates::{DayCount, DayCountContext};
 use finstack_quant_valuations::instruments::rates::ir_future::FutureContractSpecs;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::Position;
@@ -297,19 +297,34 @@ fn test_day_count_impact() {
     let (as_of, start, end) = standard_dates();
     let market = build_standard_market(as_of, 0.05);
 
-    let day_counts = vec![DayCount::Act360, DayCount::Act365F];
+    let forward = market.get_forward("USD_LIBOR_3M").unwrap();
+    let growth =
+        forward.df_on_date_curve(start).unwrap() / forward.df_on_date_curve(end).unwrap() - 1.0;
+    let day_counts = [DayCount::Act360, DayCount::Act365F];
 
     let mut pvs = Vec::new();
     for day_count in &day_counts {
         let mut future = create_standard_future(start, end);
         future.day_count = *day_count;
         let pv = future.value(&market, as_of).unwrap().amount();
+        let accrual = day_count
+            .year_fraction(start, end, DayCountContext::default())
+            .unwrap();
+        let expected_price = 100.0 * (1.0 - growth / accrual);
+        let expected_pv = future.terms.contracts
+            * future.terms.multiplier
+            * (expected_price - future.terms.entry_price);
+        assert!(
+            (pv - expected_pv).abs() < 1e-8,
+            "{day_count:?}: PV={pv}, expected={expected_pv}"
+        );
         pvs.push(pv);
     }
 
-    // Exchange-traded futures P&L is defined by price ticks, so the contract
-    // day count does not rescale mark-to-market once model price is known.
-    assert_eq!(pvs[0], pvs[1]);
+    // The same growth annualizes to a higher ACT/365F rate and lower futures
+    // price. P&L still uses the listed price-point multiplier without another
+    // accrual factor or discount factor.
+    assert!(pvs[1] < pvs[0]);
 }
 
 #[test]

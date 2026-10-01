@@ -1,7 +1,7 @@
 //! Numerical and boundary regressions for analytics kernels.
 use finstack_quant_analytics::correlation::{nearest_correlation_matrix, NearestCorrelationOpts};
 use finstack_quant_analytics::{
-    max_drawdown, sharpe, sortino, volatility, Performance, ReturnKind,
+    max_drawdown, sharpe, sortino, volatility, CagrDayCount, Performance, ReturnKind,
 };
 use finstack_quant_core::dates::{Date, Duration, Month, PeriodKind};
 use serde_json::json;
@@ -395,4 +395,142 @@ fn constant_response_fit_statistics_remain_undefined() {
             serde_json::from_str(&serde_json::to_string(&fit).unwrap()).unwrap();
         assert!(restored.r_squared.is_nan());
     }
+}
+
+#[test]
+fn cagr_annualizes_log_growth_before_reconstructing_terminal_wealth() {
+    let grid: Vec<Date> = (2001..=2020)
+        .map(|year| Date::from_calendar_date(year, Month::January, 1).unwrap())
+        .collect();
+    let perf = Performance::from_returns(
+        grid,
+        vec![vec![-0.9; 20]],
+        vec!["A".into()],
+        None,
+        PeriodKind::Annual,
+    )
+    .unwrap();
+    // The 20-year wealth is 1e-20, but the annual growth factor remains 0.1.
+    let years = 7305.0 / 365.25;
+    let expected = 0.1_f64.powf(20.0 / years) - 1.0;
+    close(
+        perf.cagr(CagrDayCount::default(), None).unwrap()[0],
+        expected,
+    );
+
+    let overflow = Performance::from_returns(
+        vec![
+            Date::from_calendar_date(2021, Month::January, 1).unwrap(),
+            Date::from_calendar_date(2022, Month::January, 1).unwrap(),
+        ],
+        vec![vec![1e200; 2]],
+        vec!["A".into()],
+        None,
+        PeriodKind::Annual,
+    )
+    .unwrap();
+    let result = overflow.cagr(CagrDayCount::default(), None).unwrap()[0];
+    let expected = 1e200_f64.powf(2.0 / (731.0 / 365.25));
+    assert!(result.is_finite());
+    assert!((result / expected - 1.0).abs() < 1e-12);
+}
+
+#[test]
+fn identical_paths_have_zero_relative_wealth_at_extreme_absolute_wealth() {
+    for returns in [vec![-0.9; 20], vec![1e300; 4]] {
+        let perf = Performance::from_returns(
+            dates(returns.len()),
+            vec![returns.clone(), returns],
+            vec!["BENCH".into(), "PORT".into()],
+            None,
+            PeriodKind::Daily,
+        )
+        .unwrap();
+        assert!(perf
+            .cumulative_returns_outperformance()
+            .iter()
+            .flatten()
+            .all(|&relative| relative == 0.0));
+    }
+}
+
+#[test]
+fn drawdowns_remain_finite_when_absolute_wealth_overflows() {
+    let perf = panel(vec![1e300, 1e300, -0.5, 0.0], PeriodKind::Daily);
+    let drawdown = &perf.drawdown_series()[0];
+    close(drawdown[0], 0.0);
+    close(drawdown[1], 0.0);
+    close(drawdown[2], -0.5);
+    close(drawdown[3], -0.5);
+    close(perf.max_drawdown()[0], -0.5);
+    let episodes = perf.drawdown_details(0, 5).unwrap();
+    assert_eq!(episodes.len(), 1);
+    close(episodes[0].max_drawdown, -0.5);
+    assert_eq!(episodes[0].start, dates(4)[1]);
+    assert_eq!(episodes[0].end, None);
+    assert_eq!(perf.max_drawdown_duration(), vec![2]);
+}
+
+#[test]
+fn positive_near_wipeout_growth_is_not_exact_wipeout() {
+    let near_wipeout = -0.9999999999999999_f64;
+    let perf = panel(
+        vec![near_wipeout, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        PeriodKind::Daily,
+    );
+    let expected = (1.0 + near_wipeout).powf(1.0 / 8.0) - 1.0;
+    close(perf.geometric_mean()[0], expected);
+    assert!(perf.geometric_mean()[0] > -1.0);
+}
+
+#[test]
+fn compounded_metrics_preserve_returns_smaller_than_machine_epsilon() {
+    let movement = 1e-18;
+    let perf = panel(vec![movement, movement], PeriodKind::Daily);
+    assert!((perf.cumulative_returns()[0][1] / (2.0 * movement) - 1.0).abs() < 1e-12);
+    assert!((perf.geometric_mean()[0] / movement - 1.0).abs() < 1e-12);
+    let excess = perf.excess_returns(&[movement; 2], Some(252.0)).unwrap();
+    let expected = movement * (1.0 - 1.0 / 252.0);
+    assert!((excess[0][0] / expected - 1.0).abs() < 1e-12);
+}
+
+#[test]
+fn rolling_returns_preserve_tiny_windows_after_positive_outlier_leaves() {
+    let movement = 1e-18;
+    let mut returns = vec![0.1];
+    returns.extend((0..1110).map(|i| if i % 2 == 0 { movement } else { -movement }));
+    let perf = panel(returns.clone(), PeriodKind::Daily);
+    let singleton = perf.rolling_returns(0, 1).unwrap();
+    assert_eq!(singleton.dates, dates(returns.len()));
+    for (&actual, &expected) in singleton.values.iter().zip(&returns) {
+        assert!((actual / expected - 1.0).abs() < 1e-12);
+    }
+
+    let rolling = perf.rolling_returns(0, 3).unwrap();
+    assert_eq!(rolling.dates, dates(returns.len())[2..]);
+    close(rolling.values[0], 0.1);
+    // At this scale the product correction is below f64 resolution: each
+    // alternating three-return window compounds to its first return.
+    // The series also crosses the scheduled accumulator rebuild.
+    for (start, &actual) in rolling.values.iter().enumerate().skip(1) {
+        assert!((actual / returns[start] - 1.0).abs() < 1e-12);
+    }
+}
+
+#[test]
+fn drawdown_ratios_propagate_invalid_cash_before_zero_risk_sentinels() {
+    for returns in [vec![0.1, 0.2], vec![0.0, 0.0], vec![-0.1, 0.2]] {
+        let perf = panel(returns, PeriodKind::Daily);
+        for cash in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(perf.sterling_ratio(cash, 5).unwrap()[0].is_nan());
+            assert!(perf.burke_ratio(cash, 5).unwrap()[0].is_nan());
+            assert!(perf.pain_ratio(cash).unwrap()[0].is_nan());
+        }
+    }
+    let positive = panel(vec![0.1, 0.2], PeriodKind::Daily);
+    assert_eq!(positive.calmar().unwrap()[0], f64::INFINITY);
+    assert_eq!(positive.martin_ratio().unwrap()[0], f64::INFINITY);
+    let flat = panel(vec![0.0, 0.0], PeriodKind::Daily);
+    assert_eq!(flat.calmar().unwrap()[0], 0.0);
+    assert_eq!(flat.martin_ratio().unwrap()[0], 0.0);
 }

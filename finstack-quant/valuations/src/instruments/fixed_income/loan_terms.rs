@@ -99,6 +99,9 @@ impl RateSpec {
     /// # Arguments
     ///
     /// * `date` - Accrual start the rate is projected for.
+    /// * `accrual_end` - Exclusive end of the contractual coupon period.
+    /// * `accrual_year_fraction` - Positive finite coupon accrual under its
+    ///   contractual day count, including any required schedule context.
     /// * `market` - Market holding the forward curve and fixings named by
     ///   the floating spec's `forward_curve_id`.
     ///
@@ -109,6 +112,8 @@ impl RateSpec {
     pub fn try_current_rate_with_index(
         &self,
         date: Date,
+        accrual_end: Date,
+        accrual_year_fraction: f64,
         market: &finstack_quant_core::market_data::context::MarketContext,
     ) -> finstack_quant_core::Result<f64> {
         let as_of = match self {
@@ -117,7 +122,7 @@ impl RateSpec {
                 .get_forward(spec.forward_curve_id.as_str())?
                 .base_date(),
         };
-        self.try_rate_for_period(date, as_of, market)
+        self.try_rate_for_period(date, accrual_end, accrual_year_fraction, as_of, market)
     }
 
     /// Contractual rate for an explicit accrual period, as a decimal.
@@ -128,7 +133,11 @@ impl RateSpec {
     ///
     /// # Arguments
     ///
-    /// * `accrual_start` - Start of the accrual period.
+    /// * `accrual_start` - Start of the accrual period, also the effective date
+    ///   used to sample a projected term-index quote.
+    /// * `accrual_end` - Exclusive end of the full contractual coupon period.
+    /// * `accrual_year_fraction` - Positive finite contractual coupon accrual,
+    ///   used to convert the curve-basis quote before spreads and rate bounds.
     /// * `as_of` - Valuation date separating observed fixings from projections.
     /// * `market` - Market holding the forward curve and fixings.
     ///
@@ -140,6 +149,8 @@ impl RateSpec {
     pub fn try_rate_for_period(
         &self,
         accrual_start: Date,
+        accrual_end: Date,
+        accrual_year_fraction: f64,
         as_of: Date,
         market: &finstack_quant_core::market_data::context::MarketContext,
     ) -> finstack_quant_core::Result<f64> {
@@ -192,6 +203,9 @@ impl RateSpec {
                     accrual_start,
                     fwd.as_ref(),
                     &params,
+                    accrual_start,
+                    accrual_end,
+                    accrual_year_fraction,
                 )
             }
         }

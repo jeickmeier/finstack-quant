@@ -91,7 +91,7 @@
           "type": "array"
         },
         "num_repricings": {
-          "description": "Number of repricings performed.",
+          "description": "Number of top-level valuation calls, including attempted carry-helper\nmetric, flat-yield and funding valuations. Internal risk-metric bump\nvaluations are not counted separately.",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
@@ -316,7 +316,7 @@
       "type": "object"
     },
     "CreditCarryDecomposition": {
-      "description": "Factor-cut decomposition of carry under a calibrated `CreditFactorModel`.\nPopulated only when an `AttributionSpec.credit_factor_model` was supplied.\nPurely additive — does not modify any existing field.\n\n# Reconciliation invariants (§7.4, all at 1e-8 absolute tolerance)\n\nWith `w = s / (r + s)` the credit share used for the coupon split\n(see `compute_carry_credit_split_and_decomposition`):\n\n- `rates_carry_total + credit_carry_total ≡ carry_detail.total` — the two\n  legs partition the full carry, **including `pull_to_par`**, which is\n  split on the same `w` (its wire field stays a single unsplit `Money`)\n- `credit_carry_total ≡ Σ_lines SourceLine.credit_part + w × pull_to_par`\n  (lines = coupon + roll)\n- `credit_carry_total ≡ generic + Σ_levels(level.total) + adder_total`\n- `rates_carry_total ≡ Σ_lines SourceLine.rates_part\n  + (1 − w) × pull_to_par`\n- `funding_cost` is a separate financing overlay outside both gross totals.\n\n# Attribution method coverage\n\nAll four methods populate `carry_detail`: Parallel, Waterfall and Taylor\nvia `apply_total_return_carry` (theta + coupon_income, with financing\nidentified separately when configured), MetricsBased from the carry\ndecomposition metrics. `credit_carry_decomposition` is therefore emitted\non any path whose `carry_detail.coupon_income` is populated when a\n`CreditFactorModel` is supplied — the decomposition logic is\nmethod-agnostic.",
+      "description": "Factor-cut decomposition of carry under a calibrated `CreditFactorModel`.\nPopulated only when an `AttributionSpec.credit_factor_model` was supplied.\nPurely additive — does not modify any existing field.\n\n# Reconciliation invariants (§7.4, all at 1e-8 absolute tolerance)\n\nWith `w = s / (r + s)` the credit share used for the coupon split\n(see `compute_carry_credit_split_and_decomposition`):\n\n- `rates_carry_total + credit_carry_total ≡ carry_detail.total` — the two\n  legs partition the full carry, **including `pull_to_par`**, which is\n  split on the same `w` (its wire field stays a single unsplit `Money`)\n- `credit_carry_total ≡ Σ_lines SourceLine.credit_part + w × pull_to_par`\n  (lines = coupon + roll)\n- `credit_carry_total ≡ generic + Σ_levels(level.total) + adder_total`\n- `rates_carry_total ≡ Σ_lines SourceLine.rates_part\n  + (1 − w) × pull_to_par`\n- `funding_cost` is a separate financing overlay outside both gross totals.\n\n# Attribution method coverage\n\nAll four methods populate `carry_detail`: Parallel, Waterfall and Taylor\nvia `apply_total_return_carry` (theta + period economic cash, with financing\nidentified separately when configured), MetricsBased from the carry\ndecomposition metrics. `credit_carry_decomposition` is therefore emitted\non any path whose `carry_detail.coupon_income` is populated when a\n`CreditFactorModel` is supplied — the decomposition logic is\nmethod-agnostic.",
       "properties": {
         "credit_by_level": {
           "$ref": "#/$defs/CreditCarryByLevel",
@@ -1616,7 +1616,7 @@
               "type": "null"
             }
           ],
-          "description": "Pure mark-to-market change: `val_t1 − val_t0` with **no** intra-period\ncashflow adjustment.\n\nSeparates the raw user-input price change from\nthe total-return view stamped on `total_pnl`. When the attribution path\nadded coupon_income to `total_pnl` (the standard total-return convention\nin parallel / waterfall / taylor attribution), this field still reports\nthe raw `val_t1 − val_t0` so a downstream consumer that computed their\nown total from the underlying valuations can reconcile cleanly.\n\nAttribution paths that cannot provide the raw mark-to-market change use\n`None`."
+          "description": "Pure mark-to-market change: `val_t1 − val_t0` with **no** intra-period\ncashflow adjustment.\n\nSeparates the raw user-input price change from\nthe total-return view stamped on `total_pnl`. When the attribution path\nadded period economic cash to `total_pnl` (the standard total-return convention\nin parallel / waterfall / taylor attribution), this field still reports\nthe raw `val_t1 − val_t0` so a downstream consumer that computed their\nown total from the underlying valuations can reconcile cleanly.\n\nAttribution paths that cannot provide the raw mark-to-market change use\n`None`."
         },
         "market_scalars_pnl": {
           "$ref": "#/$defs/Money",
@@ -1677,7 +1677,7 @@
         },
         "total_pnl": {
           "$ref": "#/$defs/Money",
-          "description": "Total P&L *as reported by this attribution*.\n\nIn the standard total-return convention (the default carry path uses\nthe internal total-return carry helper), this is\n`(val_t1 − val_t0) + coupon_income_between(T0, T1)`. Cashflows received\nduring the period are added back so that\n`total_pnl == carry + factor_sum + residual` holds: the `carry` field\nincludes the coupon income, and reconciliation against the user's\nobserved val_t1 − val_t0 must subtract the coupon_income out of\n`total_pnl` to recover the pure mark-to-market move.\n\n**For a raw mark-to-market view that excludes intra-period cashflows,\nread [`Self::mark_to_market_pnl`].** That field, when present, is the\nuntouched `val_t1 − val_t0` and never absorbs coupon income."
+          "description": "Total P&L *as reported by this attribution*.\n\nIn the standard total-return convention (the default carry path uses\nthe internal total-return carry helper), this is\n`(val_t1 − val_t0) + economic_cash_between(T0, T1)`. Cashflows received\nduring the period are added back so that\n`total_pnl == carry + factor_sum + residual` holds: the `carry` field\nincludes income and principal receipts, and reconciliation against the user's\nobserved val_t1 − val_t0 must subtract the economic cash out of\n`total_pnl` to recover the pure mark-to-market move.\n\n**For a raw mark-to-market view that excludes intra-period cashflows,\nread [`Self::mark_to_market_pnl`].** That field, when present, is the\nuntouched `val_t1 − val_t0` and never absorbs cash receipts."
         },
         "vol_detail": {
           "anyOf": [
@@ -1803,11 +1803,11 @@
       "properties": {
         "ingest_scale_by_currency": {
           "additionalProperties": {
-            "format": "uint32",
+            "maximum": 28,
             "minimum": 0,
             "type": "integer"
           },
-          "description": "Ingest scale map snapshot by currency code.",
+          "description": "Validated ingest scale snapshot by currency code, with values in `0..=28`.",
           "type": "object"
         },
         "mode": {
@@ -1816,11 +1816,11 @@
         },
         "output_scale_by_currency": {
           "additionalProperties": {
-            "format": "uint32",
+            "maximum": 28,
             "minimum": 0,
             "type": "integer"
           },
-          "description": "Output scale map snapshot by currency code.",
+          "description": "Validated output scale snapshot by currency code, with values in `0..=28`.",
           "type": "object"
         },
         "tolerances": {

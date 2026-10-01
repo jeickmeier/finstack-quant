@@ -547,11 +547,11 @@ def test_documented_one_way_inventory_is_exact() -> None:
         "generic-error-result-alias": 7,
         "in-process-serde-spec": 2,
         "internal-registry-document": 2,
-        "non-maintained-serde-output": 3,
+        "non-maintained-serde-output": 2,
         "runtime-result": 9,
         "runtime-spec": 3,
     }
-    assert len(_MODULE.REVIEWED_EXCEPTIONS) == 31
+    assert len(_MODULE.REVIEWED_EXCEPTIONS) == 30
 
 
 def test_maintained_contract_capability_matrix_is_complete() -> None:

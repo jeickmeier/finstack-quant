@@ -34,6 +34,12 @@ pub struct TableEnvelope {
 impl TableEnvelope {
     /// Construct a table from validated columns.
     ///
+    /// # Arguments
+    ///
+    /// * `columns` - Owned columns in the desired export order; names must be
+    ///   unique and every column must have the same number of values. An empty
+    ///   list constructs a table with zero rows and no columns.
+    ///
     /// # Errors
     ///
     /// Returns [`Error::Validation`] if columns have mismatched lengths or if
@@ -43,6 +49,13 @@ impl TableEnvelope {
     }
 
     /// Construct a table from validated columns and metadata.
+    ///
+    /// # Arguments
+    ///
+    /// * `columns` - Owned columns in export order, with unique names and
+    ///   equal lengths; an empty list gives a zero-row table.
+    /// * `metadata` - Owned table-level JSON annotations, preserved in their
+    ///   insertion order without changing column values or row counts.
     ///
     /// # Errors
     ///
@@ -87,6 +100,11 @@ impl TableEnvelope {
     }
 
     /// Look up a column by name.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - Exact, case-sensitive column name to find; returns `None`
+    ///   when no column has this name.
     #[must_use]
     pub fn column(&self, name: &str) -> Option<&TableColumn> {
         self.columns.iter().find(|column| column.name == name)
@@ -111,6 +129,13 @@ pub struct TableColumn {
 
 impl TableColumn {
     /// Create a column with no role or metadata.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - Owned or convertible column name used for exact table
+    ///   lookup; uniqueness is validated when constructing a table.
+    /// * `data` - Owned typed values whose length determines the column's
+    ///   row count; nullable variants preserve missing values as `None`.
     #[must_use]
     pub fn new(name: impl Into<String>, data: TableColumnData) -> Self {
         Self {
@@ -122,6 +147,11 @@ impl TableColumn {
     }
 
     /// Attach a semantic role to the column.
+    ///
+    /// # Arguments
+    ///
+    /// * `role` - Consumer-facing hint describing how to interpret the column;
+    ///   replaces an existing role without changing its typed values.
     #[must_use]
     pub fn with_role(mut self, role: TableColumnRole) -> Self {
         self.role = Some(role);
@@ -129,6 +159,11 @@ impl TableColumn {
     }
 
     /// Attach metadata to the column.
+    ///
+    /// # Arguments
+    ///
+    /// * `metadata` - Owned JSON annotations replacing the existing metadata
+    ///   map; insertion order and typed column values are preserved.
     #[must_use]
     pub fn with_metadata(mut self, metadata: IndexMap<String, serde_json::Value>) -> Self {
         self.metadata = metadata;

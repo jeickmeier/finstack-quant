@@ -317,7 +317,7 @@
       "fixed_kappa": null,
       "initial_kappa": null,
       "initial_sigma": null,
-      "payment_frequency": "semi_annual",
+      "index_id": "USD-SOFR-3M",
       "volatility_mode": "scalar"
     },
     "svi_surface": {

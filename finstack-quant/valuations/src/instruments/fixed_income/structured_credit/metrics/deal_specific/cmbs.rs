@@ -32,7 +32,8 @@ fn loan_debt_service(
             let calendar =
                 crate::cashflow::builder::calendar::resolve_calendar_strict("weekends_only")?;
             let next_reset = as_of.add_business_days(curve.reset_lag(), calendar)?;
-            let projected = term_rate_for_period(curve.as_ref(), market, next_reset)?;
+            let projected =
+                term_rate_for_period(curve.as_ref(), market, next_reset, asset.day_count)?;
             let floored = asset
                 .index_floor_bp
                 .map_or(projected, |floor_bp| projected.max(floor_bp / 10_000.0));

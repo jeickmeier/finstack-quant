@@ -652,7 +652,9 @@ getters!(JsAssetBackedFacility, "AssetBackedFacility", |i| {
         revolving_end as revolvingEnd => date(i.revolving_end),
         /// Final repayment date: the revolving end plus the term-out window, capped at maturity.
         /// @returns The repayment date.
-        repayment_date as repaymentDate => date(i.repayment_date()),
+        /// @throws `FinstackError` (kind `validation`) if the term-out window
+        /// exceeds the supported date range.
+        repayment_date as repaymentDate => date(i.repayment_date().map_err(to_js_err)?),
         /// Legal final maturity.
         /// @returns The maturity date.
         maturity as maturity => date(i.maturity),

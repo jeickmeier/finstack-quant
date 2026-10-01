@@ -304,7 +304,7 @@ impl PrepaymentPenalty {
                         let mut pv = 0.0;
                         let whole_years = years.floor() as i32;
                         for k in 1..=whole_years {
-                            let at = date.add_months(12 * k).min(maturity);
+                            let at = date.add_months(12 * k)?.min(maturity);
                             pv += lost_per_year * curve.df_between_dates(date, at)?;
                         }
                         let stub = years - f64::from(whole_years);

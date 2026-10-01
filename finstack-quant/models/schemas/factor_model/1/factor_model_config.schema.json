@@ -1214,7 +1214,7 @@
               "type": "null"
             }
           ],
-          "description": "Policy used when a dependency does not map to a configured factor."
+          "description": "Policy used when a dependency does not map to a configured factor.\n`None` selects `Strict`, which fails the run. Select `Warn` explicitly\nto continue with unmatched dependencies reported to the caller."
         }
       },
       "required": [
@@ -1784,7 +1784,7 @@
         },
         {
           "const": "full_repricing",
-          "description": "Reprice across a scenario grid and derive deltas from the P&L profile.\n\nUse this when the portfolio workflow needs richer scenario behavior than\na single small bump can capture, at the cost of more repricing work.",
+          "description": "Select the engine that can also compute explicit scenario P&L profiles.\n\nSensitivity extraction uses the same two central endpoints as\n`DeltaBased`; full grids are evaluated only when P&L profiles are requested.",
           "type": "string"
         }
       ]
@@ -1860,11 +1860,6 @@
         {
           "const": "strict",
           "description": "Fail immediately when any dependency is unmatched.\n\nUse this in production risk runs where dropping unmapped risk would be a\ncontrol failure.",
-          "type": "string"
-        },
-        {
-          "const": "residual",
-          "description": "Roll unmatched risk into a residual bucket.\n\nUse this when the engine should preserve total exposure while making the\nunmatched component explicit as residual risk.",
           "type": "string"
         },
         {

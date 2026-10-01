@@ -27,7 +27,7 @@ fn test_backtest_perfect_forecast() {
     let metrics = backtest_forecast(&actual, &forecast).unwrap();
 
     assert_eq!(metrics.mae, 0.0);
-    assert_eq!(metrics.mape, 0.0);
+    assert_eq!(metrics.mape, Some(0.0));
     assert_eq!(metrics.rmse, 0.0);
     assert_eq!(metrics.n, 4);
 }
@@ -74,7 +74,12 @@ fn test_backtest_mape_calculation() {
     let metrics = backtest_forecast(&actual, &forecast).unwrap();
 
     // MAPE: ((10/100 + 20/200 + 5/50) / 3) * 100 = ((0.1 + 0.1 + 0.1) / 3) * 100 = 10.0
-    assert_close(metrics.mape, 10.0, METRICS_TOLERANCE, "MAPE calculation");
+    assert_close(
+        metrics.mape.unwrap(),
+        10.0,
+        METRICS_TOLERANCE,
+        "MAPE calculation",
+    );
 }
 
 // Edge Cases
@@ -89,7 +94,7 @@ fn test_backtest_single_datapoint() {
     assert_eq!(metrics.mae, 5.0);
     assert_eq!(metrics.rmse, 5.0);
     assert_close(
-        metrics.mape,
+        metrics.mape.unwrap(),
         5.0,
         METRICS_TOLERANCE,
         "MAPE for single point",
@@ -107,7 +112,7 @@ fn test_backtest_negative_values() {
     // Metrics should work with negative values
     assert!(metrics.mae > 0.0);
     assert!(metrics.rmse > 0.0);
-    assert!(metrics.mape > 0.0);
+    assert!(metrics.mape.unwrap() > 0.0);
     assert!(!metrics.mae.is_nan());
     assert!(!metrics.rmse.is_nan());
 }
@@ -120,8 +125,7 @@ fn test_backtest_near_zero_actuals() {
     // Should not panic or produce inf/nan despite near-zero actual
     let metrics = backtest_forecast(&actual, &forecast).unwrap();
 
-    assert!(!metrics.mape.is_infinite());
-    assert!(!metrics.mape.is_nan());
+    assert!(metrics.mape.unwrap().is_finite());
 }
 
 // Error Cases
@@ -152,9 +156,9 @@ fn test_backtest_empty_arrays_error() {
 fn test_forecast_metrics_summary() {
     let metrics = ForecastMetrics {
         mae: 2.5,
-        mape: 3.7,
+        mape: Some(3.7),
         mape_effective_n: 10,
-        smape: 3.5,
+        smape: Some(3.5),
         rmse: 3.2,
         n: 10,
     };
@@ -195,5 +199,44 @@ fn test_backtest_trending_series() {
 
     // Forecast is consistently slightly low
     assert!(metrics.mae > 0.0);
-    assert!(metrics.mape > 0.0);
+    assert!(metrics.mape.unwrap() > 0.0);
+}
+
+#[test]
+fn test_zero_forecast_metrics_round_trip() {
+    let metrics = backtest_forecast(&[0.0, 0.0], &[0.0, 0.0]).unwrap();
+    assert_eq!(metrics.mae, 0.0);
+    assert_eq!(metrics.rmse, 0.0);
+    assert_eq!(metrics.mape, None);
+    assert_eq!(metrics.smape, None);
+    assert_eq!(metrics.mape_effective_n, 0);
+    let json = serde_json::to_value(&metrics).unwrap();
+    assert!(json["mape"].is_null());
+    assert!(json["smape"].is_null());
+    assert_eq!(
+        serde_json::from_value::<ForecastMetrics>(json).unwrap(),
+        metrics
+    );
+    assert!(metrics.summary().contains("sMAPE: n/a"));
+}
+
+#[test]
+fn test_zero_actual_has_unavailable_mape_and_defined_smape() {
+    let metrics = backtest_forecast(&[0.0], &[1.0]).unwrap();
+    assert_eq!(metrics.mape, None);
+    assert_eq!(metrics.smape, Some(200.0));
+}
+
+#[test]
+fn test_backtest_rejects_nonfinite_input_and_overflow() {
+    for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        assert!(backtest_forecast(&[value], &[0.0]).is_err());
+        assert!(backtest_forecast(&[0.0], &[value]).is_err());
+    }
+    assert!(backtest_forecast(&[f64::MAX], &[-f64::MAX]).is_err());
+    assert!(backtest_forecast(&[1e200], &[0.0]).is_err());
+    // Perfect large observations still have finite, zero errors; the sMAPE
+    // denominator must not overflow just because both observations are large.
+    let metrics = backtest_forecast(&[f64::MAX], &[f64::MAX]).unwrap();
+    assert_eq!(metrics.smape, Some(0.0));
 }

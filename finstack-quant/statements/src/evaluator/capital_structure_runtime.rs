@@ -1,4 +1,8 @@
 //! Capital-structure-specific evaluator runtime helpers.
+//!
+//! Statements consume raw classified schedules so historical periods and PIK
+//! capitalization remain visible; public valuation schedules filter past cash
+//! and normalize PIK into non-cash principal rows.
 
 use super::{EvaluationContext, Evaluator, PeriodHistory};
 use crate::error::Result;
@@ -10,8 +14,7 @@ use indexmap::IndexMap;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-type Instruments =
-    IndexMap<String, Arc<dyn finstack_quant_cashflows::CashflowProvider + Send + Sync>>;
+type Instruments = IndexMap<String, Arc<dyn finstack_quant_valuations::instruments::Instrument>>;
 type DynamicPeriodEvaluation = (
     IndexMap<String, f64>,
     Vec<Option<f64>>,
@@ -26,13 +29,11 @@ impl Evaluator {
         model: &FinancialModelSpec,
     ) -> Result<Option<Instruments>> {
         use crate::capital_structure::integration;
-        use finstack_quant_cashflows::CashflowProvider;
 
         let Some(cs_spec) = &model.capital_structure else {
             return Ok(None);
         };
-        let mut instruments: IndexMap<String, Arc<dyn CashflowProvider + Send + Sync>> =
-            IndexMap::new();
+        let mut instruments = Instruments::new();
 
         for debt_spec in &cs_spec.debt_instruments {
             if instruments.contains_key(&debt_spec.id) {
@@ -180,7 +181,7 @@ pub(crate) fn resolve_opening_balance(
     as_of: Date,
     period_start: Date,
 ) -> Result<Money> {
-    let schedule = instrument.cashflow_schedule(market_ctx, as_of)?;
+    let schedule = instrument.raw_cashflow_schedule(market_ctx, as_of)?;
     let outstanding_path = schedule.outstanding_by_date()?;
 
     let abs_money = |m: &Money| -> Money {
@@ -198,18 +199,29 @@ pub(crate) fn resolve_opening_balance(
         return Ok(abs_money(m));
     }
 
-    // No outstanding entry at or before the period start. A forward-dated /
-    // delayed-draw instrument (issue date after the period start) carries a
-    // zero balance pre-issuance — falling back to the first *future* entry
-    // would report the full notional before the debt exists. Only use the
-    // first entry for issued instruments whose first flow lands later.
+    // Initial funding dated on the first period boundary belongs to that
+    // period. Its opening is zero: `calculate_period_flows` records the funding
+    // and the waterfall adds it at close. Bonds without an initial funding leg
+    // still use face value below.
+    let funding_at_start = schedule.get_meta().issue_date == Some(period_start)
+        && schedule.get_flows().iter().any(|flow| {
+            flow.get_balance_date() == period_start
+                && crate::capital_structure::period_flows::funding_principal(flow)
+                    .is_some_and(|principal| principal.amount() > 0.0)
+        });
+    if funding_at_start {
+        return Ok(Money::from((
+            0_i64,
+            schedule.get_notional().initial.currency(),
+        )));
+    }
+
+    // A forward-dated instrument has no opening principal before issuance,
+    // including a schedule that omits the issuance cash leg entirely.
     let pre_issuance = schedule
         .get_meta()
         .issue_date
-        .is_some_and(|issue| issue > period_start)
-        && outstanding_path
-            .first()
-            .is_some_and(|(d, _)| *d > period_start);
+        .is_some_and(|issue| issue > period_start);
     if pre_issuance {
         return Ok(Money::from((
             0_i64,
@@ -217,17 +229,10 @@ pub(crate) fn resolve_opening_balance(
         )));
     }
 
-    if let Some((_, m)) = outstanding_path.first() {
-        return Ok(abs_money(m));
-    }
-
-    // Use the schedule's own notional currency rather than guessing USD: an
-    // empty-schedule non-USD instrument must not seed a USD zero balance (it can
-    // later trip the waterfall's single-currency check with a confusing error).
-    Ok(Money::from((
-        0_i64,
-        schedule.get_notional().initial.currency(),
-    )))
+    // Before the first event, principal is the schedule's initial notional.
+    // The first path row is an after-event balance, so using it here would
+    // apply boundary amortization or even a future redemption too early.
+    Ok(abs_money(&schedule.get_notional().initial))
 }
 
 fn compute_contractual_flows(
@@ -249,7 +254,7 @@ fn compute_contractual_flows(
             if let Some(balance) = cs_state.opening_balances.get(instrument_id).copied() {
                 balance
             } else {
-                let schedule = instrument.cashflow_schedule(market_ctx, as_of)?;
+                let schedule = instrument.raw_cashflow_schedule(market_ctx, as_of)?;
                 Money::from((0_i64, schedule.get_notional().initial.currency()))
             };
 
@@ -260,8 +265,10 @@ fn compute_contractual_flows(
             .get(instrument_id.as_str())
             .copied()
             .unwrap_or_else(|| Money::from((0_i64, opening_balance.currency())));
-        if !cs_state.residual_schedules.contains_key(instrument_id) {
-            let schedule = instrument.cashflow_schedule(market_ctx, as_of)?;
+        if crate::capital_structure::period_flows::is_debt_kind(instrument.key())?
+            && !cs_state.residual_schedules.contains_key(instrument_id)
+        {
+            let schedule = instrument.raw_cashflow_schedule(market_ctx, as_of)?;
             cs_state
                 .residual_schedules
                 .insert(instrument_id.clone(), schedule);
@@ -277,6 +284,12 @@ fn compute_contractual_flows(
                 as_of,
                 residual,
             )?;
+        let principal_claims = residual.map(|schedule| {
+            crate::capital_structure::period_flows::period_principal_claims(schedule, period)
+        });
+        if let Some(claims) = principal_claims {
+            cs_state.set_period_principal_flows(instrument_id.clone(), period, claims)?;
+        }
         warnings.extend(period_warnings);
 
         flows.insert(instrument_id.to_string(), breakdown.clone());
@@ -543,6 +556,83 @@ mod opening_tests {
             "opening must be the pre-payment outstanding, not the post-amort snapshot on period.start"
         );
         assert_eq!(opening.currency(), Currency::USD);
+    }
+
+    #[test]
+    fn first_period_opening_without_funding_uses_pre_event_face() {
+        let period_start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let maturity = Date::from_calendar_date(2027, Month::January, 1).expect("valid date");
+        for (issue, expected) in [
+            (
+                Date::from_calendar_date(2024, Month::January, 1).expect("issue"),
+                100.0,
+            ),
+            (period_start, 100.0),
+            (
+                Date::from_calendar_date(2025, Month::January, 15).expect("issue"),
+                0.0,
+            ),
+        ] {
+            let instrument = ScheduleInstrument {
+                schedule: CashFlowSchedule::from_parts(
+                    vec![CashFlow::new(
+                        maturity,
+                        None,
+                        Money::from((100_i64, Currency::USD)),
+                        CFKind::Notional,
+                        0.0,
+                        None,
+                    )],
+                    Notional::par(100.0, Currency::USD).expect("face"),
+                    DayCount::Act365F,
+                    CashFlowMeta {
+                        issue_date: Some(issue),
+                        ..Default::default()
+                    },
+                ),
+            };
+            let opening = resolve_opening_balance(
+                &instrument,
+                &MarketContext::new(),
+                period_start,
+                period_start,
+            )
+            .expect("opening principal");
+            assert_eq!(opening.amount(), expected, "issue={issue}");
+        }
+    }
+
+    #[test]
+    fn first_period_opening_without_funding_does_not_apply_boundary_amortization() {
+        let period_start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let instrument = ScheduleInstrument {
+            schedule: CashFlowSchedule::from_parts(
+                vec![CashFlow::new(
+                    period_start,
+                    None,
+                    Money::from((20_i64, Currency::USD)),
+                    CFKind::Amortization,
+                    0.0,
+                    None,
+                )],
+                Notional::par(100.0, Currency::USD).expect("face"),
+                DayCount::Act365F,
+                CashFlowMeta {
+                    issue_date: Some(
+                        Date::from_calendar_date(2024, Month::January, 1).expect("issue"),
+                    ),
+                    ..Default::default()
+                },
+            ),
+        };
+        let opening = resolve_opening_balance(
+            &instrument,
+            &MarketContext::new(),
+            period_start,
+            period_start,
+        )
+        .expect("opening principal");
+        assert_eq!(opening.amount(), 100.0);
     }
 }
 

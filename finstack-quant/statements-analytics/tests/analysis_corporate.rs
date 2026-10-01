@@ -673,7 +673,7 @@ fn annual_gordon_terminal_value_unchanged() {
     .expect("DCF evaluation");
 
     let dcf = result.dcf_instrument.expect("instrument");
-    assert_eq!(dcf.terminal_flow_override, None);
+    assert_eq!(dcf.terminal_flow_override, Some(480_000.0));
 
     let tv = dcf.calculate_terminal_value().expect("terminal value");
     let expected_tv = 480_000.0 * 1.02 / (0.10 - 0.02);

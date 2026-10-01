@@ -41,6 +41,7 @@ impl ForwardCurve {
             extrapolation: ExtrapolationPolicy::FlatForward,
             rate_calibration: None,
             fx_policy: None,
+            transform: None,
         }
     }
 
@@ -86,10 +87,12 @@ impl ForwardCurve {
             .build()
     }
 
-    /// Forward rate starting on `date` for the curve's tenor.
+    /// Curve-basis forward rate starting on `date` for the curve's tenor.
     ///
     /// Converts `date` to a year fraction from the base date under the curve
-    /// day count and evaluates [`ForwardCurve::rate`].
+    /// day count and evaluates [`ForwardCurve::rate`]. The returned rate is
+    /// annualized on this curve's day-count basis; a contractual index with a
+    /// different accrual basis requires conversion before calculating a coupon.
     ///
     /// # Arguments
     ///
@@ -109,7 +112,11 @@ impl ForwardCurve {
         Ok(self.rate(t))
     }
 
-    /// Forward rate starting at time `t` (in years) for the curve’s tenor.
+    /// Curve-basis forward rate starting at time `t` for the curve's tenor.
+    ///
+    /// The raw rate is annualized on [`Self::day_count`], the same clock used by
+    /// projection discount-factor chaining. Coupon projection must convert its
+    /// accrual growth to the contractual index basis when that basis differs.
     ///
     /// # Arguments
     ///
@@ -117,7 +124,10 @@ impl ForwardCurve {
     #[inline]
     #[must_use]
     pub fn rate(&self, t: f64) -> f64 {
-        self.interp.interp(t)
+        self.transform.as_ref().map_or_else(
+            || self.interp.interp(t),
+            |transform| transform.rate(&self.interp, t),
+        )
     }
 
     /// Simple forward rate implied by projection discount factors between `t1` and `t2`.
@@ -254,11 +264,18 @@ impl ForwardCurve {
         self.knots.is_empty()
     }
 
-    /// Simpson-rule integral average rate over `[t1, t2]`.
+    /// Integral average rate over `[t1, t2]`.
+    ///
+    /// This average remains annualized on the curve's day-count basis. Multiply
+    /// by `t2 - t1` and divide by the contractual observation accrual fraction
+    /// before using it as an overnight rate on a different index basis.
     ///
     /// This is appropriate for averaging short overnight observation
     /// sub-windows, not for deriving the simple term forward over an arbitrary
     /// projection interval. Use [`Self::rate_between`] for the latter.
+    /// The source interpolation uses fixed-segment Simpson integration;
+    /// accumulated continuous rate shocks are integrated analytically so a
+    /// narrow key-rate bucket cannot disappear between quadrature samples.
     ///
     /// # NaN contract
     ///
@@ -308,7 +325,23 @@ impl ForwardCurve {
         } else {
             8
         };
-        simpson_rule(|t| self.rate(t), t1, t2, n).map_or(f64::NAN, |integral| integral / dt)
+        if let Some(transform) = &self.transform {
+            let source = simpson_rule(
+                |time| self.interp.interp(time + transform.offset),
+                t1,
+                t2,
+                n,
+            );
+            source.map_or(f64::NAN, |integral| {
+                (transform.scale * integral
+                    + transform
+                        .adjustment
+                        .integral(t1 + transform.offset, t2 + transform.offset))
+                    / dt
+            })
+        } else {
+            simpson_rule(|t| self.rate(t), t1, t2, n).map_or(f64::NAN, |integral| integral / dt)
+        }
     }
 
     /// Logarithm of the implied projection discount factor from zero to `t`.

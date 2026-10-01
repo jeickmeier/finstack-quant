@@ -4,7 +4,7 @@
 //! their tests; the evaluator's capital-structure runtime drives this function
 //! per instrument and period and handles currency / FX bookkeeping. The logic here:
 //!
-//! 1. Pulls the full `CashFlowSchedule` for an instrument.
+//! 1. Pulls the full classified raw schedule, retaining history and PIK events.
 //! 2. Computes a stateful `scale` factor that relates the model's
 //!    period-opening balance to the schedule's notional opening — clamped to
 //!    [0.0, 1.10] to prevent silent cashflow amplification (see
@@ -18,13 +18,15 @@
 use crate::capital_structure::cashflows::CashflowBreakdown;
 use crate::error::Result;
 use crate::evaluator::{CapitalStructureWarning, EvalWarning};
-use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_cashflows::builder::{CashFlowSchedule, CashflowRepresentation};
 use finstack_quant_cashflows::primitives::CFKind;
-use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_cashflows::{accrued_interest_amount, AccrualConfig};
+use finstack_quant_core::cashflow::CashFlow;
 use finstack_quant_core::dates::{Date, Period};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::pricer::InstrumentType;
 
 /// True when `kind` is a cash-interest flow (the legs a swap nets).
 #[inline]
@@ -32,42 +34,48 @@ pub(crate) fn is_cash_interest_kind(kind: CFKind) -> bool {
     matches!(kind, CFKind::Fixed | CFKind::Stub | CFKind::FloatReset)
 }
 
-/// Detect whether a schedule carries two opposite-signed interest legs.
+/// Principal established by a funding flow, independently of cash proceeds.
+/// Explicit principal deltas own balance movements, including withheld OID.
+/// Raw funding rows without a delta use their cash amount's magnitude.
 ///
-/// This distinguishes a swap from single-leg debt, which the sign of an
-/// individual flow cannot do: bonds and loans emit **positive** coupons meaning
-/// "issuer pays", while a `PayReceive::Pay` swap emits a negative fixed leg and
-/// a positive floating leg. A positive flow is therefore an expense on a bond
-/// but a receipt on a swap.
+/// # Arguments
 ///
-/// The whole schedule is inspected rather than one period's flows because swap
-/// legs routinely have different frequencies (semi-annual fixed against
-/// quarterly floating is the default), so a single period may contain only one
-/// leg and would be misread as single-leg debt.
-///
-/// This is a structural inference, not a declared property: `CashflowProvider`
-/// does not expose leg structure. It is exact for the instruments this module
-/// builds — single-leg schedules never mix interest signs, and a swap always
-/// emits both legs across its life.
-pub(crate) fn schedule_is_two_leg(
-    schedule: &finstack_quant_cashflows::builder::CashFlowSchedule,
-) -> bool {
-    let mut saw_positive = false;
-    let mut saw_negative = false;
-    for cf in schedule.get_flows() {
-        if !is_cash_interest_kind(cf.kind) {
-            continue;
-        }
-        if cf.amount.amount() > 0.0 {
-            saw_positive = true;
-        } else if cf.amount.amount() < 0.0 {
-            saw_negative = true;
-        }
-        if saw_positive && saw_negative {
-            return true;
-        }
+/// * `flow` - A raw classified cashflow; only notional and revolving funding
+///   rows establish new principal. Cash amounts and their dates are preserved.
+pub(crate) fn funding_principal(flow: &CashFlow) -> Option<Money> {
+    if !matches!(flow.kind, CFKind::Notional | CFKind::RevolvingDraw) {
+        return None;
     }
-    false
+    if let Some(delta) = flow.principal_delta {
+        return (delta.amount() > 0.0).then_some(delta);
+    }
+    if matches!(flow.kind, CFKind::RevolvingDraw) || flow.amount.amount() <= 0.0 {
+        return Some(if flow.amount.amount() < 0.0 {
+            flow.amount.checked_neg()
+        } else {
+            flow.amount
+        });
+    }
+    None
+}
+
+/// Whether the declared financial-statement instrument carries borrowing principal.
+///
+/// # Arguments
+///
+/// * `kind` - Canonical instrument category whose cashflow view and borrowing
+///   semantics must belong to the financial-statement instrument union.
+pub(crate) fn is_debt_kind(kind: InstrumentType) -> Result<bool> {
+    match kind {
+        InstrumentType::Bond
+        | InstrumentType::Convertible
+        | InstrumentType::TermLoan
+        | InstrumentType::RevolvingCredit => Ok(true),
+        InstrumentType::Irs | InstrumentType::CapFloor | InstrumentType::Swaption => Ok(false),
+        _ => Err(crate::error::Error::invalid_input(format!(
+            "instrument type '{kind:?}' is not supported in a financial statement capital structure"
+        ))),
+    }
 }
 
 /// Snapshot date used for "end of period" quantities under half-open period semantics `[start, end)`.
@@ -81,6 +89,34 @@ pub(crate) fn period_snapshot_date(period: &Period) -> Date {
     period.end - time::Duration::days(1)
 }
 
+/// Preserve the cash and economic dates of this period's principal claims.
+pub(crate) fn period_principal_claims(
+    schedule: &CashFlowSchedule,
+    period: &Period,
+) -> Vec<crate::capital_structure::PrincipalClaim> {
+    schedule
+        .get_flows()
+        .iter()
+        .filter(|flow| flow.date >= period.start && flow.date < period.end)
+        .filter(|flow| {
+            matches!(
+                flow.kind,
+                CFKind::Amortization | CFKind::PrePayment | CFKind::RevolvingRepayment
+            ) || (flow.kind == CFKind::Notional && flow.amount.amount() > 0.0)
+        })
+        .filter(|flow| flow.amount.amount() != 0.0)
+        .map(|flow| crate::capital_structure::PrincipalClaim {
+            payment_date: flow.date,
+            balance_date: flow.get_balance_date(),
+            amount: if flow.amount.amount() < 0.0 {
+                flow.amount.checked_neg()
+            } else {
+                flow.amount
+            },
+        })
+        .collect()
+}
+
 /// Calculate contractual flows for a single period.
 ///
 /// This helper extracts flows for a specific period from an instrument's full schedule,
@@ -89,12 +125,19 @@ pub(crate) fn period_snapshot_date(period: &Period) -> Date {
 /// Periods are treated with half-open semantics `[start, end)`. End-of-period
 /// balances and accruals are therefore snapped at `period.end - 1 day` so
 /// cashflows occurring exactly on the next period boundary are not attributed
-/// to the prior period.
+/// to the prior period. Hedge trade notionals do not establish borrowing
+/// principal: hedge cashflows use full notional scale, while debt balance,
+/// new funding and debt accrued interest remain zero. Derivative accrual
+/// valuation is outside this debt-service extraction contract.
 ///
 /// # Arguments
 ///
-/// * `instrument` - The instrument to calculate flows for when no residual
-///   schedule is supplied.
+/// * `instrument` - Canonical instrument whose declared kind fixes the interest
+///   sign convention, even when `residual_schedule` is supplied. Bonds, convertible
+///   bonds, loans and revolvers emit positive debt coupons as issuer expenses;
+///   negative debt coupons are income. Rate hedges emit positive cash as holder
+///   receipts and negative cash as payments. Supplies the raw schedule when no
+///   residual schedule is provided.
 /// * `period` - The period to extract flows for
 /// * `opening_balance` - Opening balance at the start of the period
 /// * `toggled_pik_capitalized` - Cumulative principal capitalized via the PIK
@@ -115,19 +158,24 @@ pub(crate) fn period_snapshot_date(period: &Period) -> Date {
 /// Returns a tuple of:
 /// - [`CashflowBreakdown`] for the period
 /// - closing balance after scheduled flows
+/// - newly funded principal, using explicit principal deltas rather than net cash
+///   proceeds, and implicit initial face for a schedule without a funding leg
 /// - evaluation warnings for ignored or unsupported cashflow kinds
 ///
 /// # Errors
 ///
 /// Returns an error if the instrument schedule cannot be built, if currencies
-/// are inconsistent, or if accrued interest cannot be computed.
+/// are inconsistent, if implicit issuance principal is negative, or if accrued
+/// interest cannot be computed, or the declared instrument kind is outside
+/// the supported financial-statement instrument union, or the raw schedule
+/// is a placeholder whose contingent payouts are not modeled.
 ///
 /// # References
 ///
 /// - Cashflow discounting and schedule context: `docs/REFERENCES.md#hull-options-futures`
 /// - Fixed-income balance/risk interpretation: `docs/REFERENCES.md#tuckman-serrat-fixed-income`
 pub fn calculate_period_flows(
-    instrument: &dyn CashflowProvider,
+    instrument: &dyn Instrument,
     period: &Period,
     opening_balance: Money,
     toggled_pik_capitalized: Money,
@@ -135,11 +183,19 @@ pub fn calculate_period_flows(
     as_of: Date,
     residual_schedule: Option<&CashFlowSchedule>,
 ) -> Result<(CashflowBreakdown, Money, Money, Vec<EvalWarning>)> {
+    let is_debt = is_debt_kind(instrument.key())?;
+    let interest_expense_sign = if is_debt { 1.0 } else { -1.0 };
     let using_residual = residual_schedule.is_some();
     let full_schedule = match residual_schedule {
         Some(schedule) => schedule.clone(),
-        None => instrument.cashflow_schedule(market_ctx, as_of)?,
+        None => instrument.raw_cashflow_schedule(market_ctx, as_of)?,
     };
+    if full_schedule.get_meta().representation == CashflowRepresentation::Placeholder {
+        return Err(crate::error::Error::capital_structure(format!(
+            "instrument '{}' has an unsupported placeholder cashflow schedule; contingent payouts are not modeled",
+            instrument.id()
+        )));
+    }
     let currency = full_schedule.get_notional().initial.currency();
     if opening_balance.amount() != 0.0 && opening_balance.currency() != currency {
         return Err(crate::error::Error::currency_mismatch(
@@ -156,7 +212,11 @@ pub fn calculate_period_flows(
     let mut breakdown = CashflowBreakdown::with_currency(currency);
     let mut warnings = Vec::new();
     let snapshot_date = period_snapshot_date(period);
-    let outstanding_path = full_schedule.outstanding_by_date()?;
+    let outstanding_path = if is_debt {
+        full_schedule.outstanding_by_date()?
+    } else {
+        Vec::new()
+    };
     // Boundary convention: flows dated exactly on `period.start` belong to
     // *this* period (half-open `[start, end)`), so the scheduled opening must
     // be the balance strictly *before* `period.start` to match the
@@ -179,19 +239,56 @@ pub fn calculate_period_flows(
     // after a correct rebuild, `opening / scheduled_opening ≈ 1`.
     const SCALE_WARN_THRESHOLD: f64 = 1.05;
     const RESIDUAL_SCALE_TOLERANCE: f64 = 1e-6;
-    // Whether a draw event lands in this period (revolver redraw, or a
-    // mid-period issuance / delayed-draw notional exchange). Computed once and
-    // used both for the closing balance and, below, for the scale: a draw
-    // establishes a fresh balance even from a zero stateful opening, and the
-    // in-period flows are already scheduled against it. Keeping this a single
-    // binding stops the scale and closing branches from drifting apart.
-    let has_new_funding = full_schedule.get_flows().iter().any(|cf| {
-        cf.date >= period.start
-            && cf.date < period.end
-            && (matches!(cf.kind, CFKind::RevolvingDraw)
-                || (matches!(cf.kind, CFKind::Notional) && cf.amount.amount() <= 0.0))
-    });
-    let scale = if opening_balance.amount() == 0.0 {
+    // Funding establishes principal even from a zero opening. For schedules
+    // without an issuance cash leg, recognize their initial face
+    // once when issuance falls in this period. An explicit funding schedule
+    // owns its economic draw timing; never infer an earlier draw from its commitment.
+    // Debt face follows explicit principal deltas; cash proceeds remain intact
+    // on the raw flow, so withheld OID does not reduce the amount owed.
+    let mut has_funding_leg = false;
+    let mut net_new_funding = 0.0;
+    for flow in full_schedule.get_flows().iter().filter(|_| is_debt) {
+        if let Some(principal) = funding_principal(flow) {
+            has_funding_leg = true;
+            if principal.currency() != currency {
+                return Err(crate::error::Error::currency_mismatch(
+                    currency,
+                    principal.currency(),
+                ));
+            }
+            if flow.amount.currency() != currency {
+                return Err(crate::error::Error::currency_mismatch(
+                    currency,
+                    flow.amount.currency(),
+                ));
+            }
+            let funding_date = flow.get_balance_date();
+            if funding_date >= period.start && funding_date < period.end {
+                net_new_funding += principal.amount();
+            }
+        }
+    }
+    if is_debt
+        && opening_balance.amount() == 0.0
+        && !has_funding_leg
+        && full_schedule
+            .get_meta()
+            .issue_date
+            .is_some_and(|issue| issue >= period.start && issue < period.end)
+    {
+        let initial = full_schedule.get_notional().initial.amount();
+        if initial < 0.0 {
+            return Err(crate::error::Error::capital_structure(
+                "Implicit issuance funding requires nonnegative initial principal",
+            ));
+        }
+        net_new_funding = initial;
+    }
+    let has_new_funding = net_new_funding > 0.0;
+    let scale = if !is_debt {
+        // A hedge's trade notional sizes its coupons, not borrowed principal.
+        1.0
+    } else if opening_balance.amount() == 0.0 {
         if scheduled_opening.amount() == 0.0 || has_new_funding {
             // No prior balance and none scheduled (pre-issuance start), or the
             // balance is established by a draw this period: book at full scale.
@@ -261,25 +358,9 @@ pub fn calculate_period_flows(
         }
     };
 
-    // Interest is accumulated as a *signed* per-period sum and split into
-    // expense / income legs after the loop.
-    //
-    // The sign of an interest flow does not by itself say whether it is an
-    // expense: the schedule conventions differ by instrument (INVARIANTS.md §3
-    // — the statements sign-convention refactor is deferred).
-    //
-    // * Single-leg debt (bonds, loans) emits **positive** coupons that already
-    //   mean "issuer pays".
-    // * A two-leg swap emits opposite-signed legs — for `PayReceive::Pay`, the
-    //   fixed leg is negative (paid) and the floating leg positive (received).
-    //
-    // So a positive flow means *expense* on a bond but *receipt* on a swap's
-    // floating leg. `is_two_leg` resolves that ambiguity from the leg structure
-    // of the whole schedule, not from a single period: swap legs commonly have
-    // different frequencies (the default is semi-annual fixed vs quarterly
-    // floating), so an individual period can legitimately contain just one leg
-    // and would otherwise be misread as single-leg debt.
-    let is_two_leg = schedule_is_two_leg(&full_schedule);
+    // Keep the economic sign through netting. Negative rates or a zero leg can
+    // make every swap coupon have the same sign, so only the declared kind can
+    // distinguish holder receipts from positive issuer debt payments.
     let mut net_interest_cash = 0.0_f64;
 
     for cf in full_schedule.get_flows() {
@@ -300,9 +381,6 @@ pub fn calculate_period_flows(
                 Money::new(cf.amount.amount().abs() * scale, cf.amount.currency())?;
 
             match cf.kind {
-                // Guarded on the shared predicate so this arm and
-                // `schedule_is_two_leg` can never disagree about what counts as
-                // a cash-interest leg.
                 kind if is_cash_interest_kind(kind) => {
                     net_interest_cash += cf.amount.amount() * scale;
                 }
@@ -367,19 +445,8 @@ pub fn calculate_period_flows(
         }
     }
 
-    // Book the netted interest (see `net_interest_cash` and `is_two_leg`).
-    //
-    // Two-leg: the net carries meaning — negative is paid (expense), positive
-    // is received (an in-the-money hedge). `.abs()` here would report a receipt
-    // as an expense, overstating P&L by twice the receipt and, under a
-    // waterfall, consuming real cash to service a payment never made.
-    //
-    // Single-leg: the magnitude is the expense, exactly as before.
-    let (expense, income) = if is_two_leg {
-        ((-net_interest_cash).max(0.0), net_interest_cash.max(0.0))
-    } else {
-        (net_interest_cash.abs(), 0.0)
-    };
+    let net_expense = net_interest_cash * interest_expense_sign;
+    let (expense, income) = (net_expense.max(0.0), (-net_expense).max(0.0));
     breakdown.interest_expense_cash = Money::new(expense, currency)?;
     breakdown.interest_income_cash = Some(Money::new(income, currency)?);
 
@@ -421,17 +488,9 @@ pub fn calculate_period_flows(
             }
         });
 
-    let net_new_funding: f64 = full_schedule
-        .get_flows()
-        .iter()
-        .filter(|cf| cf.date >= period.start && cf.date < period.end)
-        .filter_map(|cf| match cf.kind {
-            CFKind::RevolvingDraw => Some(cf.amount.amount().abs()),
-            CFKind::Notional if cf.amount.amount() <= 0.0 => Some(cf.amount.amount().abs()),
-            _ => None,
-        })
-        .sum();
-    let closing_balance = if opening_balance.amount() == 0.0 {
+    let closing_balance = if !is_debt {
+        Money::from((0_i64, currency))
+    } else if opening_balance.amount() == 0.0 {
         if has_new_funding {
             // The stateful balance is zero (e.g. a revolver fully swept in a
             // prior period). New draws this period establish a fresh balance
@@ -449,7 +508,11 @@ pub fn calculate_period_flows(
                     _ => None,
                 })
                 .sum();
-            Money::new((net_new_funding - in_period_repayments).max(0.0), currency)?
+            Money::new(
+                (net_new_funding + breakdown.interest_expense_pik.amount() - in_period_repayments)
+                    .max(0.0),
+                currency,
+            )?
         } else {
             Money::from((0_i64, currency))
         }
@@ -465,18 +528,23 @@ pub fn calculate_period_flows(
     // `InputError::MissingFrequencyForActActIsma` (there is no silent ISDA
     // fallback), so an ISMA schedule cannot produce a wrong accrued figure
     // here — it errors until `CashFlowMeta` carries the coupon frequency.
-    let accrued_scalar =
-        accrued_interest_amount(&full_schedule, snapshot_date, &AccrualConfig::default())?;
-    let accrued_interest = if !using_residual && opening_balance.amount() == 0.0 && !has_new_funding
-    {
+    // Debt coupon accrual uses a single borrowing path. A hedge's merged
+    // legs are not a debt schedule and require a separate valuation accrual policy.
+    let accrued_interest = if !is_debt {
         0.0
     } else {
-        accrued_scalar * scale
+        let accrued_scalar =
+            accrued_interest_amount(&full_schedule, snapshot_date, &AccrualConfig::default())?;
+        if !using_residual && opening_balance.amount() == 0.0 && !has_new_funding {
+            0.0
+        } else {
+            accrued_scalar * scale
+        }
     };
     breakdown.accrued_interest = Money::new(accrued_interest, currency)?;
 
-    // `net_new_funding` (revolver draws + initial-exchange notional in this
-    // period) is returned so the waterfall can recover the payable balance
+    // `net_new_funding` (draws plus explicit or implicit issuance principal in
+    // this period) is returned so the waterfall can recover the payable balance
     // (`opening + funding`) and the draw-aware closing balance; without it the
     // waterfall would recompute closing as `opening - principal` and silently
     // wipe in-period draws.
@@ -499,8 +567,62 @@ mod tests {
     use finstack_quant_core::money::Money;
     use time::Month;
 
+    #[derive(Clone)]
     struct SignedFlowInstrument {
         schedule: CashFlowSchedule,
+        id: finstack_quant_core::types::InstrumentId,
+        attributes: finstack_quant_core::types::Attributes,
+    }
+
+    impl SignedFlowInstrument {
+        fn new(schedule: CashFlowSchedule) -> Self {
+            Self {
+                schedule,
+                id: "SCHEDULE".into(),
+                attributes: Default::default(),
+            }
+        }
+    }
+
+    impl Instrument for SignedFlowInstrument {
+        fn id(&self) -> &str {
+            self.id.as_str()
+        }
+        fn key(&self) -> finstack_quant_valuations::pricer::InstrumentType {
+            finstack_quant_valuations::pricer::InstrumentType::Bond
+        }
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+        fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+            self
+        }
+        fn attributes(&self) -> &finstack_quant_core::types::Attributes {
+            &self.attributes
+        }
+        fn attributes_mut(&mut self) -> &mut finstack_quant_core::types::Attributes {
+            &mut self.attributes
+        }
+        fn clone_box(&self) -> Box<dyn finstack_quant_valuations::instruments::Instrument> {
+            Box::new(self.clone())
+        }
+
+        fn base_value(
+            &self,
+            _market: &MarketContext,
+            _as_of: Date,
+        ) -> finstack_quant_core::Result<Money> {
+            Err(finstack_quant_core::Error::Validation(
+                "test schedule does not price".into(),
+            ))
+        }
+
+        fn market_dependencies(
+            &self,
+        ) -> finstack_quant_core::Result<finstack_quant_valuations::instruments::MarketDependencies>
+        {
+            Ok(Default::default())
+        }
     }
 
     impl finstack_quant_cashflows::CashflowScheduleSource for SignedFlowInstrument {
@@ -526,7 +648,7 @@ mod tests {
     }
 
     #[test]
-    fn calculate_period_flows_normalizes_interest_to_issuer_outflow() {
+    fn negative_debt_coupon_is_booked_as_issuer_income() {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let end = Date::from_calendar_date(2025, Month::April, 1).expect("valid date");
         let period = Period {
@@ -536,20 +658,18 @@ mod tests {
             is_actual: false,
         };
 
-        let instrument = SignedFlowInstrument {
-            schedule: test_schedule(
-                vec![CashFlow::new(
-                    Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
-                    None,
-                    Money::from((-50_000_i64, Currency::USD)),
-                    CFKind::Fixed,
-                    0.25,
-                    None,
-                )],
-                1_000_000.0,
-                start,
-            ),
-        };
+        let instrument = SignedFlowInstrument::new(test_schedule(
+            vec![CashFlow::new(
+                Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                None,
+                Money::from((-50_000_i64, Currency::USD)),
+                CFKind::Fixed,
+                0.25,
+                None,
+            )],
+            1_000_000.0,
+            start,
+        ));
 
         let market_ctx = MarketContext::new();
         let (breakdown, _, _, warnings) = calculate_period_flows(
@@ -564,9 +684,8 @@ mod tests {
         .expect("period flow calculation should succeed");
 
         assert!(warnings.is_empty());
-        assert_eq!(breakdown.interest_expense_cash.amount(), 50_000.0);
-        // A single-leg loan receives nothing.
-        assert_eq!(breakdown.interest_income_cash_or_zero().amount(), 0.0);
+        assert_eq!(breakdown.interest_expense_cash.amount(), 0.0);
+        assert_eq!(breakdown.interest_income_cash_or_zero().amount(), 50_000.0);
     }
 
     /// A swap whose legs net to a *receipt* must not be booked as an expense.
@@ -590,40 +709,40 @@ mod tests {
         let pay_date = Date::from_calendar_date(2025, Month::February, 15).expect("valid date");
 
         // Pay fixed 4% (outflow), receive floating 5.3% (inflow) => net receipt.
-        let instrument = SignedFlowInstrument {
-            schedule: test_schedule(
-                vec![
-                    CashFlow::new(
-                        pay_date,
-                        None,
-                        Money::from((-40_000_i64, Currency::USD)),
-                        CFKind::Fixed,
-                        0.25,
-                        None,
-                    ),
-                    CashFlow::new(
-                        pay_date,
-                        None,
-                        Money::from((53_000_i64, Currency::USD)),
-                        CFKind::FloatReset,
-                        0.25,
-                        None,
-                    ),
-                ],
-                1_000_000.0,
-                start,
-            ),
-        };
+        let instrument = SignedFlowInstrument::new(test_schedule(
+            vec![
+                CashFlow::new(
+                    pay_date,
+                    None,
+                    Money::from((-40_000_i64, Currency::USD)),
+                    CFKind::Fixed,
+                    0.25,
+                    None,
+                ),
+                CashFlow::new(
+                    pay_date,
+                    None,
+                    Money::from((53_000_i64, Currency::USD)),
+                    CFKind::FloatReset,
+                    0.25,
+                    None,
+                ),
+            ],
+            1_000_000.0,
+            start,
+        ));
 
+        let swap = finstack_quant_valuations::instruments::InterestRateSwap::example()
+            .expect("valid IRS fixture");
         let market_ctx = MarketContext::new();
         let (breakdown, _, _, _) = calculate_period_flows(
-            &instrument,
+            &swap,
             &period,
             Money::from((1_000_000_i64, Currency::USD)),
             Money::from((0_i64, Currency::USD)),
             &market_ctx,
             start,
-            None,
+            Some(&instrument.schedule),
         )
         .expect("period flow calculation should succeed");
 
@@ -670,30 +789,28 @@ mod tests {
         let coupon_date = Date::from_calendar_date(2025, Month::February, 15).expect("valid date");
 
         // Revolver: draw 1M this period, then accrue a 20k coupon on it.
-        let instrument = SignedFlowInstrument {
-            schedule: test_schedule(
-                vec![
-                    CashFlow::new(
-                        draw_date,
-                        None,
-                        Money::from((1_000_000_i64, Currency::USD)),
-                        CFKind::RevolvingDraw,
-                        0.0,
-                        None,
-                    ),
-                    CashFlow::new(
-                        coupon_date,
-                        None,
-                        Money::from((20_000_i64, Currency::USD)),
-                        CFKind::Fixed,
-                        0.25,
-                        None,
-                    ),
-                ],
-                1_000_000.0,
-                start,
-            ),
-        };
+        let instrument = SignedFlowInstrument::new(test_schedule(
+            vec![
+                CashFlow::new(
+                    draw_date,
+                    None,
+                    Money::from((1_000_000_i64, Currency::USD)),
+                    CFKind::RevolvingDraw,
+                    0.0,
+                    None,
+                ),
+                CashFlow::new(
+                    coupon_date,
+                    None,
+                    Money::from((20_000_i64, Currency::USD)),
+                    CFKind::Fixed,
+                    0.25,
+                    None,
+                ),
+            ],
+            1_000_000.0,
+            start,
+        ));
 
         let market_ctx = MarketContext::new();
         // Stateful opening is zero — the revolver was fully swept last period.
@@ -719,8 +836,8 @@ mod tests {
         );
     }
 
-    /// A genuinely unissued instrument (zero opening, no draw) still books
-    /// nothing — the pre-issuance case the zero-scale branch exists for.
+    /// A previously issued instrument that has been fully repaid books
+    /// nothing when there is no new draw, even if its original schedule remains.
     #[test]
     fn zero_balance_without_draw_books_nothing() {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
@@ -733,20 +850,18 @@ mod tests {
         };
         let coupon_date = Date::from_calendar_date(2025, Month::February, 15).expect("valid date");
 
-        let instrument = SignedFlowInstrument {
-            schedule: test_schedule(
-                vec![CashFlow::new(
-                    coupon_date,
-                    None,
-                    Money::from((20_000_i64, Currency::USD)),
-                    CFKind::Fixed,
-                    0.25,
-                    None,
-                )],
-                1_000_000.0,
-                start,
-            ),
-        };
+        let instrument = SignedFlowInstrument::new(test_schedule(
+            vec![CashFlow::new(
+                coupon_date,
+                None,
+                Money::from((20_000_i64, Currency::USD)),
+                CFKind::Fixed,
+                0.25,
+                None,
+            )],
+            1_000_000.0,
+            Date::from_calendar_date(2024, Month::December, 1).expect("valid issue date"),
+        ));
 
         let market_ctx = MarketContext::new();
         let (breakdown, _, _, _) = calculate_period_flows(
@@ -763,7 +878,7 @@ mod tests {
         assert_eq!(
             breakdown.interest_expense_cash.amount(),
             0.0,
-            "an unissued instrument with no draw books no interest"
+            "a fully repaid instrument with no draw books no interest"
         );
         assert_eq!(breakdown.accrued_interest.amount(), 0.0);
     }
@@ -789,20 +904,18 @@ mod tests {
         };
 
         // Scheduled notional 1M with a 20k coupon.
-        let instrument = SignedFlowInstrument {
-            schedule: test_schedule(
-                vec![CashFlow::new(
-                    Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
-                    None,
-                    Money::from((20_000_i64, Currency::USD)),
-                    CFKind::Fixed,
-                    0.25,
-                    None,
-                )],
-                1_000_000.0,
-                start,
-            ),
-        };
+        let instrument = SignedFlowInstrument::new(test_schedule(
+            vec![CashFlow::new(
+                Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                None,
+                Money::from((20_000_i64, Currency::USD)),
+                CFKind::Fixed,
+                0.25,
+                None,
+            )],
+            1_000_000.0,
+            start,
+        ));
 
         let market_ctx = MarketContext::new();
         // Sweeps have cut the balance to 50k, while 160k of PIK was toggled
@@ -840,20 +953,18 @@ mod tests {
             is_actual: false,
         };
 
-        let instrument = SignedFlowInstrument {
-            schedule: test_schedule(
-                vec![CashFlow::new(
-                    Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
-                    None,
-                    Money::from((20_000_i64, Currency::USD)),
-                    CFKind::Fixed,
-                    0.25,
-                    None,
-                )],
-                1_000_000.0,
-                start,
-            ),
-        };
+        let instrument = SignedFlowInstrument::new(test_schedule(
+            vec![CashFlow::new(
+                Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                None,
+                Money::from((20_000_i64, Currency::USD)),
+                CFKind::Fixed,
+                0.25,
+                None,
+            )],
+            1_000_000.0,
+            start,
+        ));
 
         let market_ctx = MarketContext::new();
         // Balance grew to 1.1M because 100k of PIK capitalized: interest must
@@ -890,40 +1001,40 @@ mod tests {
         let pay_date = Date::from_calendar_date(2025, Month::February, 15).expect("valid date");
 
         // Pay fixed 4% (outflow), receive floating 1% (inflow) => net payment.
-        let instrument = SignedFlowInstrument {
-            schedule: test_schedule(
-                vec![
-                    CashFlow::new(
-                        pay_date,
-                        None,
-                        Money::from((-40_000_i64, Currency::USD)),
-                        CFKind::Fixed,
-                        0.25,
-                        None,
-                    ),
-                    CashFlow::new(
-                        pay_date,
-                        None,
-                        Money::from((10_000_i64, Currency::USD)),
-                        CFKind::FloatReset,
-                        0.25,
-                        None,
-                    ),
-                ],
-                1_000_000.0,
-                start,
-            ),
-        };
+        let instrument = SignedFlowInstrument::new(test_schedule(
+            vec![
+                CashFlow::new(
+                    pay_date,
+                    None,
+                    Money::from((-40_000_i64, Currency::USD)),
+                    CFKind::Fixed,
+                    0.25,
+                    None,
+                ),
+                CashFlow::new(
+                    pay_date,
+                    None,
+                    Money::from((10_000_i64, Currency::USD)),
+                    CFKind::FloatReset,
+                    0.25,
+                    None,
+                ),
+            ],
+            1_000_000.0,
+            start,
+        ));
 
+        let swap = finstack_quant_valuations::instruments::InterestRateSwap::example()
+            .expect("valid IRS fixture");
         let market_ctx = MarketContext::new();
         let (breakdown, _, _, _) = calculate_period_flows(
-            &instrument,
+            &swap,
             &period,
             Money::from((1_000_000_i64, Currency::USD)),
             Money::from((0_i64, Currency::USD)),
             &market_ctx,
             start,
-            None,
+            Some(&instrument.schedule),
         )
         .expect("period flow calculation should succeed");
 
@@ -942,30 +1053,30 @@ mod tests {
             is_actual: false,
         };
 
-        let instrument = SignedFlowInstrument {
-            schedule: test_schedule(
-                vec![
-                    CashFlow::new(
-                        Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
-                        None,
-                        Money::from((-50_000_i64, Currency::USD)),
-                        CFKind::Fixed,
-                        0.25,
-                        None,
-                    ),
-                    CashFlow::new(
-                        Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
-                        None,
-                        Money::from((-100_000_i64, Currency::USD)),
-                        CFKind::Amortization,
-                        0.0,
-                        None,
-                    ),
-                ],
-                1_000_000.0,
-                start,
-            ),
-        };
+        // The debt was issued before this period and subsequently fully
+        // repaid. Its original contractual schedule must not resurrect it.
+        let instrument = SignedFlowInstrument::new(test_schedule(
+            vec![
+                CashFlow::new(
+                    Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                    None,
+                    Money::from((-50_000_i64, Currency::USD)),
+                    CFKind::Fixed,
+                    0.25,
+                    None,
+                ),
+                CashFlow::new(
+                    Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
+                    None,
+                    Money::from((-100_000_i64, Currency::USD)),
+                    CFKind::Amortization,
+                    0.0,
+                    None,
+                ),
+            ],
+            1_000_000.0,
+            Date::from_calendar_date(2024, Month::January, 1).expect("valid issue date"),
+        ));
 
         let market_ctx = MarketContext::new();
         let (breakdown, closing_balance, _, warnings) = calculate_period_flows(
@@ -998,20 +1109,18 @@ mod tests {
             is_actual: false,
         };
 
-        let instrument = SignedFlowInstrument {
-            schedule: test_schedule(
-                vec![CashFlow::new(
-                    Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
-                    None,
-                    Money::from((-100_000_i64, Currency::USD)),
-                    CFKind::RevolvingDraw,
-                    0.0,
-                    None,
-                )],
+        let instrument = SignedFlowInstrument::new(test_schedule(
+            vec![CashFlow::new(
+                Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                None,
+                Money::from((-100_000_i64, Currency::USD)),
+                CFKind::RevolvingDraw,
                 0.0,
-                start,
-            ),
-        };
+                None,
+            )],
+            0.0,
+            start,
+        ));
 
         let market_ctx = MarketContext::new();
         let (breakdown, closing_balance, _, warnings) = calculate_period_flows(
@@ -1060,7 +1169,7 @@ mod tests {
             flows.push(CashFlow::new(
                 q_start(q),
                 None,
-                Money::new(-outstanding * 0.01, Currency::USD).expect("valid money fixture"),
+                Money::new(outstanding * 0.01, Currency::USD).expect("valid money fixture"),
                 CFKind::Fixed,
                 0.25,
                 Some(0.04),
@@ -1075,9 +1184,7 @@ mod tests {
             ));
             outstanding -= 100_000.0;
         }
-        let instrument = SignedFlowInstrument {
-            schedule: test_schedule(flows, 1_000_000.0, issue),
-        };
+        let instrument = SignedFlowInstrument::new(test_schedule(flows, 1_000_000.0, issue));
 
         let market_ctx = MarketContext::new();
         let mut opening = Money::from((1_000_000_i64, Currency::USD));
@@ -1139,20 +1246,18 @@ mod tests {
             is_actual: false,
         };
 
-        let instrument = SignedFlowInstrument {
-            schedule: test_schedule(
-                vec![CashFlow::new(
-                    Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
-                    None,
-                    Money::from((-20_000_i64, Currency::USD)),
-                    CFKind::Fixed,
-                    0.25,
-                    Some(0.08),
-                )],
-                1_000_000.0,
-                start,
-            ),
-        };
+        let instrument = SignedFlowInstrument::new(test_schedule(
+            vec![CashFlow::new(
+                Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                None,
+                Money::from((20_000_i64, Currency::USD)),
+                CFKind::Fixed,
+                0.25,
+                Some(0.08),
+            )],
+            1_000_000.0,
+            start,
+        ));
 
         let market_ctx = MarketContext::new();
         // Opening balance = scheduled 1.0M + 160k of toggle-capitalized PIK
@@ -1208,32 +1313,30 @@ mod tests {
         };
 
         let issue = Date::from_calendar_date(2024, Month::January, 1).expect("valid date");
-        let instrument = SignedFlowInstrument {
-            schedule: test_schedule(
-                vec![
-                    CashFlow::new(
-                        Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
-                        None,
-                        Money::from((-100_000_i64, Currency::USD)),
-                        CFKind::RevolvingDraw,
-                        0.0,
-                        None,
-                    ),
-                    CashFlow::new(
-                        Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
-                        None,
-                        Money::from((30_000_i64, Currency::USD)),
-                        CFKind::RevolvingRepayment,
-                        0.0,
-                        None,
-                    ),
-                ],
-                // Scheduled balance is 500k — the stateful balance (zero,
-                // fully swept upstream) takes precedence.
-                500_000.0,
-                issue,
-            ),
-        };
+        let instrument = SignedFlowInstrument::new(test_schedule(
+            vec![
+                CashFlow::new(
+                    Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                    None,
+                    Money::from((-100_000_i64, Currency::USD)),
+                    CFKind::RevolvingDraw,
+                    0.0,
+                    None,
+                ),
+                CashFlow::new(
+                    Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
+                    None,
+                    Money::from((30_000_i64, Currency::USD)),
+                    CFKind::RevolvingRepayment,
+                    0.0,
+                    None,
+                ),
+            ],
+            // Scheduled balance is 500k — the stateful balance (zero,
+            // fully swept upstream) takes precedence.
+            500_000.0,
+            issue,
+        ));
 
         let market_ctx = MarketContext::new();
         let (breakdown, closing, _, _) = calculate_period_flows(
@@ -1269,30 +1372,28 @@ mod tests {
             is_actual: false,
         };
 
-        let instrument = SignedFlowInstrument {
-            schedule: test_schedule(
-                vec![
-                    CashFlow::new(
-                        Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
-                        None,
-                        Money::from((-5_000_i64, Currency::USD)),
-                        CFKind::CommitmentFee,
-                        0.25,
-                        None,
-                    ),
-                    CashFlow::new(
-                        Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
-                        None,
-                        Money::from((-2_000_i64, Currency::USD)),
-                        CFKind::FacilityFee,
-                        0.25,
-                        None,
-                    ),
-                ],
-                1_000_000.0,
-                start,
-            ),
-        };
+        let instrument = SignedFlowInstrument::new(test_schedule(
+            vec![
+                CashFlow::new(
+                    Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                    None,
+                    Money::from((-5_000_i64, Currency::USD)),
+                    CFKind::CommitmentFee,
+                    0.25,
+                    None,
+                ),
+                CashFlow::new(
+                    Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                    None,
+                    Money::from((-2_000_i64, Currency::USD)),
+                    CFKind::FacilityFee,
+                    0.25,
+                    None,
+                ),
+            ],
+            1_000_000.0,
+            start,
+        ));
 
         let market_ctx = MarketContext::new();
         // Stateful balance at half the schedule → interest-like flows scale
@@ -1326,20 +1427,18 @@ mod tests {
             is_actual: false,
         };
 
-        let instrument = SignedFlowInstrument {
-            schedule: test_schedule(
-                vec![CashFlow::new(
-                    Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
-                    None,
-                    Money::from((-50_000_i64, Currency::USD)),
-                    CFKind::Fixed,
-                    0.25,
-                    None,
-                )],
-                0.01,
-                start,
-            ),
-        };
+        let instrument = SignedFlowInstrument::new(test_schedule(
+            vec![CashFlow::new(
+                Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                None,
+                Money::from((50_000_i64, Currency::USD)),
+                CFKind::Fixed,
+                0.25,
+                None,
+            )],
+            0.01,
+            start,
+        ));
 
         let market_ctx = MarketContext::new();
         let (breakdown, _, _, warnings) = calculate_period_flows(
@@ -1399,38 +1498,36 @@ mod tests {
             is_actual: false,
         };
 
-        let instrument = SignedFlowInstrument {
-            schedule: test_schedule(
-                vec![
-                    CashFlow::new(
-                        issue,
-                        None,
-                        Money::from((-1_000_000_i64, Currency::USD)),
-                        CFKind::Notional,
-                        0.0,
-                        None,
-                    ),
-                    CashFlow::new(
-                        start,
-                        None,
-                        Money::from((-20_000_i64, Currency::USD)),
-                        CFKind::Fixed,
-                        0.25,
-                        Some(0.08),
-                    ),
-                    CashFlow::new(
-                        start,
-                        None,
-                        Money::from((100_000_i64, Currency::USD)),
-                        CFKind::Amortization,
-                        0.0,
-                        None,
-                    ),
-                ],
-                1_000_000.0,
-                issue,
-            ),
-        };
+        let instrument = SignedFlowInstrument::new(test_schedule(
+            vec![
+                CashFlow::new(
+                    issue,
+                    None,
+                    Money::from((-1_000_000_i64, Currency::USD)),
+                    CFKind::Notional,
+                    0.0,
+                    None,
+                ),
+                CashFlow::new(
+                    start,
+                    None,
+                    Money::from((20_000_i64, Currency::USD)),
+                    CFKind::Fixed,
+                    0.25,
+                    Some(0.08),
+                ),
+                CashFlow::new(
+                    start,
+                    None,
+                    Money::from((100_000_i64, Currency::USD)),
+                    CFKind::Amortization,
+                    0.0,
+                    None,
+                ),
+            ],
+            1_000_000.0,
+            issue,
+        ));
 
         let market_ctx = MarketContext::new();
         let outstanding_path = instrument

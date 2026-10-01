@@ -403,8 +403,8 @@ mod tests {
     fn index_option(strike_spread: f64) -> CdsOption {
         let params = CdsOptionParams::call(
             CdsOptionStrike::Spread(Decimal::try_from(strike_spread).expect("valid strike")),
-            as_of().add_months(6),
-            as_of().add_months(66),
+            as_of().add_months(6).expect("valid date shift"),
+            as_of().add_months(66).expect("valid date shift"),
             Money::from((10_000_000_i64, Currency::USD)),
         )
         .expect("params")
@@ -431,7 +431,7 @@ mod tests {
             option,
             selector,
             target_hazard_curve_id: target,
-            hazard_horizon: as_of().add_months(60),
+            hazard_horizon: as_of().add_months(60).expect("valid date shift"),
         }
     }
 
@@ -725,8 +725,8 @@ mod tests {
 
         let params = CdsOptionParams::call(
             CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1)),
-            as_of().add_months(6),
-            as_of().add_months(66),
+            as_of().add_months(6).expect("valid date shift"),
+            as_of().add_months(66).expect("valid date shift"),
             Money::from((10_000_000_i64, Currency::USD)),
         )
         .expect("params")

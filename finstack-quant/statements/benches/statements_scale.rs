@@ -18,6 +18,9 @@
 //! Run with `cargo bench -p finstack-quant-statements --bench statements_scale`.
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use finstack_quant_statements::checks::{
+    Check, CheckCategory, CheckContext, FormulaCheckSpec, Severity,
+};
 use finstack_quant_statements::evaluator::{Evaluator, MonteCarloConfig};
 use finstack_quant_statements::prelude::*;
 use indexmap::IndexMap;
@@ -209,10 +212,38 @@ fn bench_large_lbo_model(c: &mut Criterion) {
 
 // Criterion configuration
 
+fn bench_formula_check_scaling(c: &mut Criterion) {
+    let mut group = c.benchmark_group("formula_check_scaling");
+    for n_periods in [60usize, 120, 240] {
+        let model = build_large_lbo_model(100, n_periods);
+        let results = Evaluator::new().evaluate(&model).unwrap();
+        let check = FormulaCheckSpec {
+            id: "revenue_positive".into(),
+            name: "Revenue positive".into(),
+            category: CheckCategory::InternalConsistency,
+            severity: Severity::Error,
+            formula: "revenue > 0".into(),
+            message_template: "Revenue was not positive in {period}".into(),
+            tolerance: None,
+        };
+        let context = CheckContext::new(&model, &results);
+        group.throughput(Throughput::Elements((100 * n_periods) as u64));
+        group.bench_with_input(
+            BenchmarkId::from_parameter(n_periods),
+            &context,
+            |b, context| {
+                b.iter(|| black_box(check.execute(black_box(context)).unwrap()));
+            },
+        );
+    }
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_monte_carlo_scaling,
     bench_rolling_window_scaling,
-    bench_large_lbo_model
+    bench_large_lbo_model,
+    bench_formula_check_scaling
 );
 criterion_main!(benches);

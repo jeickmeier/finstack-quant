@@ -29,6 +29,7 @@ use crate::instruments::commodity::commodity_spread_option::CommoditySpreadOptio
 use crate::instruments::OptionType;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurfaceAxis};
 use finstack_quant_core::money::Money;
 use finstack_quant_models::closed_form::{black_call, black_put};
 
@@ -93,9 +94,13 @@ fn kirk_price(
         )));
     }
     let surface1 = market.get_surface(inst.leg1_vol_surface_id.as_str())?;
+    surface1.require_quote_type(VolQuoteType::BlackLognormal)?;
+    surface1.require_secondary_axis(VolSurfaceAxis::Strike)?;
     let sigma1 = finstack_quant_models::volatility::get_surface_vol_clamped(&surface1, t, f1);
 
     let surface2 = market.get_surface(inst.leg2_vol_surface_id.as_str())?;
+    surface2.require_quote_type(VolQuoteType::BlackLognormal)?;
+    surface2.require_secondary_axis(VolSurfaceAxis::Strike)?;
     let sigma2 = finstack_quant_models::volatility::get_surface_vol_clamped(&surface2, t, f2);
 
     let rho = inst.correlation;
@@ -253,6 +258,42 @@ mod tests {
             .correlation(correlation)
             .day_count(DayCount::Act365F)
             .build()
+    }
+
+    #[test]
+    fn kirk_rejects_incompatible_surface_contracts() {
+        let as_of =
+            time::Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
+        let expiry =
+            time::Date::from_calendar_date(2026, time::Month::January, 1).expect("valid date");
+        let option = make_spread_option(OptionType::Call, 5.0, 0.5, expiry);
+        for id in ["LEG1-VOL", "LEG2-VOL"] {
+            let base = flat_vol_surface(id, 0.3);
+            let incompatible = [
+                (
+                    base.clone()
+                        .with_quote_type(VolQuoteType::Normal)
+                        .expect("normal surface"),
+                    "black_lognormal",
+                ),
+                (
+                    base.clone()
+                        .with_displacements(&[10.0; 4])
+                        .expect("shifted surface"),
+                    "black_lognormal",
+                ),
+                (base.with_secondary_axis(VolSurfaceAxis::Tenor), "strike"),
+            ];
+            for (surface, expected) in incompatible {
+                let market =
+                    make_market(as_of, 100.0, 80.0, 0.3, 0.2, 0.05).insert_surface(surface);
+                let error = compute_pv(&option, &market, as_of)
+                    .expect_err("Kirk requires unshifted Black strike surfaces");
+                let message = error.to_string();
+                assert!(message.contains(id), "{message}");
+                assert!(message.contains(expected), "{message}");
+            }
+        }
     }
 
     #[test]

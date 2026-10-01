@@ -1354,8 +1354,9 @@ def bs_cos_price(
     Raises
     ------
     ValueError
-        If ``n_terms`` is outside ``1..=65536`` or ``vol`` is not strictly
-        positive.
+        If ``spot``, ``strike``, ``expiry`` or ``vol`` is not finite and
+        positive, ``rate`` or ``div_yield`` is non-finite, or ``n_terms`` is
+        outside ``1..=65536``.
     RuntimeError
         If the inputs produce an invalid COS truncation range, a non-finite
         characteristic-function value, or a non-finite option price.
@@ -1400,11 +1401,13 @@ def vg_cos_price(
     div_yield : float
         Continuous dividend yield (decimal).
     sigma : float
-        VG diffusion parameter (volatility).
+        Positive finite volatility of the subordinated Brownian motion.
     theta : float
-        VG drift parameter.
+        Finite annual log-return drift of the subordinated Brownian motion;
+        its sign controls skew.
     nu : float
-        VG variance rate parameter.
+        Positive finite variance rate of the Gamma time change, in years;
+        larger values increase log-return tail thickness.
     expiry : float
         Time to expiry in years.
     is_call : bool
@@ -1420,7 +1423,10 @@ def vg_cos_price(
     Raises
     ------
     ValueError
-        If ``n_terms`` is outside ``1..=65536``.
+        If ``spot``, ``strike`` or ``expiry`` is not finite and positive, a
+        model input is non-finite, ``sigma`` or ``nu`` is not positive, the
+        martingale condition ``1 - theta*nu - 0.5*sigma**2*nu > 0`` fails, or
+        ``n_terms`` is outside ``1..=65536``.
     RuntimeError
         If the Variance Gamma parameters produce an invalid COS truncation
         range, a non-finite characteristic-function value, or a non-finite
@@ -1489,7 +1495,10 @@ def merton_jump_cos_price(
     Raises
     ------
     ValueError
-        If ``n_terms`` is outside ``1..=65536``.
+        If ``spot``, ``strike`` or ``expiry`` is not finite and positive, a
+        model input is non-finite, ``sigma``, ``sigma_jump`` or ``lambda_`` is
+        negative, the jump compensator is non-finite, or ``n_terms`` is
+        outside ``1..=65536``.
     RuntimeError
         If the jump-diffusion parameters produce an invalid COS truncation
         range, a non-finite characteristic-function value, or a non-finite

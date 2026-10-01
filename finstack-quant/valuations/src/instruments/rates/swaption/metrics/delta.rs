@@ -4,12 +4,13 @@
 //! underlying swap annuity. Uses SABR-implied vol if parameters are set,
 //! otherwise uses the volatility surface or an override from `InstrumentPricingOverrides`.
 //!
-//! # Numerical Stability
+//! # Expiry convention
 //!
-//! Although delta doesn't involve division by sqrt(T) (unlike gamma), the d1
-//! calculation can become numerically unstable near expiry. We apply a
-//! near-expiry threshold for consistency and to return intrinsic delta.
-//!
+//! Positive time retains the analytic model Greek, however short the horizon.
+//! Expired contracts return zero. At zero volatility the shared model kernel
+//! uses call delta one at the exact ATM kink (put delta zero), and zero gamma
+//! and vega; these are finite reporting conventions at a nondifferentiable point.
+
 //! # Cash-settled (ParYield) limitation — frozen annuity
 //!
 //! The annuity is taken from `greek_inputs` as a constant. For physically
@@ -31,12 +32,6 @@ use finstack_quant_models::closed_form::{
 };
 use finstack_quant_models::volatility::VolatilityConvention;
 
-/// Minimum time to expiry (in years) for Black/Normal model delta.
-///
-/// Below this threshold, return intrinsic delta (1 for ITM call, -1 for ITM put,
-/// 0 for OTM) for consistency with gamma/vega behavior near expiry.
-const EXPIRY_THRESHOLD: f64 = 1.0 / 252.0;
-
 /// Delta calculator for swaptions
 pub(crate) struct DeltaCalculator;
 
@@ -49,28 +44,6 @@ impl MetricCalculator for DeltaCalculator {
         let Some(inputs) = option.greek_inputs(&context.curves, context.as_of)? else {
             return Ok(0.0); // Option expired
         };
-
-        // Near-expiry guard: return intrinsic delta when within ~1 business day of expiry.
-        // This avoids d1 instability and is economically meaningful (binary ITM/OTM).
-        if inputs.time_to_expiry < EXPIRY_THRESHOLD {
-            let intrinsic_delta = match option.option_type {
-                OptionType::Call => {
-                    if inputs.forward > strike {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                }
-                OptionType::Put => {
-                    if inputs.forward < strike {
-                        -1.0
-                    } else {
-                        0.0
-                    }
-                }
-            };
-            return Ok(intrinsic_delta * option.notional.amount() * inputs.annuity);
-        }
 
         let (forward, strike) = ResolvedVolatility {
             sigma: inputs.sigma,

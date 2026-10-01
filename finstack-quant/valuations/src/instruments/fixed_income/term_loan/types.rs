@@ -794,10 +794,22 @@ impl TermLoan {
     ///
     /// If `calendar_id` is set, settlement days are treated as business days on that calendar.
     /// Otherwise, a weekends-only weekday roll is used as default behavior.
+    ///
+    /// # Arguments
+    ///
+    /// * `as_of` - Valuation date from which the nonnegative settlement-day lag is counted.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the settlement-day count exceeds the signed offset range,
+    /// the shifted date exceeds the calendar, or the calendar cannot be resolved.
     pub fn settlement_date(&self, as_of: Date) -> finstack_quant_core::Result<Date> {
         if self.settlement_days == 0 {
             return Ok(as_of);
         }
+        let settlement_days = i32::try_from(self.settlement_days).map_err(|_| {
+            finstack_quant_core::Error::Validation("settlement days exceed supported range".into())
+        })?;
 
         if let Some(calendar_id) = &self.calendar_id {
             let calendar = calendar_by_id(calendar_id).ok_or_else(|| {
@@ -805,10 +817,10 @@ impl TermLoan {
                     id: format!("calendar:{}", calendar_id),
                 })
             })?;
-            return as_of.add_business_days(self.settlement_days as i32, calendar);
+            return as_of.add_business_days(settlement_days, calendar);
         }
 
-        Ok(as_of.add_weekdays(self.settlement_days as i32))
+        as_of.add_weekdays(settlement_days)
     }
 
     /// Accrual configuration for settlement accrued-interest calculations.
@@ -844,6 +856,13 @@ impl crate::instruments::common_impl::traits::Instrument for TermLoan {
         if let Some(credit_curve_id) = &self.credit_curve_id {
             deps.add_credit_curve(credit_curve_id.clone());
         }
+        if let Some(schedule) = &self.call_schedule {
+            for call in &schedule.calls {
+                if let super::spec::LoanCallType::MakeWhole(spec) = &call.call_type {
+                    deps.add_discount_curve(spec.reference_curve_id.clone());
+                }
+            }
+        }
         if let RateSpec::Floating(spec) = &self.rate {
             deps.add_forward_curve(spec.forward_curve_id.clone());
             deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
@@ -860,14 +879,12 @@ impl crate::instruments::common_impl::traits::Instrument for TermLoan {
         if self.credit_curve_id.is_some() {
             return crate::pricer::ModelKey::Tree;
         }
-        if let Some(ref cs) = self.call_schedule {
-            let has_exercisable = cs
-                .calls
-                .iter()
-                .any(|c| !matches!(c.call_type, super::spec::LoanCallType::MakeWhole { .. }));
-            if has_exercisable {
-                return crate::pricer::ModelKey::Tree;
-            }
+        if self
+            .call_schedule
+            .as_ref()
+            .is_some_and(|cs| !cs.calls.is_empty())
+        {
+            return crate::pricer::ModelKey::Tree;
         }
         crate::pricer::ModelKey::Discounting
     }
@@ -992,6 +1009,16 @@ mod tests {
     use super::*;
     use finstack_quant_core::dates::Date;
     use time::Month;
+
+    #[test]
+    fn date_offset_rejects_wrapping_settlement_days() {
+        let mut loan = TermLoan::example().expect("example loan");
+        loan.settlement_days = u32::MAX;
+        for calendar in [None, Some("weekends_only".into())] {
+            loan.calendar_id = calendar;
+            assert!(loan.settlement_date(loan.issue_date).is_err());
+        }
+    }
 
     #[test]
     fn unsupported_realized_covenant_consequences_fail_explicitly() {

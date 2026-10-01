@@ -75,6 +75,7 @@ use crate::market_data::bumps::BumpSpec;
 use crate::{Error, Result};
 
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 /// Interpolation method for CPI/RPI values between monthly observations.
 ///
@@ -134,11 +135,12 @@ impl core::str::FromStr for InflationInterpolation {
     }
 }
 
-/// Publication lag for inflation index reference dates.
+/// Contractual observation lag for inflation index reference dates.
 ///
 /// Inflation indices are published with a delay (typically 2-4 weeks). Securities
-/// using these indices incorporate a lag to ensure the reference index is published
-/// by the settlement date.
+/// using these indices incorporate an observation lag to ensure the reference
+/// index is published by settlement. This lag does not specify the actual
+/// publication date; use [`InflationIndex::with_publication_dates`] for that.
 ///
 /// # Standard Lags by Market
 ///
@@ -253,9 +255,10 @@ impl std::str::FromStr for InflationLag {
 ///
 /// # Components
 ///
-/// - **Observations**: Historical index levels by publication date
+/// - **Observations**: Index levels labelled by reference date/month
 /// - **Interpolation**: Daily interpolation between monthly observations
-/// - **Lag**: Publication lag (typically 3 months for TIPS)
+/// - **Lag**: Contractual observation lag (typically 3 months for TIPS)
+/// - **Publication dates**: Optional explicit availability dates by reference month
 /// - **Seasonality**: Optional monthly adjustment factors
 ///
 /// # Interpolation Methods
@@ -330,27 +333,23 @@ impl std::str::FromStr for InflationLag {
 pub struct InflationIndex {
     /// Unique identifier for this index (e.g., "US-CPI-U", "UK-RPI")
     pub id: String,
-    /// Underlying time series (raw, without interpolation applied)
+    /// Canonical observations and calendar-time interpolation policy.
     series: ScalarTimeSeries,
-    /// Pre-built series with the active interpolation applied, used by `value_on`
-    /// to avoid a clone on every call. Not part of the serialized representation
-    /// (the struct uses try_from/into via InflationIndexWire).
-    series_interp: ScalarTimeSeries,
-    /// Interpolation method between observations
-    pub interpolation: InflationInterpolation,
     /// Lag policy for index application
-    pub lag: InflationLag,
+    lag: InflationLag,
     /// Currency of the index
     pub currency: Currency,
     /// Optional monthly seasonality factors (index by month-1)
     seasonality: Option<[f64; 12]>,
+    /// Explicit publication dates, keyed by the first day of the reference month.
+    publication_dates: BTreeMap<Date, Date>,
 }
 
 impl InflationIndex {
     /// Create a new inflation index from observations.
     ///
     /// Observations are normalized and validated by [`ScalarTimeSeries`]; the
-    /// default lookup convention is step interpolation with no publication lag
+    /// default lookup convention is step interpolation with no observation lag
     /// and no seasonality. Configure the returned index explicitly for the
     /// legal indexation convention of the instrument being priced.
     ///
@@ -363,7 +362,9 @@ impl InflationIndex {
     /// # Arguments
     ///
     /// * `id` - Stable identifier such as `"US-CPI-U"`.
-    /// * `observations` - `(Date, CPI)` pairs in chronological order.
+    /// * `observations` - `(reference_date, CPI)` pairs in chronological order.
+    ///   Monthly observations may be labelled on any day of their reference
+    ///   month; actual publication dates are configured separately.
     /// * `currency` - Reporting currency of the published index levels.
     pub fn new(
         id: impl Into<String>,
@@ -377,30 +378,23 @@ impl InflationIndex {
         // Use a placeholder internal id; external id is stored separately.
         let series = ScalarTimeSeries::new("inflation-index", observations, Some(currency))?;
 
-        // Pre-build the interpolated series with the default (Step) interpolation
-        // so that value_on does not need to clone on every call.
-        let interp = SeriesInterpolation::default(); // matches InflationInterpolation::default() == Step
-        let series_interp = series.clone().with_interpolation(interp);
-
         Ok(Self {
             id: id.into(),
             series,
-            series_interp,
-            interpolation: InflationInterpolation::default(),
             lag: InflationLag::default(),
             currency,
             seasonality: None,
+            publication_dates: BTreeMap::new(),
         })
     }
 
     /// Set the interpolation method between observations.
     pub fn with_interpolation(mut self, interpolation: InflationInterpolation) -> Self {
-        self.interpolation = interpolation;
         let interp = match interpolation {
             InflationInterpolation::Step => SeriesInterpolation::Step,
             InflationInterpolation::Linear => SeriesInterpolation::Linear,
         };
-        self.series_interp = self.series.clone().with_interpolation(interp);
+        self.series = self.series.with_interpolation(interp);
         self
     }
 
@@ -408,6 +402,71 @@ impl InflationIndex {
     pub fn with_lag(mut self, lag: InflationLag) -> Self {
         self.lag = lag;
         self
+    }
+
+    /// Set the expected publication date of each monthly observation.
+    ///
+    /// These dates describe data availability independently of the contractual
+    /// observation lag. A valuation may project an unpublished reference month,
+    /// but must require its observed fixing on or after the publication date.
+    /// No release calendar is inferred from the index identifier or currency.
+    /// Supplying a schedule declares monthly reference observations even for
+    /// contracts with no lag or a day lag: valuation resolvers apply monthly
+    /// interpolation after that date shift, rather than interpolating between
+    /// arbitrary observation labels. With no publication metadata those
+    /// contracts retain their calendar-time interpolation convention.
+    ///
+    /// # Arguments
+    ///
+    /// * `dates` - Pairs of `(reference_month, publication_date)`. Each reference
+    ///   month must be labelled by its first calendar day and occur only once;
+    ///   its publication date must not precede that day. Dates are inclusive
+    ///   availability dates, so intraday release timing is not represented.
+    ///   This replaces any previously configured publication schedule.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for duplicate months, non-month-start keys,
+    /// or a publication date before the reference month.
+    pub fn with_publication_dates(mut self, dates: Vec<(Date, Date)>) -> Result<Self> {
+        let mut publication_dates = BTreeMap::new();
+        for (reference_month, publication_date) in dates {
+            if reference_month.day() != 1 || publication_date < reference_month {
+                return Err(Error::Validation(format!(
+                    "invalid inflation publication date {publication_date} for reference month {reference_month}"
+                )));
+            }
+            if publication_dates
+                .insert(reference_month, publication_date)
+                .is_some()
+            {
+                return Err(Error::Validation(format!(
+                    "duplicate inflation publication month {reference_month}"
+                )));
+            }
+        }
+        self.publication_dates = publication_dates;
+        Ok(self)
+    }
+
+    /// Return the configured publication date for a monthly reference value.
+    ///
+    /// # Arguments
+    ///
+    /// * `reference_date` - Any day in the reference month. The day component
+    ///   does not affect lookup. Returns `None` when no explicit date is set;
+    ///   callers must not infer that missing historical data is unpublished.
+    pub fn get_publication_date(&self, reference_date: Date) -> Option<Date> {
+        let reference_month = reference_date.replace_day(1).ok()?;
+        self.publication_dates.get(&reference_month).copied()
+    }
+
+    /// Return configured `(reference_month, publication_date)` pairs in month order.
+    pub fn get_publication_dates(&self) -> Vec<(Date, Date)> {
+        self.publication_dates
+            .iter()
+            .map(|(reference_month, publication_date)| (*reference_month, *publication_date))
+            .collect()
     }
 
     /// Add multiplicative seasonal adjustment factors, indexed January through December.
@@ -446,7 +505,7 @@ impl InflationIndex {
     /// validation errors.
     pub fn value_on(&self, date: Date) -> Result<f64> {
         if let InflationLag::Months(months) = self.lag {
-            let contract_date = match self.interpolation {
+            let contract_date = match self.interpolation() {
                 InflationInterpolation::Linear => date,
                 InflationInterpolation::Step => date
                     .replace_day(1)
@@ -455,7 +514,7 @@ impl InflationIndex {
             return self.ref_cpi_months_lag(contract_date, months.into());
         }
         let effective_date = self.apply_lag(date)?;
-        let base_value = self.series_interp.value_on(effective_date)?;
+        let base_value = self.series.value_on(effective_date)?;
         let adjusted_value = self.apply_seasonality(base_value, effective_date)?;
 
         Ok(adjusted_value)
@@ -489,17 +548,19 @@ impl InflationIndex {
     ///
     /// # Errors
     ///
-    /// Returns an error when the anchor observations are unavailable or the
-    /// anchor dates cannot be constructed.
+    /// Returns an error when the anchor observations are unavailable, `lag_months`
+    /// exceeds the signed month-offset range, or an anchor falls outside the calendar.
     pub fn ref_cpi_months_lag(&self, date: Date, lag_months: u32) -> Result<f64> {
         let first_of_month = Date::from_calendar_date(date.year(), date.month(), 1)
             .map_err(|_| Error::Input(crate::error::InputError::InvalidDateRange))?;
-        let anchor0 = first_of_month.add_months(-(lag_months as i32));
+        let lag_months = i32::try_from(lag_months)
+            .map_err(|_| Error::Validation("CPI lag months exceed supported range".into()))?;
+        let anchor0 = first_of_month.add_months(-lag_months)?;
         let cpi0 = self.apply_seasonality(self.series.value_in_month(anchor0)?, anchor0)?;
         if date.day() == 1 {
             return Ok(cpi0);
         }
-        let anchor1 = anchor0.add_months(1);
+        let anchor1 = anchor0.add_months(1)?;
         let cpi1 = self.apply_seasonality(self.series.value_in_month(anchor1)?, anchor1)?;
 
         let days_in_month = f64::from(date.month().length(date.year()));
@@ -564,15 +625,25 @@ impl InflationIndex {
         self.series.observations()
     }
 
+    /// Retrieve the latest stored observation without lag or seasonality.
+    pub(crate) fn get_latest_observation(&self) -> Result<(Date, f64)> {
+        let date = self
+            .series
+            .last_date()
+            .ok_or_else(|| Error::internal("inflation index observations missing last date"))?;
+        Ok((date, self.series.value_on_exact(date)?))
+    }
+
     /// Rebuild this index with replacement observations while preserving its
-    /// interpolation, lag, currency, and seasonality conventions.
+    /// interpolation, lag, currency, seasonality, and publication conventions.
     pub(crate) fn with_replaced_observations(
         &self,
         observations: Vec<(Date, f64)>,
     ) -> Result<Self> {
         let mut rebuilt = Self::new(self.id.clone(), observations, self.currency)?
-            .with_interpolation(self.interpolation)
+            .with_interpolation(self.interpolation())
             .with_lag(self.lag);
+        rebuilt.publication_dates = self.publication_dates.clone();
         if let Some(seasonality) = self.seasonality {
             rebuilt = rebuilt.with_seasonality(seasonality)?;
         }
@@ -591,7 +662,10 @@ impl InflationIndex {
 
     /// Expose current interpolation setting for bump/rebuild helpers.
     pub fn interpolation(&self) -> InflationInterpolation {
-        self.interpolation
+        match self.series.interpolation() {
+            SeriesInterpolation::Step => InflationInterpolation::Step,
+            SeriesInterpolation::Linear => InflationInterpolation::Linear,
+        }
     }
     /// Expose current lag setting for bump/rebuild helpers.
     pub fn lag(&self) -> InflationLag {
@@ -611,7 +685,7 @@ impl InflationIndex {
                 .ok_or(Error::Input(crate::error::InputError::InvalidDateRange)),
             InflationLag::Months(months) => {
                 // Proper month arithmetic using shared helper
-                Ok(date.add_months(-(months as i32)))
+                date.add_months(-(months as i32))
             }
         }
     }
@@ -648,6 +722,23 @@ struct InflationIndexWire {
     pub lag: InflationLag,
     /// Optional seasonality factors
     pub seasonality: Option<[f64; 12]>,
+    /// Explicit monthly observation availability; no release dates are inferred.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub publication_dates: Vec<InflationPublicationWire>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+struct InflationPublicationWire {
+    /// First calendar day of the reference month.
+    #[serde(with = "crate::wire::date")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
+    reference_month: Date,
+    /// Inclusive date on which the observation must be available.
+    #[serde(with = "crate::wire::date")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
+    publication_date: Date,
 }
 
 impl From<InflationIndex> for InflationIndexWire {
@@ -658,9 +749,19 @@ impl From<InflationIndex> for InflationIndexWire {
             id: index.id.to_owned(),
             currency: index.currency,
             observations,
-            interpolation: index.interpolation,
+            interpolation: index.interpolation(),
             lag: index.lag,
             seasonality: index.seasonality,
+            publication_dates: index
+                .get_publication_dates()
+                .into_iter()
+                .map(
+                    |(reference_month, publication_date)| InflationPublicationWire {
+                        reference_month,
+                        publication_date,
+                    },
+                )
+                .collect(),
         }
     }
 }
@@ -671,7 +772,14 @@ impl TryFrom<InflationIndexWire> for InflationIndex {
     fn try_from(state: InflationIndexWire) -> crate::Result<Self> {
         let mut index = Self::new(state.id, state.observations, state.currency)?
             .with_interpolation(state.interpolation)
-            .with_lag(state.lag);
+            .with_lag(state.lag)
+            .with_publication_dates(
+                state
+                    .publication_dates
+                    .into_iter()
+                    .map(|entry| (entry.reference_month, entry.publication_date))
+                    .collect(),
+            )?;
 
         if let Some(factors) = state.seasonality {
             index = index.with_seasonality(factors)?;
@@ -784,6 +892,51 @@ mod tests {
     use super::*;
     use time::Month;
 
+    #[test]
+    fn publication_dates_survive_wire_and_projection_bumps() {
+        let january = time::macros::date!(2026 - 01 - 01);
+        let february = time::macros::date!(2026 - 02 - 01);
+        let release = time::macros::date!(2026 - 02 - 13);
+        let index = InflationIndex::new(
+            "US-CPI",
+            vec![(january, 300.0), (february, 301.0)],
+            Currency::USD,
+        )
+        .expect("index")
+        .with_publication_dates(vec![(january, release)])
+        .expect("publication schedule");
+        let json = serde_json::to_string(&index).expect("serialize");
+        let restored: InflationIndex = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(restored.get_publication_dates(), vec![(january, release)]);
+        assert_eq!(
+            restored.get_publication_date(time::macros::date!(2026 - 01 - 31)),
+            Some(release)
+        );
+        let bumped = restored
+            .apply_projection_bump(january, BumpSpec::inflation_shift_pct(0.01))
+            .expect("projection bump");
+        assert_eq!(
+            bumped.get_publication_dates(),
+            index.get_publication_dates()
+        );
+        assert_eq!(bumped.observations()[0], index.observations()[0]);
+    }
+
+    #[test]
+    fn publication_schedule_rejects_ambiguous_months_and_dates() {
+        let month = time::macros::date!(2026 - 01 - 01);
+        let release = time::macros::date!(2026 - 02 - 13);
+        let index =
+            InflationIndex::new("US-CPI", vec![(month, 300.0)], Currency::USD).expect("index");
+        for dates in [
+            vec![(month, release), (month, release)],
+            vec![(time::macros::date!(2026 - 01 - 02), release)],
+            vec![(month, time::macros::date!(2025 - 12 - 31))],
+        ] {
+            assert!(index.clone().with_publication_dates(dates).is_err());
+        }
+    }
+
     fn make_date(year: i32, month: u8, day: u8) -> Date {
         Date::from_calendar_date(
             year,
@@ -804,6 +957,17 @@ mod tests {
 
         InflationIndex::new("US-CPI", observations, Currency::USD)
             .expect("InflationIndex creation should succeed in test")
+    }
+
+    #[test]
+    fn date_offset_rejects_wrapping_cpi_lag() {
+        let index = sample_cpi();
+        for lag_months in [1_u32 << 31, u32::MAX] {
+            assert!(index
+                .ref_cpi_months_lag(make_date(2023, 5, 1), lag_months)
+                .is_err());
+        }
+        assert!(index.ref_cpi_months_lag(Date::MIN, 1).is_err());
     }
 
     #[test]
@@ -851,6 +1015,31 @@ mod tests {
             .value_on(make_date(2023, 3, 15))
             .expect("Value lookup should succeed in test");
         assert!(value > 101.0 && value < 102.0);
+    }
+
+    #[test]
+    fn interpolation_metadata_and_values_share_one_policy() {
+        let query = make_date(2023, 3, 15);
+        let mut index = sample_cpi();
+        for interpolation in [
+            InflationInterpolation::Linear,
+            InflationInterpolation::Step,
+            InflationInterpolation::Linear,
+        ] {
+            index = index.with_interpolation(interpolation);
+            assert_eq!(index.interpolation(), interpolation);
+            let actual = index.value_on(query).expect("covered observation interval");
+            match interpolation {
+                InflationInterpolation::Step => assert_eq!(actual, 101.0),
+                InflationInterpolation::Linear => assert!(actual > 101.0 && actual < 102.0),
+            }
+            let restored: InflationIndex =
+                serde_json::from_str(&serde_json::to_string(&index).expect("serialize index"))
+                    .expect("restore configured index");
+            assert_eq!(restored.interpolation(), interpolation);
+            assert_eq!(restored.value_on(query).expect("same interval"), actual);
+            assert_eq!(restored.observations(), index.observations());
+        }
     }
 
     #[test]

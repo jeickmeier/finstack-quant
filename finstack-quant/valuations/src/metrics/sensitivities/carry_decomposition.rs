@@ -15,9 +15,12 @@
 use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
     df_from_yield, YieldCompounding,
 };
+use crate::instruments::fixed_income::bond::pricing::time_basis::{
+    act365l_year_fraction, bond_coupon_periods,
+};
 use crate::instruments::Bond;
 use crate::metrics::sensitivities::theta::{
-    calculate_theta_date, collect_cashflows_in_period_cached, theta_termination_date,
+    calculate_theta_date, collect_period_cash_cached, theta_termination_date,
 };
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
@@ -50,8 +53,9 @@ impl MetricCalculator for CarryDecompositionCalculator {
         let base_currency = context.base_value.currency();
 
         let start_date = context.as_of;
-        let coupon_income =
-            collect_cashflows_in_period_cached(context, start_date, rolled_date, base_currency)?;
+        let cash = collect_period_cash_cached(context, start_date, rolled_date, base_currency)?;
+        let coupon_income = cash.income.amount();
+        let principal_cash = cash.total.checked_sub(cash.income)?.amount();
 
         let curved_pv = context
             .reprice_money(context.curves.as_ref(), rolled_date)?
@@ -84,7 +88,10 @@ impl MetricCalculator for CarryDecompositionCalculator {
             (0.0, true)
         };
 
-        let roll_down = total_pv_change - pull_to_par;
+        // Principal settlement reduces the live instrument PV without being
+        // coupon income or curve roll-down. Neutralize that receipt against
+        // the price drop before partitioning the remaining carry.
+        let roll_down = total_pv_change + principal_cash - pull_to_par;
         let funding_cost = compute_funding_cost(context, rolled_date)?;
         let carry_total = coupon_income + pull_to_par + roll_down - funding_cost;
 
@@ -124,20 +131,20 @@ impl MetricCalculator for CarryDecompositionCalculator {
 /// default) solve annually compounded yields, so those fall back to
 /// `(1 + y)^tau` using the context day count when one was stamped.
 fn ytm_accretion_factor(context: &MetricContext, ytm: f64, rolled_date: Date) -> Result<f64> {
-    let (compounding, frequency, day_count) =
-        if let Some(bond) = context.instrument.as_any().downcast_ref::<Bond>() {
-            (
-                YieldCompounding::Street,
-                bond.cashflow_spec.frequency(),
-                bond.cashflow_spec.day_count(),
-            )
-        } else {
-            (
-                YieldCompounding::Rate(Compounding::Annual),
-                Tenor::annual(),
-                context.day_count.unwrap_or(DayCount::Act365F),
-            )
-        };
+    let bond = context.instrument.as_any().downcast_ref::<Bond>();
+    let (compounding, frequency, day_count) = if let Some(bond) = bond {
+        (
+            YieldCompounding::Street,
+            bond.cashflow_spec.frequency(),
+            bond.cashflow_spec.day_count(),
+        )
+    } else {
+        (
+            YieldCompounding::Rate(Compounding::Annual),
+            Tenor::annual(),
+            context.day_count.unwrap_or(DayCount::Act365F),
+        )
+    };
 
     // ACT/ACT (ICMA) requires the coupon frequency in the day-count context
     // (mirrors `price_from_ytm_compounded_params`). The schedule-derived
@@ -155,7 +162,18 @@ fn ytm_accretion_factor(context: &MetricContext, ytm: f64, rolled_date: Date) ->
         }),
         ..DayCountContext::default()
     };
-    let tau = day_count.year_fraction(context.as_of, rolled_date, dc_ctx)?;
+    // ACT/365L must retain each enclosing coupon's denominator when the
+    // carry horizon crosses a coupon boundary, just as the bond yield clock does.
+    let tau = if let Some(bond) = bond.filter(|_| day_count == DayCount::Act365L) {
+        act365l_year_fraction(
+            frequency,
+            &bond_coupon_periods(bond)?,
+            context.as_of,
+            rolled_date,
+        )?
+    } else {
+        day_count.year_fraction(context.as_of, rolled_date, dc_ctx)?
+    };
     let df = df_from_yield(ytm, tau, compounding, frequency)?;
     Ok(1.0 / df)
 }
@@ -166,18 +184,8 @@ fn compute_funding_cost(context: &MetricContext, rolled_date: Date) -> Result<f6
     };
 
     let funding_curve = context.curves.get_discount(repo_curve_id.as_str())?;
-    let annual_rate = funding_curve.zero_rate_on_date(rolled_date, Compounding::Continuous)?;
-    let day_count = context.day_count.ok_or_else(|| {
-        finstack_quant_core::Error::Validation(format!(
-            "funding cost for '{}' requires an explicit day-count convention",
-            context.instrument.id()
-        ))
-    })?;
-    let dcf = day_count.year_fraction(context.as_of, rolled_date, DayCountContext::default())?;
-
-    // `annual_rate` is a continuously compounded zero, so the funding accrual
-    // over the horizon is PV * (exp(r*dcf) - 1), not simple-interest PV*r*dcf.
-    Ok(context.base_value.amount() * ((annual_rate * dcf).exp() - 1.0))
+    let horizon_df = funding_curve.df_between_dates(context.as_of, rolled_date)?;
+    Ok(context.base_value.amount() * (1.0 / horizon_df - 1.0))
 }
 
 #[cfg(test)]
@@ -307,6 +315,83 @@ mod tests {
         assert_eq!(context.computed.get(&MetricId::PullToPar), Some(&0.0));
         assert_eq!(context.computed.get(&MetricId::RollDown), Some(&0.0));
         assert_eq!(context.computed.get(&MetricId::FundingCost), Some(&0.0));
+    }
+
+    #[test]
+    fn act365l_carry_and_theta_cross_coupon_denominators() {
+        let as_of = date!(2024 - 09 - 15);
+        let rolled = date!(2024 - 12 - 15);
+        let mut bond = act365_semi_bond(
+            "ACT365L-CARRY",
+            0.05,
+            date!(2023 - 10 - 15),
+            date!(2025 - 10 - 15),
+        );
+        bond.cashflow_spec = CashflowSpec::fixed(0.05, Tenor::semi_annual(), DayCount::Act365L)
+            .expect("finite coupon");
+        if let CashflowSpec::Fixed(spec) = &mut bond.cashflow_spec {
+            spec.schedule.business_day_convention =
+                finstack_quant_core::dates::BusinessDayConvention::Unadjusted;
+        }
+        let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.05, as_of));
+        let ytm: f64 = 0.047;
+        let mut context = context_for(bond, market, as_of, Tenor::quarterly(), Some(ytm));
+        let base_pv = context.base_value.amount();
+
+        // The Apr-Oct coupon ends in leap year 2024; the Oct-Apr coupon
+        // ends in 2025. A single denominator for this horizon is incorrect.
+        let tau = 30.0 / 366.0 + 61.0 / 365.0;
+        let accretion = (1.0 + ytm / 2.0).powf(2.0 * tau);
+        assert!(
+            (ytm_accretion_factor(&context, ytm, rolled).expect("accretion") - accretion).abs()
+                < 1e-12
+        );
+        let total = CarryDecompositionCalculator
+            .calculate(&mut context)
+            .expect("ACT/365L carry");
+        let coupon_income = 100.0 * 0.05 * 183.0 / 366.0;
+        assert!((context.computed[&MetricId::CouponIncome] - coupon_income).abs() < 1e-12);
+        assert!(
+            (context.computed[&MetricId::PullToPar]
+                - (base_pv * (accretion - 1.0) - coupon_income))
+                .abs()
+                < 1e-10
+        );
+        assert_eq!(
+            context.computed[&MetricId::CarryDecompositionDegenerate],
+            0.0
+        );
+        let theta = crate::metrics::sensitivities::theta::GenericThetaAny
+            .calculate(&mut context)
+            .expect("ACT/365L theta");
+        assert!((total - theta).abs() < 1e-10);
+        assert_eq!(context.computed[&MetricId::ThetaPeriodDays], 91.0);
+    }
+
+    #[test]
+    fn zero_coupon_redemption_is_not_coupon_income_or_roll_down() {
+        let as_of = date!(2026 - 01 - 14);
+        let bond = act365_semi_bond(
+            "ZERO-REDEEM",
+            0.0,
+            date!(2025 - 01 - 15),
+            date!(2026 - 01 - 15),
+        );
+        let market = MarketContext::new().insert(flat_discount_curve("USD-OIS", 0.05, as_of));
+        let mut context = context_for(
+            bond,
+            market,
+            as_of,
+            Tenor::daily(),
+            Some(street_equivalent_yield(0.05)),
+        );
+        let total = CarryDecompositionCalculator
+            .calculate(&mut context)
+            .expect("carry");
+        assert_eq!(context.computed[&MetricId::CouponIncome], 0.0);
+        assert!(context.computed[&MetricId::PullToPar] > 0.0);
+        assert!(context.computed[&MetricId::RollDown].abs() < 1e-8);
+        assert!(total > 0.0 && total < 0.1);
     }
 
     /// Test B: for a zero-coupon bond, pull-to-par is exactly the Street-yield
@@ -493,7 +578,7 @@ mod tests {
     }
 
     #[test]
-    fn test_funding_cost_uses_bond_day_count_fraction() {
+    fn test_funding_cost_uses_funding_curve_day_count() {
         let as_of = date!(2025 - 01 - 15);
         let mut bond = zero_coupon_bond();
         bond.repo_curve_id = Some(CurveId::new("USD-REPO"));
@@ -513,12 +598,10 @@ mod tests {
             Some(date!(2026 - 01 - 15)),
         )
         .expect("rolled date");
-        let expected_dcf = DayCount::Thirty360
+        let expected_dcf = DayCount::Act365F
             .year_fraction(as_of, rolled, DayCountContext::default())
             .expect("year fraction");
-        // Test C: the funding curve rate is a CONTINUOUSLY compounded zero, so
-        // the accrual over the horizon is PV * (exp(r*dcf) - 1), not the
-        // simple-interest PV * r * dcf (which understates by ~PV*(r*dcf)^2/2).
+        // The repo curve uses ACT/365F, independent of the bond's 30/360 basis.
         let expected = context.base_value.amount() * ((0.02f64 * expected_dcf).exp() - 1.0);
         let funding_cost = *context
             .computed
@@ -532,23 +615,48 @@ mod tests {
     }
 
     #[test]
-    fn test_funding_cost_requires_explicit_day_count() {
+    fn test_funding_cost_uses_forward_df_from_curve_base_before_as_of() {
         let as_of = date!(2025 - 01 - 15);
+        let rolled = date!(2025 - 02 - 15);
         let mut bond = zero_coupon_bond();
         bond.repo_curve_id = Some(CurveId::new("USD-REPO"));
+        let repo = DiscountCurve::builder("USD-REPO")
+            .base_date(date!(2024 - 01 - 15))
+            .day_count(DayCount::Act365F)
+            .interp(InterpStyle::LogLinear)
+            .knots([
+                (0.0, 1.0),
+                (1.0, (-0.01_f64).exp()),
+                (2.0, (-0.06_f64).exp()),
+                (3.0, (-0.15_f64).exp()),
+            ])
+            .build()
+            .expect("repo curve");
+        let t_start = DayCount::Act365F
+            .year_fraction(date!(2024 - 01 - 15), as_of, DayCountContext::default())
+            .expect("start year fraction");
+        let t_end = DayCount::Act365F
+            .year_fraction(date!(2024 - 01 - 15), rolled, DayCountContext::default())
+            .expect("end year fraction");
+        // Both horizon endpoints lie in the second log-linear segment, whose
+        // continuously compounded forward rate is 5%, rather than its zero rate.
+        let expected_factor = (0.05 * (t_end - t_start)).exp() - 1.0;
         let market = MarketContext::new()
             .insert(flat_discount_curve("USD-OIS", 0.05, as_of))
-            .insert(flat_discount_curve("USD-REPO", 0.02, as_of));
+            .insert(repo);
         let mut context = context_for(bond, market, as_of, Tenor::monthly(), Some(0.05));
+        context.day_count = None;
+        let funding_cost = compute_funding_cost(&context, rolled)
+            .expect("repo accrual does not require the instrument day count");
+        assert!((funding_cost - context.base_value.amount() * expected_factor).abs() < 1e-8);
 
-        let err = CarryDecompositionCalculator
+        // A full carry calculation still uses the bond's day count for its
+        // separate constant-yield accretion component.
+        context.day_count = Some(DayCount::Thirty360);
+        CarryDecompositionCalculator
             .calculate(&mut context)
-            .expect_err("funding cost should not silently default the day-count convention");
-
-        assert!(
-            err.to_string().contains("day-count"),
-            "expected day-count validation error, got: {err}"
-        );
+            .expect("carry decomposition");
+        assert!((context.computed[&MetricId::FundingCost] - funding_cost).abs() < 1e-8);
     }
 
     #[test]

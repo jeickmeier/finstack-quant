@@ -33,7 +33,7 @@ impl JsSabrParameters {
     /// Create SABR parameters from alpha, beta, nu, rho, and optional shift.
     /// @param alpha - Positive SABR initial volatility scale parameter.
     /// @param beta - SABR CEV elasticity parameter from 0 through 1.
-    /// @param nu - Positive SABR volatility-of-volatility parameter.
+    /// @param nu - Finite nonnegative SABR volatility-of-volatility parameter; zero keeps the volatility factor constant.
     /// @param rho - Instantaneous correlation between the asset and variance shocks.
     /// @param shift - Additive SABR rate shift applied to forward and strike before modelling.
     ///
@@ -260,15 +260,16 @@ impl JsSabrSmile {
     ///
     /// Returns the Rust `ArbitrageValidationResult` serde object:
     /// `arbitrage_free`, `butterfly_violations` and `monotonicity_violations`.
-    /// @param strikes - Ascending option strikes used to test the smile for static arbitrage.
-    /// @param r - Continuously compounded risk-free rate (decimal) that discounts the
+    /// @param strikes - Finite, strictly ascending strikes with arbitrary spacing; convexity uses the actual strike distances.
+    /// @param r - Finite continuously compounded risk-free rate (decimal) that discounts the
     /// forward-based Black call prices compared against the 1e-6 tolerance.
     ///
     /// # Errors
     ///
     /// Throws a JavaScript exception if volatility generation fails for the
-    /// stored smile and supplied strikes, or the result cannot be converted to
-    /// a JavaScript value.
+    /// stored smile and supplied strikes, strikes are non-finite or not strictly
+    /// ascending, the rate is non-finite, call prices are non-finite, or the
+    /// result cannot be converted to a JavaScript value.
     #[wasm_bindgen(js_name = validateNoArbitrage)]
     pub fn validate_no_arbitrage(&self, strikes: JsValue, r: JsValue) -> Result<JsValue, JsValue> {
         let r = js_f64(&r, "r")?;
@@ -322,7 +323,13 @@ impl JsSabrCalibrator {
     /// Return a copy of this calibrator with an overridden iteration cap,
     /// preserving all other settings.
     /// @param max_iterations - Positive cap on solver iterations before a
-    /// non-convergence error; pair a tight tolerance with a larger budget.
+    /// non-convergence error; a finite non-negative integer no greater than
+    /// 4294967295. Zero is rejected by the canonical calibrator when used.
+    ///
+    /// # Errors
+    ///
+    /// Throws if `max_iterations` is non-finite, fractional, negative, or
+    /// exceeds the wasm32 integer range.
     #[wasm_bindgen(js_name = withMaxIterations)]
     pub fn with_max_iterations(
         &self,
@@ -627,7 +634,8 @@ pub fn get_cube_normal_vol_clamped(
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception when `expiry_index` is outside the surface.
+/// Throws a JavaScript exception when `expiry_index` is non-finite, fractional,
+/// negative, exceeds the wasm32 integer range, or is outside the surface.
 #[wasm_bindgen(js_name = getFxDeltaPillarVols)]
 pub fn get_fx_delta_pillar_vols(
     surface: &JsFxDeltaVolSurface,

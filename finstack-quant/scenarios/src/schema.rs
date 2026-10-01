@@ -80,9 +80,9 @@ fn template_metadata_examples() -> finstack_quant_core::Result<Vec<serde_json::V
 /// carrying a calibrated market snapshot.
 fn application_envelope_examples() -> finstack_quant_core::Result<Vec<serde_json::Value>> {
     let market = serde_json::to_value(
-        finstack_quant_core::market_data::context::MarketContextState::from(
+        finstack_quant_core::market_data::context::MarketContextState::try_from(
             &finstack_quant_core::market_data::context::MarketContext::new(),
-        ),
+        )?,
     )
     .map_err(|error| {
         finstack_quant_core::Error::Internal(format!("serialize example market: {error}"))

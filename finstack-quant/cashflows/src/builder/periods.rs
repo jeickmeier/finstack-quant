@@ -10,8 +10,8 @@ use finstack_quant_core::InputError;
 
 use super::calendar::resolve_calendar_strict;
 use super::date_generation::{
-    build_schedule_period, generate_periods_with_adjustment, icma_coupon_period,
-    validate_unique_payment_dates,
+    build_schedule_period, effective_frequency, effective_stub, generate_periods_with_adjustment,
+    icma_coupon_period, validate_accrual_grid, validate_unique_payment_dates,
 };
 use super::emission::compute_reset_date;
 use super::specs::{RollRule, ScheduleParams};
@@ -58,29 +58,72 @@ pub struct BuildPeriodsParams<'a> {
     pub business_day_convention: BusinessDayConvention,
     /// Holiday calendar identifier (use "weekends_only" for weekends-only adjustments).
     pub calendar_id: &'a str,
-    /// Whether to enforce end-of-month rolling.
+    /// Whether to enforce end-of-month rolling. Incompatible with IMM roll rules.
+    /// ACT/ACT ICMA requires the regular anchor (end for front stubs, start
+    /// otherwise) to be month-end when this flag is set.
     pub end_of_month: bool,
     /// Day count convention for accrual fractions.
     pub day_count: DayCount,
-    /// Payment lag in business days after accrual end.
+    /// Non-negative payment lag in business days after the adjusted accrual end.
     pub payment_lag_days: i32,
-    /// Optional reset lag in business days before accrual start.
+    /// Optional non-negative reset lag in business days before accrual start.
     pub reset_lag_days: Option<i32>,
     /// Adjust accrual start/end boundaries with the business-day convention.
     pub adjust_accrual_dates: bool,
     /// Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).
     ///
     /// The IMM modes override `frequency`/`stub` with quarterly / short-back;
-    /// see [`RollRule`].
+    /// see [`RollRule`]. Third-Wednesday IMM with ACT/ACT ICMA is unsupported
+    /// because that day count requires nominal month-grid reference coupons.
     pub roll_rule: RollRule,
 }
 
 impl<'a> BuildPeriodsParams<'a> {
+    fn validated_effective(self) -> finstack_quant_core::Result<Self> {
+        if self.start >= self.end {
+            return Err(finstack_quant_core::Error::Validation(
+                "a period schedule requires start strictly before end".into(),
+            ));
+        }
+        if self.payment_lag_days < 0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "payment_lag_days must be non-negative; got {}",
+                self.payment_lag_days
+            )));
+        }
+        if self.reset_lag_days.is_some_and(|lag| lag < 0) {
+            return Err(finstack_quant_core::Error::Validation(
+                "reset_lag_days must be non-negative".into(),
+            ));
+        }
+        let effective = Self {
+            frequency: effective_frequency(self.frequency, self.roll_rule),
+            stub: effective_stub(self.stub, self.roll_rule),
+            ..self
+        };
+        validate_accrual_grid(
+            effective.start,
+            effective.end,
+            effective.stub,
+            effective.end_of_month,
+            effective.day_count,
+            effective.roll_rule,
+        )?;
+        Ok(effective)
+    }
+
     /// Create period-generation parameters from canonical schedule conventions.
     ///
     /// The conversion keeps start/end boundaries and reset lag explicit while
     /// reusing every date, calendar, stub, and day-count convention from the
     /// schedule specification.
+    ///
+    /// # Arguments
+    ///
+    /// * `schedule` - Coupon date conventions; explicit IMM rules resolve to a quarterly grid when built.
+    /// * `start` - Inclusive contractual schedule start before adjustment.
+    /// * `end` - Contractual maturity before adjustment, strictly after `start`.
+    /// * `reset_lag_days` - Optional non-negative fixing lag in business days before accrual starts.
     #[must_use]
     pub fn from_schedule(
         schedule: &'a ScheduleParams,
@@ -123,6 +166,7 @@ pub fn period_accrual(
     end: Date,
     params: &BuildPeriodsParams<'_>,
 ) -> finstack_quant_core::Result<f64> {
+    let params = params.validated_effective()?;
     if start < period.accrual_start || end > period.accrual_end || end < start {
         return Err(finstack_quant_core::Error::Validation(
             "accrual subinterval lies outside its contractual period".into(),
@@ -144,12 +188,72 @@ pub fn period_accrual(
                 StubKind::ShortBack
             },
             params.end_of_month,
+            params.roll_rule,
         ),
-        end_is_termination_date: period.accrual_end >= params.end,
+        end_is_termination_date: period.unadjusted_end == params.end,
     };
-    params
-        .day_count
-        .year_fraction(start, end, day_count_context)
+    contractual_accrual(
+        params.day_count,
+        (period.accrual_start, period.accrual_end),
+        start,
+        end,
+        day_count_context,
+    )
+}
+
+/// Prorate a validated actual-day coupon fraction without changing its denominator.
+///
+/// # Arguments
+///
+/// * `full_period` - Contractual start/end dates whose actual days determined the supplied fraction.
+/// * `start` - Inclusive accrual cutoff within `full_period`.
+/// * `end` - Exclusive accrual cutoff within `full_period`, on or after `start`.
+/// * `full_accrual` - Finite non-negative fraction in years for the entire contractual period.
+pub(crate) fn prorated_actual_accrual(
+    full_period: (Date, Date),
+    start: Date,
+    end: Date,
+    full_accrual: f64,
+) -> finstack_quant_core::Result<f64> {
+    let (full_start, full_end) = full_period;
+    if full_end <= full_start
+        || start < full_start
+        || end > full_end
+        || end < start
+        || !full_accrual.is_finite()
+        || full_accrual < 0.0
+    {
+        return Err(finstack_quant_core::Error::Validation(
+            "invalid contractual actual-day accrual interval or fraction".into(),
+        ));
+    }
+    Ok(full_accrual * (end - start).whole_days() as f64
+        / (full_end - full_start).whole_days() as f64)
+}
+
+/// Calculate a subperiod fraction while preserving contractual ACT/365L rules.
+///
+/// # Arguments
+///
+/// * `day_count` - Contractual coupon convention; ACT/365L retains its full-period denominator.
+/// * `full_period` - Actual contractual boundaries, separate from an ICMA reference coupon.
+/// * `start` - Inclusive start of the subperiod being accrued.
+/// * `end` - Exclusive end of the subperiod being accrued.
+/// * `context` - Original calendar, frequency, ICMA reference dates, and termination status.
+pub(crate) fn contractual_accrual(
+    day_count: DayCount,
+    full_period: (Date, Date),
+    start: Date,
+    end: Date,
+    mut context: DayCountContext<'_>,
+) -> finstack_quant_core::Result<f64> {
+    if day_count == DayCount::Act365L {
+        context.coupon_period = Some(full_period);
+        day_count.year_fraction(start, end, context)
+    } else {
+        context.end_is_termination_date &= end == full_period.1;
+        day_count.year_fraction(start, end, context)
+    }
 }
 
 fn enrich_period(
@@ -209,6 +313,8 @@ fn enrich_periods(
 ///   convention
 /// - day-count calculation fails for the supplied convention
 /// - reset-date computation fails when `reset_lag_days` is provided
+/// - either lag is negative, the dates are not strictly increasing, or the
+///   day count cannot represent the selected roll grid
 ///
 /// # Examples
 ///
@@ -240,6 +346,7 @@ fn enrich_periods(
 pub fn build_single_period(
     params: BuildPeriodsParams<'_>,
 ) -> finstack_quant_core::Result<SchedulePeriod> {
+    let params = params.validated_effective()?;
     let cal = resolve_calendar_strict(params.calendar_id)?;
     let period = build_schedule_period(
         params.start,
@@ -264,8 +371,9 @@ pub fn build_single_period(
 ///
 /// # Returns
 ///
-/// Ordered schedule periods spanning `params.start` to `params.end`. Returns an
-/// empty vector when date generation produces no periods.
+/// Ordered schedule periods ending at `params.end`, including an off-IMM
+/// terminal stub. CDS IMM schedules may begin before `params.start` to include
+/// the initial front accrual from the preceding CDS roll.
 ///
 /// # Errors
 ///
@@ -276,6 +384,8 @@ pub fn build_single_period(
 ///   day convention
 /// - day-count calculation fails for any generated period
 /// - reset-date computation fails when `reset_lag_days` is provided
+/// - either lag is negative, the dates are not strictly increasing, or the
+///   day count cannot represent the selected roll grid
 ///
 /// # Examples
 ///
@@ -306,6 +416,7 @@ pub fn build_single_period(
 pub fn build_periods(
     params: BuildPeriodsParams<'_>,
 ) -> finstack_quant_core::Result<Vec<SchedulePeriod>> {
+    let params = params.validated_effective()?;
     let periods = generate_periods_with_adjustment(
         params.start,
         params.end,

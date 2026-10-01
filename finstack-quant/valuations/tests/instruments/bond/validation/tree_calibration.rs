@@ -63,15 +63,16 @@ fn test_tree_calibrates_to_curve() {
     };
 
     let mut tree = ShortRateTree::new(tree_config);
-    let time_to_maturity = 5.0;
-    tree.calibrate(&curve, time_to_maturity).unwrap();
-
     // Check that tree produces correct discount factors at key points
     let test_times = [0.5, 1.0, 2.0, 3.0, 5.0];
     let valuator = ZeroCouponValuator { notional: 1.0 };
     let market = MarketContext::new();
 
     for &t in &test_times {
+        // Node spacing and calibrated rates belong to one horizon. Each
+        // zero-coupon claim needs a lattice calibrated to its own maturity;
+        // reusing the 5Y rates on a shorter clock changes their economics.
+        tree.calibrate(&curve, t).unwrap();
         let expected_df = (-rate * t).exp();
         let tree_df = tree
             .price(

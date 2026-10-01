@@ -5,6 +5,9 @@ use finstack_quant_portfolio::optimization as opt;
 use super::spec_result::{PyPortfolioOptimizationResult, PyPortfolioOptimizationSpec};
 
 /// Run the optimizer against a typed :class:`PortfolioOptimizationSpec`.
+///
+/// Candidate IDs must be unique among candidates and absent from the existing
+/// portfolio; collisions raise ``PortfolioError`` before solving.
 #[pyfunction]
 #[pyo3(signature = (spec, market))]
 pub(super) fn optimize_portfolio(

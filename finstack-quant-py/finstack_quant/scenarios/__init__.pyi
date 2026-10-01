@@ -1486,8 +1486,10 @@ class HorizonResult:
         Returns
         -------
         float or None
-            Annualized total return, or ``None`` when ``horizon_days`` is
-            ``None`` or zero.
+            ``(1 + total_return) ** (365 / horizon_days) - 1`` as a decimal
+            fraction; ``None`` when the horizon is absent or nonpositive,
+            total return is nonfinite or below -100%, or the compounded value
+            is nonfinite. Exactly -100% remains a total loss.
 
         Notes
         -----
@@ -1575,12 +1577,16 @@ class HorizonResult:
 
     def to_json(self) -> str:
         """
-        Serialize the result to JSON.
+        Serialize the canonical horizon result and Rust-computed returns to JSON.
 
         Returns
         -------
         str
-            JSON-serialized ``HorizonResult`` envelope.
+            JSON-serialized ``HorizonResult`` with currency-tagged values,
+            attribution, scenario report, decimal ``total_return`` and
+            ``annualized_return``, and a ``factor_contributions`` mapping keyed
+            by canonical attribution factor names. Undefined derived values are
+            JSON ``null``, matching the WASM result shape.
 
         Raises
         ------
@@ -1592,12 +1598,14 @@ class HorizonResult:
     @staticmethod
     def from_json(json: str) -> HorizonResult:
         """
-        Deserialize from JSON produced by :meth:`to_json`.
+        Deserialize canonical horizon JSON and recompute derived return fields.
 
         Parameters
         ----------
         json : str
-            JSON-serialized ``HorizonResult`` envelope.
+            JSON-serialized ``HorizonResult`` produced by :meth:`to_json` or the
+            WASM horizon API. Serialized derived returns and contributions are
+            not trusted as inputs; Rust recomputes them from the underlying values.
 
         Returns
         -------
@@ -1705,11 +1713,13 @@ def compute_horizon_return(
     method : {"parallel", "waterfall", "metrics_based", "taylor"} | None, default None
         Attribution method; ``None`` selects the Rust default
         (``AttributionMethod::default()``, currently ``"parallel"``).
-        ``"metrics_based"`` re-prices the instrument with
-        the default attribution metric set (DV01, CS01, vega, ...) using the
-        same configuration and recalibration provider as the scenario
-        engine; instruments lacking one of those metrics raise
-        ``RuntimeError`` instead of silently dropping the factor.
+        ``"metrics_based"`` calculates the instrument's applicable subset of
+        the default attribution metrics (DV01, CS01, vega, ...) at the opening
+        snapshot, using the same configuration and recalibration provider as
+        the scenario engine. The canonical Rust registry omits metrics
+        unsupported by that instrument type. Selected metric failures raise
+        ``ValueError`` for invalid inputs, ``KeyError`` for missing data, or
+        ``RuntimeError`` for computation failures.
     config : FinstackConfig | str | None, default None
         Library configuration threaded into both the scenario engine and the
         attribution pricing; ``None`` uses the default.
@@ -1718,7 +1728,7 @@ def compute_horizon_return(
         targets under ``TimeRollMode.business_days`` (e.g. ``"nyse"``,
         ``"target"``). Defaults to a weekends-only calendar, so business-day
         rolls always avoid weekends but not market holidays. Raises
-        ``ValueError`` if the identifier is not a built-in calendar.
+        ``KeyError`` if the identifier is not a built-in calendar.
 
     Returns
     -------
@@ -1730,11 +1740,11 @@ def compute_horizon_return(
     ------
     ValueError
         If an input fails to parse or validate, ``method`` is unknown,
-        ``calendar_id`` is not a built-in calendar, or the scenario contains
-        an instrument-scoped operation (horizon analysis prices one
-        instrument instance at both dates).
+        or the scenario contains an instrument-scoped operation (horizon
+        analysis prices one instrument instance at both dates).
     KeyError
-        If the scenario references market data or tenors that do not exist.
+        If ``calendar_id`` is not a built-in calendar, or the scenario references
+        market data or tenors that do not exist.
     RuntimeError
         If pricing or attribution fails.
 
@@ -2545,7 +2555,8 @@ class RateBindingSpec:
         Parameters
         ----------
         node_id : str
-            Statement rate node identifier.
+            Dimensionless scalar rate node identifier. Applying a binding to a
+            monetary node records a rate-binding failure without changing values.
         curve_id : str
             Market curve identifier (e.g. ``"USD-OIS"``).
         tenor : str
@@ -3407,7 +3418,9 @@ class OperationSpec:
         node_id : str
             Statement forecast node identifier.
         value : float
-            Absolute value to assign.
+            Finite absolute value in the node's units. Monetary forecasts retain
+            their currency and interpret this as major currency units; actuals
+            are preserved.
 
         Returns
         -------

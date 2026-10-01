@@ -460,10 +460,11 @@ publishing have separate gates and evidence.
 
 ## Independent installation gate
 
-Registry items depend on `finstack-quant-wasm` at the version in
-`finstack-quant-wasm/package.json`; the generators read it from there, so a
-version bump without `mise run ui-gen` fails `ui-check` and `gen-check`. The
-package is not on npm: the local install tasks serve that exact dependency as a
+Registry items pin `finstack-quant-wasm` to the version in
+`finstack-quant-wasm/package.json`; the generators read it from there, so
+`mise run ui-gen` writes that pin into every registry item and a version bump
+without it fails `mise run ui-check` and `gen-check`. The package is not
+published to npm: the local install tasks serve that exact dependency as a
 `file:` path to the workspace package.
 
 After a fresh `mise run wasm-pkg`, run `mise run ui-install`. It builds the registry,

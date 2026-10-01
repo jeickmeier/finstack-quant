@@ -1087,8 +1087,10 @@ impl PyCorporateAnalysis {
 ///     Terminal value method (typed, serde dict, or tagged JSON such as
 ///     ``{"type": "gordon_growth", "stable_growth_rate": 0.02}``).
 /// ufcf_node : str
-///     Node id containing unlevered free cash flow. Defaults to the Rust
-///     ``DEFAULT_UFCF_NODE`` (``"ufcf"``).
+///     Node id containing monetary unlevered free cash flow in model currency.
+///     Defaults to the Rust ``DEFAULT_UFCF_NODE`` (``"ufcf"``). Gordon Growth /
+///     H-Model terminal cash flow requires a complete contiguous calendar year
+///     at the end of the forecast.
 /// net_debt_override : float | None
 ///     Flat net-debt amount used instead of the model-derived bridge.
 /// options : dict | str | None
@@ -1200,8 +1202,10 @@ fn evaluate_dcf<'py>(
 ///     Terminal value method; selects whether the growth rate or the exit
 ///     multiple is shocked.
 /// ufcf_node : str
-///     Node id containing unlevered free cash flow. Defaults to the Rust
-///     ``DEFAULT_UFCF_NODE`` (``"ufcf"``).
+///     Node id containing monetary unlevered free cash flow in model currency.
+///     Defaults to the Rust ``DEFAULT_UFCF_NODE`` (``"ufcf"``). Gordon Growth /
+///     H-Model terminal cash flow requires a complete contiguous calendar year
+///     at the end of the forecast.
 /// net_debt_override : float | None
 ///     Flat net-debt amount used instead of the model-derived bridge.
 /// options : dict | str | None
@@ -1445,8 +1449,11 @@ fn wacc(
 /// as_of : datetime.date | str | None
 ///     Valuation date; required when ``market`` is set.
 /// ltv_value_node : str | None
-///     Statement node supplying a per-period LTV denominator. When omitted, a
-///     positive DCF enterprise value is broadcast as a constant denominator.
+///     Monetary statement node supplying a per-period LTV denominator in
+///     reporting currency; scalar, foreign-currency or non-finite values are
+///     rejected. Missing or non-positive values do not supply a denominator.
+///     When omitted, a positive DCF enterprise value is broadcast as a constant
+///     denominator.
 ///
 /// Returns
 /// -------

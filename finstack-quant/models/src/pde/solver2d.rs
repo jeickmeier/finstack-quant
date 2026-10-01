@@ -27,7 +27,7 @@ impl Solver2D {
     /// * `grid` - Tensor-product spatial grid for the solve
     /// * `stepper` - Modified Craig-Sneyd ADI time-stepper (see
     ///   [`CraigSneydStepper::new`] and
-    ///   [`CraigSneydStepper::with_rannacher`])
+    ///   [`CraigSneydStepper::with_damping`])
     #[must_use]
     pub fn new(grid: Grid2D, stepper: CraigSneydStepper) -> Self {
         Self { grid, stepper }
@@ -246,6 +246,147 @@ mod tests {
     use super::super::grid::Grid1D;
     use super::super::problem2d::PdeProblem2D;
     use super::*;
+
+    struct ConstantSource;
+
+    impl PdeProblem2D for ConstantSource {
+        fn diffusion_xx(&self, _x: f64, _y: f64, _t: f64) -> f64 {
+            0.0
+        }
+        fn diffusion_yy(&self, _x: f64, _y: f64, _t: f64) -> f64 {
+            0.0
+        }
+        fn mixed_diffusion(&self, _x: f64, _y: f64, _t: f64) -> f64 {
+            0.0
+        }
+        fn convection_x(&self, _x: f64, _y: f64, _t: f64) -> f64 {
+            0.0
+        }
+        fn convection_y(&self, _x: f64, _y: f64, _t: f64) -> f64 {
+            0.0
+        }
+        fn reaction(&self, _x: f64, _y: f64, _t: f64) -> f64 {
+            0.0
+        }
+        fn source(&self, _x: f64, _y: f64, _t: f64) -> f64 {
+            2.0
+        }
+        fn terminal_condition(&self, _x: f64, _y: f64) -> f64 {
+            1.0
+        }
+        fn boundary_x_lower(&self, _y: f64, _t: f64) -> BoundaryCondition {
+            BoundaryCondition::Neumann(0.0)
+        }
+        fn boundary_x_upper(&self, _y: f64, _t: f64) -> BoundaryCondition {
+            BoundaryCondition::Neumann(0.0)
+        }
+        fn boundary_y_lower(&self, _x: f64, _t: f64) -> BoundaryCondition {
+            BoundaryCondition::Neumann(0.0)
+        }
+        fn boundary_y_upper(&self, _x: f64, _t: f64) -> BoundaryCondition {
+            BoundaryCondition::Neumann(0.0)
+        }
+    }
+
+    #[test]
+    fn source_is_integrated_once_by_mcs_and_implicit_start() {
+        for damping in [0, 2] {
+            let grid = Grid2D::new(
+                Grid1D::uniform(0.0, 1.0, 5).expect("x grid"),
+                Grid1D::uniform(0.0, 1.0, 5).expect("y grid"),
+            );
+            let solution = Solver2D::new(grid, CraigSneydStepper::with_damping(damping, 10))
+                .solve(&ConstantSource, 0.5)
+                .expect("constant source solve");
+            for value in solution.values {
+                assert!(
+                    (value - 2.0).abs() < 1e-12,
+                    "source integrated to {value}, expected 2"
+                );
+            }
+        }
+    }
+
+    struct AffineHeat2D;
+
+    impl PdeProblem2D for AffineHeat2D {
+        fn diffusion_xx(&self, _x: f64, _y: f64, _t: f64) -> f64 {
+            1.0
+        }
+        fn diffusion_yy(&self, _x: f64, _y: f64, _t: f64) -> f64 {
+            1.0
+        }
+        fn mixed_diffusion(&self, _x: f64, _y: f64, _t: f64) -> f64 {
+            0.0
+        }
+        fn convection_x(&self, _x: f64, _y: f64, _t: f64) -> f64 {
+            0.0
+        }
+        fn convection_y(&self, _x: f64, _y: f64, _t: f64) -> f64 {
+            0.0
+        }
+        fn reaction(&self, _x: f64, _y: f64, _t: f64) -> f64 {
+            0.0
+        }
+        fn terminal_condition(&self, x: f64, y: f64) -> f64 {
+            1.0 + x + 2.0 * y
+        }
+        fn boundary_x_lower(&self, _y: f64, _t: f64) -> BoundaryCondition {
+            BoundaryCondition::Linear
+        }
+        fn boundary_x_upper(&self, _y: f64, _t: f64) -> BoundaryCondition {
+            BoundaryCondition::Linear
+        }
+        fn boundary_y_lower(&self, _x: f64, _t: f64) -> BoundaryCondition {
+            BoundaryCondition::Linear
+        }
+        fn boundary_y_upper(&self, _x: f64, _t: f64) -> BoundaryCondition {
+            BoundaryCondition::Linear
+        }
+    }
+
+    #[test]
+    fn linear_boundaries_preserve_affine_surface_on_nonuniform_grid() {
+        let gx = Grid1D::from_points(vec![0.0, 0.1, 0.4, 0.65, 1.0]).expect("x grid");
+        let gy = Grid1D::from_points(vec![0.0, 0.2, 0.3, 0.7, 1.0]).expect("y grid");
+        let grid = Grid2D::new(gx, gy);
+        let solver = Solver2D::new(grid.clone(), CraigSneydStepper::new(100));
+        let solution = solver.solve(&AffineHeat2D, 0.1).expect("solve");
+        for (i, &x) in grid.x().points().iter().enumerate() {
+            for (j, &y) in grid.y().points().iter().enumerate() {
+                let expected = 1.0 + x + 2.0 * y;
+                let actual = solution.values[i * grid.ny() + j];
+                assert!(
+                    (actual - expected).abs() < 1e-9,
+                    "x={x}, y={y}, actual={actual}, expected={expected}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn boundary_corners_use_current_adjacent_edges() {
+        let gx = Grid1D::from_points(vec![0.0, 0.1, 0.4, 0.65, 1.0]).expect("x grid");
+        let gy = Grid1D::from_points(vec![0.0, 0.2, 0.5, 0.8, 1.0]).expect("y grid");
+        let grid = Grid2D::new(gx, gy);
+        let mut full = vec![f64::NAN; grid.total()];
+        let mut interior = Vec::new();
+        for &x in &grid.x().points()[1..grid.nx() - 1] {
+            for &y in &grid.y().points()[1..grid.ny() - 1] {
+                interior.push(1.0 + x + 2.0 * y);
+            }
+        }
+        fill_boundaries(&AffineHeat2D, &grid, &mut full, &interior, 0.0);
+        for (i, &x) in grid.x().points().iter().enumerate() {
+            for (j, &y) in grid.y().points().iter().enumerate() {
+                let value = full[i * grid.ny() + j];
+                assert!(
+                    (value - (1.0 + x + 2.0 * y)).abs() < 1e-12,
+                    "stale boundary ({i},{j}): {value}"
+                );
+            }
+        }
+    }
 
     /// 2D heat equation on [0,pi]^2 with Dirichlet BCs.
     struct Heat2D;

@@ -51,6 +51,12 @@ pub(super) fn parse_range_with_calendar<C: PeriodCalendar>(
             ),
         ));
     }
+    if start.fiscal != end.fiscal {
+        return Err(invalid_period(
+            s,
+            "range start and end must use the same fiscal or Gregorian identifiers",
+        ));
+    }
     if start > end {
         return Err(invalid_period(
             s,
@@ -151,23 +157,13 @@ pub(super) fn invalid_period(value: &str, reason: &str) -> crate::Error {
     ))
 }
 
-pub(super) fn enumerate_ids<C: PeriodCalendar>(
-    mut cur: PeriodId,
-    end: PeriodId,
-    calendar: &C,
-) -> crate::Result<Vec<PeriodId>> {
-    let mut out = Vec::new();
-    while cur <= end {
-        out.push(cur);
-        let max = calendar.max_index(cur.year, cur.kind)?;
-        if cur.index >= max {
-            cur.year += 1;
-            cur.index = 1;
-        } else {
-            cur.index += 1;
-        }
-    }
-    Ok(out)
+pub(super) fn checked_year_offset(year: i32, offset: i32) -> crate::Result<i32> {
+    year.checked_add(offset).ok_or_else(|| {
+        invalid_period(
+            &year.to_string(),
+            "year stepping exceeds the supported integer range",
+        )
+    })
 }
 
 pub(super) fn days_in_year(year: i32) -> u16 {
@@ -178,15 +174,13 @@ pub(super) fn days_in_year(year: i32) -> u16 {
     }
 }
 
-pub(super) fn step(mut id: PeriodId) -> crate::Result<PeriodId> {
-    (id.year, id.index) = id.kind.step_forward(id.year, id.index);
-    Ok(id)
+pub(super) fn step(id: PeriodId) -> crate::Result<PeriodId> {
+    step_with_calendar(id, &Gregorian, true)
 }
 
 /// Step backward by one period (inverse of step).
-pub(super) fn step_backward(mut id: PeriodId) -> crate::Result<PeriodId> {
-    (id.year, id.index) = id.kind.step_backward(id.year, id.index);
-    Ok(id)
+pub(super) fn step_backward(id: PeriodId) -> crate::Result<PeriodId> {
+    step_with_calendar(id, &Gregorian, false)
 }
 
 pub(super) fn step_with_calendar<C: PeriodCalendar>(
@@ -194,16 +188,22 @@ pub(super) fn step_with_calendar<C: PeriodCalendar>(
     calendar: &C,
     forward: bool,
 ) -> crate::Result<PeriodId> {
+    let max = calendar.max_index(id.year, id.kind)?;
+    if id.index == 0 || id.index > max {
+        return Err(invalid_period(
+            &id.to_string(),
+            "period index is outside this year's range",
+        ));
+    }
     if forward {
-        let max = calendar.max_index(id.year, id.kind)?;
         if id.index >= max {
-            id.year += 1;
+            id.year = checked_year_offset(id.year, 1)?;
             id.index = 1;
         } else {
             id.index += 1;
         }
     } else if id.index == 1 {
-        id.year -= 1;
+        id.year = checked_year_offset(id.year, -1)?;
         id.index = calendar.max_index(id.year, id.kind)?;
     } else {
         id.index -= 1;

@@ -10,4 +10,4 @@ pub(crate) mod pricer;
 /// Type definitions for inflation caps and floors.
 pub(crate) mod types;
 
-pub use types::{InflationCapFloor, InflationCapFloorBuilder};
+pub use types::{InflationCapFloor, InflationCapFloorBuilder, InflationVolatilityExpiry};

@@ -444,12 +444,12 @@ impl MarketSnapshot {
     /// Restore market by applying snapshot factors and preserving non-snapshot factors.
     ///
     /// Clone-and-overwrite: the result starts as a full clone of
-    /// `current_market`, so every store the snapshot does not model (credit
-    /// indices, collateral CSA mappings, hierarchy) is preserved. For each
-    /// family:
+    /// `current_market`, so stores the snapshot does not model are preserved.
+    /// Credit indices and collateral mappings are removed only when their
+    /// required curves are absent from the final restored state. For each family:
     ///
-    /// - **Curves**: each flagged family is dropped and replaced from
-    ///   `snapshot`; unflagged families are preserved from `current_market`.
+    /// - **Curves**: each flagged family is replaced from `snapshot`, inserting
+    ///   replacements before removing obsolete IDs; unflagged families are preserved.
     ///   Every [`CurveStorage`] variant belongs to exactly one flag family
     ///   (see the module-level table): basis-spread and parametric curves
     ///   restore with `FORWARD`, vol-index curves with `VOL`, and price
@@ -477,24 +477,8 @@ impl MarketSnapshot {
     ) -> MarketContext {
         let mut new_market = current_market.clone();
 
-        // --- Curves: drop-and-replace each FLAGGED family. The clone keeps
-        // unflagged families. The match is deliberately EXHAUSTIVE (no `_`
-        // arm): every `CurveStorage` variant must be owned by exactly one
-        // flag family, so adding a tenth variant is a compile error here
-        // instead of a silent restore gap.
-        new_market.retain_curves_mut(|_, curve| match curve {
-            CurveStorage::Discount(_) => !restore_flags.contains(MarketRestoreFlags::DISCOUNT),
-            CurveStorage::Forward(_)
-            | CurveStorage::BasisSpread(_)
-            | CurveStorage::Parametric(_) => !restore_flags.contains(MarketRestoreFlags::FORWARD),
-            CurveStorage::Hazard(_) => !restore_flags.contains(MarketRestoreFlags::HAZARD),
-            CurveStorage::Inflation(_) => !restore_flags.contains(MarketRestoreFlags::INFLATION),
-            CurveStorage::BaseCorrelation(_) => {
-                !restore_flags.contains(MarketRestoreFlags::CORRELATION)
-            }
-            CurveStorage::VolIndex(_) => !restore_flags.contains(MarketRestoreFlags::VOL),
-            CurveStorage::Price(_) => !restore_flags.contains(MarketRestoreFlags::SCALARS),
-        });
+        // Install replacements before removing obsolete curves: dependent
+        // credit indices must never see a temporary hole in the curve map.
         for curve in snapshot.discount_curves.values() {
             new_market.insert_mut(Arc::clone(curve));
         }
@@ -523,18 +507,51 @@ impl MarketSnapshot {
             new_market.insert_mut(Arc::clone(curve));
         }
 
-        // Credit indices hold direct references to hazard / base-correlation
-        // curves; re-bind them so they resolve against the restored curves.
-        if restore_flags.contains(MarketRestoreFlags::HAZARD)
-            || restore_flags.contains(MarketRestoreFlags::CORRELATION)
-        {
-            let invalidated = new_market.rebind_credit_indices_mut();
-            if !invalidated.is_empty() {
-                tracing::warn!(
-                    invalidated = ?invalidated,
-                    "credit indices invalidated during snapshot restore (their                      curves are absent from the restored state)"
-                );
+        // Every variant belongs to exactly one factor family. Retention also
+        // removes dependent metadata only when its final curve is missing.
+        let mutation = new_market.retain_curves_mut(|id, curve| match curve {
+            CurveStorage::Discount(_) => {
+                !restore_flags.contains(MarketRestoreFlags::DISCOUNT)
+                    || snapshot.discount_curves.contains_key(id)
             }
+            CurveStorage::Forward(_) => {
+                !restore_flags.contains(MarketRestoreFlags::FORWARD)
+                    || snapshot.forward_curves.contains_key(id)
+            }
+            CurveStorage::BasisSpread(_) => {
+                !restore_flags.contains(MarketRestoreFlags::FORWARD)
+                    || snapshot.basis_spread_curves.contains_key(id)
+            }
+            CurveStorage::Parametric(_) => {
+                !restore_flags.contains(MarketRestoreFlags::FORWARD)
+                    || snapshot.parametric_curves.contains_key(id)
+            }
+            CurveStorage::Hazard(_) => {
+                !restore_flags.contains(MarketRestoreFlags::HAZARD)
+                    || snapshot.hazard_curves.contains_key(id)
+            }
+            CurveStorage::Inflation(_) => {
+                !restore_flags.contains(MarketRestoreFlags::INFLATION)
+                    || snapshot.inflation_curves.contains_key(id)
+            }
+            CurveStorage::BaseCorrelation(_) => {
+                !restore_flags.contains(MarketRestoreFlags::CORRELATION)
+                    || snapshot.base_correlation_curves.contains_key(id)
+            }
+            CurveStorage::VolIndex(_) => {
+                !restore_flags.contains(MarketRestoreFlags::VOL)
+                    || snapshot.vol_index_curves.contains_key(id)
+            }
+            CurveStorage::Price(_) => {
+                !restore_flags.contains(MarketRestoreFlags::SCALARS)
+                    || snapshot.price_curves.contains_key(id)
+            }
+        });
+        if !mutation.invalidated_credit_indices.is_empty() {
+            tracing::warn!(
+                invalidated = ?mutation.invalidated_credit_indices,
+                "credit indices invalidated during snapshot restore because required curves are absent"
+            );
         }
 
         // --- FX ---

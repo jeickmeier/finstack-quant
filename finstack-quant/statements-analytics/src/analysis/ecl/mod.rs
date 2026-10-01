@@ -15,7 +15,7 @@
 //!
 //! ```
 //! use finstack_quant_statements_analytics::analysis::{
-//!     EclConfigBuilder, EclEngine, Exposure, QualitativeFlags, RawPdCurve, Stage,
+//!     EclConfigBuilder, EclEngine, Exposure, MacroScenario, QualitativeFlags, RawPdCurve, Stage,
 //! };
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -44,9 +44,10 @@
 //! };
 //!
 //! let config = EclConfigBuilder::new().bucket_width(0.25).build()?;
-//! let scenario = config.scenarios[0].clone();
+//! let scenario = MacroScenario { id: "base".into(), weight: 1.0, lgd_override: None };
+//! let origination_pd = RawPdCurve::new("BBB", vec![(0.0, 0.0), (1.0, 0.02), (5.0, 0.10)])?;
 //! let engine = EclEngine::new(config, vec![(&scenario, &pd_curve)]);
-//! let result = engine.process_exposure(&exposure)?;
+//! let result = engine.process_exposure(&exposure, &origination_pd, 0.0)?;
 //!
 //! assert_eq!(result.stage_result.stage, Stage::Stage1);
 //! # Ok(())

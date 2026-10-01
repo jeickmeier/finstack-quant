@@ -36,6 +36,7 @@ impl JsVolCube {
     ///   `[alpha0, beta0, rho0, nu0, shift0, alpha1, …]`.
     ///   Length must equal `expiries.len() * tenors.len() * 5`.
     ///   Pass `NaN` for the shift element of a node to omit the shift.
+    ///   The `nu` component is nonnegative; zero gives deterministic volatility.
     /// * `forwards` - Row-major forward rates, one per grid node.
     /// @param interpolation_mode - Interpolation across the expiry axis: `"vol"` or
     /// `"total_variance"`; omitted keeps the Rust `VolCube::from_grid` default (`"vol"`).
@@ -44,7 +45,8 @@ impl JsVolCube {
     ///
     /// Throws a JavaScript exception if an axis is empty, non-finite,
     /// non-positive, or not strictly increasing; the parameter or forward array
-    /// has the wrong length; a forward is non-finite; any SABR node has invalid
+    /// has the wrong length or its grid-size product overflows; a forward is
+    /// non-finite; any SABR node has invalid
     /// alpha, beta, rho, nu, or shift; or `interpolationMode` is neither `vol`
     /// nor `total_variance`.
     #[wasm_bindgen(constructor)]
@@ -62,8 +64,14 @@ impl JsVolCube {
         let forwards: &[f64] = &js_f64_seq(&forwards, "forwards")?;
         let id: &str = &js_string(&id, "id")?;
         let interpolation_mode = js_opt_string(interpolation_mode.as_ref(), "interpolationMode")?;
-        let n_nodes = expiries.len() * tenors.len();
-        if params_flat.len() != n_nodes * 5 {
+        let n_nodes = expiries
+            .len()
+            .checked_mul(tenors.len())
+            .ok_or_else(|| to_js_err("VolCube grid dimensions are too large"))?;
+        let n_params = n_nodes
+            .checked_mul(5)
+            .ok_or_else(|| to_js_err("VolCube parameter dimensions are too large"))?;
+        if params_flat.len() != n_params {
             return Err(to_js_err(format!(
                 "params_flat length {} != {} nodes * 5 params",
                 params_flat.len(),
@@ -434,7 +442,7 @@ impl JsVolSurface {
         if let Some(quote) = js_opt_string(quote_type.as_ref(), "quoteType")? {
             opts.quote_type = quote.parse().map_err(|error: String| to_js_err(error))?;
         }
-        RustVolSurface::from_grid_opts(id, &expiries, &strikes, &vols, opts)
+        RustVolSurface::from_grid_opts(id, &expiries, &strikes, &vols, opts, None)
             .map(|surface| Self::from_inner(Arc::new(surface)))
             .map_err(to_js_err)
     }

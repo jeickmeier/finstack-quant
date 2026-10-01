@@ -32,7 +32,10 @@ use finstack_quant_core::InputError;
 use rust_decimal::Decimal;
 
 use super::calendar::resolve_calendar_strict;
-use super::date_generation::{generate_periods_with_adjustment, index_period_schedule};
+use super::date_generation::{
+    build_schedule_period, effective_frequency, effective_stub, generate_periods_with_adjustment,
+    index_period_schedule, validate_accrual_grid,
+};
 use super::periods::SchedulePeriod;
 use super::rate_helpers::ResolvedFloatingRateSpec;
 use super::specs::{
@@ -126,8 +129,17 @@ impl DateWindow {
 fn build_periods_with_meta(
     window: DateWindow,
     params: &ScheduleParams,
+    allow_front_accrual: bool,
 ) -> finstack_quant_core::Result<ScheduleWithMeta> {
-    let periods = generate_periods_with_adjustment(
+    validate_accrual_grid(
+        window.start,
+        window.end,
+        params.stub,
+        params.end_of_month,
+        params.day_count,
+        params.roll_rule,
+    )?;
+    let mut periods = generate_periods_with_adjustment(
         window.start,
         window.end,
         params.frequency,
@@ -139,7 +151,25 @@ fn build_periods_with_meta(
         params.adjust_accrual_dates,
         params.roll_rule,
     )?;
-    index_period_schedule(periods, params.frequency)
+    // CDS front accrual belongs to the instrument's initial window only.
+    // Reapplying it after a coupon or settlement-type change would charge the
+    // portion before the change twice. Keep the next roll and clip the start.
+    if !allow_front_accrual {
+        if let Some(first) = periods
+            .first_mut()
+            .filter(|period| period.unadjusted_start < window.start)
+        {
+            *first = build_schedule_period(
+                window.start,
+                first.unadjusted_end,
+                params.business_day_convention,
+                params.payment_lag_days,
+                resolve_calendar_strict(&params.calendar_id)?,
+                params.adjust_accrual_dates,
+            )?;
+        }
+    }
+    index_period_schedule(periods, params.frequency, params.roll_rule)
 }
 
 /// Adjusted accrual end of the instrument maturity period, if present.
@@ -240,7 +270,7 @@ pub(super) fn build_fee_schedules(
                     roll_rule: crate::builder::specs::RollRule::None,
                 };
                 let (dates, prev, _) =
-                    build_periods_with_meta(DateWindow::new(issue, maturity), &schedule)?;
+                    build_periods_with_meta(DateWindow::new(issue, maturity), &schedule, true)?;
                 if dates.is_empty() {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "periodic fee ({bp} bp, {frequency} on '{calendar_id}') produced an empty \
@@ -450,7 +480,7 @@ fn compile_step_up_schedules(input: StepUpCompileInput<'_>) -> Vec<FixedSchedule
         let Some(period) = input.prev.get(&payment_date) else {
             continue;
         };
-        let period_rate = rate_for(period.accrual_start);
+        let period_rate = rate_for(period.unadjusted_start);
         let extend_last = rate_groups
             .last()
             .map(|group| group.rate == period_rate)
@@ -535,7 +565,7 @@ fn select_payment_split(
                     "overlapping payment windows [{}, {}) and [{}, {}) cover [{start}, {end}) \
                      without containment; nest payment windows or make them disjoint",
                     current.window.start, current.window.end, piece.window.start, piece.window.end
-                )))
+                )));
             }
         }
     }
@@ -624,20 +654,23 @@ pub(super) fn compute_coupon_schedules(
 
         let chosen_coupon = select_coupon_piece(&coupon_pieces, s, e)?;
         let split = select_payment_split(&payment_pieces, s, e)?;
+        let mut schedule = chosen_coupon.schedule.clone();
+        schedule.frequency = effective_frequency(schedule.frequency, schedule.roll_rule);
+        schedule.stub = effective_stub(schedule.stub, schedule.roll_rule);
 
         let (dates, prev, first_or_last) =
-            build_periods_with_meta(DateWindow::new(s, e), &chosen_coupon.schedule)?;
+            build_periods_with_meta(DateWindow::new(s, e), &schedule, s == issue)?;
         if dates.is_empty() {
             return Err(InputError::TooFewPoints.into());
         }
-        let calendar = resolve_calendar_strict(&chosen_coupon.schedule.calendar_id)?;
+        let calendar = resolve_calendar_strict(&schedule.calendar_id)?;
 
         match &chosen_coupon.coupon {
             CouponSpec::Fixed { rate } => {
                 let spec = FixedCouponSpec {
                     coupon_type: split,
                     rate: *rate,
-                    schedule: chosen_coupon.schedule.clone(),
+                    schedule: schedule.clone(),
                 };
                 let terminal = terminal_accrual_end(&prev, maturity);
                 fixed_schedules.push(FixedSchedule {
@@ -663,7 +696,7 @@ pub(super) fn compute_coupon_schedules(
                     split,
                     initial_rate: *initial_rate,
                     step_schedule,
-                    schedule: &chosen_coupon.schedule,
+                    schedule: &schedule,
                     calendar,
                     dates: &dates,
                     prev: &prev,
@@ -674,7 +707,7 @@ pub(super) fn compute_coupon_schedules(
                 let spec = FloatingCouponSpec {
                     rate_spec: rate_spec.clone(),
                     coupon_type: split,
-                    schedule: chosen_coupon.schedule.clone(),
+                    schedule: schedule.clone(),
                 };
                 let runtime_spec = ResolvedFloatingRateSpec::try_from(&spec.rate_spec)?;
                 let calendar = resolve_calendar_strict(&spec.schedule.calendar_id)?;

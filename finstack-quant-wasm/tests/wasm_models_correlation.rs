@@ -2,6 +2,7 @@
 
 #![cfg(target_arch = "wasm32")]
 
+use finstack_quant_models::correlation::{Copula, RandomFactorLoadingCopula};
 use finstack_quant_wasm::api::models::correlation::*;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
@@ -104,8 +105,12 @@ fn wasm_copula_stress_correlation_proxy_rfl_only() {
         .unwrap()
         .build()
         .expect("RFL copula should build");
-    // RFL has no closed-form λ_L: NaN per the tail-dependence contract.
-    assert!(rfl.tail_dependence(JsValue::from(0.3)).unwrap().is_nan());
+    // RFL λ_L is the mass at unit loading under the calibrated clipped-normal
+    // loading distribution: finite, in [0, 1], and equal to the Rust model.
+    let lambda = rfl.tail_dependence(JsValue::from(0.3)).unwrap();
+    let expected = Copula::tail_dependence(&RandomFactorLoadingCopula::new(0.2), 0.3);
+    assert!((0.0..=1.0).contains(&lambda), "λ_L out of range: {lambda}");
+    assert_eq!(lambda, expected);
     let proxy = rfl
         .stress_correlation_proxy(JsValue::from(0.3))
         .expect("proxy defined for RFL");

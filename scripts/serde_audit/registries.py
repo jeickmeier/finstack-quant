@@ -113,11 +113,6 @@ NON_MAINTAINED_SERDE_EXCEPTIONS = (
     ),
     *_computed_output("core", "src/expr/ast.rs", ("EvaluationResult",)),
     *_in_process_spec("core", "src/market_data/bumps.rs", ("BumpSpec",)),
-    *_computed_output(
-        "core",
-        "src/market_data/term_structures/base_correlation.rs",
-        ("ArbitrageCheckResult",),
-    ),
     *_computed_output("core", "src/money/fx/types.rs", ("FxRateResult",)),
     *_classification(
         "core",

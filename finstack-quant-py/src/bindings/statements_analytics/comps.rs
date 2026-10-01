@@ -651,7 +651,9 @@ impl PyPeerSet {
 ///     Optional explanatory metric in the same notation. ``None`` (default)
 ///     scores the dependent metric against its peer distribution.
 /// weight : float
-///     Weight in the composite score. Default ``1.0``.
+///     Finite non-negative relative weight in the composite score. Default
+///     ``1.0``; zero disables the dimension. Positive weights are normalized
+///     over usable dimensions.
 /// direction : str
 ///     ``"higher_is_cheap"`` (spread-like, default) or ``"higher_is_rich"``
 ///     (multiple-like).
@@ -1325,6 +1327,8 @@ fn extract_dimensions(
 ///
 /// The composite is the weighted average of the direction-adjusted dimension
 /// scores: positive = cheap, negative = rich.
+/// Unusable dimensions (missing metrics, insufficient or degenerate samples)
+/// are excluded; regression dimensions retain their regression semantics.
 ///
 /// Parameters
 /// ----------
@@ -1343,7 +1347,8 @@ fn extract_dimensions(
 /// ------
 /// ValueError
 ///     If a payload is malformed, a direction or extractor is unknown, or the
-///     peer set cannot be scored (no peers with the required metrics).
+///     weights are negative/non-finite, no positive-weight dimension is
+///     usable, or the composite cannot be represented as a finite number.
 ///
 /// Examples
 /// --------

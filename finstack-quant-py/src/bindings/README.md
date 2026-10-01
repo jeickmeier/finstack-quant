@@ -60,17 +60,17 @@ The pattern, from `analytics/mod.rs`:
 
 ```rust
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "analytics")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "analytics")?;
     m.setattr("__doc__", "Performance analytics centred on the Performance class.")?;
     types::register(py, &m)?;
     performance::register(py, &m)?;
     regression::register(py, &m)?;
     let all = PyList::new(py, ["Performance", "PeriodStats", /* … */])?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule(
-        py, parent, &m, "analytics",
-        crate::bindings::module_utils::ROOT_PACKAGE,
-        crate::bindings::module_utils::ParentNameSource::Name,
+    crate::bindings::module_utils::attach_submodule(
+        parent,
+        &m,
+        crate::bindings::module_utils::Exposure::Python,
     )
 }
 ```
@@ -80,23 +80,26 @@ Rules that are load-bearing:
 - Set `__all__` with `PyList` inside `register`; never return an export list for the
   parent to assemble. Keep it exhaustive.
 - Every module sets `__doc__`.
-- Always finish through `module_utils::register_submodule` (or
-  `register_submodule_at`). It does three things PyO3 does not: `add_submodule` on
-  the parent, set **both** `__name__` and `__package__` to the fully-qualified dotted
-  path, and insert the module into `sys.modules`. Setting only `__package__` leaves
-  `__name__` at the bare name, which breaks `inspect.getmodule`, `help()`, and
-  `logging.getLogger(mod.__name__)`.
-- `ParentNameSource` picks whether the child's path is derived from the parent's
-  `__package__` or its `__name__`. All 14 domain-level `register` calls pass
-  `Name`; nested submodules (`core/money.rs`, `margin/schema.rs`, …) pass
-  `Package`. The `Name` choice is load-bearing at the top level — `core/mod.rs`
-  carries the comment explaining it: deriving from `__package__` would claim the
-  public `finstack_quant.core` key for the compiled module and make the
-  pure-Python shim at `../../finstack_quant/core/__init__.py` permanently
-  unreachable. Follow the surrounding module rather than guessing.
-- Each domain also has a pure-Python shim package under `../../finstack_quant/`
-  that re-exports the compiled submodules and owns the docstring and stubs. A new
-  namespace needs both halves.
+- Create every compiled module with `module_utils::new_submodule(parent, name)`,
+  never `PyModule::new`. It names the module by its **public** import path
+  (`finstack_quant.models.credit.lgd`, not the extension-internal
+  `finstack_quant.finstack_quant.…`), derived from `parent.__package__`, and sets
+  `__name__` and `__package__` before anything is added — so child modules, and the
+  `__module__` of every function added afterwards, inherit the public path. Do not
+  patch `__name__`, `__package__` or `__module__` afterwards.
+- Finish with `module_utils::attach_submodule(parent, &m, exposure)`. Pass
+  `Exposure::Compiled` when `import finstack_quant.x.y` should return the compiled
+  module itself: it gets a `__spec__` and is registered in `sys.modules` under its
+  public path. Pass `Exposure::Python` when a pure-Python package or module at that path
+  (`../../finstack_quant/x/y/__init__.py` or `…/y.py`) re-exports it: the Python
+  file owns the `sys.modules` key, and registering the compiled module there would
+  replace it or keep it from ever running.
+  `tests/test_module_names.py` fails if either choice is wrong.
+- Each root namespace also has a pure-Python shim under `../../finstack_quant/`
+  (a package per domain, `schema.py` for the workspace registry) that re-exports
+  the compiled module and owns the docstring and stubs. A new namespace needs both
+  halves; a root namespace without a Python file is not importable until
+  something else has loaded the extension.
 
 ## Wrapper conventions
 

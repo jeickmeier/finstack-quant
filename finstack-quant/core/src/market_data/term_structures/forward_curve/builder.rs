@@ -33,6 +33,7 @@ pub struct ForwardCurveBuilder {
     pub(super) extrapolation: ExtrapolationPolicy,
     pub(super) rate_calibration: Option<crate::market_data::term_structures::RateCalibrationRecipe>,
     pub(super) fx_policy: Option<String>,
+    pub(super) transform: Option<super::evaluation::CurveTransform>,
 }
 
 impl ForwardCurveBuilder {
@@ -174,6 +175,7 @@ impl ForwardCurveBuilder {
         }
         let (kvec, fvec): (Vec<f64>, Vec<f64>) = split_points(self.points);
         crate::math::interp::utils::validate_knots(&kvec)?;
+        crate::math::interp::utils::validate_finite_series(&fvec)?;
         if let Some(min_fwd) = self.min_forward_rate {
             for (i, &f) in fvec.iter().enumerate() {
                 if f < min_fwd {
@@ -205,13 +207,19 @@ impl ForwardCurveBuilder {
         let forwards = fvec.into_boxed_slice();
         // Use allow_any_values to support negative forward rates
         // (common in EUR, CHF, JPY markets since 2014)
+        let (source_knots, source_forwards) = if let Some(transform) = &self.transform {
+            let (times, values) = split_points(transform.source_points().to_vec());
+            (times.into_boxed_slice(), values.into_boxed_slice())
+        } else {
+            (knots.clone(), forwards.clone())
+        };
         let interp = build_interp_allow_any_values(
             self.style,
-            knots.clone(),
-            forwards.clone(),
+            source_knots,
+            source_forwards,
             self.extrapolation,
         )?;
-        Ok(ForwardCurve {
+        let mut curve = ForwardCurve {
             id: self.id,
             base: self.base,
             reset_lag: self.reset_lag,
@@ -221,8 +229,13 @@ impl ForwardCurveBuilder {
             forwards,
             projection_grid,
             interp,
+            transform: None,
             rate_calibration: self.rate_calibration,
             fx_policy: self.fx_policy,
-        })
+        };
+        if let Some(transform) = self.transform {
+            curve.restore_transform(transform)?;
+        }
+        Ok(curve)
     }
 }

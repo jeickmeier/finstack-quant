@@ -1,6 +1,7 @@
 //! Python bindings for `finstack_quant_core::market_data::term_structures` curve types.
 
 pub mod credit;
+mod cube_expiry_slice;
 pub mod discount;
 pub mod forward;
 pub mod hazard;
@@ -10,6 +11,7 @@ pub mod price;
 pub mod surfaces;
 
 pub use credit::{PyBaseCorrelationCurve, PyCreditIndexData};
+pub use cube_expiry_slice::PyVolCubeExpirySlice;
 pub use discount::PyDiscountCurve;
 pub use forward::PyForwardCurve;
 pub use hazard::PyHazardCurve;
@@ -31,12 +33,13 @@ pub(super) const EXPORTS: &[&str] = &[
     "PriceCurve",
     "SabrParameterData",
     "VolCube",
+    "VolCubeExpirySlice",
     "VolSurface",
 ];
 
 /// Register the `finstack_quant.core.market_data.curves` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "curves")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "curves")?;
     m.setattr(
         "__doc__",
         "Market-data bindings: discount, forward, hazard, inflation, price (incl. vol-index) curves, vol surfaces, SABR cubes and FX delta surfaces.",
@@ -53,17 +56,15 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFxDeltaVolSurface>()?;
     m.add_class::<PySabrParameterData>()?;
     m.add_class::<PyVolCube>()?;
+    m.add_class::<PyVolCubeExpirySlice>()?;
 
     let all = PyList::new(py, EXPORTS)?;
     m.setattr("__all__", all)?;
 
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "curves",
-        "finstack_quant.core.market_data",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
 
     Ok(())

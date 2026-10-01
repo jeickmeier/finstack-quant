@@ -4,7 +4,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::{HashMap, HashSet};
 
 use finstack_quant_margin::{
     ClearingHouseImCalculator, ImCalculator, ImMethodology, NettingSetId, ScheduleAssetClass,
@@ -240,11 +240,24 @@ impl PortfolioMarginAggregator {
             result.add_netting_set(ns_margin)?;
         }
 
+        let tracked: HashSet<&str> = self.positions.iter().map(|(id, _)| id.as_str()).collect();
+        let degraded: HashSet<&str> = result
+            .degraded_positions
+            .iter()
+            .map(|(id, _)| id.as_str())
+            .collect();
         result.positions_without_margin = portfolio
             .positions
-            .len()
-            .saturating_sub(result.total_positions)
-            + result.degraded_positions.len();
+            .iter()
+            .filter(|position| {
+                !tracked.contains(position.position_id.as_str())
+                    || degraded.contains(position.position_id.as_str())
+            })
+            .count()
+            + degraded
+                .iter()
+                .filter(|id| portfolio.get_position(id).is_none())
+                .count();
 
         self.apply_csa_im_terms(&mut result, current_im_collateral, market, as_of)?;
         Ok(result)
@@ -1169,6 +1182,9 @@ mod tests {
             result.degraded_positions
         );
         assert_eq!(result.total_variation_margin.amount(), 0.0);
+        assert_eq!(result.total_positions, 0);
+        assert_eq!(result.degraded_positions.len(), 1);
+        assert_eq!(result.positions_without_margin, 1);
     }
 
     #[test]

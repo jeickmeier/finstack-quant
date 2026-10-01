@@ -58,11 +58,24 @@ impl StructuredCredit {
     ///     base.closing_date,
     ///     base.maturity,
     ///     base.discount_curve_id.as_str(),
-    /// );
+    /// ).expect("valid structured-credit dates");
     /// # let _ = clo;
     /// # Ok(())
     /// # }
     /// ```
+    /// # Arguments
+    ///
+    /// * `id` - Stable deal identifier used for pricing results and risk labels.
+    /// * `deal_type` - Registry profile selecting the default payment frequency and credit models.
+    /// * `pool` - Collateral balances and contractual terms in the pool currency.
+    /// * `tranches` - Note balances, priorities and coupon terms.
+    /// * `closing_date` - Deal inception anchoring the first registry payment period.
+    /// * `maturity` - Legal final date capping the first payment date.
+    /// * `discount_curve_id` - Market-context discount curve identifier for valuation.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if the first registry payment period exceeds the supported calendar range.
     #[allow(clippy::too_many_arguments)]
     pub fn apply_deal_defaults(
         id: impl Into<InstrumentId>,
@@ -72,7 +85,7 @@ impl StructuredCredit {
         closing_date: Date,
         maturity: Date,
         discount_curve_id: impl Into<CurveId>,
-    ) -> Self {
+    ) -> finstack_quant_core::Result<Self> {
         match deal_type {
             DealType::Clo => Self::new_clo(
                 id,
@@ -143,7 +156,7 @@ impl StructuredCredit {
         )?;
         let tranches = TrancheStructure::new(vec![tranche])?;
         Ok(
-            StructuredCredit::new_clo("CLO-EXAMPLE", pool, tranches, closing, legal, "USD-OIS")
+            StructuredCredit::new_clo("CLO-EXAMPLE", pool, tranches, closing, legal, "USD-OIS")?
                 .with_calendar_id("nyse"),
         )
     }
@@ -225,7 +238,9 @@ impl StructuredCredit {
     /// * `maturity` - Legal final date, strictly after closing.
     /// * `discount_curve_id` - Market-context discount curve used for tranche PV.
     ///
-    #[allow(clippy::expect_used)] // Builder with valid default dates
+    /// # Errors
+    ///
+    /// Returns a validation error if the first registry payment period exceeds the supported calendar range.
     pub fn new_abs(
         id: impl Into<InstrumentId>,
         pool: AssetPool,
@@ -233,9 +248,9 @@ impl StructuredCredit {
         closing_date: Date,
         maturity: Date,
         discount_curve_id: impl Into<CurveId>,
-    ) -> Self {
+    ) -> finstack_quant_core::Result<Self> {
         let disc_id: CurveId = discount_curve_id.into();
-        Self::new_with_deal_config(
+        Ok(Self::new_with_deal_config(
             id,
             DealType::Abs,
             InstrumentParams {
@@ -244,9 +259,9 @@ impl StructuredCredit {
                 maturity,
                 discount_curve_id: disc_id.as_str(),
             },
-            deal_config_from_registry("abs_auto_standard", closing_date),
+            deal_config_from_registry("abs_auto_standard", closing_date)?,
             closing_date,
-        )
+        ))
     }
 
     /// Create a new CLO instrument from its building blocks.
@@ -263,7 +278,9 @@ impl StructuredCredit {
     /// * `maturity` - Legal final date, strictly after closing.
     /// * `discount_curve_id` - Market-context discount curve used for tranche PV.
     ///
-    #[allow(clippy::expect_used)] // Builder with valid default dates
+    /// # Errors
+    ///
+    /// Returns a validation error if the first registry payment period exceeds the supported calendar range.
     pub fn new_clo(
         id: impl Into<InstrumentId>,
         pool: AssetPool,
@@ -271,9 +288,9 @@ impl StructuredCredit {
         closing_date: Date,
         maturity: Date,
         discount_curve_id: impl Into<CurveId>,
-    ) -> Self {
+    ) -> finstack_quant_core::Result<Self> {
         let disc_id: CurveId = discount_curve_id.into();
-        Self::new_with_deal_config(
+        Ok(Self::new_with_deal_config(
             id,
             DealType::Clo,
             InstrumentParams {
@@ -282,9 +299,9 @@ impl StructuredCredit {
                 maturity,
                 discount_curve_id: disc_id.as_str(),
             },
-            deal_config_from_registry("clo_standard", closing_date),
+            deal_config_from_registry("clo_standard", closing_date)?,
             closing_date,
-        )
+        ))
     }
 
     /// Create a new CMBS instrument from its building blocks.
@@ -301,7 +318,9 @@ impl StructuredCredit {
     /// * `maturity` - Legal final date, strictly after closing.
     /// * `discount_curve_id` - Market-context discount curve used for tranche PV.
     ///
-    #[allow(clippy::expect_used)] // Builder with valid default dates
+    /// # Errors
+    ///
+    /// Returns a validation error if the first registry payment period exceeds the supported calendar range.
     pub fn new_cmbs(
         id: impl Into<InstrumentId>,
         pool: AssetPool,
@@ -309,9 +328,9 @@ impl StructuredCredit {
         closing_date: Date,
         maturity: Date,
         discount_curve_id: impl Into<CurveId>,
-    ) -> Self {
+    ) -> finstack_quant_core::Result<Self> {
         let disc_id: CurveId = discount_curve_id.into();
-        Self::new_with_deal_config(
+        Ok(Self::new_with_deal_config(
             id,
             DealType::Cmbs,
             InstrumentParams {
@@ -320,9 +339,9 @@ impl StructuredCredit {
                 maturity,
                 discount_curve_id: disc_id.as_str(),
             },
-            deal_config_from_registry("cmbs_standard", closing_date),
+            deal_config_from_registry("cmbs_standard", closing_date)?,
             closing_date,
-        )
+        ))
     }
 
     /// Create a new RMBS instrument from its building blocks.
@@ -339,7 +358,9 @@ impl StructuredCredit {
     /// * `maturity` - Legal final date, strictly after closing.
     /// * `discount_curve_id` - Market-context discount curve used for tranche PV.
     ///
-    #[allow(clippy::expect_used)] // Builder with valid default dates
+    /// # Errors
+    ///
+    /// Returns a validation error if the first registry payment period exceeds the supported calendar range.
     pub fn new_rmbs(
         id: impl Into<InstrumentId>,
         pool: AssetPool,
@@ -347,9 +368,9 @@ impl StructuredCredit {
         closing_date: Date,
         maturity: Date,
         discount_curve_id: impl Into<CurveId>,
-    ) -> Self {
+    ) -> finstack_quant_core::Result<Self> {
         let disc_id: CurveId = discount_curve_id.into();
-        Self::new_with_deal_config(
+        Ok(Self::new_with_deal_config(
             id,
             DealType::Rmbs,
             InstrumentParams {
@@ -358,27 +379,30 @@ impl StructuredCredit {
                 maturity,
                 discount_curve_id: disc_id.as_str(),
             },
-            deal_config_from_registry("rmbs_standard", closing_date),
+            deal_config_from_registry("rmbs_standard", closing_date)?,
             closing_date,
-        )
+        ))
     }
 }
 
 #[allow(clippy::expect_used)]
-fn deal_config_from_registry(profile_id: &str, closing_date: Date) -> DealConfig {
+fn deal_config_from_registry(
+    profile_id: &str,
+    closing_date: Date,
+) -> finstack_quant_core::Result<DealConfig> {
     let defaults =
         required_assumption(embedded_registry_or_panic().constructor_defaults(profile_id));
-    DealConfig {
+    Ok(DealConfig {
         first_payment_date: closing_date.add_months(
             defaults
                 .frequency
                 .months()
                 .expect("validated month-based frequency") as i32,
-        ),
+        )?,
         frequency: defaults.frequency,
         prepayment_spec: defaults.prepayment_spec,
         default_spec: defaults.default_spec,
         recovery_spec: defaults.recovery_spec,
         deal_metadata: Metadata::default(),
-    }
+    })
 }

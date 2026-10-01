@@ -5,23 +5,17 @@ import { isDeepStrictEqual } from "node:util";
 import { loadRegistry } from "shadcn/registry";
 import prettier from "prettier";
 import { checkGraph } from "./check-registry.mjs";
-import { itemMetadata, metadataInputs } from "./registry-metadata.mjs";
+import { itemMetadata, metadataInputs, pinWasm } from "./registry-metadata.mjs";
 const cwd = fileURLToPath(new URL("../", import.meta.url));
 const check = process.argv.includes("--check");
 const registry = await loadRegistry({ cwd }),
   graph = checkGraph(registry.items),
   inputs = await metadataInputs(cwd);
-// Hand-authored category indexes name the WASM package; its version is derived here.
-const wasmPin = `finstack-quant-wasm@${inputs.wasmVersion}`;
-const pinWasm = (dependencies) =>
-  dependencies?.map((value) =>
-    value.startsWith("finstack-quant-wasm@") ? wasmPin : value,
-  );
 async function visit(file) {
   const source = JSON.parse(await readFile(file, "utf8"));
   for (const item of source.items) {
     const derived = itemMetadata(graph.byName.get(item.name), graph, inputs);
-    const dependencies = pinWasm(item.dependencies);
+    const dependencies = pinWasm(item.dependencies, inputs.wasmVersion);
     if (check) {
       if (
         !isDeepStrictEqual(
@@ -31,11 +25,10 @@ async function visit(file) {
       )
         throw Error(`Registry metadata drift: ${item.name}`);
       if (!isDeepStrictEqual(item.dependencies, dependencies))
-        throw Error(`Registry WASM dependency drift: ${item.name}`);
-    } else {
-      Object.assign(item, derived);
-      if (dependencies) item.dependencies = dependencies;
-    }
+        throw Error(
+          `Registry WASM pin drift: ${item.name} must depend on finstack-quant-wasm@${inputs.wasmVersion}`,
+        );
+    } else Object.assign(item, derived, dependencies && { dependencies });
   }
   if (!check)
     await writeFile(

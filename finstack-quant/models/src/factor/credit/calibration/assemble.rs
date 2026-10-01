@@ -217,8 +217,8 @@ pub(crate) fn assemble_factor_model_config(
             // Ledoit-Wolf shrinkage over complete-case observations. Unlike
             // Ridge/FullSampleRepaired, both ρ and the covariance diagonal
             // come from the shrunk estimator; `vol_state` keeps the
-            // vol-model variances (precedent: Ridge already stores a Σ whose
-            // diagonal differs from vol_state by α).
+            // unregularized vol-model variances for diagnostics. Horizon
+            // forecasts scale the calibrated covariance itself.
             let (corr_rows, cov_ann) =
                 ledoit_wolf_cov_and_corr(factor_id_order, factor_returns, annualization_factor)?;
             let corr =
@@ -251,9 +251,9 @@ pub(crate) fn assemble_factor_model_config(
         pricing_mode: PricingMode::DeltaBased,
         risk_measure: Default::default(),
         bump_config: None,
-        // Warn rather than the silent Residual default: a calibrated
-        // artifact knows its factor universe, so a runtime issuer matching
-        // a bucket outside it is a data gap worth surfacing.
+        // Calibrated artifacts explicitly select Warn: a runtime issuer
+        // matching a bucket outside their factor universe is surfaced as a
+        // data gap without rejecting the exploratory analysis.
         unmatched_policy: Some(crate::factor::UnmatchedPolicy::Warn),
     };
 

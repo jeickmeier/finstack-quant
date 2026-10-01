@@ -9,7 +9,7 @@ use crate::builder::{
     CashFlowSchedule, CouponType, FeeSpec, FixedCouponSpec, FloatingCouponSpec, Notional,
     PrincipalExchange, StepUpCouponSpec,
 };
-use crate::primitives::{is_cash_settlement_kind, CFKind};
+use crate::primitives::CFKind;
 use finstack_quant_core::dates::{parse_iso_date, Date};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -234,7 +234,9 @@ pub struct PrincipalEventSpec {
     pub payment_date: Date,
     /// Outstanding balance delta. Positive increases outstanding, negative repays.
     pub delta: Money,
-    /// Optional cash leg. When omitted, the cash leg equals `delta`.
+    /// Optional settlement amount before classification-dependent sign handling.
+    /// When omitted, amortization repayments use `-delta` and draws use `delta`.
+    /// Amortization emits this amount as a receipt; other kinds negate it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cash: Option<Money>,
     /// Cashflow classification to emit.
@@ -504,36 +506,6 @@ pub fn validate_cashflow_schedule_json(schedule_json: &str) -> Result<String> {
     serialize_json(&schedule, "cashflow schedule")
 }
 
-/// Settlement cash flows of a validated schedule as `(date, amount)` pairs.
-///
-/// Runs [`CashFlowSchedule::validate`] and keeps only cash-settling rows
-/// (non-cash `PIK` and `DefaultedNotional` rows are excluded), in schedule
-/// order. This is the single owner of the settlement filter used by
-/// [`dated_flows_json`] and host bindings.
-///
-/// # Arguments
-///
-/// * `schedule` - Cashflow schedule to validate and filter; amounts keep
-///   their own currency.
-///
-/// # Returns
-///
-/// Dated settlement amounts, safe to sum per currency.
-///
-/// # Errors
-///
-/// Returns an error if the schedule fails validation (for example, an
-/// interest-bearing flow dated before `meta.issue_date`).
-pub fn dated_flows(schedule: &CashFlowSchedule) -> Result<crate::DatedFlows> {
-    schedule.validate()?;
-    Ok(schedule
-        .flows
-        .iter()
-        .filter(|flow| is_cash_settlement_kind(flow.kind))
-        .map(|flow| (flow.date, flow.amount))
-        .collect())
-}
-
 /// Extract dated amounts from a schedule JSON payload.
 ///
 /// The returned JSON is an array of [`DatedFlowJson`] values. Each entry
@@ -552,7 +524,7 @@ pub fn dated_flows(schedule: &CashFlowSchedule) -> Result<crate::DatedFlows> {
 /// # Errors
 ///
 /// Returns an error if the schedule JSON is invalid, the schedule fails
-/// validation (see [`dated_flows`]), or the output cannot be serialized.
+/// validation (see [`crate::dated_flows`]), or the output cannot be serialized.
 ///
 /// # Examples
 ///
@@ -577,7 +549,7 @@ pub fn dated_flows(schedule: &CashFlowSchedule) -> Result<crate::DatedFlows> {
 /// ```
 pub fn dated_flows_json(schedule_json: &str) -> Result<String> {
     let schedule = parse_schedule(schedule_json)?;
-    let flows: Vec<DatedFlowJson> = dated_flows(&schedule)?
+    let flows: Vec<DatedFlowJson> = crate::dated_flows(&schedule)?
         .into_iter()
         .map(|(date, amount)| DatedFlowJson { date, amount })
         .collect();
@@ -598,12 +570,15 @@ pub fn dated_flows_json(schedule_json: &str) -> Result<String> {
 ///
 /// # Returns
 ///
-/// Scalar accrued-interest amount in the schedule's currency space.
+/// Finite scalar accrued-interest amount in the schedule's currency space.
 ///
 /// # Errors
 ///
 /// Returns an error if the schedule, as-of date, or optional accrual config JSON
-/// cannot be parsed.
+/// cannot be parsed or validated, a day-count or ex-coupon calculation fails,
+/// a compounded coupon-period rate is non-finite or at or below `-1`, or the
+/// accrued-interest formula or accumulated result is non-finite. Valid negative
+/// compounded period rates in `(-1, 0)` remain supported.
 ///
 /// # Examples
 ///

@@ -112,6 +112,8 @@ pub struct ForwardCurve {
     /// Optional contractual reset/end-date boundaries, separate from interpolation knots.
     projection_grid: Option<Box<[f64]>>,
     interp: Interp,
+    /// Exact source interpolation plus accumulated continuous transformations.
+    transform: Option<evaluation::CurveTransform>,
     /// Exact typed recipe used to replay calibration after quote shocks.
     rate_calibration: Option<crate::market_data::term_structures::RateCalibrationRecipe>,
     /// Opaque FX policy stamp; see [`DiscountCurve::fx_policy`].
@@ -120,6 +122,7 @@ pub struct ForwardCurve {
 
 mod builder;
 mod curve;
+mod evaluation;
 #[cfg(test)]
 mod tests;
 mod transform;

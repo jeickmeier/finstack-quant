@@ -6,7 +6,9 @@ use finstack_quant_core::dates::PeriodId;
 use indexmap::IndexMap;
 
 use super::{Check, CheckContext, CheckFinding, CheckResult, FormulaCheckSpec, Severity};
-use crate::evaluator::{formula::evaluate_formula, EvaluationContext, StatementResult};
+use crate::evaluator::{
+    formula::evaluate_formula, EvaluationContext, PeriodHistory, StatementResult,
+};
 use crate::types::NodeId;
 use crate::Result;
 
@@ -24,25 +26,51 @@ impl Check for FormulaCheckSpec {
     }
 
     fn execute(&self, context: &CheckContext) -> Result<CheckResult> {
+        context.config.validate()?;
         if self.tolerance.is_some_and(|t| !t.is_finite() || t < 0.0) {
             return Err(crate::Error::invalid_input(
                 "Formula-check tolerance must be finite and nonnegative",
             ));
         }
-        let expression = crate::dsl::parse_and_compile(&self.formula)?;
-        let node_to_column = Arc::new(node_columns(context.results));
-        let historical_results = Arc::new(period_results(context.results, context.model));
+        let ast = crate::dsl::parse_formula(&self.formula)?;
+        let mut value_types = IndexMap::new();
+        for node in context
+            .model
+            .nodes
+            .keys()
+            .map(NodeId::as_str)
+            .chain(context.results.nodes.keys().map(String::as_str))
+        {
+            value_types.insert(
+                NodeId::new(node),
+                super::helpers::validated_input_value_type(self.id(), context, node)?,
+            );
+        }
+        let (reporting_currency, instrument_currencies) =
+            super::helpers::validated_capital_structure_currencies(self.id(), context)?;
+        let _ = crate::dsl::compiler::infer_value_type(
+            &ast,
+            &value_types,
+            reporting_currency,
+            &instrument_currencies,
+        )?;
+        let expression = crate::dsl::compiler::compile(&ast)?;
+        let history = Arc::new(period_history(context.results, context.model));
         let historical_cashflows = Arc::new(period_cashflows(context.results, context.model));
-        let node_value_types = Arc::new(context.results.node_value_types.clone());
+        let node_value_types = Arc::new(
+            value_types
+                .into_iter()
+                .map(|(node, value_type)| (node.to_string(), value_type))
+                .collect(),
+        );
         let mut findings = Vec::new();
 
         for period in &context.model.periods {
-            let mut evaluation = EvaluationContext::new(
+            let mut evaluation = EvaluationContext::new_with_history(
                 period.id,
-                Arc::clone(&node_to_column),
-                Arc::clone(&historical_results),
+                Arc::clone(&history),
+                Arc::clone(&historical_cashflows),
             );
-            evaluation.historical_capital_structure_cashflows = Arc::clone(&historical_cashflows);
             evaluation.node_value_types = Arc::clone(&node_value_types);
             evaluation.capital_structure_cashflows = context
                 .results
@@ -102,26 +130,20 @@ fn node_columns(results: &StatementResult) -> IndexMap<NodeId, usize> {
         .collect()
 }
 
-fn period_results(
+fn period_history(
     results: &StatementResult,
     model: &crate::types::FinancialModelSpec,
-) -> IndexMap<PeriodId, IndexMap<String, f64>> {
-    model
-        .periods
-        .iter()
-        .map(|period| {
-            let values = results
-                .nodes
-                .iter()
-                .filter_map(|(node_id, series)| {
-                    series
-                        .get(&period.id)
-                        .map(|value| (node_id.clone(), *value))
-                })
-                .collect();
-            (period.id, values)
-        })
-        .collect()
+) -> PeriodHistory {
+    let mut history = PeriodHistory::with_periods(Arc::new(node_columns(results)), &model.periods);
+    for period in &model.periods {
+        let row = results
+            .nodes
+            .values()
+            .map(|series| series.get(&period.id).copied())
+            .collect();
+        history.push_row(period.id, row);
+    }
+    history
 }
 
 fn period_cashflows(

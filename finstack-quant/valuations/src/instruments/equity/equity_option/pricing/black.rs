@@ -99,7 +99,9 @@ pub struct EquityOptionGreeks {
     pub gamma: f64,
     /// Vega: sensitivity to 1% change in volatility
     pub vega: f64,
-    /// Theta: time decay per day
+    /// Theta: smooth time decay per reporting day. European cash-dividend
+    /// theta holds each remaining cashflow's zero yield fixed and excludes
+    /// the discontinuous spot change on an ex-dividend date.
     pub theta: f64,
     /// Rho: PV change per 1bp (0.0001) move in the risk-free rate, in currency
     pub rho: f64,
@@ -110,6 +112,10 @@ pub struct EquityOptionGreeks {
 /// Uses proper day count handling:
 /// - Rate lookups use the discount curve's day count
 /// - Vol time uses the configured model day count (ACT/365F by default)
+///
+/// European theta holds spot, volatility, and the current zero yield for each
+/// remaining cashflow fixed while shortening model times. Cash-dividend theta
+/// excludes the ex-date jump, which belongs in a dated scenario revaluation.
 pub(crate) fn compute_greeks(
     inst: &EquityOption,
     curves: &MarketContext,
@@ -216,16 +222,36 @@ pub(crate) fn compute_greeks(
             // expressed per 1% rate move (hence the `ONE_PERCENT` factor:
             // `greeks_unit.rho_r` is per-1%, while `delta` and `∂S*/∂r` are
             // per-unit). The result is rescaled to per 1bp below.
-            let rho_pct = {
+            let (rho_pct, theta) = {
                 let disc_curve = curves.get_discount(inst.discount_curve_id.as_str())?;
                 let future_divs = future_dividends(inst, disc_curve.as_ref(), as_of)?;
                 if future_divs.is_empty() {
-                    greeks_unit.rho_r
+                    (greeks_unit.rho_r, greeks_unit.theta)
                 } else {
                     // `future_divs` already contains each dividend's PV.
                     let ds_star_dr = escrowed_spot_drho(0.0, &future_divs);
                     const ONE_PERCENT: f64 = 0.01;
-                    greeks_unit.rho_r + greeks_unit.delta * ds_star_dr * ONE_PERCENT
+                    let rho_pct = greeks_unit.rho_r + greeks_unit.delta * ds_star_dr * ONE_PERCENT;
+
+                    // Smooth calendar theta also differentiates S* = S - PV(D).
+                    // Hold each dividend's own zero yield fixed as its remaining
+                    // time shrinks: dS*/dt = -sum(z_i * PV(D_i)). This reduces to
+                    // -r * PV(D) for a flat curve, with no ex-date jump included.
+                    let mut dividend_carry = 0.0;
+                    for &(ex_date, amount) in &inst.discrete_dividends {
+                        if ex_date > as_of && ex_date <= inst.expiry {
+                            let t_div = year_fraction(inst.day_count, as_of, ex_date)?;
+                            if t_div > 0.0 {
+                                let df = disc_curve.df_between_dates(as_of, ex_date)?;
+                                let zero_yield = -df.ln() / t_div;
+                                dividend_carry += zero_yield * amount * df;
+                            }
+                        }
+                    }
+                    let theta = greeks_unit.theta
+                        - greeks_unit.delta * dividend_carry
+                            / inst.metric_pricing_overrides.theta_days_per_year();
+                    (rho_pct, theta)
                 }
             };
 
@@ -234,7 +260,7 @@ pub(crate) fn compute_greeks(
                 delta: greeks_unit.delta * scale,
                 gamma: greeks_unit.gamma * scale,
                 vega: greeks_unit.vega * scale,
-                theta: greeks_unit.theta * scale,
+                theta: theta * scale,
                 rho: rho_pct * scale / 100.0,
             })
         }

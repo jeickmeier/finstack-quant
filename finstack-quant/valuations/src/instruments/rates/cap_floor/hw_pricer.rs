@@ -430,14 +430,22 @@ impl CapFloorHullWhitePricer {
                         PricingErrorContext::default(),
                     )
                 })? / projection_df_as_of;
-                let pf_pay = fwd.df_on_date_curve(period.accrual_end).map_err(|e| {
+                let pf_end = fwd.df_on_date_curve(period.accrual_end).map_err(|e| {
                     PricingError::model_failure_with_context(
                         e.to_string(),
                         PricingErrorContext::default(),
                     )
                 })? / projection_df_as_of;
-                let t_pay = finstack_quant_core::dates::DayCount::Act365F
+                let t_end = finstack_quant_core::dates::DayCount::Act365F
                     .year_fraction(as_of, period.accrual_end, ctx)
+                    .map_err(|e| {
+                        PricingError::model_failure_with_context(
+                            e.to_string(),
+                            PricingErrorContext::default(),
+                        )
+                    })?;
+                let t_pay = finstack_quant_core::dates::DayCount::Act365F
+                    .year_fraction(as_of, period.payment_date, ctx)
                     .map_err(|e| {
                         PricingError::model_failure_with_context(
                             e.to_string(),
@@ -456,10 +464,11 @@ impl CapFloorHullWhitePricer {
                     * hw1f_term_caplet_price_from_dfs_with_model(
                         &hw_model,
                         pf_start,
-                        pf_pay,
+                        pf_end,
                         df,
                         t_fix,
                         t_start,
+                        t_end,
                         t_pay,
                         tau,
                         term_strike,
@@ -1087,6 +1096,9 @@ mod tests {
         let t_end = DayCount::Act365F
             .year_fraction(as_of, period.accrual_end, DayCountContext::default())
             .expect("end time");
+        let t_pay = DayCount::Act365F
+            .year_fraction(as_of, period.payment_date, DayCountContext::default())
+            .expect("payment time");
         let model = HullWhiteParams::constant(0.05, 0.012).expect("constant model");
         let expected = caplet.notional.amount()
             * hw1f_term_caplet_price_from_dfs_with_model(
@@ -1097,6 +1109,7 @@ mod tests {
                 t_fix,
                 t_start,
                 t_end,
+                t_pay,
                 period.accrual_year_fraction,
                 0.04,
                 true,

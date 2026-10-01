@@ -29,9 +29,12 @@ fn monthly_dates(n: usize, end: Date) -> Vec<Date> {
     for _ in 0..n {
         out.push(current);
         current = if current == current.end_of_month() {
-            current.add_months(-1).end_of_month()
+            current
+                .add_months(-1)
+                .expect("valid date shift")
+                .end_of_month()
         } else {
-            current.add_months(-1)
+            current.add_months(-1).expect("valid date shift")
         };
     }
     out.reverse();

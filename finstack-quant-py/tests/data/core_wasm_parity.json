@@ -619,11 +619,11 @@
   ],
   "months_until": 25,
   "next_cds_date": "2025-06-20",
-  "next_equity_option_expiry": "2025-04-18",
   "next_imm": "2025-06-18",
   "next_imm_option_expiry": "2025-06-13",
   "next_semiannual_cds_maturity": "2028-12-20",
   "next_sifma_settlement": "2027-04-13",
+  "next_third_friday": "2025-04-18",
   "norm_with_params": [
     0.5987063256829237,
     0.19333405840142462

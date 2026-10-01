@@ -1,9 +1,21 @@
 use super::*;
 
+/// Resolve a collateral index fixing or project its contractual term rate.
+///
+/// # Arguments
+///
+/// * `fwd` - Projection curve defining reset lag and tenor; its day count only
+///   maps absolute dates into projection discount-factor coordinates.
+/// * `context` - Market data supplying exact historical fixings for past resets.
+/// * `accrual_start` - Coupon start date from which the curve's business-day
+///   reset lag determines the fixing date.
+/// * `day_count` - Contractual index accrual convention used to annualize the
+///   projection discount-factor growth over the reset tenor.
 pub(crate) fn term_rate_for_period(
     fwd: &ForwardCurve,
     context: &MarketContext,
     accrual_start: Date,
+    day_count: DayCount,
 ) -> Result<f64> {
     let calendar = crate::cashflow::builder::calendar::resolve_calendar_strict("weekends_only")?;
     let fixing_date = accrual_start.add_business_days(-fwd.reset_lag(), calendar)?;
@@ -22,32 +34,59 @@ pub(crate) fn term_rate_for_period(
             fwd.tenor(),
             fwd.day_count(),
         )?;
+    let accrual_year_fraction =
+        day_count.year_fraction(fixing_date, reset_end, DayCountContext::default())?;
     crate::instruments::common_impl::pricing::time::rate_between_on_dates(
         fwd,
         fixing_date,
         reset_end,
+        accrual_year_fraction,
     )
+}
+
+/// Contractual coupon inputs for one floating collateral asset.
+#[derive(Clone, Copy)]
+pub(crate) struct CollateralCoupon {
+    /// Current all-in coupon used for a past reset without recorded fixings.
+    pub(crate) fallback_all_in_rate: f64,
+    /// Spread over the reference index, in basis points; absent means zero.
+    pub(crate) spread_bp: Option<f64>,
+    /// Contractual index and coupon accrual basis, independent of the curve clock.
+    pub(crate) day_count: DayCount,
+    /// Decimal floor applied to the index before adding the spread.
+    pub(crate) index_floor_rate: Option<f64>,
 }
 
 /// Resolve an asset's all-in coupon without re-projecting an already-reset
 /// period. The pool's stored `rate` is the contractual current coupon and is
 /// therefore the authoritative fallback when no historical fixing series is
 /// supplied for a reset before the curve base date.
+///
+/// # Arguments
+///
+/// * `fwd` - Projection curve identifying the index and its reset lag and tenor.
+/// * `context` - Market data supplying historical fixings for already-reset coupons.
+/// * `accrual_start` - Start date of the collateral coupon period.
+/// * `coupon` - Contractual accrual, spread, floor, and current all-in coupon terms.
+/// * `rate_shift` - Additive decimal-rate shift applied only to projected index
+///   rates, before the index floor and contractual spread.
 pub(crate) fn collateral_asset_rate_for_period(
     fwd: &ForwardCurve,
     context: &MarketContext,
     accrual_start: Date,
-    fallback_all_in_rate: f64,
-    spread_bp: Option<f64>,
+    coupon: CollateralCoupon,
     rate_shift: f64,
-    index_floor_rate: Option<f64>,
 ) -> Result<f64> {
     let calendar = crate::cashflow::builder::calendar::resolve_calendar_strict("weekends_only")?;
     let fixing_date = accrual_start.add_business_days(-fwd.reset_lag(), calendar)?;
-    let spread = spread_bp.unwrap_or(0.0) / 10_000.0;
+    let spread = coupon.spread_bp.unwrap_or(0.0) / 10_000.0;
     // The floor applies to the index before the spread (`FloatingRateSpec`
     // convention), so a floored loan pays `max(index, floor) + spread`.
-    let floored = |index: f64| index_floor_rate.map_or(index, |floor| index.max(floor));
+    let floored = |index: f64| {
+        coupon
+            .index_floor_rate
+            .map_or(index, |floor| index.max(floor))
+    };
 
     if fixing_date < fwd.base_date() {
         if let Ok(series) = fixings::get_fixing_series(context, fwd.id().as_str()) {
@@ -61,14 +100,16 @@ pub(crate) fn collateral_asset_rate_for_period(
             // cannot retroactively change it, so no shift applies.
             return Ok(floored(fixing) + spread);
         }
-        return Ok(fallback_all_in_rate);
+        return Ok(coupon.fallback_all_in_rate);
     }
 
     // Shift the PROJECTED forward, so a floating asset's coupon follows
     // the simulated rate path. Floored at zero — a deeply negative shift must
     // not manufacture a negative all-in coupon.
     Ok(
-        (floored(term_rate_for_period(fwd, context, accrual_start)? + rate_shift) + spread)
+        (floored(
+            term_rate_for_period(fwd, context, accrual_start, coupon.day_count)? + rate_shift,
+        ) + spread)
             .max(0.0),
     )
 }
@@ -103,10 +144,13 @@ pub(super) fn current_collateral_wac(
                 fwd.as_ref(),
                 context,
                 period_start,
-                state.pool_state.rates[i],
-                state.pool_state.spread_bp[i],
+                CollateralCoupon {
+                    fallback_all_in_rate: state.pool_state.rates[i],
+                    spread_bp: state.pool_state.spread_bp[i],
+                    day_count: state.pool_state.day_counts[i],
+                    index_floor_rate: state.pool_state.index_floors[i],
+                },
                 state.floating_rate_shift,
-                state.pool_state.index_floors[i],
             )?
         } else {
             state.pool_state.rates[i]
@@ -159,9 +203,17 @@ pub(super) fn tranche_period_interest_due(
     afc_capped: bool,
     rate_shift: f64,
 ) -> Result<f64> {
-    let raw = tranche
-        .coupon
-        .try_rate_for_period(dates.start, dates.valuation, context)?;
+    let accrual =
+        tranche
+            .day_count
+            .year_fraction(dates.start, dates.payment, DayCountContext::default())?;
+    let raw = tranche.coupon.try_rate_for_period(
+        dates.start,
+        dates.payment,
+        accrual,
+        dates.valuation,
+        context,
+    )?;
     // Shift FLOATING tranche coupons onto the simulated rate path so a
     // floating-rate note's coupon and its discount factors move together. A
     // fixed coupon is contractual and unaffected. Floored at zero so a deeply
@@ -176,10 +228,6 @@ pub(super) fn tranche_period_interest_due(
     // net WAC, which is itself shifted, so capping the unshifted rate would
     // compare quantities measured on different rate paths.
     let rate = if afc_capped { raw.min(afc_cap) } else { raw };
-    let accrual =
-        tranche
-            .day_count
-            .year_fraction(dates.start, dates.payment, DayCountContext::default())?;
     Ok(balance * rate * accrual)
 }
 

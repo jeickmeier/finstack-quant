@@ -159,11 +159,12 @@ export type D_948Cdc4Db846A21357A4 = "hull_white" | "black_derman_toy";
  */
 export type D_3F9F853D11E3E642Afa6 = "step" | "linear";
 /**
- * Publication lag for inflation index reference dates.
+ * Contractual observation lag for inflation index reference dates.
  *
  * Inflation indices are published with a delay (typically 2-4 weeks). Securities
- * using these indices incorporate a lag to ensure the reference index is published
- * by the settlement date.
+ * using these indices incorporate an observation lag to ensure the reference
+ * index is published by settlement. This lag does not specify the actual
+ * publication date; use [`InflationIndex::with_publication_dates`] for that.
  *
  * # Standard Lags by Market
  *
@@ -948,6 +949,7 @@ export interface DD760Eef55C5Bd7D5B1F6 {
  * Models the relationship between the accreted notional and the recovery
  * rate in default. As PIK accrual increases the notional relative to the
  * original base, recovery declines according to the chosen [`RecoveryModel`].
+ * Deserialization enforces the same parameter invariants as the constructors.
  */
 export interface D_16451E0Bf3B6B78178D8 {
   /**
@@ -1002,6 +1004,8 @@ export interface D_16451E0Bf3B6B78178D8 {
  * Models the relationship between a firm's leverage and its instantaneous
  * hazard rate, enabling a feedback loop where PIK accrual increases the
  * notional (and hence leverage), which drives the hazard rate higher.
+ * Deserialization validates the parameters and rejects incomplete or
+ * inconsistent tabular calibrations before they can be evaluated.
  */
 export interface DCc8Ed166Abbb10Ad4451 {
   /**

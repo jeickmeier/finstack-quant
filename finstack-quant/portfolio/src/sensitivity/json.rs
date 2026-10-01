@@ -213,6 +213,42 @@ mod tests {
     use std::sync::Arc;
 
     #[test]
+    fn monetary_matrix_wire_roundtrip_preserves_reporting_currency_and_rows() {
+        let matrix = SensitivityMatrix::from_rows(
+            vec!["A".into()],
+            vec![FactorId::new("FX")],
+            vec![vec![2.5]],
+        )
+        .expect("valid matrix");
+        let wire = SensitivityMatrixJson::from_matrix(&matrix, Currency::EUR);
+        let value = serde_json::to_value(&wire).expect("serialize");
+        assert_eq!(
+            value,
+            serde_json::json!({
+                "base_currency": "EUR", "position_ids": ["A"],
+                "factor_ids": ["FX"], "data": [[2.5]],
+            })
+        );
+        let restored: SensitivityMatrixJson = serde_json::from_value(value).expect("deserialize");
+        assert_eq!(restored.base_currency, Currency::EUR);
+        assert_eq!(
+            SensitivityMatrix::try_from(restored).expect("valid rows"),
+            matrix
+        );
+    }
+
+    #[test]
+    fn monetary_matrix_wire_rejects_missing_currency_and_unknown_fields() {
+        for value in [
+            serde_json::json!({"position_ids": [], "factor_ids": [], "data": []}),
+            serde_json::json!({"base_currency": "BAD", "position_ids": [], "factor_ids": [], "data": []}),
+            serde_json::json!({"base_currency": "USD", "position_ids": [], "factor_ids": [], "data": [], "n_factors": 0}),
+        ] {
+            assert!(serde_json::from_value::<SensitivityMatrixJson>(value).is_err());
+        }
+    }
+
+    #[test]
     fn reporting_currency_is_explicit_and_independent_of_position_order() {
         let as_of = time::macros::date!(2025 - 01 - 01);
         let provider = Arc::new(SimpleFxProvider::new());

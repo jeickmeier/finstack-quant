@@ -311,7 +311,7 @@ impl StructuredCredit {
             // The timeline runs from the loan's origination (acquisition
             // date, else closing).
             let anchor = asset.acquisition_date.unwrap_or(self.closing_date);
-            if anchor.add_months(months) > self.maturity {
+            if anchor.add_months(months)? > self.maturity {
                 return Err(invalid(format!(
                     "asset {} resolves {} months after its origination {anchor}, past the deal \
                      maturity {}",

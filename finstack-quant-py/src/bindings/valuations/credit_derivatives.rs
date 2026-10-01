@@ -83,13 +83,7 @@ fn cds_option_example_json() -> PyResult<String> {
 }
 
 pub(super) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "credit_derivatives")?;
-    let qual = crate::bindings::module_utils::set_submodule_package_by_package(
-        parent,
-        &m,
-        "credit_derivatives",
-        "finstack_quant.valuations",
-    )?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "credit_derivatives")?;
     m.setattr(
         "__doc__",
         "Canonical example payloads for CDS-family instruments (CDS, index, tranche, option).",
@@ -110,6 +104,10 @@ pub(super) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
         ],
     )?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule_at(py, parent, &m, &qual)?;
+    crate::bindings::module_utils::attach_submodule(
+        parent,
+        &m,
+        crate::bindings::module_utils::Exposure::Python,
+    )?;
     Ok(())
 }

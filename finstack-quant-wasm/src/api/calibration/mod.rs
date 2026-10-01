@@ -137,9 +137,9 @@ fn calibrate_inner(envelope_json: &str) -> Result<CalibrationResultEnvelope, Exe
 ///
 /// Throws a `CalibrationEnvelopeError` if the envelope is malformed or violates
 /// the calibration schema or static plan contract (fail-fast: first static
-/// error; `dryRun` lists every static error), market context construction
-/// or a calibration step fails, a solver does not converge, or the result
-/// envelope cannot be converted to a JavaScript value.
+/// error; `dryRun` lists every static error), solver configuration is invalid,
+/// market context construction or a calibration step fails, a solver does
+/// not converge, or the result envelope cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = calibrate)]
 pub fn calibrate(envelope_json: JsValue) -> Result<JsValue, JsValue> {
     let envelope_json: &str = &json_text(&envelope_json, "envelopeJson")?;
@@ -257,6 +257,9 @@ pub fn dry_run_json(envelope_json: JsValue) -> Result<String, JsValue> {
 /// @returns Positive finite LMM base volatility.
 ///
 /// # Errors
+///
+/// The JavaScript facade rejects object inputs containing non-finite numbers
+/// with `TypeError` before serialization. Explicit JSON strings are parsed in Rust.
 ///
 /// Throws if the envelope is not a Bermudan swaption, the date or market
 /// inputs are invalid, or the Rebonato calibration cannot be completed.

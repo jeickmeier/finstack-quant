@@ -169,6 +169,7 @@ fn build_clo(cpr: f64, cdr: f64, recovery: f64, recovery_lag: u32) -> Structured
         maturity(),
         "USD_OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     clo.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(cpr);

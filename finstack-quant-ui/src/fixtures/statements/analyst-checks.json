@@ -38,7 +38,7 @@
       "name": "Free cash flow positive",
       "category": "credit_reasonableness",
       "severity": "warning",
-      "formula": "fcf > 0",
+      "formula": "fcf > 0 * fcf",
       "message_template": "Negative free cash flow in {period}",
       "tolerance": null
     },

@@ -25,7 +25,7 @@ fn neumaier_sum(values: Vec<f64>) -> f64 {
 
 /// Build the `finstack_quant.core.math.summation` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "summation")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "summation")?;
     m.setattr(
         "__doc__",
         "Numerically stable summation: Kahan and Neumaier compensated sums.",
@@ -36,13 +36,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
 
     let all = PyList::new(py, ["kahan_sum", "neumaier_sum"])?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "summation",
-        "finstack_quant.core.math",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
 
     Ok(())

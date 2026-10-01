@@ -1,0 +1,81 @@
+{
+  "$defs": {
+    "VolQuoteType": {
+      "description": "Quoting convention of the volatilities stored on a [`VolSurface`].\n\nThe same `vol_surface_id` channel is read by consumers with very different\nexpectations: rates calibrations typically read normal (Bachelier, absolute)\nvols on an `expiry × tenor` ATM matrix, while equity/FX/swaption smile\nconsumers read Black (lognormal, relative) vols on `expiry × strike`. The\nstored numbers are an order of magnitude apart (e.g. 0.008 normal vs 0.20\nBlack), so misreading one as the other silently mis-prices. Tagging the\nquote type lets consumers enforce their convention via\n[`VolSurface::require_quote_type`].",
+      "oneOf": [
+        {
+          "const": "black_lognormal",
+          "description": "Black (lognormal) implied volatility, relative units (the default).",
+          "type": "string"
+        },
+        {
+          "const": "shifted_black_lognormal",
+          "description": "Displaced Black volatility; per-expiry displacements accompany the grid.",
+          "type": "string"
+        },
+        {
+          "const": "normal",
+          "description": "Normal (Bachelier) implied volatility, absolute rate units.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/market_data/1/vol_cube_expiry_slice.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Tenor-by-strike volatility quotes at a fixed option expiry, preserving quote convention and displacement.",
+  "properties": {
+    "displacements": {
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "expiry": {
+      "format": "double",
+      "type": "number"
+    },
+    "id": {
+      "type": "string"
+    },
+    "quote_type": {
+      "$ref": "#/$defs/VolQuoteType"
+    },
+    "strikes": {
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "tenors": {
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "vols_row_major": {
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "expiry",
+    "tenors",
+    "strikes",
+    "vols_row_major",
+    "quote_type"
+  ],
+  "title": "Volatility Cube Expiry Slice",
+  "type": "object"
+}

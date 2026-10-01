@@ -51,17 +51,17 @@ def test_decimal_subclass_uses_decimal_path_not_float() -> None:
 
 
 def test_decimal_infinity_rejected() -> None:
-    with pytest.raises(ValueError, match='Invalid Decimal value "Infinity"'):
+    with pytest.raises(ValueError, match="exactly representable"):
         Money(Decimal("Infinity"), "USD")
 
 
 def test_decimal_negative_infinity_rejected() -> None:
-    with pytest.raises(ValueError, match='Invalid Decimal value "-Infinity"'):
+    with pytest.raises(ValueError, match="exactly representable"):
         Money(Decimal("-Infinity"), "USD")
 
 
 def test_decimal_nan_rejected() -> None:
-    with pytest.raises(ValueError, match='Invalid Decimal value "NaN"'):
+    with pytest.raises(ValueError, match="exactly representable"):
         Money(Decimal("NaN"), "USD")
 
 
@@ -137,3 +137,24 @@ def test_from_decimal_str_rejects_bad_currency_and_wrong_types() -> None:
 def test_format_with_rejects_precision_above_native_bound() -> None:
     with pytest.raises(ValueError, match="formatting precision"):
         Money(1.0, "USD").format_with(decimals=1_000_001)
+
+
+@pytest.mark.parametrize(
+    "amount",
+    [
+        "1.123456789012345678901234567891",
+        "0.50000000000000000000000000001",
+        "1e-29",
+    ],
+)
+def test_all_decimal_ingest_paths_reject_precision_loss(amount: str) -> None:
+    with pytest.raises(ValueError, match="exactly representable"):
+        Money(amount, "USD")
+    with pytest.raises(ValueError, match="exactly representable"):
+        Money(Decimal(amount), "USD")
+    with pytest.raises(ValueError, match="exactly representable"):
+        Money.from_decimal(Decimal(amount), "USD")
+
+
+def test_decimal_constructor_applies_scientific_exponent_exactly() -> None:
+    assert Money(Decimal("2000e-31"), "USD").amount_decimal == Decimal("2e-28")

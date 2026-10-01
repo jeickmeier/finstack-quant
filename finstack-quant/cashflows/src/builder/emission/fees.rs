@@ -3,7 +3,7 @@
 use crate::primitives::{CFKind, CashFlow};
 use finstack_quant_core::cashflow::CashFlowAccrual;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::InputError;
 use rust_decimal::Decimal;
@@ -14,6 +14,28 @@ use super::{decimal_to_f64, f64_to_decimal};
 
 /// Conversion factor from basis points to rate (1 bp = 0.0001).
 const BP_TO_RATE: Decimal = Decimal::from_parts(1, 0, 0, false, 4);
+
+fn checked_fee_amount(
+    base: Decimal,
+    bp: Decimal,
+    year_fraction: Decimal,
+) -> finstack_quant_core::Result<Decimal> {
+    let mut factors = [base, bp, BP_TO_RATE, year_fraction];
+    // Pair the largest and smallest magnitudes before each multiplication.
+    // This avoids overflowing a large notional/quote product or rounding a
+    // tiny rate/accrual factor to zero when the final fee is representable.
+    for remaining in (2..=factors.len()).rev() {
+        factors[..remaining].sort_by_key(|factor| factor.abs());
+        factors[0] = factors[0]
+            .checked_mul(factors[remaining - 1])
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(
+                    "periodic fee amount exceeds Decimal range".into(),
+                )
+            })?;
+    }
+    Ok(factors[0])
+}
 
 /// Emit fee cashflows on a specific date.
 ///
@@ -65,14 +87,22 @@ pub(in crate::builder) fn emit_fees_on(
             }
             for (accrual_start, accrual_end, effective_outstanding) in segments {
                 let is_termination_date = pf.terminal_accrual_end == Some(accrual_end);
-                let coupon_period = crate::builder::date_generation::icma_coupon_period(
-                    period.unadjusted_start,
-                    period.unadjusted_end,
-                    pf.frequency,
-                    pf.stub,
-                    false,
-                );
-                let yf = pf.day_count.year_fraction(
+                let full_period = (period.accrual_start, period.accrual_end);
+                let coupon_period = if pf.day_count == DayCount::Act365L {
+                    Some(full_period)
+                } else {
+                    crate::builder::date_generation::icma_coupon_period(
+                        period.unadjusted_start,
+                        period.unadjusted_end,
+                        pf.frequency,
+                        pf.stub,
+                        false,
+                        crate::builder::RollRule::None,
+                    )
+                };
+                let yf = crate::builder::periods::contractual_accrual(
+                    pf.day_count,
+                    full_period,
                     accrual_start,
                     accrual_end,
                     finstack_quant_core::dates::DayCountContext {
@@ -96,11 +126,10 @@ pub(in crate::builder) fn emit_fees_on(
                 };
 
                 let yf_dec = f64_to_decimal(yf)?;
-                let fee_amt_dec = base_amt * pf.bp * BP_TO_RATE * yf_dec;
+                let fee_amt_dec = checked_fee_amount(base_amt, pf.bp, yf_dec)?;
                 let fee_amt = decimal_to_f64(fee_amt_dec)?;
 
-                let rate_dec = pf.bp * BP_TO_RATE;
-                let rate = decimal_to_f64(rate_dec)?;
+                let rate = decimal_to_f64(pf.bp)? * 1e-4;
 
                 if fee_amt != 0.0 {
                     new_flows.push(

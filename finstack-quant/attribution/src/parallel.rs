@@ -613,9 +613,7 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
     for w in &carry_inputs.warnings {
         attribution.meta.notes.push(w.clone());
     }
-    // `total_return_carry_inputs` performed extra `price_with_metrics`
-    // repricings (Accrued×2, YTM, flat-curve value×2) — count one.
-    num_repricings += 1;
+    num_repricings += carry_inputs.num_repricings;
 
     apply_total_return_carry(&mut attribution, theta, carry_inputs)?;
 

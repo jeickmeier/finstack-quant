@@ -72,17 +72,19 @@ fn shared_fixtures_are_deterministic_and_have_required_shapes() {
             let accruals = spec["accrual_fractions"]
                 .as_array()
                 .expect("CMS accrual schedule");
-            let funding_dates = spec["funding_leg"]["payment_dates"]
+            let funding_periods = spec["funding_leg"]["periods"]
                 .as_array()
-                .expect("funding payment schedule");
+                .expect("funding accrual schedule");
             assert_eq!(fixing_dates.len(), 20);
             assert_eq!(payment_dates.len(), 20);
             assert_eq!(accruals.len(), 20);
-            assert_eq!(funding_dates.len(), 20);
+            assert_eq!(funding_periods.len(), 20);
             assert_eq!(fixing_dates[0], "2024-12-30");
             assert_eq!(payment_dates[0], "2025-07-01");
             assert_eq!(payment_dates[19], "2035-01-02");
-            assert_eq!(funding_dates, payment_dates);
+            for (period, payment_date) in funding_periods.iter().zip(payment_dates) {
+                assert_eq!(&period["payment_date"], payment_date);
+            }
             assert!(accruals.iter().all(|value| {
                 value
                     .as_f64()

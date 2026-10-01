@@ -9,8 +9,6 @@ Examples:
 ['gfc_2008', 'covid_2020']
 """
 
-import sys as _sys
-
 from finstack_quant.finstack_quant import scenarios as _scenarios
 
 compose_scenarios = _scenarios.compose_scenarios
@@ -38,11 +36,6 @@ TenorMatchMode = _scenarios.TenorMatchMode
 TimeRollMode = _scenarios.TimeRollMode
 Compounding = _scenarios.Compounding
 schema = _scenarios.schema
-
-# `schema` is a real submodule, so `import finstack_quant.scenarios.schema`
-# must work as well as attribute access.
-if "finstack_quant.scenarios.schema" not in _sys.modules:
-    _sys.modules["finstack_quant.scenarios.schema"] = schema
 
 __all__: list[str] = [
     "ApplicationReport",

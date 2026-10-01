@@ -58,9 +58,9 @@ pub mod volatility;
 
 pub use closed_form::{
     bachelier_greeks, bachelier_price, black76_greeks, black76_implied_vol, black76_price,
-    bs_greeks, bs_implied_vol, bs_price, heston_call_price_fourier, heston_price,
-    heston_put_price_fourier, vanilla_expiry_payoff, BsGreeks, ForwardGreeks, HestonPricingParams,
-    ONE_PERCENT,
+    black_shifted_price, black_shifted_vega, bs_greeks, bs_implied_vol, bs_price,
+    heston_call_price_fourier, heston_price, heston_put_price_fourier, vanilla_expiry_payoff,
+    BsGreeks, ForwardGreeks, HestonPricingParams, ONE_PERCENT,
 };
 pub use trees::{
     short_rate_keys, single_factor_equity_state, state_keys, BinomialTree, EvolutionParams,

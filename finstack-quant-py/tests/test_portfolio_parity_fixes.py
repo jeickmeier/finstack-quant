@@ -26,6 +26,7 @@ from finstack_quant.portfolio import (
     Portfolio,
     PortfolioBuilder,
     PortfolioCashflows,
+    PortfolioError,
     PortfolioMetrics,
     PortfolioResult,
     PortfolioValuation,
@@ -200,6 +201,49 @@ class TestCashflows:
         assert list(frame.columns) == ["date", "kind", "amount", "currency"]
         ladder = json.loads(cfs.collapse_to_base_by_date_kind_json(_market(), "USD", AS_OF))
         assert len(ladder) == frame["date"].nunique()
+
+    @pytest.mark.parametrize("date", ["wrong-date", "2025-02-30"])
+    def test_json_netting_rejects_invalid_payment_dates(self, date: str) -> None:
+        payload = {date: {"USD": {"coupon": {"amount": "100", "currency": "USD"}}}}
+        with pytest.raises(PortfolioError, match="invalid cashflow date"):
+            net_in_currency_by_date(json.dumps(payload), "USD")
+
+    @pytest.mark.parametrize(
+        "money",
+        [
+            {"amount": "oops", "currency": "USD"},
+            {"amount": "NaN", "currency": "USD"},
+            {"amount": "inf", "currency": "USD"},
+            {"amount": 100, "currency": "USD"},
+            {"amount": "100"},
+            {"amount": "100", "currency": "EUR"},
+        ],
+    )
+    def test_json_netting_rejects_invalid_money_without_partial_totals(self, money: dict[str, object]) -> None:
+        payload = {
+            "by_date": {
+                "2025-01-15": {
+                    "USD": {
+                        "coupon": {"amount": "100", "currency": "USD"},
+                        "principal": money,
+                    }
+                }
+            }
+        }
+        with pytest.raises(PortfolioError, match="cashflow money"):
+            net_in_currency_by_date(json.dumps(payload), "USD")
+
+    def test_json_netting_validates_currencies_outside_the_requested_output(self) -> None:
+        payload = {
+            "2025-01-15": {
+                "USD": {"Coupon": {"amount": "100", "currency": "USD"}},
+                "EUR": {"Principal": {"amount": "invalid", "currency": "EUR"}},
+            }
+        }
+        with pytest.raises(PortfolioError, match="EUR/Principal"):
+            net_in_currency_by_date(json.dumps(payload), "USD")
+        payload["2025-01-15"]["EUR"]["Principal"]["amount"] = "200"
+        assert net_in_currency_by_date(json.dumps(payload), "USD") == [("2025-01-15", 100.0)]
 
 
 class TestOptimizationInputs:

@@ -381,16 +381,16 @@ impl ForecastSpec {
 
     /// Create a multiplicative log-normal path forecast.
     ///
-    /// When the base value is non-zero, forecasted values follow
+    /// The base value must be finite and strictly positive. Forecasted values follow
     /// `value[t] = value[t-1] * exp(mean - 0.5 * std_dev^2 + std_dev * z[t])`.
     /// The `-0.5 * std_dev^2` term is the standard log-normal drift adjustment
-    /// so `mean` is interpreted as the expected log-return drift. When the base
-    /// value is zero, the path falls back to independent
-    /// `exp(mean + std_dev * z[t])` draws because multiplication by zero would
-    /// otherwise collapse the whole path.
+    /// so the expected one-period growth factor is `exp(mean)`, while the
+    /// expected log return is `mean - 0.5 * std_dev^2`. Zero and negative
+    /// bases are rejected; use an additive Normal forecast for such series.
     ///
     /// # Arguments
-    /// * `mean` - Per-period log-return drift
+    /// * `mean` - Per-period continuously compounded expected-growth drift;
+    ///   the expected log return is this value minus half the variance
     /// * `std_dev` - Per-period log-return volatility
     /// * `seed` - Random seed for deterministic results
     ///
@@ -487,8 +487,7 @@ impl ForecastSpec {
     /// Returns a forecast error naming the offending key and the accepted
     /// keys or expected type.
     pub fn validate(&self) -> crate::error::Result<()> {
-        crate::forecast::validate_params(self.method, &self.params)?;
-        crate::forecast::validate_param_types(&self.params)
+        crate::forecast::validate_params(self.method, &self.params)
     }
 
     /// Create a linear fade-to-target forecast.

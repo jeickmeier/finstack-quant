@@ -7,6 +7,7 @@ use crate::trees::NodeState;
 use crate::types::{OptionMarketParams, OptionType};
 use crate::volatility::black::d1_d2;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::validation::validate_f64_positive;
 use finstack_quant_core::HashMap;
 use finstack_quant_core::HashSet;
 use finstack_quant_core::{Error, Result};
@@ -249,6 +250,8 @@ impl BinomialTree {
         market_params: &OptionMarketParams,
         exercise_steps: Option<&[usize]>,
     ) -> Result<f64> {
+        validate_f64_positive(market_params.spot, "OptionMarketParams.spot")?;
+        validate_f64_positive(market_params.strike, "OptionMarketParams.strike")?;
         let factors = self.calculate_parameters(
             market_params.spot,
             market_params.strike,
@@ -288,6 +291,8 @@ impl BinomialTree {
         exercise_steps: Option<&[usize]>,
         dividends: &[(f64, f64)],
     ) -> Result<f64> {
+        validate_f64_positive(market_params.spot, "OptionMarketParams.spot")?;
+        validate_f64_positive(market_params.strike, "OptionMarketParams.strike")?;
         if dividends.is_empty() {
             return self.price_with_exercise(market_params, exercise_steps);
         }
@@ -319,9 +324,15 @@ impl BinomialTree {
                 (step, *time, *amount)
             })
             .collect::<Vec<_>>();
+        // Escrow the scheduled cash payments at the same carry as the full
+        // stock. With S = X + reserve and dS = (r-q)S dt + diffusion between
+        // ex-dates, reserve' = (r-q)reserve makes dX = (r-q)X dt + diffusion.
+        // This preserves the stock forward when continuous yield and cash
+        // dividends coexist; ignoring q only for nonempty schedules does not.
+        let carry = market_params.rate - market_params.dividend_yield;
         let dividend_pv = mapped_dividends
             .iter()
-            .map(|(_, time, amount)| amount * (-market_params.rate * time).exp())
+            .map(|(_, time, amount)| amount * (-carry * time).exp())
             .sum::<f64>();
         let escrowed_spot = market_params.spot - dividend_pv;
         if !escrowed_spot.is_finite() || escrowed_spot <= 0.0 {
@@ -337,7 +348,7 @@ impl BinomialTree {
             market_params.rate,
             market_params.volatility,
             market_params.time_to_expiry,
-            0.0,
+            market_params.dividend_yield,
         )?;
         let remaining_dividend_values = (0..=self.steps)
             .map(|step| {
@@ -346,7 +357,7 @@ impl BinomialTree {
                     .iter()
                     .filter(|(dividend_step, _, _)| *dividend_step >= step)
                     .map(|(_, dividend_time, amount)| {
-                        amount * (-market_params.rate * (dividend_time - node_time).max(0.0)).exp()
+                        amount * (-carry * (dividend_time - node_time).max(0.0)).exp()
                     })
                     .sum()
             })
@@ -360,7 +371,7 @@ impl BinomialTree {
         let initial_vars = single_factor_equity_state(
             escrowed_spot,
             market_params.rate,
-            0.0,
+            market_params.dividend_yield,
             market_params.volatility,
         );
 
@@ -378,7 +389,10 @@ impl BinomialTree {
     ///
     /// # Arguments
     ///
-    /// * `market_params` - Spot, strike, rate, volatility, expiry, and option-side inputs.
+    /// * `market_params` - Positive spot and strike, continuous annual rate and
+    ///   dividend yield, non-negative annual volatility, positive expiry in
+    ///   years, and option side. Continuous yield remains active alongside the
+    ///   scheduled cash dividends; it must exclude those scheduled payments.
     /// * `dividends` - Cash-dividend schedule as `(time_in_years, cash_amount)` pairs.
     pub fn price_american_with_discrete_dividends(
         &self,
@@ -393,7 +407,10 @@ impl BinomialTree {
     ///
     /// # Arguments
     ///
-    /// * `market_params` - Spot, strike, rate, volatility, expiry, and option-side inputs.
+    /// * `market_params` - Positive spot and strike, continuous annual rate and
+    ///   dividend yield, non-negative annual volatility, positive expiry in
+    ///   years, and option side. Continuous yield remains active alongside the
+    ///   scheduled cash dividends; it must exclude those scheduled payments.
     /// * `exercise_dates` - Permitted exercise times in years from the valuation date.
     /// * `dividends` - Cash-dividend schedule as `(time_in_years, cash_amount)` pairs.
     pub fn price_bermudan_with_discrete_dividends(
@@ -487,6 +504,94 @@ impl TreeModel for BinomialTree {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn vanilla_tree_entry_points_reject_invalid_prices() {
+        for tree in [BinomialTree::crr(20), BinomialTree::leisen_reimer(21)] {
+            for invalid in [0.0, -100.0, f64::NAN, f64::INFINITY] {
+                for (spot, strike) in [(invalid, 100.0), (100.0, invalid)] {
+                    let params = OptionMarketParams::call(spot, strike, 0.05, 0.2, 1.0);
+                    assert!(tree.price_european(&params).is_err());
+                    assert!(tree.price_american(&params).is_err());
+                    assert!(tree.price_bermudan(&params, &[0.5]).is_err());
+                    assert!(tree
+                        .price_american_with_discrete_dividends(&params, &[(0.5, 2.0)])
+                        .is_err());
+                    assert!(tree
+                        .price_bermudan_with_discrete_dividends(&params, &[0.5], &[(0.5, 2.0)])
+                        .is_err());
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn generic_crr_valuator_still_requires_no_option_strike() {
+        struct UnitPayoff;
+        impl TreeValuator for UnitPayoff {
+            fn value_at_maturity(&self, _state: &NodeState) -> Result<f64> {
+                Ok(1.0)
+            }
+            fn value_at_node(&self, _state: &NodeState, value: f64, _dt: f64) -> Result<f64> {
+                Ok(value)
+            }
+        }
+        let actual = BinomialTree::crr(20)
+            .price_generic(
+                single_factor_equity_state(0.0, 0.05, 0.02, 0.2),
+                1.0,
+                &MarketContext::new(),
+                &UnitPayoff,
+            )
+            .expect("generic payoff without a strike");
+        assert!((actual - (-0.05_f64).exp()).abs() < 1e-12);
+    }
+
+    #[test]
+    fn cash_dividend_tree_preserves_continuous_carry_in_deterministic_limit() {
+        for tree in [BinomialTree::crr(100), BinomialTree::leisen_reimer(101)] {
+            for yield_rate in [-0.02, 0.0, 0.03, 0.08] {
+                for option_type in [OptionType::Call, OptionType::Put] {
+                    let params = OptionMarketParams::new(
+                        100.0,
+                        100.0,
+                        0.05,
+                        0.0,
+                        1.0,
+                        yield_rate,
+                        option_type,
+                    );
+                    let actual = tree
+                        .price_bermudan_with_discrete_dividends(&params, &[], &[(0.5, 2.0)])
+                        .expect("deterministic cash dividend and continuous carry");
+                    let carry = params.rate - params.dividend_yield;
+                    let terminal_spot = params.spot * carry.exp() - 2.0 * (carry * 0.5).exp();
+                    let expected =
+                        intrinsic(option_type, terminal_spot, params.strike) * (-params.rate).exp();
+                    assert!(
+                        (actual - expected).abs() < 1e-10,
+                        "yield={yield_rate}, side={option_type}: {actual} vs {expected}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn vanishing_cash_dividend_converges_to_continuous_yield_price() {
+        let mut params = OptionMarketParams::call(100.0, 100.0, 0.05, 0.2, 1.0);
+        params.dividend_yield = 0.05;
+        for tree in [BinomialTree::crr(100), BinomialTree::leisen_reimer(101)] {
+            let without_cash = tree.price_american(&params).expect("continuous yield");
+            let with_cash = tree
+                .price_american_with_discrete_dividends(&params, &[(0.5, 1e-8)])
+                .expect("vanishing cash dividend");
+            assert!(
+                (with_cash - without_cash).abs() < 1e-6,
+                "cash-dividend limit must retain yield: {with_cash} vs {without_cash}"
+            );
+        }
+    }
 
     #[test]
     fn test_crr_european_converges_to_black_scholes() {

@@ -421,8 +421,9 @@ pub fn measure_inflation_curve_shift(
 ///
 /// # Errors
 ///
-/// Returns an error if `index_id` is absent, has no observations, cannot be
-/// queried at its latest date, or has a non-finite or non-positive latest level.
+/// Returns an error if `index_id` is absent, has no observations, or has a
+/// non-finite or non-positive latest stored level. Contractual lag,
+/// interpolation, and seasonal adjustments are not applied to published prints.
 ///
 /// # Arguments
 ///
@@ -438,10 +439,8 @@ pub fn measure_inflation_index_shift(
     let index_id = index_id.as_ref();
     let index_t0 = market_t0.get_inflation_index(index_id)?;
     let index_t1 = market_t1.get_inflation_index(index_id)?;
-    let (_, last_t0) = index_t0.date_range()?;
-    let (_, last_t1) = index_t1.date_range()?;
-    let level_t0 = index_t0.value_on(last_t0)?;
-    let level_t1 = index_t1.value_on(last_t1)?;
+    let (_, level_t0) = index_t0.get_latest_observation()?;
+    let (_, level_t1) = index_t1.get_latest_observation()?;
     if !level_t0.is_finite() || !level_t1.is_finite() || level_t0 <= 0.0 || level_t1 <= 0.0 {
         return Err(crate::InputError::Invalid.into());
     }
@@ -578,27 +577,18 @@ pub fn measure_fx_shift(
 ///
 /// # Errors
 ///
-/// Returns error if scalar not found in either market.
+/// Returns an error if the scalar is absent, its kind differs between markets,
+/// monetary prices use different currencies, the baseline is zero, or the
+/// resulting shift is non-finite. Currency changes require explicit conversion
+/// before comparison.
 pub fn measure_scalar_shift(
     scalar_id: impl AsRef<str>,
     market_t0: &MarketContext,
     market_t1: &MarketContext,
 ) -> Result<f64> {
-    use crate::market_data::scalars::MarketScalar;
-
     let scalar_t0 = market_t0.get_price(&scalar_id)?;
     let scalar_t1 = market_t1.get_price(&scalar_id)?;
-
-    // Extract numeric values from enum
-    let value_t0 = match scalar_t0 {
-        MarketScalar::Unitless(v) => *v,
-        MarketScalar::Price(m) => m.amount(),
-    };
-
-    let value_t1 = match scalar_t1 {
-        MarketScalar::Unitless(v) => *v,
-        MarketScalar::Price(m) => m.amount(),
-    };
+    let (value_t0, value_t1) = comparable_scalar_values(scalar_id.as_ref(), scalar_t0, scalar_t1)?;
 
     // Guard against division by zero
     if value_t0.abs() < 1e-15 {
@@ -634,8 +624,9 @@ pub fn measure_scalar_shift(
 ///
 /// # Errors
 ///
-/// Returns `Err` if either market lacks the scalar or the computed shift is
-/// non-finite.
+/// Returns an error if either market lacks the scalar, scalar kinds differ,
+/// monetary currencies differ, or the computed shift is non-finite. Prices
+/// must be converted explicitly to the same currency before comparison.
 ///
 /// # Arguments
 ///
@@ -648,19 +639,9 @@ pub fn measure_scalar_absolute_shift(
     market_t0: &MarketContext,
     market_t1: &MarketContext,
 ) -> Result<f64> {
-    use crate::market_data::scalars::MarketScalar;
-
     let scalar_t0 = market_t0.get_price(&scalar_id)?;
     let scalar_t1 = market_t1.get_price(&scalar_id)?;
-
-    let value_t0 = match scalar_t0 {
-        MarketScalar::Unitless(v) => *v,
-        MarketScalar::Price(m) => m.amount(),
-    };
-    let value_t1 = match scalar_t1 {
-        MarketScalar::Unitless(v) => *v,
-        MarketScalar::Price(m) => m.amount(),
-    };
+    let (value_t0, value_t1) = comparable_scalar_values(scalar_id.as_ref(), scalar_t0, scalar_t1)?;
 
     let abs_change = value_t1 - value_t0;
     if !abs_change.is_finite() {
@@ -672,6 +653,30 @@ pub fn measure_scalar_absolute_shift(
         )));
     }
     Ok(abs_change)
+}
+
+fn comparable_scalar_values(
+    scalar_id: &str,
+    baseline: &super::scalars::MarketScalar,
+    comparison: &super::scalars::MarketScalar,
+) -> Result<(f64, f64)> {
+    use super::scalars::MarketScalar;
+
+    match (baseline, comparison) {
+        (MarketScalar::Unitless(a), MarketScalar::Unitless(b)) => Ok((*a, *b)),
+        (MarketScalar::Price(a), MarketScalar::Price(b)) => {
+            if a.currency() != b.currency() {
+                return Err(crate::Error::CurrencyMismatch {
+                    expected: a.currency(),
+                    actual: b.currency(),
+                });
+            }
+            Ok((a.amount(), b.amount()))
+        }
+        _ => Err(crate::Error::Validation(format!(
+            "Cannot compare scalar '{scalar_id}': monetary and unitless values have different units"
+        ))),
+    }
 }
 
 #[cfg(test)]
@@ -686,6 +691,92 @@ mod tests {
 
     fn sample_date() -> Date {
         Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date")
+    }
+
+    #[test]
+    fn inflation_print_shift_ignores_lag_interpolation_and_seasonality() {
+        use crate::market_data::scalars::{InflationInterpolation, InflationLag};
+
+        let observations = vec![
+            (time::macros::date!(2025 - 01 - 01), 300.0),
+            (time::macros::date!(2025 - 02 - 01), 301.0),
+            (time::macros::date!(2025 - 03 - 01), 302.0),
+            (time::macros::date!(2025 - 04 - 01), 303.0),
+            (time::macros::date!(2025 - 05 - 01), 306.0),
+        ];
+        let mut seasonality = [1.0; 12];
+        seasonality[0] = 1.1;
+        seasonality[1] = 0.9;
+        seasonality[3] = 1.2;
+        seasonality[4] = 0.8;
+        for lag in [InflationLag::None, InflationLag::Months(3)] {
+            for interpolation in [InflationInterpolation::Step, InflationInterpolation::Linear] {
+                let context = |observations| {
+                    let index = InflationIndex::new("CPI", observations, Currency::USD)
+                        .expect("index")
+                        .with_lag(lag)
+                        .with_interpolation(interpolation)
+                        .with_seasonality(seasonality)
+                        .expect("seasonality");
+                    MarketContext::new().insert_inflation_index("CPI", index)
+                };
+                let t0 = context(observations[..4].to_vec());
+                let t1 = context(observations.clone());
+                let shift = measure_inflation_index_shift("CPI", &t0, &t1).expect("print shift");
+                assert!((shift - (306.0 / 303.0 - 1.0) * 10_000.0).abs() < 1e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn inflation_print_shift_does_not_require_lagged_history() {
+        use crate::market_data::scalars::InflationLag;
+
+        let context = |value| {
+            let index = InflationIndex::new("CPI", vec![(sample_date(), value)], Currency::USD)
+                .expect("single print")
+                .with_lag(InflationLag::Months(3));
+            MarketContext::new().insert_inflation_index("CPI", index)
+        };
+        let shift = measure_inflation_index_shift("CPI", &context(100.0), &context(101.0))
+            .expect("raw print does not need lagged history");
+        assert!((shift - 100.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn scalar_shifts_reject_incompatible_units_and_currencies() {
+        use crate::market_data::scalars::MarketScalar;
+        use crate::money::Money;
+
+        let price = |currency| MarketScalar::Price(Money::new(100.0, currency).expect("price"));
+        for (left, right) in [
+            (price(Currency::USD), price(Currency::EUR)),
+            (price(Currency::USD), MarketScalar::Unitless(100.0)),
+            (MarketScalar::Unitless(100.0), price(Currency::USD)),
+        ] {
+            let t0 = MarketContext::new().insert_price("SPOT", left);
+            let t1 = MarketContext::new().insert_price("SPOT", right);
+            assert!(measure_scalar_shift("SPOT", &t0, &t1).is_err());
+            assert!(measure_scalar_absolute_shift("SPOT", &t0, &t1).is_err());
+        }
+
+        for (left, right) in [
+            (MarketScalar::Unitless(100.0), MarketScalar::Unitless(120.0)),
+            (
+                price(Currency::USD),
+                MarketScalar::Price(Money::new(120.0, Currency::USD).expect("price")),
+            ),
+        ] {
+            let t0 = MarketContext::new().insert_price("SPOT", left);
+            let t1 = MarketContext::new().insert_price("SPOT", right);
+            assert!(
+                (measure_scalar_shift("SPOT", &t0, &t1).expect("same units") - 20.0).abs() < 1e-12
+            );
+            assert_eq!(
+                measure_scalar_absolute_shift("SPOT", &t0, &t1).expect("same units"),
+                20.0
+            );
+        }
     }
 
     #[test]

@@ -28,13 +28,13 @@ fn parallel_stamps_configured_rounding_context() {
     config
         .rounding
         .output_scale
-        .overrides
-        .insert(Currency::USD, 4);
+        .set_scale(Currency::USD, 4)
+        .expect("valid decimal scale");
     config
         .rounding
         .ingest_scale
-        .overrides
-        .insert(Currency::USD, 4);
+        .set_scale(Currency::USD, 4)
+        .expect("valid decimal scale");
 
     let attribution = attribute_pnl(
         &AttributionMethod::Parallel,
@@ -54,12 +54,12 @@ fn parallel_stamps_configured_rounding_context() {
 
     let rounding = attribution.meta.rounding;
     assert_eq!(
-        rounding.output_scale_by_currency.get(&Currency::USD),
+        rounding.get_output_scale_by_currency().get(&Currency::USD),
         Some(&4),
         "Output scale for USD should reflect configured rounding"
     );
     assert_eq!(
-        rounding.ingest_scale_by_currency.get(&Currency::USD),
+        rounding.get_ingest_scale_by_currency().get(&Currency::USD),
         Some(&4),
         "Ingest scale for USD should reflect configured rounding"
     );
@@ -119,19 +119,19 @@ fn all_methods_stamp_configured_rounding_context() {
     config
         .rounding
         .output_scale
-        .overrides
-        .insert(Currency::USD, 4);
+        .set_scale(Currency::USD, 4)
+        .expect("valid decimal scale");
     config
         .rounding
         .ingest_scale
-        .overrides
-        .insert(Currency::USD, 4);
+        .set_scale(Currency::USD, 4)
+        .expect("valid decimal scale");
 
     let assert_stamp = |attr: &PnlAttribution, method: &str| {
         assert_eq!(
             attr.meta
                 .rounding
-                .output_scale_by_currency
+                .get_output_scale_by_currency()
                 .get(&Currency::USD),
             Some(&4),
             "{method}: output scale must reflect the configured rounding"
@@ -139,7 +139,7 @@ fn all_methods_stamp_configured_rounding_context() {
         assert_eq!(
             attr.meta
                 .rounding
-                .ingest_scale_by_currency
+                .get_ingest_scale_by_currency()
                 .get(&Currency::USD),
             Some(&4),
             "{method}: ingest scale must reflect the configured rounding"
@@ -186,8 +186,8 @@ fn all_methods_stamp_configured_rounding_context() {
     )
     .expect("metrics-based attribution should succeed");
     assert_eq!(
-        metrics_based.meta.rounding.output_scale_by_currency,
-        default_rounding.output_scale_by_currency,
+        metrics_based.meta.rounding.get_output_scale_by_currency(),
+        default_rounding.get_output_scale_by_currency(),
         "metrics-based must stamp the default rounding context"
     );
 }

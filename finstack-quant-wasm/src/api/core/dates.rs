@@ -48,13 +48,15 @@ impl JsDayCountContext {
     /// * `calendar_id` - Registered holiday-calendar identifier (for example
     ///   `"nyse"`) used by Bus/252; resolved when the context is used.
     /// * `frequency` - Coupon frequency as tenor text (for example `"6M"`; use
-    ///   `tenor.toString()` for a `Tenor`), required by Act/Act ICMA and used
-    ///   by Act/365L.
+    ///   `tenor.toString()` for a `Tenor`), required by Act/Act ICMA and
+    ///   Act/365L.
     /// * `bus_basis` - Business-day denominator for Bus/252 (an integer in
     ///   `0..=65535`, normally `252`).
-    /// * `coupon_period` - Reference coupon period `[startEpochDays,
-    ///   endEpochDays]` (days since 1970-01-01) for Act/Act ICMA; the start must
-    ///   precede the end.
+    /// * `coupon_period` - `[startEpochDays, endEpochDays]` (days since
+    ///   1970-01-01): the unadjusted regular reference period for Act/Act ICMA,
+    ///   or the full enclosing contractual coupon for Act/365L; the start must
+    ///   precede the end. ICMA endpoints must share the contractual nominal
+    ///   month grid, rather than adjusted payment dates.
     /// * `end_is_termination_date` - Whether the accrual end is the
     ///   instrument's termination date (30E/360 ISDA February-end handling);
     ///   omitted means `false`.
@@ -304,9 +306,10 @@ impl JsDayCount {
         }
     }
 
-    /// Actual/365L (ICMA Rule 251). Annual periods (or periods without
-    /// frequency context) use denominator 366 exactly when February 29 falls
-    /// in `(start, end]`; non-annual periods use 366 exactly when the end
+    /// Actual/365L (ICMA Rule 251). Requires a `DayCountContext` with the
+    /// coupon frequency and the enclosing coupon period. Annual periods use
+    /// denominator 366 exactly when February 29 falls in the coupon period's
+    /// `(start, end]`; non-annual periods use 366 exactly when the coupon end
     /// date's year is a leap year. Otherwise the denominator is 365. This is
     /// not ACT/ACT AFB.
     #[wasm_bindgen(js_name = act365l)]
@@ -393,8 +396,10 @@ impl JsDayCount {
     ///
     /// The published facade makes `ctx` optional: an omitted context is the
     /// empty Rust default (`new DayCountContext()`). Act/Act ISMA needs a
-    /// context frequency (or coupon period) and Bus/252 a context calendar;
-    /// both throw without them.
+    /// context frequency (or coupon period), Act/365L a frequency and an
+    /// enclosing coupon period (accrual dates outside that coupon throw), and
+    /// Bus/252 a context calendar; all throw without them. ICMA reference
+    /// endpoints outside one unadjusted nominal month grid throw.
     ///
     /// @param startEpochDays - Start date as days since 1970-01-01.
     /// @param endEpochDays - End date as days since 1970-01-01; must not be
@@ -468,7 +473,7 @@ impl JsDayCount {
     ///
     /// # Errors
     ///
-    /// Throws a JavaScript exception if either epoch-day value is outside the
+    /// Throws a JavaScript exception if either epoch-day value is non-finite, fractional, or outside the
     /// representable date range.
     #[wasm_bindgen(js_name = calendarDays)]
     pub fn calendar_days(
@@ -777,14 +782,16 @@ fn roll_rule(
 }
 
 /// Create a date and return it as epoch days (days since 1970-01-01).
-/// @param year - Four-digit calendar year component of the supplied date.
-/// @param month - Calendar month number from 1 through 12.
-/// @param day - Calendar day number within the selected month.
+/// # Arguments
+///
+/// * `year` - Integral calendar year supported by the Rust date type.
+/// * `month` - Integral calendar month number from 1 through 12.
+/// * `day` - Integral calendar day number within the selected month, from 1 through 31.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `month` is outside `1..=12` or the supplied
-/// year, month, and day do not form a representable calendar date.
+/// Throws a JavaScript exception if any component is non-finite or fractional,
+/// `month` is outside `1..=12`, or the supplied year, month, and day do not form a representable calendar date.
 #[wasm_bindgen(js_name = createDate)]
 pub fn create_date(year: JsValue, month: JsValue, day: JsValue) -> Result<i32, JsValue> {
     let year: i32 = js_int(&year, "year")?;
@@ -796,12 +803,13 @@ pub fn create_date(year: JsValue, month: JsValue, day: JsValue) -> Result<i32, J
 }
 
 /// Convert epoch days back to `[year, month, day]` as a JS array-compatible triple.
-/// @param days - Number of days since 1970-01-01 to decompose into year, month, and day.
+/// # Arguments
+///
+/// * `days` - Integral number of days since 1970-01-01 to decompose into year, month, and day.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `days` is outside the representable date
-/// range.
+/// Throws a JavaScript exception if `days` is non-finite, fractional, or outside the representable date range.
 #[wasm_bindgen(js_name = dateFromEpochDays)]
 pub fn date_from_epoch_days(days: JsValue) -> Result<Vec<i32>, JsValue> {
     let date = js_epoch_days(&days, "days")?;
@@ -811,13 +819,16 @@ pub fn date_from_epoch_days(days: JsValue) -> Result<Vec<i32>, JsValue> {
 /// Adjust a date (epoch days) according to a business-day convention and calendar.
 ///
 /// Returns the adjusted date as epoch days.
-/// @param epoch_days - Unadjusted date as days since 1970-01-01.
-/// @param convention - Business-day adjustment convention string accepted by the date API.
-/// @param calendar_code - Registered holiday-calendar identifier used to find business days.
+///
+/// # Arguments
+///
+/// * `epoch_days` - Integral unadjusted date as days since 1970-01-01.
+/// * `convention` - Canonical business-day convention name, such as following or modified_following.
+/// * `calendar_code` - Registered holiday-calendar identifier used to select business days; unknown identifiers are rejected.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `epochDays` is outside the representable date
+/// Throws a JavaScript exception if `epochDays` is non-finite, fractional, or outside the representable date
 /// range, `convention` is unrecognized, `calendarCode` is unknown, or adjustment
 /// cannot produce a representable business date.
 #[wasm_bindgen(js_name = adjust)]

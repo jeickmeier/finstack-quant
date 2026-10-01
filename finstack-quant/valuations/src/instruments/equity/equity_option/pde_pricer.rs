@@ -100,6 +100,24 @@ impl EquityOptionPdePricer {
 
         let is_call = matches!(inst.option_type, OptionType::Call);
 
+        if sigma == 0.0 {
+            let price = deterministic_price(
+                spot,
+                inst.strike,
+                r,
+                q,
+                t,
+                is_call,
+                matches!(inst.exercise_style, ExerciseStyle::American),
+            );
+            return Money::new(price * inst.quantity, ccy).map_err(|error| {
+                PricingError::from_core(
+                    error,
+                    PricingErrorContext::from_instrument(inst).model(ModelKey::PdeCrankNicolson1D),
+                )
+            });
+        }
+
         let pde = BlackScholesPde {
             sigma,
             rate: r,
@@ -109,9 +127,10 @@ impl EquityOptionPdePricer {
             is_call,
         };
 
-        // Grid: span both ln(spot) and ln(strike) with margin of 5σ√t,
+        // Grid: span both ln(spot) and ln(strike), including deterministic
+        // drift as well as a 5σ√t margin even when volatility is very small,
         // concentrated near the strike (payoff kink).
-        let spread = 5.0 * sigma * t.sqrt();
+        let spread = 5.0 * sigma * t.sqrt() + ((r - q) * t).abs();
         let ln_spot = spot.ln();
         let ln_strike = inst.strike.ln();
         let x_min = ln_spot.min(ln_strike) - spread;
@@ -188,6 +207,39 @@ impl EquityOptionPdePricer {
     }
 }
 
+/// Exact discounted payoff when spot follows deterministic risk-neutral carry.
+/// For American exercise the maximum occurs at an endpoint or at the single
+/// stationary point of S exp(-q t) - K exp(-r t).
+fn deterministic_price(
+    spot: f64,
+    strike: f64,
+    rate: f64,
+    dividend: f64,
+    maturity: f64,
+    is_call: bool,
+    american: bool,
+) -> f64 {
+    let direction = if is_call { 1.0 } else { -1.0 };
+    let exercise_value = |time: f64| {
+        (direction * (spot * (-dividend * time).exp() - strike * (-rate * time).exp())).max(0.0)
+    };
+    let mut price = exercise_value(maturity);
+    if american {
+        price = price.max(exercise_value(0.0));
+        let rate_spread = rate - dividend;
+        if dividend != 0.0 && rate_spread.abs() > 0.0 {
+            let ratio = rate * strike / (dividend * spot);
+            if ratio > 0.0 {
+                let stationary_time = ratio.ln() / rate_spread;
+                if stationary_time > 0.0 && stationary_time < maturity {
+                    price = price.max(exercise_value(stationary_time));
+                }
+            }
+        }
+    }
+    price
+}
+
 impl Pricer for EquityOptionPdePricer {
     fn key(&self) -> PricerKey {
         PricerKey::new(InstrumentType::EquityOption, ModelKey::PdeCrankNicolson1D)
@@ -211,5 +263,67 @@ impl Pricer for EquityOptionPdePricer {
         let pv = self.price_internal(equity_option, market, as_of)?;
 
         Ok(ValuationResult::stamped(equity_option.id(), as_of, pv))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use finstack_quant_core::market_data::scalars::MarketScalar;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use time::{macros::date, Duration};
+
+    #[test]
+    fn low_volatility_pde_mesh_refinement_converges_to_vanilla_limit() {
+        let as_of = date!(2025 - 01 - 06);
+        let mut option = EquityOption::example().unwrap();
+        option.expiry = as_of + Duration::days(365);
+        option.strike = 100.0;
+        option.quantity = 1.0;
+        option.div_yield_id = None;
+        let curve = DiscountCurve::builder(option.discount_curve_id.clone())
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (1.0, (-0.05_f64).exp())])
+            .build()
+            .unwrap();
+        let market = MarketContext::new()
+            .insert(curve)
+            .insert_price(option.spot_id.as_str(), MarketScalar::Unitless(100.0));
+        for volatility in [0.04, 0.02, 0.01] {
+            option.instrument_pricing_overrides = option
+                .instrument_pricing_overrides
+                .with_implied_volatility(volatility);
+            let reference = finstack_quant_models::closed_form::bs_price(
+                100.0,
+                100.0,
+                0.05,
+                0.0,
+                volatility,
+                1.0,
+                OptionType::Call,
+            )
+            .unwrap();
+            let coarse = EquityOptionPdePricer {
+                space_points: 100,
+                time_steps: 100,
+            }
+            .price_internal(&option, &market, as_of)
+            .unwrap()
+            .amount();
+            let fine = EquityOptionPdePricer {
+                space_points: 400,
+                time_steps: 400,
+            }
+            .price_internal(&option, &market, as_of)
+            .unwrap()
+            .amount();
+            let coarse_error = (coarse - reference).abs();
+            let fine_error = (fine - reference).abs();
+            assert!(
+                fine_error < coarse_error,
+                "vol={volatility}: coarse={coarse_error}, fine={fine_error}"
+            );
+            assert!(fine_error < 5e-4, "vol={volatility}: error={fine_error}");
+        }
     }
 }

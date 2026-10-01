@@ -24,10 +24,11 @@
 //! for spread-bootstrapped curves, typically understates the true value
 //! by 2-5x.
 //!
-//! Note: per-issuer hazard curves (`issuer_credit_curves`) are *not*
-//! recalibrated by an index-recovery bump — they're independent quotes for
-//! single-name names. An index recovery shock conceptually shifts the index
-//! pricing convention, not the per-issuer recovery agreements.
+//! Per-issuer hazard curves with distinct curve IDs remain frozen because
+//! they represent independent single-name quotes. Issuers referencing the
+//! index hazard's curve ID share its recalibrated curve, consistent with the
+//! market context's single canonical curve for each ID. Per-issuer recovery
+//! agreements remain unchanged.
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::credit_derivatives::cds_tranche::CdsTranche;
@@ -77,9 +78,9 @@ fn frozen_market_at_bumped_recovery(
     new_recovery: f64,
 ) -> Result<MarketContext> {
     let bumped_index = rebuild_with_recovery(original_index, new_recovery)?;
-    Ok(base_market
+    base_market
         .clone()
-        .insert_credit_index(&tranche.credit_index_id, bumped_index))
+        .insert_credit_index(&tranche.credit_index_id, bumped_index)
 }
 
 /// Build a market with both the index recovery bumped and the index hazard
@@ -117,10 +118,11 @@ fn recalibrated_market_at_bumped_recovery(
             ),
             category: "recovery01_rebootstrap".to_string(),
         })?;
-    bumped_index.index_credit_curve = recalibrated;
-    Ok(base_market
+    bumped_index.index_credit_curve = Arc::clone(&recalibrated);
+    base_market
         .clone()
-        .insert_credit_index(&tranche.credit_index_id, bumped_index))
+        .insert(recalibrated)
+        .insert_credit_index(&tranche.credit_index_id, bumped_index)
 }
 
 impl MetricCalculator for Recovery01Calculator {

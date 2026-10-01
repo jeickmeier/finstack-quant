@@ -175,8 +175,8 @@ impl ShortRateTree {
 
         // Same hard repricing gate philosophy as BDT: a well-posed lattice
         // calibrates to float noise; anything materially off must not escape.
-        const MAX_CALIBRATION_ERROR_BPS: f64 = 25.0;
-        let converged = max_error_bp.is_finite() && max_error_bp <= MAX_CALIBRATION_ERROR_BPS;
+        let fit_tolerance_bp = self.config.curve_fit_tolerance_bp;
+        let converged = max_error_bp.is_finite() && max_error_bp <= fit_tolerance_bp;
         self.calibration_quality = Some(TreeCalibrationResult {
             max_error_bp,
             max_error_step,
@@ -187,7 +187,7 @@ impl ShortRateTree {
             return Err(Error::Validation(format!(
                 "Black-Karasinski calibration failed to reprice the discount \
                  curve: max error {max_error_bp:.2} bp at step {max_error_step} \
-                 exceeds the {MAX_CALIBRATION_ERROR_BPS:.1} bp tolerance"
+                 exceeds the {fit_tolerance_bp:.4} bp tolerance"
             )));
         }
 

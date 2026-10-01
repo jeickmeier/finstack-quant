@@ -198,7 +198,8 @@ struct BrinsonGroup {
 ///
 /// # Errors
 ///
-/// Returns a validation error when the specification violates the
+/// Returns a validation error when a derived weight, contribution, or aggregate
+/// cannot be represented as a finite `f64`, or the specification violates the
 /// weighting/benchmark invariants, including a Brinson group with zero net weight
 /// but nonzero contribution. Split offsetting long/short positions into distinct
 /// groups before requesting benchmark-relative attribution.
@@ -219,7 +220,8 @@ pub fn attribute_return_contribution(
 ///
 /// # Errors
 ///
-/// Returns a validation error when the JSON is malformed or violates the
+/// Returns a validation error when the JSON is malformed, a derived weight,
+/// contribution, or aggregate is non-finite, or the specification violates the
 /// weighting/benchmark invariants, including a Brinson group with zero net weight
 /// but nonzero contribution. Split offsetting long/short positions into distinct
 /// groups before requesting benchmark-relative attribution.
@@ -259,6 +261,16 @@ fn parse_return_contribution_spec(spec_json: &str) -> Result<ReturnContributionS
         .map_err(|err| Error::Validation(format!("invalid return contribution JSON: {err}")))
 }
 
+fn finite(value: f64, quantity: &str) -> Result<f64> {
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(Error::Validation(format!(
+            "return contribution {quantity} must remain finite; arithmetic overflow occurred"
+        )))
+    }
+}
+
 impl ReturnContributionSpec {
     fn execute(&self) -> Result<ReturnContributionResult> {
         self.validate_shape()?;
@@ -270,7 +282,7 @@ impl ReturnContributionSpec {
         for position in &weighted {
             portfolio_return.add(position.contribution);
         }
-        let portfolio_return = portfolio_return.total();
+        let portfolio_return = finite(portfolio_return.total(), "portfolio return")?;
 
         let benchmark_return = if benchmark_mode {
             Some(total_benchmark_return(&weighted)?)
@@ -286,13 +298,14 @@ impl ReturnContributionSpec {
             for row in &factor_contribution {
                 factor_total.add(row.contribution);
             }
-            Some(portfolio_return - factor_total.total())
+            let factor_total = finite(factor_total.total(), "total factor contribution")?;
+            Some(finite(portfolio_return - factor_total, "specific return")?)
         };
 
         Ok(ReturnContributionResult {
             portfolio_return,
-            instrument_contribution: instrument_contributions(&weighted, benchmark_return),
-            group_contribution: group_contributions(&weighted),
+            instrument_contribution: instrument_contributions(&weighted, benchmark_return)?,
+            group_contribution: group_contributions(&weighted)?,
             factor_contribution,
             specific_return,
             benchmark_relative: if benchmark_mode {
@@ -427,7 +440,7 @@ impl ReturnContributionSpec {
                 for weight in &weights {
                     weight_sum.add(*weight);
                 }
-                let weight_sum = weight_sum.total();
+                let weight_sum = finite(weight_sum.total(), "explicit weight sum")?;
                 if (weight_sum - 1.0).abs() > EXPLICIT_WEIGHT_SUM_WARN_TOLERANCE {
                     warnings.push(format!(
                         "explicit weights sum to {weight_sum} rather than 1.0; contributions \
@@ -441,16 +454,18 @@ impl ReturnContributionSpec {
             market_value_weights(&self.positions, self.weighting, warnings)?
         };
 
-        Ok(self
-            .positions
+        self.positions
             .iter()
             .zip(weights)
-            .map(|(input, weight)| WeightedPosition {
-                input,
-                weight,
-                contribution: weight * input.period_return,
+            .map(|(input, weight)| {
+                let contribution = finite(weight * input.period_return, "position contribution")?;
+                Ok(WeightedPosition {
+                    input,
+                    weight,
+                    contribution,
+                })
             })
-            .collect())
+            .collect()
     }
 
     fn validate_benchmark_mode(&self) -> Result<bool> {
@@ -500,7 +515,8 @@ fn market_value_weights(
         }
     }
 
-    let denominator = denominator.total();
+    let denominator = finite(denominator.total(), "market value weighting denominator")?;
+    let gross = finite(gross.total(), "gross market value")?;
     if denominator.abs() <= WEIGHT_TOLERANCE {
         // Audit fix: an exactly-flat net-MV book has no defined net weights.
         // Silently returning all-zero weights would make a real long/short
@@ -519,7 +535,6 @@ fn market_value_weights(
     // Audit fix: a small-but-nonzero net on a long/short book divides every
     // position by a tiny denominator, producing highly leveraged weights
     // (|weight| ≫ 1). Mathematically correct, but the consumer must be told.
-    let gross = gross.total();
     if matches!(weighting, ReturnContributionWeighting::NetMarketValue)
         && denominator.abs() < NET_MV_LEVERAGE_WARN_FRACTION * gross
     {
@@ -539,7 +554,7 @@ fn market_value_weights(
             })?;
             // Both modes keep the signed market value in the numerator; only
             // the denominator differs (Σ|MV| for gross, ΣMV for net).
-            Ok(market_value / denominator)
+            finite(market_value / denominator, "normalized position weight")
         })
         .collect()
 }
@@ -547,7 +562,7 @@ fn market_value_weights(
 fn instrument_contributions(
     weighted: &[WeightedPosition<'_>],
     benchmark_return: Option<f64>,
-) -> Vec<InstrumentContribution> {
+) -> Result<Vec<InstrumentContribution>> {
     let mut rows = weighted
         .iter()
         .map(|position| {
@@ -557,26 +572,33 @@ fn instrument_contributions(
                 position.input.benchmark_return,
             ) {
                 (Some(_), Some(benchmark_weight), Some(benchmark_period_return)) => {
-                    Some(position.contribution - benchmark_weight * benchmark_period_return)
+                    let benchmark_contribution = finite(
+                        benchmark_weight * benchmark_period_return,
+                        "benchmark position contribution",
+                    )?;
+                    Some(finite(
+                        position.contribution - benchmark_contribution,
+                        "active position contribution",
+                    )?)
                 }
                 _ => None,
             };
-            InstrumentContribution {
+            Ok(InstrumentContribution {
                 id: position.input.id.clone(),
                 weight: position.weight,
                 period_return: position.input.period_return,
                 contribution: position.contribution,
                 active_contribution,
-            }
+            })
         })
-        .collect::<Vec<_>>();
+        .collect::<Result<Vec<_>>>()?;
     rows.sort_by(|left, right| left.id.cmp(&right.id));
-    rows
+    Ok(rows)
 }
 
 fn group_contributions(
     weighted: &[WeightedPosition<'_>],
-) -> BTreeMap<String, Vec<GroupContribution>> {
+) -> Result<BTreeMap<String, Vec<GroupContribution>>> {
     let n = weighted.len();
     let mut buckets: BTreeMap<String, BTreeMap<String, NeumaierAccumulator>> = BTreeMap::new();
     let mut seen: BTreeMap<String, usize> = BTreeMap::new();
@@ -593,34 +615,42 @@ fn group_contributions(
             *seen.entry(group_name.clone()).or_insert(0) += 1;
         }
     }
-    let total_contrib = total.total();
+    let total_contrib = finite(total.total(), "grouped portfolio return")?;
     for (group_name, count) in &seen {
         if *count < n {
-            let present: f64 = buckets
+            let present = buckets
                 .get(group_name)
-                .map(|group| group.values().map(NeumaierAccumulator::current).sum())
+                .map(|group| {
+                    let mut present = NeumaierAccumulator::new();
+                    for value in group.values() {
+                        present.add(value.current());
+                    }
+                    present.total()
+                })
                 .unwrap_or(0.0);
+            let missing = finite(
+                total_contrib - finite(present, "grouped present contribution")?,
+                "ungrouped contribution",
+            )?;
             buckets
                 .entry(group_name.clone())
                 .or_default()
                 .entry("unknown".to_string())
                 .or_default()
-                .add(total_contrib - present);
+                .add(missing);
         }
     }
     buckets
         .into_iter()
         .map(|(group_name, group)| {
-            (
-                group_name,
-                group
-                    .into_iter()
-                    .map(|(key, contribution)| GroupContribution {
-                        key,
-                        contribution: contribution.total(),
-                    })
-                    .collect(),
-            )
+            let rows = group
+                .into_iter()
+                .map(|(key, contribution)| {
+                    let contribution = finite(contribution.total(), "group bucket contribution")?;
+                    Ok(GroupContribution { key, contribution })
+                })
+                .collect::<Result<Vec<_>>>()?;
+            Ok((group_name, rows))
         })
         .collect()
 }
@@ -628,13 +658,19 @@ fn group_contributions(
 fn factor_contributions(factors: &[ReturnContributionFactor]) -> Result<Vec<FactorContribution>> {
     let mut rows = factors
         .iter()
-        .map(|factor| FactorContribution {
-            factor: factor.factor.clone(),
-            exposure: factor.exposure,
-            factor_return: factor.factor_return,
-            contribution: factor.exposure * factor.factor_return,
+        .map(|factor| {
+            let contribution = finite(
+                factor.exposure * factor.factor_return,
+                "factor contribution",
+            )?;
+            Ok(FactorContribution {
+                factor: factor.factor.clone(),
+                exposure: factor.exposure,
+                factor_return: factor.factor_return,
+                contribution,
+            })
         })
-        .collect::<Vec<_>>();
+        .collect::<Result<Vec<_>>>()?;
     rows.sort_by(|left, right| left.factor.cmp(&right.factor));
     Ok(rows)
 }
@@ -648,9 +684,9 @@ fn total_benchmark_return(weighted: &[WeightedPosition<'_>]) -> Result<f64> {
         let ret = position.input.benchmark_return.ok_or_else(|| {
             Error::Internal("benchmark mode encountered missing benchmark_return".to_string())
         })?;
-        benchmark_return.add(weight * ret);
+        benchmark_return.add(finite(weight * ret, "benchmark position contribution")?);
     }
-    Ok(benchmark_return.total())
+    finite(benchmark_return.total(), "benchmark return")
 }
 
 fn benchmark_relative(
@@ -694,19 +730,19 @@ fn benchmark_relative(
     let mut interaction = NeumaierAccumulator::new();
 
     for (key, group) in &groups {
-        let portfolio_weight = group.portfolio_weight.total();
-        let benchmark_weight = group.benchmark_weight.total();
+        let portfolio_weight = finite(group.portfolio_weight.total(), "group portfolio weight")?;
+        let benchmark_weight = finite(group.benchmark_weight.total(), "group benchmark weight")?;
+        let portfolio_contribution = finite(
+            group.portfolio_contribution.total(),
+            "group portfolio contribution",
+        )?;
+        let benchmark_contribution = finite(
+            group.benchmark_contribution.total(),
+            "group benchmark contribution",
+        )?;
         for (side, weight, contribution) in [
-            (
-                "portfolio",
-                portfolio_weight,
-                group.portfolio_contribution.total(),
-            ),
-            (
-                "benchmark",
-                benchmark_weight,
-                group.benchmark_contribution.total(),
-            ),
+            ("portfolio", portfolio_weight, portfolio_contribution),
+            ("benchmark", benchmark_weight, benchmark_contribution),
         ] {
             if weight.abs() <= WEIGHT_TOLERANCE && contribution.abs() > WEIGHT_TOLERANCE {
                 return Err(Error::Validation(format!(
@@ -729,7 +765,10 @@ fn benchmark_relative(
             ));
             benchmark_return
         } else {
-            group.benchmark_contribution.total() / benchmark_weight
+            finite(
+                benchmark_contribution / benchmark_weight,
+                "benchmark group return",
+            )?
         };
         let portfolio_group_return = if portfolio_weight.abs() <= WEIGHT_TOLERANCE {
             warnings.push(format!(
@@ -738,21 +777,39 @@ fn benchmark_relative(
             ));
             benchmark_group_return
         } else {
-            group.portfolio_contribution.total() / portfolio_weight
+            finite(
+                portfolio_contribution / portfolio_weight,
+                "portfolio group return",
+            )?
         };
 
-        let weight_delta = portfolio_weight - benchmark_weight;
-        let return_delta = portfolio_group_return - benchmark_group_return;
-        allocation.add(weight_delta * (benchmark_group_return - benchmark_return));
-        selection.add(benchmark_weight * return_delta);
-        interaction.add(weight_delta * return_delta);
+        let weight_delta = finite(portfolio_weight - benchmark_weight, "group active weight")?;
+        let return_delta = finite(
+            portfolio_group_return - benchmark_group_return,
+            "group active return",
+        )?;
+        allocation.add(finite(
+            weight_delta * (benchmark_group_return - benchmark_return),
+            "group allocation effect",
+        )?);
+        selection.add(finite(
+            benchmark_weight * return_delta,
+            "group selection effect",
+        )?);
+        interaction.add(finite(
+            weight_delta * return_delta,
+            "group interaction effect",
+        )?);
     }
 
-    let allocation_effect = allocation.total();
-    let selection_effect = selection.total();
-    let interaction_effect = interaction.total();
-    let active_return = portfolio_return - benchmark_return;
-    let residual = active_return - allocation_effect - selection_effect - interaction_effect;
+    let allocation_effect = finite(allocation.total(), "allocation effect")?;
+    let selection_effect = finite(selection.total(), "selection effect")?;
+    let interaction_effect = finite(interaction.total(), "interaction effect")?;
+    let active_return = finite(portfolio_return - benchmark_return, "active return")?;
+    let residual = finite(
+        active_return - allocation_effect - selection_effect - interaction_effect,
+        "benchmark-relative residual",
+    )?;
 
     Ok(BenchmarkRelativeContribution {
         benchmark_return,
@@ -775,14 +832,17 @@ fn validate_benchmark_weights(weighted: &[WeightedPosition<'_>]) -> Result<()> {
         })?);
     }
 
-    let portfolio_weight = portfolio_weight.total();
+    let portfolio_weight = finite(
+        portfolio_weight.total(),
+        "benchmark-mode portfolio weight sum",
+    )?;
     if (portfolio_weight - 1.0).abs() > WEIGHT_TOLERANCE {
         return Err(Error::Validation(format!(
             "return contribution portfolio weights must sum to 1.0 for benchmark-relative attribution (got {portfolio_weight})"
         )));
     }
 
-    let benchmark_weight = benchmark_weight.total();
+    let benchmark_weight = finite(benchmark_weight.total(), "benchmark weight sum")?;
     if (benchmark_weight - 1.0).abs() > WEIGHT_TOLERANCE {
         return Err(Error::Validation(format!(
             "return contribution benchmark weights must sum to 1.0 for benchmark-relative attribution (got {benchmark_weight})"

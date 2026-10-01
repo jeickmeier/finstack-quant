@@ -248,7 +248,9 @@ impl JsMarketContext {
     ///   base-correlation curve of the index.
     ///
     /// @returns This context, updated in place, so calls can be chained.
-    /// @throws `TypeError` if `id` is not a string.
+    /// @throws `TypeError` if `id` is not a string; `FinstackError` (kind
+    /// `validation`) if the constituent count, recovery or issuer coverage is
+    /// invalid, or a curve the index needs is absent or of the wrong type.
     #[wasm_bindgen(js_name = insertCreditIndex)]
     pub fn insert_credit_index(
         &mut self,
@@ -257,7 +259,8 @@ impl JsMarketContext {
     ) -> Result<(), JsValue> {
         let id = js_string(&id, "id")?;
         self.context_mut()
-            .insert_credit_index_mut(id, (*data.inner).clone());
+            .insert_credit_index_mut(id, (*data.inner).clone())
+            .map_err(to_js_err)?;
         Ok(())
     }
 

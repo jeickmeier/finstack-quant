@@ -236,8 +236,8 @@ pub(crate) fn resolve_sigma(
 /// Build the synthetic underlying CDS that backs the option's forward
 /// premium-leg risky annuity and protection-PV calculations. The synthetic
 /// CDS uses Bloomberg CDSW conventions for the underlying (BloombergCdswClean
-/// valuation convention, adjusted-to-adjusted accruals, +1-day inclusive on
-/// the final ACT/360 period).
+/// valuation convention, adjusted intermediate accrual dates, and unadjusted
+/// maturity inclusive in the final ACT/360 period).
 #[doc(hidden)]
 pub(crate) fn synthetic_underlying_cds(
     option: &CdsOption,
@@ -424,8 +424,8 @@ mod settlement_and_sigma_tests {
     fn spread_option(as_of: Date, settlement: SettlementType, vol: Option<f64>) -> CdsOption {
         let params = CdsOptionParams::new(
             CdsOptionStrike::Spread(Decimal::new(1, 2)),
-            as_of.add_months(12),
-            as_of.add_months(60),
+            as_of.add_months(12).expect("valid date shift"),
+            as_of.add_months(60).expect("valid date shift"),
             Money::from((10_000_000_i64, Currency::USD)),
             OptionType::Call,
         )
@@ -444,8 +444,8 @@ mod settlement_and_sigma_tests {
     fn price_strike_option(as_of: Date) -> CdsOption {
         let params = CdsOptionParams::new(
             CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1)),
-            as_of.add_months(12),
-            as_of.add_months(60),
+            as_of.add_months(12).expect("valid date shift"),
+            as_of.add_months(60).expect("valid date shift"),
             Money::from((10_000_000_i64, Currency::USD)),
             OptionType::Call,
         )

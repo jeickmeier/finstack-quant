@@ -1001,7 +1001,7 @@ impl JsForwardCurve {
     ///
     /// # Errors
     ///
-    /// Throws Error when options cannot be decoded or canonical curve validation rejects dates, conventions, knots, tenor, reset lag, or projection grid.
+    /// Throws Error when options contain unknown fields, cannot be decoded, or canonical curve validation rejects dates, conventions, knots, tenor, reset lag, or projection grid.
     #[wasm_bindgen(constructor)]
     pub fn new(options: JsValue) -> Result<JsForwardCurve, JsValue> {
         let options = from_js_json(&options, "options")?;
@@ -1009,7 +1009,13 @@ impl JsForwardCurve {
     }
 
     /// Forward rate at year fraction `t`.
-    /// @param t - Time from the curve base date in years.
+    ///
+    /// The stored rate is annualized on the curve's day-count basis. Convert
+    /// its accrual growth to the contractual index basis before calculating a
+    /// coupon with a different accrual convention; Rust instrument pricing
+    /// performs this conversion from the contractual schedule.
+    /// @param t - Time from the curve base date in years using the curve day count.
+    /// @returns Simple forward rate as a decimal, annualized on the curve day count.
     #[wasm_bindgen(js_name = rate)]
     pub fn rate(&self, t: JsValue) -> Result<f64, JsValue> {
         let t = js_f64(&t, "t")?;
@@ -1017,8 +1023,13 @@ impl JsForwardCurve {
     }
 
     /// Discount-factor-implied simple forward over `(t1, t2)`.
+    ///
+    /// The denominator is the curve-time span `t2 - t1`. To express the
+    /// implied growth on another contractual index basis, multiply by that
+    /// span and divide by the index accrual fraction for the same dated period.
     /// @param t1 - Earlier curve time in years used as the start of the forward interval.
     /// @param t2 - Later curve time in years used as the end of the forward interval.
+    /// @returns Simple forward rate as a decimal, annualized on the curve day count.
     ///
     /// # Errors
     ///

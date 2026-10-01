@@ -168,15 +168,28 @@ pub(super) fn fixed_rate_at(facility: &RevolvingCredit, rate: f64, date: Date) -
 ///   of the valuation and commitment dates.
 /// * `fwd` - Term index forward curve (e.g. `USD-SOFR-3M`).
 /// * `disc` - Facility discount curve the Hull-White process was fitted to.
+/// * `accrual_start` - Inclusive start of the full contractual payment coupon.
+/// * `accrual_end` - Exclusive end of that coupon, before payment adjustment.
+/// * `accrual_year_fraction` - Full coupon fraction on the facility's contractual
+///   day count, retaining any context-sensitive denominator.
 pub(super) fn index_basis_at(
     date: Date,
     anchor: Date,
     fwd: &ForwardCurve,
     disc: &dyn Discounting,
+    accrual_start: Date,
+    accrual_end: Date,
+    accrual_year_fraction: f64,
 ) -> Result<f64> {
     use finstack_quant_models::rates::clock::{model_time, ModelDiscountCurve};
 
-    let index_forward = crate::cashflow::builder::rate_helpers::project_index_rate(date, fwd)?;
+    let index_forward = crate::cashflow::builder::rate_helpers::project_index_rate(
+        date,
+        fwd,
+        accrual_start,
+        accrual_end,
+        accrual_year_fraction,
+    )?;
     let model_curve = ModelDiscountCurve::new(disc, anchor)?;
     let ois_forward = model_curve.instantaneous_forward(model_time(anchor, date).max(0.0))?;
     Ok(index_forward - ois_forward)
@@ -284,6 +297,8 @@ pub(super) struct RevolverFloatingProjection<'a> {
     pub day_count: DayCount,
     /// Payment frequency used by context-sensitive overnight day counts.
     pub coupon_frequency: Tenor,
+    /// Actual full facility coupon containing the projected accrual slice.
+    pub coupon_period: (Date, Date),
     /// Facility currency, used to pick a default overnight calendar.
     pub currency: Currency,
     /// The facility's `calendar_id`, when set.
@@ -328,10 +343,27 @@ pub(super) fn project_revolver_floating_rate(
     let mut params = crate::cashflow::builder::FloatingRateParams::try_from(input.spec)?;
     params.spread_bp += input.margin_delta_bp;
     let Some(compounding) = resolved_overnight_compounding(input.spec)? else {
+        let (coupon_start, coupon_end) = input.coupon_period;
+        let accrual_context = if input.day_count == DayCount::Act365L {
+            finstack_quant_core::dates::DayCountContext {
+                frequency: Some(input.coupon_frequency),
+                coupon_period: Some(input.coupon_period),
+                ..Default::default()
+            }
+        } else {
+            Default::default()
+        };
+        let coupon_accrual =
+            input
+                .day_count
+                .year_fraction(coupon_start, coupon_end, accrual_context)?;
         return crate::cashflow::builder::project_floating_rate(
             input.accrual_start,
             input.fwd,
             &params,
+            coupon_start,
+            coupon_end,
+            coupon_accrual,
         );
     };
 
@@ -372,6 +404,7 @@ pub(super) fn project_revolver_floating_rate(
         accrual_end,
         day_count,
         coupon_frequency: Some(input.coupon_frequency),
+        coupon_period: input.coupon_period,
         compounding: &compounding,
         fixing_calendar: calendar,
         compounded_spread: 0.0,
@@ -674,6 +707,9 @@ mod tests {
             reset,
             &forward,
             &crate::cashflow::builder::FloatingRateParams::try_from(&spec).expect("rate params"),
+            reset,
+            Date::from_calendar_date(2025, Month::April, 2).expect("date"),
+            90.0 / 360.0,
         )
         .expect("projected coupon");
         assert!((rate - 0.02).abs() < 1e-12, "all-in cap must bind: {rate}");
@@ -722,6 +758,7 @@ mod tests {
                 fwd: &forward,
                 day_count: DayCount::Act360,
                 coupon_frequency: Tenor::quarterly(),
+                coupon_period: (start, end),
                 currency: Currency::USD,
                 calendar_id: None,
                 margin_delta_bp: 0.0,
@@ -744,6 +781,7 @@ mod tests {
             accrual_end: end,
             day_count: DayCount::Act360,
             coupon_frequency: Some(Tenor::quarterly()),
+            coupon_period: (start, end),
             compounding: &compounding,
             fixing_calendar: calendar,
             compounded_spread: 0.0,
@@ -755,6 +793,80 @@ mod tests {
             "revolver overnight rate {revolver_rate} != shared engine {}",
             expected.rate
         );
+    }
+
+    #[test]
+    fn act365l_overnight_slices_keep_the_actual_annual_coupon_denominator() {
+        use finstack_quant_core::dates::calendar_by_id;
+        use finstack_quant_core::market_data::term_structures::ForwardCurve;
+        use rust_decimal::Decimal;
+        use time::macros::date;
+
+        let coupon_start = date!(2023 - 03 - 01);
+        let coupon_end = date!(2024 - 03 - 01);
+        let split = date!(2023 - 06 - 01);
+        let spec = crate::cashflow::builder::FloatingRateSpec {
+            forward_curve_id: "USD-SOFR-OIS".into(),
+            spread_bp: Decimal::ZERO,
+            gearing: Decimal::ONE,
+            gearing_includes_spread: true,
+            index_floor_bp: None,
+            index_cap_bp: None,
+            all_in_floor_bp: None,
+            all_in_cap_bp: None,
+            overnight_index_constraints: Default::default(),
+            reset_frequency: Tenor::annual(),
+            index_tenor: None,
+            reset_lag_days: 0,
+            fixing_calendar_id: Some("weekends_only".into()),
+            compounding: Some(FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }),
+            overnight_basis: None,
+            fallback: Default::default(),
+        };
+        let forward = ForwardCurve::builder("USD-SOFR-OIS", 1.0 / 365.0)
+            .base_date(coupon_start)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 0.05), (2.0, 0.05)])
+            .build()
+            .expect("flat overnight curve");
+        let calendar = calendar_by_id("weekends_only").expect("weekend calendar");
+        for (start, end, margin_delta_bp) in
+            [(coupon_start, split, 0.0), (split, coupon_end, 100.0)]
+        {
+            let projected = project_revolver_floating_rate(
+                RevolverFloatingProjection {
+                    accrual_start: start,
+                    accrual_end: end,
+                    as_of: coupon_start,
+                    spec: &spec,
+                    fwd: &forward,
+                    day_count: DayCount::Act365L,
+                    coupon_frequency: Tenor::annual(),
+                    coupon_period: (coupon_start, coupon_end),
+                    currency: Currency::USD,
+                    calendar_id: Some("weekends_only"),
+                    margin_delta_bp,
+                    fixings: None,
+                },
+                None,
+            )
+            .expect("overnight coupon slice");
+            let mut factor = 1.0;
+            let mut date = start;
+            while date < end {
+                let next = date
+                    .add_business_days(1, calendar)
+                    .expect("next weekday")
+                    .min(end);
+                // Projection growth uses the curve's ACT/365F clock; the
+                // resulting coupon is annualized on contractual ACT/365L.
+                factor *= 1.0 + 0.05 * (next - date).whole_days() as f64 / 365.0;
+                date = next;
+            }
+            let expected = (factor - 1.0) / ((end - start).whole_days() as f64 / 366.0)
+                + margin_delta_bp * 1e-4;
+            assert!((projected - expected).abs() < 1e-13, "{start} -> {end}");
+        }
     }
 
     /// A 0% SOFR index floor applied daily floors every negative fixing
@@ -840,6 +952,7 @@ mod tests {
                     fwd: &forward,
                     day_count: DayCount::Act360,
                     coupon_frequency: Tenor::quarterly(),
+                    coupon_period: (start, end),
                     currency: Currency::USD,
                     calendar_id: None,
                     margin_delta_bp: 0.0,

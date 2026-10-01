@@ -8,9 +8,9 @@
 //!
 //! The shape vectors `ĝ_i` are fixed (a linear-decay proxy for the first two
 //! principal components of the forward-rate correlation matrix), but the
-//! overall scale `base_vol` must be **calibrated** so the model reprices the
-//! co-terminal European swaptions embedded in the Bermudan's exercise
-//! schedule. Plugging a raw swaption-surface vol straight in as `base_vol`
+//! overall scale `base_vol` is calibrated to the earliest remaining
+//! co-terminal European swaption using the Rebonato approximation.
+//! Plugging a raw swaption-surface vol straight in as `base_vol`
 //! (the previous behaviour) is wrong: the surface quotes the *swap-rate*
 //! Black vol, not the *forward-rate* instantaneous vol — the two differ by
 //! the Rebonato shape factor `R` derived below.
@@ -36,17 +36,19 @@
 //! R = sqrt( (1/S²) Σ_i Σ_j w_i w_j F_i F_j (ĝ_i·ĝ_j) )
 //! ```
 //!
-//! Calibration is therefore the closed-form `base_vol = σ_market / R` — no
-//! iterative solve is needed, and the result reprices the co-terminal
-//! European swaption to its market vol by construction.
+//! Without displacement, calibration is the closed-form
+//! `base_vol = σ_market / R`. This matches the market volatility within the
+//! frozen-weight Rebonato approximation; it is not an exact multi-forward
+//! Monte Carlo repricing guarantee.
 //!
 //! For displaced (shifted-lognormal) dynamics the same identity holds with
 //! `F_i → F_i + d_i` and `S → S + d`, which is the basket level the
 //! shifted-lognormal swap rate diffuses. The market surface quotes the
 //! *Black lognormal* vol on `S`, while `base_vol · R` is the lognormal vol
-//! of the shifted level `S + d`; matching the at-the-money absolute
-//! volatility `σ_Black · S = σ_displaced · (S + d)` gives the conversion
-//! `σ_displaced = σ_Black · S / (S + d)` applied before the `1/R` division.
+//! of the shifted level `S + d`. The market ATM Black premium is therefore
+//! inverted at shifted forward and strike `S + d`, at the same expiry, before
+//! the `1/R` division. This preserves the finite-expiry premium, including
+//! for a single forward where the displaced-lognormal model is exact.
 //!
 //! # References
 //!
@@ -55,9 +57,11 @@
 //! - Andersen, L. & Piterbarg, V. (2010). *Interest Rate Modeling*, Vol. 2,
 //!   §16.5, Atlantic Financial Press. `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`
 
-use finstack_quant_core::dates::{Date, DayCountContext};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
+use finstack_quant_models::closed_form::volatility::black_call;
+use finstack_quant_models::volatility::implied_vol_black;
 use finstack_quant_valuations::instruments::rates::swaption::lmm_pricer::BermudanSwaptionLmmPricer;
 use finstack_quant_valuations::instruments::rates::swaption::BermudanSwaption;
 
@@ -166,22 +170,35 @@ pub(crate) fn rebonato_factors(slice: &CoTerminalSlice<'_>) -> Option<RebonatoFa
     })
 }
 
-/// Calibrate the LMM `base_vol` so the co-terminal European swaption reprices
-/// to the market **Black lognormal** vol `market_swaption_vol`.
+/// Calibrate the LMM `base_vol` to the market ATM Black premium within the
+/// frozen-weight Rebonato approximation.
 ///
 /// The Black vol quotes lognormal dynamics on the unshifted swap rate `S`,
 /// while `base_vol · R` is the lognormal vol of the shifted level `S + d`.
-/// The Black vol is first converted to displaced dynamics by the ATM
-/// absolute-volatility match `σ_displaced = σ_Black · S / (S + d)` and then
-/// divided by `R`. With zero displacement the conversion is the identity.
+/// The Black premium is inverted at shifted forward and strike `S + d` and
+/// then divided by `R`. With zero displacement the conversion is the identity.
 ///
-/// Returns `None` when the Rebonato shape factor cannot be formed (degenerate
-/// swap, non-positive swap rate, or non-positive shifted level).
+/// # Arguments
+///
+/// * `slice` - Remaining co-terminal forward basket and unscaled factor loadings.
+/// * `market_swaption_vol` - Positive finite annual Black-lognormal volatility,
+///   expressed as a decimal, at the unshifted ATM swap rate.
+/// * `expiry` - Positive finite ACT/365F time from valuation to exercise, in years.
+///
+/// # Returns
+///
+/// Returns `None` for invalid expiry or volatility, a degenerate swap, or an
+/// ATM premium that cannot be converted to a positive finite loading scale.
 pub(crate) fn calibrate_base_vol(
     slice: &CoTerminalSlice<'_>,
     market_swaption_vol: f64,
+    expiry: f64,
 ) -> Option<f64> {
-    if !market_swaption_vol.is_finite() || market_swaption_vol <= 0.0 {
+    if !market_swaption_vol.is_finite()
+        || market_swaption_vol <= 0.0
+        || !expiry.is_finite()
+        || expiry <= 0.0
+    {
         return None;
     }
     let factors = rebonato_factors(slice)?;
@@ -189,16 +206,35 @@ pub(crate) fn calibrate_base_vol(
     if shape_factor <= 1e-12 || factors.swap_rate <= 1e-12 {
         return None;
     }
-    let displaced_vol = market_swaption_vol * factors.swap_rate / factors.shifted_level;
-    Some(displaced_vol / shape_factor)
+    let displaced_vol = if factors.swap_rate == factors.shifted_level {
+        market_swaption_vol
+    } else {
+        let premium = black_call(
+            factors.swap_rate,
+            factors.swap_rate,
+            market_swaption_vol,
+            expiry,
+        );
+        implied_vol_black(
+            premium,
+            factors.shifted_level,
+            factors.shifted_level,
+            expiry,
+            true,
+        )
+        .ok()?
+    };
+    let base_vol = displaced_vol / shape_factor;
+    (base_vol.is_finite() && base_vol > 0.0).then_some(base_vol)
 }
 
 /// Calibrate the explicit flat LMM loading scale for a Bermudan swaption.
 ///
 /// The helper constructs the same valuations-owned tenor, forward,
 /// displacement, and loading shape used by pricing, validates the swaption
-/// surface as an expiry-by-strike Black-lognormal grid, targets the longest
-/// co-terminal European swaption, and applies the closed-form Rebonato map.
+/// surface as an ACT/365F expiry-by-strike Black-lognormal grid, targets the
+/// earliest future exercise, and matches its ATM premium in the Rebonato
+/// approximation. Past exercises and their preceding tenor periods are omitted.
 ///
 /// # Arguments
 ///
@@ -206,56 +242,34 @@ pub(crate) fn calibrate_base_vol(
 ///   roles, and volatility-surface identifier define the target.
 /// * `market` - Immutable market containing discount/projection curves and the
 ///   Black-lognormal swaption volatility surface.
-/// * `as_of` - Calibration date used for curve and expiry year fractions.
+/// * `as_of` - Calibration date used for curve and expiry year fractions;
+///   only exercise dates strictly after this date remain eligible.
 ///
 /// # Errors
 ///
 /// Returns an error for invalid schedules, missing curves or surfaces,
-/// mis-tagged volatility grids, invalid quotes, or a degenerate Rebonato map.
+/// unsupported LMM contract terms, mis-tagged volatility grids, invalid quotes,
+/// a schedule without future exercises, or a degenerate Rebonato map.
+/// The pricing engine's single-curve, matching-leg,
+/// zero-spread/reset/payment-lag domain applies equally to calibration.
 pub fn calibrate_bermudan_lmm_base_vol(
     swaption: &BermudanSwaption,
     market: &MarketContext,
     as_of: Date,
 ) -> Result<f64> {
     let discount = market.get_discount(swaption.get_discount_curve_id().as_str())?;
-    let structure = BermudanSwaptionLmmPricer::build_lmm_params(
-        swaption,
-        discount.as_ref(),
-        market,
-        as_of,
-        1.0,
-    )
-    .map_err(|error| {
-        finstack_quant_core::Error::Validation(format!(
-            "LMM structure construction failed for '{}': {error}",
-            swaption.id
-        ))
-    })?;
+    let structure =
+        BermudanSwaptionLmmPricer::build_lmm_params(swaption, discount.as_ref(), as_of, 1.0)
+            .map_err(|error| {
+                finstack_quant_core::Error::Validation(format!(
+                    "LMM structure construction failed for '{}': {error}",
+                    swaption.id
+                ))
+            })?;
 
-    let fallback_expiry = swaption.get_fixed_day_count().year_fraction(
-        as_of,
-        swaption.get_underlying_start_date(),
-        DayCountContext::default(),
-    )?;
-    let expiry = swaption
-        .first_exercise()
-        .map(|date| {
-            swaption
-                .get_fixed_day_count()
-                .year_fraction(as_of, date, DayCountContext::default())
-        })
-        .transpose()?
-        .filter(|value| value.is_finite() && *value > 0.0)
-        .unwrap_or(fallback_expiry);
-    if !expiry.is_finite() || expiry <= 0.0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "LMM calibration for '{}' requires a positive future exercise time",
-            swaption.id
-        )));
-    }
-
-    let first_alive = structure.tenors[..structure.num_forwards]
-        .partition_point(|&tenor| tenor + 1.0e-8 < expiry);
+    // The shared structure starts at the earliest remaining exercise, so its
+    // clock and live forwards are identical to those used by the pricer.
+    let expiry = structure.tenors[0];
     let loading_shapes = structure.vol_values.first().ok_or_else(|| {
         finstack_quant_core::Error::Validation(format!(
             "LMM calibration for '{}' has no loading structure",
@@ -268,7 +282,7 @@ pub fn calibrate_bermudan_lmm_base_vol(
         initial_forwards: &structure.initial_forwards,
         displacements: &structure.displacements,
         loading_shapes,
-        first_alive,
+        first_alive: 0,
     };
     let factors = rebonato_factors(&slice).ok_or_else(|| {
         finstack_quant_core::Error::Validation(format!(
@@ -289,7 +303,7 @@ pub fn calibrate_bermudan_lmm_base_vol(
         expiry,
         factors.swap_rate,
     );
-    calibrate_base_vol(&slice, market_vol).ok_or_else(|| {
+    calibrate_base_vol(&slice, market_vol, expiry).ok_or_else(|| {
         finstack_quant_core::Error::Validation(format!(
             "LMM calibration for '{}' is degenerate at expiry {expiry} and swap rate {}",
             swaption.id, factors.swap_rate
@@ -310,7 +324,8 @@ pub fn calibrate_bermudan_lmm_base_vol(
 ///   rejected after parse.
 /// * `market` - Immutable market containing discount/projection curves and the
 ///   Black-lognormal swaption volatility surface.
-/// * `as_of` - Calibration date used for curve and expiry year fractions.
+/// * `as_of` - Calibration date used for curve and expiry year fractions;
+///   exercise dates on or before this date are excluded from calibration.
 ///
 /// # Errors
 ///
@@ -343,6 +358,7 @@ mod tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_valuations::instruments::rates::hw1f::RateExoticMcConfig;
+    use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
     use finstack_quant_valuations::instruments::rates::swaption::lmm_pricer::BermudanSwaptionLmmPricer;
     use finstack_quant_valuations::instruments::rates::swaption::{
         BermudanSchedule, BermudanSwaption,
@@ -356,12 +372,14 @@ mod tests {
     fn test_swaption() -> BermudanSwaption {
         let swap_start = Date::from_calendar_date(2026, Month::January, 17).expect("swap start");
         let swap_end = Date::from_calendar_date(2032, Month::January, 17).expect("swap end");
-        let first_exercise =
-            Date::from_calendar_date(2028, Month::January, 17).expect("first exercise");
-        let schedule =
-            BermudanSchedule::co_terminal(first_exercise, swap_end, Tenor::semi_annual())
-                .expect("exercise schedule");
-        BermudanSwaption::new(
+        let schedule = BermudanSchedule::new(
+            (2028..2032)
+                .map(|year| {
+                    Date::from_calendar_date(year, Month::January, 17).expect("exercise date")
+                })
+                .collect(),
+        );
+        let mut swaption = BermudanSwaption::new(
             "BERM-LMM-CAL",
             OptionType::Call,
             Money::from((10_000_000_i64, Currency::USD)),
@@ -369,15 +387,26 @@ mod tests {
             swap_start,
             swap_end,
             schedule,
-            "USD-OIS",
-            "USD-OIS",
+            "D",
+            "D",
             "USD-SWPNVOL",
         )
-        .expect("Bermudan swaption")
+        .expect("Bermudan swaption");
+        swaption.underlying_fixed_leg.frequency = Tenor::annual();
+        swaption.underlying_float_leg.frequency = Tenor::annual();
+        swaption.underlying_float_leg.day_count = swaption.underlying_fixed_leg.day_count;
+        // A neutral single-curve ID represents simple tenor forwards without
+        // selecting registered overnight-index compounding conventions.
+        swaption.underlying_float_leg.compounding = FloatingLegCompounding::Simple;
+        swaption.underlying_fixed_leg.business_day_convention =
+            finstack_quant_core::dates::BusinessDayConvention::Unadjusted;
+        swaption.underlying_float_leg.business_day_convention =
+            finstack_quant_core::dates::BusinessDayConvention::Unadjusted;
+        swaption
     }
 
-    fn test_discount_curve(as_of: Date) -> DiscountCurve {
-        DiscountCurve::builder("USD-OIS")
+    fn test_discount_curve(as_of: Date, curve_id: &str) -> DiscountCurve {
+        DiscountCurve::builder(curve_id)
             .base_date(as_of)
             .knots([
                 (0.0, 1.0),
@@ -410,9 +439,16 @@ mod tests {
             .collect()
     }
 
-    fn implied_swaption_vol(slice: &CoTerminalSlice<'_>, base_vol: f64) -> f64 {
+    fn implied_swaption_vol(slice: &CoTerminalSlice<'_>, base_vol: f64, expiry: f64) -> f64 {
         let factors = rebonato_factors(slice).expect("factors");
-        base_vol * factors.shape_factor * factors.shifted_level / factors.swap_rate
+        let premium = black_call(
+            factors.shifted_level,
+            factors.shifted_level,
+            base_vol * factors.shape_factor,
+            expiry,
+        );
+        implied_vol_black(premium, factors.swap_rate, factors.swap_rate, expiry, true)
+            .expect("Black equivalent of displaced premium")
     }
 
     #[test]
@@ -441,7 +477,7 @@ mod tests {
     fn public_helper_produces_positive_finite_override() {
         let as_of = Date::from_calendar_date(2025, Month::January, 17).expect("as of");
         let market = MarketContext::new()
-            .insert(test_discount_curve(as_of))
+            .insert(test_discount_curve(as_of, "D"))
             .insert_surface(test_surface());
         let base_vol = calibrate_bermudan_lmm_base_vol(&test_swaption(), &market, as_of)
             .expect("LMM base-vol calibration");
@@ -450,6 +486,179 @@ mod tests {
         assert!(
             (base_vol - SURFACE_VOL).abs() > 1.0e-6,
             "the forward-loading scale must not be the raw swaption quote"
+        );
+    }
+
+    #[test]
+    fn public_helper_matches_exact_one_forward_displaced_black_premium() {
+        use finstack_quant_core::dates::DayCount;
+        use finstack_quant_core::math::interp::InterpStyle;
+        use finstack_quant_models::closed_form::volatility::black_shifted_call;
+
+        // Ten-year expiry and one one-year forward reproduce the supported
+        // low-rate case where the old instantaneous conversion overpriced by 7.7%.
+        let as_of = time::macros::date!(2025 - 01 - 01);
+        let start = time::macros::date!(2034 - 12 - 30);
+        let end = time::macros::date!(2035 - 12 - 30);
+        let mut swaption = test_swaption();
+        swaption.underlying_fixed_leg.start = start;
+        swaption.underlying_fixed_leg.end = end;
+        swaption.underlying_fixed_leg.day_count = DayCount::Act365F;
+        swaption.underlying_float_leg.start = start;
+        swaption.underlying_float_leg.end = end;
+        swaption.underlying_float_leg.day_count = DayCount::Act365F;
+        swaption.exercise_schedule = BermudanSchedule::new(vec![start]);
+        let rate = 1.005_f64.ln();
+        let curve = DiscountCurve::builder("D")
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (20.0, (-rate * 20.0).exp())])
+            .interp(InterpStyle::LogLinear)
+            .build()
+            .expect("low-rate curve");
+        let surface = VolSurface::builder("USD-SWPNVOL")
+            .expiries(&[0.5, 12.0])
+            .strikes(&[0.001, 0.20])
+            .row(&[0.50, 0.50])
+            .row(&[0.50, 0.50])
+            .build()
+            .expect("Black surface");
+        let market = MarketContext::new()
+            .insert(curve.clone())
+            .insert_surface(surface);
+        let base_vol = calibrate_bermudan_lmm_base_vol_from_json(
+            &bermudan_envelope_json(swaption.clone()),
+            &market,
+            as_of,
+        )
+        .expect("one-forward calibration");
+        let params =
+            BermudanSwaptionLmmPricer::build_lmm_params(&swaption, &curve, as_of, base_vol)
+                .expect("one-forward structure");
+
+        assert_eq!(params.num_forwards, 1);
+        assert_eq!(params.tenors[0], 10.0);
+        assert!((params.initial_forwards[0] - 0.005).abs() < 1e-14);
+        assert!((params.displacements[0] - 0.005).abs() < 1e-14);
+        let model_premium = black_shifted_call(
+            params.initial_forwards[0],
+            params.initial_forwards[0],
+            base_vol,
+            params.tenors[0],
+            params.displacements[0],
+        );
+        let market_premium = black_call(
+            params.initial_forwards[0],
+            params.initial_forwards[0],
+            0.50,
+            params.tenors[0],
+        );
+        assert!(
+            (model_premium - market_premium).abs() < 1e-14,
+            "conversion must preserve the canonical Black premium: model={model_premium}, market={market_premium}"
+        );
+        // Independent analytical ATM Black premium, per unit annuity.
+        // The existing statrs normal-CDF approximation differs from the
+        // reference by about 2.1e-13 here. A 1e-12 absolute reference budget
+        // is less than $0.00001 on 10MM notional with a unit annuity; the
+        // premium-preserving conversion above retains its tighter budget.
+        let expected_premium = 0.002_854_023_497_798_254_7;
+        assert!(
+            (model_premium - expected_premium).abs() < 1e-12,
+            "finite-expiry premium mismatch: model={model_premium}, market={expected_premium}"
+        );
+        assert!((base_vol - 0.25).abs() > 0.01);
+    }
+
+    #[test]
+    fn calibration_uses_next_exercise_on_and_between_exercise_dates() {
+        let start = time::macros::date!(2025 - 01 - 01);
+        let next_exercise = time::macros::date!(2026 - 01 - 01);
+        let end = time::macros::date!(2027 - 01 - 01);
+        let mut swaption = test_swaption();
+        swaption.underlying_fixed_leg.start = start;
+        swaption.underlying_fixed_leg.end = end;
+        swaption.underlying_float_leg.start = start;
+        swaption.underlying_float_leg.end = end;
+        swaption.exercise_schedule = BermudanSchedule::new(vec![start, next_exercise]);
+
+        for as_of in [start, time::macros::date!(2025 - 07 - 01)] {
+            let curve = test_discount_curve(as_of, "D");
+            let market = MarketContext::new()
+                .insert(curve.clone())
+                .insert_surface(test_surface());
+            let base_vol = calibrate_bermudan_lmm_base_vol_from_json(
+                &bermudan_envelope_json(swaption.clone()),
+                &market,
+                as_of,
+            )
+            .expect("remaining-exercise calibration");
+            let params =
+                BermudanSwaptionLmmPricer::build_lmm_params(&swaption, &curve, as_of, base_vol)
+                    .expect("remaining-exercise model");
+            let expiry = finstack_quant_models::rates::clock::model_time(as_of, next_exercise);
+            assert_eq!(params.num_forwards, 1);
+            assert_eq!(params.tenors[0], expiry);
+            assert!(params.tenors.iter().all(|tenor| *tenor > 0.0));
+            let factors = rebonato_factors(&CoTerminalSlice {
+                tenors: &params.tenors,
+                accrual_factors: &params.accrual_factors,
+                initial_forwards: &params.initial_forwards,
+                displacements: &params.displacements,
+                loading_shapes: &params.vol_values[0],
+                first_alive: 0,
+            })
+            .expect("actual calibrated loadings");
+            let model_premium = black_call(
+                factors.shifted_level,
+                factors.shifted_level,
+                factors.shape_factor,
+                expiry,
+            );
+            let market_premium =
+                black_call(factors.swap_rate, factors.swap_rate, SURFACE_VOL, expiry);
+            assert!((model_premium - market_premium).abs() < 1e-14);
+        }
+    }
+
+    #[test]
+    fn calibration_rejects_contract_without_remaining_exercises() {
+        let swaption = test_swaption();
+        let as_of = swaption.last_exercise().expect("last exercise");
+        let market = MarketContext::new().insert(test_discount_curve(as_of, "D"));
+        let error = calibrate_bermudan_lmm_base_vol(&swaption, &market, as_of)
+            .expect_err("no remaining option to calibrate")
+            .to_string();
+        assert!(
+            error.contains("future exercise"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn calibration_rejects_overnight_compounding_before_surface_lookup() {
+        let as_of = Date::from_calendar_date(2025, Month::January, 17).expect("as of");
+        let market = MarketContext::new().insert(test_discount_curve(as_of, "USD-OIS"));
+        let mut swaption = test_swaption();
+        swaption.underlying_fixed_leg.discount_curve_id = "USD-OIS".into();
+        swaption.underlying_float_leg.discount_curve_id = "USD-OIS".into();
+        swaption.underlying_float_leg.forward_curve_id = "USD-OIS".into();
+        swaption.underlying_float_leg.compounding =
+            FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };
+        swaption
+            .build_swap_schedule()
+            .expect("overnight contract has a valid underlying IRS schedule");
+
+        let error = calibrate_bermudan_lmm_base_vol(&swaption, &market, as_of)
+            .expect_err("overnight compounding lies outside the LMM domain")
+            .to_string();
+        assert!(
+            error.contains("LMM unsupported contract") && error.contains("simple compounding"),
+            "unexpected error: {error}"
+        );
+        assert!(
+            !error.contains("surface"),
+            "calibration attempted a volatility-surface lookup: {error}"
         );
     }
 
@@ -464,7 +673,7 @@ mod tests {
     fn from_json_matches_typed_helper() {
         let as_of = Date::from_calendar_date(2025, Month::January, 17).expect("as of");
         let market = MarketContext::new()
-            .insert(test_discount_curve(as_of))
+            .insert(test_discount_curve(as_of, "D"))
             .insert_surface(test_surface());
         let swaption = test_swaption();
         let typed = calibrate_bermudan_lmm_base_vol(&swaption, &market, as_of)
@@ -507,7 +716,7 @@ mod tests {
     #[test]
     fn pricing_consumes_override_without_reading_surface() {
         let as_of = Date::from_calendar_date(2025, Month::January, 17).expect("as of");
-        let curve = test_discount_curve(as_of);
+        let curve = test_discount_curve(as_of, "D");
         let calibration_market = MarketContext::new()
             .insert(curve.clone())
             .insert_surface(test_surface());
@@ -535,7 +744,7 @@ mod tests {
     #[test]
     fn pricing_rejects_missing_or_invalid_override_before_surface_lookup() {
         let as_of = Date::from_calendar_date(2025, Month::January, 17).expect("as of");
-        let market = MarketContext::new().insert(test_discount_curve(as_of));
+        let market = MarketContext::new().insert(test_discount_curve(as_of, "D"));
         let pricer = BermudanSwaptionLmmPricer::with_config(RateExoticMcConfig {
             num_paths: 8,
             min_steps_between_events: 1,
@@ -577,8 +786,8 @@ mod tests {
             first_alive: 0,
         };
         let market_vol = 0.22;
-        let base_vol = super::calibrate_base_vol(&slice, market_vol).expect("calibration");
-        let implied_swaption_vol = implied_swaption_vol(&slice, base_vol);
+        let base_vol = super::calibrate_base_vol(&slice, market_vol, 2.0).expect("calibration");
+        let implied_swaption_vol = implied_swaption_vol(&slice, base_vol, 2.0);
         assert!(
             (implied_swaption_vol - market_vol).abs() < 1e-12,
             "calibrated LMM should reprice swaption vol {market_vol}, got {}",
@@ -609,9 +818,9 @@ mod tests {
             loading_shapes: &shapes,
             first_alive: 2,
         };
-        let base_vol = super::calibrate_base_vol(&slice, 0.20).expect("calibration");
+        let base_vol = super::calibrate_base_vol(&slice, 0.20, 2.0).expect("calibration");
         assert!(base_vol.is_finite() && base_vol > 0.0);
-        let implied_swaption_vol = implied_swaption_vol(&slice, base_vol);
+        let implied_swaption_vol = implied_swaption_vol(&slice, base_vol, 2.0);
         assert!((implied_swaption_vol - 0.20).abs() < 1e-12);
     }
 
@@ -631,22 +840,21 @@ mod tests {
             first_alive: 1, // no live forwards
         };
         assert!(rebonato_factors(&slice).is_none());
-        assert!(super::calibrate_base_vol(&slice, 0.2).is_none());
+        assert!(super::calibrate_base_vol(&slice, 0.2, 1.0).is_none());
         // Non-positive market vol rejected.
         let live_slice = CoTerminalSlice {
             first_alive: 0,
             ..slice
         };
-        assert!(super::calibrate_base_vol(&live_slice, 0.0).is_none());
-        assert!(super::calibrate_base_vol(&live_slice, -0.1).is_none());
+        assert!(super::calibrate_base_vol(&live_slice, 0.0, 1.0).is_none());
+        assert!(super::calibrate_base_vol(&live_slice, -0.1, 1.0).is_none());
+        for expiry in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            assert!(super::calibrate_base_vol(&live_slice, 0.2, expiry).is_none());
+        }
     }
 
     #[test]
-    fn displaced_calibration_rescales_black_vol_by_s_over_s_plus_d() {
-        // The market Black vol quotes lognormal dynamics on S; displaced
-        // dynamics diffuse S + d. The calibrated base_vol must absorb the
-        // S/(S+d) conversion, and the implied (Black-convention) swaption
-        // vol must still round-trip to the market target.
+    fn displaced_calibration_preserves_finite_expiry_atm_premium() {
         let tenors = vec![0.0, 1.0, 2.0, 3.0, 4.0];
         let accruals = vec![1.0; 4];
         let forwards = vec![0.01, 0.012, 0.014, 0.016];
@@ -661,26 +869,31 @@ mod tests {
             first_alive: 0,
         };
         let market_vol = 0.30;
-        let base_vol = super::calibrate_base_vol(&slice, market_vol).expect("calibration");
+        let expiry = 10.0;
+        let base_vol = super::calibrate_base_vol(&slice, market_vol, expiry).expect("calibration");
         let factors = rebonato_factors(&slice).expect("factors");
 
-        // base_vol = sigma_Black * S/(S+d) / R, materially below sigma/R.
-        let expected_base =
+        // Instantaneous absolute-volatility matching is insufficient at
+        // finite expiry. Compare premiums rather than inverting that ratio.
+        let instantaneous_base =
             market_vol * factors.swap_rate / factors.shifted_level / factors.shape_factor;
         assert!(
-            (base_vol - expected_base).abs() < 1e-14,
-            "base_vol {} != expected {expected_base}",
-            base_vol
+            (base_vol - instantaneous_base).abs() > 1e-4,
+            "finite-expiry premium matching must differ from the instantaneous approximation"
         );
-        let unscaled_base = market_vol / factors.shape_factor;
+        let market_premium = black_call(factors.swap_rate, factors.swap_rate, market_vol, expiry);
+        let model_premium = black_call(
+            factors.shifted_level,
+            factors.shifted_level,
+            base_vol * factors.shape_factor,
+            expiry,
+        );
         assert!(
-            (base_vol - unscaled_base).abs() > 1e-3,
-            "S/(S+d) rescaling must materially change base_vol \
-             (got {}, unscaled {unscaled_base})",
-            base_vol
+            (model_premium - market_premium).abs() < 1e-14,
+            "model premium {model_premium} must match market premium {market_premium}"
         );
         // The Black-convention implied vol still round-trips.
-        let implied_swaption_vol = implied_swaption_vol(&slice, base_vol);
+        let implied_swaption_vol = implied_swaption_vol(&slice, base_vol, expiry);
         assert!(
             (implied_swaption_vol - market_vol).abs() < 1e-12,
             "implied Black vol {} should round-trip market {market_vol}",

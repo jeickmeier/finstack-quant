@@ -11,7 +11,7 @@ use crate::cashflow::builder::specs::{
 use crate::cashflow::builder::{CashFlowBuilder, PrincipalEvent, ScheduleParams};
 use crate::cashflow::primitives::{CFKind, CashFlow};
 use crate::instruments::fixed_income::term_loan::types::TermLoan;
-use finstack_quant_core::dates::{Date, DayCountContext};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use rust_decimal::prelude::ToPrimitive;
@@ -534,17 +534,14 @@ fn build_commitment_fee_flows(
         return Ok(Vec::new());
     }
 
-    use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
+    use crate::cashflow::builder::periods::{build_periods, period_accrual, BuildPeriodsParams};
 
     // Fees accrue on the loan's own period grid and are paid once per period
     // on its payment date; the availability window may start and end off it.
     let schedule_params = loan_schedule_params(loan);
-    let periods = build_periods(BuildPeriodsParams::from_schedule(
-        &schedule_params,
-        loan.issue_date,
-        loan.maturity,
-        None,
-    ))?;
+    let period_params =
+        BuildPeriodsParams::from_schedule(&schedule_params, loan.issue_date, loan.maturity, None);
+    let periods = build_periods(period_params)?;
     let mut dates: Vec<Date> = vec![fee_start, fee_end];
     dates.extend(
         periods
@@ -589,9 +586,17 @@ fn build_commitment_fee_flows(
     let mut by_payment_date = std::collections::BTreeMap::<Date, f64>::new();
     let mut prev = dates[0];
     for &d in dates.iter().skip(1) {
-        let yf = loan
-            .day_count
-            .year_fraction(prev, d, DayCountContext::default())?;
+        let period = periods
+            .iter()
+            .find(|period| period.accrual_start <= prev && d <= period.accrual_end)
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "TermLoan '{}' commitment-fee interval [{prev}, {d}) lies outside a \
+                     single loan period [{}, {})",
+                    loan.id, loan.issue_date, loan.maturity
+                ))
+            })?;
+        let yf = period_accrual(period, prev, d, &period_params)?;
         // The sub-period is [prev, d), so a step-down effective on `d` must not
         // reduce the commitment base for the interval that ends on `d`.
         let limit = ddtl.limit_in_force_at(prev);
@@ -612,17 +617,7 @@ fn build_commitment_fee_flows(
         };
         let fee_amt = base * fee_rate * yf;
         if fee_amt > 0.0 {
-            let payment_date = periods
-                .iter()
-                .find(|period| period.accrual_start <= prev && prev < period.accrual_end)
-                .map(|period| period.payment_date)
-                .ok_or_else(|| {
-                    finstack_quant_core::Error::Validation(format!(
-                        "TermLoan '{}' commitment-fee accrual from {prev} lies outside the \
-                         loan's periods [{}, {})",
-                        loan.id, loan.issue_date, loan.maturity
-                    ))
-                })?;
+            let payment_date = period.payment_date;
             *by_payment_date.entry(payment_date).or_default() += fee_amt;
         }
         prev = d;
@@ -678,4 +673,58 @@ pub(crate) fn build_oid_eir_schedule(
         loan.currency,
         spec.include_fees,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::instruments::fixed_income::loan_terms::RateSpec;
+    use crate::instruments::fixed_income::term_loan::spec::{
+        AmortizationSpec, CommitmentFeeBase, DdtlSpec, DrawEvent,
+    };
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
+    use time::macros::date;
+
+    #[test]
+    fn act365l_ddtl_fees_use_each_enclosing_loan_coupon_across_availability_slices() {
+        let mut loan = TermLoan::example().expect("example loan");
+        loan.issue_date = date!(2023 - 03 - 01);
+        loan.maturity = date!(2025 - 03 - 01);
+        loan.notional_limit = Money::from((1_000_000_i64, Currency::USD));
+        loan.currency = Currency::USD;
+        loan.rate = RateSpec::Fixed { rate: 0.05 };
+        loan.frequency = Tenor::annual();
+        loan.day_count = DayCount::Act365L;
+        loan.stub = StubKind::None;
+        loan.business_day_convention = BusinessDayConvention::Unadjusted;
+        loan.amortization = AmortizationSpec::None;
+        loan.ddtl = Some(DdtlSpec {
+            commitment: loan.notional_limit,
+            availability_start: date!(2023 - 06 - 01),
+            availability_end: date!(2024 - 06 - 01),
+            draws: vec![DrawEvent {
+                date: date!(2023 - 12 - 01),
+                amount: Money::from((500_000_i64, Currency::USD)),
+            }],
+            commitment_steps: vec![],
+            usage_fee_bp: Decimal::ZERO,
+            commitment_fee_bp: Decimal::from(100),
+            fee_base: CommitmentFeeBase::Undrawn,
+            oid_policy: None,
+        });
+        let schedule = generate_cashflows(&loan, &MarketContext::new()).expect("DDTL schedule");
+        let fees: Vec<_> = schedule
+            .get_flows()
+            .iter()
+            .filter(|flow| flow.kind == CFKind::CommitmentFee)
+            .collect();
+        assert_eq!(fees.len(), 2);
+        assert_eq!(fees[0].date, date!(2024 - 03 - 01));
+        assert_eq!(fees[1].date, date!(2025 - 03 - 01));
+        let expected_first = (10_000.0 * 183.0 + 5_000.0 * 91.0) / 366.0;
+        let expected_second = 5_000.0 * 92.0 / 365.0;
+        assert!((fees[0].amount.amount() - expected_first).abs() < 1e-8);
+        assert!((fees[1].amount.amount() - expected_second).abs() < 1e-8);
+    }
 }

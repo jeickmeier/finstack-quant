@@ -241,6 +241,8 @@ fn test_portfolio_from_spec_preserves_position_metadata() {
     let mut meta = IndexMap::new();
     meta.insert("desk".to_string(), json!("credit"));
 
+    let mut book = Book::new("ig", Some("Investment Grade".to_string()));
+    book.add_position("POS_001".into());
     let spec = PortfolioSpec {
         id: "TEST".to_string(),
         name: None,
@@ -260,10 +262,7 @@ fn test_portfolio_from_spec_preserves_position_metadata() {
             attributes,
             meta,
         }],
-        books: IndexMap::from([(
-            BookId::new("ig"),
-            Book::new("ig", Some("Investment Grade".to_string())),
-        )]),
+        books: IndexMap::from([(BookId::new("ig"), book)]),
         tags: IndexMap::new(),
         meta: IndexMap::new(),
     };

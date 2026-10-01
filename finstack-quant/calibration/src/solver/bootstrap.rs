@@ -426,9 +426,8 @@ impl SequentialBootstrapper {
 
         // Compute optional diagnostics if requested.
         if config.compute_diagnostics {
-            let resid_vec: Vec<f64> = report.residuals.values().copied().collect();
             let diagnostics =
-                compute_bootstrap_diagnostics(target, quotes, &knots, &resid_vec, config);
+                compute_bootstrap_diagnostics(target, quotes, &knots, &report.residuals, config)?;
             report = report.with_diagnostics(diagnostics);
         }
 
@@ -552,27 +551,27 @@ impl SequentialBootstrapper {
 ///
 /// For each knot, bumps the solved value by a small amount and re-evaluates
 /// the residual for the corresponding quote to estimate dResidual/dKnotValue.
+/// Base residuals are matched by the report key, whose lexical order can differ
+/// from both quote maturity and caller order.
 fn compute_bootstrap_diagnostics<T>(
     target: &T,
     quotes: &[T::Quote],
     knots: &[(f64, f64)],
-    resid_values: &[f64],
+    residuals: &BTreeMap<String, f64>,
     config: &CalibrationConfig,
-) -> CalibrationDiagnostics
+) -> Result<CalibrationDiagnostics>
 where
     T: BootstrapTarget,
     T::Quote: std::fmt::Debug,
 {
-    let n = resid_values.len();
+    let resid_values: Vec<f64> = residuals.values().copied().collect();
+    let n = residuals.len();
     let bump_h = super::helpers::diagnostics_bump_h(config);
 
     let mut per_quote = Vec::with_capacity(n);
 
     // Sort quotes by time for consistent ordering (matching the bootstrap solve order).
-    let Ok(sorted_quotes) = sort_quotes_by_time(target, quotes) else {
-        // Fall back to basic diagnostics if sorting fails.
-        return CalibrationDiagnostics::from_residuals(resid_values);
-    };
+    let sorted_quotes = sort_quotes_by_time(target, quotes)?;
 
     // For each sorted quote, compute a finite-difference sensitivity.
     // The knots vector has initial_knots + solved knots. The solved knots
@@ -589,12 +588,20 @@ where
 
     for (sorted_idx, sq) in sorted_quotes.iter().enumerate() {
         let knot_idx = n_initial + sorted_idx;
-        let resid = resid_values.get(sorted_idx).copied().unwrap_or(0.0);
+        let quote = &quotes[sq.original_idx];
+        let quote_label = target.residual_key(quote, sorted_idx);
+        let resid = residuals.get(&quote_label).copied().ok_or_else(|| {
+            finstack_quant_core::Error::Calibration {
+                message: format!(
+                    "Bootstrap diagnostics missing residual for quote key '{quote_label}'"
+                ),
+                category: "bootstrapping".to_string(),
+            }
+        })?;
 
         let sensitivity = if knot_idx < knots.len() {
             let (t, v) = knots[knot_idx];
             let h = bump_h * (1.0 + v.abs());
-            let quote = &quotes[sq.original_idx];
 
             // Central differences: O(h^2) accuracy. Reuse `knots_scratch`:
             // restore it to the base knots, perturb only `knot_idx` for the up
@@ -632,7 +639,7 @@ where
         };
 
         per_quote.push(QuoteQuality {
-            quote_label: target.residual_key(&quotes[sq.original_idx], sorted_idx),
+            quote_label,
             target_value: 0.0,
             fitted_value: resid,
             residual: resid,
@@ -640,11 +647,11 @@ where
         });
     }
 
-    CalibrationDiagnostics {
+    Ok(CalibrationDiagnostics {
         per_quote,
         condition_number: None, // Bootstrap is sequential; no J^T*J available.
-        ..CalibrationDiagnostics::from_residuals(resid_values)
-    }
+        ..CalibrationDiagnostics::from_residuals(&resid_values)
+    })
 }
 
 #[cfg(test)]
@@ -714,6 +721,119 @@ mod tests {
 
         assert_eq!(curve_a, curve_b);
         Ok(())
+    }
+
+    #[derive(Debug, Clone)]
+    struct DiagnosticQuote {
+        time: f64,
+        label: &'static str,
+        residual: f64,
+        slope: f64,
+    }
+
+    struct BoundaryDiagnosticTarget;
+
+    impl BootstrapTarget for BoundaryDiagnosticTarget {
+        type Quote = DiagnosticQuote;
+        type Curve = DummyCurve;
+
+        fn quote_time(&self, quote: &Self::Quote) -> Result<f64> {
+            Ok(quote.time)
+        }
+
+        fn build_curve(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
+            if knots.iter().any(|(_, value)| *value < 0.0) {
+                return Err(finstack_quant_core::Error::Calibration {
+                    message: "negative knot is outside the feasible domain".to_string(),
+                    category: "test".to_string(),
+                });
+            }
+            Ok(DummyCurve(knots.to_vec()))
+        }
+
+        fn calculate_residual(&self, curve: &Self::Curve, quote: &Self::Quote) -> Result<f64> {
+            let value = curve
+                .0
+                .iter()
+                .find(|(time, _)| *time == quote.time)
+                .map(|(_, value)| *value)
+                .expect("the quote's knot must exist");
+            Ok(quote.residual + quote.slope * value)
+        }
+
+        fn initial_guess(
+            &self,
+            _quote: &Self::Quote,
+            _previous_knots: &[(f64, f64)],
+        ) -> Result<f64> {
+            Ok(0.0)
+        }
+
+        fn scan_points(&self, _quote: &Self::Quote, _initial_guess: f64) -> Result<Vec<f64>> {
+            Ok((0..9).map(|index| f64::from(index) * 0.1).collect())
+        }
+
+        fn residual_key(&self, quote: &Self::Quote, _idx: usize) -> String {
+            quote.label.to_string()
+        }
+
+        fn allow_approximate_knots(&self) -> bool {
+            true
+        }
+    }
+
+    #[test]
+    fn bootstrap_diagnostics_associate_residuals_and_one_sided_sensitivities_by_quote_key() {
+        let short = DiagnosticQuote {
+            time: 1.0,
+            label: "Z-short",
+            residual: 0.01,
+            slope: 2.0,
+        };
+        let long = DiagnosticQuote {
+            time: 2.0,
+            label: "A-long",
+            residual: -0.02,
+            slope: -3.0,
+        };
+        let config = CalibrationConfig::default()
+            .with_tolerance(0.1)
+            .with_compute_diagnostics(true);
+
+        // Both opt-in approximate knots settle at the lower bound, with distinct
+        // nonzero residuals. Down bumps fail, so the diagnostic must subtract the
+        // correct quote's base residual to recover the one-sided derivative.
+        for quotes in [
+            vec![short.clone(), long.clone()],
+            vec![long.clone(), short.clone()],
+        ] {
+            let (curve, report) = SequentialBootstrapper::bootstrap(
+                &BoundaryDiagnosticTarget,
+                &quotes,
+                vec![(0.0, 0.0)],
+                &config,
+                0.1,
+            )
+            .expect("boundary knots are explicitly accepted within tolerance");
+            assert_eq!(curve.0, vec![(0.0, 0.0), (1.0, 0.0), (2.0, 0.0)]);
+            let diagnostics = report.diagnostics.expect("diagnostics enabled");
+            assert_eq!(diagnostics.per_quote.len(), 2);
+            for (quality, quote) in diagnostics.per_quote.iter().zip([&short, &long]) {
+                assert_eq!(quality.quote_label, quote.label);
+                assert_eq!(quality.residual, quote.residual);
+                assert_eq!(quality.fitted_value, quote.residual);
+                assert_eq!(report.residuals[&quality.quote_label], quality.residual);
+                assert!(
+                    (quality.sensitivity - quote.slope.abs()).abs() < 1e-10,
+                    "{}: expected sensitivity {}, got {}",
+                    quote.label,
+                    quote.slope.abs(),
+                    quality.sensitivity
+                );
+            }
+            assert_eq!(diagnostics.max_residual, 0.02);
+            assert_eq!(diagnostics.rms_residual, report.rmse);
+        }
     }
 }
 

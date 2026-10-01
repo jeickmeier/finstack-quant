@@ -238,7 +238,7 @@ pub fn compute_pnl_profiles_with_market(
 /// as the `riskMeasureJson` input: `"variance"` or `"volatility"`, or an
 /// object carrying `confidence` for `var` / `expected_shortfall`. The Python
 /// `RiskDecomposition.measure` getter returns the same value.
-/// @param sensitivities_json - Canonical sensitivity-matrix JSON `{ base_currency, position_ids, factor_ids, data }` with one `data` row per position and one entry per factor; unknown keys are rejected.
+/// @param sensitivities_json - Canonical factor-sensitivity JSON with required `base_currency`, ordered `position_ids`/`factor_ids`, and nested `data[position][factor]` rows; `JSON.stringify` the result of `computeFactorSensitivities`. Python `SensitivityMatrix.to_json()` uses the same contract. Unknown fields, inconsistent dimensions, and non-finite entries are rejected.
 /// @param covariance_json - Factor covariance-matrix JSON aligned with the supplied sensitivities.
 /// @param risk_measure_json - `RiskMeasure` wire value selecting the decomposition metric: `"variance"`, `"volatility"`, an object such as `{ var: { confidence: 0.99 } }`, or the same value as JSON text; omit for `"variance"`.
 ///

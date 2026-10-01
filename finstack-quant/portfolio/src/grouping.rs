@@ -16,7 +16,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::{HashMap, HashSet};
 use indexmap::IndexMap;
 
-const MAX_BOOK_GROUPING_RECURSION_DEPTH: usize = 512;
+const MAX_BOOK_GROUPING_RECURSION_DEPTH: usize = crate::book::MAX_BOOK_DEPTH;
 
 /// Aggregate portfolio values by book hierarchy with recursive rollup.
 ///

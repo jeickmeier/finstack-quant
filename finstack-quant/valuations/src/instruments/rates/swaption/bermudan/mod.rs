@@ -694,7 +694,7 @@ impl BermudanSwaptionPricer {
         );
         result.measures.insert(
             crate::metrics::MetricId::custom("lsmc_num_paths"),
-            mc_paths as f64,
+            estimate.num_paths as f64,
         );
         result.measures.insert(
             crate::metrics::MetricId::custom("lsmc_seed"),
@@ -832,6 +832,59 @@ impl Pricer for BermudanSwaptionPricer {
         match self.method {
             BermudanPricingMethod::HullWhiteTree => self.price_tree(swaption, market, as_of),
             BermudanPricingMethod::Lsmc => self.price_lsmc(swaption, market, as_of),
+        }
+    }
+}
+
+#[cfg(test)]
+mod lsmc_diagnostics_tests {
+    use super::*;
+    use time::macros::date;
+
+    #[test]
+    fn public_lsmc_counts_pricing_estimators_and_preserves_seed_determinism() {
+        let as_of = date!(2026 - 01 - 15);
+        let mut swaption = BermudanSwaption::example().expect("swaption");
+        let model = &mut swaption.instrument_pricing_overrides.model_config;
+        model.hw1f_mean_reversion = Some(0.03);
+        model.hw1f_sigma = Some(0.012);
+        model.mc_paths = Some(64);
+        let market = MarketContext::new()
+            .insert(DiscountCurve::flat("USD-OIS", as_of, 0.03).expect("discount curve"));
+
+        for antithetic in [false, true] {
+            for oos_lsmc in [false, true] {
+                let pricer =
+                    BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
+                        mc: RateExoticMcConfig {
+                            // The instrument override supplies the 64 actual streams.
+                            num_paths: 16,
+                            antithetic,
+                            oos_lsmc,
+                            seed: 42,
+                            ..BermudanSwaptionPricerConfig::DEFAULT_MC
+                        },
+                        ..Default::default()
+                    });
+                let result = pricer.price_dyn(&swaption, &market, as_of).expect("price");
+                let repeat = pricer.price_dyn(&swaption, &market, as_of).expect("repeat");
+                assert_eq!(
+                    result.measures["lsmc_num_paths"],
+                    if oos_lsmc { 32.0 } else { 64.0 }
+                );
+                assert_eq!(result.value, repeat.value);
+                assert_eq!(result.measures["mc_stderr"], repeat.measures["mc_stderr"]);
+                assert_eq!(
+                    result.measures["lsmc_ci95_low"],
+                    repeat.measures["lsmc_ci95_low"]
+                );
+                assert_eq!(
+                    result.measures["lsmc_ci95_high"],
+                    repeat.measures["lsmc_ci95_high"]
+                );
+                assert!(result.measures["lsmc_ci95_low"] <= result.value.amount());
+                assert!(result.measures["lsmc_ci95_high"] >= result.value.amount());
+            }
         }
     }
 }

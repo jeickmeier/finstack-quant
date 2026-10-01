@@ -171,7 +171,6 @@ fn test_ecf_sweep_basic() {
 mod period_flow_waterfall_integration {
     use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
     use finstack_quant_cashflows::primitives::CFKind;
-    use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_core::cashflow::CashFlow;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount, Period, PeriodId};
@@ -183,23 +182,12 @@ mod period_flow_waterfall_integration {
     };
     use finstack_quant_statements::evaluator::EvaluationContext;
     use finstack_quant_statements::types::NodeId;
+    use finstack_quant_valuations::instruments::Instrument;
     use indexmap::IndexMap;
     use std::sync::Arc;
     use time::Month;
 
-    struct ScheduleInstrument {
-        schedule: CashFlowSchedule,
-    }
-
-    impl finstack_quant_cashflows::CashflowScheduleSource for ScheduleInstrument {
-        fn raw_cashflow_schedule(
-            &self,
-            _curves: &MarketContext,
-            _as_of: Date,
-        ) -> finstack_quant_core::Result<CashFlowSchedule> {
-            Ok(self.schedule.clone())
-        }
-    }
+    use crate::dsl_all::support::ScheduleInstrument;
 
     fn quarter_period(year: i32, q: u8) -> Period {
         let month = |q: u8| match q {
@@ -281,15 +269,13 @@ mod period_flow_waterfall_integration {
             flows.push(CashFlow::new(
                 Date::from_calendar_date(year, month, 15).expect("valid date"),
                 None,
-                Money::new(-notional * rate_q, Currency::USD).expect("valid money fixture"),
+                Money::new(notional * rate_q, Currency::USD).expect("valid money fixture"),
                 CFKind::Fixed,
                 0.25,
                 Some(rate_q * 4.0),
             ));
         }
-        let instrument = ScheduleInstrument {
-            schedule: schedule(flows, notional, issue),
-        };
+        let instrument = ScheduleInstrument::new(schedule(flows, notional, issue));
 
         let waterfall = WaterfallSpec {
             priority_of_payments: vec![
@@ -422,30 +408,28 @@ mod period_flow_waterfall_integration {
         let q1 = quarter_period(2025, 1);
         let q2 = quarter_period(2025, 2);
 
-        let instrument = ScheduleInstrument {
-            schedule: schedule(
-                vec![
-                    CashFlow::new(
-                        Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
-                        None,
-                        Money::new(-20_000.0, Currency::USD).expect("valid money fixture"),
-                        CFKind::Fixed,
-                        0.25,
-                        Some(0.08),
-                    ),
-                    CashFlow::new(
-                        Date::from_calendar_date(2025, Month::May, 15).expect("valid date"),
-                        None,
-                        Money::new(-20_000.0, Currency::USD).expect("valid money fixture"),
-                        CFKind::Fixed,
-                        0.25,
-                        Some(0.08),
-                    ),
-                ],
-                notional,
-                issue,
-            ),
-        };
+        let instrument = ScheduleInstrument::new(schedule(
+            vec![
+                CashFlow::new(
+                    Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                    None,
+                    Money::new(20_000.0, Currency::USD).expect("valid money fixture"),
+                    CFKind::Fixed,
+                    0.25,
+                    Some(0.08),
+                ),
+                CashFlow::new(
+                    Date::from_calendar_date(2025, Month::May, 15).expect("valid date"),
+                    None,
+                    Money::new(20_000.0, Currency::USD).expect("valid money fixture"),
+                    CFKind::Fixed,
+                    0.25,
+                    Some(0.08),
+                ),
+            ],
+            notional,
+            issue,
+        ));
 
         let waterfall = WaterfallSpec {
             priority_of_payments: vec![
@@ -552,30 +536,28 @@ mod period_flow_waterfall_integration {
         let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let period = quarter_period(2025, 1);
 
-        let instrument = ScheduleInstrument {
-            schedule: schedule(
-                vec![
-                    CashFlow::new(
-                        Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
-                        None,
-                        Money::new(-10_000.0, Currency::USD).expect("valid money fixture"),
-                        CFKind::Fixed,
-                        0.25,
-                        Some(0.04),
-                    ),
-                    CashFlow::new(
-                        Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
-                        None,
-                        Money::new(50_000.0, Currency::USD).expect("valid money fixture"),
-                        CFKind::Amortization,
-                        0.0,
-                        None,
-                    ),
-                ],
-                1_000_000.0,
-                issue,
-            ),
-        };
+        let instrument = ScheduleInstrument::new(schedule(
+            vec![
+                CashFlow::new(
+                    Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                    None,
+                    Money::new(10_000.0, Currency::USD).expect("valid money fixture"),
+                    CFKind::Fixed,
+                    0.25,
+                    Some(0.04),
+                ),
+                CashFlow::new(
+                    Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
+                    None,
+                    Money::new(50_000.0, Currency::USD).expect("valid money fixture"),
+                    CFKind::Amortization,
+                    0.0,
+                    None,
+                ),
+            ],
+            1_000_000.0,
+            issue,
+        ));
 
         let market_ctx = MarketContext::new();
         let mut state = CapitalStructureState::new();
@@ -649,33 +631,30 @@ mod period_flow_waterfall_integration {
 
         // Instrument issued mid-horizon (Q3): funding draw on Jul 1, one
         // coupon in Q4.
-        let instrument: Arc<dyn CashflowProvider + Send + Sync> = Arc::new(ScheduleInstrument {
-            schedule: schedule(
-                vec![
-                    CashFlow::new(
-                        issue,
-                        None,
-                        Money::new(-1_000_000.0, Currency::USD).expect("valid money fixture"),
-                        CFKind::Notional,
-                        0.0,
-                        None,
-                    ),
-                    CashFlow::new(
-                        Date::from_calendar_date(2025, Month::November, 15).expect("valid date"),
-                        None,
-                        Money::new(-20_000.0, Currency::USD).expect("valid money fixture"),
-                        CFKind::Fixed,
-                        0.25,
-                        Some(0.08),
-                    ),
-                ],
-                1_000_000.0,
-                issue,
-            ),
-        });
+        let instrument: Arc<dyn Instrument> = Arc::new(ScheduleInstrument::new(schedule(
+            vec![
+                CashFlow::new(
+                    issue,
+                    None,
+                    Money::new(-1_000_000.0, Currency::USD).expect("valid money fixture"),
+                    CFKind::Notional,
+                    0.0,
+                    None,
+                ),
+                CashFlow::new(
+                    Date::from_calendar_date(2025, Month::November, 15).expect("valid date"),
+                    None,
+                    Money::new(20_000.0, Currency::USD).expect("valid money fixture"),
+                    CFKind::Fixed,
+                    0.25,
+                    Some(0.08),
+                ),
+            ],
+            1_000_000.0,
+            issue,
+        )));
 
-        let mut instruments: IndexMap<String, Arc<dyn CashflowProvider + Send + Sync>> =
-            IndexMap::new();
+        let mut instruments: IndexMap<String, Arc<dyn Instrument>> = IndexMap::new();
         instruments.insert("DDTL-1".to_string(), instrument);
 
         let periods: Vec<Period> = (1..=4).map(|q| quarter_period(2025, q)).collect();

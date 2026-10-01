@@ -7,8 +7,11 @@ use finstack_quant_core::dates::calendar::{
     HKEX as Hkex, HKHK as Hkhk, NSE as Nse, NYSE as Nyse, SGSI as Sgsi, SIFMA as Sifma, SIX as Six,
     SSE as Sse, TARGET2 as Target2, TSX as Tsx, USNY as Usny,
 };
-use finstack_quant_core::dates::{available_calendars, Date, HolidayCalendar};
+use finstack_quant_core::dates::{
+    adjust, available_calendars, BusinessDayConvention, Date, DateExt, HolidayCalendar, Month, Rule,
+};
 use std::collections::HashSet;
+use time::Weekday;
 
 fn holiday_set(cal: &dyn HolidayCalendar, year: i32) -> HashSet<Date> {
     (1..=if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) {
@@ -19,6 +22,325 @@ fn holiday_set(cal: &dyn HolidayCalendar, year: i32) -> HashSet<Date> {
         .filter_map(|d| Date::from_ordinal_date(year, d).ok())
         .filter(|&dt| cal.is_holiday(dt))
         .collect()
+}
+
+#[test]
+fn calendars_match_complete_published_years_including_open_days() {
+    let rows = include_str!("fixtures/published_weekday_closures.csv")
+        .lines()
+        .filter(|line| !line.starts_with('#'))
+        .skip(1);
+    for row in rows {
+        let fields: Vec<_> = row.split(',').collect();
+        assert_eq!(fields.len(), 3, "invalid fixture row {row}");
+        let id = fields[0];
+        let year = fields[1].parse::<i32>().unwrap();
+        let calendar = calendar_by_id(id).unwrap();
+        let closed: HashSet<_> = fields[2]
+            .split(';')
+            .map(|value| {
+                let (month, day) = value.split_once('-').unwrap();
+                make_date(year, month.parse().unwrap(), day.parse().unwrap())
+            })
+            .collect();
+        assert!(closed.iter().all(|date| !date.is_weekend()));
+        let mut expected_count = 0;
+        for ordinal in 1..=366 {
+            let Ok(date) = Date::from_ordinal_date(year, ordinal) else {
+                continue;
+            };
+            let expected = !date.is_weekend() && !closed.contains(&date);
+            assert_eq!(calendar.is_business_day(date), expected, "{id}: {date}");
+            expected_count += i32::from(expected);
+        }
+        assert_eq!(
+            calendar.count_business_days(make_date(year, 1, 1), make_date(year + 1, 1, 1)),
+            expected_count,
+            "{id}: full-year accrual count {year}"
+        );
+    }
+}
+
+#[test]
+fn calendar_conventions_preserve_neighboring_open_dates() {
+    for id in ["cato", "tsx"] {
+        let calendar = calendar_by_id(id).unwrap();
+        assert_eq!(
+            adjust(
+                make_date(2026, 5, 18),
+                BusinessDayConvention::Following,
+                calendar
+            )
+            .unwrap(),
+            make_date(2026, 5, 19)
+        );
+        assert!(calendar.is_business_day(make_date(2026, 5, 25)));
+    }
+    for id in ["asx", "auce"] {
+        let calendar = calendar_by_id(id).unwrap();
+        assert!(!calendar.is_business_day(make_date(2024, 1, 26)));
+        assert!(calendar.is_business_day(make_date(2024, 1, 29)));
+    }
+    for id in ["asx", "auce", "cato", "tsx", "nzau"] {
+        let calendar = calendar_by_id(id).unwrap();
+        for closed in [make_date(2027, 12, 27), make_date(2027, 12, 28)] {
+            assert!(!calendar.is_business_day(closed), "{id}: {closed}");
+        }
+        assert!(calendar.is_business_day(make_date(2027, 12, 29)));
+        assert!(!calendar.is_business_day(make_date(2022, 12, 27)));
+        assert!(calendar.is_business_day(make_date(2022, 12, 28)));
+    }
+    assert!(Nyse.is_business_day(make_date(2027, 12, 31)));
+    assert!(!Nyse.is_business_day(make_date(2025, 1, 9)));
+    assert!(Usny.is_business_day(make_date(2025, 1, 9)));
+    assert!(Sifma.is_business_day(make_date(2026, 4, 3)));
+    assert!(!Nyse.is_business_day(make_date(2026, 4, 3)));
+    assert!(Sgsi.is_business_day(make_date(2025, 8, 11)));
+    assert!(!Sgsi.is_business_day(make_date(2027, 2, 8)));
+    // ANBIMA national accrual holidays deliberately differ from B3 trading.
+    assert!(Brbd.is_business_day(make_date(2025, 12, 24)));
+    assert!(Brbd.is_business_day(make_date(2025, 12, 31)));
+    assert!(Brbd.name.contains("ANBIMA"));
+}
+
+#[test]
+fn holiday_adoption_bounds_are_respected() {
+    for calendar in [&Cato, &Tsx] {
+        assert!(calendar.is_business_day(make_date(2007, 2, 19)));
+        assert!(!calendar.is_business_day(make_date(2008, 2, 18)));
+    }
+    assert!(Cato.is_business_day(make_date(2020, 9, 30)));
+    assert!(!Cato.is_business_day(make_date(2021, 9, 30)));
+    let auckland = calendar_by_id("nzau").unwrap();
+    assert!(!auckland.is_business_day(make_date(2022, 6, 24)));
+    assert!(!auckland.is_business_day(make_date(2052, 6, 21)));
+    assert!(auckland.is_business_day(make_date(2021, 6, 25)));
+    assert!(!auckland.is_business_day(make_date(2022, 9, 26)));
+    assert!(auckland.is_business_day(make_date(2010, 4, 26)));
+    assert!(!auckland.is_business_day(make_date(2015, 4, 27)));
+    assert!(!auckland.is_business_day(make_date(2022, 1, 4)));
+    assert!(auckland.is_business_day(make_date(2022, 1, 5)));
+}
+
+#[test]
+fn hong_kong_matches_published_general_holidays() {
+    // Complete gazetted lists (excluding ordinary Sundays), not model outputs:
+    // https://www.legco.gov.hk/yr98-99/english/bc/bc51/papers/p66e01.pdf
+    // https://www.info.gov.hk/gia/general/202405/03/P2024043000417.htm
+    // https://www.info.gov.hk/gia/general/202505/16/P2025051300353.htm
+    // https://www.info.gov.hk/gia/general/202605/15/P2026051400300.htm
+    let years: &[(i32, &[(u8, u8)])] = &[
+        (
+            1999,
+            &[
+                (1, 1),
+                (2, 16),
+                (2, 17),
+                (2, 18),
+                (4, 2),
+                (4, 3),
+                (4, 5),
+                (4, 6),
+                (5, 1),
+                (5, 22),
+                (6, 18),
+                (7, 1),
+                (9, 25),
+                (10, 1),
+                (10, 18),
+                (12, 25),
+                (12, 27),
+            ],
+        ),
+        (
+            2025,
+            &[
+                (1, 1),
+                (1, 29),
+                (1, 30),
+                (1, 31),
+                (4, 4),
+                (4, 18),
+                (4, 19),
+                (4, 21),
+                (5, 1),
+                (5, 5),
+                (5, 31),
+                (7, 1),
+                (10, 1),
+                (10, 7),
+                (10, 29),
+                (12, 25),
+                (12, 26),
+            ],
+        ),
+        (
+            2026,
+            &[
+                (1, 1),
+                (2, 17),
+                (2, 18),
+                (2, 19),
+                (4, 3),
+                (4, 4),
+                (4, 6),
+                (4, 7),
+                (5, 1),
+                (5, 25),
+                (6, 19),
+                (7, 1),
+                (9, 26),
+                (10, 1),
+                (10, 19),
+                (12, 25),
+                (12, 26),
+            ],
+        ),
+        (
+            2027,
+            &[
+                (1, 1),
+                (2, 6),
+                (2, 8),
+                (2, 9),
+                (3, 26),
+                (3, 27),
+                (3, 29),
+                (4, 5),
+                (5, 1),
+                (5, 13),
+                (6, 9),
+                (7, 1),
+                (9, 16),
+                (10, 1),
+                (10, 8),
+                (12, 25),
+                (12, 27),
+            ],
+        ),
+    ];
+    for id in ["hkhk", "hkex"] {
+        let calendar = calendar_by_id(id).unwrap();
+        for &(year, month_days) in years {
+            let expected: HashSet<_> = month_days
+                .iter()
+                .map(|&(month, day)| make_date(year, month, day))
+                .collect();
+            assert_eq!(holiday_set(calendar, year), expected, "{id} {year}");
+        }
+        assert_eq!(
+            make_date(2026, 4, 2)
+                .add_business_days(1, calendar)
+                .unwrap(),
+            make_date(2026, 4, 8),
+            "{id}: Easter/Ching Ming collision"
+        );
+        // Saturday holidays do not close the preceding Friday.
+        assert!(calendar.is_business_day(make_date(2027, 4, 30)));
+    }
+}
+
+#[test]
+fn hong_kong_historical_adoption_and_substitution() {
+    for id in ["hkhk", "hkex"] {
+        let calendar = calendar_by_id(id).unwrap();
+        for date in [
+            make_date(1981, 7, 29),  // Royal wedding one-off holiday.
+            make_date(1982, 4, 21),  // Colonial Queen's Birthday.
+            make_date(1983, 6, 13),  // Monday after second Saturday in June.
+            make_date(1984, 6, 18),  // Announced exception one week later.
+            make_date(1986, 10, 22), // Royal visit one-off holiday.
+            make_date(1997, 6, 16),  // Last Queen's Birthday holiday.
+            make_date(1997, 7, 2),   // One-off handover holiday.
+            make_date(1998, 8, 17),  // Transitional Sino-Japanese War Victory Day.
+            make_date(1998, 10, 2),
+            make_date(1999, 5, 22), // First general Buddha birthday holiday.
+            make_date(2010, 2, 13), // Pre-2012 substitution on New Year's Eve.
+            make_date(2013, 2, 13), // Post-2012 fourth lunar day substitution.
+            make_date(2012, 10, 2), // Mid-Autumn/National Day collision.
+            make_date(2015, 9, 3),  // Published one-off special holiday.
+            make_date(2020, 10, 2), // Mid-Autumn/National Day collision.
+        ] {
+            assert!(calendar.is_holiday(date), "{id} missing {date}");
+        }
+        for date in [
+            make_date(1998, 5, 1), // Labour Day only added to general holidays in 1999.
+            make_date(1984, 6, 11),
+            make_date(1998, 6, 15),
+            make_date(1999, 8, 16),
+            make_date(1999, 10, 2),
+            make_date(2010, 2, 17), // No fourth-day substitute under the older regime.
+        ] {
+            assert!(!calendar.is_holiday(date), "{id} unexpected {date}");
+        }
+    }
+}
+
+#[test]
+fn japan_matches_cabinet_office_holidays_1970_through_2027() {
+    // Snapshot of the independent Cabinet Office CSV (accessed 2026-09-30):
+    // https://www8.cao.go.jp/chosei/shukujitsu/syukujitsu.csv
+    let expected: HashSet<_> = include_str!("fixtures/japan_public_holidays.csv")
+        .lines()
+        .skip(1)
+        .map(|line| {
+            let fields: Vec<_> = line.split(',').collect();
+            make_date(
+                fields[0].parse().unwrap(),
+                fields[1].parse().unwrap(),
+                fields[2].parse().unwrap(),
+            )
+        })
+        .collect();
+    for year in 1970..=2027 {
+        for ordinal in 1..=366 {
+            let Ok(date) = Date::from_ordinal_date(year, ordinal) else {
+                continue;
+            };
+            assert_eq!(
+                Rule::JapanPublicHolidays.applies(date),
+                expected.contains(&date),
+                "national/citizens/substitute holiday {date}"
+            );
+            let bank_closure = (date.month() == Month::January && matches!(date.day(), 2 | 3))
+                || (date.month() == Month::December && date.day() == 31);
+            let business = !expected.contains(&date)
+                && !bank_closure
+                && !matches!(date.weekday(), Weekday::Saturday | Weekday::Sunday);
+            for id in ["jpto", "jpx"] {
+                assert_eq!(
+                    calendar_by_id(id).unwrap().is_business_day(date),
+                    business,
+                    "{id} {date}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn japan_golden_week_and_citizens_holiday_adjustments() {
+    for id in ["jpto", "jpx"] {
+        let calendar = calendar_by_id(id).unwrap();
+        assert_eq!(
+            adjust(
+                make_date(2026, 5, 5),
+                BusinessDayConvention::Following,
+                calendar
+            )
+            .unwrap(),
+            make_date(2026, 5, 7),
+            "{id}: substitute skips May 4 and May 5"
+        );
+        assert!(!calendar.is_business_day(make_date(2026, 9, 22)));
+        assert!(calendar.is_business_day(make_date(2026, 9, 24)));
+        assert!(
+            calendar.is_business_day(make_date(2023, 2, 10)),
+            "{id}: Saturday Feb 11 has no Friday substitute"
+        );
+        assert!(!calendar.is_business_day(make_date(2027, 3, 22)));
+        assert!(!calendar.is_business_day(make_date(2026, 12, 31)));
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -63,7 +385,7 @@ const CASES: &[CalendarCase] = &[
             },
             YearCheck {
                 year: 2025,
-                expected_count: Some(10),
+                expected_count: Some(11),
                 must_have: &[(2025, 1, 1), (2025, 4, 18), (2025, 12, 25)],
             },
         ],
@@ -170,12 +492,12 @@ const CASES: &[CalendarCase] = &[
         checks: &[
             YearCheck {
                 year: 2024,
-                expected_count: Some(11),
+                expected_count: Some(17),
                 must_have: &[(2024, 2, 10), (2024, 7, 1), (2024, 12, 25)],
             },
             YearCheck {
                 year: 2025,
-                expected_count: Some(11),
+                expected_count: Some(17),
                 must_have: &[(2025, 1, 29), (2025, 4, 4), (2025, 10, 1)],
             },
         ],
@@ -186,12 +508,12 @@ const CASES: &[CalendarCase] = &[
         checks: &[
             YearCheck {
                 year: 2024,
-                expected_count: Some(11),
+                expected_count: Some(17),
                 must_have: &[(2024, 2, 10), (2024, 5, 15)],
             },
             YearCheck {
                 year: 2025,
-                expected_count: Some(11),
+                expected_count: Some(17),
                 must_have: &[(2025, 1, 29), (2025, 10, 1)],
             },
         ],
@@ -262,13 +584,13 @@ const CASES: &[CalendarCase] = &[
         checks: &[
             YearCheck {
                 year: 2024,
-                expected_count: Some(7),
+                expected_count: Some(12),
                 must_have: &[(2024, 2, 10), (2024, 3, 29)],
             },
             YearCheck {
                 year: 2025,
-                expected_count: Some(7),
-                must_have: &[(2025, 1, 29), (2025, 8, 11)],
+                expected_count: Some(12),
+                must_have: &[(2025, 1, 29), (2025, 8, 9)],
             },
         ],
     },
@@ -278,12 +600,12 @@ const CASES: &[CalendarCase] = &[
         checks: &[
             YearCheck {
                 year: 2024,
-                expected_count: Some(7),
-                must_have: &[(2024, 1, 29), (2024, 3, 29)],
+                expected_count: Some(8),
+                must_have: &[(2024, 1, 26), (2024, 3, 29)],
             },
             YearCheck {
                 year: 2025,
-                expected_count: Some(7),
+                expected_count: Some(8),
                 must_have: &[(2025, 1, 27), (2025, 4, 18)],
             },
         ],
@@ -295,7 +617,7 @@ const CASES: &[CalendarCase] = &[
             YearCheck {
                 year: 2024,
                 expected_count: Some(10),
-                must_have: &[(2024, 1, 29), (2024, 6, 10), (2024, 10, 7)],
+                must_have: &[(2024, 1, 26), (2024, 6, 10), (2024, 10, 7)],
             },
             YearCheck {
                 year: 2025,
@@ -742,6 +1064,39 @@ fn usny_fed_observance_saturday_no_substitute_sunday_to_monday() {
     );
 }
 
+#[test]
+fn sofr_calendar_follows_repo_closures_independently_of_banking_and_trading() {
+    let sofr = calendar_by_id("sofr").expect("registered SOFR calendar");
+    // NY Fed operating policies 250328a, 260312a and 260618a: there is no
+    // SOFR value date on these Fridays; Thursday's fixing covers to Monday.
+    for (holiday, following) in [
+        (make_date(2025, 4, 18), make_date(2025, 4, 21)),
+        (make_date(2026, 4, 3), make_date(2026, 4, 6)),
+        (make_date(2026, 7, 3), make_date(2026, 7, 6)),
+    ] {
+        assert!(!sofr.is_business_day(holiday), "SOFR closure: {holiday}");
+        assert!(Usny.is_business_day(holiday), "banking day: {holiday}");
+        assert_eq!(
+            adjust(holiday, BusinessDayConvention::Following, sofr).unwrap(),
+            following
+        );
+    }
+    // Good Friday 2026 is a SIFMA early-close trading session, but the
+    // cleared repo market is closed and SOFR does not fix.
+    assert!(Sifma.is_business_day(make_date(2026, 4, 3)));
+
+    // Repo observance is holiday-specific; do not import the federal-workforce
+    // Friday-substitution rule for New Year's Day or Veterans Day.
+    assert!(sofr.is_business_day(make_date(2021, 12, 31)));
+    assert!(sofr.is_business_day(make_date(2023, 11, 10)));
+    assert!(!sofr.is_business_day(make_date(2021, 12, 24)));
+    assert!(!sofr.is_business_day(make_date(2023, 1, 2)));
+    assert!(!sofr.is_business_day(make_date(2022, 6, 20)));
+    assert!(!sofr.is_business_day(make_date(2018, 12, 5)));
+    // The 2025 Carter mourning day was an early close, with unchanged SOFR.
+    assert!(sofr.is_business_day(make_date(2025, 1, 9)));
+}
+
 /// UK chained substitution for Christmas/Boxing Day: the two observed days
 /// never collide and never drop a substitute day.
 #[test]
@@ -817,12 +1172,12 @@ fn gblo_one_off_and_moved_bank_holidays() {
 }
 
 /// Dia da Consciência Negra became a Brazilian national holiday only from 2024
-/// (Law 14.759/2023); B3 traded on Nov 20 in 2023.
+/// (Law 14.759/2023); ANBIMA national accrual holidays include it from 2024.
 #[test]
 fn brbd_consciencia_negra_year_gated_from_2024() {
     assert!(
         Brbd.is_business_day(make_date(2023, 11, 20)),
-        "B3 traded Mon 2023-11-20 (holiday national only from 2024)"
+        "National accrual holiday applies from 2024"
     );
     assert!(Brbd.is_holiday(make_date(2024, 11, 20)));
 }

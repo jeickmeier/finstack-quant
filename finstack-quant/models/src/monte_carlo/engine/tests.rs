@@ -837,7 +837,7 @@ fn test_price_with_capture_parallel_non_splittable_returns_error() {
 #[test]
 fn test_on_path_start_state_survives_into_simulation() {
     let engine = McEngine::builder()
-        .num_paths(1)
+        .num_paths(2)
         .uniform_grid(1.0, 1)
         .parallel(false)
         .build()
@@ -887,6 +887,56 @@ fn test_price_rejects_zero_paths() {
 }
 
 #[test]
+fn test_price_rejects_one_independent_estimator_including_an_antithetic_pair() {
+    for antithetic in [false, true] {
+        for parallel in [false, true] {
+            let engine = McEngine::new(
+                McEngineConfig::uniform(1, 1.0, 1)
+                    .expect("grid should build")
+                    .parallel(parallel)
+                    .antithetic(antithetic),
+            );
+            let err = engine
+                .price(
+                    &DummyRng,
+                    &DummyProcess,
+                    &DummyDisc,
+                    &[100.0],
+                    &DummyPayoff,
+                    Currency::USD,
+                    1.0,
+                )
+                .expect_err("one independent estimator cannot define a confidence interval");
+            assert!(err
+                .to_string()
+                .contains("at least 2 independent estimators"));
+        }
+    }
+
+    let engine = McEngine::new(
+        McEngineConfig::uniform(1, 1.0, 1)
+            .expect("grid should build")
+            .parallel(false)
+            .path_capture(PathCaptureConfig::all()),
+    );
+    let err = engine
+        .price_with_capture(
+            &DummyRng,
+            &DummyProcess,
+            &DummyDisc,
+            &[100.0],
+            &DummyPayoff,
+            Currency::USD,
+            1.0,
+            ProcessParams::new("test"),
+        )
+        .expect_err("capture must enforce the same independent sample requirement");
+    assert!(err
+        .to_string()
+        .contains("at least 2 independent estimators"));
+}
+
+#[test]
 fn test_price_rejects_zero_chunk_size() {
     let time_grid = TimeGrid::uniform(1.0, 1).expect("grid should build");
     let engine = McEngine::new(McEngineConfig {
@@ -912,6 +962,71 @@ fn test_price_rejects_zero_chunk_size() {
         .expect_err("zero chunk size should be rejected");
 
     assert!(err.to_string().contains("chunk_size"));
+}
+
+#[test]
+fn captured_rough_heston_paths_reset_history_and_match_streaming_prices() {
+    use crate::monte_carlo::discretization::rough_heston::RoughHestonHybrid;
+    use crate::monte_carlo::payoff::vanilla::EuropeanCall;
+    use crate::monte_carlo::process::metadata::ProcessMetadata;
+    use crate::monte_carlo::process::rough_heston::{RoughHestonParams, RoughHestonProcess};
+    use crate::monte_carlo::rng::philox::PhiloxRng;
+    use finstack_quant_core::math::fractional::HurstExponent;
+
+    let process = RoughHestonProcess::new(
+        RoughHestonParams {
+            r: 0.05,
+            q: 0.02,
+            hurst: HurstExponent::new(0.1).unwrap(),
+            kappa: 2.0,
+            theta: 0.04,
+            sigma_v: 0.3,
+            rho: -0.7,
+            v0: 0.04,
+        }
+        .validate()
+        .unwrap(),
+    );
+    let time_grid = TimeGrid::uniform(1.0, 3).unwrap();
+    let disc = RoughHestonHybrid::new(time_grid.times(), 0.1).unwrap();
+    let payoff = EuropeanCall::new(100.0, 1.0, 3);
+    let rng = PhiloxRng::new(42);
+    for parallel in [false, true] {
+        // Two paths per chunk require the captured loop to reset a used
+        // Volterra history and its terminal step counter before the next path.
+        let config = McEngineConfig::new(4, time_grid.clone())
+            .parallel(parallel)
+            .antithetic(false)
+            .chunk_size(2);
+        let streaming = McEngine::new(config.clone())
+            .price(
+                &rng,
+                &process,
+                &disc,
+                &[100.0, 0.04],
+                &payoff,
+                Currency::USD,
+                1.0,
+            )
+            .unwrap();
+        let captured = McEngine::new(config.path_capture(PathCaptureConfig::all()))
+            .price_with_capture(
+                &rng,
+                &process,
+                &disc,
+                &[100.0, 0.04],
+                &payoff,
+                Currency::USD,
+                1.0,
+                process.metadata(),
+            )
+            .unwrap();
+        assert!((streaming.mean.amount() - captured.estimate.mean.amount()).abs() < 1e-12);
+        assert!((streaming.stderr - captured.estimate.stderr).abs() < 1e-12);
+        let paths = captured.paths.unwrap().paths;
+        assert_eq!(paths.len(), 4);
+        assert!(paths.iter().all(|path| path.points.len() == 4));
+    }
 }
 
 #[test]
@@ -1054,7 +1169,7 @@ fn test_price_rejects_parallel_auto_stop_configuration() {
 #[test]
 fn test_price_with_capture_captures_initial_event_cashflows_and_payoff() {
     let engine = McEngine::new(McEngineConfig {
-        num_paths: 1,
+        num_paths: 2,
         time_grid: TimeGrid::uniform(1.0, 1).expect("grid should build"),
         target_ci_half_width: None,
         use_parallel: false,
@@ -1092,7 +1207,7 @@ fn test_price_with_capture_captures_initial_event_cashflows_and_payoff() {
 #[test]
 fn test_price_with_capture_preserves_cashflows_across_multiple_timesteps() {
     let engine = McEngine::new(McEngineConfig {
-        num_paths: 1,
+        num_paths: 2,
         time_grid: TimeGrid::uniform(1.0, 2).expect("grid should build"),
         target_ci_half_width: None,
         use_parallel: false,

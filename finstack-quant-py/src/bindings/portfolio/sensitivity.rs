@@ -57,6 +57,10 @@ impl PySensitivityMatrix {
     /// (``{base_currency, position_ids, factor_ids, data}``, ``data`` as one
     /// row per position), the shape WASM ``computeFactorSensitivities``
     /// returns and ``decomposeFactorRisk`` accepts.
+    ///
+    /// ``data[position][factor]`` must contain exactly one finite entry per
+    /// declared position/factor pair. Malformed shapes and unknown fields raise
+    /// ``ValueError``.
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {

@@ -33,6 +33,9 @@ pub(super) struct RawForwardCurve {
     pub rate_calibration: Option<crate::market_data::term_structures::RateCalibrationRecipe>,
     /// Opaque FX policy stamp; see [`crate::market_data::term_structures::DiscountCurve::fx_policy`].
     pub fx_policy: Option<String>,
+    /// Canonical source interpolation and cumulative continuous transformations.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transform: Option<super::evaluation::CurveTransform>,
 }
 
 impl From<ForwardCurve> for RawForwardCurve {
@@ -56,6 +59,7 @@ impl From<ForwardCurve> for RawForwardCurve {
             extrapolation: curve.interp.extrapolation(),
             rate_calibration: curve.rate_calibration,
             fx_policy: curve.fx_policy,
+            transform: curve.transform,
         }
     }
 }
@@ -64,7 +68,7 @@ impl TryFrom<RawForwardCurve> for ForwardCurve {
     type Error = crate::Error;
 
     fn try_from(state: RawForwardCurve) -> crate::Result<Self> {
-        ForwardCurve::builder(state.id, state.tenor)
+        let mut builder = ForwardCurve::builder(state.id, state.tenor)
             .base_date(state.base)
             .reset_lag(state.reset_lag)
             .day_count(state.day_count)
@@ -73,7 +77,8 @@ impl TryFrom<RawForwardCurve> for ForwardCurve {
             .interp(state.interp_style)
             .extrapolation(state.extrapolation)
             .rate_calibration_opt(state.rate_calibration)
-            .fx_policy_opt(state.fx_policy)
-            .build()
+            .fx_policy_opt(state.fx_policy);
+        builder.transform = state.transform;
+        builder.build()
     }
 }

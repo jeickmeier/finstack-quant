@@ -197,13 +197,19 @@ fn mc_step_schedule(
 
     let dt = 1.0 / 12.0;
     let start_month = first_unpaid_accrual_start(mbs, as_of)?;
+    let projection_months = i32::try_from(num_steps).map_err(|_| {
+        finstack_quant_core::Error::Validation(
+            "MBS projection months exceed supported range".into(),
+        )
+    })?;
+    start_month.add_months(projection_months)?;
 
     let mut payment_extras = Vec::with_capacity(num_steps);
     let mut accrual_fractions = Vec::with_capacity(num_steps);
     let mut base_smms = Vec::with_capacity(num_steps);
     for m in 0..num_steps {
-        let period_start = start_month.add_months(m as i32);
-        let accrual_end = period_start.add_months(1);
+        let period_start = start_month.add_months(m as i32)?;
+        let accrual_end = period_start.add_months(1)?;
         let payment_date = mbs.payment_date_for_accrual_period(period_start)?;
         // Grid time is the curve's time axis (the HW1F θ(t) is fitted to the
         // curve on it), so the payment offset is measured the same way.
@@ -394,6 +400,8 @@ pub(crate) fn calculate_mc_oas(
 
     let discount_curve = market.get_discount(&mbs.discount_curve_id)?;
     let num_steps = config.num_steps.unwrap_or(mbs.wam_months as usize);
+    // Validate the calendar horizon before allocating rate paths.
+    let steps = mc_step_schedule(mbs, as_of, num_steps, discount_curve.day_count())?;
 
     // Fit the HW1F model to the initial discount curve: r(0) from the curve's
     // instantaneous forward and a piecewise-constant θ(t) bootstrap, so the
@@ -412,10 +420,6 @@ pub(crate) fn calculate_mc_oas(
         num_steps,
         config.seed,
     );
-
-    // Per-step accrual periods, day-count fractions, seasonings and
-    // payment-delay discounting offsets (actual payment dates).
-    let steps = mc_step_schedule(mbs, as_of, num_steps, discount_curve.day_count())?;
 
     // Objective: average price across paths minus market price.
     //

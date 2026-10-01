@@ -188,19 +188,26 @@ impl PyStochasticPricingResult {
         self.inner.es_confidence
     }
 
-    /// Standard error of the mean present value, in currency units.
+    /// Sample standard error of the mean present value, in currency units.
+    /// Monte Carlo uses the sample standard deviation divided by the square
+    /// root of the independent-estimator count; each antithetic pair contributes
+    /// its average as one observation.
     #[getter]
     fn pv_std_error(&self) -> f64 {
         self.inner.pv_std_error
     }
 
-    /// 95% confidence interval of the mean present value, in currency units.
+    /// Two-sided 95% Student-t confidence interval of mean present value, in
+    /// currency units. Monte Carlo uses one fewer degree of freedom than the
+    /// independent-estimator count; each antithetic pair counts once.
     #[getter]
     fn pv_confidence_interval(&self) -> (f64, f64) {
         self.inner.pv_confidence_interval
     }
 
     /// Number of simulated scenario paths (two per antithetic estimator).
+    /// Monte Carlo sampling uncertainty uses independent estimator counts,
+    /// which equal half this value when antithetic pairing is enabled.
     #[getter]
     fn num_paths(&self) -> usize {
         self.inner.num_paths

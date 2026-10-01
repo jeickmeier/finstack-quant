@@ -11,7 +11,7 @@ export type BusinessDayConvention =
  */
 export type Id = string;
 /**
- * Day count convention for accrual and option time.
+ * Day count convention for accrual. Option quote time always uses ACT/365F.
  */
 export type DayCount =
   | "one_one"
@@ -155,11 +155,12 @@ export type D_948Cdc4Db846A21357A4 = "hull_white" | "black_derman_toy";
  */
 export type D_248B18283Cf30A5Fa9Bc = "step" | "linear";
 /**
- * Publication lag for inflation index reference dates.
+ * Contractual observation lag for inflation index reference dates.
  *
  * Inflation indices are published with a delay (typically 2-4 weeks). Securities
- * using these indices incorporate a lag to ensure the reference index is published
- * by the settlement date.
+ * using these indices incorporate an observation lag to ensure the reference
+ * index is published by settlement. This lag does not specify the actual
+ * publication date; use [`InflationIndex::with_publication_dates`] for that.
  *
  * # Standard Lags by Market
  *
@@ -414,13 +415,6 @@ export interface D_2572320F93343Dabe361 {
   frequency: Tenor;
   id: Id2;
   inflation_index_id: Id3;
-  /**
-   * Correlation between the inflation index and the nominal short rate,
-   * used in the YoY convexity/timing adjustment. `None` ⇒ treated as 0
-   * (the timing term vanishes; the pure inflation-vol Jensen convexity
-   * `σ_I²·τ` is still applied).
-   */
-  inflation_nominal_correlation?: number | null;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   /**
    * Contractual monthly CPI interpolation; takes precedence over index metadata.
@@ -434,11 +428,6 @@ export interface D_2572320F93343Dabe361 {
   lag?: DC8D5A8Dc925586Cc9B9D | null;
   maturity: Date;
   metric_pricing_overrides?: MetricPricingOverrides;
-  /**
-   * Nominal short-rate volatility `σ_n` (annualized, absolute), used in the
-   * YoY timing term. `None` ⇒ the `ρ·σ_n` timing term is dropped.
-   */
-  nominal_rate_volatility?: number | null;
   notional: Money;
   /**
    * Cap/floor type (cap, floor, caplet, floorlet). Caplet and floorlet price a
@@ -453,6 +442,12 @@ export interface D_2572320F93343Dabe361 {
    */
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
   vol_surface_id: Id4;
+  /**
+   * Clock used by the volatility surface's annualized quotes. This is
+   * independent of CPI publication policy; changing it requires matching
+   * quotes, not merely relabelling the old surface.
+   */
+  volatility_expiry?: "reference_date" | "publication_date";
 }
 /**
  * Attributes for scenario selection and tagging.
@@ -963,6 +958,7 @@ export interface DD760Eef55C5Bd7D5B1F6 {
  * Models the relationship between the accreted notional and the recovery
  * rate in default. As PIK accrual increases the notional relative to the
  * original base, recovery declines according to the chosen [`RecoveryModel`].
+ * Deserialization enforces the same parameter invariants as the constructors.
  */
 export interface D_16451E0Bf3B6B78178D8 {
   /**
@@ -1017,6 +1013,8 @@ export interface D_16451E0Bf3B6B78178D8 {
  * Models the relationship between a firm's leverage and its instantaneous
  * hazard rate, enabling a feedback loop where PIK accrual increases the
  * notional (and hence leverage), which drives the hazard rate higher.
+ * Deserialization validates the parameters and rejects incomplete or
+ * inconsistent tabular calibrations before they can be evaluated.
  */
 export interface DCc8Ed166Abbb10Ad4451 {
   /**

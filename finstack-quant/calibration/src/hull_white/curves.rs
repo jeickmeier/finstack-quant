@@ -3,7 +3,14 @@
 //! The solvers in this module's siblings take discount-factor closures on the
 //! ACT/365F model clock. Hosts hold calibrated [`DiscountCurve`] objects, so
 //! these functions own the curve-to-closure adaptation
-//! ([`ModelDiscountCurve`]) once for every caller.
+//! ([`ModelDiscountCurve`]) once for every caller: each curve is mapped from
+//! its own base date and day count to ACT/365F model years and normalized at
+//! the discount curve's base date.
+//!
+//! The curve forms use the regular synthetic schedules implied by the quote
+//! maturity and payment frequency, with no calendar or settlement adjustment.
+//! Convention-driven contractual schedules go through the plan-driven
+//! `hull_white` and `cap_floor_hull_white` engine steps.
 
 use super::{
     bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn,
@@ -19,8 +26,9 @@ use finstack_quant_models::rates::clock::ModelDiscountCurve;
 /// Run `solve` with discount-factor closures for the discount and projection curves.
 ///
 /// Both curves are normalized at the discount curve's base date and read on
-/// the ACT/365F model clock; a lookup that fails yields `NaN`, which the
-/// solvers reject as an invalid discount factor.
+/// the ACT/365F model clock, each mapped from its own base date and day
+/// count; a lookup that fails yields `NaN`, which the solvers reject as an
+/// invalid discount factor.
 fn with_model_curves<T>(
     discount: &DiscountCurve,
     forward: Option<&DiscountCurve>,
@@ -38,26 +46,33 @@ fn with_model_curves<T>(
 ///
 /// Curve-input form of [`calibrate_hull_white_to_swaptions_with_fn`] with the
 /// synthetic constant-period fixed-leg schedule (no contractual schedules).
+/// The curve is mapped from its day count to ACT/365F model years, normalized
+/// at its base date.
 ///
 /// # Arguments
 ///
 /// * `discount` - Discount curve the swap annuities and forward swap rates are
 ///   read from. Its base date is the valuation date; times are ACT/365F years
 ///   from that date.
-/// * `quotes` - At least two ATM swaption quotes (expiry and tenor in years,
-///   volatility as a decimal: absolute rate volatility for normal quotes,
-///   Black volatility for lognormal quotes).
-/// * `frequency` - Fixed-leg payment frequency of the underlying swaps.
-/// * `initial_guess` - Optional solver seed for `(κ, σ)`; `None` uses the
-///   built-in starting point.
-/// * `fit_tolerance` - Required positive maximum implied-quote error: decimal
-///   rate volatility for normal quotes, relative volatility for Black quotes.
+/// * `quotes` - At least two ATM swaption quotes (expiry and tenor in ACT/365F
+///   years from the discount curve's base date, volatility as a decimal:
+///   absolute rate volatility for normal quotes, Black volatility for
+///   lognormal quotes).
+/// * `frequency` - Fixed-leg payment frequency used to construct the synthetic
+///   swap schedules.
+/// * `initial_guess` - Optional positive solver seed for `(κ, σ)`; `None` uses
+///   the built-in starting point.
+/// * `fit_tolerance` - Required positive maximum reconstructed quote error:
+///   decimal rate volatility for normal quotes, relative volatility for Black
+///   quotes.
 ///
 /// # Errors
 ///
 /// Returns a validation error for a non-positive `fit_tolerance`, fewer than
 /// two quotes, an invalid quote or an unusable discount curve, and a
-/// calibration error when the solver does not converge.
+/// calibration error when the solver does not converge. A converged fit
+/// outside `fit_tolerance` is not an error: it returns a report with
+/// `success = false`.
 pub fn calibrate_hull_white_to_swaptions(
     discount: &DiscountCurve,
     quotes: &[SwaptionQuote],
@@ -79,17 +94,23 @@ pub fn calibrate_hull_white_to_swaptions(
 
 /// Calibrate scalar Hull-White `(κ, σ)` to cap/floor quotes on market curves.
 ///
-/// Curve-input form of [`calibrate_hull_white_to_cap_floors_with_fn`].
+/// Curve-input form of [`calibrate_hull_white_to_cap_floors_with_fn`] with
+/// the synthetic caplet schedule implied by `config.frequency` (no
+/// contractual schedules). Both curves are normalized at
+/// `discount.base_date()` and mapped from their own day counts to ACT/365F
+/// model years.
 ///
 /// # Arguments
 ///
 /// * `discount` - Discounting curve; its base date is the valuation date and
 ///   times are ACT/365F years from that date.
 /// * `forward` - Curve projecting the caplet forwards from ratios of its
-///   discount factors, normalized at the discount curve's base date. `None`
-///   projects on `discount` (single-curve).
-/// * `quotes` - Normal-vol cap or floor quotes (maturity in years, strike and
-///   volatility as decimals). A single quote requires `config.fixed_kappa`.
+///   discount factors, with its own base date and day count, normalized at
+///   the discount curve's base date. `None` projects on `discount`
+///   (single-curve).
+/// * `quotes` - Normal (Bachelier) cap or floor quotes (maturity in ACT/365F
+///   years from the discount curve's base date, strike and volatility as
+///   decimals). A single quote requires `config.fixed_kappa`.
 /// * `config` - Fit tolerance in normal-vol units, caplet payment frequency,
 ///   optional fixed mean reversion and optional solver seed.
 ///
@@ -97,7 +118,9 @@ pub fn calibrate_hull_white_to_swaptions(
 ///
 /// Returns a validation error when no quotes are supplied, a single quote is
 /// given without `config.fixed_kappa`, the tolerance is not positive or a
-/// curve is unusable, and a calibration error when the solver does not converge.
+/// curve is unusable, and a calibration error when the solver does not
+/// converge. A converged fit outside the configured tolerance is not an
+/// error: it returns a report with `success = false`.
 pub fn calibrate_hull_white_to_cap_floors(
     discount: &DiscountCurve,
     forward: Option<&DiscountCurve>,
@@ -105,30 +128,38 @@ pub fn calibrate_hull_white_to_cap_floors(
     config: CapFloorCalibrationConfig,
 ) -> Result<(HullWhiteCalibrationParams, CalibrationReport)> {
     with_model_curves(discount, forward, |discount_df, forward_df| {
-        calibrate_hull_white_to_cap_floors_with_fn(discount_df, forward_df, quotes, config)
+        calibrate_hull_white_to_cap_floors_with_fn(discount_df, forward_df, quotes, None, config)
     })
 }
 
 /// Bootstrap a piecewise-constant Hull-White sigma schedule to cap/floor quotes on market curves.
 ///
-/// Curve-input form of [`bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn`].
+/// Curve-input form of [`bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn`]
+/// with the synthetic caplet schedule implied by `config.frequency` (no
+/// contractual schedules). Both curves use ACT/365F model time normalized at
+/// `discount.base_date()`.
 ///
 /// # Arguments
 ///
 /// * `discount` - Discounting curve; its base date is the valuation date and
 ///   times are ACT/365F years from that date.
-/// * `forward` - Curve projecting the caplet forwards, normalized at the
-///   discount curve's base date. `None` projects on `discount`.
-/// * `quotes` - Normal-vol cap or floor quotes with distinct maturities in
-///   years; each maturity adds one constant-sigma interval.
-/// * `config` - Fixed mean reversion, sigma search bracket (absolute rate
-///   volatility), fit tolerance and caplet payment frequency.
+/// * `forward` - Curve projecting the caplet forwards, mapped from its own
+///   base date and day count and normalized at the discount curve's base
+///   date. `None` projects on `discount`.
+/// * `quotes` - Normal (Bachelier) cap or floor quotes with distinct
+///   maturities in ACT/365F years from the discount curve's base date and
+///   volatility in decimal rate units; each maturity adds one constant-sigma
+///   interval.
+/// * `config` - Fixed mean reversion, positive sigma search bracket (absolute
+///   rate volatility), fit tolerance and caplet payment frequency.
 ///
 /// # Errors
 ///
 /// Returns a validation error when no quotes are supplied, maturities repeat,
-/// the configuration bounds are invalid or a curve is unusable, and a
-/// calibration error when an interval's sigma cannot be bracketed or solved.
+/// the configuration bounds are invalid or a curve is unusable, and an error
+/// when an interval's sigma cannot be bracketed or solved. A solved schedule
+/// outside the configured tolerance is not an error: it returns a report with
+/// `success = false`.
 pub fn bootstrap_hull_white_sigma_schedule_to_cap_floors(
     discount: &DiscountCurve,
     forward: Option<&DiscountCurve>,
@@ -140,6 +171,7 @@ pub fn bootstrap_hull_white_sigma_schedule_to_cap_floors(
             discount_df,
             forward_df,
             quotes,
+            None,
             config,
         )
     })
@@ -149,6 +181,7 @@ pub fn bootstrap_hull_white_sigma_schedule_to_cap_floors(
 mod tests {
     use super::*;
     use finstack_quant_core::dates::{Date, DayCount};
+    use finstack_quant_core::math::interp::InterpStyle;
     use time::Month;
 
     fn flat_curve(id: &str, rate: f64) -> DiscountCurve {
@@ -193,6 +226,7 @@ mod tests {
             &df,
             &df,
             &cap_quotes(),
+            None,
             config,
         )
         .expect("closure form");
@@ -215,6 +249,48 @@ mod tests {
             calibrate_hull_white_to_cap_floors(&curve, Some(&curve), &quote, config)
                 .expect("explicit forward");
         assert_eq!(single, explicit);
+    }
+
+    #[test]
+    fn curve_adapter_preserves_distinct_dates_and_day_counts() {
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let forward_base = Date::from_calendar_date(2024, Month::January, 1).expect("valid date");
+        let discount = DiscountCurve::builder("DISCOUNT")
+            .base_date(as_of)
+            .day_count(DayCount::Act360)
+            .knots([(0.0, 1.0), (20.0, (-0.03_f64 * 20.0).exp())])
+            .interp(InterpStyle::LogLinear)
+            .build()
+            .expect("valid curve");
+        let forward = DiscountCurve::builder("FORWARD")
+            .base_date(forward_base)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (20.0, (-0.04_f64 * 20.0).exp())])
+            .interp(InterpStyle::LogLinear)
+            .build()
+            .expect("valid curve");
+        let quotes = [CapFloorQuote::try_new(5.0, 0.04, 0.009, true, true).expect("valid quote")];
+        let config = CapFloorCalibrationConfig {
+            fit_tolerance: 1e-5,
+            frequency: SwapFrequency::Quarterly,
+            fixed_kappa: Some(0.03),
+            initial_guess: None,
+        };
+        let discount_df = |time: f64| (-0.03 * time * 365.0 / 360.0).exp();
+        let forward_df = |time: f64| (-0.04 * time).exp();
+        let (expected, _) = calibrate_hull_white_to_cap_floors_with_fn(
+            &discount_df,
+            &forward_df,
+            &quotes,
+            None,
+            config,
+        )
+        .expect("reference fit");
+        let (actual, report) =
+            calibrate_hull_white_to_cap_floors(&discount, Some(&forward), &quotes, config)
+                .expect("curve fit");
+        assert!(report.success);
+        assert!((actual.sigma - expected.sigma).abs() < 1e-12);
     }
 
     #[test]

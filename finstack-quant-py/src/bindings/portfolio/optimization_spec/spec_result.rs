@@ -46,6 +46,8 @@ impl PyCandidatePosition {
     /// ----------
     /// id : str
     ///     Identifier that becomes the position id if the optimizer trades it.
+    ///     Must be unique among candidates and absent from existing positions;
+    ///     optimization raises ``PortfolioError`` for a collision.
     /// entity_id : str
     ///     Owning entity for the candidate.
     /// instrument : Bond | InterestRateSwap | ... | str
@@ -127,7 +129,8 @@ impl PyCandidatePosition {
         serialize_json(&self.inner)
     }
 
-    /// Candidate identifier (becomes the position id when traded).
+    /// Candidate identifier, unique among candidates and absent from existing
+    /// positions; becomes the position id when traded.
     #[getter]
     fn id(&self) -> String {
         self.inner.id.as_str().to_owned()
@@ -248,7 +251,8 @@ impl PyTradeUniverse {
         PyPositionFilter::from_inner(self.inner.tradeable_filter.clone())
     }
 
-    /// Filter selecting positions frozen at their current weight, if any.
+    /// Filter selecting positions whose exact quantities and weights remain
+    /// fixed under every weighting scheme, including zero-PV holdings, if any.
     #[getter]
     fn held_filter(&self) -> Option<PyPositionFilter> {
         self.inner
@@ -652,8 +656,10 @@ impl PyPortfolioOptimizationResult {
     /// Returns
     /// -------
     /// dict[str, float]
-    ///     Units / face / notional, depending on the weighting scheme — these
-    ///     are quantities, not weights.
+    ///     Quantities in each position's unit convention, including percentage
+    ///     points for ``percentage``. Held existing positions retain their exact
+    ///     current quantity under every weighting scheme, including zero-PV
+    ///     holdings.
     #[getter]
     fn implied_quantities(&self) -> HashMap<String, f64> {
         self.inner

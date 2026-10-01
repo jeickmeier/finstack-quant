@@ -43,6 +43,39 @@ const MODEL_JSON = JSON.stringify({
   schema_version: 1,
 });
 
+test('statements model ingestion rejects node IDs that alias another forecast cache', () => {
+  const model = JSON.parse(MODEL_JSON);
+  model.nodes.cost = {
+    node_id: 'revenue',
+    node_type: 'value',
+    values: { '2025Q1': 40000.0 },
+  };
+  const payload = JSON.stringify(model);
+  for (const load of [statements.validateFinancialModelJson, statements.evaluateModel]) {
+    assert.throws(() => load(payload), /does not match its embedded node_id/);
+  }
+});
+
+test('statements model ingestion rejects observations outside the model timeline', () => {
+  const model = JSON.parse(MODEL_JSON);
+  model.nodes.revenue.values['2025Q2'] = 200000.0;
+  assert.throws(
+    () => statements.validateFinancialModelJson(JSON.stringify(model)),
+    /2025Q2.*not present in the model timeline/
+  );
+});
+
+test('statements model ingestion reserves the wide-export timeline column', () => {
+  const model = JSON.parse(MODEL_JSON);
+  model.nodes = {
+    period_id: { node_id: 'period_id', node_type: 'value', values: { '2025Q1': 100.0 } },
+  };
+  assert.throws(
+    () => statements.validateFinancialModelJson(JSON.stringify(model)),
+    /period_id.*reserved/
+  );
+});
+
 const SENSITIVITY_CONFIG_JSON = JSON.stringify({
   mode: 'diagonal',
   parameters: [
@@ -91,7 +124,7 @@ test('statements_analytics.runSensitivity returns a structured object', () => {
     '2025Q1'
   );
   assert.ok(Array.isArray(entries), 'generateTornadoEntries returns an array');
-  assert.equal(entries[0].parameter_id, 'revenue');
+  assert.equal(entries[0].parameter_id, 'revenue@2025Q1');
   assert.equal(typeof entries[0].downside, 'number');
   assert.equal(typeof entries[0].upside, 'number');
 });

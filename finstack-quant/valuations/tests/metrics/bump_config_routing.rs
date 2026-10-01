@@ -580,7 +580,8 @@ fn quanto_defaults_are_bit_identical() {
     assert_pins(&[
         ("delta", m(MetricId::Delta), 0x402d387eb9b2e2f9),
         ("gamma", m(MetricId::Gamma), 0x3f5998b5a0d6ce52),
-        ("vega", m(MetricId::Vega), 0x41181e8d0fc216ea),
+        // Currency per volatility percentage point (0.01), rather than per decimal sigma.
+        ("vega", m(MetricId::Vega), 0x40aedf6ce0f86f40),
         ("rho", m(MetricId::Rho), 0xc01e1b66ed300000),
         ("foreign_rho", m(MetricId::ForeignRho), 0x4049b76ea7a3c800),
         ("fx_delta", m(MetricId::FxDelta), 0x0000000000000000),
@@ -766,7 +767,17 @@ fn lookback_rho_honours_rate_bump() {
         MetricId::Rho,
         PricingOptions::default(),
     );
-    assert_pins(&[("lookback rho", default_rho, 0x3f72bd0500ee5000)]);
+    // The log-CDF reflection formula changes the last bits of the old direct
+    // product formula. Retain an exact pin for the current stable calculation.
+    assert_pins(&[("lookback rho", default_rho, 0x3f72bd0500ee2000)]);
+    let default_ref =
+        pv(&opt, &bump_rate(&market, "USD-OIS", 1.0), as_of) - pv(&opt, &market, as_of);
+    assert_rel(
+        "default lookback rho per bp",
+        default_rho,
+        default_ref,
+        1e-12,
+    );
 
     let h_r = 5.0;
     opt.metric_pricing_overrides = overrides(None, None, Some(h_r));

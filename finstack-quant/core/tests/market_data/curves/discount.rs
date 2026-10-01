@@ -1439,3 +1439,279 @@ mod roll_forward_realized_forward {
         assert!(curve.roll_forward(730).is_err());
     }
 }
+
+mod continuous_transform_regressions {
+    use super::*;
+
+    fn shaped(style: InterpStyle) -> DiscountCurve {
+        DiscountCurve::builder("CONTINUOUS")
+            .base_date(sample_base_date())
+            .interp(style)
+            .knots([
+                (0.5, 0.995),
+                (1.0, 0.985),
+                (2.0, 0.955),
+                (5.0, 0.86),
+                (10.0, 0.70),
+            ])
+            .build()
+            .expect("valid shaped curve")
+    }
+
+    fn close(actual: f64, expected: f64) {
+        assert!(
+            (actual - expected).abs() < 2e-12,
+            "actual {actual}, expected {expected}"
+        );
+    }
+
+    #[test]
+    fn every_interpolation_preserves_off_pillar_realized_forwards() {
+        for style in [
+            InterpStyle::Linear,
+            InterpStyle::LogLinear,
+            InterpStyle::MonotoneConvex,
+            InterpStyle::CubicHermite,
+            InterpStyle::PiecewiseQuadraticForward,
+        ] {
+            let source = shaped(style);
+            for days in [-1, 1, 73, 365] {
+                let offset = days as f64 / 365.0;
+                let rolled = source.roll_forward(days).expect("roll");
+                for t in [0.0, 0.02, 0.1, 0.5, 1.5, 3.0, 7.0] {
+                    close(rolled.df(t), source.df(t + offset) / source.df(offset));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn sparse_curve_key_rate_shock_acts_at_every_maturity() {
+        let source = DiscountCurve::flat("SPARSE", sample_base_date(), 0.05).expect("flat");
+        let shocked = source
+            .with_triangular_key_rate_bump_neighbors(Some(3.0), 5.0, Some(7.0), 10.0)
+            .expect("continuous key-rate shock");
+        for (time, weight) in [
+            (0.5, 0.0),
+            (3.0, 0.0),
+            (4.0, 0.5),
+            (5.0, 1.0),
+            (6.0, 0.5),
+            (7.0, 0.0),
+            (10.0, 0.0),
+        ] {
+            close(
+                shocked.df(time),
+                source.df(time) * (-0.001_f64 * weight * time).exp(),
+            );
+        }
+    }
+
+    #[test]
+    fn parallel_shock_preserves_continuous_definition_for_every_interpolation() {
+        for style in [
+            InterpStyle::Linear,
+            InterpStyle::LogLinear,
+            InterpStyle::MonotoneConvex,
+            InterpStyle::CubicHermite,
+            InterpStyle::PiecewiseQuadraticForward,
+        ] {
+            let source = shaped(style);
+            let shocked = source.with_parallel_bump(25.0).expect("parallel shock");
+            for t in [0.0, 0.2, 0.75, 1.5, 3.5, 7.5] {
+                close(shocked.df(t), source.df(t) * (-0.0025_f64 * t).exp());
+            }
+        }
+    }
+
+    #[test]
+    fn sparse_bucket_shocks_partition_the_parallel_log_discount_shift() {
+        let source = DiscountCurve::flat("BUCKETS", sample_base_date(), 0.05).expect("flat");
+        let first = source
+            .with_triangular_key_rate_bump_neighbors(None, 1.0, Some(5.0), 1.0)
+            .expect("first");
+        let middle = first
+            .with_triangular_key_rate_bump_neighbors(Some(1.0), 5.0, Some(10.0), 1.0)
+            .expect("middle");
+        let all = middle
+            .with_triangular_key_rate_bump_neighbors(Some(5.0), 10.0, None, 1.0)
+            .expect("last");
+        let parallel = source.with_parallel_bump(1.0).expect("parallel");
+        for t in [0.0, 0.1, 0.5, 2.0, 4.5, 5.0, 7.5, 15.0] {
+            close(all.df(t), parallel.df(t));
+        }
+    }
+
+    #[test]
+    fn transformed_curves_preserve_roll_shock_serde_and_rename_composition() {
+        let source = shaped(InterpStyle::MonotoneConvex);
+        let shocked = source
+            .with_triangular_key_rate_bump_neighbors(Some(0.25), 1.0, Some(3.0), 17.0)
+            .expect("shock");
+        let rolled = shocked.roll_forward(73).expect("roll");
+        let twice_rolled = rolled.roll_forward(146).expect("second roll");
+        let rerolled = shocked.roll_forward(219).expect("combined roll");
+        let final_curve = twice_rolled
+            .with_triangular_key_rate_bump_neighbors(None, 0.3, Some(1.3), -6.0)
+            .expect("shock after roll")
+            .with_parallel_bump(3.0)
+            .expect("parallel after roll");
+        let restored: DiscountCurve =
+            serde_json::from_str(&serde_json::to_string(&final_curve).expect("serialize"))
+                .expect("deserialize");
+        let renamed = final_curve
+            .to_builder_with_id("RENAMED")
+            .build()
+            .expect("rename builder");
+        for t in [0.0, 0.03, 0.3, 0.5, 1.1, 2.0, 7.0] {
+            close(rolled.df(t), shocked.df(t + 0.2) / shocked.df(0.2));
+            close(twice_rolled.df(t), rerolled.df(t));
+            let weight = if t <= 0.3 {
+                1.0
+            } else if t < 1.3 {
+                1.3 - t
+            } else {
+                0.0
+            };
+            close(
+                final_curve.df(t),
+                twice_rolled.df(t) * ((0.0006 * weight - 0.0003) * t).exp(),
+            );
+            close(restored.df(t), final_curve.df(t));
+            close(renamed.df(t), final_curve.df(t));
+        }
+    }
+
+    #[test]
+    fn inverse_shocks_and_zero_bumps_preserve_exact_roll_economics() {
+        let source = shaped(InterpStyle::CubicHermite)
+            .roll_forward(100)
+            .expect("roll");
+        let zero = source.with_parallel_bump(0.0).expect("zero");
+        let up = source
+            .with_triangular_key_rate_bump_neighbors(Some(0.1), 0.4, Some(2.0), 50.0)
+            .expect("up");
+        let restored = up
+            .with_triangular_key_rate_bump_neighbors(Some(0.1), 0.4, Some(2.0), -50.0)
+            .expect("down");
+        for t in [0.0, 0.05, 0.3, 0.4, 1.0, 2.0, 5.0] {
+            close(zero.df(t), source.df(t));
+            close(restored.df(t), source.df(t));
+        }
+    }
+
+    #[test]
+    fn repeated_shocks_merge_instead_of_accumulating_a_serialized_history() {
+        let source = shaped(InterpStyle::LogLinear);
+        let first = source
+            .with_triangular_key_rate_bump_neighbors(Some(1.0), 3.0, Some(5.0), 1.0)
+            .expect("first");
+        let mut repeated = first.clone();
+        for _ in 0..99 {
+            repeated = repeated
+                .with_triangular_key_rate_bump_neighbors(Some(1.0), 3.0, Some(5.0), 1.0)
+                .expect("repeat");
+        }
+        let first_json = serde_json::to_value(&first).expect("serialize");
+        let repeated_json = serde_json::to_value(&repeated).expect("serialize");
+        assert_eq!(
+            first_json["transform"]["adjustment"]["segments"]
+                .as_array()
+                .expect("segments")
+                .len(),
+            repeated_json["transform"]["adjustment"]["segments"]
+                .as_array()
+                .expect("segments")
+                .len()
+        );
+        for t in [0.5, 2.0, 3.0, 4.0, 6.0] {
+            let once = source
+                .with_triangular_key_rate_bump_neighbors(Some(1.0), 3.0, Some(5.0), 100.0)
+                .expect("equivalent");
+            close(repeated.df(t), once.df(t));
+        }
+    }
+
+    #[test]
+    fn discount_origin_is_validated_by_builder_solver_and_serde() {
+        for points in [[(0.0, 0.9), (1.0, 0.8)], [(-1.0, 1.1), (1.0, 0.9)]] {
+            assert!(DiscountCurve::builder("INVALID")
+                .base_date(sample_base_date())
+                .knots(points)
+                .build()
+                .is_err());
+            assert!(DiscountCurve::builder("INVALID")
+                .base_date(sample_base_date())
+                .knots(points)
+                .build_for_solver()
+                .is_err());
+        }
+        let source = shaped(InterpStyle::LogLinear);
+        let mut json = serde_json::to_value(&source).expect("serialize");
+        json["knot_points"][0][1] = serde_json::json!(0.9);
+        assert!(serde_json::from_value::<DiscountCurve>(json).is_err());
+        let solver = DiscountCurve::builder("SOLVER")
+            .base_date(sample_base_date())
+            .knots([(1.0, 0.95), (2.0, 0.90)])
+            .build_for_solver()
+            .expect("automatic anchor");
+        assert_eq!(solver.df(0.0), 1.0);
+    }
+
+    #[test]
+    fn serialized_transform_cannot_disagree_with_public_pillars() {
+        let source = shaped(InterpStyle::MonotoneConvex)
+            .roll_forward(100)
+            .expect("roll");
+        let mut json = serde_json::to_value(&source).expect("serialize");
+        json["transform"]["offset"] = serde_json::json!(0.5);
+        assert!(serde_json::from_value::<DiscountCurve>(json).is_err());
+    }
+
+    #[test]
+    fn roll_rejects_overflow_and_preserves_explicit_validation_policy() {
+        use finstack_quant_core::market_data::term_structures::ValidationMode;
+        let raw = ValidationMode::Raw {
+            allow_non_monotonic: true,
+            forward_floor: None,
+        };
+        let extreme = DiscountCurve::builder("OVERFLOW")
+            .base_date(sample_base_date())
+            .knots([(0.0, 1.0), (1.0, 1e-310), (2.0, 1.0)])
+            .interp(InterpStyle::LogLinear)
+            .validation(raw)
+            .build()
+            .expect("finite source");
+        assert!(extreme.roll_forward(365).is_err());
+        let points = [
+            (0.0, 1.0),
+            (1.0, (-0.01_f64).exp()),
+            (2.0, (-0.011_f64).exp()),
+        ];
+        let strict = DiscountCurve::builder("STRICT")
+            .base_date(sample_base_date())
+            .knots(points)
+            .interp(InterpStyle::PiecewiseQuadraticForward)
+            .build()
+            .expect("source");
+        assert!(strict.roll_forward(693).is_err());
+        let permissive = DiscountCurve::builder("PERMISSIVE")
+            .base_date(sample_base_date())
+            .knots(points)
+            .interp(InterpStyle::PiecewiseQuadraticForward)
+            .validation(raw)
+            .build()
+            .expect("source");
+        let rolled = permissive.roll_forward(693).expect("permissive roll");
+        let restored: DiscountCurve =
+            serde_json::from_str(&serde_json::to_string(&rolled).expect("serialize"))
+                .expect("restore");
+        for t in [0.0, 0.03, 0.08] {
+            close(
+                rolled.df(t),
+                permissive.df(t + 693.0 / 365.0) / permissive.df(693.0 / 365.0),
+            );
+            close(rolled.df(t), restored.df(t));
+        }
+    }
+}

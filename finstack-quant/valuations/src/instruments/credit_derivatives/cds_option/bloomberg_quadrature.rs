@@ -917,8 +917,8 @@ mod tests {
     ) -> CdsOption {
         let params = CdsOptionParams::new(
             super::super::strike::CdsOptionStrike::Spread(bp_to_decimal(strike_bp)),
-            as_of.add_months(12),
-            as_of.add_months(60),
+            as_of.add_months(12).expect("valid date shift"),
+            as_of.add_months(60).expect("valid date shift"),
             Money::from((10_000_000_i64, Currency::USD)),
             option_type,
         )
@@ -1464,8 +1464,8 @@ mod tests {
             super::super::strike::CdsOptionStrike::CleanPricePct(
                 Decimal::try_from(strike_price_pct).expect("valid clean-price strike"),
             ),
-            as_of.add_months(12),
-            as_of.add_months(60),
+            as_of.add_months(12).expect("valid date shift"),
+            as_of.add_months(60).expect("valid date shift"),
             Money::from((10_000_000_i64, Currency::USD)),
             option_type,
         )

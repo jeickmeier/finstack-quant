@@ -49,7 +49,8 @@ macro_rules! deal_constructor {
                     super::arg::date(&closing_date, "closingDate")?,
                     super::arg::date(&maturity, "maturity")?,
                     js_string(&discount_curve_id, "discountCurveId")?,
-                );
+                )
+                .map_err(to_js_err)?;
                 if let Some(calendar_id) =
                     crate::utils::input::js_opt_string(calendar_id.as_ref(), "calendarId")?
                 {

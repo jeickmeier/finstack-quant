@@ -15,22 +15,22 @@
 //!
 //! XIRR uses a day count convention (defaulting to Act/365F) to calculate year fractions.
 //!
-//! # Multiple Roots
+//! # Unique-Return Contract
 //!
-//! **Important**: For certain cashflow patterns, the NPV equation can have multiple roots
-//! (i.e., multiple rates that produce NPV = 0). This typically occurs when:
-//! - Cashflows change sign more than once (e.g., outflow, inflow, outflow)
-//! - There are large negative cashflows late in the sequence
-//!
-//! When multiple roots exist, this implementation collects **all** valid roots from
-//! every solver phase (Brent direct, Newton, Brent fallback), deduplicates them
-//! within `1e-9` tolerance, and returns the root **closest to 0.0**. This
-//! deterministic selection avoids dependence on solver iteration order.
+//! After removing zero flows and, for XIRR, netting equal dates and year
+//! fractions, cashflows must change sign exactly once. That pattern has at
+//! most one root for `r > -1`. Nonconventional streams with more than one sign
+//! change are rejected explicitly: they can have multiple or repeated roots,
+//! and an initial guess does not establish which return is economically valid.
+//! The rejection applies even when a particular nonconventional stream happens
+//! to have only one root. This API does not select among ambiguous returns.
 //!
 //! # Rate Bounds
 //!
-//! The solver rejects rates below `MIN_VALID_RATE` (-99.9%) as these represent
-//! near-total loss scenarios that are economically implausible for most applications.
+//! The solver searches in `log(1 + r)` over the finite `f64` rate domain
+//! `r > -1`, including distressed returns below -99.9%. It returns an error
+//! when the mathematical return cannot be represented with sufficient NPV
+//! accuracy as a finite `f64` rate greater than -1.
 //!
 //! # References
 //!
@@ -39,32 +39,20 @@
 
 use crate::dates::{Date, DayCount, DayCountContext};
 use crate::error::InputError;
-use crate::math::solver::{BrentSolver, NewtonSolver, Solver};
+use crate::math::solver::BrentSolver;
 use crate::math::NeumaierAccumulator;
 
-/// Default tolerance for IRR/XIRR solver.
-///
-/// Set to 1e-8 to match QuantLib's `CashFlows::irr()` standard.
-/// Previous value (1e-6) was Excel-grade; 1e-8 provides professional-grade
-/// precision suitable for long-duration cashflows where tolerance matters.
-pub(crate) const DEFAULT_TOLERANCE: f64 = 1e-8;
+/// Absolute root tolerance in log-growth coordinates, `log(1 + r)`.
+const LOG_RATE_TOLERANCE: f64 = 1e-12;
+
+/// Maximum residual relative to gross discounted cashflows after rate conversion.
+const RELATIVE_NPV_TOLERANCE: f64 = 1e-8;
 
 /// Default maximum iterations for IRR/XIRR solver.
-pub(crate) const DEFAULT_MAX_ITERATIONS: usize = 100;
+const DEFAULT_MAX_ITERATIONS: usize = 100;
 
 /// Default initial guess for IRR/XIRR.
-pub(crate) const DEFAULT_GUESS: f64 = 0.1;
-
-/// Minimum valid rate threshold.
-///
-/// Rates at or below this threshold (-99.9%) represent near-total loss scenarios
-/// where (1 + r) approaches zero. Such extreme rates:
-/// - Cause numerical instability in discounting calculations
-/// - Are economically implausible for most applications
-/// - Often indicate solver convergence to an invalid root
-///
-/// The solver rejects any root at or below this threshold.
-pub(crate) const MIN_VALID_RATE: f64 = -0.999;
+const DEFAULT_GUESS: f64 = 0.1;
 
 /// Calculate the internal rate of return for periodic cashflows.
 ///
@@ -75,21 +63,22 @@ pub(crate) const MIN_VALID_RATE: f64 = -0.999;
 /// # Arguments
 ///
 /// - `cashflows`: Cashflow amounts ordered by period. At least one positive and
-///   one negative amount are required.
-/// - `guess`: Optional initial solver guess as a decimal rate. `None` uses the
-///   crate default of 10%.
+///   one negative amount are required. Zero amounts preserve elapsed period
+///   spacing but do not affect the solver's time origin or residual scale.
+///   Nonzero amounts must have exactly one sign change.
+/// - `guess`: Optional finite decimal rate greater than -1 used to split the
+///   search bracket. `None` uses 10%; it never selects among multiple roots.
 ///
 /// # Returns
 ///
 /// Returns the rate `r` that makes `sum(cashflows[i] / (1 + r)^i)` approximately
-/// zero. When the cashflow sequence admits multiple roots, the deterministic
-/// selection rule described in the module docs is used.
+/// zero, when the cashflow sign pattern guarantees at most one root.
 ///
 /// # Errors
 ///
-/// Returns an error if there are fewer than two cashflows, no sign change, or no
-/// valid root above `MIN_VALID_RATE` can be found within the configured solver
-/// bounds.
+/// Returns an error if an amount is non-finite, there are fewer than two nonzero
+/// cashflows, there is not exactly one sign change, the guess is non-finite or
+/// at most -1, or no sufficiently accurate finite rate greater than -1 exists.
 ///
 /// # Examples
 ///
@@ -113,16 +102,18 @@ pub fn irr(cashflows: &[f64], guess: Option<f64>) -> crate::Result<f64> {
 
 /// Calculate XIRR for dated cashflows using the default `Act365F` convention.
 ///
-/// XIRR sorts flows by date, measures each date from the earliest flow, and
-/// solves for an annualized decimal rate. Prefer [`xirr_with_daycount`] when
-/// the valuation convention should be explicit at the call site.
+/// XIRR nets flows by date, measures each remaining date from the earliest
+/// nonzero net dated flow, and solves for an annualized decimal rate. Prefer
+/// [`xirr_with_daycount`] when the valuation convention should be explicit at
+/// the call site.
 ///
 /// # Arguments
 ///
-/// - `cashflows`: `(date, amount)` pairs. The input may be unsorted; same-date
-///   flows are aggregated before solving.
-/// - `guess`: Optional initial solver guess as a decimal annual rate. `None`
-///   uses the crate default of 10%.
+/// - `cashflows`: `(date, amount)` pairs with finite amounts. The input may be
+///   unsorted; same-date flows are netted and zero net dates are ignored before
+///   selecting the time origin. Net flows must have exactly one sign change.
+/// - `guess`: Optional finite decimal annual rate greater than -1 used to
+///   split the search bracket. `None` uses 10%; it does not select a root.
 ///
 /// # Returns
 ///
@@ -131,9 +122,10 @@ pub fn irr(cashflows: &[f64], guess: Option<f64>) -> crate::Result<f64> {
 ///
 /// # Errors
 ///
-/// Returns an error if there are fewer than two flows, no sign change, a
-/// day-count calculation fails, or no valid root above `MIN_VALID_RATE` can be
-/// found.
+/// Returns an error if an amount or net amount is non-finite, there are fewer
+/// than two nonzero net flows, there is not exactly one net sign change, the
+/// guess is non-finite or at most -1, a day-count calculation fails, or no
+/// sufficiently accurate finite rate greater than -1 can be found.
 ///
 /// # Examples
 ///
@@ -163,12 +155,14 @@ pub fn xirr(cashflows: &[(Date, f64)], guess: Option<f64>) -> crate::Result<f64>
 ///
 /// # Arguments
 ///
-/// - `cashflows`: `(date, amount)` pairs. The input may be unsorted; same-date
-///   flows are aggregated before solving.
+/// - `cashflows`: `(date, amount)` pairs with finite amounts. The input may be
+///   unsorted; same-date flows are netted and zero net dates are ignored before
+///   selecting the time origin. Amounts at identical year fractions are netted
+///   again before solving; the resulting flows must change sign exactly once.
 /// - `day_count`: Convention used to convert dates into year fractions from the
-///   earliest flow date.
-/// - `guess`: Optional initial solver guess as a decimal annual rate. `None`
-///   uses the crate default of 10%.
+///   earliest nonzero net dated flow date.
+/// - `guess`: Optional finite decimal annual rate greater than -1 used to
+///   split the search bracket. `None` uses 10%; it does not select a root.
 ///
 /// # Returns
 ///
@@ -177,9 +171,11 @@ pub fn xirr(cashflows: &[(Date, f64)], guess: Option<f64>) -> crate::Result<f64>
 ///
 /// # Errors
 ///
-/// Returns an error if there are fewer than two flows, no sign change, the
-/// day-count convention cannot evaluate a year fraction for the inputs, or no
-/// valid root above `MIN_VALID_RATE` can be found.
+/// Returns an error if an amount or net amount is non-finite, there are fewer
+/// than two nonzero net flows, there is not exactly one net sign change, the
+/// guess is non-finite or at most -1, the day-count convention cannot evaluate
+/// a finite year fraction, or no sufficiently accurate finite rate greater
+/// than -1 can be found.
 ///
 /// # Examples
 ///
@@ -212,13 +208,18 @@ pub fn xirr_with_daycount(
 ///
 /// # Arguments
 ///
-/// - `flows`: `(date, amount)` pairs. The input may be unsorted; same-date flows
-///   are aggregated after converting dates to year fractions.
+/// - `flows`: `(date, amount)` pairs with finite amounts. The input may be
+///   unsorted; same-date flows are netted before selecting the time origin.
+///   Remaining dates are converted to year fractions from the earliest nonzero
+///   net dated flow, with amounts at identical year fractions netted again.
+///   The resulting nonzero flows must change sign exactly once.
 /// - `day_count`: Convention used to convert dates into year fractions.
 /// - `ctx`: Supplemental day-count context, such as coupon schedule information
-///   or business-day calendar data.
-/// - `guess`: Optional initial solver guess as a decimal annual rate. `None`
-///   uses the crate default of 10%.
+///   or business-day calendar data. `Act365L` requires frequency and one full
+///   enclosing coupon period containing the earliest nonzero net flow and all
+///   remaining flow dates.
+/// - `guess`: Optional finite decimal annual rate greater than -1 used to
+///   split the search bracket. `None` uses 10%; it does not select a root.
 ///
 /// # Returns
 ///
@@ -227,9 +228,11 @@ pub fn xirr_with_daycount(
 ///
 /// # Errors
 ///
-/// Returns an error if there are fewer than two flows, no sign change, the
-/// day-count convention rejects the supplied context, or no valid root above
-/// `MIN_VALID_RATE` can be found.
+/// Returns an error if an amount or net amount is non-finite, there are fewer
+/// than two nonzero net flows, there is not exactly one net sign change, the
+/// guess is non-finite or at most -1, the day-count convention rejects the
+/// context or produces a non-finite year fraction, or no sufficiently accurate
+/// finite rate greater than -1 can be found.
 ///
 /// # Examples
 ///
@@ -263,229 +266,206 @@ pub fn xirr_with_daycount_ctx(
         ));
     }
 
-    let first_date = flows.iter().map(|(d, _)| *d).min().ok_or_else(|| {
-        crate::Error::Validation("Cashflows must contain at least one flow".to_string())
-    })?;
-
-    let mut years_and_amounts: Vec<(f64, f64)> = Vec::with_capacity(flows.len());
-    for (date, amount) in flows.iter().copied() {
-        let years = day_count.signed_year_fraction(first_date, date, ctx)?;
-        years_and_amounts.push((years, amount));
+    if flows.iter().any(|(_, amount)| !amount.is_finite()) {
+        return Err(crate::Error::Validation(
+            "IRR cashflow amounts must be finite".into(),
+        ));
     }
 
+    let mut dated_flows = flows.to_vec();
+    dated_flows.sort_by_key(|&(date, _)| date);
+
+    // Net dates before selecting the origin: offsetting flows are equivalent
+    // to a zero amount even under non-additive day counts such as 30/360 US.
+    // Keep each surviving group's original components until the final time
+    // aggregation, so rounding a large date total cannot erase a small residue
+    // when different dates map to the same year fraction.
+    let mut net_dates = Vec::new();
+    let mut start = 0;
+    while start < dated_flows.len() {
+        let date = dated_flows[start].0;
+        let mut end = start;
+        let mut sum = NeumaierAccumulator::new();
+        while end < dated_flows.len() && dated_flows[end].0 == date {
+            sum.add(dated_flows[end].1);
+            end += 1;
+        }
+        let amount = sum.total();
+        if !amount.is_finite() {
+            return Err(crate::Error::Validation(
+                "IRR net dated cashflow amounts must be finite".into(),
+            ));
+        }
+        if amount != 0.0 {
+            net_dates.push((date, start..end));
+        }
+        start = end;
+    }
+    let first_date = net_dates.first().ok_or(InputError::TooFewPoints)?.0;
+
+    let mut years_and_amounts = Vec::with_capacity(dated_flows.len());
+    for (date, components) in net_dates {
+        let years = day_count.signed_year_fraction(first_date, date, ctx)?;
+        if !years.is_finite() {
+            return Err(crate::Error::Validation(
+                "IRR cashflow times must be finite".into(),
+            ));
+        }
+        years_and_amounts.extend(
+            dated_flows[components]
+                .iter()
+                .map(|&(_, amount)| (years, amount)),
+        );
+    }
     years_and_amounts.sort_by(|a, b| a.0.total_cmp(&b.0));
 
-    // Aggregate entries with identical year-fractions by summing amounts.
-    // This deduplicates same-date flows, reduces iteration cost, and avoids
-    // f64 summation noise from carrying redundant entries.
-    let mut aggregated: Vec<(f64, f64)> = Vec::with_capacity(years_and_amounts.len());
-    for (t, amount) in years_and_amounts {
-        if let Some(last) = aggregated.last_mut() {
-            if (last.0 - t).abs() < 1e-12 {
-                last.1 += amount;
-                continue;
-            }
+    // Distinct dates can have identical times under conventions such as
+    // 30/360. Net those amounts too, so gross-PV residual normalization does
+    // not count large offsetting components as economic cashflows.
+    let mut aggregated = Vec::with_capacity(years_and_amounts.len());
+    start = 0;
+    while start < years_and_amounts.len() {
+        let time = years_and_amounts[start].0;
+        let mut end = start;
+        let mut sum = NeumaierAccumulator::new();
+        while end < years_and_amounts.len() && years_and_amounts[end].0.total_cmp(&time).is_eq() {
+            sum.add(years_and_amounts[end].1);
+            end += 1;
         }
-        aggregated.push((t, amount));
+        let amount = sum.total();
+        if !amount.is_finite() {
+            return Err(crate::Error::Validation(
+                "IRR net cashflow amounts must be finite".into(),
+            ));
+        }
+        if amount != 0.0 {
+            aggregated.push((time, amount));
+        }
+        start = end;
     }
 
     solve_rate_of_return(aggregated, guess)
 }
 
-/// Solves for the rate of return (r) that sets the Net Present Value (NPV) to zero.
+/// Solve for a unique rate of return whose NPV is zero.
 ///
-/// # Determinism contract
-///
-/// With exactly one cashflow sign change, Descartes' rule gives at most one
-/// valid root, so the first converged root is returned. With multiple sign
-/// changes, all solver phases run and the deduplicated root closest to zero is
-/// returned. Solver phase and seed order are fixed.
+/// Time-ordered, net cashflows must change sign exactly once. The generalized
+/// Descartes rule then gives at most one positive discount-factor root, so the
+/// initial guess only narrows a bracket and cannot select another return.
 ///
 /// # Arguments
-/// * `flows` - Iterator of (time, amount) pairs
-/// * `guess` - Optional initial guess
+///
+/// * `flows` - Strictly time-ordered, net (year fraction, amount) pairs.
+/// * `guess` - Optional finite decimal rate greater than -1 for bracketing.
 fn solve_rate_of_return<I>(flows: I, guess: Option<f64>) -> crate::Result<f64>
 where
-    I: IntoIterator<Item = (f64, f64)> + Clone,
+    I: IntoIterator<Item = (f64, f64)>,
 {
     let mut data: Vec<(f64, f64)> = flows.into_iter().collect();
-
+    if data
+        .iter()
+        .any(|&(time, amount)| !time.is_finite() || !amount.is_finite())
+    {
+        return Err(crate::Error::Validation(
+            "IRR cashflow times and amounts must be finite".into(),
+        ));
+    }
+    data.retain(|&(_, amount)| amount != 0.0);
     if data.len() < 2 {
         return Err(InputError::TooFewPoints.into());
     }
 
-    if !has_sign_change(data.iter().map(|&(_, amt)| amt)) {
-        return Err(InputError::Invalid.into());
+    // A common time shift cannot change a root. Removing it also prevents
+    // delayed cashflows from shrinking the residual at large positive rates.
+    let first_time = data[0].0;
+    for (time, _) in &mut data {
+        *time -= first_time;
     }
-    // Time-ordered flows with one sign change have at most one valid root by
-    // Descartes' rule, so later solver phases can only rediscover it.
-    let sign_changes = count_sign_changes(data.iter().map(|&(_, amt)| amt));
-    let root_is_unique = sign_changes == 1;
-    if sign_changes > 1 {
-        tracing::warn!(
-            num_flows = data.len(),
-            algorithm = "newton_then_brent",
-            "xirr: cashflows contain multiple sign changes; IRR may be non-unique, returning the valid root closest to 0.0"
-        );
+    let sign_changes = count_sign_changes(data.iter().map(|&(_, amount)| amount));
+    if sign_changes != 1 {
+        return Err(crate::Error::Validation(format!(
+            "IRR requires exactly one sign change after netting; found {sign_changes}. Nonconventional cashflows can have multiple or repeated roots"
+        )));
     }
-
-    // Normalize amounts by max |amount| so the absolute NPV acceptance
-    // tolerance (DEFAULT_TOLERANCE, in currency units) is scale-free.
-    // The IRR root is scale-invariant (NPV(r) = 0 ⇔ k·NPV(r) = 0), so the
-    // result is identical; without this, a 1e9-notional stream could fail
-    // the Newton acceptance check that a 1.0-notional stream passes.
-    let max_abs = data
-        .iter()
-        .map(|&(_, amt)| amt.abs())
-        .fold(0.0_f64, f64::max);
-    if max_abs > 0.0 && max_abs.is_finite() {
-        for entry in &mut data {
-            entry.1 /= max_abs;
-        }
-    }
-
-    // Define NPV function: Σ C_t / (1+r)^t using Neumaier compensated summation.
-    // Uses exp(−t·ln(1+r)) instead of powf(t) to hoist the transcendental out of
-    // the inner loop (one ln vs N powf calls).
-    let npv = |rate: f64| -> f64 {
-        let df_base = 1.0 + rate;
-        if df_base <= 0.0 {
-            return f64::INFINITY;
-        }
-        let ln_df = df_base.ln();
-        let mut acc = NeumaierAccumulator::new();
-        for &(t, amount) in &data {
-            acc.add(amount * (-t * ln_df).exp());
-        }
-        acc.total()
-    };
-
-    // Define derivative d(NPV)/dr: Σ -t * C_t / (1+r)^(t+1) using Neumaier.
-    // Same ln-exp hoist as npv.
-    let npv_derivative = |rate: f64| -> f64 {
-        let df_base = 1.0 + rate;
-        if df_base <= 0.0 {
-            return f64::INFINITY;
-        }
-        let ln_df = df_base.ln();
-        let mut acc = NeumaierAccumulator::new();
-        for &(t, amount) in &data {
-            acc.add(-t * amount * (-(t + 1.0) * ln_df).exp());
-        }
-        acc.total()
-    };
-
-    let newton = NewtonSolver::new()
-        .tolerance(DEFAULT_TOLERANCE)
-        .max_iterations(DEFAULT_MAX_ITERATIONS);
 
     let initial_guess = guess.unwrap_or(DEFAULT_GUESS);
-
-    let seeds: &[f64] = &[
-        initial_guess,
-        0.1,   // 10% (common default)
-        0.05,  // 5%
-        0.2,   // 20%
-        0.01,  // 1%
-        0.5,   // 50%
-        -0.05, // -5%
-        -0.2,  // -20%
-        -0.5,  // -50%
-        -0.9,  // -90% (Distressed)
-        -0.99, // -99% (Near total loss)
-        -0.75, // -75%
-        -0.25, // -25%
-        0.0,   // 0%
-        1.0,   // 100%
-        2.0,   // 200% (VC/Startup)
-        5.0,   // 500%
-    ];
-
-    // Collect roots only when the sign pattern permits multiple solutions.
-    let mut all_roots: Vec<f64> = Vec::new();
-
-    let is_valid = |root: f64| root > MIN_VALID_RATE && root.is_finite();
-
-    // Phase 0: Attempt direct Brent bracketing from NPV sign at r=0.
-    let npv_at_zero = npv(0.0);
-    if npv_at_zero.is_finite() && npv_at_zero.abs() > DEFAULT_TOLERANCE {
-        let brent_direct = BrentSolver::new()
-            .tolerance(DEFAULT_TOLERANCE)
-            .max_iterations(DEFAULT_MAX_ITERATIONS)
-            .bracket_hint(crate::math::solver::BracketHint::Xirr)
-            .bracket_bounds(-0.99, 10.0);
-        let direct_seed = if npv_at_zero > 0.0 { 0.1 } else { -0.1 };
-        if let Ok(root) = brent_direct.solve(npv, direct_seed) {
-            if is_valid(root) {
-                if root_is_unique {
-                    return Ok(root);
-                }
-                all_roots.push(root);
-            }
-        }
+    if !initial_guess.is_finite() || initial_guess <= -1.0 {
+        return Err(crate::Error::Validation(
+            "IRR guess must be finite and greater than -1".into(),
+        ));
     }
 
-    // Phase 1: Try Newton-Raphson (fast, quadratic convergence) with all seeds
-    for &g in seeds {
-        if let Ok(root) = newton.solve_with_derivative(npv, npv_derivative, g) {
-            if is_valid(root) && npv(root).abs() < DEFAULT_TOLERANCE * 100.0 {
-                if root_is_unique {
-                    return Ok(root);
-                }
-                all_roots.push(root);
-            }
-        }
-    }
-
-    // Phase 2: fall back to Brent's method when a valid bracket is available.
-    let brent = BrentSolver::new()
-        .tolerance(DEFAULT_TOLERANCE)
-        .max_iterations(DEFAULT_MAX_ITERATIONS)
-        .bracket_hint(crate::math::solver::BracketHint::Xirr)
-        .bracket_bounds(-0.99, 10.0);
-
-    let brent_seeds: &[f64] = &[0.1, 0.0, -0.5, 0.5, -0.9, 1.0, 2.0, 5.0];
-
-    for &g in brent_seeds {
-        if let Ok(root) = brent.solve(npv, g) {
-            if is_valid(root) {
-                if root_is_unique {
-                    return Ok(root);
-                }
-                all_roots.push(root);
-            }
-        }
-    }
-
-    // Deduplicate roots within 1e-9 tolerance, then pick closest to 0.
-    all_roots.sort_by(|a, b| a.total_cmp(b));
-    all_roots.dedup_by(|a, b| (*a - *b).abs() < 1e-9);
-
-    all_roots
+    // Log magnitudes and gross-PV normalization preserve small finite flows
+    // and prevent discount-factor overflow across the entire search domain.
+    let data: Vec<_> = data
         .into_iter()
-        .min_by(|a, b| a.abs().total_cmp(&b.abs()))
-        .ok_or_else(|| crate::Error::Validation("IRR calculation failed: no convergence".into()))
+        .map(|(time, amount)| (time, amount.abs().ln(), amount.signum()))
+        .collect();
+    let npv = |log_growth| relative_npv(&data, log_growth);
+
+    // Search every representable rate above -1, without an economic loss
+    // floor or arbitrary positive cap. Log coordinates avoid singular steps.
+    let min_rate = -1.0 + f64::EPSILON / 2.0;
+    let mut lower = min_rate.ln_1p();
+    let mut upper = f64::MAX.ln();
+    let seed = initial_guess.ln_1p();
+    let at_seed = npv(seed);
+    if at_seed != 0.0 {
+        // At the infinite log-growth endpoints, the last and first cashflows
+        // respectively dominate. Uniqueness identifies the correct half.
+        if at_seed.is_sign_positive() == data[0].2.is_sign_positive() {
+            upper = seed;
+        } else {
+            lower = seed;
+        }
+    } else {
+        return Ok(initial_guess);
+    }
+
+    let at_lower = npv(lower);
+    let at_upper = npv(upper);
+    if at_lower != 0.0 && at_upper != 0.0 && at_lower.signum() == at_upper.signum() {
+        return Err(crate::Error::Validation(
+            "IRR root lies outside the representable finite rate domain greater than -1".into(),
+        ));
+    }
+
+    let log_growth = BrentSolver::new()
+        .tolerance(LOG_RATE_TOLERANCE)
+        .max_iterations(DEFAULT_MAX_ITERATIONS)
+        .solve_in_bracket(npv, lower, upper)?;
+    let rate = log_growth.exp_m1();
+    // Rounding expm1 back into the rate domain can lose meaningful accuracy
+    // near -1. Validate the returned rate, not just its log-space root.
+    if !rate.is_finite() || rate <= -1.0 || npv(rate.ln_1p()).abs() > RELATIVE_NPV_TOLERANCE {
+        return Err(crate::Error::Validation(
+            "IRR root is not representable as a sufficiently accurate finite rate greater than -1"
+                .into(),
+        ));
+    }
+    Ok(rate)
 }
 
-/// Return `true` if the iterator contains at least one positive and one negative value.
-pub(crate) fn has_sign_change<I>(iter: I) -> bool
-where
-    I: IntoIterator<Item = f64>,
-{
-    let mut has_positive = false;
-    let mut has_negative = false;
-
-    for v in iter {
-        if v > 0.0 {
-            has_positive = true;
-        } else if v < 0.0 {
-            has_negative = true;
-        }
-        if has_positive && has_negative {
-            return true;
-        }
+/// NPV divided by gross discounted cashflows at a log growth factor.
+///
+/// Entries are `(time, log_absolute_amount, sign)` with finite, nonnegative
+/// times. Rescaling bounds each term without erasing finite input amounts.
+fn relative_npv(data: &[(f64, f64, f64)], log_growth: f64) -> f64 {
+    let max_log_pv = data
+        .iter()
+        .map(|&(time, log_amount, _)| log_amount - time * log_growth)
+        .fold(f64::NEG_INFINITY, f64::max);
+    if !max_log_pv.is_finite() {
+        return f64::INFINITY;
     }
-    false
+    let mut npv = NeumaierAccumulator::new();
+    let mut gross_pv = NeumaierAccumulator::new();
+    for &(time, log_amount, sign) in data {
+        let pv = sign * (log_amount - time * log_growth - max_log_pv).exp();
+        npv.add(pv);
+        gross_pv.add(pv.abs());
+    }
+    npv.total() / gross_pv.total()
 }
 
 /// Count the number of sign changes in a numeric sequence.
@@ -555,9 +535,8 @@ mod tests {
         let rate = irr(&amounts, None).expect("IRR calculation should succeed in test");
         assert!(rate > 0.07 && rate < 0.08);
 
-        // The solver normalizes flows by max |amount| (2026-06-09 core quant
-        // review: scale-free acceptance tolerance), so the residual bound is
-        // relative to the largest flow rather than absolute currency units.
+        // The solver measures NPV relative to gross discounted cashflows,
+        // so the residual bound is scale-free rather than in currency units.
         let npv_at_irr = compute_periodic_npv(&amounts, rate);
         assert!(npv_at_irr.abs() / 1000.0 < 1e-6);
     }
@@ -580,6 +559,127 @@ mod tests {
     fn test_irr_periodic_no_sign_change() {
         let amounts = [100.0, 200.0, 300.0];
         assert!(irr(&amounts, None).is_err());
+    }
+
+    #[test]
+    fn irr_leading_zero_periods_preserve_roots_and_missing_roots() {
+        for amounts in [&[-100.0, 110.0][..], &[-100.0, -30.0, 150.0][..]] {
+            let expected = irr(amounts, None).expect("cashflows have a valid root");
+            for lag in [1, 5, 20] {
+                let mut delayed = vec![0.0; lag];
+                delayed.extend_from_slice(amounts);
+                let actual = irr(&delayed, None).expect("time shift preserves roots");
+                assert!((actual - expected).abs() < 1e-12);
+            }
+        }
+
+        // NPV = -100*v^lag*(1-v+v^2), v = 1/(1+r), is strictly
+        // negative for every r > -1. A small discounted residual is not a root.
+        for lag in [0, 1, 5, 20] {
+            let mut rootless = vec![0.0; lag];
+            rootless.extend_from_slice(&[-100.0, 100.0, -100.0]);
+            assert!(irr(&rootless, None).is_err(), "lag={lag} has no IRR");
+        }
+    }
+
+    #[test]
+    fn xirr_ignores_zero_dates_when_selecting_the_time_origin() {
+        let early = create_date(2025, Month::January, 1).expect("date");
+        let d0 = create_date(2030, Month::January, 1).expect("date");
+        let d1 = create_date(2031, Month::January, 1).expect("date");
+        let d2 = create_date(2032, Month::January, 1).expect("date");
+
+        let expected = xirr(&[(d0, -100.0), (d1, 110.0)], None).expect("valid root");
+        let actual = xirr(&[(early, 0.0), (d0, -100.0), (d1, 110.0)], None)
+            .expect("zero amount does not change the root");
+        assert!((actual - expected).abs() < 1e-12);
+
+        assert!(xirr(
+            &[(early, 0.0), (d0, -100.0), (d1, 100.0), (d2, -100.0)],
+            None
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn xirr_nets_dates_before_selecting_a_thirty360_origin() {
+        let early = create_date(2025, Month::January, 29).expect("date");
+        let d0 = create_date(2025, Month::February, 28).expect("date");
+        let d1 = create_date(2025, Month::March, 30).expect("date");
+        let expected = 1.1_f64.powi(12) - 1.0;
+        for prefix in [
+            vec![],
+            vec![(early, 0.0)],
+            vec![(early, -1.0), (early, 1.0)],
+        ] {
+            let mut flows = prefix;
+            flows.extend([(d0, -100.0), (d1, 110.0)]);
+            let rate = xirr_with_daycount(&flows, DayCount::Thirty360, None)
+                .expect("net-zero date does not affect the origin");
+            assert!((rate - expected).abs() < 1e-8);
+        }
+    }
+
+    #[test]
+    fn xirr_compensates_same_date_cancellation_in_every_order() {
+        let d0 = create_date(2025, Month::January, 1).expect("date");
+        let d1 = create_date(2026, Month::January, 1).expect("date");
+        let amounts = [-1e16, -1.0, 1e16];
+        for order in [
+            [0, 1, 2],
+            [0, 2, 1],
+            [1, 0, 2],
+            [1, 2, 0],
+            [2, 0, 1],
+            [2, 1, 0],
+        ] {
+            let mut flows: Vec<_> = order.into_iter().map(|i| (d0, amounts[i])).collect();
+            flows.push((d1, 1.1));
+            assert!((xirr(&flows, None).expect("compensated net outflow") - 0.1).abs() < 1e-8);
+        }
+    }
+
+    #[test]
+    fn xirr_compensates_distinct_dates_with_identical_year_fractions() {
+        let d0 = create_date(2025, Month::January, 30).expect("date");
+        let same_time = create_date(2025, Month::January, 31).expect("date");
+        let d1 = create_date(2026, Month::January, 30).expect("date");
+        let flows = [(d0, -1e16), (same_time, -1.0), (same_time, 1e16), (d1, 1.1)];
+        let rate = xirr_with_daycount(&flows, DayCount::Thirty360, None)
+            .expect("compensated net time-zero outflow");
+        assert!((rate - 0.1).abs() < 1e-8);
+    }
+
+    #[test]
+    fn irr_rejects_non_finite_cashflows() {
+        for amount in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(irr(&[-100.0, amount, 110.0], None).is_err());
+        }
+    }
+
+    #[test]
+    fn irr_does_not_confuse_large_later_amounts_with_a_root() {
+        for scale in [1e2, 1e4, 1e8] {
+            // -1 + scale*v - scale^2*v^2 has negative discriminant, so
+            // none of these streams has a root, regardless of amount scale.
+            let rootless = [-1.0, scale, -scale * scale];
+            assert!(irr(&rootless, None).is_err(), "scale={scale} has no IRR");
+        }
+    }
+
+    #[test]
+    fn relative_npv_matches_one_period_closed_form() {
+        let flows = [(0.0, 100.0_f64.ln(), -1.0), (1.0, 110.0_f64.ln(), 1.0)];
+        // For [-100,110], relative NPV = (0.1-r)/(2.1+r).
+        for rate in [-0.99_f64, -0.5, 0.0, 0.1, 1.0, 10.0] {
+            let residual = relative_npv(&flows, rate.ln_1p());
+            let expected = (0.1 - rate) / (2.1 + rate);
+            assert!((residual - expected).abs() < 1e-14);
+        }
+
+        for rate in [-1.0 + f64::EPSILON, f64::MAX] {
+            assert!(relative_npv(&flows, rate.ln_1p()).is_finite());
+        }
     }
 
     #[test]
@@ -729,10 +829,8 @@ mod tests {
     }
 
     /// IRR is scale-invariant: a 1e9-notional stream must converge to the
-    /// same rate as the identical stream scaled to 1.0. Before amounts were
-    /// normalized by max |amount|, the absolute NPV acceptance tolerance was
-    /// scale-dependent and large notionals could lose Newton roots
-    /// .
+    /// same rate as the identical stream scaled to 1.0. Residual tolerances
+    /// must therefore be relative to the discounted cashflows.
     #[test]
     fn test_xirr_scale_invariant_large_notional() {
         let d0 = create_date(2024, Month::January, 1).expect("Valid test date");
@@ -772,7 +870,7 @@ mod tests {
     }
 
     #[test]
-    fn test_xirr_allows_multiple_sign_changes_when_solver_can_converge() {
+    fn xirr_rejects_multiple_sign_changes_even_with_a_root_guess() {
         let flows = [
             (
                 create_date(2024, Month::January, 1).expect("Valid test date"),
@@ -788,9 +886,63 @@ mod tests {
             ),
         ];
 
-        let rate = xirr(&flows, Some(0.10))
-            .expect("multiple sign changes should warn but still attempt a solve");
+        let error = xirr(&flows, Some(0.10)).expect_err("ambiguous return is rejected");
+        assert!(error.to_string().contains("exactly one sign change"));
+    }
 
-        assert!(rate.is_finite(), "expected a finite IRR, got {rate}");
+    #[test]
+    fn irr_rejects_ambiguous_polynomial_and_repeated_roots() {
+        // Multiplying NPV by (1+r)^5 yields a polynomial with exact roots
+        // -0.52, -0.43, 0.48, 0.63, and 4.25. Finite seed searches previously
+        // returned +48% while claiming to select the closest root, -43%.
+        let amounts = [-1.0, 9.41, -27.7915, 34.629291, -18.42559164, 3.46517136];
+        for root in [-0.52, -0.43, 0.48, 0.63, 4.25] {
+            assert!(compute_periodic_npv(&amounts, root).abs() < 1e-10);
+            let error = irr(&amounts, Some(root)).expect_err("guess cannot select a branch");
+            assert!(error.to_string().contains("exactly one sign change"));
+        }
+        assert!(irr(&amounts, None).is_err());
+
+        // NPV*(1+r)^2 = -(r-0.1)^2: a repeated root also requires an
+        // explicit nonconventional-return policy, not residual-only guesses.
+        let repeated = [-1.0, 2.2, -1.21];
+        assert!(compute_periodic_npv(&repeated, 0.1).abs() < 1e-14);
+        assert!(irr(&repeated, Some(0.1)).is_err());
+
+        let start = create_date(2025, Month::January, 1).expect("date");
+        let dated: Vec<_> = amounts
+            .iter()
+            .enumerate()
+            .map(|(i, &amount)| (start + time::Duration::days(365 * i as i64), amount))
+            .collect();
+        assert!(xirr(&dated, None).is_err());
+    }
+
+    #[test]
+    fn irr_covers_distressed_and_large_finite_returns() {
+        let start = create_date(2025, Month::January, 1).expect("date");
+        let end = create_date(2026, Month::January, 1).expect("date");
+        for payoff in [0.2, 0.01, 0.0001, 1e10, 1e100] {
+            let expected_growth = payoff / 100.0;
+            let amounts = [-100.0, payoff];
+            for guess in [None, Some(-0.99), Some(100.0)] {
+                let rate = irr(&amounts, guess).expect("unique finite return");
+                assert!(((1.0 + rate) / expected_growth - 1.0).abs() < 1e-8);
+                let dated = xirr(&[(start, -100.0), (end, payoff)], guess)
+                    .expect("dated unique finite return");
+                assert!(((1.0 + dated) / expected_growth - 1.0).abs() < 1e-8);
+            }
+        }
+    }
+
+    #[test]
+    fn irr_rejects_invalid_guesses_and_unrepresentable_returns() {
+        for guess in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -1.0, -2.0] {
+            assert!(irr(&[-100.0, 110.0], Some(guess)).is_err());
+        }
+        // The mathematical growth factors are positive, but their rates
+        // round to -1 or exceed the largest finite f64.
+        assert!(irr(&[-1.0, 1e-100], None).is_err());
+        assert!(irr(&[-1e-100, 1e300], None).is_err());
     }
 }

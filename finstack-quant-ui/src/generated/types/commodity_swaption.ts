@@ -514,6 +514,11 @@ export interface D_630447734299C7A44378 {
  *   over the swap period
  * - Annuity factor captures the present value of a unit payment stream
  *
+ * Analytical delta measures currency per unit change in the annuity-weighted
+ * forward price, holding rates and volatility fixed. At zero volatility or
+ * expiry, delta uses the intrinsic-payoff derivative and is defined as zero
+ * exactly at the strike, where that derivative does not exist.
+ *
  * # Examples
  *
  * ```rust
@@ -1081,6 +1086,7 @@ export interface DD760Eef55C5Bd7D5B1F6 {
  * Models the relationship between the accreted notional and the recovery
  * rate in default. As PIK accrual increases the notional relative to the
  * original base, recovery declines according to the chosen [`RecoveryModel`].
+ * Deserialization enforces the same parameter invariants as the constructors.
  */
 export interface D_16451E0Bf3B6B78178D8 {
   /**
@@ -1135,6 +1141,8 @@ export interface D_16451E0Bf3B6B78178D8 {
  * Models the relationship between a firm's leverage and its instantaneous
  * hazard rate, enabling a feedback loop where PIK accrual increases the
  * notional (and hence leverage), which drives the hazard rate higher.
+ * Deserialization validates the parameters and rejects incomplete or
+ * inconsistent tabular calibrations before they can be evaluated.
  */
 export interface DCc8Ed166Abbb10Ad4451 {
   /**

@@ -295,11 +295,12 @@ pub use core::standard_registry::standard_registry;
 pub use core::traits::{MetricCalculator, MetricContext, Structured2D};
 /// Format a standard risk bucket (years) as a human-readable label.
 pub use sensitivities::config::{
-    format_bucket_label, STANDARD_BUCKETS_YEARS, STANDARD_BUCKET_LABELS,
+    format_bucket_label, format_key_rate_label, parse_key_rate_label, STANDARD_BUCKETS_YEARS,
+    STANDARD_BUCKET_LABELS,
 };
 pub(crate) use sensitivities::cross_factor::CrossFactorCalculator;
 pub use sensitivities::cross_factor::CrossFactorPair;
-pub use sensitivities::theta::collect_cashflows_in_period;
+pub use sensitivities::theta::{collect_cashflows_in_period, collect_period_cash, PeriodCash};
 
 // Crate-internal re-exports (NOT part of the public API)
 //

@@ -54,6 +54,7 @@ fn rmbs_instrument() -> StructuredCredit {
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse")
 }
 
@@ -99,6 +100,7 @@ fn cmbs_instrument() -> StructuredCredit {
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
 }
 
 fn abs_instrument() -> StructuredCredit {
@@ -148,6 +150,7 @@ fn abs_instrument() -> StructuredCredit {
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
 }
 
 fn metric_context(instrument: StructuredCredit, as_of: Date) -> MetricContext {
@@ -201,7 +204,8 @@ fn test_abs_charge_off_and_credit_enhancement_handle_zero_balances() {
         as_of,
         Date::from_calendar_date(2030, Month::January, 1).unwrap(),
         "USD-OIS",
-    );
+    )
+    .expect("valid structured-credit dates");
 
     let charge_off = AbsChargeOffCalculator
         .calculate(&mut metric_context(empty_abs.clone(), as_of))

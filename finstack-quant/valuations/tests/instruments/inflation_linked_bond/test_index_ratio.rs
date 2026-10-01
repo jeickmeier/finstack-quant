@@ -465,7 +465,7 @@ fn test_index_ratio_time_series() {
     // Extend to 18 months (Jan 2024 to June 2025) to cover lagged query dates
     let mut observations = Vec::new();
     for i in 0..18 {
-        let month_date = d(2024, 1, 1).add_months(i);
+        let month_date = d(2024, 1, 1).add_months(i).expect("valid date shift");
         let value = 300.0 * (1.005_f64).powi(i);
         observations.push((month_date, value));
     }

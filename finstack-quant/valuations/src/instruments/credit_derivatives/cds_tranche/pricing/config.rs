@@ -66,9 +66,14 @@ pub(super) const HOMOGENEITY_TOLERANCE: f64 = 1e-9;
 /// Minimum grid step to avoid degenerate convolution buckets
 pub(super) const GRID_STEP_MIN: f64 = 1e-6;
 
-/// Hard cap on convolution PMF points before falling back to the
-/// moment-matched normal approximation
+/// Hard cap on convolution PMF points. Exceeding it returns an error;
+/// an exact calculation never silently switches to a normal approximation.
 pub(super) const MAX_GRID_POINTS: usize = 200_000;
+
+/// Maximum conservative issuer × grid-point visits per conditional
+/// convolution. This resource limit is not an approximation error budget and
+/// does not bound the number of adaptive factor quadrature evaluations.
+pub(super) const MAX_CONVOLUTION_WORK: usize = 5_000_000;
 
 /// Maximum iterations for par spread solver
 pub(super) const PAR_SPREAD_MAX_ITER: usize = 50;
@@ -157,9 +162,21 @@ pub struct CdsTranchePricerConfig {
     pub corr_boundary_width: f64,
 
     // Heterogeneous Portfolio Settings
-    /// Heterogeneous issuer method when issuer curves are available
+    /// Heterogeneous issuer method when issuer curves are available.
+    /// Defaults to bounded exact convolution; the normal approximation is
+    /// an explicit opt-in without a general concentration error guarantee.
     pub hetero_method: HeteroMethod,
-    /// Grid step for exact convolution method (fraction of portfolio notional)
+    /// Grid step for exact convolution (fraction of portfolio notional,
+    /// default `0.001`, floored at `1e-6`). Pricing returns an error if the
+    /// rounded loss support needs more than 200,000 grid points or positive
+    /// issuer count times grid points exceeds 5,000,000 per factor evaluation.
+    /// The latter is a conservative computation limit, not a bound on total
+    /// adaptive integration work. Stochastic recovery additionally checks an
+    /// unscaled unit-exposure grid before its normalization integrals, then
+    /// checks the scaled grid; the preflight can conservatively reject a
+    /// configuration whose eventual scales would reduce its support. Grid error
+    /// is separate from the factor integration tolerance; refine this step
+    /// to check convergence for the requested attachment and detachment.
     pub grid_step: f64,
 }
 
@@ -188,7 +205,7 @@ impl Default for CdsTranchePricerConfig {
             corr_boundary_width: DEFAULT_CORR_BOUNDARY_WIDTH,
 
             // Heterogeneous portfolio
-            hetero_method: HeteroMethod::NormalApprox,
+            hetero_method: HeteroMethod::ExactConvolution,
             grid_step: DEFAULT_GRID_STEP,
         }
     }
@@ -371,15 +388,19 @@ pub enum HeteroMethod {
     /// Moment-matched normal (CLT) approximation for heterogeneous pool loss.
     ///
     /// Matches the conditional loss mean and variance with a Gaussian; can
-    /// place bounded probability mass below zero. Renamed from the misleading
-    /// `Spa` (2026-07 credit-derivatives audit M5): this is **not** a
-    /// CGF-based saddle-point method. Pools at or below
-    /// `credit::SMALL_POOL_THRESHOLD` constituents are always routed to
-    /// exact convolution regardless of this setting; the measured bias of
-    /// this approximation above that threshold is ≤ ~0.2% of tranche PV
-    /// (see the threshold's doc table).
+    /// place probability mass below zero. This is an explicit approximation
+    /// choice, not a saddlepoint method. Its error is not controlled by the
+    /// factor integration tolerance and can be large for concentrated pools
+    /// at any nominal constituent count. Callers must validate its accuracy
+    /// for their exposures and tranche strikes. Pools at or below
+    /// `credit::SMALL_POOL_THRESHOLD` positive-weight constituents still use
+    /// exact convolution regardless of this setting.
     NormalApprox,
-    /// Exact convolution method (slower but more accurate)
+    /// Conditional convolution on the configured loss grid (default).
+    /// Slower than the normal approximation; retains discrete name exposure
+    /// and requires separate loss-grid convergence checks. Exceeding the
+    /// 200,000-point grid limit or the 5,000,000 issuer-grid visits per
+    /// factor-evaluation budget fails instead of changing pricing methods.
     ExactConvolution,
 }
 

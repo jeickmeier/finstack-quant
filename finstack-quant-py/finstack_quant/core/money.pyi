@@ -53,13 +53,14 @@ class Money:
     currency : Currency | str
         ISO-4217 currency (object or alphabetic code string).
     config : FinstackConfig | None
-        When given, ``float``/``int`` amounts are rounded on ingest using the
+        When given, amounts are rounded on ingest using the
         config's rounding mode and per-currency ingest scale.
 
     Raises
     ------
     ValueError
-        If *amount* is not finite / not parsable or *currency* is invalid.
+        If *amount* is non-finite, malformed, or cannot fit an exact 96-bit
+        Decimal with at most 28 fractional digits, or *currency* is invalid.
 
     Examples
     --------
@@ -98,14 +99,14 @@ class Money:
             (case-insensitive, not trimmed).
         config : FinstackConfig | None
             Optional config whose rounding mode and ingest scale are applied
-            to every amount type (``Decimal``/``str`` amounts round without
-            going through ``float``).
+            to every amount type after exact decimal parsing (``Decimal``/``str``
+            amounts round without going through ``float``).
 
         Raises
         ------
         ValueError
-            If *amount* is not finite, cannot be parsed as a Decimal, or
-            *currency* is invalid.
+            If *amount* is non-finite, malformed, or needs precision beyond a
+            96-bit Decimal with at most 28 fractional digits, or *currency* is invalid.
         TypeError
             If *amount* is not a number, ``Decimal`` or ``str``.
         """
@@ -154,7 +155,7 @@ class Money:
         """
         Construct from exact decimal text, rejecting inexact amounts.
 
-        Unlike general ``Money`` construction or JSON deserialization, this
+        Unlike JSON deserialization, this
         entry point never routes the amount through ``float`` or tolerates
         lossy re-rendering: the text must be exactly representable as a Rust
         ``Decimal`` (96-bit mantissa, at most 28 fractional digits). For

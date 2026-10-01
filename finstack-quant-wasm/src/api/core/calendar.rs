@@ -300,7 +300,10 @@ pub fn add_business_days(date: JsValue, n: JsValue, calendar: JsValue) -> Result
 pub fn add_weekdays(date: JsValue, n: JsValue) -> Result<i32, JsValue> {
     let start = js_epoch_days(&date, "date")?;
     let n: i32 = js_int(&n, "n")?;
-    Ok(rust_days_since_epoch(start.add_weekdays(n)))
+    start
+        .add_weekdays(n)
+        .map(rust_days_since_epoch)
+        .map_err(to_js_err)
 }
 
 /// Add calendar months, clamping to the last day of the target month (Rust
@@ -319,7 +322,10 @@ pub fn add_weekdays(date: JsValue, n: JsValue) -> Result<i32, JsValue> {
 pub fn add_months(date: JsValue, months: JsValue) -> Result<i32, JsValue> {
     let start = js_epoch_days(&date, "date")?;
     let months: i32 = js_int(&months, "months")?;
-    Ok(rust_days_since_epoch(start.add_months(months)))
+    start
+        .add_months(months)
+        .map(rust_days_since_epoch)
+        .map_err(to_js_err)
 }
 
 /// Last calendar day of the date's month (Rust `DateExt::end_of_month`).

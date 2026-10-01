@@ -9,6 +9,169 @@ use serde::{Deserialize, Serialize};
 
 use crate::types::PositionId;
 
+/// Maximum supported number of organizational books in a portfolio.
+pub(crate) const MAX_BOOKS: usize = 100_000;
+/// Maximum supported ancestry depth, including the root book.
+pub(crate) const MAX_BOOK_DEPTH: usize = 512;
+
+/// Validate the canonical book forest and return its position memberships.
+///
+/// Both native construction and materialization use this walk so their
+/// membership, referential-integrity, and resource limits cannot diverge.
+pub(crate) fn validate_books<'a>(
+    books: &'a IndexMap<BookId, Book>,
+    positions: &finstack_quant_core::HashSet<&PositionId>,
+    mut emit: impl FnMut(finstack_quant_core::contract::Diagnostic),
+) -> finstack_quant_core::HashMap<&'a PositionId, &'a BookId> {
+    use finstack_quant_core::contract::{Diagnostic, LoadPhase, Severity};
+    use finstack_quant_core::{HashMap, HashSet};
+
+    let issue = |code, message, pointer| {
+        Diagnostic::new(code, LoadPhase::Semantic, Severity::Error, message).with_pointer(pointer)
+    };
+    let mut memberships = HashMap::default();
+    if books.len() > MAX_BOOKS {
+        emit(issue(
+            "portfolio/book-limit",
+            format!(
+                "Portfolio has {} books; maximum is {MAX_BOOKS}",
+                books.len()
+            ),
+            "/portfolio/books".to_string(),
+        ));
+        return memberships;
+    }
+    let mut child_parents = HashMap::default();
+    for (book_id, book) in books {
+        if book_id != &book.id {
+            emit(issue(
+                "portfolio/book-id-mismatch",
+                format!(
+                    "book map key '{book_id}' does not match embedded id '{}'",
+                    book.id
+                ),
+                format!("/portfolio/books/{book_id}/id"),
+            ));
+        }
+        if let Some(parent_id) = &book.parent_id {
+            if !books.contains_key(parent_id) {
+                emit(issue(
+                    "portfolio/book-missing-parent",
+                    format!("book '{book_id}' references missing parent '{parent_id}'"),
+                    format!("/portfolio/books/{book_id}/parent_id"),
+                ));
+            }
+        }
+        for (index, position_id) in book.position_ids.iter().enumerate() {
+            let pointer = format!("/portfolio/books/{book_id}/position_ids/{index}");
+            if !positions.contains(position_id) {
+                emit(
+                    issue(
+                        "portfolio/book-missing-position",
+                        format!(
+                            "book '{book_id}' references non-existent position '{position_id}'"
+                        ),
+                        pointer.clone(),
+                    )
+                    .with_position_id(position_id.to_string()),
+                );
+            }
+            if let Some(first_book) = memberships.insert(position_id, book_id) {
+                emit(issue(
+                    "portfolio/position-multiple-books",
+                    format!("position '{position_id}' is assigned more than once, in books '{first_book}' and '{book_id}'"),
+                    pointer,
+                ).with_position_id(position_id.to_string()));
+            }
+        }
+        for (index, child_id) in book.child_book_ids.iter().enumerate() {
+            let pointer = format!("/portfolio/books/{book_id}/child_book_ids/{index}");
+            let Some(child) = books.get(child_id) else {
+                emit(issue(
+                    "portfolio/book-missing-child",
+                    format!("book '{book_id}' references non-existent child book '{child_id}'"),
+                    pointer,
+                ));
+                continue;
+            };
+            if let Some(first_parent) = child_parents.insert(child_id, book_id) {
+                emit(issue(
+                    "portfolio/book-multiple-parents",
+                    format!("book '{child_id}' is listed more than once by parents '{first_parent}' and '{book_id}'"),
+                    pointer.clone(),
+                ));
+            }
+            if child.parent_id.as_ref() != Some(book_id) {
+                emit(issue(
+                    "portfolio/book-parent-child-mismatch",
+                    format!(
+                        "book '{book_id}' lists '{child_id}' as child, but its parent is {:?}",
+                        child.parent_id
+                    ),
+                    pointer,
+                ));
+            }
+        }
+    }
+    for (book_id, book) in books {
+        if let Some(parent_id) = &book.parent_id {
+            if books.contains_key(parent_id)
+                && child_parents.get(book_id).copied() != Some(parent_id)
+            {
+                emit(issue(
+                    "portfolio/book-parent-child-mismatch",
+                    format!("book '{book_id}' names parent '{parent_id}', but the parent does not list it as a child"),
+                    format!("/portfolio/books/{book_id}/parent_id"),
+                ));
+            }
+        }
+    }
+
+    // Completed paths cache their depth; each parent edge is traversed once.
+    let mut depths: HashMap<&BookId, usize> = HashMap::default();
+    let mut visiting = HashSet::default();
+    for book_id in books.keys() {
+        if depths.contains_key(book_id) {
+            continue;
+        }
+        let mut path = Vec::new();
+        let mut current = Some(book_id);
+        let mut depth = 0;
+        while let Some(id) = current {
+            if let Some(cached) = depths.get(id) {
+                depth = *cached;
+                break;
+            }
+            if !visiting.insert(id) {
+                emit(issue(
+                    "portfolio/book-cycle",
+                    format!("Cycle detected in book hierarchy at book '{id}'"),
+                    format!("/portfolio/books/{id}/parent_id"),
+                ));
+                break;
+            }
+            path.push(id);
+            current = books
+                .get(id)
+                .and_then(|book| book.parent_id.as_ref())
+                .filter(|parent| books.contains_key(*parent));
+        }
+        for id in path.into_iter().rev() {
+            depth += 1;
+            depths.insert(id, depth);
+            visiting.remove(id);
+            if depth > MAX_BOOK_DEPTH {
+                emit(issue(
+                    "portfolio/book-depth-limit",
+                    format!("Book '{id}' exceeds maximum hierarchy depth of {MAX_BOOK_DEPTH}"),
+                    format!("/portfolio/books/{id}/parent_id"),
+                ));
+            }
+        }
+    }
+    memberships
+}
+
 define_string_id! {
     /// Book identifier.
     pub struct BookId;
@@ -27,7 +190,8 @@ define_string_id! {
 /// - Positions without `book_id` are not in any book
 /// - Book hierarchies are expected to be acyclic trees or forests; aggregation
 ///   helpers reject cycles and excessively deep nesting instead of recursing
-///   indefinitely
+///   indefinitely. A portfolio supports at most 100,000 books and 512 levels
+///   of ancestry, including the root.
 /// - [`Book::child_book_ids`] drives rollup in [`crate::grouping::aggregate_by_book`];
 ///   [`crate::portfolio::Portfolio::validate`] checks parent/child consistency
 ///   between child lists and [`Book::parent_id`]

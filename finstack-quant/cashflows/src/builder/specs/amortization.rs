@@ -25,7 +25,10 @@ pub enum AmortizationSpec {
         /// Target remaining principal at the end of the amortization schedule.
         final_notional: Money,
     },
-    /// Explicit schedule of remaining principal amounts after given dates.
+    /// Explicit schedule of remaining principal amounts after given economic dates.
+    /// Targets include PIK capitalized and principal events effective on that date.
+    /// A target may exceed initial or earlier remaining principal when funded by
+    /// intervening draws or PIK, but must not exceed the live balance on its date.
     /// Each pair stores `(date, remaining_principal_after_date)`.
     StepRemaining {
         /// Ordered list of `(date, remaining_principal_after_date)`.
@@ -53,18 +56,24 @@ pub enum AmortizationSpec {
         /// 0.025 = 2.5%), in `[0, 1]`.
         pct: f64,
     },
-    /// Equal principal installments on every payment date in `(start, end]`,
-    /// repaying the outstanding principal in full by `end`.
+    /// Equal principal installments on coupon accrual boundaries in `(start, end]`.
+    /// The installment is fixed from outstanding after all start-date movements,
+    /// including PIK and explicit principal events. The final installment pays
+    /// the live remaining balance, including subsequent PIK or principal changes.
+    /// Principal changes economically on each accrual boundary; cash settles on
+    /// that coupon's adjusted, lagged payment date.
     LinearBetween {
-        /// Amortization start; installments fall on payment dates strictly
-        /// after it.
+        /// Economic amortization start, on or after issue; installments fall
+        /// on coupon accrual boundaries strictly after it.
         #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
             schemars(with = "finstack_quant_core::wire::DateWire")
         )]
         start: Date,
-        /// Amortization end (full repayment), on or before maturity.
+        /// Economic end of amortization (full repayment), which must be an
+        /// actual coupon accrual boundary on or before the effective terminal
+        /// accrual date. Cash settlement may follow this date due to payment lag.
         #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
@@ -74,6 +83,8 @@ pub enum AmortizationSpec {
     },
     /// Custom principal exchanges on specific dates (absolute cash amounts).
     /// Positive amounts reduce outstanding (i.e., principal paid by issuer).
+    /// Each payment must be covered by the live balance, including prior draws
+    /// and PIK. Lifetime repayments may therefore exceed initial principal.
     CustomPrincipal {
         /// List of `(date, principal_amount)` exchanges; amounts are absolute cashflows.
         #[serde(with = "finstack_quant_core::wire::dated_money_values")]
@@ -146,17 +157,21 @@ impl Notional {
         self.initial.currency()
     }
 
-    /// Validates the notional and its amortization specification.
+    /// Validates the notional and the structure of its amortization specification.
+    ///
+    /// Available principal for dated repayments and remaining-balance targets is
+    /// checked during schedule building, after draws and PIK have been applied.
     ///
     /// # Validation Rules
     ///
     /// - `LinearTo`: Currency must match initial; final_notional must not exceed initial.
     /// - `StepRemaining`: Dates must be strictly increasing (sorted, no duplicates);
-    ///   currencies must match; remaining amounts must be non-increasing.
+    ///   currencies must match; remaining amounts must be finite and non-negative.
     /// - `PercentOfOriginalPerPeriod` / `PercentOfRemainingPerPeriod`: Percentage must
     ///   be finite and in range `[0.0, 1.0]`.
     /// - `LinearBetween`: `start` must precede `end`.
-    /// - `CustomPrincipal`: All currencies must match initial.
+    /// - `CustomPrincipal`: Amounts must be finite and non-negative; all
+    ///   currencies must match initial. Repayment coverage depends on the live balance.
     ///
     /// # Errors
     ///
@@ -202,7 +217,6 @@ impl Notional {
             }
             AmortizationSpec::StepRemaining { schedule } => {
                 let mut prev_date: Option<Date> = None;
-                let mut prev_amount: Option<f64> = None;
 
                 for (date, remaining) in schedule {
                     if remaining.currency() != currency {
@@ -222,26 +236,14 @@ impl Notional {
                         }
                     }
 
-                    if let Some(pa) = prev_amount {
-                        if remaining.amount() > pa {
-                            return Err(finstack_quant_core::Error::Validation(format!(
-                                "StepRemaining amounts must be non-increasing; found {} after {}",
-                                remaining.amount(),
-                                pa
-                            )));
-                        }
-                    }
-
-                    if remaining.amount() < 0.0 || remaining.amount() > self.initial.amount() {
+                    if !remaining.amount().is_finite() || remaining.amount() < 0.0 {
                         return Err(finstack_quant_core::Error::Validation(format!(
-                            "StepRemaining target {} must lie in [0, initial {}]",
-                            remaining.amount(),
-                            self.initial.amount()
+                            "StepRemaining target {} must be finite and non-negative",
+                            remaining.amount()
                         )));
                     }
 
                     prev_date = Some(*date);
-                    prev_amount = Some(remaining.amount());
                 }
                 Ok(())
             }
@@ -270,7 +272,6 @@ impl Notional {
                 Ok(())
             }
             AmortizationSpec::CustomPrincipal { items } => {
-                let mut total_amort = 0.0;
                 for (_date, amount) in items {
                     if amount.currency() != currency {
                         return Err(finstack_quant_core::Error::Validation(format!(
@@ -285,16 +286,6 @@ impl Notional {
                             amount.amount()
                         )));
                     }
-                    if amount.amount() > 0.0 {
-                        total_amort += amount.amount();
-                    }
-                }
-                if total_amort > self.initial.amount() {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "CustomPrincipal total amortization ({:.2}) exceeds initial notional ({:.2})",
-                        total_amort,
-                        self.initial.amount()
-                    )));
                 }
                 Ok(())
             }

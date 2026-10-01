@@ -1,22 +1,23 @@
 //! Shared utilities for registering Python submodules.
 //!
-//! Every binding submodule needs to:
+//! The compiled extension is installed as `finstack_quant.finstack_quant`, but
+//! its submodules are part of the public `finstack_quant` tree: every compiled
+//! module is named by its public import path (`finstack_quant.models.credit.lgd`),
+//! never by its location inside the extension.
 //!
-//! 1. Call `parent.add_submodule(&m)?` so attribute access works.
-//! 2. Set `m.__name__` **and** `m.__package__` to the fully-qualified dotted
-//!    path. Both, not one: PyO3 leaves `__name__` at the bare name the module
-//!    was constructed with, so setting only `__package__` yields
-//!    `__name__ == "dates"` beside `__package__ == "finstack_quant.core.dates"`
-//!    — which satisfies neither CPython invariant and makes
-//!    `logging.getLogger(mod.__name__)`, `inspect.getmodule`, and `help()`
-//!    name a module that does not exist.
-//! 3. Insert `m` into `sys.modules` under the qualified name so `import
-//!    finstack_quant.x.y` resolves correctly (matters for re-export shims, the
-//!    importlib machinery, and tools like `inspect.getmodule`).
+//! [`new_submodule`] creates a module with that name. The name is derived from
+//! the parent's `__package__` (the root sets it to [`ROOT_PACKAGE`]) and set at
+//! creation, so `__name__`, `__package__` and the `__module__` of every function
+//! added afterwards are all the public path from the start.
 //!
-//! Callers choose whether the parent's qualified path comes from `__package__`
-//! or `__name__`. That keeps historical behavior explicit while avoiding two
-//! near-identical registration helpers.
+//! [`attach_submodule`] then attaches the module to its parent and, when the
+//! compiled module is itself what `import finstack_quant.x.y` should return
+//! ([`Exposure::Compiled`]), gives it a `__spec__` and registers it in
+//! `sys.modules` under that path. A
+//! compiled module re-exported by a pure-Python package or module at the same
+//! path ([`Exposure::Python`]) is not registered: the Python file owns that
+//! `sys.modules` key, and registering the compiled module there would replace
+//! the Python module or keep it from ever running.
 
 use pyo3::prelude::*;
 use serde_json::Value;
@@ -24,105 +25,91 @@ use serde_json::Value;
 /// Canonical qualified name of the public Python package root.
 pub(crate) const ROOT_PACKAGE: &str = "finstack_quant";
 
-/// Which parent attribute should be used to derive a child module's qualified
-/// dotted path.
-pub(crate) enum ParentNameSource {
-    /// Derive from `parent.__package__`.
-    Package,
-    /// Derive from `parent.__name__`.
-    Name,
+/// How the public import path of a compiled module resolves.
+pub(crate) enum Exposure {
+    /// The compiled module is imported directly: it is registered in
+    /// `sys.modules` under its public path.
+    Compiled,
+    /// A pure-Python package or module at the same public path re-exports the
+    /// compiled module and owns its `sys.modules` key.
+    Python,
 }
 
-/// Register `submodule` under `parent`, deriving the qualified path from the
-/// selected parent attribute and falling back to `parent_default` when the
-/// attribute is missing or unreadable.
-pub(crate) fn register_submodule(
-    py: Python<'_>,
-    parent: &Bound<'_, PyModule>,
-    submodule: &Bound<'_, PyModule>,
-    submod_name: &str,
-    parent_default: &str,
-    source: ParentNameSource,
-) -> PyResult<()> {
-    let qual = submodule_name(parent, submod_name, parent_default, source);
-    submodule.setattr("__package__", &qual)?;
-    register_submodule_at(py, parent, submodule, &qual)
-}
-
-/// Set `submodule.__package__` before registering its children, returning the
-/// qualified module path that should later be used for `sys.modules`.
+/// Create the compiled submodule `name` of `parent`, named by its public
+/// import path.
 ///
-/// Some modules need their qualified package name before they can call nested
-/// `register` functions, because those children derive their own paths from
-/// the parent's `__package__`.
-pub(crate) fn set_submodule_package_by_package(
-    parent: &Bound<'_, PyModule>,
-    submodule: &Bound<'_, PyModule>,
-    submod_name: &str,
-    parent_default_pkg: &str,
-) -> PyResult<String> {
-    set_submodule_package(
-        parent,
-        submodule,
-        submod_name,
-        parent_default_pkg,
-        ParentNameSource::Package,
-    )
+/// The path is `parent.__package__` followed by `.name`; both `__name__` and
+/// `__package__` of the new module are set to it, so its own submodules and
+/// the functions added to it inherit the public path.
+///
+/// # Arguments
+///
+/// * `parent` - Compiled module the new module will be attached to; its
+///   `__package__` must hold its public path (the root holds [`ROOT_PACKAGE`]).
+/// * `name` - Attribute name of the new module under `parent`, without dots.
+///
+/// # Errors
+///
+/// Returns a `RuntimeError` when `parent.__package__` is not a string, and
+/// propagates failures to create the module or set its attributes.
+pub(crate) fn new_submodule<'py>(
+    parent: &Bound<'py, PyModule>,
+    name: &str,
+) -> PyResult<Bound<'py, PyModule>> {
+    let parent_path: String = parent.getattr("__package__")?.extract().map_err(|_| {
+        pyo3::exceptions::PyRuntimeError::new_err(format!(
+            "cannot register compiled submodule {name:?}: parent module has no __package__"
+        ))
+    })?;
+    let path = format!("{parent_path}.{name}");
+    let module = PyModule::new(parent.py(), &path)?;
+    module.setattr("__package__", &path)?;
+    Ok(module)
 }
 
-/// Set `submodule.__package__` using the selected parent-name source.
-pub(crate) fn set_submodule_package(
+/// Attach `module` (created by [`new_submodule`]) to `parent` and, for
+/// [`Exposure::Compiled`], register it in `sys.modules` under its public path.
+///
+/// A registered module also gets a `__spec__` (`ModuleSpec(path, None,
+/// is_package=True)`) so `importlib.util.find_spec` resolves it; the import
+/// system reads `__spec__`, not `__package__`. It is a package spec because
+/// [`new_submodule`] sets `__package__` to the module's own path, and
+/// `__spec__.parent` must agree with it. The loader is `None`: no loader can
+/// re-create a compiled submodule on its own, so `importlib.reload` fails
+/// rather than re-initialising the extension under the wrong name.
+///
+/// # Arguments
+///
+/// * `parent` - Module that receives `module` as an attribute named by the
+///   last component of `module.__name__`.
+/// * `module` - Compiled submodule to attach.
+/// * `exposure` - Whether `import` of the public path returns this compiled
+///   module ([`Exposure::Compiled`]) or a Python module that re-exports it
+///   ([`Exposure::Python`]).
+///
+/// # Errors
+///
+/// Propagates failures to set the attribute, build the `__spec__`, or update
+/// `sys.modules`.
+pub(crate) fn attach_submodule(
     parent: &Bound<'_, PyModule>,
-    submodule: &Bound<'_, PyModule>,
-    submod_name: &str,
-    parent_default: &str,
-    source: ParentNameSource,
-) -> PyResult<String> {
-    let qual = submodule_name(parent, submod_name, parent_default, source);
-    submodule.setattr("__package__", &qual)?;
-    Ok(qual)
-}
-
-/// Attach `submodule` to `parent` and register it in `sys.modules` at `qual`.
-pub(crate) fn register_submodule_at(
-    py: Python<'_>,
-    parent: &Bound<'_, PyModule>,
-    submodule: &Bound<'_, PyModule>,
-    qual: &str,
+    module: &Bound<'_, PyModule>,
+    exposure: Exposure,
 ) -> PyResult<()> {
-    parent.add_submodule(submodule)?;
-    submodule.setattr("__name__", qual)?;
-    submodule.setattr("__package__", qual)?;
-    let sys = PyModule::import(py, "sys")?;
-    sys.getattr("modules")?.set_item(qual, submodule)?;
+    parent.add_submodule(module)?;
+    if let Exposure::Compiled = exposure {
+        let py = parent.py();
+        let path = module.name()?;
+        let kwargs = pyo3::types::PyDict::new(py);
+        kwargs.set_item("is_package", true)?;
+        let spec = PyModule::import(py, "importlib.machinery")?
+            .getattr("ModuleSpec")?
+            .call((&path, py.None()), Some(&kwargs))?;
+        module.setattr("__spec__", spec)?;
+        let sys = PyModule::import(py, "sys")?;
+        sys.getattr("modules")?.set_item(path, module)?;
+    }
     Ok(())
-}
-
-fn submodule_name(
-    parent: &Bound<'_, PyModule>,
-    submod_name: &str,
-    parent_default: &str,
-    source: ParentNameSource,
-) -> String {
-    let parent_name = parent_qualified_name(parent, parent_default, source);
-    format!("{parent_name}.{submod_name}")
-}
-
-/// Derive a module's qualified parent path from the selected Python attribute.
-pub(crate) fn parent_qualified_name(
-    parent: &Bound<'_, PyModule>,
-    parent_default: &str,
-    source: ParentNameSource,
-) -> String {
-    let attr_name = match source {
-        ParentNameSource::Package => "__package__",
-        ParentNameSource::Name => "__name__",
-    };
-    parent
-        .getattr(attr_name)
-        .ok()
-        .and_then(|v| v.extract::<String>().ok())
-        .unwrap_or_else(|| parent_default.to_string())
 }
 
 /// Convert a Python object (e.g. dict or string) to a `serde_json::Value`.

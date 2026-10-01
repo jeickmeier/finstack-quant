@@ -127,6 +127,62 @@ test('portfolio namespace exposes exactly the pinned contract surface', () => {
   }
 });
 
+test('portfolio.decomposeFactorRisk consumes the canonical Python monetary matrix wire', () => {
+  const sensitivities = {
+    base_currency: 'EUR',
+    position_ids: ['A', 'B'],
+    factor_ids: ['F'],
+    data: [[2.0], [3.0]],
+  };
+  const covariance = JSON.stringify({ factor_ids: ['F'], n: 1, data: [0.04] });
+  const result = assertStructured(
+    portfolio.decomposeFactorRisk(JSON.stringify(sensitivities), covariance),
+    'factor decomposition'
+  );
+  assert.ok(Math.abs(result.total_risk - 1.0) < 1e-12);
+  assert.deepEqual(
+    result.position_factor_contributions.map((row) => row.position_id),
+    ['A', 'B']
+  );
+  assert.ok(
+    Math.abs(
+      result.position_factor_contributions.reduce((sum, row) => sum + row.risk_contribution, 0) -
+        result.total_risk
+    ) < 1e-12
+  );
+  assert.equal(result.measure, 'variance');
+  for (const measure of [
+    'volatility',
+    { var: { confidence: 0.99 } },
+    { expected_shortfall: { confidence: 0.975 } },
+  ]) {
+    const measured = portfolio.decomposeFactorRisk(
+      JSON.stringify(sensitivities),
+      covariance,
+      JSON.stringify(measure)
+    );
+    assert.deepEqual(measured.measure, measure);
+    assert.ok(Number.isFinite(measured.total_risk));
+  }
+});
+
+test('portfolio.decomposeFactorRisk rejects malformed matrices and missing reporting currency', () => {
+  const valid = { base_currency: 'USD', position_ids: ['P'], factor_ids: ['F'], data: [[2.0]] };
+  const covariance = JSON.stringify({ factor_ids: ['F'], n: 1, data: [0.04] });
+  for (const data of [[], [[], []], [[]], [[2.0, 3.0]], [2.0], [[null]]]) {
+    assert.throws(() =>
+      portfolio.decomposeFactorRisk(JSON.stringify({ ...valid, data }), covariance)
+    );
+  }
+  for (const extra of [{ n_factors: 1 }, { unexpected: true }, { base_currency: 'BAD' }]) {
+    assert.throws(() =>
+      portfolio.decomposeFactorRisk(JSON.stringify({ ...valid, ...extra }), covariance)
+    );
+  }
+  const missingCurrency = { position_ids: ['P'], factor_ids: ['F'], data: [[2.0]] };
+  assert.throws(() => portfolio.decomposeFactorRisk(JSON.stringify(missingCurrency), covariance));
+});
+
 // Runtime arity gate. `index.d.ts` is hand-maintained, so a declaration with
 // the wrong argument count would compile clean for a TypeScript caller while
 // the extra argument is silently discarded at the JS boundary. Pinning

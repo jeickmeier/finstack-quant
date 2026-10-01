@@ -396,11 +396,11 @@ fn test_compile_multiple_instruments() {
 
 #[test]
 fn test_aggregate_period_flows() {
-    use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_core::dates::{build_periods, Date};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::types::{CurveId, InstrumentId};
     use finstack_quant_valuations::instruments::Bond;
+    use finstack_quant_valuations::instruments::Instrument;
 
     use std::sync::Arc;
     use time::Month;
@@ -420,7 +420,7 @@ fn test_aggregate_period_flows() {
     )
     .expect("Bond::fixed should succeed with valid parameters");
 
-    let mut instruments: indexmap::IndexMap<String, Arc<dyn CashflowProvider + Send + Sync>> =
+    let mut instruments: indexmap::IndexMap<String, Arc<dyn Instrument>> =
         indexmap::IndexMap::new();
     instruments.insert("BOND-001".to_string(), Arc::new(bond));
 

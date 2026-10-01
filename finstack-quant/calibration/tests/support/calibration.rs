@@ -136,7 +136,7 @@ fn parse_snapshot_currency(value: &str, field: &str) -> Result<Currency> {
 /// Split a [`MarketContext`] into the canonical `(prior_market,
 /// market_data)` inputs used by calibration tests.
 pub fn split_market_context(ctx: &MarketContext) -> (Vec<PriorMarketObject>, Vec<MarketDatum>) {
-    split_market_context_state(MarketContextState::from(ctx))
+    split_market_context_state(MarketContextState::try_from(ctx).expect("coherent market snapshot"))
         .expect("valid market context snapshot")
 }
 
@@ -147,7 +147,7 @@ pub fn execute_step(
     context: &MarketContext,
     global_config: &CalibrationConfig,
 ) -> Result<(MarketContext, CalibrationReport)> {
-    let (prior, mut data) = split_market_context_state(MarketContextState::from(context))?;
+    let (prior, mut data) = split_market_context_state(MarketContextState::try_from(context)?)?;
 
     let ids = quote_set_ids(quotes);
     extend_market_data(&mut data, quotes);

@@ -15,6 +15,8 @@ mod report_serialization;
 mod scenario_modules;
 #[path = "schema_contract.rs"]
 mod schema_contract;
+#[path = "senior_review_market_regressions.rs"]
+mod senior_review_market_regressions;
 #[path = "spec_validation_test.rs"]
 mod spec_validation_test;
 #[path = "templates_integration.rs"]

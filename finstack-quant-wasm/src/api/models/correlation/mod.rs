@@ -70,7 +70,8 @@ impl JsCopulaSpec {
     /// # Errors
     ///
     /// Throws a JavaScript exception if a Student-t specification contains
-    /// non-finite degrees of freedom or a value at most two.
+    /// non-finite degrees of freedom or a value at most two, or random-loading
+    /// volatility is non-finite or outside `[0, 0.5]`.
     #[wasm_bindgen(js_name = build)]
     pub fn build(&self) -> Result<JsCopula, JsValue> {
         self.inner
@@ -152,10 +153,10 @@ impl JsCopula {
     /// Strict lower-tail dependence coefficient `λ_L` at the given
     /// correlation.
     ///
-    /// Returns `NaN` when the model has no closed-form `λ_L` (Random Factor
-    /// Loading); check `Number.isNaN()` before using the result. For the
-    /// RFL heuristic stress gauge use `stressCorrelationProxy` instead.
-    /// @param correlation - Asset correlation as a decimal in `[0, 1]`. Out-of-range values are clamped by the model, not rejected (Student-t clamps to its supported correlation range; Gaussian models ignore the value and return 0).
+    /// Random Factor Loading returns the mass at unit loading under its
+    /// calibrated clipped-normal loading distribution. Gaussian models have
+    /// zero tail dependence except at perfect correlation.
+    /// @param correlation - Dependence correlation from -1 through 1 under the selected copula or recovery model.
     #[wasm_bindgen(js_name = tailDependence)]
     pub fn tail_dependence(&self, correlation: JsValue) -> Result<f64, JsValue> {
         let correlation = js_f64(&correlation, "correlation")?;
@@ -166,8 +167,7 @@ impl JsCopula {
     /// copula.
     ///
     /// This is **not** the strict copula lower-tail-dependence coefficient
-    /// `λ_L` (which has no closed form for RFL — `tailDependence` returns
-    /// `NaN`). It gauges the extra correlation mass in the high-loading
+    /// `λ_L` returned by `tailDependence`. It gauges the extra correlation mass in the high-loading
     /// tail and vanishes in the Gaussian (`loadingVol = 0`) limit.
     /// @param correlation - Base asset correlation as a decimal in `[0, 1]`; out-of-range values are clamped to `[0, 1]`.
     ///
@@ -368,14 +368,22 @@ pub fn joint_probabilities(
 /// checks unit diagonal, off-diagonal in `[-1, 1]`, symmetry, and positive
 /// semi-definiteness. Returns nothing on success; raises a descriptive error
 /// (including the failing dimension or constraint) otherwise.
-/// @param matrix - Flat row-major `n * n` correlation coefficients; unit diagonal, off-diagonals in `[-1, 1]`.
-/// @param n - Positive square-matrix dimension; `matrix` must contain exactly `n * n` entries.
+///
+/// # Arguments
+///
+/// * `matrix` - Flat row-major `n * n` correlation coefficients; unit
+///   diagonal, off-diagonals in `[-1, 1]`.
+/// * `n` - Finite non-negative integer square-matrix dimension no greater
+///   than `4294967295`; `matrix` must contain exactly `n * n` entries, and
+///   an empty matrix uses zero.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if the flat length is not `n * n`, a diagonal
-/// entry is not one, an entry is outside the correlation bounds, the matrix is
-/// not symmetric, or the matrix is not positive semidefinite.
+/// Throws a JavaScript exception if `n` is non-finite, fractional, negative,
+/// or exceeds the WebAssembly `usize` range; if `n * n` overflows or the flat
+/// length is not `n * n`; if a diagonal entry is not one, an entry is outside
+/// the correlation bounds, the matrix is not symmetric, or the matrix is not
+/// positive semidefinite.
 #[wasm_bindgen(js_name = validateCorrelationMatrix)]
 pub fn validate_correlation_matrix(matrix: JsValue, n: JsValue) -> Result<(), JsValue> {
     let matrix: &[f64] = &js_f64_seq(&matrix, "matrix")?;
@@ -389,16 +397,25 @@ pub fn validate_correlation_matrix(matrix: JsValue, n: JsValue) -> Result<(), Js
 /// matrix but fails Cholesky by a small margin, returns the nearest valid
 /// correlation matrix (symmetric, unit diagonal, PSD) in Frobenius norm.
 /// Gross input violations raise rather than being silently reshaped.
-/// @param matrix - Flat row-major `n * n` near-correlation matrix to project onto the correlation set.
-/// @param n - Positive square-matrix dimension; `matrix` must contain exactly `n * n` entries.
-/// @param max_iter - Maximum number of Higham nearest-correlation projection iterations; omitted uses Rust `NearestCorrelationOpts::default()` (200).
-/// @param tol - Positive convergence tolerance for the nearest-correlation projection; omitted uses Rust `NearestCorrelationOpts::default()` (`1e-10`).
+///
+/// # Arguments
+///
+/// * `matrix` - Flat row-major `n * n` near-correlation matrix to project
+///   onto the correlation set.
+/// * `n` - Non-negative integer square-matrix dimension; `matrix` must
+///   contain exactly `n * n` entries, and an empty matrix uses zero.
+/// * `max_iter` - Optional non-negative integer limit on Higham projection
+///   iterations; omitted uses Rust `NearestCorrelationOpts::default()` (200).
+/// * `tol` - Optional positive convergence tolerance for the projection;
+///   omitted uses Rust `NearestCorrelationOpts::default()` (`1e-10`).
 ///
 /// # Errors
 ///
-/// Throws a `validation` error if the flat length is not `n * n` or the input
-/// has a gross diagonal or symmetry violation, and a `computation` error if
-/// the projection does not converge within `maxIter` iterations at `tol`.
+/// Throws a `TypeError` if `n` or `maxIter` is non-finite, fractional,
+/// negative, or exceeds the WebAssembly `usize` range; a `validation` error
+/// if `n * n` overflows, the flat length is not `n * n` or the input has a
+/// gross diagonal or symmetry violation; and a `computation` error if the
+/// projection does not converge within `maxIter` iterations at `tol`.
 #[wasm_bindgen(js_name = nearestCorrelation)]
 pub fn nearest_correlation(
     matrix: JsValue,

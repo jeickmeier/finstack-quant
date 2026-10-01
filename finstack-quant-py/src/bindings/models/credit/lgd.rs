@@ -1155,7 +1155,7 @@ fn ead_revolver(drawn: f64, undrawn: f64, ccf: f64) -> PyResult<f64> {
 
 /// Build the `finstack_quant.models.credit.lgd` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "lgd")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "lgd")?;
     m.setattr(
         "__doc__",
         format!(
@@ -1203,13 +1203,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "lgd",
-        "finstack_quant.models.credit",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
 
     Ok(())

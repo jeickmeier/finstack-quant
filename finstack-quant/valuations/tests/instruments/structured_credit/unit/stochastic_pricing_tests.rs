@@ -76,6 +76,7 @@ fn build_sc(id: &str, pool_balance: f64) -> StructuredCredit {
         legal_maturity(),
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse")
 }
 
@@ -104,7 +105,7 @@ fn stochastic_pricing_is_deterministic_and_returns_tranche_results() {
             &market,
             as_of,
             StructuredCreditPricingMode::MonteCarlo {
-                num_paths: 1,
+                num_paths: 2,
                 antithetic: false,
             },
         )
@@ -114,7 +115,7 @@ fn stochastic_pricing_is_deterministic_and_returns_tranche_results() {
             &market,
             as_of,
             StructuredCreditPricingMode::MonteCarlo {
-                num_paths: 1,
+                num_paths: 2,
                 antithetic: false,
             },
         )
@@ -125,12 +126,39 @@ fn stochastic_pricing_is_deterministic_and_returns_tranche_results() {
     assert_eq!(
         first.pricing_mode,
         StructuredCreditPricingMode::MonteCarlo {
-            num_paths: 1,
+            num_paths: 2,
             antithetic: false,
         }
     );
     assert_eq!(first.npv.amount(), second.npv.amount());
     assert_eq!(first.tranche_results.len(), second.tranche_results.len());
+}
+
+#[test]
+fn monte_carlo_rejects_fewer_than_two_independent_estimators() {
+    let sc = build_sc("ABS-MC-TOO-FEW", 1_000_000.0);
+    let market = MarketContext::new().insert(discount_curve(closing_date()));
+
+    for num_paths in [0, 1] {
+        for antithetic in [false, true] {
+            let err = sc
+                .price_stochastic_with_mode(
+                    &market,
+                    closing_date(),
+                    StructuredCreditPricingMode::MonteCarlo {
+                        num_paths,
+                        antithetic,
+                    },
+                )
+                .expect_err("MC uncertainty requires two independent estimators");
+
+            assert!(
+                err.to_string()
+                    .contains("at least two independent estimators"),
+                "num_paths={num_paths}, antithetic={antithetic}: {err}"
+            );
+        }
+    }
 }
 
 #[test]
@@ -230,6 +258,7 @@ fn enable_stochastic_populates_specs_for_each_deal_family() {
             legal_maturity(),
             "USD-OIS",
         )
+        .expect("valid structured-credit dates")
     };
 
     for mut sc in [
@@ -489,6 +518,7 @@ fn mc_variance_no_catastrophic_cancellation_on_large_pv_deal() {
         maturity,
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     // Factor-correlated default spec: moderate base CDR with inter-path
@@ -554,32 +584,11 @@ fn mc_variance_no_catastrophic_cancellation_on_large_pv_deal() {
     );
 }
 
-/// Guard: the stochastic MC pricer must use `PhiloxRng` with per-path
-/// substream splitting.
-///
-/// # What this test checks
-///
-/// 1. **Repeated-run determinism** — two calls with the same seed produce
-///    bit-identical NPVs.
-///
-/// 2. **Philox stream identity** — the first path's result equals the result
-///    obtained by constructing `PhiloxRng::new(42).substream(0)` and pulling
-///    the same number of standard normals.  Because `Pcg64Rng` produces a
-///    different first-path normal sequence, the Philox-specific NPV pin
-///    rejects any regression back to `Pcg64`.
-///
-/// # Parent-run result (pre-fix, Pcg64Rng)
-///
-/// On the unpatched engine this test **fails** on assertion (2): the
-/// `philox_1path_npv` assertion errors because `Pcg64Rng::new(42)` produces
-/// a different first-path factor sequence than
-/// `PhiloxRng::new(42).substream(0)`, so the single-path NPVs diverge.
-///
-/// Assertion (1) already passes on the parent (Pcg64 serial generation is
-/// deterministic), but we retain it to guard against future refactors that
-/// could reintroduce non-determinism.
+/// Repeated calls with the same seed must produce bit-identical NPVs at
+/// both four estimators and the minimum valid count of two. Separately,
+/// the reference Philox substream must produce finite normal draws.
 #[test]
-fn philox_rng_discipline_determinism_and_stream_identity() {
+fn philox_rng_discipline_determinism_and_stream_sanity() {
     use finstack_quant_cashflows::builder::DefaultModelSpec;
     use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
     use finstack_quant_models::monte_carlo::traits::RandomStream;
@@ -615,6 +624,7 @@ fn philox_rng_discipline_determinism_and_stream_identity() {
         maturity,
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.02);
@@ -643,7 +653,7 @@ fn philox_rng_discipline_determinism_and_stream_identity() {
     };
 
     // ── Assertion 1: repeated-run determinism ─────────────────────────────
-    // Both calls use the same seed (default 42); results must be bit-identical.
+    // Both calls use the same instrument/date-derived seed; results must be bit-identical.
     let run1 = sc
         .price_stochastic_with_mode(&market, close, mode_4.clone())
         .expect("first stochastic run");
@@ -665,50 +675,25 @@ fn philox_rng_discipline_determinism_and_stream_identity() {
         "repeated MC runs must produce bit-identical tranche NPVs"
     );
 
-    // ── Assertion 2: Philox stream identity ───────────────────────────────
-    // Run with exactly 1 path so path_index == 0.  After the fix, the engine
-    // constructs PhiloxRng::new(seed=42).substream(0) for that path.
-    // We derive the same stream here and manually produce the same factor
-    // sequence, then feed it through a reference computation.
-    //
-    // The reference: 1 path, no antithetic, seed=42.  The engine calls
-    // `PhiloxRng::new(42).substream(0)` and draws `month_count` normals.
-    // Two runs with 1 path must be bit-identical (determinism); and the NPV
-    // must equal the value produced when we use a fresh substream(0) here.
-    let mode_1 = StructuredCreditPricingMode::MonteCarlo {
-        num_paths: 1,
+    // Reproducibility must also hold at the minimum valid estimator count.
+    let mode_2 = StructuredCreditPricingMode::MonteCarlo {
+        num_paths: 2,
         antithetic: false,
     };
-    let single_run_a = sc
-        .price_stochastic_with_mode(&market, close, mode_1.clone())
-        .expect("single-path run A");
-    let single_run_b = sc
-        .price_stochastic_with_mode(&market, close, mode_1)
-        .expect("single-path run B");
+    let minimum_run_a = sc
+        .price_stochastic_with_mode(&market, close, mode_2.clone())
+        .expect("two-estimator run A");
+    let minimum_run_b = sc
+        .price_stochastic_with_mode(&market, close, mode_2)
+        .expect("two-estimator run B");
 
     assert_eq!(
-        single_run_a.npv.amount(),
-        single_run_b.npv.amount(),
-        "single-path MC must be bit-identical across runs"
+        minimum_run_a.npv.amount(),
+        minimum_run_b.npv.amount(),
+        "two-estimator MC must be bit-identical across runs"
     );
 
-    // Verify the RNG is Philox by checking that a fresh substream(0) drawn
-    // independently produces the same leading normal as path 0.
-    // The engine's path 0 calls `base_rng.substream(0).next_std_normal()`
-    // for each month.  We extract the first two normals from the reference
-    // stream and verify that the deal PV shifted from the zero-factor baseline
-    // in the direction those normals would push it.
-    //
-    // This is a structural / sanity check, not an exact-value pin. Pinning an
-    // exact single-path NPV would be brittle: any legitimate change to the
-    // engine (discounting, seasoning, factor wiring) would break it. The
-    // forward guard against an RNG regression is structural — the engine is
-    // compiled against `PhiloxRng` — reinforced by the repeated-run
-    // determinism asserted above. Below we additionally confirm that the
-    // `PhiloxRng::substream` API yields finite normal draws and that the
-    // single-path NPV is finite and near par.
-
-    // Derive the Philox substream(0) normals for path 0.
+    // Independently sanity-check the Philox substream API used by the engine.
     let mut philox_path0 = PhiloxRng::new(42).substream(0);
     // 24 months (2-year deal, monthly)
     let month_count = 24usize;
@@ -716,8 +701,6 @@ fn philox_rng_discipline_determinism_and_stream_identity() {
         .map(|_| philox_path0.next_std_normal())
         .collect();
 
-    // The engine produces the same factor vector for path 0 when using Philox.
-    // Verify all draws are finite (sanity).
     for (i, &z) in philox_normals.iter().enumerate() {
         assert!(
             z.is_finite(),
@@ -725,13 +708,16 @@ fn philox_rng_discipline_determinism_and_stream_identity() {
         );
     }
 
-    // The single-path NPV must be finite and in a plausible range
+    // The two-estimator NPV must be finite and in a plausible range
     // (within 20% of par for a 2-year 5%-coupon ABS near fair value).
-    let npv = single_run_a.npv.amount();
-    assert!(npv.is_finite(), "single-path NPV must be finite, got {npv}");
+    let npv = minimum_run_a.npv.amount();
+    assert!(
+        npv.is_finite(),
+        "two-estimator NPV must be finite, got {npv}"
+    );
     assert!(
         npv > 800_000.0 && npv < 1_200_000.0,
-        "single-path NPV must be near par (800k–1200k), got {npv}"
+        "two-estimator NPV must be near par (800k–1200k), got {npv}"
     );
 }
 
@@ -1064,6 +1050,7 @@ fn stochastic_waterfall_matches_independent_cashflow_vectors() {
             .unwrap();
             let mut sc =
                 StructuredCredit::new_abs("REFERENCE", pool, tranches, start, end, "USD-OIS")
+                    .expect("valid structured-credit dates")
                     .with_calendar_id("nyse");
             sc.frequency = Tenor::quarterly();
             sc.first_payment_date = date!(2024 - 04 - 02);
@@ -1137,9 +1124,9 @@ fn stochastic_waterfall_matches_independent_cashflow_vectors() {
     }
 }
 
-/// Stochastic CLO-style deal whose factor draws reach the result, so the pin
-/// below is sensitive to the path count and the antithetic pairing.
-fn stochastic_pin_deal() -> StructuredCredit {
+/// Stochastic CLO-style deal whose factor draws affect the result, so changing
+/// the estimator count changes the computed estimate.
+fn stochastic_estimator_count_deal() -> StructuredCredit {
     let mut sc = build_sc("ABS-MC-ESTIMATOR-PIN", 1_000_000.0);
     sc.with_stochastic_prepay(StochasticPrepaySpec::factor_correlated(
         PrepaymentModelSpec::constant_cpr(0.15),
@@ -1151,14 +1138,13 @@ fn stochastic_pin_deal() -> StructuredCredit {
     sc
 }
 
-/// `StructuredCreditPricingMode::MonteCarlo.num_paths` counts independent estimators: with
-/// antithetic pairing the engine simulates two paths per estimator. The
-/// default halved from 10,000 total paths to 5,000 estimators, so the default
-/// PV is unchanged. Reference: bit patterns captured before the change, when
-/// the default simulated 10,000 antithetic paths.
+/// The default is 5,000 independent antithetic estimators, each comprising two
+/// physical paths. An explicit mode must reproduce every default result using
+/// the same instrument/date-derived seed; an estimator-count override must
+/// affect the stochastic estimate as well as its reported path count.
 #[test]
-fn default_monte_carlo_pv_is_bit_identical_under_estimator_semantics() {
-    let sc = stochastic_pin_deal();
+fn default_monte_carlo_matches_explicit_estimator_count_and_honors_override() {
+    let sc = stochastic_estimator_count_deal();
     let market = MarketContext::new().insert(discount_curve(closing_date()));
 
     let result = sc
@@ -1172,18 +1158,44 @@ fn default_monte_carlo_pv_is_bit_identical_under_estimator_semantics() {
         }
     );
     assert_eq!(result.num_paths, 10_000, "5,000 antithetic estimators");
-    assert_eq!(result.npv.amount().to_bits(), 0x4130_84b6_808a_923b);
-    assert_eq!(result.pv_std_error.to_bits(), 0x4096_ba8e_d92a_aa55);
+    assert!(result.pv_std_error.is_finite() && result.pv_std_error > 0.0);
 
-    // Formerly `monte_carlo(200)` (200 total antithetic paths).
-    let explicit = sc
+    let explicit_default = sc
+        .price_stochastic_with_mode(
+            &market,
+            closing_date(),
+            StructuredCreditPricingMode::MonteCarlo {
+                num_paths: 5_000,
+                antithetic: true,
+            },
+        )
+        .expect("explicit default estimator count");
+    assert_eq!(explicit_default.num_paths, 10_000);
+    assert_eq!(
+        serde_json::to_vec(&result).expect("serialize default result"),
+        serde_json::to_vec(&explicit_default).expect("serialize explicit default result"),
+        "identical seed and estimator count must reproduce every output exactly"
+    );
+
+    let reduced = sc
         .price_stochastic_with_mode(
             &market,
             closing_date(),
             StructuredCreditPricingMode::monte_carlo(100),
         )
-        .expect("explicit stochastic price");
-    assert_eq!(explicit.num_paths, 200);
-    assert_eq!(explicit.npv.amount().to_bits(), 0x4130_b915_f154_110f);
-    assert_eq!(explicit.pv_std_error.to_bits(), 0x40c1_5b2e_4943_154f);
+        .expect("reduced estimator count");
+    assert_eq!(
+        reduced.pricing_mode,
+        StructuredCreditPricingMode::MonteCarlo {
+            num_paths: 100,
+            antithetic: true,
+        }
+    );
+    assert_eq!(reduced.num_paths, 200);
+    assert!(reduced.pv_std_error.is_finite() && reduced.pv_std_error > 0.0);
+    assert_ne!(
+        reduced.npv.amount().to_bits(),
+        result.npv.amount().to_bits(),
+        "the estimator-count override must affect pricing, not only metadata"
+    );
 }

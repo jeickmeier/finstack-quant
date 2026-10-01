@@ -78,9 +78,9 @@ macro_rules! schema_artifact {
 /// Deliberately minimal: its job is to show the required-key shape, including
 /// the mandatory `hierarchy` key whose value may be an explicit `null`.
 fn market_context_state_examples() -> Result<Vec<Value>> {
-    let state = crate::market_data::context::MarketContextState::from(
+    let state = crate::market_data::context::MarketContextState::try_from(
         &crate::market_data::context::MarketContext::new(),
-    );
+    )?;
     let value = serde_json::to_value(&state)
         .map_err(|error| Error::Internal(format!("serialize market context example: {error}")))?;
     Ok(vec![value])
@@ -128,6 +128,21 @@ fn schedule_examples() -> Result<Vec<Value>> {
 fn scorecard_scale_examples() -> Result<Vec<Value>> {
     let registry = crate::rating_scales::embedded_registry()?;
     example(registry.rating_scale(registry.default_scale_id())?)
+}
+
+/// A one-year-expiry normal-volatility slice over two tenors and three strikes.
+fn vol_cube_expiry_slice_examples() -> Result<Vec<Value>> {
+    use crate::market_data::surfaces::{VolCubeExpirySlice, VolQuoteType};
+    let slice = VolCubeExpirySlice::from_grid(
+        "USD-SWAPTION-1Y",
+        1.0,
+        &[2.0, 5.0],
+        &[0.02, 0.03, 0.04],
+        &[0.0085, 0.008, 0.0082, 0.009, 0.0086, 0.0088],
+        VolQuoteType::Normal,
+        None,
+    )?;
+    example(&slice)
 }
 
 /// The core crate's schema registry.
@@ -188,4 +203,12 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
     )
     .with_kind(SchemaKind::Output)
     .with_examples(scorecard_scale_examples),
+    SchemaArtifact::new::<crate::market_data::surfaces::VolCubeExpirySlice>(
+        "schemas/market_data/1/vol_cube_expiry_slice.schema.json",
+        "https://finstack_quant.dev/schemas/market_data/1/vol_cube_expiry_slice.schema.json",
+        "Volatility Cube Expiry Slice",
+        "Tenor-by-strike volatility quotes at a fixed option expiry, preserving quote convention and displacement.",
+    )
+    .with_kind(SchemaKind::Output)
+    .with_examples(vol_cube_expiry_slice_examples),
 ];

@@ -46,9 +46,12 @@ pub enum StructuredCreditPricingMode {
     /// The default, because it is the only mode that can price a deal at a
     /// realistic horizon.
     MonteCarlo {
-        /// Number of independent estimators. With `antithetic` each estimator
-        /// simulates a `(Z, -Z)` pair, so the engine prices `2 × num_paths`
-        /// scenario paths.
+        /// Number of independent estimators; must be at least two to estimate
+        /// sampling uncertainty. With `antithetic` each estimator averages a
+        /// `(Z, -Z)` pair, so the engine prices `2 × num_paths` scenario paths.
+        /// Sample standard error and the Student-t interval use this estimator
+        /// count, with `num_paths - 1` degrees of freedom.
+        #[cfg_attr(feature = "json-schema", schemars(range(min = 2)))]
         num_paths: usize,
         /// Pair each estimator's path with its sign-flipped mirror.
         antithetic: bool,

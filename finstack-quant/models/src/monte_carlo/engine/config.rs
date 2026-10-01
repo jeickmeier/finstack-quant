@@ -21,10 +21,9 @@ pub const MAX_CAPTURED_PATHS: usize = 100_000;
 /// [`McEngine`](super::McEngine). All time values are year fractions.
 #[derive(Debug, Clone)]
 pub struct McEngineConfig {
-    /// Requested number of independent path estimators. Values above
-    /// [`MAX_NUM_PATHS`] are rejected (not capped) at runtime. A value of 1
-    /// is accepted but yields an undefined (`NaN`) standard error — at least
-    /// 2 paths are needed for a sample variance.
+    /// Requested number of independent path estimators. Runtime validation
+    /// requires `2..=MAX_NUM_PATHS` so the sample variance and confidence
+    /// interval are defined. Antithetic pairs each count as one estimator.
     ///
     /// With [`Self::antithetic`] disabled this equals the number of simulated
     /// sample paths. With antithetic pairing enabled the engine runs
@@ -66,8 +65,9 @@ impl McEngineConfig {
     ///
     /// # Arguments
     ///
-    /// * `num_paths` - Requested number of Monte Carlo paths. Runtime validation
-    ///   requires this to be greater than zero.
+    /// * `num_paths` - Requested independent path estimators in
+    ///   `2..=MAX_NUM_PATHS`, validated when pricing. Each antithetic pair
+    ///   contributes one estimator.
     /// * `time_grid` - Simulation grid in year fractions.
     ///
     /// # Returns
@@ -93,7 +93,8 @@ impl McEngineConfig {
     ///
     /// # Arguments
     ///
-    /// * `num_paths` - Requested independent path estimators.
+    /// * `num_paths` - Requested independent path estimators in
+    ///   `2..=MAX_NUM_PATHS`, validated when pricing.
     /// * `t_max` - Positive finite simulation horizon in years.
     /// * `num_steps` - Positive number of uniform time steps.
     ///

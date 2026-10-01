@@ -206,7 +206,7 @@ mod cds_market_edge {
         let as_of = date!(2024 - 01 - 15);
 
         // Next IMM date after as_of
-        let next_imm_date = next_imm(as_of);
+        let next_imm_date = next_imm(as_of).expect("supported IMM date");
 
         // Verify next IMM date is correct
         let (_y, m, d) = (
@@ -247,12 +247,13 @@ mod cds_market_edge {
         use finstack_quant_core::dates::{is_imm_date, next_imm};
 
         let start = date!(2024 - 01 - 01);
-        let mut current = next_imm(start);
+        let mut current = next_imm(start).expect("supported IMM date");
         let mut imm_dates = vec![current];
 
         // Generate next 8 IMM dates (2 years)
         for _ in 0..7 {
-            current = next_imm(current.saturating_add(time::Duration::days(1)));
+            current = next_imm(current.saturating_add(time::Duration::days(1)))
+                .expect("supported IMM date");
             imm_dates.push(current);
         }
 
@@ -389,10 +390,10 @@ mod bond_market_edge {
         );
     }
 
-    /// Test ex-coupon window zeroes accrued at boundary.
+    /// Test coupon entitlement on the record date and the following ex window.
     ///
-    /// Exactly at ex-coupon date, accrued should be zero.
-    /// One day before ex-coupon, accrued should be full period accrual.
+    /// Settlement on the record date retains the coupon and positive accrued.
+    /// Strictly after it, accrued is the negative remaining-coupon rebate.
     #[test]
     fn test_ex_coupon_boundary_behavior() {
         let issue = date!(2025 - 01 - 01);
@@ -421,31 +422,41 @@ mod bond_market_edge {
             .unwrap();
         let config = bond.accrual_config();
 
-        // 8 days before coupon = just before ex-coupon window
-        let before_ex = coupon_date - time::Duration::days(8);
-        let accrued_before = accrued_interest_amount(&schedule, before_ex, &config).unwrap();
+        let record_date = coupon_date - time::Duration::days(7);
+        let before_record = record_date - time::Duration::days(1);
+        let accrued_before = accrued_interest_amount(&schedule, before_record, &config).unwrap();
 
-        // 7 days before coupon = exactly at ex-coupon boundary
-        let at_ex = coupon_date - time::Duration::days(7);
-        let accrued_at = accrued_interest_amount(&schedule, at_ex, &config).unwrap();
+        let accrued_record = accrued_interest_amount(&schedule, record_date, &config).unwrap();
+
+        let after_record = record_date + time::Duration::days(1);
+        let accrued_after = accrued_interest_amount(&schedule, after_record, &config).unwrap();
 
         // 5 days before coupon = within ex-coupon window
         let within_ex = coupon_date - time::Duration::days(5);
         let accrued_within = accrued_interest_amount(&schedule, within_ex, &config).unwrap();
 
-        // Before ex-coupon: should have significant accrued (~2.9% of 3% = full period minus 8 days)
+        // The US corporate bond pays $30 semiannually on 30/360. From Jan 1,
+        // June 23/24/25/26 have 172/173/174/175 convention days of accrual.
+        let coupon = 1000.0 * 0.06 / 2.0;
+        let annual_interest = 1000.0 * 0.06;
+        for (actual, expected) in [
+            (accrued_before, annual_interest * 172.0 / 360.0),
+            (accrued_record, annual_interest * 173.0 / 360.0),
+            (accrued_after, annual_interest * 174.0 / 360.0 - coupon),
+            (accrued_within, annual_interest * 175.0 / 360.0 - coupon),
+        ] {
+            assert!((actual - expected).abs() < 1e-12, "Accrued should match the independent 30/360 coupon calculation: actual={actual}, expected={expected}");
+        }
         assert!(
-            accrued_before > 2.0,
-            "Accrued before ex-coupon should be substantial: {}",
-            accrued_before
+            accrued_record > accrued_before && accrued_before > 0.0,
+            "Accrued remains positive and increases through the record date"
         );
 
-        // At and within ex-coupon: negative accrued (seller keeps the coupon,
-        // buyer is compensated for the remaining stub to the coupon date).
+        // The coupon is forfeited starting strictly after the record date.
         assert!(
-            accrued_at < 0.0,
-            "Accrued at ex-coupon boundary should be negative: {}",
-            accrued_at
+            accrued_after < 0.0,
+            "Accrued immediately after the record date should be negative: {}",
+            accrued_after
         );
         assert!(
             accrued_within < 0.0,
@@ -454,9 +465,9 @@ mod bond_market_edge {
         );
         // Closer to the coupon date the negative stub shrinks towards zero.
         assert!(
-            accrued_within > accrued_at,
-            "Negative accrued should shrink towards zero through the ex window: at={} within={}",
-            accrued_at,
+            accrued_within > accrued_after,
+            "Negative accrued should shrink towards zero through the ex window: after_record={} within={}",
+            accrued_after,
             accrued_within
         );
     }

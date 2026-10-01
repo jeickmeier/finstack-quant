@@ -357,15 +357,21 @@ pub enum Function {
     /// zero selects the recursive form. Leading and interior NaNs are preserved,
     /// and the recursion starts at the first non-NaN observation.
     EwmMean,
-    /// Sample standard deviation (n−1, Bessel's correction; pandas `ddof=1`).
+    /// Population standard deviation (denominator `n`, pandas `ddof=0`),
+    /// broadcast over the input length. NaNs are excluded; fewer than two
+    /// non-NaN observations produce NaN.
     Std,
-    /// Sample variance (n−1, Bessel's correction; pandas `ddof=1`).
+    /// Population variance (denominator `n`, pandas `ddof=0`), broadcast over
+    /// the input length. NaNs are excluded; fewer than two non-NaN
+    /// observations produce NaN.
     Var,
     /// Median.
     Median,
-    /// Rolling standard deviation over a fixed row window size.
+    /// Rolling population standard deviation (`ddof=0`) over a fixed row
+    /// window size. Incomplete windows and windows containing NaN return NaN.
     RollingStd,
-    /// Rolling variance over a fixed row window size.
+    /// Rolling population variance (`ddof=0`) over a fixed row window size.
+    /// Incomplete windows and windows containing NaN return NaN.
     RollingVar,
     /// Rolling median over a fixed row window size.
     RollingMedian,
@@ -392,11 +398,15 @@ pub enum Function {
     /// `[1e-12, 1]`. An omitted or positive `adjust` uses adjusted weights;
     /// zero or a negative value selects the recursive form. Leading and interior
     /// NaNs are preserved, and the recursion starts at the first non-NaN value.
+    /// Returns weighted population standard deviation without a sample-bias
+    /// correction; the first non-NaN observation has standard deviation zero.
     EwmStd,
     /// `ewm_var(series, alpha, adjust?)`, with `alpha` normalized to
     /// `[1e-12, 1]`. An omitted or positive `adjust` uses adjusted weights;
     /// zero or a negative value selects the recursive form. Leading and interior
     /// NaNs are preserved, and the recursion starts at the first non-NaN value.
+    /// Returns weighted population variance without a sample-bias correction;
+    /// the first non-NaN observation has variance zero.
     EwmVar,
 
     // Custom financial functions

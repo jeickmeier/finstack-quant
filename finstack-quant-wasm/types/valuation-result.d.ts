@@ -517,9 +517,11 @@ export type StructuredCreditPricingMode =
          */
         antithetic: boolean;
         /**
-         * Number of independent estimators. With `antithetic` each estimator
-         * simulates a `(Z, -Z)` pair, so the engine prices `2 × num_paths`
-         * scenario paths.
+         * Number of independent estimators; must be at least two to estimate
+         * sampling uncertainty. With `antithetic` each estimator averages a
+         * `(Z, -Z)` pair, so the engine prices `2 × num_paths` scenario paths.
+         * Sample standard error and the Student-t interval use this estimator
+         * count, with `num_paths - 1` degrees of freedom.
          */
         num_paths: bigint;
       };
@@ -688,7 +690,7 @@ export interface ResultsMeta {
  */
 export interface RoundingContext {
   /**
-   * Ingest scale map snapshot by currency code.
+   * Validated ingest scale snapshot by currency code, with values in `0..=28`.
    */
   ingest_scale_by_currency: {
     [k: string]: number;
@@ -698,7 +700,7 @@ export interface RoundingContext {
    */
   mode: "bankers" | "away_from_zero" | "toward_zero" | "floor" | "ceil";
   /**
-   * Output scale map snapshot by currency code.
+   * Validated output scale snapshot by currency code, with values in `0..=28`.
    */
   output_scale_by_currency: {
     [k: string]: number;
@@ -3004,7 +3006,7 @@ export interface ResultsMeta2 {
  */
 export interface RoundingContext1 {
   /**
-   * Ingest scale map snapshot by currency code.
+   * Validated ingest scale snapshot by currency code, with values in `0..=28`.
    */
   ingest_scale_by_currency: {
     [k: string]: number;
@@ -3014,7 +3016,7 @@ export interface RoundingContext1 {
    */
   mode: "bankers" | "away_from_zero" | "toward_zero" | "floor" | "ceil";
   /**
-   * Output scale map snapshot by currency code.
+   * Validated output scale snapshot by currency code, with values in `0..=28`.
    */
   output_scale_by_currency: {
     [k: string]: number;
@@ -3092,9 +3094,11 @@ export interface StochasticPricingResult {
            */
           antithetic: boolean;
           /**
-           * Number of independent estimators. With `antithetic` each estimator
-           * simulates a `(Z, -Z)` pair, so the engine prices `2 × num_paths`
-           * scenario paths.
+           * Number of independent estimators; must be at least two to estimate
+           * sampling uncertainty. With `antithetic` each estimator averages a
+           * `(Z, -Z)` pair, so the engine prices `2 × num_paths` scenario paths.
+           * Sample standard error and the Student-t interval use this estimator
+           * count, with `num_paths - 1` degrees of freedom.
            */
           num_paths: bigint;
         };
@@ -3112,14 +3116,19 @@ export interface StochasticPricingResult {
         };
       };
   /**
-   * 95% confidence interval for the mean PV
+   * Two-sided 95% Student-t confidence interval for the mean PV, in the
+   * NPV currency, using one fewer degree of freedom than the independent
+   * estimator count. Coverage is approximate for non-Gaussian payoffs.
    *
    * @minItems 2
    * @maxItems 2
    */
   pv_confidence_interval: [unknown, unknown];
   /**
-   * Standard error of the mean PV estimate
+   * Sample standard error of the mean PV estimate, in the NPV currency.
+   *
+   * Uses Bessel-corrected variance over independent estimators; each
+   * antithetic pair contributes one mean observation.
    */
   pv_std_error: number;
   /**

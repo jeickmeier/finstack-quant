@@ -186,6 +186,7 @@ def build_european_fx_option() -> dict[str, Any]:
                 "quotes": [["EUR", "USD", spot]],
                 "pinned_quotes": [],
                 "provider_quotes": [],
+                "provider_pinned_quotes": [],
             },
             surfaces=[constant_vol_surface("EURUSD-VOL-QL", volatility)],
         ),

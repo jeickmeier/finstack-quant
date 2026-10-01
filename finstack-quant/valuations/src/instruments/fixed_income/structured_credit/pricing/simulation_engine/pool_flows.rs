@@ -316,9 +316,13 @@ pub(super) fn calculate_pool_flows_with_rates(
         // next period on, its level payment recast on the re-performing
         // balance.
         if let Some(spec) = state.pool_state.liquidation[i] {
-            let months = i32::try_from(spec.months_to_resolution).unwrap_or(i32::MAX);
+            let months = i32::try_from(spec.months_to_resolution).map_err(|_| {
+                finstack_quant_core::Error::Validation(
+                    "liquidation resolution months exceed supported range".into(),
+                )
+            })?;
             let anchor = state.pool_state.acquisition_dates[i].unwrap_or(state.closing_date);
-            if request.pay_date < anchor.add_months(months) {
+            if request.pay_date < anchor.add_months(months)? {
                 continue;
             }
             state.pool_state.liquidation[i] = None;
@@ -328,9 +332,13 @@ pub(super) fn calculate_pool_flows_with_rates(
             total_recovery = total_recovery.checked_add(Money::new(proceeds, currency)?)?;
             if liquidated > 0.0 {
                 // Dated so the deal's recovery lag lands the release today.
-                let claim_date = request
-                    .pay_date
-                    .add_months(-i32::try_from(state.recovery_lag_months).unwrap_or(i32::MAX));
+                let claim_date = request.pay_date.add_months(
+                    -i32::try_from(state.recovery_lag_months).map_err(|_| {
+                        finstack_quant_core::Error::Validation(
+                            "recovery lag months exceed supported range".into(),
+                        )
+                    })?,
+                )?;
                 workout_claims.push((
                     claim_date,
                     Money::new(proceeds, currency)?,
@@ -425,10 +433,13 @@ pub(super) fn calculate_pool_flows_with_rates(
                 resolved_curves[curve_idx].as_ref(),
                 request.context,
                 request.prev_date,
-                state.pool_state.rates[i],
-                state.pool_state.spread_bp[i],
+                period_helpers::CollateralCoupon {
+                    fallback_all_in_rate: state.pool_state.rates[i],
+                    spread_bp: state.pool_state.spread_bp[i],
+                    day_count: state.pool_state.day_counts[i],
+                    index_floor_rate: state.pool_state.index_floors[i],
+                },
                 state.floating_rate_shift,
-                state.pool_state.index_floors[i],
             )?
         } else {
             state.pool_state.rates[i]
@@ -634,10 +645,17 @@ pub(super) fn calculate_pool_flows_with_rates(
                         let shift = if spec.workout_months == 0 {
                             0
                         } else {
-                            i32::try_from(spec.workout_months).unwrap_or(i32::MAX)
-                                - i32::try_from(state.recovery_lag_months).unwrap_or(i32::MAX)
+                            i32::try_from(spec.workout_months).map_err(|_| {
+                                finstack_quant_core::Error::Validation(
+                                    "workout months exceed supported range".into(),
+                                )
+                            })? - i32::try_from(state.recovery_lag_months).map_err(|_| {
+                                finstack_quant_core::Error::Validation(
+                                    "recovery lag months exceed supported range".into(),
+                                )
+                            })?
                         };
-                        let claim_date = request.pay_date.add_months(shift);
+                        let claim_date = request.pay_date.add_months(shift)?;
                         total_default =
                             total_default.checked_add(Money::new(workout, currency)?)?;
                         total_recovery =
@@ -651,7 +669,11 @@ pub(super) fn calculate_pool_flows_with_rates(
                     let extended = performing_at_maturity * extension_prob;
                     if extended > 0.0 {
                         state.pool_state.maturities[i] = state.pool_state.maturities[i]
-                            .add_months(i32::try_from(spec.extension_months).unwrap_or(i32::MAX));
+                            .add_months(i32::try_from(spec.extension_months).map_err(|_| {
+                                finstack_quant_core::Error::Validation(
+                                    "extension months exceed supported range".into(),
+                                )
+                            })?)?;
                         if let Some(extension_rate) = spec.extension_rate {
                             // An all-in modification rate: the extended
                             // balance no longer floats.
@@ -699,7 +721,7 @@ pub(super) fn calculate_pool_flows_with_rates(
         // prepayment shortens the term rather than recasting the payment.
         // Defaulted loans stop paying, so scale the frozen aggregate payment by
         // the period survival fraction `(1 − period_mdr)`.
-        let scheduled_principal = if state.pool_state.is_amortizing[i] && rate > 0.0 {
+        let scheduled_principal = if state.pool_state.is_amortizing[i] {
             if !rate.is_finite() || rate <= -1.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "invalid amortization rate for pool asset '{}': {rate}",
@@ -750,19 +772,8 @@ pub(super) fn calculate_pool_flows_with_rates(
                 let level_payment = match state.pool_state.level_payments[i] {
                     Some(lp) => lp,
                     None => {
-                        let denom = 1.0 - (1.0 + period_rate).powf(-remaining_periods_f64);
-                        if !remaining_periods_f64.is_finite() || !denom.is_finite() {
-                            return Err(finstack_quant_core::Error::Validation(format!(
-                            "invalid amortization math for pool asset '{}': rate={rate}, period_rate={period_rate}",
-                            state.pool_state.ids[i]
-                        )));
-                        }
-                        let lp = if denom.abs() > 1e-12 && remaining_periods_f64 > 0.0 {
-                            balance * period_rate / denom
-                        } else {
-                            // Denominator ~0 (very short term): pay the full balance.
-                            balance
-                        };
+                        let lp =
+                            balance * level_payment_per_unit(period_rate, remaining_periods_f64);
                         if !lp.is_finite() {
                             return Err(finstack_quant_core::Error::Validation(format!(
                                 "invalid level payment for pool asset '{}': {lp}",

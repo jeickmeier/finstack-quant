@@ -672,6 +672,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Repo {
 
         let cash_outflow = Money::new(-self.cash_amount.amount(), self.cash_amount.currency())?;
         let total_repayment = self.total_repayment()?;
+        let interest = total_repayment.checked_sub(self.cash_amount)?;
         let flows = vec![
             crate::cashflow::primitives::CashFlow::new(
                 adj_start,
@@ -684,7 +685,15 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Repo {
             crate::cashflow::primitives::CashFlow::new(
                 adj_maturity,
                 None,
-                total_repayment,
+                self.cash_amount,
+                crate::cashflow::primitives::CFKind::Notional,
+                0.0,
+                None,
+            ),
+            crate::cashflow::primitives::CashFlow::new(
+                adj_maturity,
+                None,
+                interest,
                 crate::cashflow::primitives::CFKind::Fixed,
                 0.0,
                 None,
@@ -858,7 +867,7 @@ mod tests {
             .dated_cashflows(&ctx, date(2025, 1, 1))
             .expect("Schedule should build");
 
-        assert_eq!(flows.len(), 2, "Repo should have 2 cashflows");
+        assert_eq!(flows.len(), 3, "Repo separates principal and interest");
         assert_eq!(
             flows[0].0, adj_start,
             "First flow should be on adjusted start"
@@ -867,6 +876,7 @@ mod tests {
             flows[1].0, adj_maturity,
             "Second flow should be on adjusted maturity"
         );
+        assert_eq!(flows[2].0, adj_maturity, "Interest uses adjusted maturity");
 
         // Verify determinism: run multiple times and check consistency
         for _ in 0..3 {

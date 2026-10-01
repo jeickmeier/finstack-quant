@@ -13,6 +13,7 @@ use crate::drawdown::{drawdown_details, to_drawdown_series, DrawdownEpisode};
 use crate::lookback;
 use crate::math::linalg::unflatten_square;
 use crate::math::stats::{correlation, mean_var};
+use crate::math::summation::NeumaierAccumulator;
 use crate::returns::{comp_sum, comp_total, excess_returns};
 
 impl Performance {
@@ -139,16 +140,23 @@ impl Performance {
         finalize_correlation_matrix(matrix)
     }
 
-    /// Cumulative outperformance versus the active benchmark.
+    /// Cumulative relative wealth versus the active benchmark.
+    ///
+    /// Returns `portfolio_wealth / benchmark_wealth - 1` over each ticker's
+    /// overlapping dates. Log-growth differences are accumulated directly,
+    /// so identical paths remain zero even when absolute wealth would
+    /// overflow or round to zero.
     pub fn cumulative_returns_outperformance(&self) -> Vec<Vec<f64>> {
         self.map_tickers(|i| {
             let (port, bench) = self.active_pair_returns(i);
-            let port_cum = comp_sum(port);
-            let bench_cum = comp_sum(bench);
-            port_cum
-                .iter()
-                .zip(bench_cum.iter())
-                .map(|(p, b)| ((1.0 + p) / (1.0 + b)) - 1.0)
+            let mut relative_log_growth = NeumaierAccumulator::new();
+            port.iter()
+                .zip(bench.iter())
+                .map(|(&p, &b)| {
+                    relative_log_growth.add(p.ln_1p());
+                    relative_log_growth.add(-b.ln_1p());
+                    relative_log_growth.total().exp_m1()
+                })
                 .collect()
         })
     }

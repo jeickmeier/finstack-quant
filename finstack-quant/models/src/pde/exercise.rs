@@ -36,6 +36,36 @@ pub enum ExerciseType {
     },
 }
 
+/// Invalid early-exercise inputs or numerical configuration.
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
+pub enum ExerciseError {
+    /// Payoffs do not cover exactly the solver's interior spatial nodes.
+    #[error("exercise payoff length {actual} does not match {expected} interior nodes")]
+    PayoffLength {
+        /// Number of interior solution values.
+        expected: usize,
+        /// Number of supplied intrinsic values.
+        actual: usize,
+    },
+    /// A payoff or continuation value is not finite.
+    #[error("non-finite exercise {kind} at interior node {index}")]
+    NonFiniteValue {
+        /// Whether the invalid value is a payoff or continuation value.
+        kind: &'static str,
+        /// Index into the interior-node value vector.
+        index: usize,
+    },
+    /// The penalty factor is not finite and positive, or no iteration is requested.
+    #[error("exercise requires a positive finite penalty factor and at least one iteration")]
+    InvalidPenalty,
+    /// The time-step interval is not finite and strictly positive.
+    #[error("exercise time step must be positive and finite, got {dt}")]
+    InvalidTimeStep {
+        /// Rejected step width in model years.
+        dt: f64,
+    },
+}
+
 impl PenaltyExercise {
     /// Create an American exercise constraint.
     ///
@@ -76,53 +106,86 @@ impl PenaltyExercise {
         }
     }
 
+    /// Check the obstacle shape and penalty settings before any state is changed.
+    pub(super) fn validate(&self, interior_nodes: usize) -> Result<(), ExerciseError> {
+        if self.payoff_values.len() != interior_nodes {
+            return Err(ExerciseError::PayoffLength {
+                expected: interior_nodes,
+                actual: self.payoff_values.len(),
+            });
+        }
+        if let Some(index) = self
+            .payoff_values
+            .iter()
+            .position(|value| !value.is_finite())
+        {
+            return Err(ExerciseError::NonFiniteValue {
+                kind: "payoff",
+                index,
+            });
+        }
+        if !self.penalty_factor.is_finite() || self.penalty_factor <= 0.0 || self.iterations == 0 {
+            return Err(ExerciseError::InvalidPenalty);
+        }
+        Ok(())
+    }
+
     /// Apply the penalty method to enforce the exercise constraint.
     ///
     /// After the linear solve, nodes where `u_i < payoff_i` are pushed
     /// toward the intrinsic value. Modifies `u` in place.
     ///
-    /// Returns the early exercise boundary (leftmost grid index where the
-    /// continuation value strictly exceeds intrinsic, or `None` if fully
-    /// exercised).
+    /// Returns every transition between the binding obstacle and strictly
+    /// better continuation. Each index identifies the higher-coordinate node
+    /// of the adjacent pair straddling a transition. This handles exercise on
+    /// either side and payoffs with multiple exercise regions; an entirely
+    /// exercised or entirely continuing grid has no interior boundary.
     ///
-    /// # Boundary detection
+    /// # Arguments
     ///
-    /// The boundary is read from the **converged** solution *after* all
-    /// penalty iterations, never from an intermediate iterate. Recording it
-    /// inside the iteration loop (as a previous implementation did) is wrong
-    /// for `iterations >= 2`: the penalty drives an exercised node's value to
-    /// `payoff` so tightly that, after the first iteration, the `u_i < payoff`
-    /// test can flip to false purely through floating-point round-off — which
-    /// would misclassify an exercised node as the continuation boundary.
+    /// * `u` - Finite continuation values at every interior spatial node,
+    ///   overwritten by the penalized exercise values.
+    /// * `dt` - Positive finite time-step width in model years.
     ///
-    /// On the converged solution an exercised node satisfies `u_i <= payoff_i`
-    /// (the penalty is a convex pull toward `payoff` from below, so it never
-    /// overshoots above it), while a continuation node keeps its untouched
-    /// value `u_i > payoff_i`. A *strict* `u_i > payoff_i` test therefore
-    /// separates the two regions robustly, with no tolerance.
-    pub fn apply(&self, u: &mut [f64], dt: f64) -> Option<usize> {
-        debug_assert_eq!(u.len(), self.payoff_values.len());
+    /// # Errors
+    ///
+    /// Returns [`ExerciseError`] for a length mismatch, non-finite payoff or
+    /// continuation value, invalid penalty settings, or invalid `dt`. All
+    /// validation occurs before modifying `u`.
+    pub fn apply(&self, u: &mut [f64], dt: f64) -> Result<Vec<usize>, ExerciseError> {
+        self.validate(u.len())?;
+        if !dt.is_finite() || dt <= 0.0 {
+            return Err(ExerciseError::InvalidTimeStep { dt });
+        }
+        if let Some(index) = u.iter().position(|value| !value.is_finite()) {
+            return Err(ExerciseError::NonFiniteValue {
+                kind: "continuation",
+                index,
+            });
+        }
 
-        let lambda = self.penalty_factor / dt;
+        // The convex pull cannot change which side of the obstacle a node
+        // occupies. Determine transitions before rounding can collapse a
+        // penalized value exactly onto its payoff.
+        let boundaries = (1..u.len())
+            .filter(|&i| (u[i - 1] > self.payoff_values[i - 1]) != (u[i] > self.payoff_values[i]))
+            .collect();
+
+        // lambda*dt is exactly the configured factor; forming lambda first
+        // can overflow on short intervals even though the update is finite.
+        let continuation_weight = 1.0 / (1.0 + self.penalty_factor);
+        let payoff_weight = self.penalty_factor / (1.0 + self.penalty_factor);
 
         // Run all penalty iterations first — no boundary tracking here.
         for _ in 0..self.iterations {
             for (&payoff, u_val) in self.payoff_values.iter().zip(u.iter_mut()) {
                 if *u_val < payoff {
-                    // Continuous limit: u = (u + lambda*dt*payoff) / (1 + lambda*dt).
-                    // With lambda*dt = penalty_factor >> 1, this ≈ payoff.
-                    *u_val = (*u_val + lambda * dt * payoff) / (1.0 + lambda * dt);
+                    *u_val = continuation_weight * *u_val + payoff_weight * payoff;
                 }
             }
         }
 
-        // Record the early-exercise boundary from the CONVERGED solution:
-        // the leftmost node where the constraint is slack (continuation
-        // value strictly above intrinsic).
-        self.payoff_values
-            .iter()
-            .zip(u.iter())
-            .position(|(&payoff, &u_val)| u_val > payoff)
+        Ok(boundaries)
     }
 }
 
@@ -136,7 +199,7 @@ mod tests {
         let exercise = PenaltyExercise::american(payoff.clone());
 
         let mut u = vec![4.0, 2.0, 0.5, 1.0, 2.0];
-        exercise.apply(&mut u, 0.01);
+        exercise.apply(&mut u, 0.01).expect("valid exercise values");
 
         for (i, (&u_val, &p_val)) in u.iter().zip(payoff.iter()).enumerate() {
             if p_val > 0.0 {
@@ -196,15 +259,15 @@ mod tests {
                 iterations,
             };
             let mut u = u_raw.clone();
-            let boundary = exercise.apply(&mut u, dt);
+            let boundary = exercise.apply(&mut u, dt).expect("valid exercise values");
             boundaries.push((iterations, boundary, u));
         }
 
         // (1) Iteration-count invariance + correct converged boundary.
         for (iterations, boundary, _) in &boundaries {
             assert_eq!(
-                *boundary,
-                Some(expected_boundary),
+                boundary.as_slice(),
+                &[expected_boundary],
                 "with {iterations} penalty iteration(s) the early-exercise boundary must be \
                  the converged leftmost continuation node ({expected_boundary}), got {boundary:?}"
             );
@@ -214,7 +277,7 @@ mod tests {
         // iteration count: strictly slack at the boundary node, binding
         // (clamped to at most intrinsic) just left of it.
         for (iterations, boundary, u) in &boundaries {
-            let b = boundary.expect("boundary recorded");
+            let b = boundary[0];
             assert!(
                 u[b] > payoff[b],
                 "[{iterations} iters] returned u[{b}]={} must be > payoff[{b}]={} \
@@ -235,9 +298,7 @@ mod tests {
         }
     }
 
-    /// [P6-3] When every node is in the continuation region (no early
-    /// exercise is optimal anywhere) the boundary is the first node, for any
-    /// iteration count — and when every node is exercised it is `None`.
+    /// A homogeneous exercise/continuation region has no interior transition.
     #[test]
     fn exercise_boundary_handles_all_continuation_and_all_exercise() {
         let payoff = vec![3.0, 2.0, 1.0];
@@ -251,9 +312,9 @@ mod tests {
         };
         let mut u = vec![10.0, 9.0, 8.0];
         assert_eq!(
-            all_cont.apply(&mut u, 0.01),
-            Some(0),
-            "all-continuation boundary must be node 0"
+            all_cont.apply(&mut u, 0.01).expect("valid inputs"),
+            Vec::<usize>::new(),
+            "an all-continuation grid has no exercise boundary"
         );
 
         // All exercise: every u below intrinsic → no continuation node.
@@ -265,9 +326,63 @@ mod tests {
         };
         let mut u = vec![0.1, 0.1, 0.1];
         assert_eq!(
-            all_ex.apply(&mut u, 0.01),
-            None,
-            "all-exercise boundary must be None"
+            all_ex.apply(&mut u, 0.01).expect("valid inputs"),
+            Vec::<usize>::new(),
+            "an all-exercise grid has no interior exercise boundary"
         );
+    }
+
+    #[test]
+    fn exercise_boundaries_cover_calls_and_multiple_regions() {
+        let call = PenaltyExercise::american(vec![0.0, 0.0, 1.0, 2.0]);
+        let mut values = vec![0.2, 0.5, 0.9, 1.8];
+        assert_eq!(
+            call.apply(&mut values, 0.1).expect("call exercise"),
+            vec![2]
+        );
+
+        let multiple = PenaltyExercise::american(vec![2.0; 5]);
+        let mut values = vec![1.0, 3.0, 4.0, 1.0, 0.0];
+        assert_eq!(
+            multiple.apply(&mut values, 0.1).expect("multiple regions"),
+            vec![1, 3]
+        );
+    }
+
+    #[test]
+    fn exercise_rejects_malformed_inputs_before_mutation() {
+        let exercise = PenaltyExercise::american(vec![1.0, 2.0]);
+        let mut values = vec![0.0];
+        assert!(matches!(
+            exercise.apply(&mut values, 0.1),
+            Err(ExerciseError::PayoffLength {
+                expected: 1,
+                actual: 2
+            })
+        ));
+        assert_eq!(values, vec![0.0]);
+
+        let invalid = PenaltyExercise::american(vec![f64::NAN]);
+        assert!(matches!(
+            invalid.apply(&mut values, 0.1),
+            Err(ExerciseError::NonFiniteValue {
+                kind: "payoff",
+                index: 0
+            })
+        ));
+        assert_eq!(values, vec![0.0]);
+
+        let exercise = PenaltyExercise::american(vec![1.0]);
+        for dt in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            assert!(matches!(
+                exercise.apply(&mut values, dt),
+                Err(ExerciseError::InvalidTimeStep { .. })
+            ));
+            assert_eq!(values, vec![0.0]);
+        }
+        exercise
+            .apply(&mut values, f64::MIN_POSITIVE)
+            .expect("finite update on short interval");
+        assert!(values[0].is_finite() && values[0] > 0.999);
     }
 }

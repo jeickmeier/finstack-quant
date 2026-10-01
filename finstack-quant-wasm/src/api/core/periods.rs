@@ -133,7 +133,10 @@ impl JsPeriodKind {
     #[wasm_bindgen(js_name = priorObservationDate)]
     pub fn prior_observation_date(&self, first: JsValue) -> Result<i32, JsValue> {
         let first = js_epoch_days(&first, "first")?;
-        Ok(days_since_epoch(self.inner.prior_observation_date(first)))
+        self.inner
+            .prior_observation_date(first)
+            .map(days_since_epoch)
+            .map_err(to_js_err)
     }
 
     /// Canonical snake_case name of the frequency.

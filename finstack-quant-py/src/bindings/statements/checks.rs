@@ -2,7 +2,7 @@
 
 use crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema;
 use crate::bindings::pandas_utils::{serde_to_py, ColumnSchema};
-use crate::errors::{serde_json_to_py, value_error};
+use crate::errors::{serde_json_to_py, statements_to_py, value_error};
 use finstack_quant_statements::checks::{
     BuiltinCheckSpec, CheckCategory, CheckConfig, CheckFinding, FormulaCheckSpec, Severity,
 };
@@ -81,15 +81,17 @@ impl PyCheckConfig {
     /// ----------
     /// default_tolerance : float | None
     ///     Absolute equality tolerance in the compared nodes' own units
-    ///     (Rust default ``0.01``, one cent when nodes are in whole dollars).
+    ///     (Rust default ``0.01``, one cent when nodes are in whole dollars);
+    ///     finite and non-negative.
     /// default_relative_tolerance : float | None
     ///     Relative tolerance as a decimal fraction of the reference
-    ///     magnitude (Rust default ``1e-9``); zero disables the relative
-    ///     component.
+    ///     magnitude (Rust default ``1e-9``); finite and non-negative, with
+    ///     zero disabling the relative component.
     /// materiality_threshold : float | None
     ///     Advisory (info/warning) findings whose absolute materiality is
     ///     below this amount are dropped from reports (Rust default ``0.0``).
-    ///     Error findings are always retained.
+    ///     Error findings are always retained. Must be finite and
+    ///     non-negative.
     /// min_severity : str | None
     ///     Lowest severity retained in reports: ``"info"`` (Rust default),
     ///     ``"warning"``, or ``"error"``.
@@ -97,7 +99,8 @@ impl PyCheckConfig {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``min_severity`` is not a known severity name.
+    ///     If ``min_severity`` is unknown or a tolerance or materiality
+    ///     threshold is negative or non-finite.
     #[new]
     #[pyo3(
         signature = (default_tolerance=None, default_relative_tolerance=None, materiality_threshold=None, min_severity=None),
@@ -110,19 +113,18 @@ impl PyCheckConfig {
         min_severity: Option<&str>,
     ) -> PyResult<Self> {
         let defaults = CheckConfig::default();
-        Ok(Self {
-            inner: CheckConfig {
-                default_tolerance: default_tolerance.unwrap_or(defaults.default_tolerance),
-                default_relative_tolerance: default_relative_tolerance
-                    .unwrap_or(defaults.default_relative_tolerance),
-                materiality_threshold: materiality_threshold
-                    .unwrap_or(defaults.materiality_threshold),
-                min_severity: min_severity
-                    .map(parse_severity)
-                    .transpose()?
-                    .unwrap_or(defaults.min_severity),
-            },
-        })
+        let inner = CheckConfig {
+            default_tolerance: default_tolerance.unwrap_or(defaults.default_tolerance),
+            default_relative_tolerance: default_relative_tolerance
+                .unwrap_or(defaults.default_relative_tolerance),
+            materiality_threshold: materiality_threshold.unwrap_or(defaults.materiality_threshold),
+            min_severity: min_severity
+                .map(parse_severity)
+                .transpose()?
+                .unwrap_or(defaults.min_severity),
+        };
+        inner.validate().map_err(statements_to_py)?;
+        Ok(Self { inner })
     }
 
     /// Support `pickle` via the canonical JSON round-trip.
@@ -132,13 +134,26 @@ impl PyCheckConfig {
     }
 
     /// Deserialize a configuration from canonical JSON (unknown fields are
-    /// rejected; omitted fields take their defaults).
+    /// rejected; omitted fields take their defaults). Negative or non-finite
+    /// tolerances and materiality thresholds raise ``ValueError``.
     #[staticmethod]
     #[pyo3(text_signature = "(json, /)")]
     fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
+        let inner: CheckConfig = serde_json::from_str(json)
             .map_err(|e| serde_json_to_py(e, "invalid CheckConfig JSON"))?;
+        inner.validate().map_err(statements_to_py)?;
         Ok(Self { inner })
+    }
+
+    /// Validate finite, non-negative tolerances and materiality thresholds.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If any configured tolerance or materiality threshold is negative
+    ///     or non-finite.
+    fn validate(&self) -> PyResult<()> {
+        self.inner.validate().map_err(statements_to_py)
     }
 
     /// Serialize this configuration to canonical JSON.
@@ -178,11 +193,12 @@ impl PyCheckConfig {
     }
 }
 
-/// User-defined formula check: a DSL predicate evaluated per period.
+/// User-defined formula check: a DSL predicate or residual evaluated per period.
 ///
-/// A finding is produced for every period where the formula evaluates to
-/// false (zero); ``{period}`` in ``message_template`` is replaced with the
-/// period id at run time.
+/// Without a tolerance, a finding is produced when the formula evaluates to
+/// false (zero). With a tolerance, it fires when the formula's absolute
+/// residual exceeds the bound. Non-finite outputs always produce a finding;
+/// ``{period}`` in ``message_template`` is replaced with the period id at run time.
 #[pyclass(
     name = "FormulaCheckSpec",
     module = "finstack_quant.statements",
@@ -218,8 +234,9 @@ impl PyFormulaCheckSpec {
     ///     Only error findings fail a report. Required, as in the Rust/JSON
     ///     form.
     /// tolerance : float | None
-    ///     Optional absolute tolerance for equality comparisons inside the
-    ///     formula, in the compared nodes' units.
+    ///     Optional finite, non-negative absolute residual bound in the formula's
+    ///     result units. With ``None``, finite nonzero predicate outputs pass;
+    ///     with a bound, absolute outputs at or below it pass. Validated at execution.
     ///
     /// Raises
     /// ------
@@ -361,7 +378,8 @@ impl PyCheckSuiteSpec {
     /// ------
     /// ValueError
     ///     If a built-in check ``type`` is unknown, a dict lacks a required
-    ///     field, or an entry is not a ``dict``.
+    ///     field, an entry is not a ``dict``, or a configured tolerance or
+    ///     materiality threshold is negative or non-finite.
     #[new]
     #[pyo3(
         signature = (name, builtin_checks=None, formula_checks=None, config=None, description=None),
@@ -385,15 +403,15 @@ impl PyCheckSuiteSpec {
             .iter()
             .map(|check| check.inner.clone())
             .collect();
-        Ok(Self {
-            inner: finstack_quant_statements::checks::CheckSuiteSpec {
-                name,
-                description,
-                builtin_checks,
-                formula_checks,
-                config: config.map(|c| c.inner.clone()).unwrap_or_default(),
-            },
-        })
+        let inner = finstack_quant_statements::checks::CheckSuiteSpec {
+            name,
+            description,
+            builtin_checks,
+            formula_checks,
+            config: config.map(|c| c.inner.clone()).unwrap_or_default(),
+        };
+        inner.config.validate().map_err(statements_to_py)?;
+        Ok(Self { inner })
     }
 
     /// Names of every built-in check, usable in ``builtin_checks``.
@@ -424,14 +442,16 @@ impl PyCheckSuiteSpec {
     ///
     /// Unknown fields are rejected, so a team-wide check policy that drifts
     /// from the schema fails at load rather than silently running fewer
-    /// checks than intended. Formula syntax and node references are validated
-    /// later, when the suite runs against a model.
+    /// checks than intended. Negative or non-finite configuration tolerances
+    /// and materiality thresholds raise ``ValueError``. Formula syntax and
+    /// node references are validated later, when the suite runs against a model.
     #[staticmethod]
     #[pyo3(text_signature = "(json, /)")]
     fn from_json(json: &str) -> PyResult<Self> {
         let inner: finstack_quant_statements::checks::CheckSuiteSpec =
             serde_json::from_str(json)
                 .map_err(|e| serde_json_to_py(e, "invalid CheckSuiteSpec JSON"))?;
+        inner.config.validate().map_err(statements_to_py)?;
         Ok(Self { inner })
     }
 

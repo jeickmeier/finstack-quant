@@ -187,16 +187,27 @@ impl MarketContext {
 
     /// Retain only the curves for which `pred` returns `true` (mutable).
     ///
-    /// Intended for snapshot-restore workflows that need drop-and-replace
-    /// semantics for a single curve family (e.g. P&L attribution factor
-    /// isolation): drop the flagged family's curves, then re-insert the
-    /// snapshot's, leaving every other family untouched.
+    /// Credit indices whose dependencies are removed are dropped immediately
+    /// and reported in the returned mutation information. Collateral mappings
+    /// without a surviving discount curve are also removed. For snapshot
+    /// replacement, insert replacement curves before removing obsolete IDs so
+    /// dependent indices remain present throughout the operation.
+    ///
+    /// # Arguments
+    ///
+    /// * `pred` - Predicate called once per curve; `true` retains that ID and
+    ///   `false` removes it. No iteration order is guaranteed.
     pub fn retain_curves_mut(
         &mut self,
         mut pred: impl FnMut(&CurveId, &CurveStorage) -> bool,
-    ) -> &mut Self {
+    ) -> super::ContextMutationInfo {
         Arc::make_mut(&mut self.curves).retain(|id, curve| pred(id, curve));
-        self
+        let curves = &self.curves;
+        Arc::make_mut(&mut self.collateral)
+            .retain(|_, id| matches!(curves.get(id), Some(CurveStorage::Discount(_))));
+        super::ContextMutationInfo {
+            invalidated_credit_indices: self.rebind_all_credit_indices(),
+        }
     }
 
     /// Iterate over the SABR volatility cubes.

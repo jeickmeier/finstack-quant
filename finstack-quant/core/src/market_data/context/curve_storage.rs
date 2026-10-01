@@ -435,3 +435,25 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod base_correlation_tests {
+    use super::{BaseCorrelationCurve, RebuildableWithId};
+
+    #[test]
+    fn rebuilding_stressed_curve_with_id_preserves_quotes_and_values() {
+        let curve = BaseCorrelationCurve::builder("CDX")
+            .knots([(3.0, 0.25), (7.0, 1.0), (10.0, 0.60)])
+            .build()
+            .unwrap();
+        let rebuilt = curve.rebuild_with_id("RENAMED".into()).unwrap();
+        assert_eq!(rebuilt.id().as_str(), "RENAMED");
+        assert_eq!(rebuilt.correlations(), curve.correlations());
+        for detachment in [3.0, 5.0, 7.0, 8.5, 10.0] {
+            assert_eq!(
+                rebuilt.correlation(detachment),
+                curve.correlation(detachment)
+            );
+        }
+    }
+}

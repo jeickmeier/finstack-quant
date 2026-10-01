@@ -106,8 +106,8 @@ fn portfolio_valuation_stamps_caller_config() {
     config
         .rounding
         .output_scale
-        .overrides
-        .insert(Currency::USD, 4);
+        .set_scale(Currency::USD, 4)
+        .expect("valid decimal scale");
 
     let valuation = finstack_quant_portfolio::valuation::value_portfolio(
         &portfolio,
@@ -125,7 +125,7 @@ fn portfolio_valuation_stamps_caller_config() {
         result
             .meta
             .rounding
-            .output_scale_by_currency
+            .get_output_scale_by_currency()
             .get(&Currency::USD)
             .copied(),
         Some(4),

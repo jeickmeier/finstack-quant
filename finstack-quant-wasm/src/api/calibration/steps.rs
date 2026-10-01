@@ -166,7 +166,7 @@ pub fn calibration_step_hazard(
 /// @param base_cpi - CPI index level at the base date.
 /// @param quote_set - Name of the quote set in `plan.quote_sets`; defaults to `id`.
 /// @param curve_id - Identifier of the produced curve; defaults to `id`.
-/// @param params - Optional object (or JSON) of further wire fields: `notional`, `method`, `interpolation`, `seasonal_factors`. An entry named like another argument is replaced by that argument.
+/// @param params - Optional object (or JSON) of further wire fields: `notional`, `method`, `interpolation`. An entry named like another argument is replaced by that argument.
 /// @returns A `CalibrationStep` object with `kind: "inflation"`.
 ///
 /// # Errors
@@ -362,7 +362,7 @@ pub fn calibration_step_student_t(
 /// `CalibrationStep::from_wire_fields`). Quotes are listed in the envelope's
 /// `market_data` and named in `plan.quote_sets` rather than attached to the step.
 /// @param id - Step identifier; also the default quote-set name.
-/// @param curve_id - Discount curve the model is calibrated on (scalars are written as `"{curve_id}_HW1F"`).
+/// @param curve_id - Discount curve the model is calibrated on (scalars are written as `"{curve_id}_HW1F_KAPPA"` and `"{curve_id}_HW1F_SIGMA"`).
 /// @param currency - ISO-4217 currency code of the model.
 /// @param base_date - ISO-8601 valuation date.
 /// @param quote_set - Name of the quote set in `plan.quote_sets`; defaults to `id`.
@@ -396,12 +396,13 @@ pub fn calibration_step_hull_white(
 /// `CalibrationStep::from_wire_fields`). Quotes are listed in the envelope's
 /// `market_data` and named in `plan.quote_sets` rather than attached to the step.
 /// @param id - Step identifier; also the default quote-set name.
-/// @param discount_curve_id - Discounting curve (scalars are written as `"{discount_curve_id}_CAPFLOOR_HW1F"`).
+/// @param discount_curve_id - Discounting curve and output-key prefix: scalar fits write `"{discount_curve_id}_CAPFLOOR_HW1F_KAPPA"` and `"{discount_curve_id}_CAPFLOOR_HW1F_SIGMA"`; piecewise fits write the same kappa scalar and the series `"{discount_curve_id}_CAPFLOOR_HW1F_SIGMA_SCHEDULE"`.
 /// @param forward_curve_id - Curve projecting the caplet forwards.
+/// @param index_id - Term-rate index identifier (for example `"EUR-EURIBOR-3M"`) whose conventions set caplet settlement, fixing and payment dates, calendars and accrual fractions; its currency must match `currency` and overnight indices are rejected at calibration.
 /// @param currency - ISO-4217 currency code of the model.
 /// @param base_date - ISO-8601 valuation date.
 /// @param quote_set - Name of the quote set in `plan.quote_sets`; defaults to `id`.
-/// @param params - Optional object (or JSON) of further wire fields: `fixed_kappa`, `initial_kappa`, `initial_sigma`, `payment_frequency`, `volatility_mode`. An entry named like another argument is replaced by that argument.
+/// @param params - Optional object (or JSON) of further wire fields: the required `fit_tolerance` (positive maximum implied-quote error in quoted volatility units), `fixed_kappa`, `initial_kappa`, `initial_sigma`, `volatility_mode`. An entry named like another argument is replaced by that argument.
 /// @returns A `CalibrationStep` object with `kind: "cap_floor_hull_white"`.
 ///
 /// # Errors
@@ -409,11 +410,13 @@ pub fn calibration_step_hull_white(
 /// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
 /// a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field
 /// (including a `params` entry) is unknown or has the wrong shape.
+#[allow(clippy::too_many_arguments)]
 #[wasm_bindgen(js_name = calibrationStepCapFloorHullWhite)]
 pub fn calibration_step_cap_floor_hull_white(
     id: JsValue,
     discount_curve_id: JsValue,
     forward_curve_id: JsValue,
+    index_id: JsValue,
     currency: JsValue,
     base_date: JsValue,
     quote_set: Option<JsValue>,
@@ -422,6 +425,7 @@ pub fn calibration_step_cap_floor_hull_white(
     let fields = Fields::from_overrides(params.as_ref())?
         .string("discount_curve_id", &discount_curve_id, "discountCurveId")?
         .string("forward_curve_id", &forward_curve_id, "forwardCurveId")?
+        .string("index_id", &index_id, "indexId")?
         .string("currency", &currency, "currency")?
         .date("base_date", &base_date, "baseDate")?;
     step("cap_floor_hull_white", &id, quote_set.as_ref(), fields)

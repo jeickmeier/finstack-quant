@@ -32,7 +32,7 @@ pub(super) fn apply_override(
         )));
     }
 
-    let overrides_map: IndexMap<String, f64> = serde_json::from_value(overrides_json.clone())
+    let raw_overrides: IndexMap<String, f64> = serde_json::from_value(overrides_json.clone())
         .map_err(|e| {
             Error::forecast(format!(
                 "Invalid 'overrides' parameter: expected map of period_id → value. Error: {}",
@@ -40,7 +40,8 @@ pub(super) fn apply_override(
             ))
         })?;
 
-    for (period_str, value) in &overrides_map {
+    let mut overrides_map = IndexMap::with_capacity(raw_overrides.len());
+    for (period_str, value) in raw_overrides {
         if !value.is_finite() {
             return Err(Error::forecast(format!(
                 "Override value for period '{}' must be finite, got {}",
@@ -55,14 +56,18 @@ pub(super) fn apply_override(
                 "Override period '{period_str}' is not in the forecast periods"
             )));
         }
+        if overrides_map.insert(parsed, value).is_some() {
+            return Err(Error::forecast(format!(
+                "Duplicate override for period '{parsed}': '{period_str}' aliases another period key"
+            )));
+        }
     }
 
     let mut results = IndexMap::new();
     let mut current_value = base_value;
 
     for period_id in forecast_periods {
-        let period_str = period_id.to_string();
-        if let Some(&override_value) = overrides_map.get(&period_str) {
+        if let Some(&override_value) = overrides_map.get(period_id) {
             current_value = override_value;
         }
         // Otherwise forward fill current_value

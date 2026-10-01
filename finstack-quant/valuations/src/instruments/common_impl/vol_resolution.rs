@@ -12,6 +12,7 @@
 use crate::instruments::pricing_overrides::MarketQuoteOverrides;
 use crate::market::resolve_vol_source;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::surfaces::VolSurfaceAxis;
 
 use finstack_quant_core::{Error, Result};
 use finstack_quant_models::volatility::VolatilityConvention;
@@ -137,6 +138,12 @@ pub(crate) fn resolve_sigma_at(
     t: f64,
     strike: f64,
 ) -> Result<f64> {
+    if overrides.implied_volatility.is_none() {
+        let source = resolve_vol_source(curves, vol_surface_id)?;
+        if let finstack_quant_models::volatility::VolSource::Surface(surface) = source {
+            surface.require_secondary_axis(VolSurfaceAxis::Strike)?;
+        }
+    }
     let resolved = resolve_volatility(
         overrides,
         curves,
@@ -161,6 +168,35 @@ pub(crate) fn resolve_sigma_at(
 mod tests {
     use super::*;
     use finstack_quant_core::market_data::surfaces::VolSurface;
+
+    #[test]
+    fn strike_only_resolver_rejects_black_tenor_surface() {
+        let surface = VolSurface::builder("TENOR-VOL")
+            .expiries(&[1.0])
+            .strikes(&[2.0, 10.0])
+            .secondary_axis(VolSurfaceAxis::Tenor)
+            .row(&[0.2, 0.4])
+            .build()
+            .expect("surface");
+        let market = MarketContext::new().insert_surface(surface);
+        let error = resolve_sigma_at(
+            &MarketQuoteOverrides::default(),
+            &market,
+            "TENOR-VOL",
+            1.0,
+            100.0,
+        )
+        .expect_err("a strike-only API cannot select an underlying tenor");
+        assert!(error.to_string().contains("secondary axis"));
+        let overrides = MarketQuoteOverrides {
+            implied_volatility: Some(0.31),
+            ..Default::default()
+        };
+        assert_eq!(
+            resolve_sigma_at(&overrides, &market, "TENOR-VOL", 1.0, 100.0).unwrap(),
+            0.31
+        );
+    }
 
     #[test]
     fn explicit_implied_volatility_wins_without_surface_lookup() {

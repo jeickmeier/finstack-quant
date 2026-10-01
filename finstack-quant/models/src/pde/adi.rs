@@ -39,7 +39,7 @@
 //! `theta = 1/3`: it is second-order accurate and is the standard literature
 //! choice for the Heston PDE (In 't Hout & Foulon 2010). The `2/5` bound is a
 //! worst-case convection-diffusion result; for the Heston PDE `1/3` remains
-//! stable in practice because the Rannacher start damps the non-smooth payoff,
+//! stable in practice because the implicit start damps the non-smooth payoff,
 //! the Péclet numbers are modest (the convection terms `r - q - v/2` and
 //! `kappa(theta - v)` are mild), and the mixed term is diffusion-like.
 //!
@@ -182,16 +182,16 @@ const MCS_THETA: f64 = 1.0 / 3.0;
 // NOTE: the former `check_peclet` global rejection (with its
 // `MCS_PECLET_MAX = 4` ceiling) was removed when the unidirectional
 // operators gained a per-node monotone upwind switch
-// (`operator2d::node_stencil`): convection-dominated cells now assemble a
+// (`operator::node_stencil`): convection-dominated cells now assemble a
 // first-order upwind convection stencil instead of a sign-flipped central
 // one, so the `theta = 1/3` MCS scheme stays within its stable envelope for
 // any convection strength and no solve needs to be rejected.
 
 /// Modified Craig-Sneyd (MCS) ADI time stepper for 2D problems.
 ///
-/// Uses `theta = 1/3` (MCS theta). Optionally applies Rannacher-style
-/// smoothing: fully-implicit (`theta = 1.0`) steps near the terminal condition
-/// to damp the non-smooth payoff, then `theta = 1/3` for the remaining steps.
+/// Uses `theta = 1/3` (MCS theta). Optional start-up damping replaces initial
+/// intervals with pairs of factorized implicit-Euler halfsteps; the mixed
+/// derivative remains explicit in these first-order split steps.
 ///
 /// The type name is retained for API stability; the implemented scheme is the
 /// Modified Craig-Sneyd scheme (plain Craig-Sneyd is the `theta = 1/2` special
@@ -199,7 +199,7 @@ const MCS_THETA: f64 = 1.0 / 3.0;
 pub struct CraigSneydStepper {
     /// MCS `theta` parameter for the implicit weight.
     theta: f64,
-    /// Number of initial fully-implicit steps (Rannacher smoothing).
+    /// Number of initial intervals using two implicit-Euler split halfsteps.
     implicit_start_steps: usize,
     /// Total number of time steps.
     n_steps: usize,
@@ -230,19 +230,23 @@ impl CraigSneydStepper {
         }
     }
 
-    /// Modified Craig-Sneyd with Rannacher-style smoothing: use `theta = 1.0`
-    /// (fully implicit) for the first `implicit_start` steps, then switch to
-    /// `theta = 1/3`.
+    /// Modified Craig-Sneyd with implicit-Euler split start-up damping.
+    ///
+    /// Each initial interval is replaced by two halfsteps satisfying
+    /// `(I - h A_x)(I - h A_y) u_new = u_old + h A_xy u_old`, including
+    /// the implicit source and boundary contributions. The directional
+    /// solves damp stiff payoff modes. This is first-order directional
+    /// splitting, with an explicit mixed derivative, rather than a fully
+    /// coupled backward-Euler solve. Subsequent intervals use standard MCS.
     ///
     /// # Arguments
     ///
-    /// * `implicit_start` - Number of initial fully-implicit (`theta = 1`)
-    ///   steps that damp the payoff-kink error before the second-order MCS
-    ///   scheme takes over; `0` disables smoothing.
+    /// * `implicit_start` - Number of initial intervals replaced by two
+    ///   implicit-Euler split halfsteps; `0` disables damping.
     /// * `n_steps` - Total number of uniform time steps (including the
     ///   `implicit_start` smoothing steps) used to march from the terminal
     ///   condition back to `t = 0`; must be at least 1.
-    pub fn with_rannacher(implicit_start: usize, n_steps: usize) -> Self {
+    pub fn with_damping(implicit_start: usize, n_steps: usize) -> Self {
         Self {
             theta: MCS_THETA,
             implicit_start_steps: implicit_start,
@@ -361,17 +365,58 @@ impl CraigSneydStepper {
             return Err(StepperError::NonPositiveStep { dt, t_from, t_to });
         }
 
+        if step_index < self.implicit_start_steps {
+            let midpoint = t_to + 0.5 * dt;
+            self.step_interval(
+                problem,
+                grid,
+                (u_full, u_int),
+                (t_from, midpoint),
+                true,
+                buffers,
+            )?;
+            self.step_interval(
+                problem,
+                grid,
+                (u_full, u_int),
+                (midpoint, t_to),
+                true,
+                buffers,
+            )
+        } else {
+            self.step_interval(
+                problem,
+                grid,
+                (u_full, u_int),
+                (t_from, t_to),
+                false,
+                buffers,
+            )
+        }
+    }
+
+    /// March one MCS interval or one factorized implicit-Euler damping halfstep.
+    fn step_interval(
+        &self,
+        problem: &dyn PdeProblem2D,
+        grid: &Grid2D,
+        (u_full, u_int): (&mut [f64], &mut [f64]),
+        (t_from, t_to): (f64, f64),
+        damping: bool,
+        buffers: &mut AdiWorkBuffers,
+    ) -> Result<(), StepperError> {
+        let dt = t_from - t_to;
+        if !dt.is_finite() || dt <= 0.0 {
+            return Err(StepperError::NonPositiveStep { dt, t_from, t_to });
+        }
+
         // Convection-dominated cells are handled inside the unidirectional
-        // operator assembly (`operator2d::node_stencil`): wherever the cell
+        // operator assembly (`operator::node_stencil`): wherever the cell
         // Péclet exceeds 1 the convection term switches to the monotone
         // first-order upwind stencil, so no global Péclet rejection is
         // needed — strongly mean-reverting problems (large Heston `κ`) solve
         // with locally reduced order instead of erroring out.
-        let theta = if step_index < self.implicit_start_steps {
-            1.0
-        } else {
-            self.theta
-        };
+        let theta = if damping { 1.0 } else { self.theta };
 
         let nx_int = grid.nx_interior();
         let ny_int = grid.ny_interior();
@@ -411,6 +456,13 @@ impl CraigSneydStepper {
         // The reaction term c*u is split into the directional operators
         // (c/2 in A_x, c/2 in A_y), so ax_u + ay_u already carries the full
         // reaction contribution; cross carries the mixed term.
+        if damping {
+            // Factorized implicit Euler: only the mixed term is explicit.
+            // Zero directional predictors mean the two sweeps below solve
+            // (I-h A_x) then (I-h A_y), without Douglas/MCS corrections.
+            ax_u.fill(0.0);
+            ay_u.fill(0.0);
+        }
         for idx in 0..interior {
             y0[idx] = u_int[idx] + dt * (ax_u[idx] + ay_u[idx] + cross[idx]);
         }
@@ -437,8 +489,9 @@ impl CraigSneydStepper {
             &ops_impl, alpha, y1, ay_u, nx_int, ny_int, rhs_buf, line_out, y2,
         )?;
 
-        if !self.apply_mcs_corrector {
-            // Bare Douglas scheme (test path): u^{n+1} = Y_2.
+        if damping || !self.apply_mcs_corrector {
+            // Damping and the test-only bare Douglas scheme end after the
+            // first pair of directional solves.
             u_int.copy_from_slice(y2);
             fill_boundaries(problem, grid, u_full, u_int, t_to);
             return Ok(());
@@ -631,31 +684,9 @@ pub fn fill_boundaries(
         }
     }
 
-    // x-boundaries (left and right edges): all y-values
-    for j in 0..ny {
-        let y = y_pts[j];
-        u_full[j] = boundary_value_2d(
-            problem.boundary_x_lower(y, t),
-            u_full,
-            grid,
-            0,
-            j,
-            true,
-            true,
-        );
-        u_full[(nx - 1) * ny + j] = boundary_value_2d(
-            problem.boundary_x_upper(y, t),
-            u_full,
-            grid,
-            nx - 1,
-            j,
-            true,
-            false,
-        );
-    }
-
     // y-boundaries (bottom and top edges): interior x-values only
-    // (corners already set by x-boundary pass)
+    // These must be current before x-edge extrapolation reads them to fill
+    // the corners used by the mixed-derivative stencil.
     for i in 1..nx - 1 {
         let x = x_pts[i];
         u_full[i * ny] = boundary_value_2d(
@@ -674,6 +705,29 @@ pub fn fill_boundaries(
             i,
             ny - 1,
             false,
+            false,
+        );
+    }
+
+    // x-boundaries last, including corners reconstructed from fresh y-edges.
+    for j in 0..ny {
+        let y = y_pts[j];
+        u_full[j] = boundary_value_2d(
+            problem.boundary_x_lower(y, t),
+            u_full,
+            grid,
+            0,
+            j,
+            true,
+            true,
+        );
+        u_full[(nx - 1) * ny + j] = boundary_value_2d(
+            problem.boundary_x_upper(y, t),
+            u_full,
+            grid,
+            nx - 1,
+            j,
+            true,
             false,
         );
     }
@@ -719,26 +773,46 @@ fn boundary_value_2d(
                 u1 + h * g
             }
         }
-        BoundaryCondition::Linear => {
-            // d²u/dx² = 0: linear extrapolation from two interior neighbors
+        BoundaryCondition::Linear | BoundaryCondition::LinearInExp => {
+            // Continue the interior slope over the actual boundary-cell width.
             if is_x_dir {
+                if grid.nx_interior() == 1 {
+                    return u_full[ny + j];
+                }
                 if is_lower {
                     let u1 = u_full[ny + j];
                     let u2 = u_full[2 * ny + j];
-                    2.0 * u1 - u2
+                    let ratio =
+                        bc.extrapolation_ratio(grid.x().h_left(1), grid.x().h_right(1), true);
+                    u1 + ratio * (u1 - u2)
                 } else {
                     let u1 = u_full[(i - 1) * ny + j];
                     let u2 = u_full[(i - 2) * ny + j];
-                    2.0 * u1 - u2
+                    let interior = grid.nx() - 2;
+                    let ratio = bc.extrapolation_ratio(
+                        grid.x().h_right(interior),
+                        grid.x().h_left(interior),
+                        false,
+                    );
+                    u1 + ratio * (u1 - u2)
                 }
+            } else if grid.ny_interior() == 1 {
+                u_full[i * ny + 1]
             } else if is_lower {
                 let u1 = u_full[i * ny + 1];
                 let u2 = u_full[i * ny + 2];
-                2.0 * u1 - u2
+                let ratio = bc.extrapolation_ratio(grid.y().h_left(1), grid.y().h_right(1), true);
+                u1 + ratio * (u1 - u2)
             } else {
                 let u1 = u_full[i * ny + (j - 1)];
                 let u2 = u_full[i * ny + (j - 2)];
-                2.0 * u1 - u2
+                let interior = grid.ny() - 2;
+                let ratio = bc.extrapolation_ratio(
+                    grid.y().h_right(interior),
+                    grid.y().h_left(interior),
+                    false,
+                );
+                u1 + ratio * (u1 - u2)
             }
         }
     }
@@ -853,6 +927,30 @@ mod tests {
             error < 0.01,
             "2D heat CS error = {error:.6e}, exact = {exact:.6}, computed = {computed:.6}"
         );
+    }
+
+    #[test]
+    fn implicit_start_damps_stiff_modes_as_split_euler_halfsteps() {
+        // One interior node per axis gives an exact semidiscrete eigenmode
+        // with lambda_x=lambda_y=-2/(pi/2)^2. A pair of split Euler
+        // halfsteps damps by (1-h*lambda)^(-4). MCS(theta=1), previously
+        // labelled fully implicit, leaves most of this stiff mode intact.
+        let grid = Grid2D::new(
+            Grid1D::uniform(0.0, std::f64::consts::PI, 3).expect("x grid"),
+            Grid1D::uniform(0.0, std::f64::consts::PI, 3).expect("y grid"),
+        );
+        let maturity = 100.0;
+        let eigenvalue = -2.0 / std::f64::consts::FRAC_PI_2.powi(2);
+        let expected = (1.0 - 0.5 * maturity * eigenvalue).powi(-4);
+        let solution = super::super::Solver2D::new(grid, CraigSneydStepper::with_damping(1, 1))
+            .solve(&Heat2D, maturity)
+            .expect("implicit damping");
+        let actual = solution.values[4];
+        assert!(
+            (actual - expected).abs() < 1e-13,
+            "actual={actual}, expected={expected}"
+        );
+        assert!(actual < 1e-6, "stiff mode was not damped");
     }
 
     /// A convection-dominated 2D problem: small diffusion, large convection.

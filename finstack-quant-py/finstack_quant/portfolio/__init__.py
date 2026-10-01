@@ -51,8 +51,6 @@ Examples:
 ('book', 'USD', 0)
 """
 
-import sys as _sys
-
 from finstack_quant.finstack_quant import portfolio as _portfolio
 
 FinstackError = _portfolio.FinstackError
@@ -179,11 +177,6 @@ PortfolioOptimizationResult = _portfolio.PortfolioOptimizationResult
 CandidatePosition = _portfolio.CandidatePosition
 TradeUniverse = _portfolio.TradeUniverse
 schema = _portfolio.schema
-
-# `schema` is a real submodule, so `import finstack_quant.portfolio.schema`
-# must work as well as attribute access.
-if "finstack_quant.portfolio.schema" not in _sys.modules:
-    _sys.modules["finstack_quant.portfolio.schema"] = schema
 
 __all__ = [
     "BrinsonPeriodResult",

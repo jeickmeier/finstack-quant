@@ -67,6 +67,7 @@ fn test_structured_credit_bucketed_dv01_computed() {
         maturity,
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     let market = MarketContext::new().insert(flat_discount_curve(0.04, as_of));
@@ -113,6 +114,7 @@ fn test_structured_credit_bucketed_cs01_reconciles_to_parallel() {
         maturity,
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     let market = MarketContext::new().insert(flat_discount_curve(0.04, as_of));

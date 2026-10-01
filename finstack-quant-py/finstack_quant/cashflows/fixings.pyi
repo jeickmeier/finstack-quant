@@ -102,7 +102,7 @@ def materialize_fixings(
     old_date: datetime.date | str,
     new_date: datetime.date | str,
 ) -> MarketContext:
-    """Return a new market containing observations crossed in ``(old_date, new_date]``.
+    """Return a new market with fixings in an advancing ``[old_date, new_date]`` window.
 
     Parameters
     ----------
@@ -113,10 +113,12 @@ def materialize_fixings(
         Canonical schedules projected on the pre-roll market. Raw observations
         come from their ``meta.projected_fixings``; coupon spreads are excluded.
     old_date : datetime.date or str
-        Exclusive fixing-window origin. Earlier missing fixings are not invented.
+        Inclusive fixing-window origin. Same-day projections become historical
+        when curves advance; earlier missing fixings are not invented.
     new_date : datetime.date or str
-        Inclusive fixing horizon on or after the origin. Curves are not rolled
-        by this helper; scenario time rolls call it before changing curve dates.
+        Inclusive fixing horizon on or after the origin. An equal date returns
+        an unchanged market clone. Curves are not rolled by this helper;
+        scenario time rolls call it before changing curve dates.
 
     Returns
     -------

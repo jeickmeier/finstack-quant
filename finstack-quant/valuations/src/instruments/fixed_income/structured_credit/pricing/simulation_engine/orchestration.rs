@@ -619,18 +619,27 @@ pub(crate) fn simulate_prepared<S: PoolFlowSource + ?Sized>(
         let deal_call = instrument
             .call_assumption
             .as_ref()
-            .filter(|call| matches!(call.scope, CallScope::Deal))
-            .filter(|call| {
-                // The scheduled date, or the term-out clock from an
-                // early-amortization event when that comes first.
-                let after_event = call
-                    .after_early_amortization_months
-                    .zip(state.early_amortization_date)
-                    .is_some_and(|(months, event)| {
-                        pay_date >= event.add_months(i32::try_from(months).unwrap_or(i32::MAX))
-                    });
-                pay_date >= call.date || after_event
-            });
+            .filter(|call| matches!(call.scope, CallScope::Deal));
+        let deal_call = if let Some(call) = deal_call {
+            // The scheduled date, or the term-out clock from an
+            // early-amortization event when that comes first.
+            let after_event = if let Some((months, event)) = call
+                .after_early_amortization_months
+                .zip(state.early_amortization_date)
+            {
+                pay_date
+                    >= event.add_months(i32::try_from(months).map_err(|_| {
+                        finstack_quant_core::Error::Validation(
+                            "call term-out months exceed supported range".into(),
+                        )
+                    })?)?
+            } else {
+                false
+            };
+            (pay_date >= call.date || after_event).then_some(call)
+        } else {
+            None
+        };
         let cleanup = instrument.cleanup_call_decimal.is_some_and(|threshold| {
             let pool_factor = if state.original_pool_balance.amount() > 0.0 {
                 state.pool_outstanding.amount() / state.original_pool_balance.amount()
@@ -848,7 +857,7 @@ fn drain_pending_recoveries_at_end(
             state.cumulative_realized_loss += (par.amount() - amount.amount()).max(0.0);
         }
         let release_date = adjust(
-            default_date.add_months(lag_months).max(last_date),
+            default_date.add_months(lag_months)?.max(last_date),
             convention,
             calendar,
         )?;

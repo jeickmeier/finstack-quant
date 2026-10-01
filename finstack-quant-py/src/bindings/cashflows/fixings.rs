@@ -74,13 +74,16 @@ fn materialize_fixings(
 }
 
 pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let module = PyModule::new(py, "fixings")?;
-    module.setattr("__package__", "finstack_quant.cashflows.fixings")?;
+    let module = crate::bindings::module_utils::new_submodule(parent, "fixings")?;
     module.add_class::<PyProjectedFixing>()?;
     module.add_function(wrap_pyfunction!(materialize_fixings, &module)?)?;
     module.setattr(
         "__all__",
         PyList::new(py, ["ProjectedFixing", "materialize_fixings"])?,
     )?;
-    parent.add_submodule(&module)
+    crate::bindings::module_utils::attach_submodule(
+        parent,
+        &module,
+        crate::bindings::module_utils::Exposure::Compiled,
+    )
 }

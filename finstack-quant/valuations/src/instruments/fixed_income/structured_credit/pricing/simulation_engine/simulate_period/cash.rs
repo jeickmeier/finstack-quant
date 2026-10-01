@@ -25,9 +25,18 @@ pub(super) fn record_opening_accruals(
         let Some(cap) = claim_caps.get(tranche.id.as_str()) else {
             continue;
         };
-        let mut rate = tranche
-            .coupon
-            .try_rate_for_period(period.accrual_start, as_of, context)?;
+        let accrual = tranche.day_count.year_fraction(
+            period.accrual_start,
+            pay_date,
+            DayCountContext::default(),
+        )?;
+        let mut rate = tranche.coupon.try_rate_for_period(
+            period.accrual_start,
+            pay_date,
+            accrual,
+            as_of,
+            context,
+        )?;
         if matches!(
             tranche.coupon,
             crate::instruments::fixed_income::loan_terms::RateSpec::Floating(_)

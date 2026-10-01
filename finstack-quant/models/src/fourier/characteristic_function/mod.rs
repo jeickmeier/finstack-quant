@@ -86,9 +86,12 @@ pub trait CharacteristicFunction: Send + Sync {
 
 /// Estimate cumulants via finite differences of ln(phi(u)).
 ///
-/// Uses centered differences at u = 0 with step h = 1e-4.
-/// Accurate for smooth characteristic functions; prefer closed-form
-/// expressions when available for better accuracy.
+/// Uses centered differences at zero with a separate step for each derivative
+/// order, followed by Richardson extrapolation. Higher derivatives need larger
+/// steps to avoid amplifying floating-point cancellation by `h^-n`.
+/// Assumes four finite cumulants and a smooth characteristic function near zero;
+/// prefer closed-form expressions when available. Non-finite evaluations propagate
+/// as non-finite cumulants rather than being replaced by plausible values.
 ///
 /// # Arguments
 ///
@@ -97,25 +100,43 @@ pub trait CharacteristicFunction: Send + Sync {
 /// * `t` - Time to maturity in years supplied to every characteristic-function
 ///   evaluation.
 pub fn cumulants_from_cf(cf: &dyn CharacteristicFunction, t: f64) -> Cumulants {
-    let h = 1e-4;
-    let i = Complex64::i();
-
-    // c_n = (-i)^n * d^n/du^n [ln phi(u)] at u=0
-    let ln_phi = |u: f64| -> Complex64 { cf.cf(Complex64::new(u, 0.0), t).ln() };
-
-    let c1 = ((-i) * (ln_phi(h) - ln_phi(-h)) / (2.0 * h)).re;
-    let c2 = ((-i).powi(2) * (ln_phi(h) - 2.0 * ln_phi(0.0) + ln_phi(-h)) / (h * h)).re;
-    let c3 = ((-i).powi(3)
-        * (ln_phi(2.0 * h) - 2.0 * ln_phi(h) + 2.0 * ln_phi(-h) - ln_phi(-2.0 * h))
-        / (2.0 * h.powi(3)))
-    .re;
-    let c4 = ((-i).powi(4)
-        * (ln_phi(2.0 * h) - 4.0 * ln_phi(h) + 6.0 * ln_phi(0.0) - 4.0 * ln_phi(-h)
-            + ln_phi(-2.0 * h))
-        / h.powi(4))
-    .re;
-
-    Cumulants { c1, c2, c3, c4 }
+    let ln_phi = |u: f64| cf.cf(Complex64::new(u, 0.0), t).ln();
+    let origin = ln_phi(0.0);
+    // Estimate location/scale only to keep the differencing interval local
+    // when log returns have a large mean or spread.
+    let probe_h = 1e-4;
+    let probe = ln_phi(probe_h);
+    let location = (probe.im - origin.im) / probe_h;
+    let variance = -2.0 * (probe.re - origin.re) / (probe_h * probe_h);
+    let scale = location.abs().max(variance.abs().sqrt()).max(1.0);
+    let estimate = |order: i32| {
+        let h = f64::EPSILON.powf(1.0 / f64::from(order + 4)) / scale;
+        let centered = |step: f64| {
+            let plus = ln_phi(step);
+            let minus = ln_phi(-step);
+            match order {
+                1 => (plus.im - minus.im) / (2.0 * step),
+                2 => -(plus.re + minus.re - 2.0 * origin.re) / step.powi(2),
+                3 => {
+                    -(ln_phi(2.0 * step).im - 2.0 * plus.im + 2.0 * minus.im
+                        - ln_phi(-2.0 * step).im)
+                        / (2.0 * step.powi(3))
+                }
+                _ => {
+                    (ln_phi(2.0 * step).re - 4.0 * plus.re + 6.0 * origin.re - 4.0 * minus.re
+                        + ln_phi(-2.0 * step).re)
+                        / step.powi(4)
+                }
+            }
+        };
+        (4.0 * centered(h) - centered(2.0 * h)) / 3.0
+    };
+    Cumulants {
+        c1: estimate(1),
+        c2: estimate(2),
+        c3: estimate(3),
+        c4: estimate(4),
+    }
 }
 
 /// Wrapper that converts a risk-neutral CF into a log-forward CF.
@@ -331,6 +352,48 @@ mod tests {
 
         assert!((closed.c1 - numerical.c1).abs() < 1e-6);
         assert!((closed.c2 - numerical.c2).abs() < 1e-6);
+    }
+
+    #[test]
+    fn numerical_cumulants_resolve_all_four_orders() {
+        let models: Vec<Box<dyn CharacteristicFunction>> = vec![
+            Box::new(BlackScholesCf {
+                r: 0.05,
+                q: 0.0,
+                sigma: 0.1,
+            }),
+            Box::new(BlackScholesCf {
+                r: 0.05,
+                q: 0.0,
+                sigma: 0.3,
+            }),
+            Box::new(MertonJumpCf {
+                r: 0.04,
+                q: 0.01,
+                sigma: 0.2,
+                lambda: 0.35,
+                mu_j: -0.03,
+                sigma_j: 0.08,
+            }),
+            Box::new(VarianceGammaCf::new(0.05, 0.01, 0.12, 0.2, -0.14).expect("valid VG")),
+        ];
+        for model in models {
+            for time in [0.25, 1.0, 5.0] {
+                let actual = cumulants_from_cf(model.as_ref(), time);
+                let expected = model.cumulants(time);
+                for (order, got, want) in [
+                    (1, actual.c1, expected.c1),
+                    (2, actual.c2, expected.c2),
+                    (3, actual.c3, expected.c3),
+                    (4, actual.c4, expected.c4),
+                ] {
+                    assert!(
+                        (got - want).abs() < 1e-6 * (1.0 + want.abs()),
+                        "order={order}, time={time}, actual={got}, expected={want}"
+                    );
+                }
+            }
+        }
     }
 
     #[test]

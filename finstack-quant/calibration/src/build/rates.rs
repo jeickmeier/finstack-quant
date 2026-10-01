@@ -252,7 +252,7 @@ pub(crate) fn resolve_rate_quote_dates(
                     (period_start, period_end)
                 }
                 IrFutureReferencePeriod::ImmQuarterInArrears => {
-                    let period_end = third_wednesday(expiry.month(), expiry.year());
+                    let period_end = third_wednesday(expiry.month(), expiry.year())?;
                     let expected_expiry = period_end.add_business_days(-1, cal)?;
                     if expiry != expected_expiry {
                         return Err(Error::Validation(format!(
@@ -260,15 +260,15 @@ pub(crate) fn resolve_rate_quote_dates(
                         )));
                     }
                     let start_month_anchor =
-                        period_end.add_months(-(fut_conv.delivery_months as i32));
+                        period_end.add_months(-(fut_conv.delivery_months as i32))?;
                     let period_start =
-                        third_wednesday(start_month_anchor.month(), start_month_anchor.year());
+                        third_wednesday(start_month_anchor.month(), start_month_anchor.year())?;
                     (period_start, period_end)
                 }
                 IrFutureReferencePeriod::CalendarMonthInArrears => {
                     let period_start = Date::from_calendar_date(expiry.year(), expiry.month(), 1)
                         .map_err(|err| Error::Validation(err.to_string()))?;
-                    let period_end = period_start.add_months(1);
+                    let period_end = period_start.add_months(1)?;
                     let expected_expiry = period_end.add_business_days(-1, cal)?;
                     if expiry != expected_expiry {
                         return Err(Error::Validation(format!(
@@ -280,7 +280,7 @@ pub(crate) fn resolve_rate_quote_dates(
                 IrFutureReferencePeriod::BusinessMonthInArrears => {
                     let calendar_start = Date::from_calendar_date(expiry.year(), expiry.month(), 1)
                         .map_err(|err| Error::Validation(err.to_string()))?;
-                    let calendar_end = calendar_start.add_months(1);
+                    let calendar_end = calendar_start.add_months(1)?;
                     let expected_expiry = calendar_end.add_business_days(-1, cal)?;
                     if expiry != expected_expiry {
                         return Err(Error::Validation(format!(

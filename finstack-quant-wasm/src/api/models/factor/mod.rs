@@ -204,7 +204,8 @@ impl JsLevelsAtDate {
     ///
     /// # Errors
     ///
-    /// Throws when `level_index` is outside the available levels or the map
+    /// Throws when `level_index` is non-finite, fractional, negative, exceeds the
+    /// wasm32 integer range, is outside the available levels, or the map
     /// cannot be converted to a JavaScript object.
     /// @returns A bucket-name to factor-level mapping in basis points.
     #[wasm_bindgen(js_name = levelValues)]
@@ -302,7 +303,8 @@ impl JsPeriodDecomposition {
     ///
     /// # Errors
     ///
-    /// Throws when `level_index` is outside the available levels or the map
+    /// Throws when `level_index` is non-finite, fractional, negative, exceeds the
+    /// wasm32 integer range, is outside the available levels, or the map
     /// cannot be converted to a JavaScript object.
     /// @returns A bucket-name to factor-change mapping in basis points.
     #[wasm_bindgen(js_name = levelDeltas)]
@@ -677,9 +679,10 @@ pub fn historical_var_decomposition(
 ///
 /// Throws a `TypeError` if an argument has the wrong JavaScript type, and a
 /// `validation` error if actual or target arrays do not match the identifier
-/// count, a position id is duplicated, non-empty target shares do not sum to
-/// one within tolerance, or nonzero component risk is paired with zero
-/// `portfolioVar`.
+/// count, a position id is duplicated, target shares are non-finite or outside
+/// [0, 1], non-empty target shares do not sum to one within 0.05, risk inputs
+/// are non-finite, the utilization threshold is non-finite or non-positive, or
+/// nonzero component risk is paired with zero `portfolioVar`.
 #[wasm_bindgen(js_name = evaluateRiskBudget)]
 pub fn evaluate_risk_budget(
     position_ids: JsValue,
@@ -1184,9 +1187,12 @@ mod tests {
         for _ in 0..n {
             out.push(current);
             current = if current == current.end_of_month() {
-                current.add_months(-1).end_of_month()
+                current
+                    .add_months(-1)
+                    .expect("valid date shift")
+                    .end_of_month()
             } else {
-                current.add_months(-1)
+                current.add_months(-1).expect("valid date shift")
             };
         }
         out.reverse();

@@ -197,16 +197,21 @@ impl RandomStream for PhiloxRng {
 
     /// Fill buffer with uniform random numbers in the open interval (0, 1).
     ///
-    /// The grid-centred mapping `(bits + 0.5)·2⁻⁵³` never produces exactly
-    /// 0 or 1 (matching core's Sobol normal mapping), so inverse-CDF
-    /// consumers and the antithetic mirror `1 − u` are safe at both
-    /// boundaries.
+    /// Uses 52 random bits with the grid-centred mapping `(bits + 0.5)·2⁻⁵²`.
+    /// Every midpoint is exactly representable in `f64`, ranging from `2⁻⁵³`
+    /// to `1 − 2⁻⁵³`. Both the result and its antithetic mirror `1 − u`
+    /// remain strictly inside the unit interval. Using 53 random bits here
+    /// would round the largest midpoint, or the mirror of the smallest, to 1.
+    ///
+    /// # Arguments
+    ///
+    /// * `out` - Output buffer filled with open-unit-interval uniforms; each
+    ///   value consumes two consecutive 32-bit Philox words.
     #[inline]
     fn fill_u01(&mut self, out: &mut [f64]) {
         for x in out {
-            // Convert u64 to (0, 1) using the upper 53 bits, centred.
-            let bits = self.next_u64() >> 11;
-            *x = (bits as f64 + 0.5) * (1.0 / (1u64 << 53) as f64);
+            let bits = self.next_u64() >> 12;
+            *x = (bits as f64 + 0.5) * (1.0 / (1u64 << 52) as f64);
         }
     }
 
@@ -258,7 +263,7 @@ mod tests {
     fn test_philox_basic() {
         let mut rng = PhiloxRng::new(42);
         let val = rng.next_u01();
-        assert!((0.0..1.0).contains(&val));
+        assert!(val > 0.0 && val < 1.0);
     }
 
     /// Known-answer test against the Random123 reference distribution
@@ -364,8 +369,35 @@ mod tests {
         rng.fill_u01(&mut values);
 
         for &val in &values {
-            assert!((0.0..1.0).contains(&val));
+            assert!(val > 0.0 && val < 1.0);
+            let mirrored = 1.0 - val;
+            assert!(mirrored > 0.0 && mirrored < 1.0);
         }
+    }
+
+    #[test]
+    fn test_fill_u01_boundary_words_and_antithetic_mirrors_are_open() {
+        let mut rng = PhiloxRng::new(0);
+        // Exercise both extreme u64 words through the actual stream conversion.
+        rng.block = [0, 0, u32::MAX, u32::MAX];
+        rng.idx = 0;
+        let mut values = [0.0; 2];
+        rng.fill_u01(&mut values);
+
+        let half_epsilon = 0.5 * f64::EPSILON;
+        assert_eq!(values, [half_epsilon, 1.0 - half_epsilon]);
+        for value in values {
+            for uniform in [value, 1.0 - value] {
+                assert!(uniform > 0.0 && uniform < 1.0);
+                assert!(finstack_quant_core::math::standard_normal_inv_cdf(uniform).is_finite());
+            }
+        }
+
+        rng.block = [0, 0, u32::MAX, u32::MAX];
+        rng.idx = 0;
+        let mut normals = [0.0; 2];
+        rng.fill_std_normals(&mut normals);
+        assert!(normals.iter().all(|z| z.is_finite()));
     }
 
     #[test]

@@ -12,6 +12,10 @@ use crate::types::NodeId;
 use crate::Result;
 
 /// Verifies that Assets = Liabilities + Equity for every period.
+///
+/// All configured operands must have compatible scalar/monetary units and one
+/// currency. Execution rejects incompatible units or invalid numeric tolerances;
+/// it performs no FX conversion.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BalanceSheetArticulation {
@@ -41,6 +45,15 @@ impl Check for BalanceSheetArticulation {
     }
 
     fn execute(&self, context: &CheckContext) -> Result<CheckResult> {
+        crate::checks::helpers::validate_identity_inputs(
+            self.id(),
+            context,
+            self.tolerance,
+            self.assets_nodes
+                .iter()
+                .chain(&self.liabilities_nodes)
+                .chain(&self.equity_nodes),
+        )?;
         // An empty node group would sum to zero and make the identity vacuous
         // (0 == 0 always "articulates"): the check would pass while checking
         // nothing. Fail loudly instead.

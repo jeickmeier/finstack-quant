@@ -65,6 +65,11 @@ pub(in crate::builder) fn compute_reset_date(
     business_day_convention: finstack_quant_core::dates::BusinessDayConvention,
     cal: &dyn HolidayCalendar,
 ) -> finstack_quant_core::Result<Date> {
+    if reset_lag_days < 0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "reset_lag_days must be non-negative; got {reset_lag_days}"
+        )));
+    }
     if reset_lag_days == 0 {
         return Ok(accrual_start);
     }

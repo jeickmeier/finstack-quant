@@ -246,6 +246,20 @@ mod monotone_convex_strategy {
         assert!(MonotoneConvexStrategy::with_epsilon(&knots, &dfs, 0.0).is_err());
         assert!(MonotoneConvexStrategy::with_epsilon(&knots, &dfs, -1.0e-12).is_err());
         assert!(MonotoneConvexStrategy::with_epsilon(&knots, &dfs, 1.0e-5).is_err());
+        assert!(MonotoneConvexStrategy::with_epsilon(&knots, &dfs, f64::NAN).is_err());
+        assert!(MonotoneConvexStrategy::with_epsilon(&knots, &dfs, f64::INFINITY).is_err());
+    }
+
+    #[test]
+    fn with_epsilon_rejects_invalid_input_shapes() {
+        for (knots, values) in [
+            (vec![], vec![]),
+            (vec![0.0], vec![1.0]),
+            (vec![0.0, 1.0], vec![1.0]),
+            (vec![0.0, f64::NAN], vec![1.0, 0.9]),
+        ] {
+            assert!(MonotoneConvexStrategy::with_epsilon(&knots, &values, 1e-14).is_err());
+        }
     }
 }
 
@@ -1124,25 +1138,8 @@ mod monotone_convex_specific {
         assert!(approx_eq(interp.interp(3.0), 0.85, 1e-12));
     }
 
-    // Hagan-West monotonicity projection
-    //
-    // Regression tests for the Hagan-West 2006 Figure 6 projection. The
-    // original implementation collapsed same-sign α, β scalings to
-    //     scale = fd_i.abs() / max(|α|, |β|)
-    // which over-flattens whenever fd_i is small (ZIRP) because the scale
-    // is driven by fd_i magnitude alone, not by the amount of negative
-    // excursion in f(x) = fd_i + g(x) on [0, 1].
-    //
-    // The corrected projection scales (α, β) by a single factor
-    //     η = fd_i / (fd_i - min_f)
-    // where min_f < 0 is the pre-adjustment minimum of f on the segment.
-    // This places (α', β') on the ray from origin through (α, β) at the
-    // exact boundary min(f) = 0, preserving the ratio α:β and therefore
-    // the shape of the segment forward.
-    //
-    // Reference: Hagan, P. S., & West, G. (2006). "Interpolation Methods
-    // for Curve Construction." Applied Mathematical Finance, 13(2), §6
-    // and Figure 6.
+    // Hagan-West forward bounds preserve nonnegative forwards without
+    // flattening positive-rate segments solely because their rates are small.
 
     /// At a short-end knot with fd_i ≈ 10 bp and an opposite-sign deviation
     /// pattern (α < 0, β > 0, |α| = |β|), the old code forced both knot
@@ -1176,10 +1173,8 @@ mod monotone_convex_specific {
 
         // Probe the instantaneous forward at the left boundary via
         //     f(0) = -DF'(0) / DF(0) = -interp_prime(0) / interp(0).
-        // With fd[0] = 10 bp and boundary extrapolation producing a negative
-        // raw f[0] = 1.5·fd[0] - 0.5·fd[1] = -10 bp, after projection:
-        //   Old code: forces f[0] = fd[0] = 10 bp (flat, curvature lost).
-        //   New code: eta = 0.5 so f[0] = 0 bp.
+        // The negative raw boundary forward is clamped to zero while the
+        // adjacent knot retains the permitted rising slope.
         let df_at_0 = interp.interp(0.0);
         let dfp_at_0 = interp.interp_prime(0.0);
         let fwd_at_0 = -dfp_at_0 / df_at_0;
@@ -1635,11 +1630,80 @@ mod monotone_convex_positivity {
     use super::*;
     use finstack_quant_core::math::random::{Pcg64Rng, RandomNumberGenerator};
 
+    #[test]
+    fn flat_strip_remains_flat_next_to_steep_rising_forwards() {
+        let interp = new_strict!(
+            Interpolator<MonotoneConvexStrategy>,
+            vec![0.0, 1.0, 2.0, 3.0].into_boxed_slice(),
+            vec![1.0, 1.0, (-0.005_f64).exp(), (-0.035_f64).exp()].into_boxed_slice(),
+            ExtrapolationPolicy::FlatForward
+        )
+        .expect("nonnegative discrete forwards");
+
+        for i in 0..=30 {
+            let t = f64::from(i) / 30.0;
+            assert!((interp.interp(t) - 1.0).abs() < 1e-15);
+            assert!(interp.interp_prime(t).abs() < 1e-15);
+        }
+    }
+
+    #[test]
+    fn segment_minima_are_nonnegative_across_rate_regimes() {
+        let knots: [f64; 4] = [0.0, 0.125, 1.0, 7.0];
+        let regimes: [f64; 6] = [0.0, 1e-8, 1e-4, 0.005, 0.03, 0.2];
+        for first in regimes {
+            for middle in regimes {
+                for last in regimes {
+                    let forwards = [first, middle, last];
+                    let mut dfs = vec![1.0];
+                    for (i, forward) in forwards.iter().enumerate() {
+                        dfs.push(dfs[i] * (-forward * (knots[i + 1] - knots[i])).exp());
+                    }
+                    let interp = new_strict!(
+                        Interpolator<MonotoneConvexStrategy>,
+                        knots.to_vec().into_boxed_slice(),
+                        dfs.clone().into_boxed_slice(),
+                        ExtrapolationPolicy::FlatForward
+                    )
+                    .expect("nonnegative discrete forwards");
+
+                    for (i, &df) in dfs.iter().enumerate() {
+                        assert!((interp.interp(knots[i]) - df).abs() < 1e-14);
+                    }
+                    // A quadratic's minimum occurs at an endpoint or its
+                    // stationary point. Check those exact locations rather
+                    // than relying on a uniform sampling grid.
+                    for i in 0..forwards.len() {
+                        let left = knots[i];
+                        let right = knots[i + 1];
+                        let f_left = -interp.interp_prime(left) / interp.interp(left);
+                        let f_right = -interp.interp_prime(right) / interp.interp(right);
+                        assert!(f_left >= -1e-14 && f_right >= -1e-14);
+                        let mean = -(dfs[i + 1] / dfs[i]).ln() / (right - left);
+                        let alpha = f_left - mean;
+                        let beta = f_right - mean;
+                        let sum = alpha + beta;
+                        if sum != 0.0 {
+                            let x = (2.0 * alpha + beta) / (3.0 * sum);
+                            if x > 0.0 && x < 1.0 {
+                                let t = left + x * (right - left);
+                                let minimum = -interp.interp_prime(t) / interp.interp(t);
+                                assert!(
+                                    minimum >= -1e-14,
+                                    "negative forward {minimum} at {t}, inputs={forwards:?}"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// Randomized-but-seeded property test: monotone-convex forwards must be
     /// non-negative on stressed curves where steep segments sit next to
-    /// near-zero segments. Regression test for the sequential Hagan-West
-    /// positivity projection re-violating earlier segments (fixed by the
-    /// bounded fixpoint sweep in `apply_monotonicity_constraints`).
+    /// near-zero segments. Every segment must satisfy the nonnegative-forward
+    /// policy, including shared endpoints.
     #[test]
     fn forwards_non_negative_on_stressed_curves() {
         // Fixed seeds per testing standards: deterministic and reproducible.
@@ -1875,5 +1939,226 @@ mod monotone_convex_negative_rates {
                 );
             }
         }
+    }
+}
+
+/// Numerical fixtures derived from Hagan & West (2008), equations (22)-(34),
+/// https://dlu-umich.github.io/docs/HaganWest.pdf, pp. 5-7. Expected adjustments
+/// below are rational values calculated independently of the implementation.
+mod hagan_west_reference {
+    use super::*;
+
+    fn from_forwards(knots: &[f64], forwards: &[f64]) -> Interpolator<MonotoneConvexStrategy> {
+        let mut log_discount = 0.0;
+        let mut dfs = vec![1.0];
+        for (interval, &forward) in knots.windows(2).zip(forwards) {
+            log_discount += forward * (interval[1] - interval[0]);
+            dfs.push((-log_discount).exp());
+        }
+        Interpolator::new(
+            knots.to_vec().into(),
+            dfs.into(),
+            ExtrapolationPolicy::FlatForward,
+            ValidationPolicy::Strict,
+        )
+        .unwrap()
+    }
+
+    fn forward(interp: &Interpolator<MonotoneConvexStrategy>, t: f64) -> f64 {
+        -interp.interp_prime(t) / interp.interp(t)
+    }
+
+    #[test]
+    fn all_four_regions_match_reference_forwards_and_integrals() {
+        // (left deviation, right deviation, x, g(x), integral_0^x g),
+        // all rate and integral adjustments expressed in units of 1%.
+        let fixtures = [
+            (-1.0, 1.0, 0.25, -0.5, -0.1875), // Region I
+            (-1.0, 1.0, 0.50, 0.0, -0.25),
+            (-1.0, 1.0, 0.75, 0.5, -0.1875),
+            (-1.0, 3.0, 0.125, -1.0, -0.125), // Region II, flat part
+            (-1.0, 3.0, 0.25, -1.0, -0.25),   // Region II, join
+            (-1.0, 3.0, 0.50, -5.0 / 9.0, -25.0 / 54.0),
+            (-1.0, 3.0, 0.75, 7.0 / 9.0, -49.0 / 108.0),
+            (-3.0, 1.0, 0.25, -7.0 / 9.0, -49.0 / 108.0), // Region III
+            (-3.0, 1.0, 0.50, 5.0 / 9.0, -25.0 / 54.0),
+            (-3.0, 1.0, 0.75, 1.0, -0.25),   // Region III, join
+            (-3.0, 1.0, 0.875, 1.0, -0.125), // Region III, flat part
+            (1.0, 3.0, 0.25, 1.0 / 36.0, 13.0 / 108.0), // Region IV
+            (1.0, 3.0, 0.50, -5.0 / 9.0, 5.0 / 108.0),
+            (1.0, 3.0, 0.75, -0.75, -0.125), // Region IV, extremum
+            (1.0, 3.0, 0.875, 3.0 / 16.0, -23.0 / 128.0),
+        ];
+        for (g0, g1, x, expected_g, expected_integral) in fixtures {
+            // Reversing signs exercises the mirrored regions and negative rates.
+            for sign in [-1.0, 1.0] {
+                let mean = sign * 0.1;
+                let left = mean + sign * 0.02 * g0;
+                let right = mean + sign * 0.02 * g1;
+                let interp = from_forwards(&[0.0, 1.0, 2.0, 3.0], &[left, mean, right]);
+                let actual_forward = forward(&interp, 1.0 + x);
+                let actual_integral = -(interp.interp(1.0 + x) / interp.interp(1.0)).ln();
+                let expected_forward = mean + sign * 0.01 * expected_g;
+                let expected_total = mean * x + sign * 0.01 * expected_integral;
+                assert!(
+                    (actual_forward - expected_forward).abs() < 2e-14,
+                    "g0={g0}, g1={g1}, x={x}, sign={sign}: {actual_forward} != {expected_forward}"
+                );
+                assert!(
+                    (actual_integral - expected_total).abs() < 2e-14,
+                    "g0={g0}, g1={g1}, x={x}, sign={sign}: integral {actual_integral} != {expected_total}"
+                );
+                // Check the derivative exposed to curve/risk consumers against
+                // a finite difference of the actual discount-factor evaluator.
+                let h = 1e-5;
+                let numeric = (interp.interp(1.0 + x + h) - interp.interp(1.0 + x - h)) / (2.0 * h);
+                assert!((interp.interp_prime(1.0 + x) - numeric).abs() < 2e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn increasing_discrete_forwards_have_no_interior_reversal() {
+        let interp = from_forwards(&[0.0, 1.0, 2.0, 3.0], &[0.01, 0.02, 0.05]);
+        assert!((forward(&interp, 1.1) - 0.015).abs() < 1e-14);
+        assert!((interp.interp(1.25) - (-0.01375_f64).exp()).abs() < 1e-14);
+        let mut previous = forward(&interp, 1.0);
+        for step in 1..=100 {
+            let current = forward(&interp, 1.0 + f64::from(step) / 100.0);
+            assert!(current >= previous - 1e-14);
+            previous = current;
+        }
+    }
+
+    #[test]
+    fn boundary_forwards_use_adjacent_instantaneous_rates() {
+        for (knots, expected) in [
+            ([0.0, 1.0, 2.0, 3.0], [0.0075, 0.015, 0.035, 0.0575]),
+            ([0.0, 0.5, 2.0, 5.0], [0.00875, 0.0125, 0.03, 0.06]),
+        ] {
+            let interp = from_forwards(&knots, &[0.01, 0.02, 0.05]);
+            for (&t, expected_forward) in knots.iter().zip(expected) {
+                assert!((forward(&interp, t) - expected_forward).abs() < 2e-14);
+            }
+            assert!((forward(&interp, -0.5) - expected[0]).abs() < 2e-14);
+            assert!((forward(&interp, knots[3] + 5.0) - expected[3]).abs() < 2e-14);
+        }
+    }
+
+    #[test]
+    fn regional_joins_and_boundaries_are_continuous() {
+        // Cross I/II, I/III, II/IV, and III/IV boundaries in both half-planes.
+        for (g0, g1) in [(-0.01, 0.02), (-0.02, 0.01), (0.0, 0.03), (0.03, 0.0)] {
+            for sign in [-1.0, 1.0] {
+                let curves: Vec<_> = [-1e-10, 0.0, 1e-10]
+                    .into_iter()
+                    .map(|shift| {
+                        let mean = sign * 0.1;
+                        from_forwards(
+                            &[0.0, 1.0, 2.0, 3.0],
+                            &[
+                                mean + 2.0 * sign * (g0 + shift),
+                                mean,
+                                mean + 2.0 * sign * (g1 + shift),
+                            ],
+                        )
+                    })
+                    .collect();
+                for x in [0.1, 0.25, 0.5, 0.75, 0.9] {
+                    for perturbed in [&curves[0], &curves[2]] {
+                        assert!(
+                            (forward(perturbed, 1.0 + x) - forward(&curves[1], 1.0 + x)).abs()
+                                < 2e-9
+                        );
+                        assert!(
+                            (perturbed.interp(1.0 + x) - curves[1].interp(1.0 + x)).abs() < 2e-9
+                        );
+                    }
+                }
+            }
+        }
+        for (forwards, join) in [
+            ([0.08, 0.1, 0.16], 1.25),
+            ([0.04, 0.1, 0.12], 1.75),
+            ([0.12, 0.1, 0.16], 1.75),
+        ] {
+            let interp = from_forwards(&[0.0, 1.0, 2.0, 3.0], &forwards);
+            assert!((forward(&interp, join - 1e-8) - forward(&interp, join + 1e-8)).abs() < 1e-10);
+            assert!((interp.interp(join - 1e-8) - interp.interp(join + 1e-8)).abs() < 3e-9);
+        }
+    }
+}
+
+mod validated_interpolator_serde {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn deserialization_rejects_invalid_shapes_and_strict_values() {
+        for (knots, values) in [
+            (json!([]), json!([])),
+            (json!([0.0]), json!([1.0])),
+            (json!([0.0, 1.0]), json!([1.0])),
+            (json!([0.0, 0.0]), json!([1.0, 0.9])),
+            (json!([1.0, 0.0]), json!([1.0, 0.9])),
+            (json!([0.0, 1e-12]), json!([1.0, 0.9])),
+            (json!([0.0, 1.0]), json!([1.0, -0.9])),
+            (json!([0.0, null]), json!([1.0, 0.9])),
+        ] {
+            let raw = json!({"knots":knots,"values":values,"extrapolation":"flat_zero","validation":"strict"});
+            assert!(serde_json::from_value::<Interpolator<LinearStrategy>>(raw).is_err());
+        }
+    }
+
+    #[test]
+    fn deserialization_rebuilds_caches_for_every_strategy() {
+        fn check<S: InterpolationStrategy>() {
+            let raw = json!({"knots":[0.0,1.0,2.0],"values":[1.0,0.9,0.7],"extrapolation":"flat_forward","validation":"strict"});
+            let original: Interpolator<S> = serde_json::from_value(raw).unwrap();
+            let mut saved = serde_json::to_value(&original).unwrap();
+            assert!(saved.get("strategy").is_none());
+            saved["values"][1] = json!(0.8);
+            let rebuilt: Interpolator<S> = serde_json::from_value(saved).unwrap();
+            assert!((rebuilt.interp(1.0) - 0.8).abs() < 1e-14);
+            let fresh = Interpolator::<S>::new(
+                vec![0.0, 1.0, 2.0].into(),
+                vec![1.0, 0.8, 0.7].into(),
+                ExtrapolationPolicy::FlatForward,
+                ValidationPolicy::Strict,
+            )
+            .unwrap();
+            for x in [-0.2, 0.4, 1.0, 1.5, 3.0] {
+                assert!((rebuilt.interp(x) - fresh.interp(x)).abs() < 1e-14);
+                assert!((rebuilt.interp_prime(x) - fresh.interp_prime(x)).abs() < 1e-14);
+            }
+        }
+        check::<LinearStrategy>();
+        check::<LogLinearStrategy>();
+        check::<CubicHermiteStrategy>();
+        check::<MonotoneConvexStrategy>();
+        check::<PiecewiseQuadraticForwardStrategy>();
+    }
+
+    #[test]
+    fn serialized_strategy_cache_is_rejected() {
+        let raw = json!({"knots":[0.0,1.0],"values":[1.0,0.9],"strategy":{"log_values":[0.0,0.0]},"extrapolation":"flat_zero","validation":"strict"});
+        assert!(serde_json::from_value::<Interpolator<LogLinearStrategy>>(raw).is_err());
+    }
+
+    #[test]
+    fn negative_value_policy_roundtrips_but_cannot_bypass_strategy_requirements() {
+        let raw = json!({"knots":[0.0,1.0],"values":[-0.01,0.02],"extrapolation":"flat_zero","validation":"allow_negative"});
+        let interp: Interpolator<LinearStrategy> = serde_json::from_value(raw.clone()).unwrap();
+        let saved = serde_json::to_value(interp).unwrap();
+        assert_eq!(saved["validation"], "allow_negative");
+        let restored: Interpolator<LinearStrategy> = serde_json::from_value(saved).unwrap();
+        assert!((restored.interp(0.5) - 0.005).abs() < 1e-14);
+        assert!(serde_json::from_value::<Interpolator<LogLinearStrategy>>(raw.clone()).is_err());
+        assert!(
+            serde_json::from_value::<Interpolator<MonotoneConvexStrategy>>(raw.clone()).is_err()
+        );
+        assert!(
+            serde_json::from_value::<Interpolator<PiecewiseQuadraticForwardStrategy>>(raw).is_err()
+        );
     }
 }

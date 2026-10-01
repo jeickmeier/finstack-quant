@@ -8,6 +8,7 @@ use crate::instruments::common_impl::traits::Attributes;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurfaceAxis};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 
@@ -272,6 +273,8 @@ impl EquityFuture {
             )
         })?;
         let equity_surface = market.get_surface(vol_surface_id)?;
+        equity_surface.require_quote_type(VolQuoteType::BlackLognormal)?;
+        equity_surface.require_secondary_axis(VolSurfaceAxis::Strike)?;
         let equity_vol = finstack_quant_models::volatility::get_surface_vol_clamped(
             &equity_surface,
             t,
@@ -305,6 +308,8 @@ impl EquityFuture {
         }
         let fx_forward = fx_spot * underlying_df / settlement_df;
         let fx_surface = market.get_surface(&quanto.fx_vol_surface_id)?;
+        fx_surface.require_quote_type(VolQuoteType::BlackLognormal)?;
+        fx_surface.require_secondary_axis(VolSurfaceAxis::Strike)?;
         let fx_vol =
             finstack_quant_models::volatility::get_surface_vol_clamped(&fx_surface, t, fx_forward);
         if !equity_vol.is_finite() || equity_vol < 0.0 || !fx_vol.is_finite() || fx_vol < 0.0 {
@@ -514,7 +519,7 @@ mod tests {
     }
 
     #[test]
-    fn quanto_equity_future_applies_equity_fx_covariance_drift() {
+    fn quanto_equity_future_applies_drift_and_checks_surface_contracts() {
         let as_of = date!(2026 - 01 - 01);
         let settlement = date!(2027 - 01 - 01);
         let market = MarketContext::new()
@@ -555,6 +560,33 @@ mod tests {
 
         let expected = 100.0 * (0.03_f64 - 0.01 - 0.5 * 0.20 * 0.10).exp();
         assert!((future.fair_price(&market, as_of).expect("fair") - expected).abs() < 1.0e-12);
+        for (id, strike) in [("SX5E-VOL", 100.0), ("EURUSD-VOL", 1.10)] {
+            let base = flat_vol(id, strike, 0.2);
+            let incompatible = [
+                (
+                    base.clone()
+                        .with_quote_type(VolQuoteType::Normal)
+                        .expect("normal surface"),
+                    "black_lognormal",
+                ),
+                (
+                    base.clone()
+                        .with_displacements(&[0.1])
+                        .expect("shifted surface"),
+                    "black_lognormal",
+                ),
+                (base.with_secondary_axis(VolSurfaceAxis::Tenor), "strike"),
+            ];
+            for (surface, expected) in incompatible {
+                let invalid_market = market.clone().insert_surface(surface);
+                let error = future
+                    .fair_price(&invalid_market, as_of)
+                    .expect_err("quanto drift requires unshifted Black strike surfaces");
+                let message = error.to_string();
+                assert!(message.contains(id), "{message}");
+                assert!(message.contains(expected), "{message}");
+            }
+        }
     }
 
     #[test]

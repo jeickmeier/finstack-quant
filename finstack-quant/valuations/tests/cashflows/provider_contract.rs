@@ -11,7 +11,7 @@
 //! 3. Returned flows are sorted by date (non-decreasing)
 //! 4. All flows have the same currency as the instrument's notional (if provided)
 //! 5. All flows satisfy `date >= as_of` (future-only)
-//! 6. No `CFKind::Pik` flows appear in the public schedule
+//! 6. PIK and other non-cash state rows are excluded from dated settlements
 //!
 //! # Adding New Instruments
 //!
@@ -49,7 +49,7 @@ use finstack_quant_valuations::instruments::Instrument as PublicInstrument;
 /// 2. `dated_cashflows` is the cash-settlement view of `cashflow_schedule`
 /// 3. Flows are sorted by date (non-decreasing)
 /// 4. All flows satisfy `date >= as_of` (future-only)
-/// 5. No `CFKind::Pik` flows in the public schedule
+/// 5. PIK and other non-cash state rows are excluded from dated settlements
 /// 6. Currency consistency with notional (if provided)
 fn verify_provider_contract<T: CashflowProvider>(
     provider: &T,
@@ -105,17 +105,6 @@ fn verify_provider_contract<T: CashflowProvider>(
             type_name,
             cf.date,
             as_of
-        );
-    }
-
-    // Contract: No pure PIK flows in the public schedule
-    use finstack_quant_core::cashflow::CFKind;
-    for cf in schedule.get_flows() {
-        assert!(
-            cf.kind != CFKind::Pik,
-            "[{}] PIK flow found on {}; pure PIK accretion must be omitted from public schedule",
-            type_name,
-            cf.date
         );
     }
 

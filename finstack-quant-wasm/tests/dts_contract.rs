@@ -480,6 +480,11 @@ fn valuations_dts_exposes_direct_fx_instruments() {
     assert!(dts.contains("FxDigitalOption: FxInstrumentConstructor<FxDigitalOptionInstrument>;"));
     assert!(dts.contains("FxTouchOption: FxInstrumentConstructor<FxTouchOptionInstrument>;"));
     assert!(dts.contains("QuantoOption: FxInstrumentConstructor<QuantoOptionInstrument>;"));
+    assert!(dts.contains("export interface QuantoOptionInstrument extends FxOptionInstrument"));
+    assert!(contains_signature(
+        interface_block(&dts, "QuantoOptionInstrument"),
+        "theta(marketJson: JsonInput, asOf: string, model?: string | null): number;"
+    ));
     assert!(dts.contains("fx: FxNamespace;"));
     assert!(dts.contains(
         "foreignRho(marketJson: JsonInput, asOf: string, model?: string | null): number;"

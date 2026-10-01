@@ -8,12 +8,10 @@ use crate::instruments::common_impl::validation;
 use finstack_quant_core::config::{results_meta, FinstackConfig, ResultsMeta};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
-use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::money::Money;
 
 use indexmap::IndexMap;
 use smallvec::SmallVec;
-use std::cmp::Ordering;
 use std::sync::Arc;
 use time::Duration;
 
@@ -30,7 +28,9 @@ pub enum WaterfallStyle {
     /// American style: deal-by-deal allocation. Every event must carry a
     /// non-empty `deal_id`; capital, preferred return, catch-up, and carry are
     /// tracked independently for each deal, while clawback remains a fund-level
-    /// lifetime reconciliation.
+    /// lifetime reconciliation. Periodic fund settlements do not reinstate an
+    /// individual deal's gross carry capacity or reassign returned capital to a
+    /// deal; later distributions continue to use that deal's original history.
     American,
 }
 
@@ -56,7 +56,7 @@ pub enum PeFundWaterfallTranche {
     /// Preferred return to LPs at specified IRR
     PreferredIrr {
         /// LP preferred-return hurdle as an annual decimal IRR (`0.08` = 8%),
-        /// compounded on the spec's `day_count`.
+        /// compounded on the spec's `day_count`; must be finite and greater than -1.
         hurdle_irr: f64,
     },
     /// Catch-up allocation to GP
@@ -83,7 +83,7 @@ pub enum PeFundWaterfallTranche {
     /// so the LP-100% infill is empty.
     PromoteTier {
         /// Annual decimal IRR hurdle (`0.12` = 12%) the LP must reach (at
-        /// 100% payout) before this tier's split activates.
+        /// 100% payout) before this tier's split activates; must be finite and greater than -1.
         hurdle_irr: f64,
         /// LP share of each split dollar, in `[0, 1]`; must sum to 1 with
         /// `gp_share`.
@@ -101,7 +101,9 @@ pub enum PeFundWaterfallTranche {
 pub enum ClawbackSettle {
     /// Settle at fund termination
     FundEnd,
-    /// Settle periodically (quarterly/annually)
+    /// Settle at configured period ends before subsequent distributions.
+    /// European settlements update fund allocation balances. American settlements
+    /// stay at fund level and do not rewrite individual deal entitlements.
     Periodic,
 }
 
@@ -159,7 +161,8 @@ impl PeFundWaterfallSpec {
     ///
     /// Returns an error when the spec has no tranches, a promote tier's
     /// LP/GP shares are non-finite, negative, or do not sum to 1.0, a
-    /// preferred-return or promote-tier hurdle rate is non-finite, a
+    /// preferred-return or promote-tier hurdle rate is non-finite or at/below
+    /// -100%, a
     /// catch-up GP share is outside `[0, 1]`, or a clawback holdback
     /// percentage is outside `[0, 1]`.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
@@ -172,9 +175,9 @@ impl PeFundWaterfallSpec {
             match tranche {
                 PeFundWaterfallTranche::ReturnOfCapital => {}
                 PeFundWaterfallTranche::PreferredIrr { hurdle_irr: irr } => {
-                    if !irr.is_finite() {
+                    if !irr.is_finite() || *irr <= -1.0 {
                         return Err(finstack_quant_core::Error::Validation(format!(
-                            "tranches[].preferred_irr.hurdle_irr must be finite, got {irr}"
+                            "tranches[].preferred_irr.hurdle_irr must be finite and greater than -100%, got {irr}"
                         )));
                     }
                 }
@@ -190,9 +193,9 @@ impl PeFundWaterfallSpec {
                     lp_share,
                     gp_share,
                 } => {
-                    if !rate.is_finite() {
+                    if !rate.is_finite() || *rate <= -1.0 {
                         return Err(finstack_quant_core::Error::Validation(format!(
-                            "tranches[].promote_tier.hurdle_irr must be finite, got {rate}"
+                            "tranches[].promote_tier.hurdle_irr must be finite and greater than -100%, got {rate}"
                         )));
                     }
                     let sum = lp_share + gp_share;
@@ -660,18 +663,27 @@ impl<'a> EquityWaterfallEngine<'a> {
 
         let mut ledger_rows = Vec::new();
 
-        match self.spec.style {
-            WaterfallStyle::European => {
-                self.run_european(&sorted_events, &mut ledger_rows)?;
-            }
-            WaterfallStyle::American => {
-                self.run_american(&sorted_events, &mut ledger_rows)?;
-            }
-        }
+        let lp_unreturned = match self.spec.style {
+            WaterfallStyle::European => self.run_european(&sorted_events, &mut ledger_rows)?,
+            WaterfallStyle::American => self.run_american(&sorted_events, &mut ledger_rows)?,
+        };
 
-        // Apply clawback if specified
-        if let Some(clawback_spec) = &self.spec.clawback {
-            self.apply_clawback(&sorted_events, &mut ledger_rows, clawback_spec)?;
+        // Periodic settlements already ran between allocations.
+        if self
+            .spec
+            .clawback
+            .as_ref()
+            .is_some_and(|clawback| clawback.settle_on == ClawbackSettle::FundEnd)
+        {
+            if let Some(last_event_date) = sorted_events.last().map(|event| event.date) {
+                self.settle_clawback_as_of(
+                    &sorted_events,
+                    &mut ledger_rows,
+                    last_event_date,
+                    false,
+                    lp_unreturned,
+                )?;
+            }
         }
 
         let config = FinstackConfig::default();
@@ -689,7 +701,7 @@ impl<'a> EquityWaterfallEngine<'a> {
         &self,
         events: &[FundEvent],
         ledger_rows: &mut Vec<AllocationRow>,
-    ) -> finstack_quant_core::Result<()> {
+    ) -> finstack_quant_core::Result<f64> {
         // Aggregate all events at fund level
         let mut lp_unreturned = 0.0;
         let mut gp_carry_cum = 0.0;
@@ -699,7 +711,23 @@ impl<'a> EquityWaterfallEngine<'a> {
             .amount
             .currency();
 
+        let mut settlements = self
+            .periodic_settlement_dates(events)?
+            .into_iter()
+            .peekable();
         for event in events {
+            // Same-date calls/distributions precede the end-of-period settlement.
+            while settlements.peek().is_some_and(|date| *date < event.date) {
+                if let Some(date) = settlements.next() {
+                    self.settle_european_period(
+                        events,
+                        ledger_rows,
+                        date,
+                        &mut lp_unreturned,
+                        &mut gp_carry_cum,
+                    )?;
+                }
+            }
             if event.kind == FundEventKind::Distribution || event.kind == FundEventKind::Proceeds {
                 let lp_distributed_so_far: f64 = ledger_rows.iter().map(|r| r.to_lp.amount()).sum();
                 let allocations = self.allocate_distribution(AllocationParams {
@@ -724,7 +752,16 @@ impl<'a> EquityWaterfallEngine<'a> {
             }
         }
 
-        Ok(())
+        for date in settlements {
+            self.settle_european_period(
+                events,
+                ledger_rows,
+                date,
+                &mut lp_unreturned,
+                &mut gp_carry_cum,
+            )?;
+        }
+        Ok(lp_unreturned)
     }
 
     /// Run American-style waterfall (deal-by-deal, chronological).
@@ -737,7 +774,7 @@ impl<'a> EquityWaterfallEngine<'a> {
         &self,
         events: &[FundEvent],
         ledger_rows: &mut Vec<AllocationRow>,
-    ) -> finstack_quant_core::Result<()> {
+    ) -> finstack_quant_core::Result<f64> {
         #[derive(Default)]
         struct DealState {
             lp_unreturned: f64,
@@ -771,7 +808,24 @@ impl<'a> EquityWaterfallEngine<'a> {
         }
 
         let mut states: IndexMap<String, DealState> = IndexMap::new();
+        let mut fund_capital_recovered = 0.0;
+        let mut settlements = self
+            .periodic_settlement_dates(events)?
+            .into_iter()
+            .peekable();
         for event in events {
+            while settlements.peek().is_some_and(|date| *date < event.date) {
+                if let Some(date) = settlements.next() {
+                    let deal_capital = states.values().map(|state| state.lp_unreturned).sum();
+                    self.settle_american_period(
+                        events,
+                        ledger_rows,
+                        date,
+                        deal_capital,
+                        &mut fund_capital_recovered,
+                    )?;
+                }
+            }
             let deal_id = event.deal_id.as_deref().ok_or_else(|| {
                 finstack_quant_core::Error::Validation(
                     "American waterfall event lost its validated deal_id".to_string(),
@@ -808,9 +862,24 @@ impl<'a> EquityWaterfallEngine<'a> {
                 state.rows.push(allocation.clone());
                 ledger_rows.push(allocation);
             }
+            // A fund-level capital recovery is a credit against existing deal
+            // capital. Consume it when principal returns exhaust that capital;
+            // it must not reduce a later, unrelated capital call.
+            let active_capital: f64 = states.values().map(|state| state.lp_unreturned).sum();
+            fund_capital_recovered = fund_capital_recovered.min(active_capital);
         }
 
-        Ok(())
+        let deal_capital: f64 = states.values().map(|state| state.lp_unreturned).sum();
+        for date in settlements {
+            self.settle_american_period(
+                events,
+                ledger_rows,
+                date,
+                deal_capital,
+                &mut fund_capital_recovered,
+            )?;
+        }
+        Ok((deal_capital - fund_capital_recovered).max(0.0))
     }
 
     /// Allocate a single distribution through the waterfall.
@@ -931,9 +1000,9 @@ impl<'a> EquityWaterfallEngine<'a> {
                     // to GP at periodic clawback settlement, where
                     // `apply_clawback` reconciles via
                     //   delta_gp = allowed_gp_total(as_of) − Σ ledger.to_gp
-                    // (allowed = from-scratch no-holdback waterfall replay)
-                    // and pays the difference (positive δ → GP receives the
-                    // accumulated holdback; negative δ → clawback from GP).
+                    // using dated lifetime entitlement and separately tracking
+                    // the implied escrow balance. Excess escrow goes to LP;
+                    // any remaining shortfall is recovered from paid GP carry.
                     let to_gp_paid = to_gp_gross * (1.0 - holdback_decimal);
                     gp_carry_cum += to_gp_gross;
                     remaining_amount -= to_gp_gross;
@@ -1098,128 +1167,45 @@ impl<'a> EquityWaterfallEngine<'a> {
         Ok(flows)
     }
 
-    /// Calculate the amount needed for preferred return using robust root finding.
-    ///
-    /// Returns the total LP amount required at `current_date` to achieve `target_irr`
-    /// given the LP-net cashflow history `lp_flows` (see
-    /// [`lp_net_history`](Self::lp_net_history)), **not yet accounting for**
-    /// same-date allocations from earlier tranches in the current distribution
-    /// call.  The call site subtracts that offset before capping against
-    /// `remaining_amount`, so the tier only allocates the incremental cash
-    /// still needed above what earlier tranches have already paid to the LP.
+    /// Additional receipt at `current_date` that makes the dated cashflows'
+    /// NPV zero at the contractual hurdle. At a fixed hurdle this is linear in
+    /// the additional amount; solving for an IRR first is unnecessary and can
+    /// select an unrelated root when a fund makes later capital calls.
     fn calculate_preferred_amount(
         &self,
         target_irr: f64,
         lp_flows: &[(Date, Money)],
         current_date: Date,
     ) -> finstack_quant_core::Result<f64> {
-        if lp_flows.is_empty() {
-            return Ok(0.0); // Need at least one prior flow (contribution)
+        if !target_irr.is_finite() || target_irr <= -1.0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "waterfall IRR hurdle must be finite and greater than -100%".into(),
+            ));
         }
-
-        // Current IRR without additional preferred return. An IRR-to-date can
-        // be legitimately *undefined* early in a fund's life — a single
-        // contribution (too few flows) or an all-negative history (no NPV
-        // sign change) — which is economically "below any hurdle", so the
-        // tier proceeds to solve for the required amount. The canonical
-        // `core::xirr` solver signals an absent sign change as
-        // `InputError::Invalid`; it, `TooFewPoints`, and `Validation` all map
-        // to "below hurdle" here. Genuine input errors (e.g. day-count
-        // failures) propagate instead of being silently treated as a 0% IRR.
-        let base_date = lp_flows[0].0;
-        let current_irr = match self.calculate_irr(lp_flows, base_date) {
-            Ok(irr) => irr,
-            Err(finstack_quant_core::Error::Input(
-                finstack_quant_core::InputError::TooFewPoints
-                | finstack_quant_core::InputError::Invalid,
-            ))
-            | Err(finstack_quant_core::Error::Validation(_)) => f64::NEG_INFINITY,
-            Err(e) => return Err(e),
+        let Some(base_date) = lp_flows.iter().map(|(date, _)| *date).min() else {
+            return Ok(0.0);
         };
-
-        if current_irr >= target_irr {
-            return Ok(0.0); // Already at or above target IRR
-        }
-
-        // Large finite penalty for invalid candidate amounts inside the Brent
-        // objective. `f64::INFINITY` poisons Brent's secant/inverse-quadratic
-        // interpolation steps (inf - inf = NaN); a large finite value keeps
-        // the bracket logic working while still repelling the solver.
-        const IRR_OBJECTIVE_PENALTY: f64 = 1.0e6;
-
-        // Use root finding to determine required additional distribution amount
-        let target_function = |additional_amount: f64| -> f64 {
-            if additional_amount < 0.0 {
-                return IRR_OBJECTIVE_PENALTY;
-            }
-
-            let mut flows_with_additional = lp_flows.to_vec();
-            // An unrepresentable candidate is outside the solver objective domain,
-            // like an invalid IRR; signal the existing finite objective penalty.
-            let Ok(additional) = Money::new(additional_amount, lp_flows[0].1.currency()) else {
-                return IRR_OBJECTIVE_PENALTY;
-            };
-            flows_with_additional.push((current_date, additional));
-
-            match self.calculate_irr(&flows_with_additional, base_date) {
-                Ok(irr) => irr - target_irr,
-                Err(_) => IRR_OBJECTIVE_PENALTY, // Invalid IRR
-            }
+        let elapsed = |date| {
+            self.spec.day_count.year_fraction(
+                base_date,
+                date,
+                finstack_quant_core::dates::DayCountContext::default(),
+            )
         };
-
-        let total_contributions: f64 = lp_flows
-            .iter()
-            .filter(|(_, amount)| amount.amount() < 0.0)
-            .map(|(_, amount)| amount.amount().abs())
-            .sum();
-
-        // f(0) = current_irr - target_irr < 0 (checked above) and f is
-        // increasing in the additional amount, so expand the upper bound
-        // until the target IRR is bracketed and solve in-bracket. (A plain
-        // guess-based solve fails for large funds: the guess can exceed the
-        // solver's default bracket-search bounds.)
-        let mut hi = total_contributions.max(1.0);
-        let mut f_hi = target_function(hi);
-        for _ in 0..60 {
-            if !f_hi.is_finite() || f_hi >= 0.0 {
-                break;
-            }
-            hi *= 2.0;
-            f_hi = target_function(hi);
+        let terminal_time = elapsed(current_date)?;
+        let mut future_value = 0.0;
+        for (date, amount) in lp_flows {
+            // Use one common anchor, matching the IRR convention even for
+            // day counts whose independently measured subperiods are not additive.
+            let years = terminal_time - elapsed(*date)?;
+            future_value += amount.amount() * (1.0 + target_irr).powf(years);
         }
-
-        let solver = BrentSolver::new().tolerance(1e-6);
-        let bracketed = if f_hi.is_finite() && f_hi >= 0.0 {
-            solver.solve_in_bracket(target_function, 0.0, hi)
-        } else {
-            Err(finstack_quant_core::InputError::Invalid.into())
-        };
-        match bracketed {
-            Ok(amount) => Ok(amount.max(0.0)),
-            Err(_) => {
-                // If root finding fails, try to estimate analytically
-                // For a simple case: if we have one contribution and want target IRR over time t,
-                // then: target_amount = contribution * (1 + target_irr)^t
-                if lp_flows.len() == 1 {
-                    let contrib_amount = lp_flows[0].1.amount().abs();
-                    // Day-count failures are real input errors; propagate
-                    // instead of silently assuming a 1-year horizon.
-                    let years = self.spec.day_count.year_fraction(
-                        base_date,
-                        current_date,
-                        finstack_quant_core::dates::DayCountContext::default(),
-                    )?;
-                    let required_total = contrib_amount * (1.0 + target_irr).powf(years);
-                    let already_received = total_contributions - contrib_amount; // Net distributions so far
-                    Ok((required_total - already_received).max(0.0))
-                } else {
-                    Err(finstack_quant_core::Error::Calibration {
-                        message: "Failed to solve for preferred return amount".into(),
-                        category: "Waterfall".into(),
-                    })
-                }
-            }
+        if !future_value.is_finite() {
+            return Err(finstack_quant_core::Error::Validation(
+                "waterfall hurdle cashflow accumulation is non-finite".into(),
+            ));
         }
+        Ok((-future_value).max(0.0))
     }
 
     /// Calculate IRR for LP cashflows.
@@ -1254,186 +1240,219 @@ impl<'a> EquityWaterfallEngine<'a> {
         self.calculate_irr(lp_flows, base_date).ok()
     }
 
-    /// GP entitlement as of `as_of` under the fund's actual waterfall
-    /// economics .
+    /// Reconcile lifetime tiers without moving historical LP receipt dates.
     ///
-    /// Replays a from-scratch waterfall over the fund's *lifetime* economics
-    /// to `as_of`: every contribution at its actual date (so IRR hurdles see
-    /// the true capital timing) plus one lump-sum distribution at `as_of`
-    /// equal to all distributions/proceeds to date. The replay runs with
-    /// clawback/holdback disabled at fund level (clawback is a fund-level
-    /// lifetime test, also for American deal-by-deal funds), and the gross GP
-    /// allocations are summed. This respects
-    /// [`CatchUpMode::Full`]/[`CatchUpMode::Partial`], the presence or
-    /// absence of a [`PeFundWaterfallTranche::CatchUp`] tranche, and promote-tier hurdles —
-    /// i.e. it equals "what a from-scratch waterfall would have paid the
-    /// GP", rather than `profit_total × first_promote_tier.gp_share` (which
-    /// over-releases to the GP under partial or missing catch-up).
+    /// A receipt is retained on its actual date and offset nominally at the
+    /// reconciliation date. Allocating total lifetime proceeds at that date then
+    /// changes only the final cumulative LP/GP split: all earlier LP cashflows
+    /// keep their original hurdle value. Capital, catch-up and promote amounts
+    /// still use lifetime nominal totals. The dated European replay caps the
+    /// entitlement so reconciliation cannot create carry absent from that
+    /// fund-level allocation (including partial or missing catch-up).
     fn allowed_gp_total_as_of(
         &self,
         events: &[FundEvent],
+        ledger_rows: &[AllocationRow],
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
-        let mut synthetic: Vec<FundEvent> = events
+        let history: Vec<FundEvent> = events
             .iter()
-            .filter(|e| e.kind == FundEventKind::Contribution && e.date <= as_of)
+            .filter(|event| event.date <= as_of)
             .cloned()
             .collect();
-
-        let total_distributions: f64 = events
+        let Some(currency) = history.first().map(|event| event.amount.currency()) else {
+            return Ok(0.0);
+        };
+        let total_distributions: f64 = history
             .iter()
-            .filter(|e| {
-                (e.kind == FundEventKind::Distribution || e.kind == FundEventKind::Proceeds)
-                    && e.date <= as_of
-            })
-            .map(|e| e.amount.amount())
+            .filter(|event| event.kind != FundEventKind::Contribution)
+            .map(|event| event.amount.amount())
             .sum();
         if total_distributions <= 0.0 {
             return Ok(0.0);
         }
+        let total_contributions: f64 = history
+            .iter()
+            .filter(|event| event.kind == FundEventKind::Contribution)
+            .map(|event| event.amount.amount())
+            .sum();
 
-        let Some(currency) = events.first().map(|e| e.amount.currency()) else {
-            return Ok(0.0);
-        };
-        synthetic.push(FundEvent::distribution(
-            as_of,
-            Money::new(total_distributions, currency)?,
-        ));
-
-        // Clawback disabled in the replay: no holdback (rows carry gross GP
-        // amounts) and no recursive settlement rows.
         let mut replay_spec = self.spec.clone();
         replay_spec.clawback = None;
         let replay_engine = EquityWaterfallEngine {
             spec: &replay_spec,
             periods: None,
         };
+        let mut chronological_rows = Vec::new();
+        replay_engine.run_european(&history, &mut chronological_rows)?;
+        let chronological_carry: f64 = chronological_rows
+            .iter()
+            .map(|row| row.to_gp.amount())
+            .sum();
 
-        let mut replay_rows = Vec::new();
-        replay_engine.run_european(&synthetic, &mut replay_rows)?;
-
-        Ok(replay_rows.iter().map(|r| r.to_gp.amount()).sum())
+        let mut timing_rows: Vec<AllocationRow> = ledger_rows
+            .iter()
+            .filter(|row| row.date <= as_of && row.to_lp.amount() != 0.0)
+            .cloned()
+            .collect();
+        if let Some(mut offset) = timing_rows.last().cloned() {
+            let receipts: f64 = timing_rows.iter().map(|row| row.to_lp.amount()).sum();
+            offset.date = as_of;
+            offset.to_lp = Money::new(-receipts, currency)?;
+            timing_rows.push(offset);
+        }
+        let reconciled = replay_engine.allocate_distribution(AllocationParams {
+            total_amount: Money::new(total_distributions, currency)?,
+            initial_lp_unreturned: total_contributions,
+            initial_gp_carry: 0.0,
+            lp_distributed_cum_before: 0.0,
+            all_events: &history,
+            prior_rows: &timing_rows,
+            allocation_date: as_of,
+            currency,
+        })?;
+        let reconciled_carry: f64 = reconciled.iter().map(|row| row.to_gp.amount()).sum();
+        Ok(reconciled_carry.min(chronological_carry).max(0.0))
     }
 
-    /// Apply clawback reconciliation.
-    fn apply_clawback(
+    /// Settle from existing escrow first, then recover overpaid carry from GP.
+    /// A positive GP release cannot exceed the cash actually held: this clause
+    /// does not authorize recalling distributions already paid to LPs.
+    fn settle_clawback_as_of(
         &self,
         events: &[FundEvent],
         ledger_rows: &mut Vec<AllocationRow>,
-        clawback_spec: &ClawbackSpec,
+        settlement_date: Date,
+        periodic: bool,
+        lp_unreturned: f64,
     ) -> finstack_quant_core::Result<()> {
-        let Some(last_event_date) = events.iter().map(|e| e.date).max() else {
+        let last_row = ledger_rows
+            .iter()
+            .enumerate()
+            .filter(|(_, row)| row.date <= settlement_date)
+            .max_by_key(|(index, row)| (row.date, *index))
+            .map(|(_, row)| row.clone());
+        let Some(last_row) = last_row else {
             return Ok(());
         };
-        let paid_gp_as_of = |rows: &[AllocationRow], as_of: Date| -> f64 {
-            rows.iter()
-                .filter(|r| r.date <= as_of)
-                .map(|r| r.to_gp.amount())
-                .sum()
-        };
-
-        if matches!(clawback_spec.settle_on, ClawbackSettle::Periodic) {
-            let periods = self
-                .periods
-                .as_ref()
-                .ok_or(finstack_quant_core::InputError::Invalid)?;
-
-            for period in periods {
-                let settlement_date = period.end - Duration::days(1);
-                // Skip periods that start after the last event
-                if period.start > last_event_date {
-                    continue;
-                }
-
-                // Skip if no events have occurred by the settlement date
-                if events.iter().all(|e| e.date > settlement_date) {
-                    continue;
-                }
-
-                let allowed_gp_total = self.allowed_gp_total_as_of(events, settlement_date)?;
-                let paid_gp_total = paid_gp_as_of(ledger_rows, settlement_date);
-
-                let delta_gp: f64 = allowed_gp_total - paid_gp_total;
-                if delta_gp.abs() <= 1e-9 {
-                    continue;
-                }
-
-                let last_row = ledger_rows
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, r)| r.date <= settlement_date)
-                    .max_by(|(idx_a, a), (idx_b, b)| match a.date.cmp(&b.date) {
-                        Ordering::Equal => idx_a.cmp(idx_b),
-                        other => other,
-                    })
-                    .map(|(_, row)| row.clone());
-
-                let Some(last_row) = last_row else {
-                    continue;
-                };
-
-                let currency = last_row.to_gp.currency();
-                let to_gp = Money::new(delta_gp, currency)?;
-                let to_lp = Money::new((-delta_gp).max(0.0), currency)?;
-
-                let settlement_row = AllocationRow {
-                    date: settlement_date,
-                    period_key: self.period_key_for(settlement_date).map(Arc::from),
-                    deal_id: None,
-                    tranche: Arc::from("Clawback Settlement (periodic)"),
-                    to_lp,
-                    to_gp,
-                    lp_unreturned: last_row.lp_unreturned,
-                    gp_carry_cum: Money::new(allowed_gp_total, currency)?,
-                    lp_irr_to_date: {
-                        let flows = self.lp_net_history(events, ledger_rows, settlement_date)?;
-                        self.calculate_lp_irr_to_date(&flows)
-                    },
-                    note: Some(Arc::from("Clawback settlement and holdback release")),
-                };
-
-                ledger_rows.push(settlement_row);
-            }
-
-            return Ok(());
-        }
-
-        let last_row = match ledger_rows.last() {
-            Some(r) => r.clone(),
-            None => return Ok(()),
-        };
-
-        let settlement_date = last_event_date;
-        let allowed_gp_total = self.allowed_gp_total_as_of(events, settlement_date)?;
-        let paid_gp_total = paid_gp_as_of(ledger_rows, settlement_date);
-        let delta_gp: f64 = allowed_gp_total - paid_gp_total;
-
-        if delta_gp.abs() <= 1e-9 {
-            return Ok(());
-        }
-
         let currency = last_row.to_gp.currency();
-        let to_gp = Money::new(delta_gp, currency)?;
-        let to_lp = Money::new((-delta_gp).max(0.0), currency)?;
-
+        let paid_lp: f64 = ledger_rows
+            .iter()
+            .filter(|row| row.date <= settlement_date)
+            .map(|row| row.to_lp.amount())
+            .sum();
+        let paid_gp: f64 = ledger_rows
+            .iter()
+            .filter(|row| row.date <= settlement_date)
+            .map(|row| row.to_gp.amount())
+            .sum();
+        let proceeds: f64 = events
+            .iter()
+            .filter(|event| {
+                event.date <= settlement_date && event.kind != FundEventKind::Contribution
+            })
+            .map(|event| event.amount.amount())
+            .sum();
+        let escrow = (proceeds - paid_lp - paid_gp).max(0.0);
+        let allowed_gp = self
+            .allowed_gp_total_as_of(events, ledger_rows, settlement_date)?
+            .min(paid_gp + escrow);
+        let delta_gp = allowed_gp - paid_gp;
+        let delta_lp = escrow - delta_gp;
+        if delta_gp.abs() <= 1e-9 && delta_lp.abs() <= 1e-9 {
+            return Ok(());
+        }
+        let mut flows = self.lp_net_history(events, ledger_rows, settlement_date)?;
+        flows.push((settlement_date, Money::new(delta_lp, currency)?));
         let settlement_row = AllocationRow {
             date: settlement_date,
             period_key: self.period_key_for(settlement_date).map(Arc::from),
             deal_id: None,
-            tranche: Arc::from("Clawback Settlement (fund_end)"),
-            to_lp,
-            to_gp,
-            lp_unreturned: last_row.lp_unreturned,
-            gp_carry_cum: Money::new(allowed_gp_total, currency)?,
-            lp_irr_to_date: {
-                let flows = self.lp_net_history(events, ledger_rows, settlement_date)?;
-                self.calculate_lp_irr_to_date(&flows)
-            },
-            note: Some(Arc::from("Clawback settlement and holdback release")),
+            tranche: Arc::from(if periodic {
+                "Clawback Settlement (periodic)"
+            } else {
+                "Clawback Settlement (fund_end)"
+            }),
+            to_lp: Money::new(delta_lp, currency)?,
+            to_gp: Money::new(delta_gp, currency)?,
+            lp_unreturned: Money::new((lp_unreturned - delta_lp).max(0.0), currency)?,
+            gp_carry_cum: Money::new(allowed_gp, currency)?,
+            lp_irr_to_date: self.calculate_lp_irr_to_date(&flows),
+            note: Some(Arc::from("Fund-level clawback and escrow release")),
         };
-
         ledger_rows.push(settlement_row);
+        Ok(())
+    }
 
+    /// Ordered period-end dates relevant to the actual event history.
+    fn periodic_settlement_dates(
+        &self,
+        events: &[FundEvent],
+    ) -> finstack_quant_core::Result<Vec<Date>> {
+        if !self
+            .spec
+            .clawback
+            .as_ref()
+            .is_some_and(|clawback| clawback.settle_on == ClawbackSettle::Periodic)
+        {
+            return Ok(Vec::new());
+        }
+        let Some(last_event_date) = events.last().map(|event| event.date) else {
+            return Ok(Vec::new());
+        };
+        let periods = self
+            .periods
+            .as_ref()
+            .ok_or(finstack_quant_core::InputError::Invalid)?;
+        let mut dates: Vec<Date> = periods
+            .iter()
+            .filter(|period| period.start <= last_event_date)
+            .map(|period| period.end - Duration::days(1))
+            .filter(|date| events.iter().any(|event| event.date <= *date))
+            .collect();
+        dates.sort_unstable();
+        dates.dedup();
+        Ok(dates)
+    }
+
+    /// American settlements remain fund-level cashflows; they cannot be assigned
+    /// to a specific deal without additional contractual attribution rules.
+    fn settle_american_period(
+        &self,
+        events: &[FundEvent],
+        ledger_rows: &mut Vec<AllocationRow>,
+        date: Date,
+        deal_capital: f64,
+        fund_capital_recovered: &mut f64,
+    ) -> finstack_quant_core::Result<()> {
+        let fund_capital = (deal_capital - *fund_capital_recovered).max(0.0);
+        let previous_count = ledger_rows.len();
+        self.settle_clawback_as_of(events, ledger_rows, date, true, fund_capital)?;
+        if ledger_rows.len() > previous_count {
+            if let Some(row) = ledger_rows.last() {
+                *fund_capital_recovered += (fund_capital - row.lp_unreturned.amount()).max(0.0);
+            }
+        }
+        Ok(())
+    }
+
+    /// Feed a completed settlement back into the next allocation's balances.
+    fn settle_european_period(
+        &self,
+        events: &[FundEvent],
+        ledger_rows: &mut Vec<AllocationRow>,
+        date: Date,
+        lp_unreturned: &mut f64,
+        gp_carry_cum: &mut f64,
+    ) -> finstack_quant_core::Result<()> {
+        let previous_count = ledger_rows.len();
+        self.settle_clawback_as_of(events, ledger_rows, date, true, *lp_unreturned)?;
+        if ledger_rows.len() > previous_count {
+            if let Some(row) = ledger_rows.last() {
+                *lp_unreturned = row.lp_unreturned.amount();
+                *gp_carry_cum = row.gp_carry_cum.amount();
+            }
+        }
         Ok(())
     }
 }
@@ -1999,6 +2018,395 @@ mod tests {
     }
 
     #[test]
+    fn clawback_preserves_early_return_dates_with_every_holdback() {
+        let events = vec![
+            FundEvent::contribution(
+                test_date(2020, 1, 1),
+                Money::from((1_000_000_i64, test_currency())),
+            ),
+            FundEvent::distribution(
+                test_date(2021, 1, 1),
+                Money::from((1_200_000_i64, test_currency())),
+            ),
+            FundEvent::distribution(
+                test_date(2025, 1, 1),
+                Money::from((100_000_i64, test_currency())),
+            ),
+        ];
+        for holdback in [0.0, 0.5, 1.0] {
+            for settle_on in [ClawbackSettle::FundEnd, ClawbackSettle::Periodic] {
+                let spec = PeFundWaterfallSpec::builder()
+                    .return_of_capital()
+                    .preferred_irr(0.08)
+                    .catch_up(1.0)
+                    .promote_tier(0.08, 0.8, 0.2)
+                    .clawback(ClawbackSpec {
+                        holdback_decimal: Some(holdback),
+                        settle_on,
+                    })
+                    .build()
+                    .expect("spec");
+                let ledger = EquityWaterfallEngine::new(&spec)
+                    .with_period_range("2020Q1..2025Q4", None)
+                    .expect("periods")
+                    .run(&events)
+                    .expect("dated reconciliation");
+                let gp: f64 = ledger.rows.iter().map(|row| row.to_gp.amount()).sum();
+                let lp: f64 = ledger.rows.iter().map(|row| row.to_lp.amount()).sum();
+                assert!(
+                    (gp - 60_000.0).abs() < 1e-6,
+                    "holdback={holdback} {settle_on:?}, gp={gp}"
+                );
+                assert!((lp - 1_240_000.0).abs() < 1e-6);
+                assert!(ledger
+                    .rows
+                    .iter()
+                    .filter(|row| row.tranche.contains("Clawback"))
+                    .all(|row| row.to_gp.amount() >= -1e-6));
+            }
+        }
+    }
+
+    #[test]
+    fn clawback_reconciles_later_capital_and_releases_escrow_to_lp() {
+        for later_capital in [40_i64, 90_i64] {
+            let events = vec![
+                FundEvent::contribution(
+                    test_date(2020, 1, 1),
+                    Money::from((100_i64, test_currency())),
+                ),
+                FundEvent::distribution(
+                    test_date(2021, 1, 1),
+                    Money::from((150_i64, test_currency())),
+                ),
+                FundEvent::contribution(
+                    test_date(2023, 1, 1),
+                    Money::from((later_capital, test_currency())),
+                ),
+            ];
+            let expected_gp = (50 - later_capital).max(0) as f64 * 0.2;
+            for holdback in [0.0, 0.5, 1.0] {
+                for settle_on in [ClawbackSettle::FundEnd, ClawbackSettle::Periodic] {
+                    let spec = PeFundWaterfallSpec::builder()
+                        .return_of_capital()
+                        .promote_tier(0.0, 0.8, 0.2)
+                        .clawback(ClawbackSpec {
+                            holdback_decimal: Some(holdback),
+                            settle_on,
+                        })
+                        .build()
+                        .expect("spec");
+                    let ledger = EquityWaterfallEngine::new(&spec)
+                        .with_period_range("2020Q1..2023Q4", None)
+                        .expect("periods")
+                        .run(&events)
+                        .expect("later-capital reconciliation");
+                    let gp: f64 = ledger.rows.iter().map(|row| row.to_gp.amount()).sum();
+                    let lp: f64 = ledger.rows.iter().map(|row| row.to_lp.amount()).sum();
+                    assert!(
+                        (gp - expected_gp).abs() < 1e-6,
+                        "capital={later_capital} holdback={holdback} {settle_on:?} gp={gp}"
+                    );
+                    assert!(
+                        (gp + lp - 150.0).abs() < 1e-6,
+                        "escrow must be fully allocated"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn dated_hurdle_uses_fixed_rate_npv_with_later_contributions() {
+        let spec = PeFundWaterfallSpec::builder()
+            .return_of_capital()
+            .promote_tier(0.08, 0.8, 0.2)
+            .build()
+            .expect("spec");
+        let start = test_date(2020, 1, 1);
+        let early = test_date(2021, 1, 1);
+        let later = test_date(2024, 1, 1);
+        let end = test_date(2025, 1, 1);
+        let flows = vec![
+            (start, Money::from((-100_i64, test_currency()))),
+            (early, Money::from((150_i64, test_currency()))),
+            (later, Money::from((-90_i64, test_currency()))),
+        ];
+        let t = |date: Date| (date - start).whole_days() as f64 / 365.0;
+        let expected = (100.0 * 1.08_f64.powf(t(end)) - 150.0 * 1.08_f64.powf(t(end) - t(early))
+            + 90.0 * 1.08_f64.powf(t(end) - t(later)))
+        .max(0.0);
+        let actual = EquityWaterfallEngine::new(&spec)
+            .calculate_preferred_amount(0.08, &flows, end)
+            .expect("fixed hurdle has a unique additional-payment solution");
+        assert!((actual - expected).abs() < 1e-12);
+    }
+
+    #[test]
+    fn clawback_preserves_dated_partial_capital_and_catchup_modes() {
+        let events = vec![
+            FundEvent::contribution(
+                test_date(2020, 1, 1),
+                Money::from((100_i64, test_currency())),
+            ),
+            FundEvent::distribution(
+                test_date(2021, 1, 1),
+                Money::from((50_i64, test_currency())),
+            ),
+            FundEvent::contribution(
+                test_date(2022, 1, 1),
+                Money::from((20_i64, test_currency())),
+            ),
+            FundEvent::distribution(
+                test_date(2023, 1, 1),
+                Money::from((150_i64, test_currency())),
+            ),
+        ];
+        for mode in [None, Some(CatchUpMode::Partial), Some(CatchUpMode::Full)] {
+            let mut builder = PeFundWaterfallSpec::builder()
+                .return_of_capital()
+                .preferred_irr(0.08);
+            if let Some(mode) = mode {
+                builder = builder.catch_up(0.5).catch_up_mode(mode);
+            }
+            let plain = builder.promote_tier(0.08, 0.8, 0.2).build().expect("spec");
+            let baseline = EquityWaterfallEngine::new(&plain)
+                .run(&events)
+                .expect("dated allocations");
+            let expected_gp: f64 = baseline.rows.iter().map(|row| row.to_gp.amount()).sum();
+            for holdback in [0.0, 0.5, 1.0] {
+                let mut reconciled = plain.clone();
+                reconciled.clawback = Some(ClawbackSpec {
+                    holdback_decimal: Some(holdback),
+                    settle_on: ClawbackSettle::FundEnd,
+                });
+                let ledger = EquityWaterfallEngine::new(&reconciled)
+                    .run(&events)
+                    .expect("reconciled allocations");
+                let gp: f64 = ledger.rows.iter().map(|row| row.to_gp.amount()).sum();
+                let lp: f64 = ledger.rows.iter().map(|row| row.to_lp.amount()).sum();
+                assert!(
+                    (gp - expected_gp).abs() < 1e-6,
+                    "mode={mode:?} holdback={holdback}, gp={gp}, expected={expected_gp}"
+                );
+                assert!((gp + lp - 200.0).abs() < 1e-6);
+            }
+        }
+    }
+
+    #[test]
+    fn american_deal_carry_is_reconciled_against_whole_fund_capital() {
+        let spec = PeFundWaterfallSpec::builder()
+            .style(WaterfallStyle::American)
+            .return_of_capital()
+            .promote_tier(0.0, 0.8, 0.2)
+            .clawback(ClawbackSpec {
+                holdback_decimal: Some(0.5),
+                settle_on: ClawbackSettle::FundEnd,
+            })
+            .build()
+            .expect("spec");
+        let events = vec![
+            FundEvent::contribution(
+                test_date(2020, 1, 1),
+                Money::from((100_i64, test_currency())),
+            )
+            .with_deal_id("A"),
+            FundEvent::distribution(
+                test_date(2021, 1, 1),
+                Money::from((150_i64, test_currency())),
+            )
+            .with_deal_id("A"),
+            FundEvent::contribution(
+                test_date(2023, 1, 1),
+                Money::from((90_i64, test_currency())),
+            )
+            .with_deal_id("B"),
+        ];
+        let ledger = EquityWaterfallEngine::new(&spec)
+            .run(&events)
+            .expect("deal allocation and fund clawback");
+        assert!(ledger
+            .rows
+            .iter()
+            .any(|row| row.deal_id.as_deref() == Some("A") && row.to_gp.amount() > 0.0));
+        let gp: f64 = ledger.rows.iter().map(|row| row.to_gp.amount()).sum();
+        let lp: f64 = ledger.rows.iter().map(|row| row.to_lp.amount()).sum();
+        assert!(gp.abs() < 1e-12);
+        assert!((lp - 150.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn periodic_clawback_updates_european_catchup_before_later_distributions() {
+        let events = vec![
+            FundEvent::contribution(
+                test_date(2020, 1, 1),
+                Money::from((100_i64, test_currency())),
+            ),
+            FundEvent::distribution(
+                test_date(2021, 1, 1),
+                Money::from((150_i64, test_currency())),
+            ),
+            FundEvent::contribution(
+                test_date(2022, 1, 1),
+                Money::from((90_i64, test_currency())),
+            ),
+            FundEvent::distribution(
+                test_date(2023, 1, 1),
+                Money::from((100_i64, test_currency())),
+            ),
+        ];
+        for holdback in [0.0, 0.5, 1.0] {
+            let spec = PeFundWaterfallSpec::builder()
+                .return_of_capital()
+                .catch_up(1.0)
+                .promote_tier(0.0, 0.8, 0.2)
+                .clawback(ClawbackSpec {
+                    holdback_decimal: Some(holdback),
+                    settle_on: ClawbackSettle::Periodic,
+                })
+                .build()
+                .expect("spec");
+            let ledger = EquityWaterfallEngine::new(&spec)
+                .with_period_range("2020Q1..2023Q4", None)
+                .expect("periods")
+                .run(&events)
+                .expect("chronological periodic settlement");
+            let gp: f64 = ledger.rows.iter().map(|row| row.to_gp.amount()).sum();
+            let lp: f64 = ledger.rows.iter().map(|row| row.to_lp.amount()).sum();
+            assert!(
+                (gp - 12.0).abs() < 1e-9,
+                "holdback={holdback}, cumulative GP={gp}"
+            );
+            assert!((lp - 238.0).abs() < 1e-9);
+            let recovery = ledger
+                .rows
+                .iter()
+                .find(|row| row.to_gp.amount() < -1e-9)
+                .expect("intermediate clawback");
+            assert!((recovery.to_gp.amount() + 10.0).abs() < 1e-9);
+            assert!((recovery.lp_unreturned.amount()-80.0).abs() < 1e-9,
+                "recovering 10 reduces the new 90 of capital to 80; old LP profits are not capital returns");
+            assert!(ledger
+                .rows
+                .windows(2)
+                .all(|pair| pair[0].date <= pair[1].date));
+        }
+    }
+
+    #[test]
+    fn american_periodic_clawback_does_not_reinstate_individual_deal_carry() {
+        let events = vec![
+            FundEvent::contribution(
+                test_date(2020, 1, 1),
+                Money::from((100_i64, test_currency())),
+            )
+            .with_deal_id("A"),
+            FundEvent::distribution(
+                test_date(2021, 1, 1),
+                Money::from((150_i64, test_currency())),
+            )
+            .with_deal_id("A"),
+            FundEvent::contribution(
+                test_date(2022, 1, 1),
+                Money::from((90_i64, test_currency())),
+            )
+            .with_deal_id("B"),
+            FundEvent::distribution(
+                test_date(2023, 1, 1),
+                Money::from((100_i64, test_currency())),
+            )
+            .with_deal_id("B"),
+        ];
+        let spec = PeFundWaterfallSpec::builder()
+            .style(WaterfallStyle::American)
+            .return_of_capital()
+            .catch_up(1.0)
+            .promote_tier(0.0, 0.8, 0.2)
+            .clawback(ClawbackSpec {
+                holdback_decimal: None,
+                settle_on: ClawbackSettle::Periodic,
+            })
+            .build()
+            .expect("spec");
+        let ledger = EquityWaterfallEngine::new(&spec)
+            .with_period_range("2020Q1..2023Q4", None)
+            .expect("periods")
+            .run(&events)
+            .expect("fund settlement with separate deal states");
+        let b_carry: f64 = ledger
+            .rows
+            .iter()
+            .filter(|row| row.deal_id.as_deref() == Some("B"))
+            .map(|row| row.to_gp.amount())
+            .sum();
+        assert!(
+            (b_carry - 2.0).abs() < 1e-9,
+            "B's 10 profit generates 2 carry; A's recovered carry is not reassigned to B"
+        );
+        let gp: f64 = ledger.rows.iter().map(|row| row.to_gp.amount()).sum();
+        let lp: f64 = ledger.rows.iter().map(|row| row.to_lp.amount()).sum();
+        assert!((gp - 2.0).abs() < 1e-9);
+        assert!((gp + lp - 250.0).abs() < 1e-9);
+        assert!(ledger
+            .rows
+            .windows(2)
+            .all(|pair| pair[0].date <= pair[1].date));
+    }
+
+    #[test]
+    fn american_fund_capital_recovery_does_not_reduce_a_later_new_deal() {
+        let contribution = |year, amount, deal| {
+            FundEvent::contribution(
+                test_date(year, 1, 1),
+                Money::from((amount, test_currency())),
+            )
+            .with_deal_id(deal)
+        };
+        let distribution = |year, month, amount, deal| {
+            FundEvent::distribution(
+                test_date(year, month, 1),
+                Money::from((amount, test_currency())),
+            )
+            .with_deal_id(deal)
+        };
+        let events = vec![
+            contribution(2020, 100_i64, "A"),
+            distribution(2021, 1, 150_i64, "A"),
+            contribution(2022, 90_i64, "B"),
+            distribution(2023, 1, 90_i64, "B"),
+            contribution(2024, 100_i64, "C"),
+            distribution(2024, 4, 10_i64, "A"),
+        ];
+        let spec = PeFundWaterfallSpec::builder()
+            .style(WaterfallStyle::American)
+            .return_of_capital()
+            .catch_up(1.0)
+            .promote_tier(0.0, 0.8, 0.2)
+            .clawback(ClawbackSpec {
+                holdback_decimal: None,
+                settle_on: ClawbackSettle::Periodic,
+            })
+            .build()
+            .expect("spec");
+        let ledger = EquityWaterfallEngine::new(&spec)
+            .with_period_range("2020Q1..2024Q4", None)
+            .expect("periods")
+            .run(&events)
+            .expect("capital recovery chronology");
+        let final_settlement = ledger
+            .rows
+            .iter()
+            .rev()
+            .find(|row| row.tranche.contains("Clawback Settlement"))
+            .expect("settlement");
+        assert_eq!(final_settlement.date, test_date(2024, 6, 30));
+        assert!((final_settlement.to_gp.amount() + 2.0).abs() < 1e-9);
+        assert!((final_settlement.lp_unreturned.amount()-98.0).abs() < 1e-9,
+            "C's new 100 capital is reduced only by its current 2 fund recovery; the old 10 credit expired with B's capital");
+    }
+
+    #[test]
     fn clawback_fund_end_overdistribution() {
         let claw = ClawbackSpec {
             holdback_decimal: None,
@@ -2425,7 +2833,7 @@ mod tests {
     #[test]
     fn non_finite_preferred_irr_rejected_at_build() {
         // Bad hurdle inputs must fail loudly at construction, not mid-solve.
-        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -1.0, -1.1] {
             let result = PeFundWaterfallSpec::builder().preferred_irr(bad).build();
             assert!(
                 matches!(result, Err(finstack_quant_core::Error::Validation(_))),

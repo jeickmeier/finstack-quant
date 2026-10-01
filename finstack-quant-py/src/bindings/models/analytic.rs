@@ -11,9 +11,10 @@
 //! - `vol` is annualized lognormal volatility (decimal); `normal_vol` is an
 //!   absolute (Bachelier) volatility in the units of the forward.
 //! - `expiry` is time to expiry in years.
-//! - Greeks use the canonical Rust scaling: `vega` and `rho_*` are per-1% move,
-//!   `theta` is per day under ACT/365 (use 252 day-count via `theta_days_per_year` if you
-//!   want a business-day convention).
+//! - Black-Scholes Greeks use canonical Rust scaling: `vega` and `rho_*` are
+//!   per-1% move and `theta` is per day under ACT/365 (or 252 via
+//!   `theta_days_per_year`). Forward-option Greeks are undiscounted and their
+//!   `vega` is per unit volatility change.
 
 use crate::bindings::pandas_utils::{
     labeled_values_to_series, serde_object_to_single_row_dataframe,

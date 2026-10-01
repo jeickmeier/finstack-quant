@@ -43,6 +43,7 @@ pub struct DiscountCurveBuilder {
     pub(super) rate_calibration: Option<super::super::RateCalibrationRecipe>,
     pub(super) calibration_ois_cutoff_days: Option<i32>,
     pub(super) fx_policy: Option<String>,
+    pub(super) transform: Option<super::evaluation::CurveTransform>,
 }
 
 impl DiscountCurveBuilder {
@@ -213,6 +214,9 @@ impl DiscountCurveBuilder {
     #[doc(hidden)]
     pub fn build_for_solver(mut self) -> crate::Result<DiscountCurve> {
         let base = self.base.ok_or(crate::error::InputError::Invalid)?;
+        if self.points.first().is_some_and(|&(time, _)| time > 0.0) {
+            self.points.insert(0, (0.0, 1.0));
+        }
         if self.points.len() < 2 {
             return Err(crate::error::InputError::TooFewPoints.into());
         }
@@ -220,6 +224,8 @@ impl DiscountCurveBuilder {
         if self.points.iter().any(|&(_, df)| df <= 0.0) {
             return Err(crate::error::InputError::NonPositiveValue.into());
         }
+
+        validate_origin(&self.points)?;
 
         let (knots, dfs) = split_points(std::mem::take(&mut self.points));
         self.finish(base, knots, dfs)
@@ -229,6 +235,8 @@ impl DiscountCurveBuilder {
     ///
     /// If the first knot time is `> 0.0`, automatically prepends `(0.0, 1.0)` to
     /// ensure the round-trip invariant `DF(0) = 1.0` (ISDA/QuantLib standard).
+    /// An explicitly supplied zero-time discount factor must equal one, and
+    /// negative maturity times are rejected.
     ///
     /// # Errors
     ///
@@ -241,7 +249,7 @@ impl DiscountCurveBuilder {
         if !self.points.is_empty() {
             self.points.sort_by(|a, b| a.0.total_cmp(&b.0));
             let first_t = self.points[0].0;
-            if first_t > 1e-14 {
+            if first_t > 0.0 {
                 self.points.insert(0, (0.0, 1.0));
             }
         }
@@ -252,6 +260,7 @@ impl DiscountCurveBuilder {
         if self.points.iter().any(|&(_, df)| df <= 0.0) {
             return Err(crate::error::InputError::NonPositiveValue.into());
         }
+        validate_origin(&self.points)?;
 
         let (knots_vec, dfs_vec): (Vec<f64>, Vec<f64>) =
             split_points(std::mem::take(&mut self.points));
@@ -280,13 +289,14 @@ impl DiscountCurveBuilder {
             true,
         )?;
 
-        Ok(DiscountCurve {
+        let mut curve = DiscountCurve {
             id: self.id,
             base,
             day_count: self.day_count,
             knots,
             dfs,
             interp,
+            transform: None,
             style: self.style,
             extrapolation: self.extrapolation,
             min_forward_rate: self.min_forward_rate,
@@ -295,6 +305,30 @@ impl DiscountCurveBuilder {
             rate_calibration: self.rate_calibration,
             calibration_ois_cutoff_days: self.calibration_ois_cutoff_days,
             fx_policy: self.fx_policy,
-        })
+        };
+        if let Some(transform) = self.transform {
+            curve.restore_transform(transform)?;
+        }
+        Ok(curve)
     }
+}
+
+fn validate_origin(points: &[(f64, f64)]) -> crate::Result<()> {
+    if points
+        .iter()
+        .any(|&(time, _)| !time.is_finite() || time < 0.0)
+    {
+        return Err(crate::Error::Validation(
+            "discount-curve times must be finite and non-negative".into(),
+        ));
+    }
+    if points
+        .first()
+        .is_none_or(|&(time, df)| time != 0.0 || !df.total_cmp(&1.0).is_eq())
+    {
+        return Err(crate::Error::Validation(
+            "discount curve must start at (time = 0, discount factor = 1)".into(),
+        ));
+    }
+    Ok(())
 }

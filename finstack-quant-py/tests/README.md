@@ -63,7 +63,7 @@ Roughly one module per binding area. The recurring groups:
 | `test_structured_credit_bindings`, `test_recovery_waterfall`, `test_envelope_diagnostics` | tranche analytics, recovery waterfalls, calibration-envelope diagnostics |
 | `test_reporting_*` | the pure-Python `finstack_quant.reporting` presentation layer |
 | `test_*_dataframes`, `test_leaf_dataframes`, `test_to_arrow_producers`, `test_arrow_interchange` | pandas/Arrow exits from result wrappers |
-| `test_namespace`, `test_schema_access`, `test_schema_registry` | package topology, `__all__`, and the compiled `finstack_quant.schema` mirror |
+| `test_namespace`, `test_schema_access`, `test_schema_registry` | package topology, `__all__`, and the per-domain `finstack_quant.<domain>.schema` and workspace-wide `finstack_quant.schema` registries |
 | `test_error_handling`, `test_error_hierarchy` | Rust error → Python exception mapping |
 | `test_pickle_roundtrip`, `test_empty_frame_dtypes` | wrapper pickling and empty-frame dtype stability |
 | `test_binding_ergonomics`, `test_binding_audit_fixes` | cross-cutting quant-facing contracts, and regression pins from the binding audit |

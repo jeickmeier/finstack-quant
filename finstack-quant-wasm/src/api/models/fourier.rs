@@ -29,14 +29,16 @@ use wasm_bindgen::prelude::*;
 /// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%; must be positive.
 /// @param expiry - Time to option expiry in years.
 /// @param is_call - Whether to value a call (`true`) or put (`false`).
-/// @param n_terms - Optional number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
+/// @param n_terms - Optional positive integer number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
 ///
 /// # Errors
 ///
-/// Throws a `validation` error if `nTerms` is outside `1..=65536` or `vol` is
-/// not positive, and a `computation` error if the model produces a degenerate
-/// or invalid COS truncation range, a non-finite characteristic-function value
-/// or forward moment, or a non-finite option price.
+/// Throws if spot, strike, expiry, or volatility is not finite and positive,
+/// or rates/carry are non-finite. Throws a `validation` error if `nTerms` is
+/// outside `1..=65536` or `vol` is not positive, and a `computation` error if
+/// the model produces a degenerate or invalid COS truncation range, a
+/// non-finite characteristic-function value or forward moment, or a
+/// non-finite option price.
 #[wasm_bindgen(js_name = bsCosPrice)]
 #[allow(clippy::too_many_arguments)]
 pub fn bs_cos_price(
@@ -78,15 +80,17 @@ pub fn bs_cos_price(
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
 /// @param div_yield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
-/// @param sigma - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
-/// @param theta - Variance-Gamma drift parameter controlling skew in log returns.
-/// @param nu - Variance-Gamma variance-rate parameter; larger values increase tail thickness.
+/// @param sigma - Positive finite volatility of the subordinated Brownian motion, as a decimal.
+/// @param theta - Finite annual log-return drift of the subordinated Brownian motion; its sign controls skew.
+/// @param nu - Positive finite variance rate of the Gamma time change, in years; larger values increase tail thickness.
 /// @param expiry - Time to option expiry in years.
 /// @param is_call - Whether to value a call (`true`) or put (`false`).
-/// @param n_terms - Optional number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
+/// @param n_terms - Optional positive integer number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
 ///
 /// # Errors
 ///
+/// Throws if spot, strike, expiry, sigma, or nu is not finite and positive,
+/// rates/carry/theta are non-finite, or the VG martingale condition fails.
 /// Throws a `validation` error if `nTerms` is outside `1..=65536`, and a
 /// `computation` error if the model produces a degenerate or invalid COS
 /// truncation range, a non-finite characteristic-function value or forward
@@ -144,12 +148,15 @@ pub fn vg_cos_price(
 /// @param lambda - Annual jump-arrival intensity in the Merton jump-diffusion model.
 /// @param expiry - Time to option expiry in years.
 /// @param is_call - Whether to value a call (`true`) or put (`false`).
-/// @param n_terms - Optional number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
+/// @param n_terms - Optional positive integer number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
 ///
 /// # Errors
 ///
-/// Throws a `validation` error if `nTerms` is outside `1..=65536`, and a
-/// `computation` error if the model produces a degenerate or invalid COS
+/// Throws if spot, strike, or expiry is not finite and positive, rates/carry
+/// or log-jump mean are non-finite, volatility/intensity is negative or
+/// non-finite, or the jump compensator overflows. Throws a `validation` error
+/// if `nTerms` is outside `1..=65536`, and a `computation` error if the model
+/// produces a degenerate or invalid COS
 /// truncation range, a non-finite characteristic-function value or forward
 /// moment, or a non-finite option price.
 #[wasm_bindgen(js_name = mertonJumpCosPrice)]

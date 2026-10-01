@@ -87,8 +87,9 @@ def statement_result_schema() -> str:
     """
     Return the JSON Schema for a serialized ``StatementResult``.
 
-    This is the shape of an evaluated model: per-period node values plus the
-    numeric mode and rounding context stamped into the result envelope.
+    This describes per-period node values and execution statistics: numeric
+    mode, node and period counts, optional elapsed time, parallel execution,
+    and evaluation warnings. Monetary node maps retain amounts and currencies.
 
     Returns
     -------

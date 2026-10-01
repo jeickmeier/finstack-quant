@@ -541,6 +541,21 @@ class ScorecardMetric:
         This accessor does not raise; it returns the stored value.
         """
         ...
+    @property
+    def thresholds(self) -> dict[str, tuple[float, float]]:
+        """
+        Return a copy of the rating thresholds ordered by rating label.
+
+        This property does not raise. Mutating the returned dictionary does
+        not change the metric's stored thresholds.
+
+        Returns
+        -------
+        dict[str, tuple[float, float]]
+            Rating labels mapped to lower and upper bounds in the units of
+            the metric formula; an empty dictionary when no bands are configured.
+        """
+        ...
     def thresholds_json(self) -> str:
         """
         Serialize rating-label thresholds to JSON.
@@ -857,6 +872,27 @@ class ScorecardReport:
         Notes
         -----
         This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def data(self) -> dict[str, Any]:
+        """
+        Return the structured report payload as a Python dictionary.
+
+        The dictionary is reconstructed from canonical JSON, so mutations to
+        it do not modify the report. An absent payload is an empty dictionary.
+
+        Returns
+        -------
+        dict[str, Any]
+            A copy of the scorecard payload with the rated ``period``, metric
+            scores, rating, ``partial`` flag and ``weight_coverage``. Missing
+            payload fields remain absent; JSON null values become ``None``.
+
+        Raises
+        ------
+        ValueError
+            If the payload cannot be converted through canonical JSON.
         """
         ...
     def data_json(self) -> str:
@@ -1529,6 +1565,27 @@ class CorkscrewReport:
         Notes
         -----
         This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def data(self) -> dict[str, Any]:
+        """
+        Return the structured report payload as a Python dictionary.
+
+        The dictionary is reconstructed from canonical JSON, so mutations to
+        it do not modify the report. An absent payload is an empty dictionary.
+
+        Returns
+        -------
+        dict[str, Any]
+            A copy of the reconciliation payload with per-account validation
+            status, periods checked and maximum absolute error. Missing payload
+            fields remain absent; JSON null values become ``None``.
+
+        Raises
+        ------
+        ValueError
+            If the payload cannot be converted through canonical JSON.
         """
         ...
     def data_json(self) -> str:
@@ -4143,6 +4200,13 @@ class CreditAssessment:
     """Structured credit assessment: leverage, coverage and free cash flow at a
     period plus the ascending per-period series.
 
+    Ratios are ``None`` when their inputs have mixed scalar/money
+    representations, different currencies, or non-finite arithmetic.
+    Trailing-year ratios require all annual, semiannual, quarterly or monthly
+    periods, including fiscal periods, or the complete Gregorian daily year
+    ending after the assessment date. Weekly and fiscal-daily ratios are
+    unavailable because the result does not contain their date calendar.
+
     Examples
     --------
     >>> from finstack_quant.statements_analytics import CreditAssessment
@@ -5375,14 +5439,12 @@ class Exposure:
     """
     A single credit exposure at a reporting date.
 
-    Wraps the Rust ``Exposure`` and carries the two lifetime PDs the
+    Wraps the Rust ``Exposure`` and carries the two remaining-window PDs the
     simplified SICR test compares. ``classify_stage`` reads days past due,
     qualitative flags, rating labels, previous stage and performing periods
     (``ead``, ``lgd`` and ``eir`` do not affect staging); ``compute_ecl`` prices
     ``ead + undrawn * ccf`` with ``lgd``, ``eir``, ``remaining_maturity`` and
     any ``ead_schedule``.
-
-    The constructor stores the supplied values and does not raise.
 
     Parameters
     ----------
@@ -5400,9 +5462,14 @@ class Exposure:
     remaining_maturity : float
         Remaining maturity in years.
     current_pd : float
-        Current lifetime probability of default as a decimal in ``[0, 1]``.
+        Current probability of default from reporting over
+        ``h = min(remaining_maturity, 30.0)`` years, as a decimal in ``[0, 1]``.
     origination_pd : float
-        Lifetime probability of default at initial recognition, decimal.
+        Initial-recognition expected PD for that same remaining window,
+        conditional on survival to the reporting date, as a decimal in ``[0, 1]``.
+        For original cumulative curve ``F``, elapsed years ``a`` and the capped
+        horizon ``h = min(remaining_maturity, 30.0)``, supply
+        ``(F(a + h) - F(a)) / (1 - F(a))``.
     dpd : int
         Days past due. Default ``0``.
     undrawn : float
@@ -5419,13 +5486,21 @@ class Exposure:
         SICR and default-evidence flags. Default: no flags.
     previous_stage : Stage | str | None
         Stage assigned at the previous reporting date, enabling the curing
-        rules. Default ``None``.
+        rules. Accepts a ``Stage`` or ``"stage1"``, ``"stage2"``, or
+        ``"stage3"``. Default ``None``.
     consecutive_performing_periods : int
         Performing periods since the last trigger, for curing. Default ``0``.
     ead_schedule : list[tuple[float, float]] | None
         Optional EAD amortisation profile as ``(time_years, ead)`` knots.
     segments : list[str] | None
         Portfolio segment keys. Default ``[]``.
+
+    Raises
+    ------
+    ValueError
+        If a non-``None`` ``previous_stage`` is neither a ``Stage`` nor a
+        recognized stage string. Financial inputs are validated by staging and
+        ECL calculations.
 
     Examples
     --------
@@ -5453,6 +5528,57 @@ class Exposure:
         ead_schedule: list[tuple[float, float]] | None = None,
         segments: list[str] | None = None,
     ) -> None: ...
+    @property
+    def current_pd(self) -> float:
+        """Current reporting-date PD over the capped SICR window.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            Decimal probability in ``[0, 1]`` over
+            ``min(remaining_maturity, 30.0)`` years, covering the same window
+            as ``origination_pd``; validated when staging runs.
+        """
+    @current_pd.setter
+    def current_pd(self, value: float) -> None:
+        """Replace the current PD used by subsequent staging calls.
+
+        Parameters
+        ----------
+        value : float
+            Decimal PD from reporting over ``min(remaining_maturity, 30.0)`` years.
+            Staging rejects non-finite values or probabilities outside ``[0, 1]``.
+
+        This setter stores the value, does not raise, and leaves validation to staging.
+        """
+    @property
+    def origination_pd(self) -> float:
+        """Initial-recognition expected PD for the same capped SICR window.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            Decimal PD conditional on survival to reporting. For original
+            cumulative curve ``F``, age ``a`` and
+            ``h = min(remaining_maturity, 30.0)``, this is
+            ``(F(a + h) - F(a)) / (1 - F(a))``.
+        """
+    @origination_pd.setter
+    def origination_pd(self, value: float) -> None:
+        """Replace the original expected PD used by subsequent staging calls.
+
+        Parameters
+        ----------
+        value : float
+            Decimal PD over the same capped SICR window as ``current_pd``,
+            conditional on survival to reporting, in ``[0, 1]``.
+
+        This setter stores the value, does not raise, and leaves validation to staging.
+        """
     @property
     def id(self) -> str:
         """
@@ -5680,17 +5806,17 @@ class ForecastMetrics:
             Mean absolute error in data units.
         """
     @property
-    def mape(self) -> float:
+    def mape(self) -> float | None:
         """
-                Mean absolute percentage error in percent (``5.0`` = 5%); ``NaN``
-        when every actual is zero.
+        Mean absolute percentage error in percent (``5.0`` = 5%).
 
-                This property does not raise.
+        This property does not raise.
 
-                Returns
-                -------
-                float
-                    Mean absolute percentage error in percent (``5.0`` = 5%); ``NaN`` when every actual is zero.
+        Returns
+        -------
+        float | None
+            Percentage error, excluding absolute actuals below ``1e-10``;
+            ``None`` when no actual contributes to MAPE.
         """
     @property
     def mape_effective_n(self) -> int:
@@ -5705,7 +5831,7 @@ class ForecastMetrics:
             Number of observations with a non-zero actual used by ``mape``.
         """
     @property
-    def smape(self) -> float:
+    def smape(self) -> float | None:
         """
         Symmetric MAPE in percent.
 
@@ -5713,8 +5839,9 @@ class ForecastMetrics:
 
         Returns
         -------
-        float
-            Symmetric MAPE in percent.
+        float | None
+            Symmetric MAPE in percent, or ``None`` when every denominator
+            ``(abs(actual) + abs(forecast)) / 2`` is below ``1e-10``.
         """
     @property
     def rmse(self) -> float:
@@ -5751,17 +5878,19 @@ class ForecastMetrics:
         str
             One-line human-readable summary (Rust ``ForecastMetrics::summary``).
         """
-    def to_series(self) -> pd.DataFrame:
+    def to_series(self) -> pd.Series:
         """
         Export as a pandas ``Series`` indexed by metric name.
 
         Index: ``mae``, ``mape``, ``mape_effective_n``, ``smape``, ``rmse``,
-        ``n``; counts are cast to float.
+        ``n``; counts are cast to float and unavailable percentages become
+        pandas ``NaN``.
 
         Returns
         -------
-        pd.DataFrame
-            Export as a pandas ``Series`` indexed by metric name. Index: ``mae``, ``mape``, ``mape_effective_n``, ``smape``, ``rmse``, ``n``; counts are cast to float.
+        pd.Series
+            Metrics indexed by name, with counts cast to float and unavailable
+            percentages represented as pandas ``NaN``.
 
         Raises
         ------
@@ -6767,9 +6896,7 @@ class PeerSet:
         ValueError: ...
         """
     @staticmethod
-    def from_dataframe(
-        df: Any, subject_id: str, period_basis: str = "ltm", id_column: str | None = None
-    ) -> pd.DataFrame:
+    def from_dataframe(df: Any, subject_id: str, period_basis: str = "ltm", id_column: str | None = None) -> PeerSet:
         """
         Build a peer set from a pandas ``DataFrame`` (rows = companies).
 
@@ -6789,8 +6916,8 @@ class PeerSet:
 
         Returns
         -------
-        pd.DataFrame
-            Build a peer set from a pandas ``DataFrame`` (rows = companies).
+        PeerSet
+            The selected subject and every other company row as its peers.
 
         Raises
         ------
@@ -6801,10 +6928,11 @@ class PeerSet:
 
         Examples
         --------
+        >>> import pandas as pd
         >>> from finstack_quant.statements_analytics import PeerSet
-        >>> PeerSet.from_dataframe("{}", "subject")
-        Traceback (most recent call last):
-        AttributeError: ...
+        >>> frame = pd.DataFrame({"id": ["SUBJ", "PEER"], "leverage": [3.0, 2.0]})
+        >>> PeerSet.from_dataframe(frame, "SUBJ", id_column="id").peer_count
+        1
         """
     @property
     def subject(self) -> CompanyMetrics:
@@ -7436,7 +7564,10 @@ class RelativeValueResult:
     ...     ScoringDimension,
     ...     score_relative_value,
     ... )
-    >>> peers = [CompanyMetrics(f"P{i}", {"leverage": float(i), "oas_bp": 100.0 * i}) for i in (1, 2, 3)]
+    >>> peers = [
+    ...     CompanyMetrics(f"P{i}", {"leverage": float(i), "oas_bp": spread})
+    ...     for i, spread in ((1, 100.0), (2, 210.0), (3, 300.0))
+    ... ]
     >>> peer_set = PeerSet(CompanyMetrics("SUBJ", {"leverage": 2.0, "oas_bp": 250.0}), peers)
     >>> result = score_relative_value(peer_set, [ScoringDimension("Spread vs Leverage", "oas_bp", "leverage")])
     >>> result.company_id, result.peer_count
@@ -7932,7 +8063,9 @@ class ScoringDimension:
         Optional explanatory metric in the same notation. ``None`` (default)
         scores the dependent metric against its peer distribution.
     weight : float
-        Weight in the composite score. Default ``1.0``.
+        Finite non-negative relative weight in the composite score. Default
+        ``1.0``; zero disables the dimension. Positive weights are normalized
+        over usable dimensions.
     direction : str
         ``"higher_is_cheap"`` (spread-like, default) or ``"higher_is_rich"``
         (multiple-like).
@@ -8285,14 +8418,15 @@ class SensitivityResult:
     @property
     def baseline(self) -> StatementResult | None:
         """
-        Unperturbed baseline evaluation (populated by tornado runs), or ``None``.
+        Unperturbed baseline evaluation retained by every sensitivity run.
 
         This property does not raise.
 
         Returns
         -------
         StatementResult | None
-            Unperturbed baseline evaluation (populated by tornado runs), or ``None``.
+            Unperturbed model evaluation, or ``None`` when absent from an imported
+            result document.
         """
     @property
     def scenarios(self) -> list[tuple[Any, StatementResult]]:
@@ -8544,19 +8678,23 @@ class StagingConfig:
     IFRS 9 staging policy: SICR thresholds, days-past-due backstops, qualitative
     switches and curing windows.
 
-    Every parameter defaults to the canonical Rust ``StagingConfig::default()``
-    value, so ``StagingConfig()`` is the standard policy.
+    Omitted parameters use the canonical Rust ``StagingConfig::default()``
+    values, so ``StagingConfig()`` is the standard policy. Explicit ``None``
+    disables the relative PD trigger.
 
-    The constructor stores the supplied values and does not raise.
+    Raises
+    ------
+    ValueError
+        If the absolute or enabled relative threshold is negative or non-finite.
 
     Parameters
     ----------
     pd_delta_absolute : float | None
-        Absolute lifetime-PD increase (decimal, ``0.01`` = 1pp) that fires the
+        Absolute remaining-window PD increase (decimal, ``0.01`` = 1pp) that fires the
         Stage 2 SICR trigger.
     pd_delta_relative : float | None
-        Relative lifetime-PD multiple (``2.0`` = PD doubled) that fires the
-        Stage 2 SICR trigger; ``inf`` disables it.
+        Finite non-negative relative remaining-window PD multiple that fires
+        Stage 2. Omitted uses ``2.0`` (PD doubled); ``None`` disables the trigger.
     rating_downgrade_notches : int | None
         Downgrade notches from origination that fire Stage 2; ``0`` disables
         the trigger.
@@ -8585,7 +8723,7 @@ class StagingConfig:
     def __init__(
         self,
         pd_delta_absolute: float | None = None,
-        pd_delta_relative: float | None = None,
+        pd_delta_relative: float | None = 2.0,
         rating_downgrade_notches: int | None = None,
         rating_scale_labels: list[str] | None = None,
         dpd_stage2_threshold: int | None = None,
@@ -8598,26 +8736,26 @@ class StagingConfig:
     @property
     def pd_delta_absolute(self) -> float:
         """
-        Absolute lifetime-PD increase (decimal) that fires Stage 2.
+        Absolute remaining-window PD increase (decimal) that fires Stage 2.
 
         This property does not raise.
 
         Returns
         -------
         float
-            Absolute lifetime-PD increase (decimal) that fires Stage 2.
+            Absolute remaining-window PD increase (decimal) that fires Stage 2.
         """
     @property
-    def pd_delta_relative(self) -> float:
+    def pd_delta_relative(self) -> float | None:
         """
-        Relative lifetime-PD multiple that fires Stage 2 (``inf`` = disabled).
+        Relative remaining-window PD multiple that fires Stage 2.
 
         This property does not raise.
 
         Returns
         -------
-        float
-            Relative lifetime-PD multiple that fires Stage 2 (``inf`` = disabled).
+        float | None
+            Finite non-negative relative threshold, or ``None`` when disabled.
         """
     @property
     def rating_downgrade_notches(self) -> int:
@@ -8728,7 +8866,7 @@ class StagingConfig:
         Raises
         ------
         ValueError
-            If the value cannot be serialized to JSON.
+            If a threshold is negative/non-finite or the value cannot be serialized to JSON.
         """
     @staticmethod
     def from_json(json: str) -> StagingConfig:
@@ -8749,7 +8887,7 @@ class StagingConfig:
         Raises
         ------
         ValueError
-            If ``json`` is not a valid ``StagingConfig`` document.
+            If ``json`` is malformed or a threshold is negative/non-finite.
 
         Examples
         --------
@@ -9422,14 +9560,15 @@ class TornadoEntry:
     @property
     def parameter_id(self) -> str:
         """
-        Parameter node identifier represented by this entry.
+        Statement sensitivity key in ``node@period`` form; DCF entries use
+        assumption identifiers such as ``wacc`` or ``g``.
 
         This property does not raise.
 
         Returns
         -------
         str
-            Parameter node identifier represented by this entry.
+            Perturbed node and period, or a DCF assumption identifier.
         """
     @property
     def downside(self) -> float:
@@ -10061,19 +10200,21 @@ def backtest_forecast(actual: list[float], forecast: list[float]) -> ForecastMet
     Parameters
     ----------
     actual : list[float]
-        Observed values.
+        Finite observed values in consistent units; negative values are accepted.
     forecast : list[float]
-        Forecast values; same length as ``actual``.
+        Finite forecast values in the same units and aligned with ``actual``.
 
     Returns
     -------
     ForecastMetrics
-        Typed metrics with ``summary()`` and ``to_series()``.
+        Typed metrics with ``summary()`` and ``to_series()``. ``mape`` and
+        ``smape`` are ``None`` when no denominator contributes; JSON emits ``null``.
 
     Raises
     ------
     ValueError
-        If the sequences are empty or of different lengths.
+        If the sequences are empty, of different lengths, contain a non-finite
+        value, or metric arithmetic overflows.
 
     Examples
     --------
@@ -10089,6 +10230,9 @@ def classify_stage(exposure: Exposure, config: StagingConfig | None = None) -> S
     default-evidence flags, the absolute and relative PD-delta SICR tests
     (``current_pd`` versus ``origination_pd``), the rating-downgrade notch test,
     qualitative SICR flags, the Stage 2 days-past-due backstop and curing.
+    Both supplied PDs must cover ``min(remaining_maturity, 30.0)`` years from
+    reporting; the original PD must be conditional on survival to reporting.
+    The caller aligns these scalar risks to that window before classification.
 
     Parameters
     ----------
@@ -10107,7 +10251,10 @@ def classify_stage(exposure: Exposure, config: StagingConfig | None = None) -> S
     Raises
     ------
     ValueError
-        If PDs are outside [0, 1], or maturity or staging thresholds are invalid.
+        If PDs are non-finite or outside [0, 1], maturity or staging thresholds
+        are invalid, or an enabled relative PD ratio is not finite. Zero
+        origination PD with positive current PD raises when PD-delta testing
+        runs; both zero PDs are stable. Stage 3 backstops skip PD-delta testing.
 
     Examples
     --------
@@ -10158,7 +10305,9 @@ def compute_ecl(
     ------
     ValueError
         If ``stage`` is unknown, the PD or EAD schedule is invalid, or an
-        exposure input is outside its accepted range.
+        exposure input is outside its accepted range. Automatic staging also
+        rejects an unrepresentable enabled relative PD ratio, including zero
+        origination PD with positive current PD, when PD-delta testing runs.
 
     Examples
     --------
@@ -10203,6 +10352,9 @@ def compute_ecl_weighted(
     ValueError
         If ``scenarios`` is empty, weights do not sum to ``1.0``, ``stage`` is
         unknown, a schedule is invalid, or an exposure input is out of range.
+        Automatic staging also rejects an unrepresentable enabled relative PD
+        ratio, including zero origination PD with positive current PD, when
+        PD-delta testing runs.
 
     Examples
     --------
@@ -10262,6 +10414,12 @@ def credit_assessment(results: Any, period: str) -> CreditAssessment:
     -------
     CreditAssessment
         Point-in-time ratios at ``period`` plus the ascending ``series``.
+        Ratios are ``None`` when their inputs have mixed scalar/money
+        representations, different currencies, or non-finite arithmetic.
+        Trailing-year ratios require all annual, semiannual, quarterly or monthly
+        periods, including fiscal periods, or the complete Gregorian daily year
+        ending after the assessment date. Weekly and fiscal-daily ratios are
+        unavailable because the result does not contain their date calendar.
 
     Raises
     ------
@@ -10294,7 +10452,9 @@ def credit_assessment_report_text(results: Any, period: str) -> str:
     Returns
     -------
     str
-        Formatted credit assessment report text.
+        Formatted credit assessment report text. Trailing-year ratios require a
+        complete annual, semiannual, quarterly, monthly or Gregorian daily year;
+        weekly and fiscal-daily ratios are reported as unavailable.
 
     Raises
     ------
@@ -10339,8 +10499,10 @@ def dcf_sensitivity(
         Terminal value method; selects whether the growth rate or the exit
         multiple is shocked.
     ufcf_node : str
-        Node id containing unlevered free cash flow. Defaults to the Rust
-        ``DEFAULT_UFCF_NODE`` (``"ufcf"``).
+        Node id containing monetary unlevered free cash flow in model currency.
+        Defaults to the Rust ``DEFAULT_UFCF_NODE`` (``"ufcf"``). Gordon Growth /
+        H-Model terminal cash flow requires a complete contiguous calendar year
+        at the end of the forecast.
     net_debt_override : float | None
         Flat net-debt amount in model currency. Without an override, debt and
         cash must be monetary in model currency and available at a period
@@ -10420,8 +10582,10 @@ def evaluate_dcf(
         Terminal value method (typed, serde dict, or tagged JSON such as
         ``{"type": "gordon_growth", "stable_growth_rate": 0.02}``).
     ufcf_node : str
-        Node id containing unlevered free cash flow. Defaults to the Rust
-        ``DEFAULT_UFCF_NODE`` (``"ufcf"``).
+        Node id containing monetary unlevered free cash flow in model currency.
+        Defaults to the Rust ``DEFAULT_UFCF_NODE`` (``"ufcf"``). Gordon Growth /
+        H-Model terminal cash flow requires a complete contiguous calendar year
+        at the end of the forecast.
     net_debt_override : float | None
         Flat net-debt amount in model currency. Without an override, debt and
         cash must be monetary in model currency and available at a period
@@ -10665,19 +10829,36 @@ def generate_tornado_entries(result: Any, metric_node: str, period: str | None =
     Returns
     -------
     list[TornadoEntry]
-        Typed entries sorted by descending absolute swing.
+        Typed entries sorted by descending absolute swing, with parameter IDs
+        preserving the perturbed ``node@period`` key.
 
     Raises
     ------
     ValueError
-        If ``period`` does not parse or ``result`` is malformed JSON.
+        If ``period`` does not parse, ``result`` is malformed JSON, the run
+        uses a full grid, a scenario does not contain exactly one perturbed
+        parameter, its unperturbed baseline is absent, the target metric/period
+        is missing, or a metric value or impact is non-finite.
 
     Examples
     --------
-    >>> from finstack_quant.statements_analytics import generate_tornado_entries
-    >>> generate_tornado_entries("{}", "ebitda")
-    Traceback (most recent call last):
-    ValueError: ...
+    >>> from finstack_quant.statements import ModelBuilder
+    >>> from finstack_quant.statements_analytics import (
+    ...     ParameterSpec,
+    ...     SensitivityConfig,
+    ...     generate_tornado_entries,
+    ...     run_sensitivity,
+    ... )
+    >>> b = ModelBuilder("m")
+    >>> _ = b.periods("2025Q1..Q2", None)
+    >>> _ = b.value("revenue", [("2025Q1", 100.0), ("2025Q2", 110.0)])
+    >>> _ = b.compute("profit", "revenue * 0.5")
+    >>> cfg = SensitivityConfig(
+    ...     "diagonal", [ParameterSpec.with_percentages("revenue", "2025Q2", 110.0, [-10.0, 10.0])], ["profit"]
+    ... )
+    >>> entries = generate_tornado_entries(run_sensitivity(b.build(), cfg), "profit", "2025Q2")
+    >>> [entry.parameter_id for entry in entries]
+    ['revenue@2025Q2']
     """
 
 def goal_seek(
@@ -10958,7 +11139,8 @@ def run_checks(model: Any, spec: Any, results: Any | None = None) -> CheckReport
         JSON string.
     results : StatementResult | str | None
         Pre-computed evaluation results; when provided the model is not
-        re-evaluated.
+        re-evaluated. Accounting identity checks require supplied node-unit
+        metadata to agree with the model's declarations or explicit monetary values.
 
     Returns
     -------
@@ -10968,8 +11150,10 @@ def run_checks(model: Any, spec: Any, results: Any | None = None) -> CheckReport
     Raises
     ------
     ValueError
-        If the spec is malformed, a formula check does not parse, or the
-        evaluation fails.
+        If a model, spec, or results payload is malformed, a check configuration
+        is invalid, formula parsing or evaluation fails, accounting operands
+        have incompatible currencies/units, or supplied result units conflict
+        with the model's declarations or explicit monetary values.
     KeyError
         If a check references a node missing from the model.
 
@@ -11040,8 +11224,11 @@ def run_corporate_analysis(
     as_of : datetime.date | str | None
         Valuation date; required when ``market`` is set.
     ltv_value_node : str | None
-        Statement node supplying a per-period LTV denominator. When omitted, a
-        positive DCF enterprise value is broadcast as a constant denominator.
+        Monetary statement node supplying a per-period LTV denominator in
+        reporting currency; scalar, foreign-currency or non-finite values are
+        rejected. Missing or non-positive values do not supply a denominator.
+        When omitted, a positive DCF enterprise value is broadcast as a constant
+        denominator.
 
     Returns
     -------
@@ -11122,9 +11309,12 @@ def run_sensitivity(model: Any, config: Any) -> SensitivityResult:
     Raises
     ------
     ValueError
-        If the configuration is malformed or a scenario fails to evaluate.
+        If the configuration is malformed, has duplicate parameters or
+        non-finite values, exceeds 128 parameters, 10,000 scenarios or
+        10 million model node-period evaluation cells, references a missing
+        perturbed parameter or target metric, or a scenario fails.
     KeyError
-        If a perturbed parameter or target metric is missing from the model.
+        If model evaluation cannot find required data or a formula reference.
 
     Examples
     --------
@@ -11152,6 +11342,8 @@ def run_three_statement_checks(model: Any, mapping: Any, results: Any | None = N
         Typed node mapping, its serde dict, or JSON string.
     results : StatementResult | str | None
         Pre-computed evaluation results; skips re-evaluation when provided.
+        Supplied accounting-node units must agree with the model's declarations
+        or explicit monetary values.
 
     Returns
     -------
@@ -11161,7 +11353,9 @@ def run_three_statement_checks(model: Any, mapping: Any, results: Any | None = N
     Raises
     ------
     ValueError
-        If the mapping is malformed or the evaluation fails.
+        If a model, mapping, or results payload is malformed, evaluation fails,
+        accounting operands have incompatible currencies/units, or supplied
+        result units conflict with model declarations or explicit monetary values.
     KeyError
         If ``results`` is omitted and a model formula references a node that
         does not exist. A mapped node that is missing from the model does not
@@ -11255,6 +11449,8 @@ def score_relative_value(peer_set: Any, dimensions: Any) -> RelativeValueResult:
 
     The composite is the weighted average of the direction-adjusted dimension
     scores: positive = cheap, negative = rich.
+    Unusable dimensions (missing metrics, insufficient or degenerate samples)
+    are excluded; regression dimensions retain their regression semantics.
 
     Parameters
     ----------
@@ -11273,7 +11469,8 @@ def score_relative_value(peer_set: Any, dimensions: Any) -> RelativeValueResult:
     ------
     ValueError
         If a payload is malformed, a direction or extractor is unknown, or the
-        peer set cannot be scored (no peers with the required metrics).
+        weights are negative/non-finite, no positive-weight dimension is
+        usable, or the composite cannot be represented as a finite number.
 
     Examples
     --------

@@ -10,17 +10,27 @@ use wasm_bindgen::prelude::*;
 ///
 /// Accepts a `Float64Array`/`number[]` containing `n * n` row-major entries
 /// and returns a flat lower-triangular factor.
-/// @param matrix - Flat row-major `n * n` entries of a symmetric
-///   positive-definite matrix.
-/// @param n - Positive square-matrix dimension; `matrix` must contain exactly
-///   `n * n` entries.
-/// @returns Lower-triangular factor L as a flat row-major `Float64Array`.
+/// Rust normalizes the matrix before factorization and restores the factor's
+/// scale afterwards. Numerical singularity is measured relative to the square
+/// root of the largest input diagonal magnitude. Uniformly scaling the matrix
+/// by a positive constant scales the factor by its square root.
+///
+/// # Arguments
+///
+/// * `matrix` - Flat row-major finite entries of a symmetric positive-definite matrix.
+/// * `n` - Positive integral dimension in `1..=4294967295`; the input must have exactly `n * n` entries.
+///
+/// # Returns
+///
+/// Lower-triangular factor L as a flat row-major `Float64Array`.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `matrix` does not contain exactly `n * n`
+/// Throws a `TypeError` if `n` is non-finite, fractional, or negative. Throws
+/// a JavaScript exception if `matrix` does not contain exactly `n * n`
 /// entries (including when `n * n` overflows), or the matrix contains a
-/// non-finite value, is singular, or is not positive definite.
+/// non-finite value, is numerically singular under that relative criterion,
+/// or is not positive definite.
 #[wasm_bindgen(js_name = choleskyDecomposition)]
 pub fn cholesky_decomposition(matrix: JsValue, n: JsValue) -> Result<Box<[f64]>, JsValue> {
     let matrix: &[f64] = &js_f64_seq(&matrix, "matrix")?;
@@ -33,16 +43,29 @@ pub fn cholesky_decomposition(matrix: JsValue, n: JsValue) -> Result<Box<[f64]>,
 /// Solve a symmetric positive-definite linear system from a flat Cholesky factor.
 ///
 /// The system dimension is `b.length`, as in Rust `cholesky_solve` and Python
-/// `cholesky_solve(chol, b)`.
-/// @param chol - Lower-triangular Cholesky factor as a flat row-major array of
-///   `b.length * b.length` entries.
-/// @param b - Right-hand-side vector of the linear system; its length is the system dimension.
-/// @returns Solution vector `x` of `L Lᵀ x = b`, with the same length as `b`.
+/// `cholesky_solve(chol, b)`. A factor diagonal is numerically singular when
+/// its magnitude is below `1e-10` times the largest factor diagonal magnitude.
+/// Uniformly scaling the matrix and right-hand side preserves the solution.
+///
+/// # Arguments
+///
+/// * `chol` - Cholesky factor as a flat row-major array of
+///   `b.length * b.length` entries; consumed lower-triangular entries must be
+///   finite, and the upper triangle is ignored.
+/// * `b` - Finite right-hand-side vector of the linear system; its length is
+///   the system dimension.
+///
+/// # Returns
+///
+/// Solution vector `x` of `L Lᵀ x = b`, with the same length as `b`.
 ///
 /// # Errors
 ///
 /// Throws a JavaScript exception if `chol` does not contain exactly
-/// `b.length * b.length` entries or a diagonal factor is singular.
+/// `b.length * b.length` entries, a consumed lower-triangular or
+/// right-hand-side entry is non-finite, a diagonal factor is numerically
+/// singular under that relative criterion, or the solution overflows to a
+/// non-finite value.
 #[wasm_bindgen(js_name = choleskySolve)]
 pub fn cholesky_solve(chol: JsValue, b: JsValue) -> Result<Box<[f64]>, JsValue> {
     let chol: &[f64] = &js_f64_seq(&chol, "chol")?;
@@ -58,15 +81,19 @@ pub fn cholesky_solve(chol: JsValue, b: JsValue) -> Result<Box<[f64]>, JsValue> 
 /// into correlated normals: if `A = L L^T` and `z ~ N(0, I)`, then
 /// `L z ~ N(0, A)`. Accepts L as `n * n` row-major entries; only the lower
 /// triangle is read and the upper triangle is assumed zero.
-/// @param l - Lower-triangular Cholesky factor as a flat row-major array of n × n entries.
-/// @param n - Positive square-matrix dimension; flat arrays must contain n × n entries.
-/// @param z - Vector of length n to transform, typically independent standard-normal draws.
+///
+/// # Arguments
+///
+/// * `l` - Lower-triangular factor stored as `n * n` row-major entries; the upper triangle is ignored.
+/// * `n` - Positive integral dimension in `1..=4294967295`, shared by the factor and vector.
+/// * `z` - Vector of exactly `n` observations to transform, typically independent standard normals.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `l` does not contain exactly `n * n`
-/// entries (including when `n * n` overflows) or `z` does not contain exactly
-/// `n` entries.
+/// Throws a `TypeError` if `n` is non-finite, fractional, or negative. Throws
+/// a JavaScript exception if `l` does not contain exactly `n * n` entries
+/// (including when `n * n` overflows) or `z` does not contain exactly `n`
+/// entries.
 #[wasm_bindgen(js_name = applyLowerTriangular)]
 pub fn apply_lower_triangular(l: JsValue, n: JsValue, z: JsValue) -> Result<Box<[f64]>, JsValue> {
     let l: &[f64] = &js_f64_seq(&l, "l")?;
@@ -221,6 +248,17 @@ pub fn quantile(data: JsValue, q: JsValue) -> Result<f64, JsValue> {
 pub fn norm_cdf(x: JsValue) -> Result<f64, JsValue> {
     let x = js_f64(&x, "x")?;
     Ok(special_functions::norm_cdf(x))
+}
+
+/// Natural logarithm of the standard normal CDF, stable in the negative tail.
+///
+/// @param x - Standard-normal threshold in standard-deviation units; infinities are accepted and NaN propagates.
+/// @returns Natural log probability; negative infinity at negative infinity, zero at positive infinity, and NaN for NaN.
+/// @throws `TypeError` if `x` is not a number; special floating-point inputs follow the documented limits.
+#[wasm_bindgen(js_name = logNormCdf)]
+pub fn log_norm_cdf(x: JsValue) -> Result<f64, JsValue> {
+    let x = js_f64(&x, "x")?;
+    Ok(special_functions::log_norm_cdf(x))
 }
 
 /// Standard normal PDF φ(x).

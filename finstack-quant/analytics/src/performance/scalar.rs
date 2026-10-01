@@ -176,8 +176,8 @@ impl Performance {
     ///
     /// # Returns
     ///
-    /// One Calmar ratio per ticker in column order. Returns `0.0` for tickers
-    /// with no observed drawdown.
+    /// One Calmar ratio per ticker in column order. With no observed drawdown,
+    /// returns `±∞` for nonzero CAGR and `0.0` for zero CAGR.
     ///
     /// # Errors
     ///
@@ -422,8 +422,8 @@ impl Performance {
     ///
     /// # Returns
     ///
-    /// One Martin ratio per ticker in column order. Returns `0.0` for tickers
-    /// with zero Ulcer Index.
+    /// One Martin ratio per ticker in column order. With zero Ulcer Index,
+    /// returns `±∞` for nonzero CAGR and `0.0` for zero CAGR.
     ///
     /// # Errors
     ///
@@ -516,12 +516,13 @@ impl Performance {
     ///
     /// # Arguments
     ///
-    /// * `risk_free_rate` - Annualized risk-free rate.
+    /// * `risk_free_rate` - Finite annualized risk-free rate as a decimal fraction.
     /// * `n` - Number of worst drawdowns to average.
     ///
     /// # Returns
     ///
-    /// One Sterling ratio per ticker in column order.
+    /// One Sterling ratio per ticker in column order. Non-finite risk-free
+    /// rates produce [`f64::NAN`], including when no drawdowns are observed.
     ///
     /// # Errors
     ///
@@ -539,12 +540,13 @@ impl Performance {
     ///
     /// # Arguments
     ///
-    /// * `risk_free_rate` - Annualized risk-free rate.
+    /// * `risk_free_rate` - Finite annualized risk-free rate as a decimal fraction.
     /// * `n` - Number of worst drawdown episodes to use.
     ///
     /// # Returns
     ///
-    /// One Burke ratio per ticker in column order.
+    /// One Burke ratio per ticker in column order. Non-finite risk-free rates
+    /// produce [`f64::NAN`], including when no episodes are observed.
     ///
     /// # Errors
     ///
@@ -576,11 +578,12 @@ impl Performance {
     ///
     /// # Arguments
     ///
-    /// * `risk_free_rate` - Annualized risk-free rate.
+    /// * `risk_free_rate` - Finite annualized risk-free rate as a decimal fraction.
     ///
     /// # Returns
     ///
-    /// One pain ratio per ticker in column order.
+    /// One pain ratio per ticker in column order. Non-finite risk-free rates
+    /// produce [`f64::NAN`], including when the pain index is zero.
     ///
     /// # Errors
     ///

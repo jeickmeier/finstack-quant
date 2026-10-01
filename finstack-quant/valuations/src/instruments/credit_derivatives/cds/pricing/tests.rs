@@ -67,7 +67,13 @@ fn create_test_curves() -> (DiscountCurve, HazardCurve) {
 fn test_enhanced_protection_leg() {
     let (disc, credit) = create_test_curves();
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
-    let cds = create_test_cds("TEST-CDS", as_of, as_of.add_months(60), 100.0, 0.40);
+    let cds = create_test_cds(
+        "TEST-CDS",
+        as_of,
+        as_of.add_months(60).expect("valid fixture date"),
+        100.0,
+        0.40,
+    );
     let pricer = CdsPricer::new();
     let protection_pv = pricer
         .pv_protection_leg(&cds, &disc, &credit, as_of)
@@ -79,7 +85,13 @@ fn test_enhanced_protection_leg() {
 fn test_accrual_on_default() {
     let (disc, credit) = create_test_curves();
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
-    let cds = create_test_cds("TEST-CDS", as_of, as_of.add_months(60), 100.0, 0.40);
+    let cds = create_test_cds(
+        "TEST-CDS",
+        as_of,
+        as_of.add_months(60).expect("valid fixture date"),
+        100.0,
+        0.40,
+    );
     let pricer_with = CdsPricer::new();
     let pricer_without = CdsPricer::with_config(CdsPricerConfig {
         include_accrual_on_default: false,
@@ -131,7 +143,13 @@ fn premium_leg_scales_linearly_with_notional_when_accrual_on_default_enabled() {
 fn test_par_spread_calculation() {
     let (disc, credit) = create_test_curves();
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
-    let cds = create_test_cds("TEST-CDS", as_of, as_of.add_months(60), 0.0, 0.40);
+    let cds = create_test_cds(
+        "TEST-CDS",
+        as_of,
+        as_of.add_months(60).expect("valid fixture date"),
+        0.0,
+        0.40,
+    );
     let pricer = CdsPricer::new();
     let par_spread = pricer
         .par_spread(&cds, &disc, &credit, as_of)
@@ -155,7 +173,13 @@ fn test_par_spread_calculation() {
 fn test_settlement_delay_reduces_protection_pv() {
     let (disc, credit) = create_test_curves();
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
-    let mut cds0 = create_test_cds("CDS-0D", as_of, as_of.add_months(60), 100.0, 0.40);
+    let mut cds0 = create_test_cds(
+        "CDS-0D",
+        as_of,
+        as_of.add_months(60).expect("valid fixture date"),
+        100.0,
+        0.40,
+    );
     let mut cds20 = cds0.clone();
     cds0.protection_leg.settlement_delay = 0;
     cds20.protection_leg.settlement_delay = 20;
@@ -175,7 +199,13 @@ fn test_settlement_delay_reduces_protection_pv() {
 fn test_par_spread_full_premium_option_runs() {
     let (disc, credit) = create_test_curves();
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
-    let cds = create_test_cds("CDS-PAR", as_of, as_of.add_months(60), 0.0, 0.40);
+    let cds = create_test_cds(
+        "CDS-PAR",
+        as_of,
+        as_of.add_months(60).expect("valid fixture date"),
+        0.0,
+        0.40,
+    );
     let pricer_ra = CdsPricer::new();
     let pricer_full = CdsPricer::with_config(CdsPricerConfig {
         par_spread_uses_full_premium: true,
@@ -199,9 +229,21 @@ fn test_xr14_regression_matches_baseline() {
     let (disc, credit) = create_test_curves();
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
 
-    let cds_baseline = create_test_cds("CDS-BASELINE", as_of, as_of.add_months(60), 100.0, 0.40);
+    let cds_baseline = create_test_cds(
+        "CDS-BASELINE",
+        as_of,
+        as_of.add_months(60).expect("valid fixture date"),
+        100.0,
+        0.40,
+    );
 
-    let mut cds_xr14 = create_test_cds("CDS-XR14", as_of, as_of.add_months(60), 100.0, 0.40);
+    let mut cds_xr14 = create_test_cds(
+        "CDS-XR14",
+        as_of,
+        as_of.add_months(60).expect("valid fixture date"),
+        100.0,
+        0.40,
+    );
     cds_xr14.doc_clause = Some(CdsDocClause::Xr14);
 
     let pricer = CdsPricer::new();
@@ -241,7 +283,13 @@ fn test_doc_clause_does_not_affect_protection_pv() {
     let pricer = CdsPricer::new();
     let mut pvs = Vec::new();
     for clause in &clauses {
-        let mut cds = create_test_cds("CDS-TEST", as_of, as_of.add_months(60), 100.0, 0.40);
+        let mut cds = create_test_cds(
+            "CDS-TEST",
+            as_of,
+            as_of.add_months(60).expect("valid fixture date"),
+            100.0,
+            0.40,
+        );
         cds.doc_clause = Some(*clause);
         pvs.push(
             pricer
@@ -260,16 +308,34 @@ fn test_doc_clause_effective_defaults() {
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
 
     // No explicit doc_clause with IsdaNa convention -> Xr14
-    let cds_na = create_test_cds("CDS-NA", as_of, as_of.add_months(60), 100.0, 0.40);
+    let cds_na = create_test_cds(
+        "CDS-NA",
+        as_of,
+        as_of.add_months(60).expect("valid fixture date"),
+        100.0,
+        0.40,
+    );
     assert_eq!(cds_na.doc_clause_effective(), CdsDocClause::Xr14);
 
     // Explicit Cr14 should override convention default
-    let mut cds_cr14 = create_test_cds("CDS-CR14", as_of, as_of.add_months(60), 100.0, 0.40);
+    let mut cds_cr14 = create_test_cds(
+        "CDS-CR14",
+        as_of,
+        as_of.add_months(60).expect("valid fixture date"),
+        100.0,
+        0.40,
+    );
     cds_cr14.doc_clause = Some(CdsDocClause::Cr14);
     assert_eq!(cds_cr14.doc_clause_effective(), CdsDocClause::Cr14);
 
     // Meta-clause IsdaEu should resolve to Mm14
-    let mut cds_eu = create_test_cds("CDS-EU", as_of, as_of.add_months(60), 100.0, 0.40);
+    let mut cds_eu = create_test_cds(
+        "CDS-EU",
+        as_of,
+        as_of.add_months(60).expect("valid fixture date"),
+        100.0,
+        0.40,
+    );
     cds_eu.doc_clause = Some(CdsDocClause::IsdaEu);
     assert_eq!(cds_eu.doc_clause_effective(), CdsDocClause::Mm14);
 }
@@ -279,7 +345,13 @@ fn test_doc_clause_serde_roundtrip() {
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
 
     // With doc_clause set
-    let mut cds_with = create_test_cds("CDS-SERDE", as_of, as_of.add_months(60), 100.0, 0.40);
+    let mut cds_with = create_test_cds(
+        "CDS-SERDE",
+        as_of,
+        as_of.add_months(60).expect("valid fixture date"),
+        100.0,
+        0.40,
+    );
     cds_with.doc_clause = Some(CdsDocClause::Cr14);
     let json = serde_json::to_string(&cds_with).expect("serialize should succeed");
     assert!(
@@ -290,7 +362,13 @@ fn test_doc_clause_serde_roundtrip() {
     assert_eq!(deser.doc_clause, Some(CdsDocClause::Cr14));
 
     // Without doc_clause (None) - should not appear in JSON (skip_serializing_if)
-    let cds_without = create_test_cds("CDS-SERDE-NONE", as_of, as_of.add_months(60), 100.0, 0.40);
+    let cds_without = create_test_cds(
+        "CDS-SERDE-NONE",
+        as_of,
+        as_of.add_months(60).expect("valid fixture date"),
+        100.0,
+        0.40,
+    );
     let json_without = serde_json::to_string(&cds_without).expect("serialize should succeed");
     assert!(
         !json_without.contains("doc_clause"),
@@ -305,7 +383,13 @@ fn test_doc_clause_serde_roundtrip() {
 fn test_doc_clause_default_when_omitted() {
     // Existing construction without doc_clause should still work
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
-    let cds = create_test_cds("CDS-COMPAT", as_of, as_of.add_months(60), 100.0, 0.40);
+    let cds = create_test_cds(
+        "CDS-COMPAT",
+        as_of,
+        as_of.add_months(60).expect("valid fixture date"),
+        100.0,
+        0.40,
+    );
     assert_eq!(cds.doc_clause, None);
 
     // Builder pattern should also work without doc_clause
@@ -318,7 +402,7 @@ fn test_doc_clause_default_when_omitted() {
             crate::instruments::common_impl::parameters::legs::PremiumLegSpec {
                 roll_rule: crate::cashflow::builder::specs::RollRule::CdsImm,
                 start: as_of,
-                end: as_of.add_months(60),
+                end: as_of.add_months(60).expect("valid fixture date"),
                 frequency: finstack_quant_core::dates::Tenor::quarterly(),
                 stub: finstack_quant_core::dates::StubKind::ShortFront,
                 business_day_convention:
@@ -347,7 +431,13 @@ fn test_doc_clause_serde_deserializes_without_field() {
     // Simulate old serialized data by serializing a CDS, stripping the
     // doc_clause field from JSON, and verifying it still deserializes.
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
-    let cds = create_test_cds("CDS-OLD", as_of, as_of.add_months(60), 100.0, 0.40);
+    let cds = create_test_cds(
+        "CDS-OLD",
+        as_of,
+        as_of.add_months(60).expect("valid fixture date"),
+        100.0,
+        0.40,
+    );
     let json = serde_json::to_string(&cds).expect("serialize should succeed");
 
     // The JSON should not contain "doc_clause" since it is None
@@ -400,7 +490,13 @@ fn test_schedule_generation_respects_isda_flag_and_calendar_availability() {
 fn test_premium_leg_per_bp_matches_risky_annuity_without_accrual_on_default() {
     let (disc, credit) = create_test_curves();
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
-    let cds = create_test_cds("CDS-PER-BP", as_of, as_of.add_months(60), 100.0, 0.40);
+    let cds = create_test_cds(
+        "CDS-PER-BP",
+        as_of,
+        as_of.add_months(60).expect("valid fixture date"),
+        100.0,
+        0.40,
+    );
 
     let without_aod = CdsPricer::with_config(CdsPricerConfig {
         include_accrual_on_default: false,
@@ -441,7 +537,13 @@ fn test_full_premium_par_spread_is_below_risky_annuity_par_spread() {
         .knots(vec![(0.25, 0.08), (1.0, 0.12), (3.0, 0.16), (5.0, 0.20)])
         .build()
         .expect("hazard curve");
-    let mut cds = create_test_cds("CDS-PAR-FULL", as_of, as_of.add_months(60), 100.0, 0.40);
+    let mut cds = create_test_cds(
+        "CDS-PAR-FULL",
+        as_of,
+        as_of.add_months(60).expect("valid fixture date"),
+        100.0,
+        0.40,
+    );
     cds.valuation_convention = CdsValuationConvention::IsdaDirty;
 
     let isda = CdsPricer::new();
@@ -470,7 +572,13 @@ fn test_npv_full_discounts_dated_upfront() {
 
     let (disc, credit) = create_test_curves();
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
-    let mut cds = create_test_cds("CDS-UPFRONT", as_of, as_of.add_months(60), 100.0, 0.40);
+    let mut cds = create_test_cds(
+        "CDS-UPFRONT",
+        as_of,
+        as_of.add_months(60).expect("valid fixture date"),
+        100.0,
+        0.40,
+    );
     cds.valuation_convention = CdsValuationConvention::IsdaDirty;
     let pricer = CdsPricer::new();
 
@@ -478,7 +586,7 @@ fn test_npv_full_discounts_dated_upfront() {
         .npv_full(&cds, &disc, &credit, as_of)
         .expect("base npv");
 
-    let dated_upfront_date = as_of.add_months(6);
+    let dated_upfront_date = as_of.add_months(6).expect("valid fixture date");
     let dated_upfront_amount = 150_000.0;
     cds.upfront = Some((
         dated_upfront_date,
@@ -509,7 +617,7 @@ fn test_npv_full_discounts_dated_upfront() {
 fn test_time_and_settlement_helpers_match_curve_and_calendar_conventions() {
     let (disc, credit) = create_test_curves();
     let base_date = disc.base_date();
-    let one_year = base_date.add_months(12);
+    let one_year = base_date.add_months(12).expect("valid fixture date");
 
     let expected_haz_t = credit
         .day_count()
@@ -582,7 +690,7 @@ fn test_time_and_settlement_helpers_match_curve_and_calendar_conventions() {
 fn test_survival_and_default_density_helpers_cover_boundary_cases() {
     let (disc, credit) = create_test_curves();
     let as_of = disc.base_date();
-    let one_year = as_of.add_months(12);
+    let one_year = as_of.add_months(12).expect("valid fixture date");
 
     let t_asof = haz_t(&credit, as_of).expect("haz_t as_of");
     let t_one_year = haz_t(&credit, one_year).expect("haz_t future");
@@ -598,11 +706,15 @@ fn test_survival_and_default_density_helpers_cover_boundary_cases() {
     while credit.sp(haz_t(&credit, late_as_of).expect("haz_t late"))
         > credit::SURVIVAL_PROBABILITY_FLOOR
     {
-        late_as_of = late_as_of.add_months(600);
+        late_as_of = late_as_of.add_months(600).expect("valid fixture date");
     }
     assert_eq!(
-        sp_cond_to(&credit, late_as_of, late_as_of.add_months(12))
-            .expect("conditional survival after effective default"),
+        sp_cond_to(
+            &credit,
+            late_as_of,
+            late_as_of.add_months(12).expect("valid fixture date")
+        )
+        .expect("conditional survival after effective default"),
         0.0,
         "conditional survival should floor to zero after effective default"
     );
@@ -629,7 +741,7 @@ fn create_forward_start_cds(
 fn test_forward_start_none_matches_spot_cds() {
     let (disc, credit) = create_test_curves();
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
-    let end = as_of.add_months(60);
+    let end = as_of.add_months(60).expect("valid fixture date");
 
     let spot_cds = create_test_cds("CDS-SPOT", as_of, end, 100.0, 0.40);
     let fwd_none = create_forward_start_cds("CDS-FWD-NONE", as_of, end, 100.0, 0.40, None);
@@ -664,8 +776,8 @@ fn test_forward_start_none_matches_spot_cds() {
 fn test_forward_start_lower_protection_pv_same_premium_pv() {
     let (disc, credit) = create_test_curves();
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
-    let end = as_of.add_months(60);
-    let fwd_date = as_of.add_months(24);
+    let end = as_of.add_months(60).expect("valid fixture date");
+    let fwd_date = as_of.add_months(24).expect("valid fixture date");
 
     let spot_cds = create_test_cds("CDS-SPOT", as_of, end, 100.0, 0.40);
     let fwd_cds = create_forward_start_cds("CDS-FWD", as_of, end, 100.0, 0.40, Some(fwd_date));
@@ -705,7 +817,7 @@ fn test_forward_start_lower_protection_pv_same_premium_pv() {
 fn test_forward_start_protection_at_end_near_zero() {
     let (disc, credit) = create_test_curves();
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
-    let end = as_of.add_months(60);
+    let end = as_of.add_months(60).expect("valid fixture date");
 
     let fwd_cds = create_forward_start_cds("CDS-FWD-END", as_of, end, 100.0, 0.40, Some(end));
 
@@ -723,7 +835,7 @@ fn test_forward_start_protection_at_end_near_zero() {
 #[test]
 fn test_forward_start_invalid_before_premium_start() {
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
-    let end = as_of.add_months(60);
+    let end = as_of.add_months(60).expect("valid fixture date");
     let before_start = Date::from_calendar_date(2024, time::Month::June, 1).expect("valid date");
 
     let mut cds = create_test_cds("CDS-BAD", as_of, end, 100.0, 0.40);
@@ -738,8 +850,8 @@ fn test_forward_start_invalid_before_premium_start() {
 #[test]
 fn test_forward_start_invalid_after_premium_end() {
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
-    let end = as_of.add_months(60);
-    let after_end = end.add_months(12);
+    let end = as_of.add_months(60).expect("valid fixture date");
+    let after_end = end.add_months(12).expect("valid fixture date");
 
     let mut cds = create_test_cds("CDS-BAD", as_of, end, 100.0, 0.40);
     cds.protection_effective_date = Some(after_end);
@@ -753,8 +865,8 @@ fn test_forward_start_invalid_after_premium_end() {
 #[test]
 fn test_protection_start_helper() {
     let as_of = Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
-    let end = as_of.add_months(60);
-    let fwd_date = as_of.add_months(24);
+    let end = as_of.add_months(60).expect("valid fixture date");
+    let fwd_date = as_of.add_months(24).expect("valid fixture date");
 
     let spot = create_test_cds("CDS-SPOT", as_of, end, 100.0, 0.40);
     assert_eq!(spot.protection_start(), as_of);

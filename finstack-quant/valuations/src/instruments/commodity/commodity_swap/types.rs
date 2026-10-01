@@ -12,7 +12,7 @@ use crate::instruments::common_impl::parameters::CommodityUnderlyingParams;
 use crate::instruments::common_impl::traits::Attributes;
 use finstack_quant_core::cashflow::CashFlowAccrual;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{calendar_by_id, BusinessDayConvention, Date, Tenor};
+use finstack_quant_core::dates::{calendar_by_id, BusinessDayConvention, Date, DateExt, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
@@ -238,302 +238,144 @@ impl CommoditySwap {
             .build()
     }
 
-    /// Calculate the present value of the fixed leg.
-    pub fn fixed_leg_pv(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
-        let disc = market.get_discount(self.discount_curve_id.as_str())?;
-        let schedule = self.payment_schedule()?;
-        let fixed_price = self.fixed_price;
-
-        let mut pv = 0.0;
-        for payment_date in schedule {
-            if payment_date < as_of {
-                continue; // Skip past payments
-            }
-            let df = disc.df_between_dates(as_of, payment_date)?;
-            let period_value = self.quantity * fixed_price;
-            pv += period_value * df;
-        }
-
-        Ok(pv)
-    }
-
-    /// Calculate the present value of the floating leg.
-    ///
-    /// Projects floating prices from the `PriceCurve` referenced by `forward_curve_id`,
-    /// with optional index lag and period averaging.
-    pub fn floating_leg_pv(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
-        let disc = market.get_discount(self.discount_curve_id.as_str())?;
-        let schedule = self.payment_schedule()?;
-
-        // Try to get PriceCurve for floating index
-        let price_curve = market.get_price_curve(self.forward_curve_id.as_str())?;
-
-        let mut pv = 0.0;
-        let mut prev_period_end = self.start_date;
-        let last_payment = schedule.last().copied();
-
-        for payment_date in schedule {
-            if payment_date < as_of {
-                prev_period_end = payment_date;
-                continue; // Skip past payments
-            }
-
-            // Period start is previous period end (or swap start for first period)
-            let period_start = prev_period_end;
-            let period_end = payment_date;
-
-            // Get expected average price for this period. Windows are
-            // half-open; the final period observes the maturity date too.
-            let include_end = Some(payment_date) == last_payment;
-            let forward_price = self.expected_period_price(
-                &price_curve,
-                as_of,
-                period_start,
-                period_end,
-                include_end,
-            )?;
-
-            let df = disc.df_between_dates(as_of, payment_date)?;
-            let period_value = self.quantity * forward_price;
-            pv += period_value * df;
-
-            prev_period_end = payment_date;
-        }
-
-        Ok(pv)
-    }
-
-    /// Calculate expected average price for a period.
-    ///
-    /// Uses business day weighted averaging for the observation period, which is
-    /// the market standard for commodity swaps. Weekends are excluded from the
-    /// average (no calendar applied yet - just weekday filtering).
+    /// Calculate the fixed-price leg's present value before applying the pay/receive side.
     ///
     /// # Arguments
-    /// * `price_curve` - The commodity price curve
-    /// * `as_of` - Valuation date
-    /// * `period_start` - Start of the averaging period
-    /// * `period_end` - End of the averaging period
-    ///
-    /// # Averaging Method
-    ///
-    /// Uses daily business day sampling for all periods (market standard for
-    /// commodity swaps). When a `calendar_id` is provided and resolves to a
-    /// valid holiday calendar, exchange holidays are also excluded from the
-    /// average. Otherwise, only weekends are filtered.
-    ///
-    /// # Past vs future observations
-    ///
-    /// Observation dates strictly before `as_of` read from
-    /// [`past_fixings`](Self::past_fixings); a missing past fixing is
-    /// an `Error::Validation` naming the date — silently substituting today's
-    /// spot would mis-mark every seasoned averaging period. Observation dates
-    /// on or after `as_of` project from the curve via `price_on_date(date)`
-    /// (respecting the curve's day count convention); a curve-lookup failure
-    /// inside the window is propagated as an error (W-11).
-    ///
-    /// # Window convention
-    ///
-    /// Windows are half-open `[period_start, period_end)` so a payment date
-    /// is never observed by two adjacent periods; the final period passes
-    /// `include_end = true` so the swap maturity is observed exactly once.
-    pub(crate) fn expected_period_price(
-        &self,
-        price_curve: &finstack_quant_core::market_data::term_structures::PriceCurve,
-        as_of: Date,
-        period_start: Date,
-        period_end: Date,
-        include_end: bool,
-    ) -> Result<f64> {
-        // Apply index lag if specified (shift observation window backwards)
-        let lag_days = self.index_lag_days.unwrap_or(0);
-        let obs_start = period_start - time::Duration::days(lag_days as i64);
-        let obs_end = period_end - time::Duration::days(lag_days as i64);
-
-        // Resolve holiday calendar if available (Item 8: integrate holiday calendars)
-        let calendar = match self.calendar_id.as_deref() {
-            Some(id) => Some(calendar_by_id(id).ok_or_else(|| {
-                finstack_quant_core::Error::Validation(format!(
-                    "CommoditySwap '{}' references unknown calendar_id '{id}'",
-                    self.id
-                ))
-            })?),
-            None => None,
-        };
-
-        // Business day filter: exclude weekends and exchange holidays
-        let is_business_day = |date: Date| -> bool {
-            let wd = date.weekday();
-            if wd == time::Weekday::Saturday || wd == time::Weekday::Sunday {
-                return false;
-            }
-            // If we have a holiday calendar, check it
-            if let Some(cal) = &calendar {
-                return cal.is_business_day(date);
-            }
-            true
-        };
-
-        // Realized-fixing lookup for past observation dates, with duplicate
-        // rejection (a duplicate would silently skew the average).
-        let mut fixings: std::collections::BTreeMap<Date, f64> = std::collections::BTreeMap::new();
-        for (d, v) in &self.past_fixings {
-            if fixings.insert(*d, *v).is_some() {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "CommoditySwap '{}' has duplicate past fixing for date {d}",
-                    self.id.as_str()
-                )));
-            }
+    /// * `market` - Market snapshot containing the quote-currency discount curve.
+    /// * `as_of` - Valuation date; payments on this date remain outstanding.
+    pub fn fixed_leg_pv(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
+        let disc = market.get_discount(self.discount_curve_id.as_str())?;
+        let mut pv = 0.0;
+        for period in self
+            .periods()?
+            .into_iter()
+            .filter(|p| p.payment_date >= as_of)
+        {
+            pv += self.quantity
+                * self.fixed_price
+                * disc.df_between_dates(as_of, period.payment_date)?;
         }
+        Ok(pv)
+    }
 
+    /// Calculate the floating-price leg's present value before applying the pay/receive side.
+    ///
+    /// Contractual observation windows remain unadjusted when payment dates roll.
+    /// Observations strictly before valuation require instrument-owned past fixings;
+    /// later observations project from the commodity price curve.
+    ///
+    /// # Arguments
+    /// * `market` - Market snapshot containing the commodity price and discount curves.
+    /// * `as_of` - Valuation date; payments on this date remain outstanding.
+    pub fn floating_leg_pv(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
+        let disc = market.get_discount(self.discount_curve_id.as_str())?;
+        let periods = self
+            .periods()?
+            .into_iter()
+            .filter(|p| p.payment_date >= as_of);
+        let mut pv = 0.0;
+        for (period, price) in self.projected_period_prices(market, as_of, periods)? {
+            pv += self.quantity * price * disc.df_between_dates(as_of, period.payment_date)?;
+        }
+        Ok(pv)
+    }
+
+    fn periods(&self) -> Result<Vec<crate::cashflow::builder::periods::SchedulePeriod>> {
+        self.validate()?;
+        super::super::averaging::commodity_periods(
+            self.start_date,
+            self.maturity,
+            self.frequency,
+            self.calendar_id.as_deref(),
+            self.business_day_convention,
+        )
+    }
+
+    /// Generate adjusted payment dates, retaining contractual averaging dates internally.
+    pub fn payment_schedule(&self) -> Result<Vec<Date>> {
+        Ok(self
+            .periods()?
+            .into_iter()
+            .map(|period| period.payment_date)
+            .collect())
+    }
+
+    // Prepare curve, calendar and historical fixings once for the requested periods.
+    fn projected_period_prices(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+        periods: impl IntoIterator<Item = crate::cashflow::builder::periods::SchedulePeriod>,
+    ) -> Result<Vec<(crate::cashflow::builder::periods::SchedulePeriod, f64)>> {
+        let price_curve = market.get_price_curve(self.forward_curve_id.as_str())?;
+        let calendar = self
+            .calendar_id
+            .as_deref()
+            .map(|id| {
+                calendar_by_id(id).ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(format!(
+                        "CommoditySwap '{}' references unknown calendar_id '{id}'",
+                        self.id
+                    ))
+                })
+            })
+            .transpose()?;
+        let fixings: std::collections::BTreeMap<Date, f64> =
+            self.past_fixings.iter().copied().collect();
         let get_price = |date: Date| -> Result<f64> {
             if date < as_of {
                 fixings.get(&date).copied().ok_or_else(|| {
                     finstack_quant_core::Error::Validation(format!(
-                        "CommoditySwap '{}' is missing a past fixing for past \
-                         observation date {date} (as_of {as_of}); past floating-leg \
-                         observations must be supplied via past_fixings",
-                        self.id.as_str()
+                        "CommoditySwap '{}' is missing a past fixing for past observation date {date} (as_of {as_of}); past floating-leg observations must be supplied via past_fixings",
+                        self.id
                     ))
                 })
             } else {
                 price_curve.price_on_date(date)
             }
         };
-
-        // Market standard: daily business day sampling for all periods, over
-        // half-open windows shared with the commodity swaption.
-        crate::instruments::commodity::averaging::business_day_average_price(
-            get_price,
-            is_business_day,
-            obs_start,
-            obs_end,
-            include_end,
-        )
-    }
-
-    /// Generate the payment schedule for this swap.
-    pub fn payment_schedule(&self) -> Result<Vec<Date>> {
-        use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
-
-        self.validate()?;
-        let business_day_convention = if self.calendar_id.is_some() {
-            self.business_day_convention
-        } else {
-            BusinessDayConvention::Unadjusted
+        let is_business_day = |date: Date| -> bool {
+            !date.is_weekend() && calendar.is_none_or(|cal| cal.is_business_day(date))
         };
-        let schedule = crate::cashflow::builder::ScheduleParams {
-            frequency: self.frequency,
-            day_count: finstack_quant_core::dates::DayCount::Act365F,
-            business_day_convention,
-            calendar_id: self
-                .calendar_id
-                .clone()
-                .unwrap_or_else(|| crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID.into()),
-            stub: finstack_quant_core::dates::StubKind::ShortBack,
-            end_of_month: false,
-            payment_lag_days: 0,
-            adjust_accrual_dates: false,
-            roll_rule: crate::cashflow::builder::specs::RollRule::None,
-        };
-        Ok(build_periods(BuildPeriodsParams::from_schedule(
-            &schedule,
-            self.start_date,
-            self.maturity,
-            None,
-        ))?
-        .into_iter()
-        .map(|period| period.payment_date)
-        .collect())
-    }
-
-    fn classified_leg_flows(
-        &self,
-        flows: Vec<(Date, Money)>,
-        kind: CFKind,
-    ) -> Result<Vec<CashFlow>> {
-        let mut accrual_start = self.start_date;
-        flows
+        let lag = time::Duration::days(i64::from(self.index_lag_days.unwrap_or(0)));
+        periods
             .into_iter()
-            .map(|(payment_date, amount)| {
-                let accrual_factor = finstack_quant_core::dates::DayCount::Act365F.year_fraction(
-                    accrual_start,
-                    payment_date,
-                    finstack_quant_core::dates::DayCountContext::default(),
+            .map(|period| {
+                let price = super::super::averaging::business_day_average_price(
+                    get_price,
+                    is_business_day,
+                    period.accrual_start - lag,
+                    period.accrual_end - lag,
+                    period.accrual_end == self.maturity,
                 )?;
-                let reset_date = (kind == CFKind::FloatReset).then_some(accrual_start);
-                let flow = CashFlow::new(
-                    payment_date,
-                    reset_date,
-                    Money::new(amount.amount(), self.underlying.currency)?,
-                    kind,
-                    accrual_factor,
-                    None,
-                )
-                .with_accrual(CashFlowAccrual {
-                    coupon_period: None,
-                    end_is_termination_date: false,
-                    calendar_id: None,
-                    start: accrual_start,
-                    end: payment_date,
-                    day_count: finstack_quant_core::dates::DayCount::Act365F,
-                    projected_index_rate: None,
-                });
-                accrual_start = payment_date;
-                Ok(flow)
+                Ok((period, price))
             })
             .collect()
     }
 
-    fn fixed_leg_flows(&self) -> Result<Vec<(Date, Money)>> {
-        let fixed_price = self.fixed_price;
-        let signed_amount = match self.side {
-            PayReceive::Pay => -self.quantity * fixed_price,
-            PayReceive::Receive => self.quantity * fixed_price,
-        };
-        self.payment_schedule()?
-            .into_iter()
-            .map(|payment_date| {
-                Ok((
-                    payment_date,
-                    Money::new(signed_amount, self.underlying.currency)?,
-                ))
-            })
-            .collect::<finstack_quant_core::Result<Vec<_>>>()
-    }
-
-    fn floating_leg_flows(
+    fn classified_flow(
         &self,
-        market: &MarketContext,
-        as_of: Date,
-    ) -> Result<Vec<(Date, Money)>> {
-        let price_curve = market.get_price_curve(self.forward_curve_id.as_str())?;
-        let mut prev_period_end = self.start_date;
-        let mut flows = Vec::new();
-        let schedule = self.payment_schedule()?;
-        let last_payment = schedule.last().copied();
-        for payment_date in schedule {
-            let period_start = prev_period_end;
-            let period_end = payment_date;
-            let include_end = Some(payment_date) == last_payment;
-            let forward_price = self.expected_period_price(
-                &price_curve,
-                as_of,
-                period_start,
-                period_end,
-                include_end,
-            )?;
-            let signed_amount = match self.side {
-                PayReceive::Pay => self.quantity * forward_price,
-                PayReceive::Receive => -self.quantity * forward_price,
-            };
-            flows.push((
-                payment_date,
-                Money::new(signed_amount, self.underlying.currency)?,
-            ));
-            prev_period_end = payment_date;
-        }
-        Ok(flows)
+        period: &crate::cashflow::builder::periods::SchedulePeriod,
+        amount: f64,
+        kind: CFKind,
+    ) -> Result<CashFlow> {
+        Ok(CashFlow::new(
+            period.payment_date,
+            (kind == CFKind::FloatReset).then_some(period.accrual_start),
+            Money::new(amount, self.underlying.currency)?,
+            kind,
+            period.accrual_year_fraction,
+            None,
+        )
+        .with_accrual(CashFlowAccrual {
+            coupon_period: None,
+            end_is_termination_date: period.accrual_end == self.maturity,
+            calendar_id: self.calendar_id.as_deref().map(str::to_owned),
+            start: period.accrual_start,
+            end: period.accrual_end,
+            day_count: finstack_quant_core::dates::DayCount::Act365F,
+            projected_index_rate: None,
+        }))
     }
 }
 
@@ -560,18 +402,21 @@ impl crate::instruments::common_impl::traits::Instrument for CommoditySwap {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        let fixed_leg_pv = self.fixed_leg_pv(market, as_of)?;
-        let floating_leg_pv = self.floating_leg_pv(market, as_of)?;
-
+        let disc = market.get_discount(self.discount_curve_id.as_str())?;
+        let periods = self
+            .periods()?
+            .into_iter()
+            .filter(|p| p.payment_date >= as_of);
+        let mut fixed_pv = 0.0;
+        let mut floating_pv = 0.0;
+        for (period, floating_price) in self.projected_period_prices(market, as_of, periods)? {
+            let df = disc.df_between_dates(as_of, period.payment_date)?;
+            fixed_pv += self.quantity * self.fixed_price * df;
+            floating_pv += self.quantity * floating_price * df;
+        }
         let npv = match self.side {
-            PayReceive::Pay => {
-                // Pay fixed, receive floating
-                floating_leg_pv - fixed_leg_pv
-            }
-            PayReceive::Receive => {
-                // Receive fixed, pay floating
-                fixed_leg_pv - floating_leg_pv
-            }
+            PayReceive::Pay => floating_pv - fixed_pv,
+            PayReceive::Receive => fixed_pv - floating_pv,
         };
 
         finstack_quant_core::money::Money::new(npv, self.underlying.currency)
@@ -579,6 +424,10 @@ impl crate::instruments::common_impl::traits::Instrument for CommoditySwap {
 
     fn effective_start_date(&self) -> Option<Date> {
         Some(self.start_date)
+    }
+
+    fn last_payment_date(&self, _curves: &MarketContext, _as_of: Date) -> Result<Option<Date>> {
+        Ok(self.periods()?.last().map(|period| period.payment_date))
     }
 
     fn expiry(&self) -> Option<Date> {
@@ -594,14 +443,24 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CommoditySwap {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
-        let flows = self
-            .classified_leg_flows(self.fixed_leg_flows()?, CFKind::Fixed)?
-            .into_iter()
-            .chain(self.classified_leg_flows(
-                self.floating_leg_flows(market, as_of)?,
+        let periods = self.periods()?;
+        let mut flows = Vec::with_capacity(periods.len() * 2);
+        let fixed_sign = match self.side {
+            PayReceive::Pay => -1.0,
+            PayReceive::Receive => 1.0,
+        };
+        for (period, floating_price) in self.projected_period_prices(market, as_of, periods)? {
+            flows.push(self.classified_flow(
+                &period,
+                fixed_sign * self.quantity * self.fixed_price,
+                CFKind::Fixed,
+            )?);
+            flows.push(self.classified_flow(
+                &period,
+                -fixed_sign * self.quantity * floating_price,
                 CFKind::FloatReset,
-            )?)
-            .collect();
+            )?);
+        }
         let schedule = crate::cashflow::traits::schedule_from_classified_flows(
             flows,
             finstack_quant_core::dates::DayCount::Act365F,
@@ -650,6 +509,77 @@ mod tests {
             .expect("Valid price curve");
 
         MarketContext::new().insert(disc).insert(price_curve)
+    }
+
+    #[test]
+    fn payment_adjustment_keeps_contractual_commodity_observations() {
+        use crate::instruments::commodity::commodity_swaption::CommoditySwaption;
+        use time::macros::date;
+        let as_of = date!(2025 - 01 - 31);
+        let maturity = date!(2025 - 05 - 31);
+        let payment = date!(2025 - 06 - 02);
+        let market = MarketContext::new()
+            .insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (1.0, 1.0)])
+                    .build()
+                    .expect("discount curve"),
+            )
+            .insert(
+                PriceCurve::builder("NG-SPOT-AVG")
+                    .base_date(as_of)
+                    .knots([
+                        (0.0, 0.0),
+                        (121.0 / 365.0, 0.0),
+                        (122.0 / 365.0, 1000.0),
+                        (1.0, 1000.0),
+                    ])
+                    .build()
+                    .expect("price curve"),
+            );
+        let mut swap = CommoditySwap::example().expect("example");
+        swap.start_date = as_of;
+        swap.maturity = maturity;
+        swap.quantity = 1.0;
+        swap.fixed_price = 0.0;
+        swap.calendar_id = Some("weekends_only".into());
+        swap.business_day_convention = BusinessDayConvention::Unadjusted;
+        assert!(swap.value_raw(&market, as_of).expect("unadjusted PV").abs() < 1e-12);
+        swap.business_day_convention = BusinessDayConvention::Following;
+        assert!(swap.value_raw(&market, as_of).expect("adjusted PV").abs() < 1e-12);
+        assert_eq!(
+            swap.last_payment_date(&market, as_of)
+                .expect("last payment"),
+            Some(payment)
+        );
+        let schedule = swap.cashflow_schedule(&market, as_of).expect("cashflows");
+        let final_flow = schedule.get_flows().last().expect("last flow");
+        assert_eq!(final_flow.date, payment);
+        assert_eq!(final_flow.accrual.as_ref().expect("accrual").end, maturity);
+        assert!(final_flow.amount.amount().abs() < 1e-12);
+
+        let mut swaption = CommoditySwaption::example().expect("swaption");
+        swaption.expiry = as_of;
+        swaption.underlying_start_date = as_of;
+        swaption.underlying_maturity = maturity;
+        swaption.forward_curve_id = swap.forward_curve_id;
+        swaption.calendar_id = swap.calendar_id;
+        swaption.business_day_convention = BusinessDayConvention::Following;
+        assert_eq!(
+            swaption
+                .swap_payment_schedule()
+                .expect("swaption payments")
+                .last(),
+            Some(&payment)
+        );
+        assert!(
+            swaption
+                .forward_swap_rate(&market, as_of)
+                .expect("swap forward")
+                .abs()
+                < 1e-12
+        );
     }
 
     #[test]

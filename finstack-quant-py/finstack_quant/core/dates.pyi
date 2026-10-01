@@ -74,7 +74,7 @@ __all__ = [
     "next_semiannual_cds_maturity",
     "imm_option_expiry",
     "next_imm_option_expiry",
-    "next_equity_option_expiry",
+    "next_third_friday",
     # free functions
     "create_date",
     "days_since_epoch",
@@ -213,14 +213,17 @@ def estimated_sifma_settlement_date_for_class(
     month: int, year: int, settlement_class: SifmaSettlementClass
 ) -> datetime.date:
     """
-    Estimate a class-specific SIFMA settlement date when no calendar is published.
+    Estimate a class-specific SIFMA settlement date for projections.
+
+    This uses the holiday-calendar business-day anchor even when a published
+    settlement exists; use ``sifma_settlement_date_for_class`` for operational dates.
 
     Parameters
     ----------
     month : int
         Delivery month number from ``1`` through ``12``.
     year : int
-        Four-digit delivery calendar year.
+        Delivery calendar year from ``1`` through ``9999``.
     settlement_class : SifmaSettlementClass
         Good-delivery class whose conventional estimated date is required.
 
@@ -232,7 +235,8 @@ def estimated_sifma_settlement_date_for_class(
     Raises
     ------
     ValueError
-        If *month* is outside ``1`` through ``12``.
+        If *month* is outside ``1`` through ``12``, the year/date is outside
+        Python years ``1..9999``, or the month has too few business days.
 
     Examples
     --------
@@ -431,6 +435,8 @@ class DayCount:
             Accrual end (exclusive); must not precede *start*.
         ctx : DayCountContext | None
             Full context object (calendar, frequency, coupon period, ...).
+            ``ACT_365L`` requires ``frequency`` and the enclosing contractual
+            ``coupon_period``; partial accrual retains that coupon's denominator.
             Mutually exclusive with *frequency* / *calendar*.
         frequency : Tenor | str | None
             Coupon frequency for ``ACT_ACT_ISMA`` / ``ACT_365L`` (e.g. ``"6M"``).
@@ -446,7 +452,10 @@ class DayCount:
         ------
         ValueError
             If *start* > *end*, both *ctx* and keywords are given, or the
-            convention needs context that was not supplied.
+            convention needs context that was not supplied. ACT/365L raises
+            if frequency or enclosing coupon dates are missing, or the
+            requested dates lie outside that coupon. ICMA raises if reference
+            endpoints do not share an unadjusted nominal month grid.
         KeyError
             If *calendar* names an unknown calendar.
 
@@ -553,7 +562,10 @@ class DayCountContext:
 
     - **Bus/252** requires a holiday calendar (resolved by ``calendar_id``).
     - **Act/Act (ISMA)** requires the coupon ``frequency`` and, for
-      irregular or mid-coupon accruals, the reference ``coupon_period``.
+      irregular or mid-coupon accruals, the unadjusted regular reference
+      ``coupon_period``.
+    - **Act/365L** requires ``frequency`` and the full enclosing contractual
+      ``coupon_period``, including for partial accrual.
     - **30E/360 ISDA** uses ``end_is_termination_date`` for its
       end-of-February rule.
 
@@ -567,11 +579,14 @@ class DayCountContext:
         calendars). Resolved on each use, so an unknown id raises
         ``KeyError`` at calculation time.
     frequency : Tenor | str | None
-        Coupon frequency for ISMA conventions (``Tenor`` or ``"6M"``).
+        Coupon frequency for ISMA and ACT/365L (``Tenor`` or ``"6M"``).
     bus_basis : int | None
         Custom business-day divisor (defaults to 252 when omitted).
     coupon_period : tuple[datetime.date | str, datetime.date | str] | None
-        Reference coupon period ``(start, end)``; ``start`` must precede ``end``.
+        Unadjusted regular ICMA reference period or ACT/365L enclosing
+        contractual coupon ``(start, end)``; ``start`` must precede ``end``.
+        ICMA endpoints must share the contractual nominal month grid,
+        rather than business-day-adjusted payment dates.
     end_is_termination_date : bool
         Whether the accrual end is the instrument termination date.
 
@@ -604,7 +619,9 @@ class DayCountContext:
         bus_basis : int | None
             Custom business-day divisor for Bus/252.
         coupon_period : tuple[datetime.date | str, datetime.date | str] | None
-            Reference coupon period ``(start, end)`` for ACT/ACT (ICMA).
+            Unadjusted regular ICMA reference period or ACT/365L enclosing
+            contractual coupon ``(start, end)``. ICMA validates that both
+            endpoints share one nominal month grid at calculation time.
         end_is_termination_date : bool
             Whether the accrual end is the instrument termination date.
 
@@ -723,7 +740,8 @@ class DayCountContext:
     @property
     def coupon_period(self) -> Optional[tuple[datetime.date, datetime.date]]:
         """
-        Optional reference coupon period as ``(start, end)`` dates.
+        Optional unadjusted ICMA reference or ACT/365L enclosing coupon
+        as ``(start, end)`` dates.
 
         Returns
         -------
@@ -1607,7 +1625,7 @@ class PeriodKind:
         Raises
         ------
         ValueError
-            If *first* is not a valid calendar date or ISO string.
+            If *first* is invalid or the prior observation date underflows the supported calendar.
 
         Examples
         --------
@@ -2502,7 +2520,8 @@ def build_periods(
     spec : str
         Range expression (e.g. ``"2025Q1..Q4"``, ``"2024M01..M12"``).
     actuals_cutoff : str | None
-        Cutoff period code for actual/forecast split (e.g. ``"2025Q2"``).
+        Inclusive cutoff for actual/forecast split (e.g. ``"2025Q2"``), using
+        the same period kind and fiscal/Gregorian calendar as *spec*.
 
     Returns
     -------
@@ -2512,7 +2531,10 @@ def build_periods(
     Raises
     ------
     ValueError
-        If *spec* cannot be parsed.
+        If *spec* or *actuals_cutoff* cannot be parsed, endpoint/cutoff kinds or fiscal
+        semantics disagree, any period boundary is outside the supported date
+        range, or the range exceeds 100,000 periods. Validation precedes
+        allocation of the period list.
 
     Examples
     --------
@@ -2538,7 +2560,8 @@ def build_fiscal_periods(
     fiscal_config : FiscalConfig
         Fiscal year configuration.
     actuals_cutoff : str | None
-        Cutoff period code for actual/forecast split.
+        Inclusive cutoff for actual/forecast split, using the same period kind
+        as *spec*. Unprefixed codes are interpreted as fiscal.
 
     Returns
     -------
@@ -2548,7 +2571,9 @@ def build_fiscal_periods(
     Raises
     ------
     ValueError
-        If *spec* cannot be parsed.
+        If *spec* or *actuals_cutoff* cannot be parsed, endpoint/cutoff kinds disagree,
+        any fiscal boundary is outside the supported date range, or the range
+        exceeds 100,000 periods. Validation precedes allocation of the period list.
 
     Examples
     --------
@@ -3509,7 +3534,9 @@ class ScheduleBuilder:
         eom : bool
             Whether to enable end-of-month rolling. Requires a month/year tenor
             and a regular schedule rule; ``build`` raises ``ValueError`` for
-            day/week tenors or IMM/CDS modes.
+            day/week tenors or IMM/CDS modes. With ``StubKind.NONE``, maturity
+            must lie on the generated month-end roll grid; otherwise an
+            explicit stub rule is required.
 
         Returns
         -------
@@ -3735,7 +3762,7 @@ def third_wednesday(month: int, year: int) -> datetime.date:
     month : int
         Month number from ``1`` through ``12``.
     year : int
-        Four-digit calendar year.
+        Calendar year from ``1`` through ``9999``.
 
     Returns
     -------
@@ -3745,7 +3772,8 @@ def third_wednesday(month: int, year: int) -> datetime.date:
     Raises
     ------
     ValueError
-        If *month* is outside ``1..12``.
+        If *month* is outside ``1..12`` or the year/date is outside
+        Python years ``1..9999``.
 
     Examples
     --------
@@ -3765,7 +3793,7 @@ def third_friday(month: int, year: int) -> datetime.date:
     month : int
         Month number from ``1`` through ``12``.
     year : int
-        Four-digit calendar year.
+        Calendar year from ``1`` through ``9999``.
 
     Returns
     -------
@@ -3775,7 +3803,8 @@ def third_friday(month: int, year: int) -> datetime.date:
     Raises
     ------
     ValueError
-        If *month* is outside ``1..12``.
+        If *month* is outside ``1..12`` or the year/date is outside
+        Python years ``1..9999``.
 
     Examples
     --------
@@ -3806,7 +3835,8 @@ def next_imm(date: datetime.date | str) -> datetime.date:
         If *date* is not a date-like object with integer ``year``, ``month``,
         and ``day`` attributes.
     ValueError
-        If those attributes do not form a valid calendar date.
+        If those attributes do not form a valid calendar date or the selected
+        roll/expiry cannot be represented in Python years ``1..9999``.
 
     Examples
     --------
@@ -3884,7 +3914,7 @@ def is_cds_date(date: datetime.date | str) -> bool:
 
 def next_cds_date(date: datetime.date | str) -> datetime.date:
     """
-    Return the next standard CDS roll date on or after *date*.
+    Return the next standard CDS roll date strictly after *date*.
 
     Parameters
     ----------
@@ -3902,7 +3932,8 @@ def next_cds_date(date: datetime.date | str) -> datetime.date:
         If *date* is not a date-like object with integer ``year``, ``month``,
         and ``day`` attributes.
     ValueError
-        If those attributes do not form a valid calendar date.
+        If those attributes do not form a valid calendar date or the selected
+        roll/expiry cannot be represented in Python years ``1..9999``.
 
     Examples
     --------
@@ -3916,7 +3947,7 @@ def next_cds_date(date: datetime.date | str) -> datetime.date:
 
 def prev_cds_date(date: datetime.date | str) -> datetime.date:
     """
-    Return the most recent standard CDS roll date on or before *date*.
+    Return the most recent standard CDS roll date strictly before *date*.
 
     Parameters
     ----------
@@ -3934,7 +3965,8 @@ def prev_cds_date(date: datetime.date | str) -> datetime.date:
         If *date* is not a date-like object with integer ``year``, ``month``,
         and ``day`` attributes.
     ValueError
-        If those attributes do not form a valid calendar date.
+        If those attributes do not form a valid calendar date or the selected
+        roll/expiry cannot be represented in Python years ``1..9999``.
 
     Examples
     --------
@@ -3968,7 +4000,8 @@ def prev_cds_semiannual_roll(date: datetime.date | str) -> datetime.date:
         If *date* is not a date-like object with integer ``year``, ``month``,
         and ``day`` attributes.
     ValueError
-        If those attributes do not form a valid calendar date.
+        If those attributes do not form a valid calendar date or the selected
+        roll/expiry cannot be represented in Python years ``1..9999``.
 
     Examples
     --------
@@ -3982,7 +4015,7 @@ def prev_cds_semiannual_roll(date: datetime.date | str) -> datetime.date:
 
 def next_semiannual_cds_maturity(date: datetime.date | str) -> datetime.date:
     """
-    Return the next semi-annual CDS maturity date after *date*.
+    Return the next semi-annual CDS maturity date on or after *date*.
 
     Parameters
     ----------
@@ -4000,7 +4033,8 @@ def next_semiannual_cds_maturity(date: datetime.date | str) -> datetime.date:
         If *date* is not a date-like object with integer ``year``, ``month``,
         and ``day`` attributes.
     ValueError
-        If those attributes do not form a valid calendar date.
+        If those attributes do not form a valid calendar date or the selected
+        roll/expiry cannot be represented in Python years ``1..9999``.
 
     Examples
     --------
@@ -4021,7 +4055,7 @@ def imm_option_expiry(month: int, year: int) -> datetime.date:
     month : int
         Month number from ``1`` through ``12``.
     year : int
-        Four-digit calendar year.
+        Calendar year from ``1`` through ``9999``.
 
     Returns
     -------
@@ -4031,7 +4065,8 @@ def imm_option_expiry(month: int, year: int) -> datetime.date:
     Raises
     ------
     ValueError
-        If *month* is outside ``1..12``.
+        If *month* is outside ``1..12`` or the year/date is outside
+        Python years ``1..9999``.
 
     Examples
     --------
@@ -4062,7 +4097,8 @@ def next_imm_option_expiry(date: datetime.date | str) -> datetime.date:
         If *date* is not a date-like object with integer ``year``, ``month``,
         and ``day`` attributes.
     ValueError
-        If those attributes do not form a valid calendar date.
+        If those attributes do not form a valid calendar date or the selected
+        roll/expiry cannot be represented in Python years ``1..9999``.
 
     Examples
     --------
@@ -4074,9 +4110,12 @@ def next_imm_option_expiry(date: datetime.date | str) -> datetime.date:
     """
     ...
 
-def next_equity_option_expiry(date: datetime.date | str) -> datetime.date:
+def next_third_friday(date: datetime.date | str) -> datetime.date:
     """
-    Return the next monthly listed-equity-option expiry after *date*.
+    Return the next unadjusted monthly third Friday after *date*.
+
+    Exchange holidays are not applied. This primitive does not determine a
+    listed option's expiration or last trading date.
 
     Parameters
     ----------
@@ -4086,7 +4125,7 @@ def next_equity_option_expiry(date: datetime.date | str) -> datetime.date:
     Returns
     -------
     datetime.date
-        Next third-Friday expiry strictly after *date*.
+        Next third Friday strictly after *date*, even when it is a holiday.
 
     Raises
     ------
@@ -4094,13 +4133,14 @@ def next_equity_option_expiry(date: datetime.date | str) -> datetime.date:
         If *date* is not a date-like object with integer ``year``, ``month``,
         and ``day`` attributes.
     ValueError
-        If those attributes do not form a valid calendar date.
+        If those attributes do not form a valid calendar date or the selected
+        roll/expiry cannot be represented in Python years ``1..9999``.
 
     Examples
     --------
     >>> import datetime
-    >>> from finstack_quant.core.dates import next_equity_option_expiry
-    >>> next_equity_option_expiry(datetime.date(2025, 5, 1))
+    >>> from finstack_quant.core.dates import next_third_friday
+    >>> next_third_friday(datetime.date(2025, 5, 1))
     datetime.date(2025, 5, 16)
 
     """
@@ -4125,7 +4165,7 @@ def add_business_days(
     date : datetime.date | str
         Anchor date.
     n : int
-        Signed number of business days to move.
+        Signed 32-bit number of business days to move.
     calendar : HolidayCalendar | str
         Holiday calendar object or registry id (``"usny"``; ``"nyse+gblo"``
         joins calendars).
@@ -4140,8 +4180,11 @@ def add_business_days(
     KeyError
         If *calendar* names an unknown calendar.
     ValueError
-        If *date* is invalid or no business day is found within the bounded
-        (100-day) search window.
+        If *date* is invalid, the shift exceeds the supported date range,
+        or no business day is found within the bounded (100-day) search window.
+
+    OverflowError
+        If the offset is outside the signed 32-bit integer range.
 
     Examples
     --------
@@ -4165,7 +4208,7 @@ def add_weekdays(date: datetime.date | str, n: int) -> datetime.date:
     date : datetime.date | str
         Anchor date.
     n : int
-        Signed number of weekdays to move; ``0`` returns *date* unchanged.
+        Signed 32-bit number of weekdays to move; ``0`` returns *date* unchanged.
 
     Returns
     -------
@@ -4175,7 +4218,10 @@ def add_weekdays(date: datetime.date | str, n: int) -> datetime.date:
     Raises
     ------
     ValueError
-        If *date* is not a valid calendar date or ISO string.
+        If *date* is invalid or the shifted date exceeds the supported calendar range.
+
+    OverflowError
+        If the offset is outside the signed 32-bit integer range.
 
     Examples
     --------
@@ -4195,7 +4241,7 @@ def add_months(date: datetime.date | str, months: int) -> datetime.date:
     date : datetime.date | str
         Anchor date.
     months : int
-        Signed number of calendar months (Jan 31 + 1 gives Feb 28/29).
+        Signed 32-bit number of calendar months (Jan 31 + 1 gives Feb 28/29).
 
     Returns
     -------
@@ -4205,7 +4251,10 @@ def add_months(date: datetime.date | str, months: int) -> datetime.date:
     Raises
     ------
     ValueError
-        If *date* is not a valid calendar date or ISO string.
+        If *date* is invalid or the shifted date exceeds the supported calendar range.
+
+    OverflowError
+        If the offset is outside the signed 32-bit integer range.
 
     Examples
     --------

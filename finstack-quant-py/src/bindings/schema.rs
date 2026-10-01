@@ -182,7 +182,7 @@ fn domains() -> Vec<&'static str> {
 ///
 /// Returns a `PyErr` if any function cannot be registered.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "schema")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "schema")?;
     m.setattr("__doc__", MODULE_DOC)?;
 
     m.add_function(wrap_pyfunction!(index, &m)?)?;
@@ -191,19 +191,13 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(domains, &m)?)?;
 
     let exports = ["domains", "get", "index", "validate"];
-    for name in exports {
-        m.getattr(name)?
-            .setattr("__module__", "finstack_quant.schema")?;
-    }
     m.setattr("__all__", PyList::new(py, exports)?)?;
 
-    crate::bindings::module_utils::register_submodule(
-        py,
+    // `finstack_quant/schema.py` re-exports this module and owns its import path.
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "schema",
-        "finstack_quant",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Python,
     )?;
     Ok(())
 }

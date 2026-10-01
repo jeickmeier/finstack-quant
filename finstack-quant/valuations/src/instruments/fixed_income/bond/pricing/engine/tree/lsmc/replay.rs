@@ -2,6 +2,36 @@
 
 use super::*;
 
+impl FloatingCoupon {
+    /// Resolve full settlement on a copy, preserving the live accrual endpoint.
+    fn settlement(
+        &self,
+        state: &FloatingRuntimeState,
+        path: &[RatesCreditPathState],
+    ) -> Result<crate::cashflow::builder::FloatingCouponSettlement> {
+        let mut settlement_state = state.clone();
+        if let FloatingRateModel::Overnight(overnight) = &self.rate_model {
+            self.compiled.advance_overnight(
+                &mut settlement_state,
+                self.compiled.period().accrual_end,
+                |slice| {
+                    overnight
+                        .sources
+                        .get(&(slice.observation_date, slice.rate_tenor_days))
+                        .ok_or_else(|| {
+                            Error::internal(format!(
+                                "bond hazard LSMC has no overnight source for {} / {} day(s)",
+                                slice.observation_date, slice.rate_tenor_days
+                            ))
+                        })?
+                        .rate(path)
+                },
+            )?;
+        }
+        self.compiled.settle(&settlement_state)
+    }
+}
+
 impl ReplayCursor {
     pub(super) fn new(template: &ReplayTemplate) -> Result<Self> {
         let mut floating = Vec::with_capacity(template.floating.len());
@@ -92,6 +122,19 @@ impl ReplayCursor {
         Ok(())
     }
 
+    /// Settle the locked full coupon without changing its cash or balance dates.
+    fn floating_settlement(
+        &self,
+        template: &ReplayTemplate,
+        path: &[RatesCreditPathState],
+        coupon_id: usize,
+    ) -> Result<crate::cashflow::builder::FloatingCouponSettlement> {
+        let coupon = &template.floating[coupon_id];
+        // Early payment requires every remaining fixing to be known, which
+        // template construction checks before replay starts.
+        coupon.settlement(&self.floating[coupon_id], path)
+    }
+
     pub(super) fn advance_step(
         &mut self,
         template: &ReplayTemplate,
@@ -130,10 +173,9 @@ impl ReplayCursor {
                     floor.target_pv(distribution.date, distribution.amount)?;
             }
         }
-        let mut pik_to_add = 0.0;
         for &coupon_id in &template.floating_payment_ids[step] {
+            let settlement = self.floating_settlement(template, path, coupon_id)?;
             let coupon = &template.floating[coupon_id];
-            let settlement = coupon.compiled.settle(&self.floating[coupon_id])?;
             let cash_coupon = settlement.cash_amount;
             current_cash += cash_coupon;
             reference_cash += cash_coupon;
@@ -142,15 +184,38 @@ impl ReplayCursor {
                 self.cumulative_distribution_target_pv +=
                     floor.target_pv(coupon.compiled.period().payment_date, cash_coupon.max(0.0))?;
             }
-            pik_to_add += settlement.pik_amount;
-            self.floating[coupon_id] = FloatingRuntimeState::default();
         }
+        let mut pik_to_add = 0.0;
+        for &coupon_id in &template.floating_balance_ids[step] {
+            let settlement = self.floating_settlement(template, path, coupon_id)?;
+            if settlement.pik_amount < 0.0 {
+                return Err(Error::Validation(format!(
+                    "Bond '{}' hazard LSMC cannot de-capitalize negative PIK on {}",
+                    bond.id.as_str(),
+                    template.floating[coupon_id].compiled.period().accrual_end
+                )));
+            }
+            pik_to_add += settlement.pik_amount;
+        }
+        // Capitalize before same-day principal movements and next-period capture.
+        self.outstanding += pik_to_add;
         for event in &template.balance_events[step] {
             self.outstanding += event.delta;
         }
-        // Canonical cashflow emission applies same-day amortization before PIK
-        // capitalization.  The next coupon captures this after-event balance.
-        self.outstanding += pik_to_add;
+        for &coupon_id in template.floating_payment_ids[step]
+            .iter()
+            .chain(&template.floating_balance_ids[step])
+        {
+            let coupon = &template.floating[coupon_id];
+            let final_step = if coupon.compiled.economics().pik_fraction > 0.0 {
+                coupon.payment_step.max(coupon.effective_end_step)
+            } else {
+                coupon.payment_step
+            };
+            if step == final_step {
+                self.floating[coupon_id] = FloatingRuntimeState::default();
+            }
+        }
         if self.outstanding < -1.0e-8 || !self.outstanding.is_finite() {
             return Err(Error::Validation(format!(
                 "Bond '{}' hazard LSMC replay produced invalid outstanding principal {} at step {step}",
@@ -229,6 +294,7 @@ struct StaticEvents {
     balance_events: Vec<Vec<BalanceEvent>>,
     static_accruals: Vec<AccrualClaim>,
     static_distributions: Vec<Vec<DistributionEvent>>,
+    static_redemption_pik: f64,
 }
 
 impl ReplayTemplate {
@@ -271,7 +337,11 @@ impl ReplayTemplate {
         let final_redemption_date = schedule
             .get_flows()
             .iter()
-            .filter(|flow| flow.kind == CFKind::Notional)
+            .filter(|flow| {
+                flow.kind == CFKind::Notional
+                    && flow.amount.amount() > 0.0
+                    && flow.principal_delta.is_none()
+            })
             .map(|flow| flow.date)
             .max();
         let inputs = TemplateInputs {
@@ -323,6 +393,28 @@ impl ReplayTemplate {
 
         let (floating, dynamic_flow_indices) =
             Self::build_floating(&inputs, include_as_of_option_cash)?;
+        if matches!(
+            &bond.cashflow_spec,
+            CashflowSpec::Amortizing { schedule, .. }
+                if !matches!(schedule, crate::cashflow::builder::AmortizationSpec::None)
+        ) && floating.iter().any(|coupon| {
+            coupon.compiled.economics().pik_fraction > 0.0
+                && match &coupon.rate_model {
+                    FloatingRateModel::Term(ObservedRateSource::Conditional(_)) => true,
+                    FloatingRateModel::Overnight(model) => model
+                        .sources
+                        .values()
+                        .any(|source| matches!(source, OvernightRateSource::Conditional(_))),
+                    FloatingRateModel::Term(ObservedRateSource::Fixed(_)) => false,
+                }
+        }) {
+            return Err(Error::Validation(format!(
+                "Bond '{}' hazard LSMC does not support stochastic floating PIK with \
+                 amortization: scheduled repayments require canonical runtime balance \
+                 targets rather than deterministic projected PIK amounts",
+                bond.id.as_str()
+            )));
+        }
 
         let ExerciseEvents {
             by_date: exercise_by_date,
@@ -335,6 +427,7 @@ impl ReplayTemplate {
             balance_events,
             static_accruals,
             static_distributions,
+            static_redemption_pik,
         } = Self::build_static_events(&inputs, &dynamic_flow_indices, include_as_of_cash)?;
 
         let mut exercise = vec![Vec::new(); times.len()];
@@ -377,6 +470,7 @@ impl ReplayTemplate {
         let mut floating_reset_ids = vec![Vec::new(); times.len()];
         let mut floating_accrual_start_ids = vec![Vec::new(); times.len()];
         let mut floating_payment_ids = vec![Vec::new(); times.len()];
+        let mut floating_balance_ids = vec![Vec::new(); times.len()];
         for (id, coupon) in floating.iter().enumerate() {
             if matches!(coupon.rate_model, FloatingRateModel::Term(_))
                 && coupon.initial_term_rate.is_none()
@@ -387,6 +481,11 @@ impl ReplayTemplate {
                 floating_accrual_start_ids[coupon.accrual_start_step].push(id);
             }
             floating_payment_ids[coupon.payment_step].push(id);
+            if coupon.compiled.economics().pik_fraction > 0.0
+                && coupon.compiled.period().accrual_end >= as_of
+            {
+                floating_balance_ids[coupon.effective_end_step].push(id);
+            }
         }
 
         let max_rate_history_steps = floating
@@ -407,8 +506,10 @@ impl ReplayTemplate {
             floating_reset_ids,
             floating_accrual_start_ids,
             floating_payment_ids,
+            floating_balance_ids,
             static_accruals,
             static_distributions,
+            static_redemption_pik,
             exercise,
             decision_steps,
             initial_outstanding,
@@ -443,15 +544,19 @@ impl ReplayTemplate {
         // then applies same-day PIK/amortization before exercise while leaving
         // a same-day final redemption available as the holder's terminal claim.
         let mut initial_outstanding = bond.notional.amount();
-        for flow in schedule.get_flows().iter().filter(|flow| flow.date < as_of) {
+        for flow in schedule
+            .get_flows()
+            .iter()
+            .filter(|flow| flow.get_balance_date() < as_of)
+        {
             if flow.kind == CFKind::Notional
                 && flow.date == bond.issue_date
                 && flow.amount.amount() < 0.0
+                && flow.principal_delta.is_none()
             {
                 continue;
             }
-            let terminal_redemption = flow.kind == CFKind::Notional
-                && final_redemption_date.is_some_and(|date| flow.date == date);
+            let terminal_redemption = is_terminal_redemption(flow, final_redemption_date);
             if let Some(delta) = static_balance_delta(flow, terminal_redemption) {
                 initial_outstanding += delta;
             }
@@ -491,22 +596,54 @@ impl ReplayTemplate {
         let mut dynamic_flow_indices = BTreeSet::new();
         if let Some(spec) = floating_spec {
             for (flow_index, flow) in schedule.get_flows().iter().enumerate() {
-                if !matches!(flow.kind, CFKind::FloatReset | CFKind::Pik) || flow.date < as_of {
+                if !matches!(flow.kind, CFKind::FloatReset | CFKind::Pik) {
                     continue;
                 }
                 let Some(accrual) = &flow.accrual else {
                     continue;
                 };
+                let dynamic =
+                    flow.date > as_of || (flow.date == as_of && include_as_of_option_cash);
+                if !dynamic {
+                    if flow.kind == CFKind::Pik
+                        && flow.get_balance_date() >= as_of
+                        && spec
+                            .rate_spec
+                            .compounding
+                            .is_some_and(|method| method.is_overnight())
+                    {
+                        // Excluding settled cash at or before the origin does
+                        // not make future PIK fixing risk deterministic. Retain
+                        // static PIK only for observed or carry-determined rates.
+                        let (overnight, _) = build_overnight_coupon(
+                            tree,
+                            market,
+                            discount.as_ref(),
+                            as_of,
+                            times,
+                            accrual.start,
+                            accrual.end,
+                            spec,
+                        )?;
+                        if overnight
+                            .sources
+                            .values()
+                            .any(|source| matches!(source, OvernightRateSource::Conditional(_)))
+                        {
+                            return Err(Error::Validation(format!(
+                                "Bond '{}' overnight coupon paid {} still requires unobserved fixings after payment for PIK capitalization on {}",
+                                bond.id.as_str(), flow.date, flow.get_balance_date(),
+                            )));
+                        }
+                    }
+                    continue;
+                }
                 if accrual.projected_index_rate.is_none() {
                     continue;
                 }
                 let reset = flow
                     .reset_date
                     .unwrap_or(contractual_reset_date(accrual.start, spec)?);
-                let dynamic = flow.date > as_of || include_as_of_option_cash;
-                if !dynamic {
-                    continue;
-                }
                 let key = (accrual.start, accrual.end, flow.date);
                 let entry = dynamic_groups.entry(key).or_default();
                 entry.reset = Some(reset);
@@ -514,9 +651,38 @@ impl ReplayTemplate {
                 entry.end = Some(accrual.end);
                 entry.payment = Some(flow.date);
                 entry.day_count = Some(accrual.day_count);
+                entry.day_count_context = Some(DayCountContext {
+                    calendar: Some(resolve_calendar_strict(
+                        accrual
+                            .calendar_id
+                            .as_deref()
+                            .unwrap_or(&spec.schedule.calendar_id),
+                    )?),
+                    frequency: Some(spec.schedule.frequency),
+                    bus_basis: None,
+                    coupon_period: accrual.coupon_period,
+                    end_is_termination_date: accrual.end_is_termination_date,
+                });
                 entry.accrual = flow.accrual_factor;
                 entry.base_index_rate = accrual.projected_index_rate;
                 dynamic_flow_indices.insert(flow_index);
+            }
+        }
+
+        if floating_spec.is_some_and(|spec| {
+            spec.rate_spec
+                .compounding
+                .is_some_and(|method| method.is_overnight())
+        }) {
+            let mut periods_by_payment = BTreeMap::<Date, usize>::new();
+            for &(_, _, payment) in dynamic_groups.keys() {
+                *periods_by_payment.entry(payment).or_default() += 1;
+            }
+            if let Some((&payment, _)) = periods_by_payment.iter().find(|(_, count)| **count > 1) {
+                return Err(Error::Validation(format!(
+                    "Bond '{}' segmented overnight coupon paid {} cannot be replayed without its original full-period observation and constraint scope",
+                    bond.id.as_str(), payment,
+                )));
             }
         }
 
@@ -524,13 +690,9 @@ impl ReplayTemplate {
             .map(|spec| coupon_fractions(spec.coupon_type))
             .transpose()?
             .unwrap_or((0.0, 0.0));
-        let mut params = floating_spec
+        let params = floating_spec
             .map(|spec| params_from_spec(&spec.rate_spec))
             .unwrap_or_default();
-        if floating_spec.is_some_and(|spec| spec.rate_spec.compounding.is_some()) {
-            params.index_floor_bp = None;
-            params.index_cap_bp = None;
-        }
         params.validate()?;
 
         let mut floating = Vec::with_capacity(dynamic_groups.len());
@@ -679,6 +841,9 @@ impl ReplayTemplate {
                     accrual_end: end,
                     payment_date: payment,
                     day_count,
+                    day_count_context: group.day_count_context.ok_or_else(|| {
+                        Error::internal("floating coupon is missing day-count context")
+                    })?,
                     accrual_factor: group.accrual,
                 },
                 FloatingCouponEconomics {
@@ -688,6 +853,18 @@ impl ReplayTemplate {
                 },
                 observation,
             )?;
+            if let FloatingRateModel::Overnight(overnight) = &rate_model {
+                for source in overnight.sources.values() {
+                    if let OvernightRateSource::Conditional(source) = source {
+                        if source.observation_step > payment_step {
+                            return Err(Error::Validation(format!(
+                                "Bond '{}' overnight coupon paid {} requires an observation after payment; adjust the accrual end or payment lag",
+                                bond.id.as_str(), payment,
+                            )));
+                        }
+                    }
+                }
+            }
             let initial_notional = (start < as_of)
                 .then(|| {
                     scheduled_outstanding_after(
@@ -708,6 +885,11 @@ impl ReplayTemplate {
                 reset_step,
                 accrual_start_step,
                 payment_step,
+                effective_end_step: if end < as_of {
+                    0
+                } else {
+                    exact_grid_step(times, as_of, end)?
+                },
                 compiled,
                 rate_model,
                 initial_notional,
@@ -759,7 +941,7 @@ impl ReplayTemplate {
                         // floor remains authoritative. A rolled payment after
                         // contractual maturity remains a live reference claim.
                         Some(MakeWholeExercise::Deterministic(0.0))
-                    } else if tree.config.rate_vol > 0.0 {
+                    } else if tree.get_config().rate_vol > 0.0 {
                         let claim_id = make_whole_claims.len();
                         let (exercise_step, basis) = build_make_whole_claim(
                             call,
@@ -867,25 +1049,36 @@ impl ReplayTemplate {
         let mut balance_events = vec![Vec::new(); times.len()];
         let mut static_accruals = Vec::new();
         let mut static_distributions = vec![Vec::new(); times.len()];
+        let mut static_redemption_pik = 0.0;
         for (flow_index, flow) in schedule.get_flows().iter().enumerate() {
-            if flow.date < as_of || dynamic_flow_indices.contains(&flow_index) {
+            if dynamic_flow_indices.contains(&flow_index) {
                 continue;
             }
             if flow.kind == CFKind::Notional
                 && flow.date == bond.issue_date
                 && flow.amount.amount() < 0.0
+                && flow.principal_delta.is_none()
             {
                 // The replay starts with issued principal already outstanding;
                 // the negative inception exchange is an investor cashflow,
                 // not a second draw into the modeled balance.
                 continue;
             }
-            let event_time =
-                grid_day_count.year_fraction(as_of, flow.date, DayCountContext::default())?;
+            let event_time = if flow.date >= as_of {
+                grid_day_count.year_fraction(as_of, flow.date, DayCountContext::default())?
+            } else {
+                0.0
+            };
             let step = nearest_step(times, event_time);
-            let terminal_redemption = flow.kind == CFKind::Notional
-                && final_redemption_date.is_some_and(|date| flow.date == date);
-            if is_cash_settlement_kind(flow.kind) && !terminal_redemption {
+            let terminal_redemption = is_terminal_redemption(flow, final_redemption_date);
+            if flow.kind == CFKind::Pik
+                && final_redemption_date.is_some_and(|redemption| {
+                    flow.date <= redemption && flow.get_balance_date() > redemption
+                })
+            {
+                static_redemption_pik += static_balance_delta(flow, false).unwrap_or(0.0);
+            }
+            if flow.date >= as_of && is_cash_settlement_kind(flow.kind) && !terminal_redemption {
                 let entitlement_key = (flow.date, flow.amount.amount().to_bits());
                 let entitled = entitled_counts
                     .get_mut(&entitlement_key)
@@ -911,12 +1104,13 @@ impl ReplayTemplate {
                     });
                 }
             }
-            if flow.date >= as_of {
+            if flow.get_balance_date() >= as_of {
                 if let Some(delta) = static_balance_delta(flow, terminal_redemption) {
-                    balance_events[step].push(BalanceEvent { delta });
+                    let balance_step = exact_grid_step(times, as_of, flow.get_balance_date())?;
+                    balance_events[balance_step].push(BalanceEvent { delta });
                 }
             }
-            if is_holder_distribution(flow) {
+            if flow.date >= as_of && is_holder_distribution(flow) {
                 static_distributions[step].push(DistributionEvent {
                     date: flow.date,
                     amount: flow.amount.amount().max(0.0),
@@ -926,12 +1120,25 @@ impl ReplayTemplate {
                 .accrual
                 .as_ref()
                 .filter(|_| matches!(flow.kind, CFKind::Fixed | CFKind::FloatReset | CFKind::Pik))
+                .filter(|accrual| flow.date >= as_of || accrual.end >= as_of)
             {
                 static_accruals.push(AccrualClaim {
                     start: accrual.start,
                     end: accrual.end,
                     payment: flow.date,
                     day_count: accrual.day_count,
+                    day_count_context: DayCountContext {
+                        calendar: Some(resolve_calendar_strict(
+                            accrual
+                                .calendar_id
+                                .as_deref()
+                                .unwrap_or(&bond.cashflow_spec.schedule().calendar_id),
+                        )?),
+                        frequency: Some(bond.cashflow_spec.schedule().frequency),
+                        bus_basis: None,
+                        coupon_period: accrual.coupon_period,
+                        end_is_termination_date: accrual.end_is_termination_date,
+                    },
                     amount: flow.amount.amount(),
                     pik: flow.kind == CFKind::Pik,
                 });
@@ -943,6 +1150,7 @@ impl ReplayTemplate {
             balance_events,
             static_accruals,
             static_distributions,
+            static_redemption_pik,
         })
     }
 
@@ -966,14 +1174,29 @@ impl ReplayTemplate {
         for (id, coupon) in self.floating.iter().enumerate() {
             if matches!(&coupon.rate_model, FloatingRateModel::Term(_))
                 && coupon.reset_step <= step
-                && step < coupon.payment_step
+                && step < coupon.payment_step.max(coupon.effective_end_step)
                 && coupon.compiled.captured_notional(&floating[id]).is_some()
                 && coupon
                     .compiled
                     .locked_term_index_rate(&floating[id])
                     .is_some()
             {
-                locked_coupon += coupon.compiled.settle(&floating[id])?.total_amount;
+                let settlement = coupon.compiled.settle(&floating[id])?;
+                if step < coupon.payment_step {
+                    locked_coupon += settlement.cash_amount;
+                }
+                if step < coupon.effective_end_step {
+                    locked_coupon += settlement.pik_amount;
+                }
+            }
+        }
+        let mut redemption_outstanding = state.outstanding;
+        if self.redemption_step == Some(step) {
+            redemption_outstanding += self.static_redemption_pik;
+            for (id, coupon) in self.floating.iter().enumerate() {
+                if coupon.payment_step <= step && step < coupon.effective_end_step {
+                    redemption_outstanding += coupon.settlement(&floating[id], path)?.pik_amount;
+                }
             }
         }
         let factor = path_state(path, step)?;
@@ -981,7 +1204,7 @@ impl ReplayTemplate {
             bond,
             step,
             path,
-            outstanding: state.outstanding,
+            outstanding: redemption_outstanding,
             locked_coupon,
             coupon_states: floating,
             cumulative_distribution_cash: state.cumulative_distribution_cash,
@@ -1002,7 +1225,7 @@ impl ReplayTemplate {
             ],
             current_cash: state.current_cash,
             hold_redemption: if self.redemption_step == Some(step) {
-                state.outstanding
+                redemption_outstanding
             } else {
                 0.0
             },
@@ -1185,22 +1408,40 @@ impl ReplayTemplate {
     ) -> Result<(f64, f64)> {
         let mut cash = 0.0;
         let mut pik = 0.0;
+        let redemption_date = self
+            .redemption_step
+            .and_then(|step| self.step_dates.get(step).copied().flatten());
         for claim in &self.static_accruals {
-            if date <= claim.start || date >= claim.payment {
+            let settlement_date = if claim.pik {
+                redemption_date.map_or(claim.end, |redemption| claim.end.min(redemption))
+            } else {
+                claim.payment
+            };
+            if date <= claim.start || date >= settlement_date {
                 continue;
             }
             let elapsed_end = date.min(claim.end);
-            let elapsed = claim.day_count.year_fraction(
-                claim.start,
-                elapsed_end,
-                DayCountContext::default(),
-            )?;
-            let total = claim.day_count.year_fraction(
-                claim.start,
-                claim.end,
-                DayCountContext::default(),
-            )?;
-            let amount = claim.amount * safe_accrual_ratio(elapsed, total);
+            let ratio = if claim.day_count == DayCount::Act365L {
+                // Preserve the emitted coupon's contractual leap denominator.
+                safe_accrual_ratio(
+                    (elapsed_end - claim.start).whole_days() as f64,
+                    (claim.end - claim.start).whole_days() as f64,
+                )
+            } else {
+                let mut elapsed_context = claim.day_count_context;
+                elapsed_context.end_is_termination_date &= elapsed_end == claim.end;
+                let elapsed =
+                    claim
+                        .day_count
+                        .year_fraction(claim.start, elapsed_end, elapsed_context)?;
+                let total = claim.day_count.year_fraction(
+                    claim.start,
+                    claim.end,
+                    claim.day_count_context,
+                )?;
+                safe_accrual_ratio(elapsed, total)
+            };
+            let amount = claim.amount * ratio;
             if claim.pik {
                 pik += amount;
             } else {
@@ -1209,12 +1450,21 @@ impl ReplayTemplate {
         }
         for (id, coupon) in self.floating.iter().enumerate() {
             let period = coupon.compiled.period();
-            if date <= period.accrual_start || date >= period.payment_date {
+            let cash_active =
+                date < period.payment_date && coupon.compiled.economics().cash_fraction > 0.0;
+            let pik_active = date < period.accrual_end
+                && redemption_date.is_none_or(|redemption| date < redemption)
+                && coupon.compiled.economics().pik_fraction > 0.0;
+            if date <= period.accrual_start || (!cash_active && !pik_active) {
                 continue;
             }
             let accrued_amount = coupon.compiled.accrued_amount(&coupon_states[id], date)?;
-            cash += accrued_amount * coupon.compiled.economics().cash_fraction;
-            pik += accrued_amount * coupon.compiled.economics().pik_fraction;
+            if cash_active {
+                cash += accrued_amount * coupon.compiled.economics().cash_fraction;
+            }
+            if pik_active {
+                pik += accrued_amount * coupon.compiled.economics().pik_fraction;
+            }
         }
         Ok((cash, pik))
     }

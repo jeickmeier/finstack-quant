@@ -4,7 +4,7 @@
 //! Each function returns a `Range<usize>` into the dates/returns arrays rather
 //! than sliced data, so callers slice their own arrays.
 
-use crate::dates::{Date, DateExt, Duration, FiscalConfig, Month};
+use crate::dates::{Date, DateExt, FiscalConfig, Month};
 use core::ops::Range;
 
 /// Index of the first date on or after `target` via binary search.
@@ -15,7 +15,7 @@ fn lower_bound(dates: &[Date], target: Date) -> usize {
 /// Shared range builder: `[period_start, ref_date]` inclusive.
 fn select_range(dates: &[Date], period_start: Date, ref_date: Date) -> Range<usize> {
     let lo = lower_bound(dates, period_start);
-    let hi = lower_bound(dates, ref_date + Duration::days(1));
+    let hi = dates.partition_point(|&date| date <= ref_date);
     lo..hi
 }
 
@@ -129,6 +129,7 @@ fn fiscal_year_start_date(ref_date: Date, fiscal_config: FiscalConfig) -> Date {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dates::Duration;
     fn d(y: i32, m: u8, day: u8) -> Date {
         crate::dates::create_date(y, Month::try_from(m).expect("valid month"), day)
             .expect("valid date")

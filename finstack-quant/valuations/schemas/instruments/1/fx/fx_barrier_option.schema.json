@@ -109,7 +109,7 @@
           "description": "Notional amount in foreign currency"
         },
         "observed_barrier_breached": {
-          "description": "Observed barrier state for expired options.\n\nHistorical monitoring must be supplied explicitly for expired contracts.",
+          "description": "Processed barrier-monitoring state through the valuation date.\n\n`Some(true)` records a breach whose at-hit rebate has already settled,\nincluding a hit processed on the valuation date. That rebate is not a\nremaining claim at expiry. An at-expiry rebate remains due on expiry.\n`Some(false)` records no breach in the processed monitoring history.\nHistorical monitoring must be supplied explicitly for seasoned and\nexpired contracts. Same-day unpaid at-hit claims require a separate\ncash receivable; this boolean does not represent pending settlement.",
           "type": [
             "boolean",
             "null"

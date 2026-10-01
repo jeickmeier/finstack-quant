@@ -3,7 +3,76 @@
 //! (opening balance = prior closing balance, no PIK toggle, no residual schedule).
 #![allow(dead_code)]
 
-use finstack_quant_cashflows::CashflowProvider;
+use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_valuations::instruments::Instrument;
+
+#[derive(Clone)]
+pub(crate) struct ScheduleInstrument {
+    pub(crate) schedule: CashFlowSchedule,
+    id: finstack_quant_core::types::InstrumentId,
+    attributes: finstack_quant_core::types::Attributes,
+}
+
+impl ScheduleInstrument {
+    pub(crate) fn new(schedule: CashFlowSchedule) -> Self {
+        Self {
+            schedule,
+            id: "SCHEDULE".into(),
+            attributes: Default::default(),
+        }
+    }
+}
+
+impl finstack_quant_cashflows::CashflowScheduleSource for ScheduleInstrument {
+    fn raw_cashflow_schedule(
+        &self,
+        _curves: &MarketContext,
+        _as_of: Date,
+    ) -> finstack_quant_core::Result<CashFlowSchedule> {
+        Ok(self.schedule.clone())
+    }
+}
+
+impl Instrument for ScheduleInstrument {
+    fn id(&self) -> &str {
+        self.id.as_str()
+    }
+    fn key(&self) -> finstack_quant_valuations::pricer::InstrumentType {
+        finstack_quant_valuations::pricer::InstrumentType::Bond
+    }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+    fn attributes(&self) -> &finstack_quant_core::types::Attributes {
+        &self.attributes
+    }
+    fn attributes_mut(&mut self) -> &mut finstack_quant_core::types::Attributes {
+        &mut self.attributes
+    }
+    fn clone_box(&self) -> Box<dyn finstack_quant_valuations::instruments::Instrument> {
+        Box::new(self.clone())
+    }
+
+    fn base_value(
+        &self,
+        _market: &MarketContext,
+        _as_of: Date,
+    ) -> finstack_quant_core::Result<Money> {
+        Err(finstack_quant_core::Error::Validation(
+            "test schedule does not price".into(),
+        ))
+    }
+
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<finstack_quant_valuations::instruments::MarketDependencies>
+    {
+        Ok(Default::default())
+    }
+}
 use finstack_quant_core::dates::{Date, Period};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -19,7 +88,7 @@ use std::sync::Arc;
 /// Totals are only populated when every instrument shares one currency (the
 /// runtime applies FX policy for mixed portfolios; these tests do not).
 pub fn aggregate_period_flows(
-    instruments: &IndexMap<String, Arc<dyn CashflowProvider + Send + Sync>>,
+    instruments: &IndexMap<String, Arc<dyn Instrument>>,
     periods: &[Period],
     market_ctx: &MarketContext,
     as_of: Date,

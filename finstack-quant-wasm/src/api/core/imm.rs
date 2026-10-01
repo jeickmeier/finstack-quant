@@ -25,8 +25,13 @@ fn month_year(month: &JsValue, year: &JsValue) -> Result<(Month, i32), JsValue> 
 }
 
 /// Apply a date-to-date rule to an epoch-day argument.
-fn map_date(date: &JsValue, rule: fn(Date) -> Date) -> Result<i32, JsValue> {
-    Ok(days_since_epoch(rule(js_epoch_days(date, "date")?)))
+fn map_date(
+    date: &JsValue,
+    rule: fn(Date) -> finstack_quant_core::Result<Date>,
+) -> Result<i32, JsValue> {
+    rule(js_epoch_days(date, "date")?)
+        .map(days_since_epoch)
+        .map_err(to_js_err)
 }
 
 /// Third Wednesday of a month, the standard IMM date (Rust `third_wednesday`).
@@ -43,7 +48,9 @@ fn map_date(date: &JsValue, rule: fn(Date) -> Date) -> Result<i32, JsValue> {
 #[wasm_bindgen(js_name = thirdWednesday)]
 pub fn third_wednesday(month: JsValue, year: JsValue) -> Result<i32, JsValue> {
     let (month, year) = month_year(&month, &year)?;
-    Ok(days_since_epoch(rust_dates::third_wednesday(month, year)))
+    rust_dates::third_wednesday(month, year)
+        .map(days_since_epoch)
+        .map_err(to_js_err)
 }
 
 /// Third Friday of a month, the standard equity-option expiry (Rust `third_friday`).
@@ -60,7 +67,9 @@ pub fn third_wednesday(month: JsValue, year: JsValue) -> Result<i32, JsValue> {
 #[wasm_bindgen(js_name = thirdFriday)]
 pub fn third_friday(month: JsValue, year: JsValue) -> Result<i32, JsValue> {
     let (month, year) = month_year(&month, &year)?;
-    Ok(days_since_epoch(rust_dates::third_friday(month, year)))
+    rust_dates::third_friday(month, year)
+        .map(days_since_epoch)
+        .map_err(to_js_err)
 }
 
 /// Next quarterly IMM date strictly after a date (Rust `next_imm`).
@@ -183,7 +192,9 @@ pub fn next_semiannual_cds_maturity(date: JsValue) -> Result<i32, JsValue> {
 #[wasm_bindgen(js_name = immOptionExpiry)]
 pub fn imm_option_expiry(month: JsValue, year: JsValue) -> Result<i32, JsValue> {
     let (month, year) = month_year(&month, &year)?;
-    Ok(days_since_epoch(rust_dates::imm_option_expiry(month, year)))
+    rust_dates::imm_option_expiry(month, year)
+        .map(days_since_epoch)
+        .map_err(to_js_err)
 }
 
 /// Next quarterly IMM option expiry strictly after a date (Rust
@@ -201,8 +212,8 @@ pub fn next_imm_option_expiry(date: JsValue) -> Result<i32, JsValue> {
     map_date(&date, rust_dates::next_imm_option_expiry)
 }
 
-/// Next monthly equity-option expiry strictly after a date (Rust
-/// `next_equity_option_expiry`).
+/// Next third Friday of a month strictly after a date, the monthly
+/// equity-option expiry (Rust `next_third_friday`).
 ///
 /// # Arguments
 ///
@@ -211,9 +222,9 @@ pub fn next_imm_option_expiry(date: JsValue) -> Result<i32, JsValue> {
 /// @returns The next third Friday of a month, as epoch days.
 /// @throws `TypeError` if `date` is not an integer; `FinstackError` (kind
 /// `validation`) if it is outside the supported date range.
-#[wasm_bindgen(js_name = nextEquityOptionExpiry)]
-pub fn next_equity_option_expiry(date: JsValue) -> Result<i32, JsValue> {
-    map_date(&date, rust_dates::next_equity_option_expiry)
+#[wasm_bindgen(js_name = nextThirdFriday)]
+pub fn next_third_friday(date: JsValue) -> Result<i32, JsValue> {
+    map_date(&date, rust_dates::next_third_friday)
 }
 
 /// SIFMA agency-MBS settlement class (A through D).
@@ -378,9 +389,9 @@ pub fn estimated_sifma_settlement_date_for_class(
     settlement_class: &JsSifmaSettlementClass,
 ) -> Result<i32, JsValue> {
     let (month, year) = month_year(&month, &year)?;
-    Ok(days_since_epoch(
-        rust_dates::estimated_sifma_settlement_date_for_class(month, year, settlement_class.inner),
-    ))
+    rust_dates::estimated_sifma_settlement_date_for_class(month, year, settlement_class.inner)
+        .map(days_since_epoch)
+        .map_err(to_js_err)
 }
 
 /// Next published SIFMA class A settlement strictly after a date (Rust

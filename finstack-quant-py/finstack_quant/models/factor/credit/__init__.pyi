@@ -1435,7 +1435,7 @@ class FactorModelConfig:
         Returns
         -------
         str or None
-            ``"strict"``, ``"residual"``, ``"warn"``, or ``None`` for the default.
+            ``"strict"``, ``"warn"``, or ``None`` for the strict default.
 
         Raises
         ------
@@ -1498,7 +1498,8 @@ class FactorCovarianceForecast:
         Returns
         -------
         FactorCovarianceMatrix
-            ``D · rho_static · D`` scaled to the horizon.
+            Calibrated covariance scaled to the horizon, preserving the selected
+            shrinkage or ridge estimator.
 
         Raises
         ------

@@ -110,7 +110,7 @@ fn production_roll_materializes_once_and_reports_conflicting_or_missing_projecti
 }
 
 #[test]
-fn production_roll_uses_exclusive_origin_and_inclusive_horizon() {
+fn production_roll_includes_origin_and_horizon_only_when_advancing() {
     let market = MarketContext::new();
     let unavailable = schedule(&[None]);
     assert!(materialize_fixings(
@@ -126,7 +126,7 @@ fn production_roll_uses_exclusive_origin_and_inclusive_horizon() {
         date!(2025 - 01 - 03),
         date!(2025 - 01 - 04)
     )
-    .is_ok());
+    .is_err());
     assert!(materialize_fixings(
         &market,
         [&unavailable],
@@ -141,4 +141,28 @@ fn production_roll_uses_exclusive_origin_and_inclusive_horizon() {
         date!(2025 - 01 - 03)
     )
     .is_err());
+    let projected = schedule(&[Some(0.03)]);
+    let advancing = materialize_fixings(
+        &market,
+        [&projected],
+        date!(2025 - 01 - 03),
+        date!(2025 - 01 - 04),
+    )
+    .unwrap();
+    assert_eq!(
+        advancing
+            .get_series("FIXING:USD-SOFR")
+            .unwrap()
+            .value_on_exact(date!(2025 - 01 - 03))
+            .unwrap(),
+        0.03
+    );
+    let same_day = materialize_fixings(
+        &market,
+        [&unavailable],
+        date!(2025 - 01 - 03),
+        date!(2025 - 01 - 03),
+    )
+    .unwrap();
+    assert!(same_day.get_series("FIXING:USD-SOFR").is_err());
 }

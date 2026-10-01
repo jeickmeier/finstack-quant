@@ -2,8 +2,8 @@
 //!
 //! Implements the Hunter–Jäckel–Joshi predictor-corrector scheme on the
 //! **log of the displaced forwards**: the proportional drift is averaged
-//! between an evaluation at the current state/time and an evaluation at the
-//! predicted state at the **end** of the step, and the update is a log-Euler
+//! between an evaluation at the current state and an evaluation at the
+//! predicted state with the same interval coefficients, and the update is a log-Euler
 //! exponential step. Only "alive" forwards (those with fixing date T_i > t)
 //! are evolved; dead forwards are frozen at their last value.
 //!
@@ -14,15 +14,17 @@
 //!
 //! 1. **Predictor** (log-Euler at the start of the step):
 //!    `X_i^pred = X_i · exp[(m_i(t, F) − ½|λ_i(t)|²)dt + λ_i(t)·Z √dt]`
-//! 2. **Corrector**: recompute the drift **at t + dt** on the predicted
-//!    state (so piecewise-constant loadings that change inside the step are
-//!    seen), average `m̄ = ½(m_i(t, F) + m_i(t+dt, F^pred))`.
+//! 2. **Corrector**: recompute the drift on the predicted state with the
+//!    interval's loadings, averaging `m̄ = ½(m_i(t, F) + m_i(t, F^pred))`.
 //! 3. **Final step**: `X_i(t+dt) = X_i · exp[(m̄ − ½|λ_i(t)|²)dt + λ_i(t)·Z √dt]`.
 //!
 //! The exponential update keeps `F_i > −d_i` by construction (no clamping
 //! floor concentrating mass at the boundary) and is **exact** for frozen
 //! coefficients — in particular the terminal-measure terminal forward, whose
 //! drift is identically zero, is simulated from its exact lognormal law.
+//! The time grid must contain the process's fixing dates and volatility knots.
+//! The engine rejects grids that cross these boundaries; direct steps on an
+//! unaligned interval return nonfinite state to signal invalid discretization.
 //!
 //! # References
 //!
@@ -65,6 +67,10 @@ impl Discretization<LmmProcess> for LmmPredictorCorrector {
         z: &[f64],
         work: &mut [f64],
     ) {
+        if !process.step_is_aligned(t, dt) {
+            x.fill(f64::NAN);
+            return;
+        }
         let params = process.params();
         let n = params.num_forwards;
         let nf = params.num_factors;
@@ -105,11 +111,11 @@ impl Discretization<LmmProcess> for LmmPredictorCorrector {
                 - params.displacements[i];
         }
 
-        // --- Corrector drift at the END of the step on the predicted state
-        // (Hunter-Jäckel-Joshi): loadings with a breakpoint inside (t, t+dt]
-        // are evaluated on their new segment instead of staying stale.
+        // Average over current/predicted states using the SAME interval's
+        // coefficients. A loading activated at t+dt has zero exposure in this
+        // step, and a forward fixing at t+dt evolves over the full interval.
         let drift_pred = &mut rest2[..n];
-        process.drift(t + dt, predicted, drift_pred);
+        process.drift(t, predicted, drift_pred);
 
         // --- Final log-Euler step with the averaged proportional drift ---
         for i in first..n {
@@ -298,5 +304,45 @@ mod tests {
             (x[1] - x1_before).abs() < 1e-15,
             "dead forward 1 should be frozen"
         );
+    }
+
+    #[test]
+    fn forwards_are_frozen_at_their_fixing_date() {
+        let process = LmmProcess::new(simple_params());
+        let disc = LmmPredictorCorrector::new();
+        for (time, fixed) in [(0.0, 1), (1.0, 2), (2.0, 3)] {
+            let mut rates = [0.03; 3];
+            disc.step(&process, time, 0.5, &mut rates, &[1.0, -0.5], &mut [0.0; 9]);
+            assert!(rates[..fixed].iter().all(|&rate| rate == 0.03));
+        }
+    }
+
+    #[test]
+    fn endpoint_volatility_change_has_no_effect_on_previous_interval() {
+        let mut params = simple_params();
+        params.vol_times = vec![0.5];
+        params.vol_values = vec![vec![[0.0; 3]; 3], vec![[0.2, 0.1, 0.0]; 3]];
+        let process = LmmProcess::new(params.validate().expect("valid parameters"));
+        let disc = LmmPredictorCorrector::new();
+        let mut rates = [0.03; 3];
+        disc.step(&process, 0.0, 0.5, &mut rates, &[1.0, -0.5], &mut [0.0; 9]);
+        assert!(rates.iter().all(|&rate| (rate - 0.03).abs() < 1e-15));
+        disc.step(&process, 0.5, 0.5, &mut rates, &[1.0, -0.5], &mut [0.0; 9]);
+        assert_eq!(rates[0], 0.03);
+        assert_ne!(rates[1], 0.03);
+    }
+
+    #[test]
+    fn crossing_a_fixing_or_volatility_knot_is_rejected() {
+        let mut params = simple_params();
+        params.vol_times = vec![0.5];
+        params.vol_values = vec![vec![[0.1; 3]; 3], vec![[0.2; 3]; 3]];
+        let process = LmmProcess::new(params.validate().expect("valid parameters"));
+        let disc = LmmPredictorCorrector::new();
+        for (t, dt) in [(0.0, 0.75), (0.5, 0.75)] {
+            let mut rates = [0.03; 3];
+            disc.step(&process, t, dt, &mut rates, &[0.0; 2], &mut [0.0; 9]);
+            assert!(rates.iter().all(|rate| rate.is_nan()));
+        }
     }
 }

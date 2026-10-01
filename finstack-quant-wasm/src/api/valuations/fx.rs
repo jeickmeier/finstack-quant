@@ -155,12 +155,14 @@ macro_rules! fx_class {
             /// @param metrics - Optional canonical metric IDs such as `"delta"`,
             /// `"vega"`, `"hvar"`, or `"expected_shortfall"`. Omit, `null`, or
             /// `undefined` for a valuation-only result.
-            /// @param metric_pricing_overrides - Optional JSON metric-pricing overrides
-            /// merged into the envelope before validation. Omit, `null`, or
-            /// `undefined` to use the envelope as-is.
+            /// @param metric_pricing_overrides - Optional JSON object patch applied before validation.
+            /// Only supplied fields replace stored overrides; `{}` preserves them. Supplied
+            /// `bump_config` fields merge into the stored object. Explicit `null` clears
+            /// nullable fields to their Rust fallback. Omit the argument or pass JavaScript
+            /// `null`/`undefined` to retain the envelope configuration.
             /// @param market_history - Optional serialized market-history JSON
             /// required by historical risk metrics such as historical VaR.
-            /// @returns Structured `ValuationResult` for the selected model.
+            /// @returns Structured `ValuationResult` for the selected model, preserving Monte Carlo seeds as lossless JavaScript `BigInt` values.
             ///
             /// # Errors
             ///

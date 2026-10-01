@@ -20,6 +20,7 @@ from finstack_quant.core.market_data import InflationCurve as InflationCurve
 from finstack_quant.core.market_data import PriceCurve as PriceCurve
 from finstack_quant.core.market_data import SabrParameterData as SabrParameterData
 from finstack_quant.core.market_data import VolCube as VolCube
+from finstack_quant.core.market_data import VolCubeExpirySlice as VolCubeExpirySlice
 from finstack_quant.core.market_data import VolSurface as VolSurface
 
 __all__ = [
@@ -33,5 +34,6 @@ __all__ = [
     "PriceCurve",
     "SabrParameterData",
     "VolCube",
+    "VolCubeExpirySlice",
     "VolSurface",
 ]

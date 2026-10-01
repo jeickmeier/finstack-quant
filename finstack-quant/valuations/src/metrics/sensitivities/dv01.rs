@@ -475,7 +475,8 @@ where
         let last_idx = buckets.len() - 1;
         context.with_market_scratch(|context, scratch| {
             for (i, &target_time) in buckets.iter().enumerate() {
-                let label = super::config::format_bucket_label_cow(target_time);
+                let label =
+                    std::borrow::Cow::Owned(super::config::format_key_rate_label(target_time));
                 // Build bucket-shaped bumps with half-triangle wings at the
                 // first and last buckets so the bump-set partitions unity
                 // across the full curve. Using a finite `prev = 0.0` at the

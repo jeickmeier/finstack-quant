@@ -20,10 +20,13 @@ use super::problem::PdeProblem1D;
 ///
 /// # Boundary Conditions
 ///
-/// - **Call**: `u(x_min, t) = 0` (deep OTM put), `u(x_max, t) = exp(x_max) - K*exp(-r*(T-t))`
-/// - **Put**: `u(x_min, t) = K*exp(-r*(T-t)) - exp(x_min)`, `u(x_max, t) = 0`
+/// - **Call**: zero at the deep-OTM lower edge and affine in `S = exp(x)`
+///   at the upper edge.
+/// - **Put**: affine in `S = exp(x)` at the lower edge and zero at the
+///   deep-OTM upper edge.
 ///
-/// Far-field boundaries use Linear (vanishing gamma) for robustness.
+/// The affine far field imposes vanishing spot gamma, `u_xx = u_x`, rather
+/// than vanishing curvature in the log-spot coordinate.
 pub struct BlackScholesPde {
     /// Volatility (annualized, decimal).
     pub sigma: f64,
@@ -66,15 +69,13 @@ impl PdeProblem1D for BlackScholesPde {
             // Deep OTM call → value ≈ 0
             BoundaryCondition::Dirichlet(0.0)
         } else {
-            // Deep ITM put → use linear extrapolation for stability
-            BoundaryCondition::Linear
+            BoundaryCondition::LinearInExp
         }
     }
 
     fn upper_boundary(&self, _t: f64) -> BoundaryCondition {
         if self.is_call {
-            // Deep ITM call → use linear extrapolation
-            BoundaryCondition::Linear
+            BoundaryCondition::LinearInExp
         } else {
             // Deep OTM put → value ≈ 0
             BoundaryCondition::Dirichlet(0.0)
@@ -234,5 +235,90 @@ mod tests {
             (0.3..=0.9).contains(&delta_spot),
             "ATM call delta={delta_spot:.4}, expected ~0.5-0.7"
         );
+    }
+
+    #[test]
+    fn convection_dominated_calls_are_nonnegative_and_converge_under_refinement() {
+        // Centered convection previously returned -0.085976 and -0.225921
+        // for these two finite, positive-volatility vanilla calls.
+        // The monotone fallback restores positivity but adds O(h) diffusion:
+        // the production 200/100 mesh alone does not resolve these nearly
+        // deterministic OTM payoffs. Require convergence as both grids refine.
+        for (spot, dividend) in [(109.7_f64, 0.10_f64), (126.0, 0.25)] {
+            let strike = 100.0_f64;
+            let sigma = 0.001;
+            let spread = 5.0 * sigma + dividend;
+            let exact = bs_call(spot, strike, 0.0, dividend, sigma, 1.0);
+            assert!((0.0..1e-10).contains(&exact), "near-deterministic OTM call");
+            let problem = BlackScholesPde {
+                sigma,
+                rate: 0.0,
+                dividend,
+                strike,
+                maturity: 1.0,
+                is_call: true,
+            };
+            let mut errors = Vec::new();
+            for (nodes, steps) in [(200, 100), (400, 200), (800, 400)] {
+                let grid = Grid1D::sinh_concentrated(
+                    strike.ln() - spread,
+                    spot.ln() + spread,
+                    nodes,
+                    strike.ln(),
+                    0.1,
+                )
+                .expect("fixed production domain");
+                let solution = Solver1D::builder()
+                    .grid(grid)
+                    .rannacher(4, steps)
+                    .build()
+                    .expect("solver")
+                    .solve(&problem, 1.0)
+                    .expect("convection-dominated solve");
+                let price = solution.interpolate(spot.ln());
+                assert!(
+                    price >= 0.0 && price <= spot * (-dividend).exp(),
+                    "call value {price} violates bounds for S={spot}, q={dividend}, nodes={nodes}"
+                );
+                errors.push((price - exact).abs());
+            }
+            assert!(errors.windows(2).all(|pair| pair[1] < pair[0]));
+            assert!(errors[2] < errors[0] / 4.0, "mesh errors {errors:?}");
+            assert!(
+                errors[2] < 0.001 * strike,
+                "800-node error exceeds 10 basis points of strike: {errors:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn log_spot_far_field_converges_to_deep_itm_call_value() {
+        // At this strike the entire upper half of the domain is effectively
+        // linear in S. Linear extrapolation in ln(S) left a >1 unit bias even
+        // with 1,001 nodes; refining the mesh could not correct it.
+        let exact = bs_call(100.0, 1.0, 0.05, 0.0, 0.5, 1.0);
+        let problem = BlackScholesPde {
+            sigma: 0.5,
+            rate: 0.05,
+            dividend: 0.0,
+            strike: 1.0,
+            maturity: 1.0,
+            is_call: true,
+        };
+        let mut errors = Vec::new();
+        for nodes in [101, 401] {
+            let grid = Grid1D::uniform(0.01_f64.ln(), 200.0_f64.ln(), nodes)
+                .expect("fixed log-spot domain");
+            let solution = Solver1D::builder()
+                .grid(grid)
+                .rannacher(4, 1000)
+                .build()
+                .expect("solver")
+                .solve(&problem, 1.0)
+                .expect("deep ITM solve");
+            errors.push((solution.interpolate(100.0_f64.ln()) - exact).abs());
+        }
+        assert!(errors[1] < 0.03, "fine-grid price error {}", errors[1]);
+        assert!(errors[1] < errors[0] / 4.0, "mesh errors {errors:?}");
     }
 }

@@ -27,6 +27,8 @@ use finstack_quant_models::monte_carlo::traits::Payoff;
 pub struct RangeAccrualPayoff {
     /// Observation dates (time in years, must be sorted, future only)
     pub observation_dates: Vec<f64>,
+    /// Per-observation carry adjustment to the simulated common spot state.
+    observation_multipliers: Vec<f64>,
     /// Lower bound of the range (effective/absolute)
     pub lower_bound: f64,
     /// Upper bound of the range (effective/absolute)
@@ -58,7 +60,7 @@ impl RangeAccrualPayoff {
     ///
     /// # Arguments
     ///
-    /// * `observation_dates` - Future dates when range check occurs (must be sorted)
+    /// * `observation_dates` - Future model times for each range check, sorted ascending; repeats retain observation multiplicity
     /// * `lower_bound` - Lower bound of the range (effective/absolute)
     /// * `upper_bound` - Upper bound of the range (must be > lower_bound)
     /// * `coupon_rate` - Annual coupon rate
@@ -68,7 +70,7 @@ impl RangeAccrualPayoff {
     /// # Errors
     ///
     /// Returns [`finstack_quant_core::Error::Validation`] if `lower_bound >= upper_bound`,
-    /// `coupon_rate` is negative, or `observation_dates` are not strictly sorted.
+    /// `coupon_rate` is negative, or `observation_dates` are not sorted.
     pub fn new(
         observation_dates: Vec<f64>,
         lower_bound: f64,
@@ -95,7 +97,7 @@ impl RangeAccrualPayoff {
     ///
     /// # Arguments
     ///
-    /// * `observation_dates` - Future dates when range check occurs (must be sorted)
+    /// * `observation_dates` - Future model times for each range check, sorted ascending; repeats retain observation multiplicity
     /// * `lower_bound` - Lower bound of the range (effective/absolute)
     /// * `upper_bound` - Upper bound of the range (must be > lower_bound)
     /// * `coupon_rate` - Annual coupon rate
@@ -108,7 +110,7 @@ impl RangeAccrualPayoff {
     ///
     /// Returns [`finstack_quant_core::Error::Validation`] if `lower_bound >= upper_bound`,
     /// `coupon_rate` is negative, `past_in_range > total_past_observations`, or
-    /// `observation_dates` are not strictly sorted in ascending order.
+    /// `observation_dates` are not finite, non-negative, and sorted in ascending order.
     #[allow(clippy::too_many_arguments)]
     pub fn new_with_history(
         observation_dates: Vec<f64>,
@@ -138,12 +140,22 @@ impl RangeAccrualPayoff {
             )));
         }
 
-        // Verify observation dates are strictly sorted ascending.
+        // Equal model times retain distinct contractual observations.
+        if observation_dates
+            .iter()
+            .any(|time| !time.is_finite() || *time < 0.0)
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "RangeAccrualPayoff: observation times must be finite and non-negative".to_owned(),
+            ));
+        }
         for i in 1..observation_dates.len() {
-            if observation_dates[i - 1].partial_cmp(&observation_dates[i]) != Some(Ordering::Less) {
+            if observation_dates[i - 1].partial_cmp(&observation_dates[i])
+                == Some(Ordering::Greater)
+            {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "RangeAccrualPayoff: observation_dates must be strictly sorted ascending; \
-                     found {} >= {} at index {}",
+                    "RangeAccrualPayoff: observation_dates must be sorted ascending; \
+                     found {} > {} at index {}",
                     observation_dates[i - 1],
                     observation_dates[i],
                     i
@@ -151,8 +163,10 @@ impl RangeAccrualPayoff {
             }
         }
 
+        let observation_multipliers = vec![1.0; observation_dates.len()];
         Ok(Self {
             observation_dates,
+            observation_multipliers,
             lower_bound,
             upper_bound,
             coupon_rate,
@@ -166,6 +180,36 @@ impl RangeAccrualPayoff {
         })
     }
 
+    /// Set the deterministic carry multiplier for each future observation.
+    ///
+    /// # Arguments
+    ///
+    /// * `multipliers` - Positive finite multipliers, matching `observation_dates`
+    ///   in length and order. Equal-time observations can have different dated
+    ///   forwards while sharing the same simulated stochastic state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the lengths differ or a multiplier is not finite
+    /// and strictly positive.
+    pub fn with_observation_multipliers(
+        mut self,
+        multipliers: &[f64],
+    ) -> finstack_quant_core::Result<Self> {
+        if multipliers.len() != self.observation_dates.len()
+            || multipliers
+                .iter()
+                .any(|&scale| !scale.is_finite() || scale <= 0.0)
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "Range accrual multipliers must be positive, finite, and match observation dates"
+                    .to_owned(),
+            ));
+        }
+        self.observation_multipliers = multipliers.to_vec();
+        Ok(self)
+    }
+
     /// Check if spot is within range.
     fn is_in_range(&self, spot: f64) -> bool {
         spot >= self.lower_bound && spot <= self.upper_bound
@@ -177,6 +221,12 @@ impl RangeAccrualPayoff {
 
 impl Payoff for RangeAccrualPayoff {
     fn on_event(&mut self, state: &mut PathState) -> finstack_quant_core::Result<()> {
+        if self.observation_multipliers.len() != self.observation_dates.len() {
+            return Err(finstack_quant_core::Error::Validation(
+                "Range accrual observation dates changed without resetting their multipliers"
+                    .to_owned(),
+            ));
+        }
         // Use a while loop to handle multiple observations per time step
         // This can happen when the simulation grid doesn't align exactly with observation dates
         while self.next_obs_idx < self.observation_dates.len() {
@@ -185,7 +235,8 @@ impl Payoff for RangeAccrualPayoff {
             // Check if we've reached or passed this observation date
             if state.time >= target_date - Self::TIME_TOLERANCE {
                 if let Some(spot) = state.spot() {
-                    if self.is_in_range(spot) {
+                    let observed_spot = spot * self.observation_multipliers[self.next_obs_idx];
+                    if self.is_in_range(observed_spot) {
                         self.days_in_range += 1;
                     }
                     self.total_observations += 1;
@@ -492,5 +543,22 @@ mod tests {
             2,
         )
         .is_err());
+    }
+    #[test]
+    fn equal_time_range_observations_keep_distinct_carry_and_counts() {
+        let mut payoff =
+            RangeAccrualPayoff::new(vec![0.5, 0.5], 95.0, 105.0, 0.1, 1000.0, Currency::USD)
+                .expect("payoff")
+                .with_observation_multipliers(&[1.0, 0.9])
+                .expect("multipliers");
+        for _ in 0..2 {
+            payoff.reset();
+            let mut state = PathState::new(1, 0.5);
+            state.set(state_keys::SPOT, 100.0);
+            payoff.on_event(&mut state).expect("observations");
+            assert_eq!(payoff.total_observations, 2);
+            assert_eq!(payoff.days_in_range, 1);
+            assert_eq!(payoff.value(Currency::USD).expect("payoff").amount(), 50.0);
+        }
     }
 }

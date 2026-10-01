@@ -25,8 +25,9 @@ use finstack_quant_core::market_data::surfaces::VolSurface;
 
 /// Checks that the Dupire local variance is positive everywhere on the grid.
 pub struct LocalVolDensityCheck {
-    /// Forward price for log-moneyness calculation.
-    pub forward: f64,
+    /// Finite positive forward prices, one per surface expiry, defining the
+    /// fixed-log-moneyness coordinates of the time derivative.
+    pub forwards: Vec<f64>,
     /// Tolerance for density positivity.
     pub tolerance: f64,
 }
@@ -41,13 +42,17 @@ impl ArbitrageCheck for LocalVolDensityCheck {
         let strikes = surface.strikes();
         let mut violations = Vec::new();
 
-        if expiries.len() < 2 || strikes.len() < 3 {
+        if expiries.len() < 2
+            || strikes.len() < 3
+            || self.forwards.len() != expiries.len()
+            || self.forwards.iter().any(|f| !f.is_finite() || *f <= 0.0)
+        {
             return violations;
         }
 
         for (ei, &t) in expiries.iter().enumerate() {
             for (si, &big_k) in strikes.iter().enumerate() {
-                let k = (big_k / self.forward).ln(); // log-moneyness
+                let k = (big_k / self.forwards[ei]).ln(); // log-moneyness
                 let v = crate::volatility::get_surface_vol_clamped(surface, t, big_k);
                 let w = v * v * t;
 
@@ -55,7 +60,7 @@ impl ArbitrageCheck for LocalVolDensityCheck {
                     continue; // Skip near-zero variance points
                 }
 
-                let dw_dt = finite_diff_time(surface, expiries, ei, strikes[si]);
+                let dw_dt = finite_diff_time(surface, expiries, &self.forwards, ei, k);
 
                 let (dw_dstrike, d2w_dstrike2) =
                     finite_diff_strike(surface, strikes, si, expiries[ei]);
@@ -87,9 +92,14 @@ impl ArbitrageCheck for LocalVolDensityCheck {
                         ),
                         suggested_fix: None,
                     });
-                } else if denominator > self.tolerance && dw_dt < -self.tolerance {
+                } else if denominator > self.tolerance
+                    && dw_dt.is_some_and(|slope| slope < -self.tolerance)
+                {
                     // Positive denominator but negative numerator: calendar spread
                     // component detected via density check.
+                    let Some(dw_dt) = dw_dt else {
+                        continue;
+                    };
                     let local_var = dw_dt / denominator;
                     if local_var < -self.tolerance {
                         let magnitude = -local_var;
@@ -118,43 +128,52 @@ impl ArbitrageCheck for LocalVolDensityCheck {
     }
 }
 
-/// Compute dw/dT at a grid point using finite differences along the expiry axis.
+/// Compute dw/dT at fixed log-moneyness, remapping the cash strike at each expiry.
 ///
 /// Uses central differences for interior points and one-sided differences at
 /// boundaries.
-fn finite_diff_time(surface: &VolSurface, expiries: &[f64], ei: usize, strike: f64) -> f64 {
-    let total_var = |idx: usize| -> f64 {
+fn finite_diff_time(
+    surface: &VolSurface,
+    expiries: &[f64],
+    forwards: &[f64],
+    ei: usize,
+    k: f64,
+) -> Option<f64> {
+    let total_var = |idx: usize| -> Option<f64> {
         let t = expiries[idx];
-        let v = crate::volatility::get_surface_vol_clamped(surface, t, strike);
-        v * v * t
+        let strike = forwards[idx] * k.exp();
+        // Assess only overlapping observed moneyness. Clamping a remapped
+        // strike would change k and can fabricate calendar arbitrage.
+        let v = crate::volatility::get_surface_vol(surface, t, strike).ok()?;
+        Some(v * v * t)
     };
 
     let n = expiries.len();
     if n < 2 {
-        return 0.0;
+        return None;
     }
 
     if ei == 0 {
         // Forward difference
         let dt = expiries[1] - expiries[0];
         if dt.abs() < 1e-14 {
-            return 0.0;
+            return None;
         }
-        (total_var(1) - total_var(0)) / dt
+        Some((total_var(1)? - total_var(0)?) / dt)
     } else if ei == n - 1 {
         // Backward difference
         let dt = expiries[n - 1] - expiries[n - 2];
         if dt.abs() < 1e-14 {
-            return 0.0;
+            return None;
         }
-        (total_var(n - 1) - total_var(n - 2)) / dt
+        Some((total_var(n - 1)? - total_var(n - 2)?) / dt)
     } else {
         // Central difference
         let dt = expiries[ei + 1] - expiries[ei - 1];
         if dt.abs() < 1e-14 {
-            return 0.0;
+            return None;
         }
-        (total_var(ei + 1) - total_var(ei - 1)) / dt
+        Some((total_var(ei + 1)? - total_var(ei - 1)?) / dt)
     }
 }
 
@@ -222,5 +241,44 @@ fn finite_diff_strike(surface: &VolSurface, strikes: &[f64], si: usize, expiry: 
             / dk_avg;
 
         (dw_dk, d2w_dk2)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn time_derivative_holds_log_moneyness_fixed_under_carry() {
+        let expiries = [1.0, 2.0];
+        let forwards = [100.0, 150.0];
+        let strikes: [f64; 7] = [50.0, 75.0, 100.0, 125.0, 150.0, 175.0, 200.0];
+        let mut values = Vec::new();
+        for (&time, &forward) in expiries.iter().zip(&forwards) {
+            for &strike in &strikes {
+                let variance = 0.04 + 0.02 * (strike / forward).ln() + 0.001 * time;
+                values.push((variance / time).sqrt());
+            }
+        }
+        let surface = VolSurface::from_grid("CARRY", &expiries, &strikes, &values).unwrap();
+        let fixed_strike_slope = 2.0 * values[7 + 2].powi(2) - values[2].powi(2);
+        assert!(fixed_strike_slope < -0.005);
+        for ei in 0..2 {
+            let derivative = finite_diff_time(&surface, &expiries, &forwards, ei, 0.0).unwrap();
+            assert!((derivative - 0.001).abs() < 1e-14);
+        }
+        assert!(
+            finite_diff_time(&surface, &expiries, &forwards, 0, 2.0_f64.ln()).is_none(),
+            "out-of-grid moneyness must not be replaced by a clamped cash strike"
+        );
+        let violations = LocalVolDensityCheck {
+            forwards: forwards.to_vec(),
+            tolerance: 1e-10,
+        }
+        .check(&surface);
+        assert!(
+            violations.is_empty(),
+            "positive fixed-moneyness slopes must pass: {violations:?}"
+        );
     }
 }

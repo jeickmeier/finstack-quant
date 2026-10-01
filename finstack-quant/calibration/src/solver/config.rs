@@ -25,9 +25,11 @@ use serde::{Deserialize, Deserializer, Serialize};
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
 pub struct SolverConfig {
-    /// Numerical convergence tolerance; distinct from economic fit acceptance.
+    /// Positive finite numerical convergence tolerance, distinct from economic fit acceptance.
+    #[cfg_attr(feature = "json-schema", schemars(extend("exclusiveMinimum" = 0.0)))]
     tolerance: f64,
-    /// Maximum iterations available to each solver invocation.
+    /// Positive maximum number of iterations available to each solver invocation.
+    #[cfg_attr(feature = "json-schema", schemars(range(min = 1)))]
     max_iterations: usize,
 }
 
@@ -57,7 +59,7 @@ impl SolverConfig {
     ///
     /// # Arguments
     ///
-    /// * `max_iterations` - Maximum number of iterations per numerical solve.
+    /// * `max_iterations` - Positive maximum number of iterations per numerical solve.
     pub fn with_max_iterations(mut self, max_iterations: usize) -> Self {
         self.max_iterations = max_iterations;
         self
@@ -200,5 +202,24 @@ mod tests {
         let json = serde_json::to_string(&config).expect("serialize");
         let deserialized: SolverConfig = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(config, deserialized);
+    }
+
+    #[test]
+    fn solver_config_rejects_invalid_stopping_settings() {
+        for tolerance in [0.0, -1e-8, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(SolverConfig::default()
+                .with_tolerance(tolerance)
+                .validate()
+                .expect_err("invalid tolerance")
+                .to_string()
+                .contains("tolerance"));
+        }
+        assert!(SolverConfig::default()
+            .with_max_iterations(0)
+            .validate()
+            .expect_err("zero iteration budget")
+            .to_string()
+            .contains("max_iterations"));
+        SolverConfig::default().validate().expect("valid defaults");
     }
 }
