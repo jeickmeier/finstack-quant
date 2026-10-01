@@ -14,10 +14,14 @@
 //! - JSON string `'{"n_steps": N}'` — variance scaled by `N`.
 
 use crate::utils::input::{
-    js_f64, js_f64_matrix, js_f64_seq, js_opt_bool, js_opt_f64, js_string, js_string_seq, js_uint,
-    json_text, opt_json_text,
+    from_js_json, js_f64, js_f64_matrix, js_f64_seq, js_opt_bool, js_opt_f64, js_string,
+    js_string_seq, js_uint, json_text, opt_json_text,
 };
 use crate::utils::{to_js_err, to_js_value};
+
+use finstack_quant_models::factor::credit::VolHorizon;
+use finstack_quant_models::factor::risk::{DecompositionConfig, PositionRiskDecomposition};
+use finstack_quant_models::factor::{FactorCovarianceMatrix, FactorId, FactorModelConfig};
 use wasm_bindgen::prelude::*;
 
 // Horizon helper (shared by CreditCalibrator and FactorCovarianceForecast)
@@ -709,6 +713,449 @@ pub fn evaluate_risk_budget(
         finstack_quant_models::factor::risk::PositionBudgetEntry,
     >(&positions)?;
     Ok(js)
+}
+
+// Accessors of the calibrated model (twins of the Python getters)
+
+#[wasm_bindgen(js_class = CreditFactorModel)]
+impl JsCreditFactorModel {
+    /// Calibration date of the model, in ISO-8601 form.
+    #[wasm_bindgen(getter, js_name = asOf)]
+    pub fn as_of(&self) -> String {
+        self.inner.as_of.to_string()
+    }
+
+    /// First and last date of the calibration window, as `[start, end]` ISO-8601 strings.
+    #[wasm_bindgen(getter, js_name = calibrationWindow)]
+    pub fn calibration_window(&self) -> Vec<String> {
+        vec![
+            self.inner.calibration_window.start.to_string(),
+            self.inner.calibration_window.end.to_string(),
+        ]
+    }
+
+    /// Issuer-beta policy the model was calibrated with: `"dynamic"` or `"globally_off"`.
+    #[wasm_bindgen(getter)]
+    pub fn policy(&self) -> String {
+        self.inner.policy.kind().to_owned()
+    }
+
+    /// Sampling frequency of the calibration panel, as its canonical label.
+    #[wasm_bindgen(getter, js_name = panelFrequency)]
+    pub fn panel_frequency(&self) -> Result<String, JsValue> {
+        finstack_quant_core::wire::serde_label(&self.inner.panel_frequency).map_err(to_js_err)
+    }
+
+    /// Bucket weighting used for the level returns, as its canonical label.
+    #[wasm_bindgen(getter, js_name = bucketWeighting)]
+    pub fn bucket_weighting(&self) -> Result<String, JsValue> {
+        finstack_quant_core::wire::serde_label(&self.inner.bucket_weighting).map_err(to_js_err)
+    }
+
+    /// Factor-model configuration (factors, covariance, matching, risk measure) as a `FactorModelConfig` object.
+    #[wasm_bindgen(getter)]
+    pub fn config(&self) -> Result<JsValue, JsValue> {
+        to_js_value(&self.inner.config)
+    }
+
+    /// Calibrated factor covariance as a `FactorCovarianceMatrix` object (`factor_ids`, row-major `data`).
+    #[wasm_bindgen(getter)]
+    pub fn covariance(&self) -> Result<JsValue, JsValue> {
+        to_js_value(&self.inner.config.covariance)
+    }
+
+    /// Calibration diagnostics (fit quality, fold-ups, dropped factors) as a plain object.
+    #[wasm_bindgen(getter)]
+    pub fn diagnostics(&self) -> Result<JsValue, JsValue> {
+        to_js_value(&self.inner.diagnostics)
+    }
+
+    /// Static factor correlation matrix the covariance forecasts are built on, as a plain object.
+    #[wasm_bindgen(getter, js_name = staticCorrelation)]
+    pub fn static_correlation(&self) -> Result<JsValue, JsValue> {
+        to_js_value(&self.inner.static_correlation)
+    }
+
+    /// Number of hierarchy levels.
+    #[wasm_bindgen(getter, js_name = nLevels)]
+    pub fn n_levels(&self) -> usize {
+        self.inner.hierarchy.levels.len()
+    }
+
+    /// Number of calibrated issuers.
+    #[wasm_bindgen(getter, js_name = nIssuers)]
+    pub fn n_issuers(&self) -> usize {
+        self.inner.issuer_betas.len()
+    }
+
+    /// Number of factors in the model configuration.
+    #[wasm_bindgen(getter, js_name = nFactors)]
+    pub fn n_factors(&self) -> usize {
+        self.inner.config.factors.len()
+    }
+
+    /// Display labels of the hierarchy levels, broadest first.
+    /// @returns Labels such as `"Rating"`, `"Region"`, `"Sector"` or a custom dimension key.
+    #[wasm_bindgen(js_name = levelNames)]
+    pub fn level_names(&self) -> Vec<String> {
+        self.inner.level_names()
+    }
+
+    /// Identifiers of the calibrated issuers, in issuer-beta row order.
+    /// @returns The issuer identifiers.
+    #[wasm_bindgen(js_name = issuerIds)]
+    pub fn issuer_ids(&self) -> Vec<String> {
+        self.inner.issuer_ids()
+    }
+
+    /// Identifiers of the factors, in covariance order.
+    /// @returns The factor identifiers.
+    #[wasm_bindgen(js_name = factorIds)]
+    pub fn factor_ids(&self) -> Vec<String> {
+        self.inner.factor_ids()
+    }
+}
+
+#[wasm_bindgen(js_class = CreditCalibrator)]
+impl JsCreditCalibrator {
+    /// Calibration configuration in canonical JSON form, as a `CreditCalibrationConfig` object.
+    #[wasm_bindgen(getter)]
+    pub fn config(&self) -> Result<JsValue, JsValue> {
+        to_js_value(self.inner.config())
+    }
+}
+
+/// Forecast horizon for the covariance and idiosyncratic-vol forecasts.
+///
+/// The forecast methods take the horizon descriptor; pass `horizon.toString()`.
+#[wasm_bindgen(js_name = VolHorizon)]
+pub struct JsVolHorizon {
+    pub(crate) inner: VolHorizon,
+}
+
+#[wasm_bindgen(js_class = VolHorizon)]
+impl JsVolHorizon {
+    /// One-period horizon: the calibrated annualized variance unchanged.
+    /// @returns The one-step horizon.
+    #[wasm_bindgen(js_name = oneStep)]
+    pub fn one_step() -> JsVolHorizon {
+        Self {
+            inner: VolHorizon::OneStep,
+        }
+    }
+
+    /// Long-run horizon: the unconditional variance of the vol model.
+    /// @returns The unconditional horizon.
+    pub fn unconditional() -> JsVolHorizon {
+        Self {
+            inner: VolHorizon::Unconditional,
+        }
+    }
+
+    /// Horizon of `n` annualized model periods; variance scales linearly with `n`.
+    /// @param n - Number of model periods; a safe non-negative integer (`0` gives zero variance).
+    /// @returns The n-step horizon.
+    ///
+    /// # Errors
+    ///
+    /// Throws a `TypeError` if `n` is not a safe non-negative integer.
+    #[wasm_bindgen(js_name = nSteps)]
+    pub fn n_steps(n: JsValue) -> Result<JsVolHorizon, JsValue> {
+        Ok(Self {
+            inner: VolHorizon::NSteps(js_uint(&n, "n")?),
+        })
+    }
+
+    /// Fractional-year horizon, for example `10 / 252` for ten trading days.
+    /// @param years - Horizon length in years; finite and non-negative.
+    /// @returns The fractional-year horizon.
+    ///
+    /// # Errors
+    ///
+    /// Throws a `validation` error if `years` is non-finite or negative.
+    pub fn years(years: JsValue) -> Result<JsVolHorizon, JsValue> {
+        VolHorizon::years(js_f64(&years, "years")?)
+            .map(|inner| Self { inner })
+            .map_err(to_js_err)
+    }
+
+    /// Parse a horizon descriptor.
+    /// @param s - `"one_step"`, `"unconditional"`, or a JSON object string such as `'{"n_steps": 5}'` or `'{"years": 0.25}'`.
+    /// @returns The parsed horizon.
+    ///
+    /// # Errors
+    ///
+    /// Throws a `validation` error if the descriptor is not recognized.
+    pub fn parse(s: JsValue) -> Result<JsVolHorizon, JsValue> {
+        VolHorizon::parse(&js_string(&s, "s")?)
+            .map(|inner| Self { inner })
+            .map_err(to_js_err)
+    }
+
+    /// Variant label: `"one_step"`, `"unconditional"`, `"n_steps"` or `"years"`.
+    #[wasm_bindgen(getter)]
+    pub fn kind(&self) -> String {
+        self.inner.kind().to_owned()
+    }
+
+    /// Step count when `kind` is `"n_steps"`, otherwise `undefined`.
+    #[wasm_bindgen(getter)]
+    pub fn n(&self) -> Option<usize> {
+        match self.inner {
+            VolHorizon::NSteps(n) => Some(n),
+            _ => None,
+        }
+    }
+
+    /// Horizon in years when `kind` is `"years"`, otherwise `undefined`.
+    #[wasm_bindgen(getter, js_name = yearsValue)]
+    pub fn years_value(&self) -> Option<f64> {
+        match self.inner {
+            VolHorizon::Years(years) => Some(years),
+            _ => None,
+        }
+    }
+
+    /// Canonical descriptor accepted by `parse` and by the forecast methods.
+    /// @returns `"one_step"`, `"unconditional"`, `{"n_steps": N}` or `{"years": Y}`.
+    #[wasm_bindgen(js_name = toString)]
+    #[allow(clippy::inherent_to_string)]
+    pub fn to_string(&self) -> String {
+        self.inner.descriptor()
+    }
+}
+
+// FactorCovarianceMatrix / FactorModelConfig computations. Both types cross
+// the boundary as plain objects, so their Rust methods are free functions here.
+
+/// Variance of one factor in a factor covariance matrix.
+/// @param matrix - `FactorCovarianceMatrix` object or JSON (`factor_ids`, row-major `data`).
+/// @param factor_id - Factor whose diagonal variance is requested; an unknown identifier returns 0.
+/// @returns The factor's variance.
+///
+/// # Errors
+///
+/// Throws a `validation` error if `matrix` is malformed or not a valid
+/// covariance matrix.
+#[wasm_bindgen(js_name = factorVariance)]
+pub fn factor_variance(matrix: JsValue, factor_id: JsValue) -> Result<f64, JsValue> {
+    let matrix: FactorCovarianceMatrix = from_js_json(&matrix, "matrix")?;
+    Ok(matrix.variance(&FactorId::new(js_string(&factor_id, "factorId")?)))
+}
+
+/// Covariance between two factors in a factor covariance matrix.
+/// @param matrix - `FactorCovarianceMatrix` object or JSON (`factor_ids`, row-major `data`).
+/// @param lhs - First factor identifier; an unknown identifier returns 0.
+/// @param rhs - Second factor identifier; an unknown identifier returns 0.
+/// @returns The covariance of the two factors.
+///
+/// # Errors
+///
+/// Throws a `validation` error if `matrix` is malformed or not a valid
+/// covariance matrix.
+#[wasm_bindgen(js_name = factorCovariance)]
+pub fn factor_covariance(matrix: JsValue, lhs: JsValue, rhs: JsValue) -> Result<f64, JsValue> {
+    let matrix: FactorCovarianceMatrix = from_js_json(&matrix, "matrix")?;
+    Ok(matrix.covariance(
+        &FactorId::new(js_string(&lhs, "lhs")?),
+        &FactorId::new(js_string(&rhs, "rhs")?),
+    ))
+}
+
+/// Correlation between two factors in a factor covariance matrix.
+/// @param matrix - `FactorCovarianceMatrix` object or JSON (`factor_ids`, row-major `data`).
+/// @param lhs - First factor identifier; an unknown identifier or a non-positive variance returns 0.
+/// @param rhs - Second factor identifier; an unknown identifier or a non-positive variance returns 0.
+/// @returns The correlation of the two factors, from -1 through 1.
+///
+/// # Errors
+///
+/// Throws a `validation` error if `matrix` is malformed or not a valid
+/// covariance matrix.
+#[wasm_bindgen(js_name = factorCorrelation)]
+pub fn factor_correlation(matrix: JsValue, lhs: JsValue, rhs: JsValue) -> Result<f64, JsValue> {
+    let matrix: FactorCovarianceMatrix = from_js_json(&matrix, "matrix")?;
+    Ok(matrix.correlation(
+        &FactorId::new(js_string(&lhs, "lhs")?),
+        &FactorId::new(js_string(&rhs, "rhs")?),
+    ))
+}
+
+/// Factor covariance matrix as one row per factor (the twin of Python `to_numpy`).
+/// @param matrix - `FactorCovarianceMatrix` object or JSON (`factor_ids`, row-major `data`).
+/// @returns An array of `number[]` rows, `nFactors` by `nFactors`, in `factor_ids` order.
+///
+/// # Errors
+///
+/// Throws a `validation` error if `matrix` is malformed or not a valid
+/// covariance matrix.
+#[wasm_bindgen(js_name = factorCovarianceRows)]
+pub fn factor_covariance_rows(matrix: JsValue) -> Result<JsValue, JsValue> {
+    let matrix: FactorCovarianceMatrix = from_js_json(&matrix, "matrix")?;
+    to_js_value(&matrix.to_rows())
+}
+
+/// Validate a factor-model configuration: factor ordering, matching rules and the risk measure.
+/// @param config - `FactorModelConfig` object or JSON, as returned by `CreditFactorModel.config` or `factorModelAt`.
+///
+/// # Errors
+///
+/// Throws a `validation` error naming the first inconsistency.
+#[wasm_bindgen(js_name = validateFactorModelConfig)]
+pub fn validate_factor_model_config(config: JsValue) -> Result<(), JsValue> {
+    let config: FactorModelConfig = from_js_json(&config, "config")?;
+    config.validate().map_err(to_js_err)
+}
+
+// Position-risk configuration, stress attribution and lookups
+
+/// Configuration of position-level VaR / ES decomposition.
+#[wasm_bindgen(js_name = DecompositionConfig)]
+pub struct JsDecompositionConfig {
+    pub(crate) inner: DecompositionConfig,
+}
+
+json_round_trip!(JsDecompositionConfig, DecompositionConfig);
+
+#[wasm_bindgen(js_class = DecompositionConfig)]
+impl JsDecompositionConfig {
+    /// Parametric (delta-normal) decomposition at a confidence level.
+    /// @param confidence - Tail confidence as a decimal probability in `(0.5, 1)`, such as 0.99.
+    /// @returns The parametric configuration.
+    ///
+    /// # Errors
+    ///
+    /// Throws a `TypeError` if `confidence` is not a number; the range is
+    /// checked when the configuration is used.
+    pub fn parametric(confidence: JsValue) -> Result<JsDecompositionConfig, JsValue> {
+        Ok(Self {
+            inner: DecompositionConfig::parametric(js_f64(&confidence, "confidence")?),
+        })
+    }
+
+    /// Parametric decomposition at 95% confidence.
+    /// @returns The parametric 95% preset.
+    #[wasm_bindgen(js_name = parametric95)]
+    pub fn parametric_95() -> JsDecompositionConfig {
+        Self {
+            inner: DecompositionConfig::parametric_95(),
+        }
+    }
+
+    /// Parametric decomposition at 99% confidence.
+    /// @returns The parametric 99% preset.
+    #[wasm_bindgen(js_name = parametric99)]
+    pub fn parametric_99() -> JsDecompositionConfig {
+        Self {
+            inner: DecompositionConfig::parametric_99(),
+        }
+    }
+
+    /// Historical-simulation decomposition at a confidence level.
+    /// @param confidence - Tail confidence as a decimal probability in `(0.5, 1)`, such as 0.99.
+    /// @returns The historical configuration.
+    ///
+    /// # Errors
+    ///
+    /// Throws a `TypeError` if `confidence` is not a number; the range is
+    /// checked when the configuration is used.
+    pub fn historical(confidence: JsValue) -> Result<JsDecompositionConfig, JsValue> {
+        Ok(Self {
+            inner: DecompositionConfig::historical(js_f64(&confidence, "confidence")?),
+        })
+    }
+
+    /// Historical-simulation decomposition at 95% confidence.
+    /// @returns The historical 95% preset.
+    #[wasm_bindgen(js_name = historical95)]
+    pub fn historical_95() -> JsDecompositionConfig {
+        Self {
+            inner: DecompositionConfig::historical_95(),
+        }
+    }
+
+    /// Copy of this configuration that also computes incremental VaR (one full repricing per position).
+    /// @returns The configuration with `computeIncremental` set.
+    #[wasm_bindgen(js_name = withIncremental)]
+    pub fn with_incremental(&self) -> JsDecompositionConfig {
+        Self {
+            inner: self.inner.clone().with_incremental(),
+        }
+    }
+
+    /// Tail confidence as a decimal probability.
+    #[wasm_bindgen(getter)]
+    pub fn confidence(&self) -> f64 {
+        self.inner.confidence
+    }
+
+    /// Decomposition method: `"parametric"` or `"historical"`.
+    #[wasm_bindgen(getter)]
+    pub fn method(&self) -> Result<String, JsValue> {
+        finstack_quant_core::wire::serde_label(&self.inner.method).map_err(to_js_err)
+    }
+
+    /// Whether leave-one-out incremental VaR is computed.
+    #[wasm_bindgen(getter, js_name = computeIncremental)]
+    pub fn compute_incremental(&self) -> bool {
+        self.inner.compute_incremental
+    }
+}
+
+/// Default utilization threshold of `evaluateRiskBudget`. Twin of the Rust and
+/// Python constant `DEFAULT_UTILIZATION_THRESHOLD`.
+/// @returns The threshold as a fraction of the risk budget.
+#[wasm_bindgen(js_name = defaultUtilizationThreshold)]
+pub fn default_utilization_threshold() -> f64 {
+    finstack_quant_models::factor::risk::DEFAULT_UTILIZATION_THRESHOLD
+}
+
+/// Attribute the portfolio loss in tail scenarios to positions.
+///
+/// Returns the canonical `StressAttribution` (the object Python's
+/// `build_stress_attribution` returns): the VaR threshold, the tail scenarios
+/// and each position's average tail P&L and share of the tail loss.
+/// @param position_ids - Position identifiers, one per row of `positionPnls`.
+/// @param position_pnls - Position-major P&L matrix as nested rows: one row per position, one column per scenario, in reporting-currency amounts.
+/// @param confidence - Optional tail confidence in `(0.5, 1)`; omitted or `null` uses the Rust `DecompositionConfig::historical_95()` preset (0.95).
+/// @returns The `StressAttribution` object.
+///
+/// # Errors
+///
+/// Throws a `TypeError` if an argument has the wrong JavaScript type, and a
+/// `validation` error if the dimensions disagree, a P&L is non-finite,
+/// `confidence` is outside `(0.5, 1)`, or the tail holds no scenario.
+#[wasm_bindgen(js_name = buildStressAttribution)]
+pub fn build_stress_attribution(
+    position_ids: JsValue,
+    position_pnls: JsValue,
+    confidence: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    use finstack_quant_models::factor::risk::{build_stress_attribution, flatten_position_pnls};
+    let ids = js_string_seq(&position_ids, "positionIds")?;
+    let position_pnls = js_f64_matrix(&position_pnls, "positionPnls")?;
+    let confidence = js_opt_f64(confidence.as_ref(), "confidence")?
+        .unwrap_or_else(|| DecompositionConfig::historical_95().confidence);
+    let (flat, n_scenarios) = flatten_position_pnls(position_pnls, ids.len()).map_err(to_js_err)?;
+    let result =
+        build_stress_attribution(&ids, &flat, n_scenarios, confidence).map_err(to_js_err)?;
+    to_js_value(&result)
+}
+
+/// One position's component VaR from a position risk decomposition.
+/// @param decomp - `PositionRiskDecomposition` object or JSON, as returned by `parametricVarDecomposition` or `historicalVarDecomposition`.
+/// @param position_id - Position identifier exactly as it appears in the decomposition.
+/// @returns The position's Euler-allocated component VaR (losses negative).
+///
+/// # Errors
+///
+/// Throws a `validation` error if `decomp` is malformed, and a `not_found`
+/// error if the position is not in the decomposition.
+#[wasm_bindgen(js_name = positionComponentVar)]
+pub fn position_component_var(decomp: JsValue, position_id: JsValue) -> Result<f64, JsValue> {
+    let decomp: PositionRiskDecomposition = from_js_json(&decomp, "decomp")?;
+    let position_id = js_string(&position_id, "positionId")?;
+    decomp.try_component_var(&position_id).map_err(to_js_err)
 }
 
 #[cfg(test)]

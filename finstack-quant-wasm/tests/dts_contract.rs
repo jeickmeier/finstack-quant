@@ -1132,18 +1132,23 @@ fn models_and_valuations_dts_expose_owned_credit_namespaces() {
     let valuations = interface_block(&dts, "ValuationsNamespace");
 
     assert!(dts.contains("export interface ModelCreditNamespace"));
-    assert!(dts.contains("mertonModelJson("));
-    assert!(dts.contains("mertonDefaultProbabilityWithDrift("));
-    assert!(dts.contains("mertonDistanceToDefaultWithDrift("));
+    let merton = interface_block(&dts, "MertonModel");
+    let merton_statics = interface_block(&dts, "MertonModelConstructor");
+    assert!(merton
+        .contains("defaultProbabilityWithDrift(assetDrift: number, horizon: number): number;"));
     assert!(
-        dts.contains("mertonKmvDefaultPoint(shortTermDebt: number, longTermDebt: number): number;")
+        merton.contains("distanceToDefaultWithDrift(assetDrift: number, horizon: number): number;")
     );
-    assert!(dts.contains("mertonDebtSpread(modelJson: JsonInput, horizon: number): number;"));
-    assert!(dts.contains(
-        "mertonCdsParSpread(modelJson: JsonInput, maturity: number, recovery: number): number;"
-    ));
-    assert!(dts.contains("creditGradesModelJson("));
-    assert!(dts.contains("toggleExerciseOptimalJson("));
+    assert!(merton.contains("debtSpread(horizon: number): number;"));
+    assert!(merton.contains("cdsParSpread(maturity: number, recovery: number): number;"));
+    assert!(merton.contains("): HazardCurve;"));
+    assert!(merton_statics
+        .contains("kmvDefaultPoint(shortTermDebt: number, longTermDebt: number): number;"));
+    assert!(merton_statics.contains("creditGrades("));
+    assert!(model_credit.contains("MertonModel: MertonModelConstructor;"));
+    assert!(model_credit.contains("ToggleExerciseModel: ToggleExerciseModelConstructor;"));
+    assert!(!dts.contains("mertonModelJson("));
+    assert!(!dts.contains("creditStateJson("));
     assert!(model_credit.contains("analyzeExchangeOffer("));
     assert!(model_credit.contains("analyzeLme("));
     assert!(!core.contains("analyzeExchangeOffer("));

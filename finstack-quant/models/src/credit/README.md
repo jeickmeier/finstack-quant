@@ -461,26 +461,21 @@ The wire and export surface is not uniform across the eight classes:
 `SimulatedPaths` is a plain path container: `times()`, `asset_values()`,
 `num_paths()`, `num_steps()`, `get()`, `path()`, `to_nested()`.
 
-Not every Rust constructor is bound. `DynamicRecoverySpec` exposes only
-`constant`, `EndogenousHazardSpec` only `power_law`, and `ToggleExerciseModel`
-only `threshold` and `optimal`. The remaining variants are reachable from
-Python through `from_json` on the canonical wire form.
+Every Rust constructor is bound: `DynamicRecoverySpec` (`constant`,
+`inverse_linear`, `inverse_power`, `floored_inverse`, `linear_decline`),
+`EndogenousHazardSpec` (`power_law`, `exponential`, `tabular`) and
+`ToggleExerciseModel` (`threshold`, `stochastic`, `optimal`).
 
-**WASM** — bound as the `valuations.credit` namespace
-([`finstack-quant-wasm/exports/valuations/credit.js`](../../../../../finstack-quant-wasm/exports/valuations/credit.js)
-over [`src/api/valuations/credit.rs`](../../../../../finstack-quant-wasm/src/api/valuations/credit.rs)),
-as JSON-string functions rather than classes: `mertonModelJson`,
-`mertonModelWithDynamicsJson`, `creditGradesModelJson`,
-`mertonFromEquityJson`, `mertonFromCdsSpreadJson`, `mertonFromTargetPdJson`,
-`mertonDefaultProbability`, `mertonDefaultProbabilityWithDrift`,
-`mertonDistanceToDefault`, `mertonDistanceToDefaultWithDrift`,
-`mertonKmvDefaultPoint`, `mertonImpliedSpread`, `mertonDebtSpread`,
-`mertonCdsParSpread`, `mertonTryImpliedEquity`, `mertonToHazardCurveJson`,
-`mertonSimulatePathsJson`, `dynamicRecoveryConstantJson`,
-`dynamicRecoveryAtNotional`, `endogenousHazardPowerLawJson`,
-`endogenousHazardAtLeverage`, `endogenousHazardAfterPikAccrual`,
-`creditStateJson`, `toggleExerciseThresholdJson`,
-`toggleExerciseOptimalJson`. The same constructor gaps as Python apply.
+**WASM** — bound as the `models.credit` namespace
+([`finstack-quant-wasm/exports/models/credit.js`](../../../../../finstack-quant-wasm/exports/models/credit.js)
+over [`src/api/models/credit/`](../../../../../finstack-quant-wasm/src/api/models/credit/))
+with the same typed handles as Python: `MertonModel`, `MertonBarrierType`,
+`AssetDynamics`, `SimulatedPaths`, `DynamicRecoverySpec`,
+`EndogenousHazardSpec`, `ToggleExerciseModel` and `RatingFactorTable`, each
+with the camelCase twin of every Python member and `toJson` / `fromJson`.
+`MertonModel.toHazardCurve` returns a `core.HazardCurve`. `CreditState` is a
+plain object (the generated `CreditState` type) passed to
+`ToggleExerciseModel.shouldPikWithUniform`.
 
 `market_anchored` is Rust-only in both hosts.
 

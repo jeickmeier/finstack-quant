@@ -201,7 +201,7 @@ class CreditFactorModel:
         Returns
         -------
         str
-            Serde label such as ``"globally_off"`` or ``"globally_on"``.
+            Variant label: ``"dynamic"`` or ``"globally_off"``.
 
         Notes
         -----

@@ -111,6 +111,50 @@ impl VolHorizon {
         }
     }
 
+    /// Build a fractional-year horizon, rejecting values a forecast cannot
+    /// scale by.
+    ///
+    /// # Arguments
+    ///
+    /// * `years` - Horizon length in years (for example `10.0 / 252.0` for
+    ///   ten trading days); must be finite and non-negative.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message if `years` is NaN, infinite or negative.
+    pub fn years(years: f64) -> Result<VolHorizon, String> {
+        if years.is_finite() && years >= 0.0 {
+            Ok(VolHorizon::Years(years))
+        } else {
+            Err("years must be finite and non-negative".to_owned())
+        }
+    }
+
+    /// Canonical descriptor string of this horizon: the inverse of `parse`.
+    ///
+    /// `"one_step"`, `"unconditional"`, `{"n_steps": N}` or `{"years": Y}`.
+    #[must_use]
+    pub fn descriptor(self) -> String {
+        match self {
+            Self::OneStep => "one_step".to_owned(),
+            Self::Unconditional => "unconditional".to_owned(),
+            Self::NSteps(n) => format!("{{\"n_steps\": {n}}}"),
+            Self::Years(years) => format!("{{\"years\": {years}}}"),
+        }
+    }
+
+    /// Variant label: `"one_step"`, `"unconditional"`, `"n_steps"` or
+    /// `"years"`.
+    #[must_use]
+    pub fn kind(self) -> &'static str {
+        match self {
+            Self::OneStep => "one_step",
+            Self::Unconditional => "unconditional",
+            Self::NSteps(_) => "n_steps",
+            Self::Years(_) => "years",
+        }
+    }
+
     /// Apply this horizon's scaling rule to an annualized variance under the
     /// `Sample` vol model.
     fn scale_sample_variance(self, variance: f64) -> f64 {

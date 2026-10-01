@@ -227,7 +227,7 @@ impl PyArbitrageReport {
 /// ValueError
 ///     If grid dimensions are inconsistent or inputs are non-finite.
 #[pyfunction]
-#[pyo3(signature = (strikes, expiries, vols, forward_prices, tolerance = 1e-6))]
+#[pyo3(signature = (strikes, expiries, vols, forward_prices, tolerance = model_arbitrage::DEFAULT_GRID_TOLERANCE))]
 fn check_butterfly_grid<'py>(
     py: Python<'py>,
     strikes: Vec<f64>,
@@ -273,7 +273,7 @@ fn check_butterfly_grid<'py>(
 /// ValueError
 ///     If grid dimensions are inconsistent or inputs are non-finite.
 #[pyfunction]
-#[pyo3(signature = (strikes, expiries, vols, forward_prices, tolerance = 1e-6))]
+#[pyo3(signature = (strikes, expiries, vols, forward_prices, tolerance = model_arbitrage::DEFAULT_GRID_TOLERANCE))]
 fn check_calendar_spread_grid<'py>(
     py: Python<'py>,
     strikes: Vec<f64>,
@@ -364,7 +364,7 @@ fn check_local_vol_density_grid<'py>(
 /// ValueError
 ///     If the forward-price shape or grid inputs are invalid.
 #[pyfunction]
-#[pyo3(signature = (strikes, expiries, vols, forward_prices, tolerance = 1e-6))]
+#[pyo3(signature = (strikes, expiries, vols, forward_prices, tolerance = model_arbitrage::DEFAULT_GRID_TOLERANCE))]
 fn check_surface_grid(
     strikes: Vec<f64>,
     expiries: Vec<f64>,

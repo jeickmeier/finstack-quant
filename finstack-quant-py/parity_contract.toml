@@ -571,7 +571,9 @@ python_package = "finstack_quant.models.monte_carlo"
 # (use `models.bs_price`). Rust-only: engine/process/discretization/RNG/payoff
 # graph, `GbmEuropeanFdSpec` (flattened into kwargs), `PathDependentPricerConfig`
 # / `LsmcConfig` (flattened into constructor kwargs), captured-path datasets,
-# and the registry defaults module.
+# the registry defaults module, and `monte_carlo::convenience` (the one place
+# that resolves an omitted pricer setting, step count or currency to its
+# registry default; both hosts build their pricers through it).
 public = [
     "Estimate",
     "EuropeanPricer",
@@ -627,7 +629,9 @@ public = ["dtsm", "hull_white"]
 # `fd_instantaneous_forward`, `hw1f_caplet_price_from_dfs`,
 # `hw1f_term_caplet_price_from_dfs_with_model`,
 # `hw1f_cap_floor_price_with_model` and `hw_bond_vol_with_model` (bound as
-# `HullWhiteParams.bond_vol`). WASM does not expose `rates.hullWhite`.
+# `HullWhiteParams.bond_vol`). WASM binds the same names under
+# `models.rates.hullWhite`; its facade makes `forwardCurve` optional because
+# wasm-bindgen cannot borrow an optional handle.
 [crates.models.rates.hull_white]
 python_package = "finstack_quant.models.rates.hull_white"
 public = [
@@ -1064,9 +1068,11 @@ note = "Typed rates/fixed-income instruments (Bond, TermLoan, InterestRateSwap, 
 #   - MigrationSimulator::simulate / empirical_matrix with a caller-supplied
 #     RNG (hosts always use the seeded canonical Pcg64); RatingPaths is a
 #     host-side collection over Vec<RatingPath>, not a Rust type
-# WASM exposes the JSON-based Merton / PIK-spec subset and the two
-# liability-management analytics; the remaining WASM gaps are in the [parity]
-# ledger backlog.
+# WASM binds the same typed handles under `models.credit` (MertonModel, the
+# PIK specifications, ToggleExerciseModel, RatingFactorTable and the lgd / pd /
+# migration / scoring / recovery_waterfall families, flattened into the one
+# namespace); CreditState and the result types cross as plain objects. The
+# [parity] ledger pins the per-name accounting.
 [crates.models.credit]
 python_package = "finstack_quant.models.credit"
 public = [
@@ -1852,7 +1858,7 @@ js_rule_members = { free = "wasm ownership: releases the wasm-bindgen handle", t
 # Ratchet: remaining backlog sizes. Lower these as names are bound; never raise them.
 # S16 moved MarketContext from the module backlog to a bound WASM class: its 29
 # unbound methods now count as member backlog (a reclassification, not growth).
-backlog_ceiling = { modules = 819, members = 286 }
+backlog_ceiling = { modules = 695, members = 255 }
 
 [parity.modules."finstack_quant"]
 js = ""
@@ -2426,135 +2432,48 @@ types = { BsGreeks = "BsGreeks", ForwardGreeks = "ForwardGreeks" }
 
 [parity.modules."finstack_quant.models.correlation"]
 js = "models.correlation"
-types = { TrancheLossStatistics = "TrancheLossStatistics" }
-backlog = [
-    "CorrelatedBernoulli",
-    "CreditExposure",
-    "LatentFactorKind",
-    "LatentFactorSpec",
-    "LatentMultiFactor",
-    "LatentSingleFactor",
-    "LatentTwoFactor",
-    "MAX_PORTFOLIO_LOSS_PATHS",
-    "PortfolioLossConfig",
-    "cholesky_decompose",
-    "simulate_portfolio_loss",
-]
+types = { CreditExposure = "CreditExposure", PortfolioLossConfig = "PortfolioLossConfig", TrancheLossStatistics = "TrancheLossStatistics" }
 
 [parity.modules."finstack_quant.models.credit"]
 js = "models.credit"
-backlog = [
-    "AssetDynamics",
-    "CreditState",
-    "DynamicRecoverySpec",
-    "EndogenousHazardSpec",
-    "MertonBarrierType",
-    "MertonModel",
-    "RatingFactorTable",
-    "SimulatedPaths",
-    "ToggleExerciseModel",
-    "moodys_warf_factor",
-]
+types = { CreditState = "CreditState" }
 
 [parity.modules."finstack_quant.models.credit.lgd"]
 js = "models.credit"
-backlog = [
-    "BetaRecovery",
-    "CollateralPiece",
-    "DownturnLgd",
-    "EadCalculator",
-    "WorkoutCosts",
-    "WorkoutLgd",
-    "WorkoutLgdBuilder",
-    "WorkoutLgdResult",
-    "beta_recovery_quantile",
-    "beta_recovery_sample",
-    "downturn_lgd_regulatory_floor",
-    "downturn_lgd_stressed",
-    "ead_revolver",
-    "ead_term_loan",
-    "seniority_recovery_stats",
-    "workout_lgd",
-]
+types = { CollateralPiece = "CollateralPiece", WorkoutLgdResult = "WorkoutLgdResult" }
 
 [parity.modules."finstack_quant.models.credit.liability_management"]
 js = "models.credit"
-types = { ExchangeOfferAnalysis = "ExchangeOfferAnalysis", LmeAnalysis = "LmeAnalysis" }
-backlog = [
-    "LeverageImpact",
-    "TENDER_RECOMMENDATION_HURDLE",
-]
+types = { ExchangeOfferAnalysis = "ExchangeOfferAnalysis", LeverageImpact = "LeverageImpact", LmeAnalysis = "LmeAnalysis" }
 
 [parity.modules."finstack_quant.models.credit.migration"]
 js = "models.credit"
-backlog = [
-    "GeneratorMatrix",
-    "MigrationSimulator",
-    "RatingPath",
-    "RatingPaths",
-    "RatingScale",
-    "TransitionMatrix",
-    "project",
-]
 
 [parity.modules."finstack_quant.models.credit.pd"]
 js = "models.credit"
-backlog = [
-    "BASEL_IRB_PD_FLOOR",
-    "MasterScale",
-    "MasterScaleGrade",
-    "MasterScaleResult",
-    "apply_basel_irb_pd_floor",
-    "central_tendency",
-    "pit_to_ttc",
-    "ttc_to_pit",
-]
+types = { MasterScaleGrade = "MasterScaleGrade", MasterScaleResult = "MasterScaleResult" }
 
 [parity.modules."finstack_quant.models.credit.recovery_waterfall"]
 js = "models.credit"
-backlog = [
-    "RecoveryAllocation",
-    "RecoveryClaim",
-    "RecoveryWaterfallResult",
-    "allocate_recovery",
-]
+types = { RecoveryAllocation = "RecoveryAllocation", RecoveryClaim = "RecoveryClaim", RecoveryWaterfallResult = "RecoveryWaterfallResult" }
 
 [parity.modules."finstack_quant.models.credit.scoring"]
 js = "models.credit"
-backlog = [
-    "ScoringResult",
-    "altman_em_score",
-    "altman_z_double_prime",
-    "altman_z_prime",
-    "altman_z_score",
-    "ohlson_o_score",
-    "zmijewski_score",
-]
+types = { ScoringResult = "ScoringResult" }
 
 [parity.modules."finstack_quant.models.factor.credit"]
 js = "models.factor.credit"
 types = { FactorCovarianceMatrix = "FactorCovarianceMatrix", FactorModelConfig = "FactorModelConfig" }
-backlog = [
-    "VolHorizon",
-]
 
 [parity.modules."finstack_quant.models.factor.risk"]
 js = "models.factor.risk"
-types = { ParametricEsDecompositionView = "ParametricEsDecompositionView", PositionBudgetEntry = "PositionBudgetEntry", PositionEsContribution = "PositionEsContribution", PositionEsContributionView = "PositionEsContributionView", PositionRiskDecomposition = "PositionRiskDecomposition", PositionVarContribution = "PositionVarContribution", RiskBudgetResult = "RiskBudgetResult" }
-backlog = [
-    "DEFAULT_UTILIZATION_THRESHOLD",
-    "DecompositionConfig",
-    "FactorContribution",
-    "PositionFactorContribution",
-    "PositionResidualContribution",
-    "RiskDecomposition",
-    "StressAttribution",
-    "StressPositionEntry",
-    "TailScenarioBreakdown",
-    "build_stress_attribution",
-    "position_component_var",
-]
+types = { FactorContribution = "FactorContribution", ParametricEsDecompositionView = "ParametricEsDecompositionView", PositionBudgetEntry = "PositionBudgetEntry", PositionEsContribution = "PositionEsContribution", PositionEsContributionView = "PositionEsContributionView", PositionFactorContribution = "PositionFactorContribution", PositionResidualContribution = "PositionResidualContribution", PositionRiskDecomposition = "PositionRiskDecomposition", PositionVarContribution = "PositionVarContribution", RiskBudgetResult = "RiskBudgetResult", RiskDecomposition = "RiskDecomposition", StressAttribution = "StressAttribution", StressPositionEntry = "StressPositionEntry", TailScenarioBreakdown = "TailScenarioBreakdown" }
 
+# Not bound in WASM yet: `finstack_quant_models::factor::schema` (like every
+# other `*::schema` module) exists only under the `json-schema` feature, which
+# the WASM crate leaves off. Turning it on, together with the umbrella
+# `render_profile` / `validate` (jsonschema) entry points, is one decision for
+# all `*.schema` namespaces (slice P10).
 [parity.modules."finstack_quant.models.factor.schema"]
 js = "models.factor"
 backlog = [
@@ -2569,81 +2488,26 @@ backlog = [
 
 [parity.modules."finstack_quant.models.liquidity"]
 js = "models.liquidity"
-types = { ImpactEstimate = "ImpactEstimate" }
-backlog = [
-    "AlmgrenChrissModel",
-    "ExecutionTrajectory",
-    "KyleLambdaModel",
-    "LiquidityProfile",
-    "LvarBangiaScalar",
-    "TradeParams",
-]
+types = { ExecutionTrajectory = "ExecutionTrajectory", ImpactEstimate = "ImpactEstimate", LiquidityProfile = "LiquidityProfile", LvarBangiaScalar = "LvarBangiaScalar", TradeParams = "TradeParams" }
 
-# `priceHestonCall` / `priceHestonPut` return the canonical `MoneyEstimate`
-# serde object (TS interface `MoneyEstimate`, the same wire form as Python
-# `MoneyEstimate.to_json()`). The Python class stays in the backlog until a
-# WASM twin of its `relative_stderr()` method exists.
+# The Monte Carlo pricers return the canonical `MoneyEstimate` / `Estimate`
+# serde objects (the same wire form as Python `to_json()`);
+# `MoneyEstimate.relative_stderr` is the free function `relativeStderr`.
 [parity.modules."finstack_quant.models.monte_carlo"]
 js = "models.monteCarlo"
-backlog = [
-    "Estimate",
-    "EuropeanPricer",
-    "GbmPathSummary",
-    "LsmcPricer",
-    "MoneyEstimate",
-    "PathDependentPricer",
-    "finite_diff_delta",
-    "finite_diff_delta_crn",
-    "finite_diff_gamma",
-    "finite_diff_gamma_crn",
-    "heston_satisfies_feller",
-    "simulate_gbm_paths",
-]
+types = { Estimate = "Estimate", GbmPathSummary = "GbmPathSummary", MoneyEstimate = "MoneyEstimate" }
 
 [parity.modules."finstack_quant.models.rates.dtsm"]
 js = "models.rates.dtsm"
-backlog = [
-    "DieboldLi",
-    "FactorTimeSeries",
-    "YieldForecast",
-    "YieldPanel",
-    "YieldPca",
-    "YieldPcaView",
-    "diebold_li_fit_factors",
-    "diebold_li_forecast",
-    "yield_pca_fit",
-    "yield_pca_scenario",
-]
+types = { FactorTimeSeries = "FactorTimeSeries", YieldForecast = "YieldForecast", YieldPcaView = "YieldPcaView" }
 
 [parity.modules."finstack_quant.models.rates.hull_white"]
-js = "models.rates"
-backlog = [
-    "HullWhiteParams",
-    "hw1f_cap_floor_price",
-    "hw1f_caplet_forward_rate_normal_vol",
-    "hw1f_convexity_adjustment",
-    "hw1f_zcb_option_price",
-    "hw_bond_vol",
-]
+js = "models.rates.hullWhite"
 
 [parity.modules."finstack_quant.models.volatility"]
 js = "models.volatility"
-types = { SviParams = "SviParams" }
-backlog = [
-    "ArbitrageReport",
-    "check_butterfly_grid",
-    "check_calendar_spread_grid",
-    "check_local_vol_density_grid",
-    "check_surface_grid",
-    "get_surface_vol",
-    "get_surface_vol_clamped",
-    "materialize_cube_expiry_slice",
-    "materialize_cube_expiry_slice_normal",
-    "materialize_cube_tenor_slice",
-    "materialize_cube_tenor_slice_normal",
-    "materialize_fx_delta_surface",
-    "surface_to_dataframe",
-]
+types = { ArbitrageReport = "ArbitrageReport", SviParams = "SviParams" }
+excluded = { surface_to_dataframe = "pandas" }
 
 [parity.modules."finstack_quant.portfolio"]
 js = "portfolio"
@@ -3053,35 +2917,23 @@ csaEurRegulatoryJson = "JSON document twin of Rust CsaSpec::eur_regulatory / Pyt
 csaUsdRegulatoryJson = "JSON document twin of Rust CsaSpec::usd_regulatory / Python CsaSpec.usd_regulatory().to_json()"
 validateCsaJson = "JSON wire validation twin of serde CsaSpec + Rust CsaSpec::validate / Python CsaSpec.from_json(json).to_json()"
 
-[parity.js."models.credit".wasm_only]
-creditGradesModelJson = "JSON-first twin of a Python credit model constructor (P5 binds the class)"
-creditStateJson = "JSON-first twin of a Python credit model constructor (P5 binds the class)"
-dynamicRecoveryAtNotional = "JSON-first twin of Python DynamicRecoverySpec.recovery_at_notional (P5)"
-dynamicRecoveryConstantJson = "JSON-first twin of a Python credit model constructor (P5 binds the class)"
-endogenousHazardAfterPikAccrual = "JSON-first twin of Python EndogenousHazardSpec.hazard_after_pik_accrual (P5)"
-endogenousHazardAtLeverage = "JSON-first twin of Python EndogenousHazardSpec.hazard_at_leverage (P5)"
-endogenousHazardPowerLawJson = "JSON-first twin of a Python credit model constructor (P5 binds the class)"
-mertonCdsParSpread = "JSON-first twin of a Python MertonModel method (P5 binds the model class)"
-mertonDebtSpread = "JSON-first twin of a Python MertonModel method (P5 binds the model class)"
-mertonDefaultProbability = "JSON-first twin of a Python MertonModel method (P5 binds the model class)"
-mertonDefaultProbabilityWithDrift = "JSON-first twin of a Python MertonModel method (P5 binds the model class)"
-mertonDistanceToDefault = "JSON-first twin of a Python MertonModel method (P5 binds the model class)"
-mertonDistanceToDefaultWithDrift = "JSON-first twin of a Python MertonModel method (P5 binds the model class)"
-mertonFromCdsSpreadJson = "JSON-first twin of a Python credit model constructor (P5 binds the class)"
-mertonFromEquityJson = "JSON-first twin of a Python credit model constructor (P5 binds the class)"
-mertonFromTargetPdJson = "JSON-first twin of a Python credit model constructor (P5 binds the class)"
-mertonImpliedSpread = "JSON-first twin of a Python MertonModel method (P5 binds the model class)"
-mertonKmvDefaultPoint = "JSON-first twin of a Python MertonModel method (P5 binds the model class)"
-mertonModelJson = "JSON-first twin of a Python credit model constructor (P5 binds the class)"
-mertonModelWithDynamicsJson = "JSON-first twin of a Python credit model constructor (P5 binds the class)"
-mertonSimulatePathsJson = "JSON-first twin of a Python MertonModel method (P5 binds the model class)"
-mertonToHazardCurveJson = "JSON-first twin of a Python MertonModel method (P5 binds the model class)"
-mertonTryImpliedEquity = "JSON-first twin of a Python MertonModel method (P5 binds the model class)"
-toggleExerciseOptimalJson = "JSON-first twin of Python ToggleExerciseModel.optimal (P5)"
-toggleExerciseThresholdJson = "JSON-first twin of Python ToggleExerciseModel.threshold (P5)"
+[parity.js."models".wasm_only]
+bsGreeksIsValid = "free-function twin of Python BsGreeks.is_valid: the type is a plain object in WASM"
+
+[parity.js."models.factor.credit".wasm_only]
+factorCorrelation = "free-function twin of Python FactorCovarianceMatrix.correlation: the type is a plain object in WASM"
+factorCovariance = "free-function twin of Python FactorCovarianceMatrix.covariance: the type is a plain object in WASM"
+factorCovarianceRows = "nested-row twin of Python FactorCovarianceMatrix.to_numpy"
+factorVariance = "free-function twin of Python FactorCovarianceMatrix.variance: the type is a plain object in WASM"
+validateFactorModelConfig = "free-function twin of Python FactorModelConfig.validate: the type is a plain object in WASM"
+
+[parity.js."models.monteCarlo".wasm_only]
+relativeStderr = "free-function twin of Python MoneyEstimate.relative_stderr: the type is a plain object in WASM"
 
 [parity.js."models.volatility".wasm_only]
-sviImpliedVol = "JSON-first twin of Python SviParams.implied_vol (P6 binds SviParams)"
+sviDurrlemanG = "free-function twin of Python SviParams.durrleman_g: the type is a plain object in WASM"
+sviImpliedVol = "free-function twin of Python SviParams.implied_vol: the type is a plain object in WASM"
+sviTotalVariance = "free-function twin of Python SviParams.total_variance: the type is a plain object in WASM"
 
 [parity.js."portfolio".wasm_only]
 collapseToBaseByDateKind = "free-function twin of Python PortfolioCashflows.collapse_to_base_by_date_kind_json (Rust PortfolioCashflows::collapse_to_base_by_date_kind); P8 binds PortfolioCashflows"
@@ -3246,52 +3098,6 @@ backlog = [
     "ZERO",
 ]
 wasm_only = { parse = "Rust Rate::from_str; twin of the Python Rate(text) constructor, which parses quotes such as \"25bp\" and \"5%\"" }
-
-[parity.members."finstack_quant.models.correlation.CopulaSpec"]
-backlog = [
-    "from_json",
-    "to_json",
-]
-
-[parity.members."finstack_quant.models.correlation.RecoverySpec"]
-backlog = [
-    "from_json",
-    "to_json",
-]
-
-[parity.members."finstack_quant.models.factor.credit.CreditCalibrator"]
-backlog = [
-    "config",
-]
-
-[parity.members."finstack_quant.models.factor.credit.CreditFactorModel"]
-backlog = [
-    "as_of",
-    "bucket_weighting",
-    "calibration_window",
-    "config",
-    "covariance",
-    "diagnostics",
-    "factor_ids",
-    "issuer_ids",
-    "level_names",
-    "n_factors",
-    "n_issuers",
-    "n_levels",
-    "panel_frequency",
-    "policy",
-    "static_correlation",
-]
-
-[parity.members."finstack_quant.models.factor.credit.PeriodDecomposition"]
-backlog = [
-]
-
-[parity.members."finstack_quant.models.volatility.SabrSmile"]
-backlog = [
-    "forward",
-    "t",
-]
 
 [parity.members."finstack_quant.portfolio.Portfolio"]
 excluded = { positions_to_dataframe = "pandas" }
@@ -3533,30 +3339,28 @@ backlog = [
     "swaption_vol",
 ]
 
-[parity.members."finstack_quant.models.BsGreeks"]
-backlog = [
-    "is_valid",
-]
+[parity.members."finstack_quant.models.BsGreeks".renames]
+is_valid = { js = "models.bsGreeksIsValid", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }
 
-[parity.members."finstack_quant.models.factor.credit.FactorCovarianceMatrix"]
-backlog = [
-    "correlation",
-    "covariance",
-    "to_numpy",
-    "variance",
-]
+[parity.members."finstack_quant.models.factor.credit.FactorCovarianceMatrix".renames]
+correlation = { js = "models.factor.credit.factorCorrelation", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }
+covariance = { js = "models.factor.credit.factorCovariance", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }
+to_numpy = { js = "models.factor.credit.factorCovarianceRows", reason = "nested-row twin of the NumPy matrix exit (Rust FactorCovarianceMatrix::to_rows)" }
+variance = { js = "models.factor.credit.factorVariance", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }
 
-[parity.members."finstack_quant.models.factor.credit.FactorModelConfig"]
-backlog = [
-    "validate",
-]
+[parity.members."finstack_quant.models.factor.credit.FactorModelConfig".renames]
+validate = { js = "models.factor.credit.validateFactorModelConfig", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }
 
-[parity.members."finstack_quant.models.volatility.SviParams"]
-backlog = [
-    "durrleman_g",
-    "implied_vol",
-    "total_variance",
-]
+[parity.members."finstack_quant.models.volatility.SviParams".renames]
+durrleman_g = { js = "models.volatility.sviDurrlemanG", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }
+implied_vol = { js = "models.volatility.sviImpliedVol", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }
+total_variance = { js = "models.volatility.sviTotalVariance", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }
+
+[parity.members."finstack_quant.models.monte_carlo.MoneyEstimate".renames]
+relative_stderr = { js = "models.monteCarlo.relativeStderr", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }
+
+[parity.members."finstack_quant.models.credit.migration.RatingPaths"]
+wasm_only = { length = "twin of Python len(paths) (__len__)" }
 
 [parity.members."finstack_quant.portfolio.ContractValidationError"]
 backlog = [

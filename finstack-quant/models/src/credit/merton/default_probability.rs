@@ -342,6 +342,23 @@ impl MertonModel {
         self.pd_from_log_drift(self.log_drift(self.risk_free_rate), horizon)
     }
 
+    /// Risk-neutral default probabilities over a grid of horizons.
+    ///
+    /// Evaluates [`Self::default_probability`] at each horizon, in input
+    /// order, so hosts build a PD term structure with one call.
+    ///
+    /// # Arguments
+    ///
+    /// * `horizons` - Time horizons in years from the valuation date; a
+    ///   non-positive horizon maps to 0. An empty slice returns an empty
+    ///   vector.
+    pub fn default_probabilities(&self, horizons: &[f64]) -> Vec<f64> {
+        horizons
+            .iter()
+            .map(|horizon| self.default_probability(*horizon))
+            .collect()
+    }
+
     /// Physical-measure default probability (theoretical EDF) over the given
     /// horizon.
     ///
@@ -427,6 +444,16 @@ mod tests {
     use finstack_quant_core::math::norm_cdf;
 
     use super::super::{AssetDynamics, MertonBarrierType, MertonModel};
+
+    #[test]
+    fn default_probabilities_match_the_scalar_method_in_order() {
+        let m = MertonModel::new(100.0, 0.20, 80.0, 0.05).unwrap();
+        let horizons = [5.0, 0.0, 1.0];
+        let grid = m.default_probabilities(&horizons);
+        let scalar: Vec<f64> = horizons.iter().map(|h| m.default_probability(*h)).collect();
+        assert_eq!(grid, scalar);
+        assert!(m.default_probabilities(&[]).is_empty());
+    }
 
     #[test]
     fn dd_textbook_values() {

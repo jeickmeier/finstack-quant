@@ -182,16 +182,13 @@ test('counts reject negatives, fractions and oversized values before Rust sizes 
 });
 
 test('u64 seeds accept exact BigInt or safe integers and reject wrapping', () => {
-  const model = models.credit.mertonModelJson(100, 0.2, 80, 0.05);
-  const paths = (seed) => models.credit.mertonSimulatePathsJson(model, 2, 2, 1, seed, false);
+  const model = new models.credit.MertonModel(100, 0.2, 80, 0.05);
+  const paths = (seed) => model.simulatePaths(2, 2, 1, seed, false).toJson();
   assert.equal(paths(7n), paths(7));
   assert.throws(() => paths(-1n), invalidType('seed'));
   assert.throws(() => paths(2n ** 64n + 7n), invalidType('seed'));
   assert.throws(() => paths('7'), invalidType('seed'));
-  assert.throws(
-    () => models.credit.mertonSimulatePathsJson(model, 2, 2, 1, 7n, 'no'),
-    invalidType('antithetic')
-  );
+  assert.throws(() => model.simulatePaths(2, 2, 1, 7n, 'no'), invalidType('antithetic'));
 });
 
 test('optional integers reject fractions (buildScenarioSpec priority)', () => {

@@ -175,9 +175,9 @@ class TestLatentMultiFactor:
     def test_generate_correlated_factors_bad_length_raises_value_error(self) -> None:
         """Wrong-length input raises ValueError, not a Rust panic."""
         model = LatentMultiFactor.uncorrelated(2, [1.0, 1.0])
-        with pytest.raises(ValueError, match=r"(?i)exactly 2 draws"):
+        with pytest.raises(ValueError, match=r"(?i)expected 2 \(one per factor\)"):
             model.generate_correlated_factors([0.5])
-        with pytest.raises(ValueError, match=r"(?i)exactly 2 draws"):
+        with pytest.raises(ValueError, match=r"(?i)expected 2 \(one per factor\)"):
             model.generate_correlated_factors([0.5, 0.1, -0.7])
 
     def test_latent_factor_kind_is_rust_canonical_name(self) -> None:

@@ -1,8 +1,10 @@
 //! WASM bindings for product-independent liquidity models.
 
-use crate::utils::input::{js_f64, js_f64_seq, js_opt_f64};
+use crate::utils::input::{from_js_json, js_f64, js_f64_seq, js_opt_f64, js_uint};
 use crate::utils::{to_js_err, to_js_value};
-use finstack_quant_models::liquidity::{self, KyleLambdaModel};
+use finstack_quant_models::liquidity::{
+    self, AlmgrenChrissModel, KyleLambdaModel, LiquidityProfile, TradeParams,
+};
 use wasm_bindgen::prelude::*;
 
 /// Estimate the effective bid-ask spread using Roll's serial-covariance model.
@@ -192,4 +194,213 @@ pub fn kyle_lambda(
         &volumes,
         reference_price,
     ))
+}
+
+/// Almgren-Chriss market-impact model with linear permanent impact and
+/// power-law temporary impact.
+#[wasm_bindgen(js_name = AlmgrenChrissModel)]
+pub struct JsAlmgrenChrissModel {
+    pub(crate) inner: AlmgrenChrissModel,
+}
+
+json_round_trip!(JsAlmgrenChrissModel, AlmgrenChrissModel);
+
+#[wasm_bindgen(js_class = AlmgrenChrissModel)]
+impl JsAlmgrenChrissModel {
+    /// Model from explicit impact coefficients.
+    /// @param gamma - Permanent-impact coefficient: price move per unit traded; non-negative.
+    /// @param eta - Temporary-impact coefficient: price concession per unit of trading rate; non-negative.
+    /// @param delta - Temporary-impact exponent on the trading rate, in `(0, 1]`; 1 is the linear model.
+    ///
+    /// # Errors
+    ///
+    /// Throws a `validation` error if a coefficient is negative, non-finite, or
+    /// `delta` is outside `(0, 1]`.
+    #[wasm_bindgen(constructor)]
+    pub fn new(
+        gamma: JsValue,
+        eta: JsValue,
+        delta: JsValue,
+    ) -> Result<JsAlmgrenChrissModel, JsValue> {
+        AlmgrenChrissModel::new(
+            js_f64(&gamma, "gamma")?,
+            js_f64(&eta, "eta")?,
+            js_f64(&delta, "delta")?,
+        )
+        .map(|inner| Self { inner })
+        .map_err(to_js_err)
+    }
+
+    /// Calibrate the impact coefficients from a liquidity profile.
+    /// @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
+    /// @param daily_volatility - Daily return volatility as a decimal; positive.
+    /// @returns The calibrated model.
+    ///
+    /// # Errors
+    ///
+    /// Throws a `validation` error if the profile is malformed or the
+    /// volatility or volume is not positive.
+    #[wasm_bindgen(js_name = fromProfile)]
+    pub fn from_profile(
+        profile: JsValue,
+        daily_volatility: JsValue,
+    ) -> Result<JsAlmgrenChrissModel, JsValue> {
+        let profile: LiquidityProfile = from_js_json(&profile, "profile")?;
+        AlmgrenChrissModel::from_profile(&profile, js_f64(&daily_volatility, "dailyVolatility")?)
+            .map(|inner| Self { inner })
+            .map_err(to_js_err)
+    }
+
+    /// Permanent-impact coefficient.
+    #[wasm_bindgen(getter)]
+    pub fn gamma(&self) -> f64 {
+        self.inner.gamma()
+    }
+
+    /// Temporary-impact coefficient.
+    #[wasm_bindgen(getter)]
+    pub fn eta(&self) -> f64 {
+        self.inner.eta()
+    }
+
+    /// Temporary-impact exponent on the trading rate.
+    #[wasm_bindgen(getter)]
+    pub fn delta(&self) -> f64 {
+        self.inner.delta()
+    }
+
+    /// Model name for diagnostics.
+    #[wasm_bindgen(getter, js_name = modelName)]
+    pub fn model_name(&self) -> String {
+        self.inner.model_name().to_string()
+    }
+
+    /// Expected cost and risk of executing a trade at a uniform rate.
+    /// @param params - `TradeParams` object or JSON: `quantity` (signed, in units), `horizon_days`, `daily_volatility`, `profile` (a `LiquidityProfile`), and optional `risk_aversion` and `reference_price`.
+    /// @returns The `ImpactEstimate` object (`permanent_impact`, `temporary_impact`, `total_cost`, `cost_bp`, `execution_risk`).
+    ///
+    /// # Errors
+    ///
+    /// Throws a `validation` error if the parameters are malformed or out of range.
+    #[wasm_bindgen(js_name = estimateCost)]
+    pub fn estimate_cost(&self, params: JsValue) -> Result<JsValue, JsValue> {
+        let params: TradeParams = from_js_json(&params, "params")?;
+        to_js_value(&self.inner.estimate_cost(&params).map_err(to_js_err)?)
+    }
+
+    /// Risk-averse optimal execution schedule (Almgren-Chriss 2000).
+    /// @param params - `TradeParams` object or JSON; `risk_aversion` selects the urgency of the schedule.
+    /// @param num_buckets - Number of equal time buckets over the horizon; a positive safe integer.
+    /// @returns The `ExecutionTrajectory` object (`quantities`, `remaining`, `time_points`, `expected_cost`, `cost_variance`).
+    ///
+    /// # Errors
+    ///
+    /// Throws a `validation` error if the parameters are malformed or
+    /// `numBuckets` is zero.
+    #[wasm_bindgen(js_name = optimalTrajectory)]
+    pub fn optimal_trajectory(
+        &self,
+        params: JsValue,
+        num_buckets: JsValue,
+    ) -> Result<JsValue, JsValue> {
+        let params: TradeParams = from_js_json(&params, "params")?;
+        let trajectory = self
+            .inner
+            .optimal_trajectory(&params, js_uint(&num_buckets, "numBuckets")?)
+            .map_err(to_js_err)?;
+        to_js_value(&trajectory)
+    }
+}
+
+/// Kyle (1985) linear price-impact model.
+#[wasm_bindgen(js_name = KyleLambdaModel)]
+pub struct JsKyleLambdaModel {
+    pub(crate) inner: KyleLambdaModel,
+}
+
+json_round_trip!(JsKyleLambdaModel, KyleLambdaModel);
+
+#[wasm_bindgen(js_class = KyleLambdaModel)]
+impl JsKyleLambdaModel {
+    /// Model from an explicit price-impact slope.
+    /// @param lambda - Kyle's lambda: price change per unit of signed order flow; non-negative.
+    ///
+    /// # Errors
+    ///
+    /// Throws a `validation` error if `lambda` is negative or non-finite.
+    #[wasm_bindgen(constructor)]
+    pub fn new(lambda: JsValue) -> Result<JsKyleLambdaModel, JsValue> {
+        KyleLambdaModel::new(js_f64(&lambda, "lambda")?)
+            .map(|inner| Self { inner })
+            .map_err(to_js_err)
+    }
+
+    /// Model whose lambda is implied by an Amihud illiquidity ratio.
+    /// @param amihud_ratio - Amihud ratio: average absolute return per unit of traded value; non-negative.
+    /// @param reference_price - Reference price used to turn the return impact into a price impact; positive.
+    /// @returns The Kyle model with `lambda = amihudRatio * referencePrice`.
+    ///
+    /// # Errors
+    ///
+    /// Throws a `validation` error if an input is negative or non-finite.
+    #[wasm_bindgen(js_name = fromAmihud)]
+    pub fn from_amihud(
+        amihud_ratio: JsValue,
+        reference_price: JsValue,
+    ) -> Result<JsKyleLambdaModel, JsValue> {
+        KyleLambdaModel::from_amihud(
+            js_f64(&amihud_ratio, "amihudRatio")?,
+            js_f64(&reference_price, "referencePrice")?,
+        )
+        .map(|inner| Self { inner })
+        .map_err(to_js_err)
+    }
+
+    /// Kyle's lambda: price change per unit of signed order flow (Python `lambda_`).
+    #[wasm_bindgen(getter)]
+    pub fn lambda(&self) -> f64 {
+        self.inner.lambda()
+    }
+
+    /// Model name for diagnostics.
+    #[wasm_bindgen(getter, js_name = modelName)]
+    pub fn model_name(&self) -> String {
+        self.inner.model_name().to_string()
+    }
+
+    /// Expected cost and risk of executing a trade at a uniform rate.
+    /// @param params - `TradeParams` object or JSON: `quantity` (signed, in units), `horizon_days`, `daily_volatility`, `profile` (a `LiquidityProfile`), and optional `risk_aversion` and `reference_price`.
+    /// @returns The `ImpactEstimate` object (`permanent_impact`, `temporary_impact`, `total_cost`, `cost_bp`, `execution_risk`).
+    ///
+    /// # Errors
+    ///
+    /// Throws a `validation` error if the parameters are malformed or out of range.
+    #[wasm_bindgen(js_name = estimateCost)]
+    pub fn estimate_cost(&self, params: JsValue) -> Result<JsValue, JsValue> {
+        let params: TradeParams = from_js_json(&params, "params")?;
+        to_js_value(&self.inner.estimate_cost(&params).map_err(to_js_err)?)
+    }
+
+    /// Execution schedule under linear impact.
+    /// @param params - `TradeParams` object or JSON describing the trade.
+    /// @param num_buckets - Number of equal time buckets over the horizon; a positive safe integer.
+    /// @returns The `ExecutionTrajectory` object (`quantities`, `remaining`, `time_points`, `expected_cost`, `cost_variance`).
+    ///
+    /// # Errors
+    ///
+    /// Throws a `validation` error if the parameters are malformed or
+    /// `numBuckets` is zero.
+    #[wasm_bindgen(js_name = optimalTrajectory)]
+    pub fn optimal_trajectory(
+        &self,
+        params: JsValue,
+        num_buckets: JsValue,
+    ) -> Result<JsValue, JsValue> {
+        let params: TradeParams = from_js_json(&params, "params")?;
+        let trajectory = self
+            .inner
+            .optimal_trajectory(&params, js_uint(&num_buckets, "numBuckets")?)
+            .map_err(to_js_err)?;
+        to_js_value(&trajectory)
+    }
 }

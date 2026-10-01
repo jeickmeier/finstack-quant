@@ -125,6 +125,21 @@ impl MasterScale {
         Ok(Self { grades })
     }
 
+    /// Map a batch of PDs to their grades, in input order.
+    ///
+    /// # Arguments
+    ///
+    /// * `pds` - Default probabilities as decimals in the closed unit
+    ///   interval; an empty slice returns an empty vector.
+    ///
+    /// # Errors
+    ///
+    /// Returns the [`Self::map_pd`] error of the first PD that is non-finite
+    /// or outside `[0, 1]`.
+    pub fn map_pds(&self, pds: &[f64]) -> Result<Vec<MasterScaleResult>, PdCalibrationError> {
+        pds.iter().map(|pd| self.map_pd(*pd)).collect()
+    }
+
     /// Map a PD to the corresponding grade.
     ///
     /// Returns the first grade whose inclusive `upper_pd >= input_pd`.

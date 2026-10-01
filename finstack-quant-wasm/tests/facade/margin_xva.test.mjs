@@ -287,16 +287,15 @@ test('VM validation and desk direction retain settlement metadata', () => {
 
 test('a Merton-calibrated hazard curve feeds computeBilateralXva through HazardCurve.fromJson', () => {
   const credit = models.credit;
-  const modelJson = credit.mertonModelJson(100.0, 0.25, 80.0, 0.05);
-  const curveJson = credit.mertonToHazardCurveJson(
-    modelJson,
+  const merton = new credit.MertonModel(100.0, 0.25, 80.0, 0.05);
+  const direct = merton.toHazardCurve(
     'CPTY-MERTON',
     '2025-01-01',
     [1.0, 3.0, 5.0],
     0.4,
     'act_365f'
   );
-  const hz = core.HazardCurve.fromJson(curveJson);
+  const hz = core.HazardCurve.fromJson(direct.toJson());
   assert.equal(hz.id, 'CPTY-MERTON');
   assert.equal(hz.toJson(), core.HazardCurve.fromJson(hz.toJson()).toJson());
   const result = margin.computeBilateralXva(exposureJson, hz, hz, flatDiscount(), 0.4, 0.4);

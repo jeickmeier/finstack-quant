@@ -25,7 +25,8 @@
 
 use std::sync::Arc;
 
-use rand::Rng;
+use rand::{Rng, SeedableRng};
+use rand_pcg::Pcg64;
 use serde::{Deserialize, Serialize};
 
 use super::{
@@ -170,6 +171,21 @@ impl TryFrom<MigrationSimulatorWire> for MigrationSimulator {
     }
 }
 
+/// Fraction of simulated paths that end in default.
+///
+/// # Arguments
+///
+/// * `paths` - Simulated rating paths; an empty slice has a default rate of
+///   zero.
+#[must_use]
+pub fn default_rate(paths: &[RatingPath]) -> f64 {
+    if paths.is_empty() {
+        return 0.0;
+    }
+    let defaulted = paths.iter().filter(|path| path.defaulted()).count();
+    defaulted as f64 / paths.len() as f64
+}
+
 impl MigrationSimulator {
     /// Create a new simulator.
     ///
@@ -207,6 +223,53 @@ impl MigrationSimulator {
         Ok((0..n_paths)
             .map(|_| simulate_path(&self.generator, &scale, initial_state, self.horizon, rng))
             .collect())
+    }
+
+    /// Simulate rating paths with a seeded PCG64 generator.
+    ///
+    /// The generator is owned here, so equal seeds give equal paths in every
+    /// host language.
+    ///
+    /// # Arguments
+    ///
+    /// * `initial_state` - Zero-based starting state index in scale order.
+    /// * `n_paths` - Number of independent paths to generate.
+    /// * `seed` - Seed of the PCG64 generator.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MigrationError::InvalidState`] if `initial_state` is outside
+    /// the scale.
+    pub fn simulate_seeded(
+        &self,
+        initial_state: usize,
+        n_paths: usize,
+        seed: u64,
+    ) -> Result<Vec<RatingPath>, MigrationError> {
+        let mut rng = Pcg64::seed_from_u64(seed);
+        self.simulate(initial_state, n_paths, &mut rng)
+    }
+
+    /// Estimate the transition matrix by simulation with a seeded PCG64
+    /// generator.
+    ///
+    /// # Arguments
+    ///
+    /// * `n_paths_per_state` - Paths simulated from every starting state;
+    ///   must be positive.
+    /// * `seed` - Seed of the PCG64 generator.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MigrationError::InvalidPathCount`] if `n_paths_per_state` is
+    /// zero.
+    pub fn empirical_matrix_seeded(
+        &self,
+        n_paths_per_state: usize,
+        seed: u64,
+    ) -> Result<TransitionMatrix, MigrationError> {
+        let mut rng = Pcg64::seed_from_u64(seed);
+        self.empirical_matrix(n_paths_per_state, &mut rng)
     }
 
     /// Estimate the transition matrix from batch simulation.

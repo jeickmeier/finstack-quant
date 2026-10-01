@@ -703,10 +703,7 @@ impl PyMertonModel {
         horizons: Vec<f64>,
     ) -> PyResult<Bound<'py, PyAny>> {
         let labels: Vec<String> = horizons.iter().map(|h| h.to_string()).collect();
-        let values: Vec<f64> = horizons
-            .iter()
-            .map(|h| self.inner.default_probability(*h))
-            .collect();
+        let values = self.inner.default_probabilities(&horizons);
         values_to_series(py, values, &labels, "default_probability")
     }
 
@@ -1593,8 +1590,10 @@ impl PyToggleExerciseModel {
     ///     Observed credit state at the decision date.
     /// u : float
     ///     Uniform draw in ``[0, 1)``; ignored by threshold rules and used as
-    ///     the Bernoulli draw by stochastic rules. Optimal-exercise rules need
-    ///     nested simulation and return ``False`` here.
+    ///     the Bernoulli draw by stochastic rules (PIK when ``u`` is below the
+    ///     logistic probability). Optimal-exercise rules run their nested
+    ///     simulation with a seed derived from ``u``, so equal draws give equal
+    ///     decisions.
     #[pyo3(text_signature = "($self, state, u)")]
     fn should_pik_with_uniform(&self, state: &PyCreditState, u: f64) -> bool {
         self.inner.should_pik_with_uniform(&state.inner, u)

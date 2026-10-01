@@ -450,8 +450,9 @@ impl JsHazardCurve {
     /// # Arguments
     ///
     /// * `json` - Canonical HazardCurve JSON text or plain object, such as
-    ///   `HazardCurve.toJson()` or `models.credit.mertonToHazardCurveJson`
-    ///   output. Unknown fields are rejected and the curve is re-validated.
+    ///   `HazardCurve.toJson()` output (for example of the curve that
+    ///   `models.credit.MertonModel.toHazardCurve` returns). Unknown fields
+    ///   are rejected and the curve is re-validated.
     ///
     /// @returns The validated `HazardCurve`.
     /// @throws If `json` is malformed, has unknown fields, or fails curve validation.

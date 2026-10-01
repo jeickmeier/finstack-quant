@@ -713,15 +713,9 @@ impl PyLatentMultiFactor {
     /// ``num_factors`` draws.
     #[pyo3(text_signature = "(self, independent_z)")]
     fn generate_correlated_factors(&self, independent_z: Vec<f64>) -> PyResult<Vec<f64>> {
-        let expected = self.inner.num_factors();
-        if independent_z.len() != expected {
-            return Err(value_error(format!(
-                "independent_z must contain exactly {expected} draws (one per factor), \
-                 got {}",
-                independent_z.len()
-            )));
-        }
-        Ok(self.inner.generate_correlated_factors(&independent_z))
+        self.inner
+            .try_generate_correlated_factors(&independent_z)
+            .map_err(correlation_to_py)
     }
 
     fn __repr__(&self) -> String {

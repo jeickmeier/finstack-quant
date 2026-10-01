@@ -98,3 +98,12 @@ pub fn analyze_lme(
     .map_err(to_js_err)?;
     to_js_value(&analysis)
 }
+
+/// Minimum NPV ratio at which a tender is recommended. Twin of the Rust and
+/// Python constant `TENDER_RECOMMENDATION_HURDLE`: a holder is advised to
+/// tender when the tender NPV is at least `old_npv` times this hurdle.
+/// @returns The dimensionless hurdle multiple.
+#[wasm_bindgen(js_name = tenderRecommendationHurdle)]
+pub fn tender_recommendation_hurdle() -> f64 {
+    finstack_quant_models::credit::liability_management::TENDER_RECOMMENDATION_HURDLE
+}

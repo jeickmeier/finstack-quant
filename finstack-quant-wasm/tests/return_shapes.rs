@@ -274,6 +274,11 @@ fn bare_string_returns_are_named_or_allowlisted() {
         ("CalibrationNamespace", "calibrationEnvelopeContentHash"),
         ("CalibrationNamespace", "calibrationResultContentHash"),
         ("StatementsNamespace", "financialModelContentHash"),
+        // Canonical horizon descriptor ("one_step", "unconditional", "years:<n>").
+        ("VolHorizon", "toString"),
+        // Rating label of a simulated path at a time / of a WARF factor.
+        ("RatingPath", "labelAt"),
+        ("RatingScale", "ratingFromWarf"),
     ];
     let dts = index_dts();
     let offenders: Vec<String> = members(&dts)

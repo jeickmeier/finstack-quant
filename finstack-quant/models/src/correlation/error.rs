@@ -68,6 +68,16 @@ pub enum Error {
         /// Human-readable requirement violated by the value.
         requirement: String,
     },
+    /// A factor-draw vector does not hold one entry per factor.
+    #[error(
+        "independent draws length mismatch: expected {expected} (one per factor), got {actual}"
+    )]
+    FactorDrawLengthMismatch {
+        /// Number of factors in the model.
+        expected: usize,
+        /// Number of draws supplied by the caller.
+        actual: usize,
+    },
     /// Student-t degrees of freedom is invalid.
     #[error("Invalid Student-t degrees of freedom {value}: must be finite and > 2.0")]
     InvalidStudentTDegreesOfFreedom {

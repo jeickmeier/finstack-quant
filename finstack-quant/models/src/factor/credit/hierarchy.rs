@@ -208,6 +208,20 @@ pub enum IssuerBetaPolicy {
     GloballyOff,
 }
 
+impl IssuerBetaPolicy {
+    /// Variant label of this policy: `"dynamic"` or `"globally_off"`.
+    ///
+    /// The same string tags the policy in its JSON form, so hosts can report
+    /// the policy without reading the per-issuer overrides it may carry.
+    #[must_use]
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Self::Dynamic { .. } => "dynamic",
+            Self::GloballyOff => "globally_off",
+        }
+    }
+}
+
 /// A single level in the credit factor hierarchy.
 ///
 /// Built-in variants (`Rating`, `Region`, `Sector`) have canonical tag keys.
@@ -226,6 +240,20 @@ pub enum HierarchyDimension {
     Sector,
     /// User-defined dimension reading `issuer_tags[key]`.
     Custom(String),
+}
+
+impl HierarchyDimension {
+    /// Display label of this dimension: `"Rating"`, `"Region"`, `"Sector"`,
+    /// or the custom dimension's own key.
+    #[must_use]
+    pub fn label(&self) -> &str {
+        match self {
+            Self::Rating => "Rating",
+            Self::Region => "Region",
+            Self::Sector => "Sector",
+            Self::Custom(name) => name,
+        }
+    }
 }
 
 /// Ordered list of hierarchy dimensions, broadest → narrowest.
@@ -897,6 +925,35 @@ pub struct CreditFactorModel {
 }
 
 impl CreditFactorModel {
+    /// Display labels of the hierarchy levels, broadest first.
+    #[must_use]
+    pub fn level_names(&self) -> Vec<String> {
+        self.hierarchy
+            .levels
+            .iter()
+            .map(|level| level.label().to_owned())
+            .collect()
+    }
+
+    /// Identifiers of the calibrated issuers, in issuer-beta row order.
+    #[must_use]
+    pub fn issuer_ids(&self) -> Vec<String> {
+        self.issuer_betas
+            .iter()
+            .map(|row| row.issuer_id.as_str().to_owned())
+            .collect()
+    }
+
+    /// Identifiers of the factors, in covariance order.
+    #[must_use]
+    pub fn factor_ids(&self) -> Vec<String> {
+        self.config
+            .factors
+            .iter()
+            .map(|factor| factor.id.to_string())
+            .collect()
+    }
+
     /// Load and validate a persisted credit-factor-model artifact.
     ///
     /// This entry point fuses bounded JSON deserialization, explicit schema

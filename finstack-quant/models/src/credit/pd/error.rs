@@ -52,3 +52,15 @@ pub enum PdCalibrationError {
     #[error("scoring result has no implied PD; request an explicit calibration first")]
     MissingImpliedPd,
 }
+
+impl PdCalibrationError {
+    /// Classify this error for host-language exception mapping.
+    ///
+    /// Every variant rejects a caller-supplied probability, correlation,
+    /// default-rate series or master-scale definition, so the kind is always
+    /// validation.
+    #[must_use]
+    pub fn kind(&self) -> finstack_quant_core::error::ErrorKind {
+        finstack_quant_core::error::ErrorKind::Validation
+    }
+}

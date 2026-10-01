@@ -2246,7 +2246,7 @@ export interface HazardCurveConstructor {
    * Deserialize a hazard curve from its canonical JSON wire form (the
    * Rust serde schema shared with Python `HazardCurve.to_json`).
    *
-   * @param json - Canonical HazardCurve JSON text or plain object, such as `HazardCurve.toJson()` or `models.credit.mertonToHazardCurveJson` output. Unknown fields are rejected and the curve is re-validated.
+   * @param json - Canonical HazardCurve JSON text or plain object, such as `HazardCurve.toJson()` output (for example of the curve that `models.credit.MertonModel.toHazardCurve` returns). Unknown fields are rejected and the curve is re-validated.
    * @returns The validated `HazardCurve`.
    * @throws If `json` is malformed, has unknown fields, or fails curve validation.
    */
@@ -4129,6 +4129,69 @@ declare class CreditFactorModel {
    */
   toJson(): string;
   /**
+   * Calibration date of the model, in ISO-8601 form.
+   */
+  readonly asOf: string;
+  /**
+   * First and last date of the calibration window, as `[start, end]` ISO-8601 strings.
+   */
+  readonly calibrationWindow: string[];
+  /**
+   * Issuer-beta policy the model was calibrated with, as its canonical label.
+   */
+  readonly policy: string;
+  /**
+   * Sampling frequency of the calibration panel, as its canonical label.
+   */
+  readonly panelFrequency: string;
+  /**
+   * Bucket weighting used for the level returns, as its canonical label.
+   */
+  readonly bucketWeighting: string;
+  /**
+   * Factor-model configuration (factors, covariance, matching, risk measure) as a `FactorModelConfig` object.
+   */
+  readonly config: FactorModelConfig;
+  /**
+   * Calibrated factor covariance as a `FactorCovarianceMatrix` object (`factor_ids`, row-major `data`).
+   */
+  readonly covariance: FactorCovarianceMatrix;
+  /**
+   * Calibration diagnostics (fit quality, fold-ups, dropped factors) as a plain object.
+   */
+  readonly diagnostics: Record<string, unknown>;
+  /**
+   * Static factor correlation matrix the covariance forecasts are built on, as a plain object.
+   */
+  readonly staticCorrelation: generated.models.FactorCorrelationMatrix;
+  /**
+   * Number of hierarchy levels.
+   */
+  readonly nLevels: number;
+  /**
+   * Number of calibrated issuers.
+   */
+  readonly nIssuers: number;
+  /**
+   * Number of factors in the model configuration.
+   */
+  readonly nFactors: number;
+  /**
+   * Display labels of the hierarchy levels, broadest first.
+   * @returns Labels such as `"Rating"`, `"Region"`, `"Sector"` or a custom dimension key.
+   */
+  levelNames(): string[];
+  /**
+   * Identifiers of the calibrated issuers, in issuer-beta row order.
+   * @returns The issuer identifiers.
+   */
+  issuerIds(): string[];
+  /**
+   * Identifiers of the factors, in covariance order.
+   * @returns The factor identifiers.
+   */
+  factorIds(): string[];
+  /**
    * Release the underlying wasm heap allocation. Do not use this handle after calling `free()`.
    */
   free(): void;
@@ -4155,6 +4218,10 @@ declare class CreditCalibrator {
    * @throws Error - Throws if inputs are structurally invalid or calibration fails.
    */
   calibrate(inputsJson: JsonInput): CreditFactorModel;
+  /**
+   * Calibration configuration in canonical JSON form, as a `CreditCalibrationConfig` object.
+   */
+  readonly config: generated.models.CreditCalibrationConfig;
   /**
    * Release the underlying wasm heap allocation. Do not use this handle after calling `free()`.
    */
@@ -4321,6 +4388,80 @@ declare class FactorCovarianceForecast {
 }
 
 /**
+ * Forecast horizon for the covariance and idiosyncratic-vol forecasts.
+ *
+ * The forecast methods take the horizon descriptor; pass `horizon.toString()`.
+ */
+export interface VolHorizon extends WasmOwned {
+  /**
+   * Canonical descriptor accepted by `parse` and by the forecast methods.
+   * @returns `"one_step"`, `"unconditional"`, `{"n_steps": N}` or `{"years": Y}`.
+   */
+  toString(): string;
+  /**
+   * Variant label: `"one_step"`, `"unconditional"`, `"n_steps"` or `"years"`.
+   */
+  readonly kind: string;
+  /**
+   * Step count when `kind` is `"n_steps"`, otherwise `undefined`.
+   */
+  readonly n: number | undefined;
+  /**
+   * Horizon in years when `kind` is `"years"`, otherwise `undefined`.
+   */
+  readonly yearsValue: number | undefined;
+}
+
+/**
+ * Factories of the forecast horizon.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const horizon = models.factor.credit.VolHorizon.years(10 / 252);
+ * console.log(horizon.kind, horizon.yearsValue, horizon.toString());
+ * horizon.free();
+ * ```
+ */
+export interface VolHorizonConstructor {
+  /**
+   * JavaScript prototype of `VolHorizon`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: VolHorizon;
+  /**
+   * Horizon of `n` annualized model periods; variance scales linearly with `n`.
+   * @param n - Number of model periods; a safe non-negative integer (`0` gives zero variance).
+   * @returns The n-step horizon.
+   * @throws Error - Throws a `TypeError` if `n` is not a safe non-negative integer.
+   */
+  nSteps(n: number): VolHorizon;
+  /**
+   * One-period horizon: the calibrated annualized variance unchanged.
+   * @returns The one-step horizon.
+   */
+  oneStep(): VolHorizon;
+  /**
+   * Parse a horizon descriptor.
+   * @param s - `"one_step"`, `"unconditional"`, or a JSON object string such as `'{"n_steps": 5}'` or `'{"years": 0.25}'`.
+   * @returns The parsed horizon.
+   * @throws Error - Throws a `validation` error if the descriptor is not recognized.
+   */
+  parse(s: string): VolHorizon;
+  /**
+   * Long-run horizon: the unconditional variance of the vol model.
+   * @returns The unconditional horizon.
+   */
+  unconditional(): VolHorizon;
+  /**
+   * Fractional-year horizon, for example `10 / 252` for ten trading days.
+   * @param years - Horizon length in years; finite and non-negative.
+   * @returns The fractional-year horizon.
+   * @throws Error - Throws a `validation` error if `years` is non-finite or negative.
+   */
+  years(years: number): VolHorizon;
+}
+
+/**
  * Namespaced TypeScript entry points for factor model credit calculations and types.
  * @example
  * ```typescript
@@ -4405,6 +4546,137 @@ export interface FactorModelCreditNamespace {
    * @throws Error - Throws if `from_levels.date > to_levels.date` or the snapshots disagree on hierarchy depth.
    */
   decomposePeriod(fromLevels: LevelsAtDate, toLevels: LevelsAtDate): PeriodDecomposition;
+  /**
+   * Forecast horizon of the covariance and idiosyncratic-vol forecasts.
+   */
+  VolHorizon: VolHorizonConstructor;
+  /**
+   * Correlation between two factors in a factor covariance matrix.
+   * @param matrix - `FactorCovarianceMatrix` object or JSON (`factor_ids`, row-major `data`).
+   * @param lhs - First factor identifier; an unknown identifier or a non-positive variance returns 0.
+   * @param rhs - Second factor identifier; an unknown identifier or a non-positive variance returns 0.
+   * @returns The correlation of the two factors, from -1 through 1.
+   * @throws Error - Throws a `validation` error if `matrix` is malformed or not a valid covariance matrix.
+   */
+  factorCorrelation(matrix: FactorCovarianceMatrix | string, lhs: string, rhs: string): number;
+  /**
+   * Covariance between two factors in a factor covariance matrix.
+   * @param matrix - `FactorCovarianceMatrix` object or JSON (`factor_ids`, row-major `data`).
+   * @param lhs - First factor identifier; an unknown identifier returns 0.
+   * @param rhs - Second factor identifier; an unknown identifier returns 0.
+   * @returns The covariance of the two factors.
+   * @throws Error - Throws a `validation` error if `matrix` is malformed or not a valid covariance matrix.
+   */
+  factorCovariance(matrix: FactorCovarianceMatrix | string, lhs: string, rhs: string): number;
+  /**
+   * Factor covariance matrix as one row per factor (the twin of Python `to_numpy`).
+   * @param matrix - `FactorCovarianceMatrix` object or JSON (`factor_ids`, row-major `data`).
+   * @returns An array of `number[]` rows, `nFactors` by `nFactors`, in `factor_ids` order.
+   * @throws Error - Throws a `validation` error if `matrix` is malformed or not a valid covariance matrix.
+   */
+  factorCovarianceRows(matrix: FactorCovarianceMatrix | string): number[][];
+  /**
+   * Variance of one factor in a factor covariance matrix.
+   * @param matrix - `FactorCovarianceMatrix` object or JSON (`factor_ids`, row-major `data`).
+   * @param factorId - Factor whose diagonal variance is requested; an unknown identifier returns 0.
+   * @returns The factor's variance.
+   * @throws Error - Throws a `validation` error if `matrix` is malformed or not a valid covariance matrix.
+   */
+  factorVariance(matrix: FactorCovarianceMatrix | string, factorId: string): number;
+  /**
+   * Validate a factor-model configuration: factor ordering, matching rules and the risk measure.
+   * @param config - `FactorModelConfig` object or JSON, as returned by `CreditFactorModel.config` or `factorModelAt`.
+   * @throws Error - Throws a `validation` error naming the first inconsistency.
+   */
+  validateFactorModelConfig(config: FactorModelConfig | string): void;
+}
+
+/**
+ * Configuration of position-level VaR / ES decomposition.
+ */
+export interface DecompositionConfig extends WasmOwned {
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson`
+   * and by Python `from_json`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   */
+  toJson(): string;
+  /**
+   * Copy of this configuration that also computes incremental VaR (one full repricing per position).
+   * @returns The configuration with `computeIncremental` set.
+   */
+  withIncremental(): DecompositionConfig;
+  /**
+   * Whether leave-one-out incremental VaR is computed.
+   */
+  readonly computeIncremental: boolean;
+  /**
+   * Tail confidence as a decimal probability.
+   */
+  readonly confidence: number;
+  /**
+   * Decomposition method: `"parametric"` or `"historical"`.
+   */
+  readonly method: string;
+}
+
+/**
+ * Factories and presets of the decomposition configuration.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const config = models.factor.risk.DecompositionConfig.parametric(0.975).withIncremental();
+ * console.log(config.confidence, config.method, config.computeIncremental);
+ * config.free();
+ * ```
+ */
+export interface DecompositionConfigConstructor {
+  /**
+   * JavaScript prototype of `DecompositionConfig`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: DecompositionConfig;
+  /**
+   * Load a handle from its canonical JSON wire form, the same form
+   * Python `from_json` reads.
+   *
+   * Unknown fields are rejected where the Rust type denies them and
+   * the Rust validation rules are applied again.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
+   */
+  fromJson(json: JsonInput): DecompositionConfig;
+  /**
+   * Historical-simulation decomposition at a confidence level.
+   * @param confidence - Tail confidence as a decimal probability in `(0.5, 1)`, such as 0.99.
+   * @returns The historical configuration.
+   * @throws Error - Throws a `TypeError` if `confidence` is not a number; the range is checked when the configuration is used.
+   */
+  historical(confidence: number): DecompositionConfig;
+  /**
+   * Historical-simulation decomposition at 95% confidence.
+   * @returns The historical 95% preset.
+   */
+  historical95(): DecompositionConfig;
+  /**
+   * Parametric (delta-normal) decomposition at a confidence level.
+   * @param confidence - Tail confidence as a decimal probability in `(0.5, 1)`, such as 0.99.
+   * @returns The parametric configuration.
+   * @throws Error - Throws a `TypeError` if `confidence` is not a number; the range is checked when the configuration is used.
+   */
+  parametric(confidence: number): DecompositionConfig;
+  /**
+   * Parametric decomposition at 95% confidence.
+   * @returns The parametric 95% preset.
+   */
+  parametric95(): DecompositionConfig;
+  /**
+   * Parametric decomposition at 99% confidence.
+   * @returns The parametric 99% preset.
+   */
+  parametric99(): DecompositionConfig;
 }
 
 /**
@@ -4503,6 +4775,41 @@ export interface FactorRiskNamespace {
     portfolioVar: number,
     utilizationThreshold?: number | null
   ): RiskBudgetResult;
+  /**
+   * Configuration of position-level VaR / ES decomposition.
+   */
+  DecompositionConfig: DecompositionConfigConstructor;
+  /**
+   * Attribute the portfolio loss in tail scenarios to positions.
+   *
+   * Returns the canonical `StressAttribution` (the object Python's
+   * `build_stress_attribution` returns): the VaR threshold, the tail scenarios
+   * and each position's average tail P&L and share of the tail loss.
+   * @param positionIds - Position identifiers, one per row of `positionPnls`.
+   * @param positionPnls - Position-major P&L matrix as nested rows: one row per position, one column per scenario, in reporting-currency amounts.
+   * @param confidence - Optional tail confidence in `(0.5, 1)`; omitted or `null` uses the Rust `DecompositionConfig::historical_95()` preset (0.95).
+   * @returns The `StressAttribution` object.
+   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if the dimensions disagree, a P&L is non-finite, `confidence` is outside `(0.5, 1)`, or the tail holds no scenario.
+   */
+  buildStressAttribution(
+    positionIds: string[],
+    positionPnls: NumericArray[],
+    confidence?: number
+  ): generated.models.StressAttribution;
+  /**
+   * Default utilization threshold of `evaluateRiskBudget`. Twin of the Rust and
+   * Python constant `DEFAULT_UTILIZATION_THRESHOLD`.
+   * @returns The threshold as a fraction of the risk budget.
+   */
+  defaultUtilizationThreshold(): number;
+  /**
+   * One position's component VaR from a position risk decomposition.
+   * @param decomp - `PositionRiskDecomposition` object or JSON, as returned by `parametricVarDecomposition` or `historicalVarDecomposition`.
+   * @param positionId - Position identifier exactly as it appears in the decomposition.
+   * @returns The position's Euler-allocated component VaR (losses negative).
+   * @throws Error - Throws a `validation` error if `decomp` is malformed, and a `not_found` error if the position is not in the decomposition.
+   */
+  positionComponentVar(decomp: PositionRiskDecomposition | string, positionId: string): number;
 }
 
 /**
@@ -4808,6 +5115,13 @@ export interface CopulaSpec extends WasmOwned {
    * @throws Error - Throws a JavaScript exception if a Student-t specification contains non-finite degrees of freedom or a value at most two.
    */
   build(): Copula;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson`
+   * and by Python `from_json`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   */
+  toJson(): string;
 }
 
 /**
@@ -4848,6 +5162,17 @@ export interface CopulaSpecConstructor {
    * @returns A `CopulaSpec` handle for deferred construction.
    */
   multiFactor(): CopulaSpec;
+  /**
+   * Load a handle from its canonical JSON wire form, the same form
+   * Python `from_json` reads.
+   *
+   * Unknown fields are rejected where the Rust type denies them and
+   * the Rust validation rules are applied again.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
+   */
+  fromJson(json: JsonInput): CopulaSpec;
 }
 
 /**
@@ -4908,6 +5233,13 @@ export interface RecoverySpec extends WasmOwned {
    * @returns A concrete `RecoveryModel` handle.
    */
   build(): RecoveryModel;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson`
+   * and by Python `from_json`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   */
+  toJson(): string;
 }
 
 /**
@@ -4953,6 +5285,17 @@ export interface RecoverySpecConstructor {
    * @returns A `RecoverySpec` handle for deferred construction.
    */
   marketStandardStochastic(): RecoverySpec;
+  /**
+   * Load a handle from its canonical JSON wire form, the same form
+   * Python `from_json` reads.
+   *
+   * Unknown fields are rejected where the Rust type denies them and
+   * the Rust validation rules are applied again.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
+   */
+  fromJson(json: JsonInput): RecoverySpec;
 }
 
 /**
@@ -5067,6 +5410,366 @@ export interface PortfolioLossResultConstructor {
 }
 
 /**
+ * Two correlated Bernoulli default indicators with exact joint probabilities.
+ *
+ * The requested correlation is clamped to the Fréchet-Hoeffding bounds of the
+ * two marginals; `correlation` reports the value actually achieved.
+ */
+export interface CorrelatedBernoulli extends WasmOwned {
+  /**
+   * Probability that the first variable is one given the second is one.
+   * @returns The conditional probability `P(X1 = 1 | X2 = 1)`.
+   */
+  conditionalP1GivenX2(): number;
+  /**
+   * Probability that the second variable is one given the first is one.
+   * @returns The conditional probability `P(X2 = 1 | X1 = 1)`.
+   */
+  conditionalP2GivenX1(): number;
+  /**
+   * The four joint probabilities.
+   * @returns `[p11, p10, p01, p00]`, summing to one.
+   */
+  jointProbabilities(): Float64Array;
+  /**
+   * Map one uniform draw to a joint outcome.
+   * @param u - Uniform draw from 0 through 1.
+   * @returns A `Uint8Array` `[x1, x2]` with each entry 0 or 1.
+   * @throws Error - Throws a `validation` error if `u` is non-finite or outside `[0, 1]`.
+   */
+  sampleFromUniform(u: number): Uint8Array;
+  /**
+   * Correlation actually achieved after clamping to the attainable range.
+   */
+  readonly correlation: number;
+  /**
+   * Probability that both variables equal zero.
+   */
+  readonly jointP00: number;
+  /**
+   * Probability that the first is zero and the second one.
+   */
+  readonly jointP01: number;
+  /**
+   * Probability that the first is one and the second zero.
+   */
+  readonly jointP10: number;
+  /**
+   * Probability that both variables equal one.
+   */
+  readonly jointP11: number;
+  /**
+   * First marginal probability.
+   */
+  readonly p1: number;
+  /**
+   * Second marginal probability.
+   */
+  readonly p2: number;
+  /**
+   * Correlation requested at construction, before clamping.
+   */
+  readonly requestedCorrelation: number;
+}
+
+/**
+ * Constructor of the correlated Bernoulli pair.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const pair = new models.correlation.CorrelatedBernoulli(0.1, 0.2, 0.3);
+ * console.log(pair.jointP11, pair.jointProbabilities(), pair.sampleFromUniform(0.5));
+ * pair.free();
+ * ```
+ */
+export interface CorrelatedBernoulliConstructor {
+  /**
+   * JavaScript prototype of `CorrelatedBernoulli`; instances are created with `new` or the static factories.
+   */
+  readonly prototype: CorrelatedBernoulli;
+  /**
+   * Joint distribution of two Bernoulli variables with a target correlation.
+   * @returns Returns a `CorrelatedBernoulli` handle.
+   * @param p1 - First marginal probability from 0 through 1.
+   * @param p2 - Second marginal probability from 0 through 1.
+   * @param correlation - Requested correlation from -1 through 1; clamped to the attainable Fréchet-Hoeffding range.
+   * @throws Error - Throws a `validation` error if a probability is outside `[0, 1]` or the correlation is non-finite or outside `[-1, 1]`.
+   */
+  new (p1: number, p2: number, correlation: number): CorrelatedBernoulli;
+}
+
+/**
+ * Concrete latent-factor model built from a `LatentFactorSpec`.
+ */
+export interface LatentFactorKind extends WasmOwned {
+  /**
+   * Contribution of one factor's own (diagonal) shock to its value.
+   * @param factorIndex - Zero-based factor index; an index beyond the model returns 0.
+   * @param z - Independent standard normal draw for that factor.
+   * @returns The diagonal Cholesky loading times `z` times the factor volatility.
+   * @throws Error - Throws a `TypeError` if `factorIndex` is not a safe non-negative integer or `z` is not a number.
+   */
+  diagonalFactorContribution(factorIndex: number, z: number): number;
+  /**
+   * Factor correlation matrix, flat row-major (`numFactors * numFactors`).
+   */
+  readonly correlationMatrix: Float64Array;
+  /**
+   * Descriptive factor names, one per factor.
+   */
+  readonly factorNames: string[];
+  /**
+   * Model name for diagnostics.
+   */
+  readonly modelName: string;
+  /**
+   * Number of systematic factors.
+   */
+  readonly numFactors: number;
+  /**
+   * Annualized factor volatilities, one per factor.
+   */
+  readonly volatilities: Float64Array;
+}
+
+/**
+ * Constructor and factory functions of `LatentFactorKind`.
+ */
+export interface LatentFactorKindClass {
+  /**
+   * JavaScript prototype of `LatentFactorKind`; instances are returned by other `correlation` calls.
+   */
+  readonly prototype: LatentFactorKind;
+}
+
+/**
+ * Latent-factor model specification for deferred construction.
+ */
+export interface LatentFactorSpec extends WasmOwned {
+  /**
+   * Build the concrete latent-factor model.
+   * @returns The `LatentFactorKind` handle.
+   * @throws Error - Throws a `validation` error if a multi-factor specification has an invalid correlation matrix or volatility vector.
+   */
+  build(): LatentFactorKind;
+  /**
+   * Number of systematic factors the specification describes.
+   */
+  readonly numFactors: number;
+}
+
+/**
+ * Factories of the latent-factor specification.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const spec = models.correlation.LatentFactorSpec.twoFactor(0.2, 0.25, -0.3);
+ * const kind = spec.build();
+ * console.log(kind.modelName, kind.numFactors, kind.volatilities);
+ * ```
+ */
+export interface LatentFactorSpecConstructor {
+  /**
+   * JavaScript prototype of `LatentFactorSpec`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: LatentFactorSpec;
+  /**
+   * One mean-reverting systematic factor.
+   * @param volatility - Annualized factor volatility as a decimal; non-negative.
+   * @param meanReversion - Mean-reversion speed per year; non-negative.
+   * @returns The single-factor specification.
+   * @throws Error - Throws a `TypeError` if an argument is not a number.
+   */
+  singleFactor(volatility: number, meanReversion: number): LatentFactorSpec;
+  /**
+   * Correlated prepayment and credit factors.
+   * @param prepayVol - Annualized prepayment-factor volatility as a decimal; non-negative.
+   * @param creditVol - Annualized credit-factor volatility as a decimal; non-negative.
+   * @param correlation - Correlation between the two factors, from -1 through 1.
+   * @returns The two-factor specification.
+   * @throws Error - Throws a `TypeError` if an argument is not a number.
+   */
+  twoFactor(prepayVol: number, creditVol: number, correlation: number): LatentFactorSpec;
+}
+
+/**
+ * General correlated latent-factor model with a Cholesky factorization.
+ */
+export interface LatentMultiFactor extends WasmOwned {
+  /**
+   * Turn independent standard normal draws into correlated, volatility-scaled factors.
+   * @param independentZ - Independent standard normal draws, exactly one per factor.
+   * @returns The correlated factor values, one per factor.
+   * @throws Error - Throws a `validation` error if `independentZ` does not hold exactly `numFactors` entries.
+   */
+  generateCorrelatedFactors(independentZ: NumericArray): Float64Array;
+  /**
+   * Factor correlation matrix, flat row-major.
+   */
+  readonly correlationMatrix: Float64Array;
+  /**
+   * Number of systematic factors.
+   */
+  readonly numFactors: number;
+  /**
+   * Annualized factor volatilities, one per factor.
+   */
+  readonly volatilities: Float64Array;
+}
+
+/**
+ * Constructors of the multi-factor latent model.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const model = new models.correlation.LatentMultiFactor(2, [0.2, 0.3], [1, 0.5, 0.5, 1]);
+ * console.log(model.generateCorrelatedFactors([1, -1]));
+ * model.free();
+ * ```
+ */
+export interface LatentMultiFactorConstructor {
+  /**
+   * JavaScript prototype of `LatentMultiFactor`; instances are created with `new` or the static factories.
+   */
+  readonly prototype: LatentMultiFactor;
+  /**
+   * Multi-factor model from volatilities and a correlation matrix.
+   * @returns Returns a `LatentMultiFactor` handle.
+   * @param numFactors - Number of systematic factors; a positive safe integer.
+   * @param volatilities - Annualized factor volatilities, one per factor; non-negative.
+   * @param correlations - Flat row-major `numFactors * numFactors` correlation matrix; symmetric, unit diagonal, positive semidefinite.
+   * @throws Error - Throws a `validation` error if the lengths disagree with `numFactors`, a volatility is negative or non-finite, or the matrix is not a valid correlation matrix.
+   */
+  new (
+    numFactors: number,
+    volatilities: NumericArray,
+    correlations: NumericArray
+  ): LatentMultiFactor;
+  /**
+   * Model with independent factors (identity correlation).
+   * @param numFactors - Number of systematic factors; a positive safe integer.
+   * @param volatilities - Annualized factor volatilities, one per factor; a length mismatch falls back to unit volatilities.
+   * @returns The uncorrelated multi-factor model.
+   * @throws Error - Throws a `TypeError` if `numFactors` is not a safe non-negative integer or `volatilities` is not an array of numbers.
+   */
+  uncorrelated(numFactors: number, volatilities: NumericArray): LatentMultiFactor;
+}
+
+/**
+ * Single mean-reverting latent factor.
+ */
+export interface LatentSingleFactor extends WasmOwned {
+  /**
+   * Mean-reversion speed per year.
+   */
+  readonly meanReversion: number;
+  /**
+   * Number of systematic factors (always 1).
+   */
+  readonly numFactors: number;
+  /**
+   * Annualized factor volatility, as a decimal.
+   */
+  readonly volatility: number;
+}
+
+/**
+ * Constructor of the single-factor latent model.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const factor = new models.correlation.LatentSingleFactor(0.25, 0.1);
+ * console.log(factor.volatility, factor.meanReversion, factor.numFactors);
+ * factor.free();
+ * ```
+ */
+export interface LatentSingleFactorConstructor {
+  /**
+   * JavaScript prototype of `LatentSingleFactor`; instances are created with `new` or the static factories.
+   */
+  readonly prototype: LatentSingleFactor;
+  /**
+   * Single-factor model; out-of-range inputs are clamped by Rust.
+   * @returns Returns a `LatentSingleFactor` handle.
+   * @param volatility - Annualized factor volatility as a decimal; non-negative.
+   * @param meanReversion - Mean-reversion speed per year; non-negative.
+   * @throws Error - Throws a `TypeError` if an argument is not a number.
+   */
+  new (volatility: number, meanReversion: number): LatentSingleFactor;
+}
+
+/**
+ * Correlated prepayment and credit latent factors.
+ */
+export interface LatentTwoFactor extends WasmOwned {
+  /**
+   * Off-diagonal Cholesky entry `L[1,0]`, equal to the correlation.
+   */
+  readonly choleskyL10: number;
+  /**
+   * Diagonal Cholesky entry `L[1,1]`, equal to `sqrt(1 - correlation^2)`.
+   */
+  readonly choleskyL11: number;
+  /**
+   * Correlation between the prepayment and credit factors.
+   */
+  readonly correlation: number;
+  /**
+   * Annualized credit-factor volatility, as a decimal.
+   */
+  readonly creditVol: number;
+  /**
+   * Number of systematic factors (always 2).
+   */
+  readonly numFactors: number;
+  /**
+   * Annualized prepayment-factor volatility, as a decimal.
+   */
+  readonly prepayVol: number;
+}
+
+/**
+ * Constructor and standard calibrations of the two-factor latent model.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const factors = models.correlation.LatentTwoFactor.rmbsStandard();
+ * console.log(factors.prepayVol, factors.creditVol, factors.correlation, factors.choleskyL11);
+ * factors.free();
+ * ```
+ */
+export interface LatentTwoFactorConstructor {
+  /**
+   * JavaScript prototype of `LatentTwoFactor`; instances are created with `new` or the static factories.
+   */
+  readonly prototype: LatentTwoFactor;
+  /**
+   * Two-factor model; out-of-range inputs are clamped by Rust.
+   * @returns Returns a `LatentTwoFactor` handle.
+   * @param prepayVol - Annualized prepayment-factor volatility as a decimal; non-negative.
+   * @param creditVol - Annualized credit-factor volatility as a decimal; non-negative.
+   * @param correlation - Correlation between the two factors, from -1 through 1.
+   * @throws Error - Throws a `TypeError` if an argument is not a number.
+   */
+  new (prepayVol: number, creditVol: number, correlation: number): LatentTwoFactor;
+  /**
+   * Standard CLO calibration of the two-factor model.
+   * @returns The CLO-standard prepayment/credit factor model.
+   */
+  cloStandard(): LatentTwoFactor;
+  /**
+   * Standard RMBS calibration of the two-factor model.
+   * @returns The RMBS-standard prepayment/credit factor model.
+   */
+  rmbsStandard(): LatentTwoFactor;
+}
+
+/**
  * Namespaced TypeScript entry points for correlation calculations and types.
  * @example
  * ```typescript
@@ -5153,11 +5856,458 @@ export interface CorrelationNamespace {
    * @throws Error - Throws a `validation` error if the flat length is not `n * n` or the input has a gross diagonal or symmetry violation, and a `computation` error if the projection does not converge within `maxIter` iterations at `tol`.
    */
   nearestCorrelation(matrix: NumericArray, n: number, maxIter?: number, tol?: number): Float64Array;
+  /**
+   * Two correlated Bernoulli default indicators.
+   */
+  CorrelatedBernoulli: CorrelatedBernoulliConstructor;
+  /**
+   * Concrete latent-factor model built by `LatentFactorSpec.build()`.
+   */
+  LatentFactorKind: LatentFactorKindClass;
+  /**
+   * Latent-factor model specification for deferred construction.
+   */
+  LatentFactorSpec: LatentFactorSpecConstructor;
+  /**
+   * General correlated latent-factor model.
+   */
+  LatentMultiFactor: LatentMultiFactorConstructor;
+  /**
+   * Single mean-reverting latent factor.
+   */
+  LatentSingleFactor: LatentSingleFactorConstructor;
+  /**
+   * Correlated prepayment and credit latent factors.
+   */
+  LatentTwoFactor: LatentTwoFactorConstructor;
+  /**
+   * Cholesky factor of a correlation matrix.
+   * @param matrix - Flat row-major `n * n` correlation matrix; symmetric with unit diagonal.
+   * @param n - Positive square-matrix dimension; `matrix` must contain exactly `n * n` entries.
+   * @returns The lower-triangular factor `L` with `L * L^T = matrix`, flat row-major.
+   * @throws Error - Throws a `validation` error if the length is not `n * n` or the matrix is not a valid positive-semidefinite correlation matrix.
+   */
+  choleskyDecompose(matrix: NumericArray, n: number): Float64Array;
+  /**
+   * Largest path count accepted by `simulatePortfolioLoss`. Twin of the Rust
+   * and Python constant `MAX_PORTFOLIO_LOSS_PATHS`.
+   * @returns The path-count ceiling, `1000000`.
+   */
+  maxPortfolioLossPaths(): number;
+  /**
+   * Simulate the portfolio credit-loss distribution under a factor copula.
+   *
+   * Paths use the deterministic path-indexed Philox scheme, so equal inputs
+   * give equal losses in every host.
+   * @param exposures - Array of `CreditExposure` objects (`id`, `notional`, `default_probability`, `lgd`, `factor_loadings`), or its JSON text; all in one currency.
+   * @param config - `PortfolioLossConfig` object or JSON: `num_paths` (1 to `maxPortfolioLossPaths()`), `seed`, `confidence` in `(0, 1)` and `copula` (a `CopulaSpec` in JSON form, for example `CopulaSpec.gaussian().toJson()` parsed).
+   * @param recovery - Optional `RecoverySpec` in JSON form (`spec.toJson()` or a plain object); when given, its conditional LGD replaces each exposure's `lgd` and every exposure needs exactly one factor loading.
+   * @returns The simulated `PortfolioLossResult` handle.
+   * @throws Error - Throws a `TypeError` if an input is neither a string nor a plain object, and a `validation` error if the exposures or configuration are invalid, the recovery specification cannot build, or a simulated loss is non-finite.
+   */
+  simulatePortfolioLoss(
+    exposures: readonly generated.models.CreditExposure[] | string,
+    config: generated.models.PortfolioLossConfig | string,
+    recovery?: generated.models.RecoverySpec | string | null
+  ): PortfolioLossResult;
 }
 
 // --- models.monteCarlo ----------------------------------------------------------
-// Host-neutral subset shared with Python: Heston Monte Carlo pricing. The
-// closed-form Black-Scholes references live at `models.bsPrice`.
+// The Python `models.monte_carlo` surface: Heston and GBM convenience pricers,
+// GBM path simulation and finite-difference Greeks. The closed-form
+// Black-Scholes references live at `models.bsPrice`.
+
+/**
+ * Monte Carlo pricer for European options under geometric Brownian motion.
+ */
+export interface EuropeanPricer extends WasmOwned {
+  /**
+   * Price a European call under GBM.
+   * @param spot - Spot level at time 0.
+   * @param strike - Exercise price in the same units as `spot`.
+   * @param rate - Continuously compounded risk-free rate (decimal, annualized).
+   * @param divYield - Continuous dividend yield (decimal, annualized).
+   * @param vol - Annualized GBM volatility (decimal).
+   * @param expiry - Time to expiry in years.
+   * @param numSteps - Optional time-grid steps; omitted uses the registry default.
+   * @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
+   * @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
+   * @throws Error - Throws a `validation` error if an input is non-finite or out of range or the currency code is unknown.
+   */
+  priceCall(
+    spot: number,
+    strike: number,
+    rate: number,
+    divYield: number,
+    vol: number,
+    expiry: number,
+    numSteps?: number,
+    currency?: string
+  ): MoneyEstimate;
+  /**
+   * Price a European put under GBM.
+   * @param spot - Spot level at time 0.
+   * @param strike - Exercise price in the same units as `spot`.
+   * @param rate - Continuously compounded risk-free rate (decimal, annualized).
+   * @param divYield - Continuous dividend yield (decimal, annualized).
+   * @param vol - Annualized GBM volatility (decimal).
+   * @param expiry - Time to expiry in years.
+   * @param numSteps - Optional time-grid steps; omitted uses the registry default.
+   * @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
+   * @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
+   * @throws Error - Throws a `validation` error if an input is non-finite or out of range or the currency code is unknown.
+   */
+  pricePut(
+    spot: number,
+    strike: number,
+    rate: number,
+    divYield: number,
+    vol: number,
+    expiry: number,
+    numSteps?: number,
+    currency?: string
+  ): MoneyEstimate;
+  /**
+   * Number of Monte Carlo paths.
+   */
+  readonly numPaths: number;
+  /**
+   * Seed of the path-indexed random streams.
+   */
+  readonly seed: bigint;
+  /**
+   * Whether paths run on the thread pool on native targets.
+   */
+  readonly useParallel: boolean;
+}
+
+/**
+ * Constructor of the GBM European Monte Carlo pricer.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const pricer = new models.monteCarlo.EuropeanPricer(10000, 42);
+ * const call = pricer.priceCall(100, 100, 0.05, 0.0, 0.2, 1.0);
+ * console.log(call.mean.amount, call.stderr);
+ * pricer.free();
+ * ```
+ */
+export interface EuropeanPricerConstructor {
+  /**
+   * JavaScript prototype of `EuropeanPricer`; instances are created with `new` or the static factories.
+   */
+  readonly prototype: EuropeanPricer;
+  /**
+   * Pricer whose omitted settings come from the Rust Monte Carlo registry.
+   * @returns Returns a `EuropeanPricer` handle.
+   * @param numPaths - Optional number of paths; a positive safe integer. Omitted uses the registry default.
+   * @param seed - Optional seed of the path-indexed random streams, as a safe integer or `bigint`. Omitted uses the registry default.
+   * @param useParallel - Optional; run paths on the thread pool. WebAssembly always runs sequentially with identical results. Omitted uses the registry default.
+   * @throws Error - Throws a `validation` error if `numPaths` is zero.
+   */
+  new (numPaths?: number, seed?: number | bigint, useParallel?: boolean): EuropeanPricer;
+}
+
+/**
+ * Longstaff-Schwartz Monte Carlo pricer for American options under GBM.
+ */
+export interface LsmcPricer extends WasmOwned {
+  /**
+   * Price an American call by Longstaff-Schwartz regression (in-sample exercise policy).
+   * @param spot - Spot level at time 0.
+   * @param strike - Exercise price in the same units as `spot`.
+   * @param rate - Continuously compounded risk-free rate (decimal, annualized).
+   * @param divYield - Continuous dividend yield (decimal, annualized).
+   * @param vol - Annualized GBM volatility (decimal).
+   * @param expiry - Time to expiry in years.
+   * @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
+   * @param numSteps - Optional exercise dates for this call; omitted keeps the pricer's value.
+   * @param basis - Optional regression basis for this call; omitted keeps the pricer's basis.
+   * @param basisDegree - Optional basis degree for this call; omitted keeps the pricer's degree.
+   * @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
+   * @throws Error - Throws a `validation` error if an input is out of range, the basis name or currency code is unknown, or the regression is ill-conditioned.
+   */
+  priceAmericanCall(
+    spot: number,
+    strike: number,
+    rate: number,
+    divYield: number,
+    vol: number,
+    expiry: number,
+    currency?: string,
+    numSteps?: number,
+    basis?: string,
+    basisDegree?: number
+  ): MoneyEstimate;
+  /**
+   * Price an American call with an out-of-sample exercise policy: the
+   * regression is fitted on the pricer's paths and applied to fresh paths
+   * drawn from `pricingSeed`, removing the in-sample high bias.
+   * @param spot - Spot level at time 0.
+   * @param strike - Exercise price in the same units as `spot`.
+   * @param rate - Continuously compounded risk-free rate (decimal, annualized).
+   * @param divYield - Continuous dividend yield (decimal, annualized).
+   * @param vol - Annualized GBM volatility (decimal).
+   * @param expiry - Time to expiry in years.
+   * @param pricingSeed - Seed of the independent pricing paths, as a safe integer or `bigint`; must differ from the pricer's seed.
+   * @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
+   * @param numSteps - Optional exercise dates for this call; omitted keeps the pricer's value.
+   * @param basis - Optional regression basis for this call; omitted keeps the pricer's basis.
+   * @param basisDegree - Optional basis degree for this call; omitted keeps the pricer's degree.
+   * @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
+   * @throws Error - Throws a `validation` error if an input is out of range, the basis name or currency code is unknown, or `pricingSeed` equals the training seed.
+   */
+  priceAmericanCallUnbiased(
+    spot: number,
+    strike: number,
+    rate: number,
+    divYield: number,
+    vol: number,
+    expiry: number,
+    pricingSeed: number | bigint,
+    currency?: string,
+    numSteps?: number,
+    basis?: string,
+    basisDegree?: number
+  ): MoneyEstimate;
+  /**
+   * Price an American put by Longstaff-Schwartz regression (in-sample exercise policy).
+   * @param spot - Spot level at time 0.
+   * @param strike - Exercise price in the same units as `spot`.
+   * @param rate - Continuously compounded risk-free rate (decimal, annualized).
+   * @param divYield - Continuous dividend yield (decimal, annualized).
+   * @param vol - Annualized GBM volatility (decimal).
+   * @param expiry - Time to expiry in years.
+   * @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
+   * @param numSteps - Optional exercise dates for this call; omitted keeps the pricer's value.
+   * @param basis - Optional regression basis for this call; omitted keeps the pricer's basis.
+   * @param basisDegree - Optional basis degree for this call; omitted keeps the pricer's degree.
+   * @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
+   * @throws Error - Throws a `validation` error if an input is out of range, the basis name or currency code is unknown, or the regression is ill-conditioned.
+   */
+  priceAmericanPut(
+    spot: number,
+    strike: number,
+    rate: number,
+    divYield: number,
+    vol: number,
+    expiry: number,
+    currency?: string,
+    numSteps?: number,
+    basis?: string,
+    basisDegree?: number
+  ): MoneyEstimate;
+  /**
+   * Price an American put with an out-of-sample exercise policy: the
+   * regression is fitted on the pricer's paths and applied to fresh paths
+   * drawn from `pricingSeed`, removing the in-sample high bias.
+   * @param spot - Spot level at time 0.
+   * @param strike - Exercise price in the same units as `spot`.
+   * @param rate - Continuously compounded risk-free rate (decimal, annualized).
+   * @param divYield - Continuous dividend yield (decimal, annualized).
+   * @param vol - Annualized GBM volatility (decimal).
+   * @param expiry - Time to expiry in years.
+   * @param pricingSeed - Seed of the independent pricing paths, as a safe integer or `bigint`; must differ from the pricer's seed.
+   * @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
+   * @param numSteps - Optional exercise dates for this call; omitted keeps the pricer's value.
+   * @param basis - Optional regression basis for this call; omitted keeps the pricer's basis.
+   * @param basisDegree - Optional basis degree for this call; omitted keeps the pricer's degree.
+   * @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
+   * @throws Error - Throws a `validation` error if an input is out of range, the basis name or currency code is unknown, or `pricingSeed` equals the training seed.
+   */
+  priceAmericanPutUnbiased(
+    spot: number,
+    strike: number,
+    rate: number,
+    divYield: number,
+    vol: number,
+    expiry: number,
+    pricingSeed: number | bigint,
+    currency?: string,
+    numSteps?: number,
+    basis?: string,
+    basisDegree?: number
+  ): MoneyEstimate;
+  /**
+   * Whether antithetic variates are used.
+   */
+  readonly antithetic: boolean;
+  /**
+   * Default regression basis name.
+   */
+  readonly basis: string;
+  /**
+   * Default highest polynomial degree of the regression basis.
+   */
+  readonly basisDegree: number;
+  /**
+   * Number of Monte Carlo paths.
+   */
+  readonly numPaths: number;
+  /**
+   * Seed of the random streams.
+   */
+  readonly seed: bigint;
+  /**
+   * Whether paths run on the thread pool on native targets.
+   */
+  readonly useParallel: boolean;
+}
+
+/**
+ * Constructor of the GBM American LSMC pricer.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const pricer = new models.monteCarlo.LsmcPricer(10000, 42, false, 50);
+ * const put = pricer.priceAmericanPut(100, 100, 0.05, 0.0, 0.2, 1.0);
+ * console.log(put.mean.amount, pricer.basis, pricer.basisDegree);
+ * pricer.free();
+ * ```
+ */
+export interface LsmcPricerConstructor {
+  /**
+   * JavaScript prototype of `LsmcPricer`; instances are created with `new` or the static factories.
+   */
+  readonly prototype: LsmcPricer;
+  /**
+   * Pricer whose omitted settings come from the Rust Monte Carlo registry.
+   * @returns Returns a `LsmcPricer` handle.
+   * @param numPaths - Optional number of paths; a positive safe integer. Omitted uses the registry default.
+   * @param seed - Optional seed of the random streams, as a safe integer or `bigint`. Omitted uses the registry default.
+   * @param useParallel - Optional; run paths on the thread pool. WebAssembly always runs sequentially with identical results. Omitted uses the registry default.
+   * @param numSteps - Optional number of exercise dates between 0 and expiry. Omitted uses the registry default.
+   * @param basis - Optional regression basis name, `"laguerre"` or `"polynomial"`. Omitted uses the registry default.
+   * @param basisDegree - Optional highest polynomial degree of the regression basis. Omitted uses the registry default.
+   * @param antithetic - Optional; use antithetic variates. Omitted uses the registry default.
+   * @throws Error - Throws a `validation` error for an unknown basis name or a zero path or step count.
+   */
+  new (
+    numPaths?: number,
+    seed?: number | bigint,
+    useParallel?: boolean,
+    numSteps?: number,
+    basis?: string,
+    basisDegree?: number,
+    antithetic?: boolean
+  ): LsmcPricer;
+}
+
+/**
+ * Monte Carlo pricer for arithmetic-average Asian options under GBM.
+ */
+export interface PathDependentPricer extends WasmOwned {
+  /**
+   * Price an arithmetic-average Asian call under GBM.
+   * @param spot - Spot level at time 0.
+   * @param strike - Exercise price in the same units as `spot`.
+   * @param rate - Continuously compounded risk-free rate (decimal, annualized).
+   * @param divYield - Continuous dividend yield (decimal, annualized).
+   * @param vol - Annualized GBM volatility (decimal).
+   * @param expiry - Time to expiry in years.
+   * @param numSteps - Optional number of averaging steps; omitted uses the registry default.
+   * @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
+   * @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
+   * @throws Error - Throws a `validation` error if an input is non-finite or out of range or the currency code is unknown.
+   */
+  priceAsianCall(
+    spot: number,
+    strike: number,
+    rate: number,
+    divYield: number,
+    vol: number,
+    expiry: number,
+    numSteps?: number,
+    currency?: string
+  ): MoneyEstimate;
+  /**
+   * Price an arithmetic-average Asian put under GBM.
+   * @param spot - Spot level at time 0.
+   * @param strike - Exercise price in the same units as `spot`.
+   * @param rate - Continuously compounded risk-free rate (decimal, annualized).
+   * @param divYield - Continuous dividend yield (decimal, annualized).
+   * @param vol - Annualized GBM volatility (decimal).
+   * @param expiry - Time to expiry in years.
+   * @param numSteps - Optional number of averaging steps; omitted uses the registry default.
+   * @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the registry default.
+   * @returns The `MoneyEstimate` object (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
+   * @throws Error - Throws a `validation` error if an input is non-finite or out of range or the currency code is unknown.
+   */
+  priceAsianPut(
+    spot: number,
+    strike: number,
+    rate: number,
+    divYield: number,
+    vol: number,
+    expiry: number,
+    numSteps?: number,
+    currency?: string
+  ): MoneyEstimate;
+  /**
+   * Whether antithetic variates are used.
+   */
+  readonly antithetic: boolean;
+  /**
+   * Number of Monte Carlo paths.
+   */
+  readonly numPaths: number;
+  /**
+   * Seed of the random streams.
+   */
+  readonly seed: bigint;
+  /**
+   * Whether paths are built by Brownian bridge.
+   */
+  readonly useBrownianBridge: boolean;
+  /**
+   * Whether paths run on the thread pool on native targets.
+   */
+  readonly useParallel: boolean;
+  /**
+   * Whether Sobol quasi-random numbers are used.
+   */
+  readonly useSobol: boolean;
+}
+
+/**
+ * Constructor of the GBM Asian Monte Carlo pricer.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const pricer = new models.monteCarlo.PathDependentPricer(10000, 42);
+ * const call = pricer.priceAsianCall(100, 100, 0.05, 0.0, 0.2, 1.0, 12);
+ * console.log(call.mean.amount, pricer.antithetic);
+ * pricer.free();
+ * ```
+ */
+export interface PathDependentPricerConstructor {
+  /**
+   * JavaScript prototype of `PathDependentPricer`; instances are created with `new` or the static factories.
+   */
+  readonly prototype: PathDependentPricer;
+  /**
+   * Pricer whose omitted settings come from the Rust Monte Carlo registry.
+   * @returns Returns a `PathDependentPricer` handle.
+   * @param numPaths - Optional number of paths; a positive safe integer. Omitted uses the registry default.
+   * @param seed - Optional seed of the random streams, as a safe integer or `bigint`. Omitted uses the registry default.
+   * @param useParallel - Optional; run paths on the thread pool. WebAssembly always runs sequentially with identical results. Omitted uses the registry default.
+   * @param antithetic - Optional; use antithetic variates. Omitted keeps the Rust configuration default.
+   * @param useSobol - Optional; use Sobol quasi-random numbers. Omitted keeps the Rust configuration default.
+   * @param useBrownianBridge - Optional; build paths by Brownian bridge. Omitted keeps the Rust configuration default.
+   * @throws Error - Throws a `validation` error if the configuration is invalid, for example a zero path count or Sobol combined with antithetic variates.
+   */
+  new (
+    numPaths?: number,
+    seed?: number | bigint,
+    useParallel?: boolean,
+    antithetic?: boolean,
+    useSobol?: boolean,
+    useBrownianBridge?: boolean
+  ): PathDependentPricer;
+}
 
 /**
  * Namespaced TypeScript entry points for Monte Carlo calculations.
@@ -5247,6 +6397,185 @@ export interface MonteCarloNamespace {
     numSteps?: number | null,
     currency?: string | null
   ): MoneyEstimate;
+  /**
+   * Monte Carlo pricer for European options under GBM.
+   */
+  EuropeanPricer: EuropeanPricerConstructor;
+  /**
+   * Longstaff-Schwartz pricer for American options under GBM.
+   */
+  LsmcPricer: LsmcPricerConstructor;
+  /**
+   * Monte Carlo pricer for arithmetic-average Asian options under GBM.
+   */
+  PathDependentPricer: PathDependentPricerConstructor;
+  /**
+   * Monte Carlo finite-difference delta of a GBM European option, with independent draws per bump.
+   * @param spot - Spot level at time 0.
+   * @param strike - Exercise price in the same units as `spot`.
+   * @param rate - Continuously compounded risk-free rate (decimal, annualized).
+   * @param divYield - Continuous dividend yield (decimal, annualized).
+   * @param vol - Annualized GBM volatility (decimal); positive.
+   * @param expiry - Time to expiry in years.
+   * @param isCall - `true` for a call payoff, `false` for a put.
+   * @param numPaths - Optional paths per evaluation; omitted uses the registry default.
+   * @param seed - Optional RNG seed as a safe integer or `bigint`; omitted uses the registry default.
+   * @param numSteps - Optional time-grid steps; omitted uses the registry default.
+   * @param bumpSize - Optional relative spot shock (0.01 is 1% of spot); omitted uses the registry default.
+   * @param currency - Optional ISO-4217 code of the simulated payoffs; omitted uses the registry default.
+   * @returns The `Estimate` object for delta (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
+   * @throws Error - Throws a `validation` error if an input is non-finite or out of range or the currency code is unknown.
+   */
+  finiteDiffDelta(
+    spot: number,
+    strike: number,
+    rate: number,
+    divYield: number,
+    vol: number,
+    expiry: number,
+    isCall: boolean,
+    numPaths?: number,
+    seed?: number | bigint,
+    numSteps?: number,
+    bumpSize?: number,
+    currency?: string
+  ): generated.models.Estimate;
+  /**
+   * Monte Carlo finite-difference delta of a GBM European option under common random numbers.
+   * @param spot - Spot level at time 0.
+   * @param strike - Exercise price in the same units as `spot`.
+   * @param rate - Continuously compounded risk-free rate (decimal, annualized).
+   * @param divYield - Continuous dividend yield (decimal, annualized).
+   * @param vol - Annualized GBM volatility (decimal); positive.
+   * @param expiry - Time to expiry in years.
+   * @param isCall - `true` for a call payoff, `false` for a put.
+   * @param numPaths - Optional paths per evaluation; omitted uses the registry default.
+   * @param seed - Optional RNG seed as a safe integer or `bigint`; omitted uses the registry default.
+   * @param numSteps - Optional time-grid steps; omitted uses the registry default.
+   * @param bumpSize - Optional relative spot shock (0.01 is 1% of spot); omitted uses the registry default.
+   * @param currency - Optional ISO-4217 code of the simulated payoffs; omitted uses the registry default.
+   * @returns The `Estimate` object for delta (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
+   * @throws Error - Throws a `validation` error if an input is non-finite or out of range or the currency code is unknown.
+   */
+  finiteDiffDeltaCrn(
+    spot: number,
+    strike: number,
+    rate: number,
+    divYield: number,
+    vol: number,
+    expiry: number,
+    isCall: boolean,
+    numPaths?: number,
+    seed?: number | bigint,
+    numSteps?: number,
+    bumpSize?: number,
+    currency?: string
+  ): generated.models.Estimate;
+  /**
+   * Monte Carlo finite-difference gamma of a GBM European option, with independent draws per bump.
+   * @param spot - Spot level at time 0.
+   * @param strike - Exercise price in the same units as `spot`.
+   * @param rate - Continuously compounded risk-free rate (decimal, annualized).
+   * @param divYield - Continuous dividend yield (decimal, annualized).
+   * @param vol - Annualized GBM volatility (decimal); positive.
+   * @param expiry - Time to expiry in years.
+   * @param isCall - `true` for a call payoff, `false` for a put.
+   * @param numPaths - Optional paths per evaluation; omitted uses the registry default.
+   * @param seed - Optional RNG seed as a safe integer or `bigint`; omitted uses the registry default.
+   * @param numSteps - Optional time-grid steps; omitted uses the registry default.
+   * @param bumpSize - Optional relative spot shock (0.01 is 1% of spot); omitted uses the registry default.
+   * @param currency - Optional ISO-4217 code of the simulated payoffs; omitted uses the registry default.
+   * @returns The `Estimate` object for gamma (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
+   * @throws Error - Throws a `validation` error if an input is non-finite or out of range or the currency code is unknown.
+   */
+  finiteDiffGamma(
+    spot: number,
+    strike: number,
+    rate: number,
+    divYield: number,
+    vol: number,
+    expiry: number,
+    isCall: boolean,
+    numPaths?: number,
+    seed?: number | bigint,
+    numSteps?: number,
+    bumpSize?: number,
+    currency?: string
+  ): generated.models.Estimate;
+  /**
+   * Monte Carlo finite-difference gamma of a GBM European option under common random numbers.
+   * @param spot - Spot level at time 0.
+   * @param strike - Exercise price in the same units as `spot`.
+   * @param rate - Continuously compounded risk-free rate (decimal, annualized).
+   * @param divYield - Continuous dividend yield (decimal, annualized).
+   * @param vol - Annualized GBM volatility (decimal); positive.
+   * @param expiry - Time to expiry in years.
+   * @param isCall - `true` for a call payoff, `false` for a put.
+   * @param numPaths - Optional paths per evaluation; omitted uses the registry default.
+   * @param seed - Optional RNG seed as a safe integer or `bigint`; omitted uses the registry default.
+   * @param numSteps - Optional time-grid steps; omitted uses the registry default.
+   * @param bumpSize - Optional relative spot shock (0.01 is 1% of spot); omitted uses the registry default.
+   * @param currency - Optional ISO-4217 code of the simulated payoffs; omitted uses the registry default.
+   * @returns The `Estimate` object for gamma (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
+   * @throws Error - Throws a `validation` error if an input is non-finite or out of range or the currency code is unknown.
+   */
+  finiteDiffGammaCrn(
+    spot: number,
+    strike: number,
+    rate: number,
+    divYield: number,
+    vol: number,
+    expiry: number,
+    isCall: boolean,
+    numPaths?: number,
+    seed?: number | bigint,
+    numSteps?: number,
+    bumpSize?: number,
+    currency?: string
+  ): generated.models.Estimate;
+  /**
+   * Whether Heston parameters satisfy the Feller condition `2 * kappa * theta >= volOfVol^2`.
+   * @param kappa - Mean-reversion speed of the variance, per year.
+   * @param theta - Long-run variance level (annualized, as a decimal).
+   * @param volOfVol - Volatility of variance (annualized, as a decimal).
+   * @returns `true` when the variance process stays strictly positive.
+   * @throws Error - Throws a `TypeError` if an argument is not a number.
+   */
+  hestonSatisfiesFeller(kappa: number, theta: number, volOfVol: number): boolean;
+  /**
+   * Relative standard error of a Monte Carlo money estimate, `stderr / |mean|`.
+   *
+   * Twin of the Rust and Python `MoneyEstimate.relative_stderr`.
+   * @param estimate - `MoneyEstimate` object or JSON, as returned by the pricing functions of this namespace.
+   * @returns The relative standard error; `Infinity` when the mean is numerically zero.
+   * @throws Error - Throws a `validation` error if `estimate` is malformed.
+   */
+  relativeStderr(estimate: MoneyEstimate | string): number;
+  /**
+   * Simulate a compact set of GBM spot paths.
+   * @param spot - Spot level at time 0.
+   * @param rate - Continuously compounded risk-free rate (decimal, annualized).
+   * @param divYield - Continuous dividend yield (decimal, annualized).
+   * @param vol - Annualized GBM volatility (decimal).
+   * @param expiry - Horizon in years; the grid is uniform from 0 to `expiry`.
+   * @param numSteps - Number of time-grid steps; a positive safe integer.
+   * @param numPaths - Number of captured paths; a positive safe integer.
+   * @param seed - Optional RNG seed as a safe integer or `bigint`; omitted uses the Rust `GbmPathConfig` default.
+   * @param antithetic - Optional; when `true`, paths are generated in antithetic pairs. Omitted uses the Rust default (`false`).
+   * @returns The `GbmPathSummary` object (`num_paths`, `num_simulated_paths`, `times`, `paths`).
+   * @throws Error - Throws a `TypeError` if a count is not a safe integer, and a `validation` error if an input is non-finite or out of range.
+   */
+  simulateGbmPaths(
+    spot: number,
+    rate: number,
+    divYield: number,
+    vol: number,
+    expiry: number,
+    numSteps: number,
+    numPaths: number,
+    seed?: number | bigint,
+    antithetic?: boolean
+  ): generated.models.GbmPathSummary;
 }
 
 /**
@@ -7212,6 +8541,14 @@ export interface SabrSmile extends WasmOwned {
    * @throws Error - Throws a JavaScript exception if volatility generation fails for the stored smile and supplied strikes, or the result cannot be converted to a JavaScript value.
    */
   validateNoArbitrage(strikes: NumericArray, r: number): ArbitrageValidationResult;
+  /**
+   * Forward price or rate the smile is built around.
+   */
+  readonly forward: number;
+  /**
+   * Time to expiry of the smile, in years.
+   */
+  readonly t: number;
 }
 
 /**
@@ -7323,13 +8660,2074 @@ export interface SabrCalibratorConstructor {
 }
 
 /**
- * Namespaced TypeScript entry points for structural-credit model calculations.
+ * Asset-value dynamics of a structural model: geometric Brownian motion,
+ * Merton jump-diffusion, or CreditGrades.
+ */
+export interface AssetDynamics extends WasmOwned {
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson`
+   * and by Python `from_json`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   */
+  toJson(): string;
+}
+
+/**
+ * Factories of the asset-value dynamics of a structural model.
  * @example
  * ```typescript
  * import init, { models } from "finstack-quant-wasm";
  * await init();
- * const model = models.credit.mertonModelJson(100, 0.25, 60, 0.03);
- * console.log(models.credit.mertonDefaultProbability(model, 1));
+ * const dynamics = models.credit.AssetDynamics.jumpDiffusion(0.5, -0.05, 0.1);
+ * const barrier = models.credit.MertonBarrierType.terminal();
+ * const model = models.credit.MertonModel.newWithDynamics(100, 0.2, 60, 0.03, 0.0, barrier, dynamics);
+ * console.log(model.defaultProbability(1));
+ * ```
+ */
+export interface AssetDynamicsConstructor {
+  /**
+   * JavaScript prototype of `AssetDynamics`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: AssetDynamics;
+  /**
+   * CreditGrades dynamics with an uncertain default barrier (Finger et al. 2002).
+   * @param barrierUncertainty - Lognormal dispersion of the default barrier (dimensionless, typically about 0.3).
+   * @param meanRecovery - Mean global recovery rate as a fraction from 0 through 1.
+   * @returns The CreditGrades dynamics.
+   * @throws Error - Throws a `TypeError` if an argument is not a number. Range checks run when the dynamics are attached to a model.
+   */
+  creditGrades(barrierUncertainty: number, meanRecovery: number): AssetDynamics;
+  /**
+   * Load a handle from its canonical JSON wire form, the same form
+   * Python `from_json` reads.
+   *
+   * Unknown fields are rejected where the Rust type denies them and
+   * the Rust validation rules are applied again.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
+   */
+  fromJson(json: JsonInput): AssetDynamics;
+  /**
+   * Lognormal diffusion without jumps (the Merton 1974 default).
+   * @returns The geometric-Brownian dynamics.
+   */
+  geometricBrownian(): AssetDynamics;
+  /**
+   * Merton (1976) jump-diffusion with lognormal jump sizes.
+   * @param jumpIntensity - Poisson jump arrival rate per year; non-negative.
+   * @param jumpMean - Mean of the log jump size (dimensionless).
+   * @param jumpVol - Standard deviation of the log jump size; non-negative.
+   * @returns The jump-diffusion dynamics.
+   * @throws Error - Throws a `TypeError` if an argument is not a number. Range checks run when the dynamics are attached to a model.
+   */
+  jumpDiffusion(jumpIntensity: number, jumpMean: number, jumpVol: number): AssetDynamics;
+}
+
+/**
+ * Beta-distributed recovery rate, parameterized by its mean and standard deviation.
+ */
+export interface BetaRecovery extends WasmOwned {
+  /**
+   * Recovery-rate quantile at a probability level.
+   * @param p - Probability level from 0 through 1.
+   * @returns The recovery rate below which a fraction `p` of outcomes fall.
+   * @throws Error - Throws a `validation` error if `p` is outside `[0, 1]`.
+   */
+  quantile(p: number): number;
+  /**
+   * Draw recovery rates with a seeded generator.
+   * @param nSamples - Number of draws; a safe non-negative integer.
+   * @param seed - Seed for reproducible draws, as a safe integer or `bigint`.
+   * @returns The sampled recovery rates.
+   * @throws Error - Throws a `TypeError` if a count is not a safe integer, and a `validation` error if sampling fails.
+   */
+  sampleSeeded(nSamples: number, seed: number | bigint): Float64Array;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson`
+   * and by Python `from_json`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   */
+  toJson(): string;
+  /**
+   * Beta shape parameter `alpha` implied by the moments.
+   */
+  readonly alpha: number;
+  /**
+   * Beta shape parameter `beta` implied by the moments.
+   */
+  readonly betaParam: number;
+  /**
+   * Mean recovery rate, as a fraction.
+   */
+  readonly mean: number;
+  /**
+   * Mean loss given default, `1 - mean`.
+   */
+  readonly meanLgd: number;
+  /**
+   * Mode of the distribution, or `undefined` when it has no interior mode.
+   */
+  readonly mode: number | undefined;
+  /**
+   * Standard deviation of the recovery rate, as a fraction.
+   */
+  readonly stdDev: number;
+  /**
+   * Variance of the recovery rate.
+   */
+  readonly variance: number;
+}
+
+/**
+ * Constructor of the Beta recovery distribution.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const recovery = new models.credit.BetaRecovery(0.4, 0.2);
+ * console.log(recovery.alpha, recovery.quantile(0.05), recovery.sampleSeeded(3, 42));
+ * recovery.free();
+ * ```
+ */
+export interface BetaRecoveryConstructor {
+  /**
+   * JavaScript prototype of `BetaRecovery`; instances are created with `new` or the static factories.
+   */
+  readonly prototype: BetaRecovery;
+  /**
+   * Beta recovery distribution matched to a mean and standard deviation.
+   * @returns Returns a `BetaRecovery` handle.
+   * @param mean - Mean recovery rate as a fraction strictly between 0 and 1.
+   * @param stdDev - Recovery standard deviation as a fraction; positive and below `sqrt(mean * (1 - mean))`.
+   * @throws Error - Throws a `validation` error if the moments are non-finite or do not define a Beta distribution.
+   */
+  new (mean: number, stdDev: number): BetaRecovery;
+  /**
+   * Load a handle from its canonical JSON wire form, the same form
+   * Python `from_json` reads.
+   *
+   * Unknown fields are rejected where the Rust type denies them and
+   * the Rust validation rules are applied again.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
+   */
+  fromJson(json: JsonInput): BetaRecovery;
+}
+
+/**
+ * Downturn LGD adjustment: Frye-Jacobs style stress or a regulatory add-on with a floor.
+ */
+export interface DownturnLgd extends WasmOwned {
+  /**
+   * Apply the downturn adjustment to a through-the-cycle LGD.
+   * @param baseLgd - Through-the-cycle LGD as a fraction from 0 through 1.
+   * @returns The downturn LGD as a fraction in `[0, 1]`.
+   * @throws Error - Throws a `validation` error if `baseLgd` is outside `[0, 1]`.
+   */
+  adjust(baseLgd: number): number;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails.
+   */
+  toJson(): string;
+  /**
+   * Canonical name of the adjustment method: `"stressed"` or `"regulatory_floor"`.
+   */
+  readonly method: string;
+  /**
+   * Method parameters as a plain object in canonical JSON form.
+   */
+  readonly params: generated.models.DownturnMethod;
+}
+
+/**
+ * Factories and registry loaders of the downturn LGD adjustment.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const downturn = models.credit.DownturnLgd.regulatoryFloor(0.08, 0.1);
+ * console.log(downturn.method, downturn.adjust(0.35));
+ * downturn.free();
+ * ```
+ */
+export interface DownturnLgdConstructor {
+  /**
+   * JavaScript prototype of `DownturnLgd`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: DownturnLgd;
+  /**
+   * Basel downturn calibration for secured exposures.
+   * @returns The registry's Basel secured downturn adjustment.
+   * @throws Error - Throws a `validation` error if the registry cannot supply the calibration.
+   */
+  baselSecured(): DownturnLgd;
+  /**
+   * Basel downturn calibration for unsecured exposures.
+   * @returns The registry's Basel unsecured downturn adjustment.
+   * @throws Error - Throws a `validation` error if the registry cannot supply the calibration.
+   */
+  baselUnsecured(): DownturnLgd;
+  /**
+   * Load a downturn adjustment from canonical JSON and validate its parameters.
+   * @param json - `DownturnLgd` JSON text or plain object; unknown fields are rejected.
+   * @returns The validated handle.
+   * @throws Error - Throws a `validation` error if the payload is malformed or its parameters are out of range.
+   */
+  fromJson(json: JsonInput): DownturnLgd;
+  /**
+   * Downturn adjustment registered under an explicit registry identifier.
+   * @param id - Registry identifier of the downturn calibration.
+   * @returns The registered downturn adjustment.
+   * @throws Error - Throws a `validation` error if no calibration is registered under `id`.
+   */
+  fromRegistryId(id: string): DownturnLgd;
+  /**
+   * Regulatory downturn adjustment: `max(baseLgd + addOn, floor)`.
+   * @param addOn - Additive LGD add-on as a fraction; non-negative.
+   * @param floor - Minimum downturn LGD as a fraction from 0 through 1.
+   * @returns The regulatory-floor downturn adjustment.
+   * @throws Error - Throws a `validation` error on out-of-range inputs.
+   */
+  regulatoryFloor(addOn: number, floor: number): DownturnLgd;
+  /**
+   * Stressed-factor downturn adjustment.
+   * @param assetCorrelation - Asset correlation with the systematic factor, from 0 to 1.
+   * @param lgdSensitivity - Sensitivity of LGD to the systematic factor; non-negative.
+   * @param stressQuantile - Stress quantile of the systematic factor, strictly between 0 and 1 (for example 0.999).
+   * @returns The stressed downturn adjustment.
+   * @throws Error - Throws a `validation` error on out-of-range inputs.
+   */
+  stressed(assetCorrelation: number, lgdSensitivity: number, stressQuantile: number): DownturnLgd;
+}
+
+/**
+ * Notional-dependent recovery specification for PIK-accreting instruments.
+ */
+export interface DynamicRecoverySpec extends WasmOwned {
+  /**
+   * Recovery rate at a given current notional, clamped to `[0, baseRecovery]`.
+   * @param notional - Current (accreted) notional in the instrument's currency.
+   * @returns Recovery rate as a fraction of par.
+   * @throws Error - Throws a `TypeError` if `notional` is not a number.
+   */
+  recoveryAtNotional(notional: number): number;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson`
+   * and by Python `from_json`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   */
+  toJson(): string;
+  /**
+   * Base (reference) notional `N0` the recovery mapping is anchored to.
+   */
+  readonly baseNotional: number;
+  /**
+   * Base (reference) recovery rate `R0`, as a fraction from 0 through 1.
+   */
+  readonly baseRecovery: number;
+  /**
+   * Canonical name of the active recovery model: `"constant"`,
+   * `"inverse_linear"`, `"inverse_power"`, `"floored_inverse"` or
+   * `"linear_decline"`.
+   */
+  readonly kind: string;
+  /**
+   * Notional-to-recovery mapping in canonical JSON form: a tag string for
+   * the parameterless models, or a single-key object carrying the parameters.
+   */
+  readonly model: generated.models.RecoveryModel;
+}
+
+/**
+ * Validating factories of the notional-dependent recovery specification.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const spec = models.credit.DynamicRecoverySpec.flooredInverse(0.4, 100, 0.1);
+ * console.log(spec.kind, spec.recoveryAtNotional(150));
+ * spec.free();
+ * ```
+ */
+export interface DynamicRecoverySpecConstructor {
+  /**
+   * JavaScript prototype of `DynamicRecoverySpec`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: DynamicRecoverySpec;
+  /**
+   * Recovery that does not depend on notional.
+   * @param recovery - Recovery rate at default as a fraction of par from 0 through 1.
+   * @returns The constant recovery specification.
+   * @throws Error - Throws a `validation` error if `recovery` is outside `[0, 1]`.
+   */
+  constant(recovery: number): DynamicRecoverySpec;
+  /**
+   * Inverse-linear recovery that never falls below a floor.
+   * @param baseRecovery - Recovery rate `R0` at the base notional, as a fraction from 0 through 1.
+   * @param baseNotional - Positive reference notional `N0` in the instrument's currency.
+   * @param floor - Minimum recovery as a fraction in `[0, baseRecovery]`.
+   * @returns The floored-inverse recovery specification.
+   * @throws Error - Throws a `validation` error on non-finite or out-of-range inputs.
+   */
+  flooredInverse(baseRecovery: number, baseNotional: number, floor: number): DynamicRecoverySpec;
+  /**
+   * Load a handle from its canonical JSON wire form, the same form
+   * Python `from_json` reads.
+   *
+   * Unknown fields are rejected where the Rust type denies them and
+   * the Rust validation rules are applied again.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
+   */
+  fromJson(json: JsonInput): DynamicRecoverySpec;
+  /**
+   * Recovery `R0 * N0 / N`: fixed recoverable value spread over a larger claim.
+   * @param baseRecovery - Recovery rate `R0` at the base notional, as a fraction from 0 through 1.
+   * @param baseNotional - Positive reference notional `N0` in the instrument's currency.
+   * @returns The inverse-linear recovery specification.
+   * @throws Error - Throws a `validation` error on non-finite or out-of-range inputs.
+   */
+  inverseLinear(baseRecovery: number, baseNotional: number): DynamicRecoverySpec;
+  /**
+   * Recovery `R0 * (N0 / N)^exponent`.
+   * @param baseRecovery - Recovery rate `R0` at the base notional, as a fraction from 0 through 1.
+   * @param baseNotional - Positive reference notional `N0` in the instrument's currency.
+   * @param exponent - Non-negative power applied to the notional ratio.
+   * @returns The inverse-power recovery specification.
+   * @throws Error - Throws a `validation` error on non-finite or out-of-range inputs.
+   */
+  inversePower(baseRecovery: number, baseNotional: number, exponent: number): DynamicRecoverySpec;
+  /**
+   * Recovery that declines linearly in the notional ratio down to a floor.
+   * @param baseRecovery - Recovery rate `R0` at the base notional, as a fraction from 0 through 1.
+   * @param baseNotional - Positive reference notional `N0` in the instrument's currency.
+   * @param slope - Non-negative recovery lost per unit increase of `N / N0 - 1`.
+   * @param floor - Minimum recovery as a fraction in `[0, baseRecovery]`.
+   * @returns The linear-decline recovery specification.
+   * @throws Error - Throws a `validation` error on non-finite or out-of-range inputs.
+   */
+  linearDecline(
+    baseRecovery: number,
+    baseNotional: number,
+    slope: number,
+    floor: number
+  ): DynamicRecoverySpec;
+}
+
+/**
+ * Exposure-at-default calculator for drawn and undrawn commitments.
+ */
+export interface EadCalculator extends WasmOwned {
+  /**
+   * Loan-equivalent factor implied by an observed exposure at default.
+   * @param observedEad - Realized exposure at default in monetary units.
+   * @returns `(observedEad - drawn) / undrawn`, or `undefined` when nothing is undrawn.
+   * @throws Error - Throws a `TypeError` if `observedEad` is not a number.
+   */
+  leqFromObservedEad(observedEad: number): number | undefined;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson`
+   * and by Python `from_json`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   */
+  toJson(): string;
+  /**
+   * Exposure at default: `drawn + ccf * undrawn`, in monetary units.
+   */
+  readonly ead: number;
+  /**
+   * Drawn plus undrawn commitment, in monetary units.
+   */
+  readonly totalCommitment: number;
+  /**
+   * Drawn balance as a fraction of the total commitment.
+   */
+  readonly utilization: number;
+}
+
+/**
+ * Constructor and presets of the exposure-at-default calculator.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const ead = new models.credit.EadCalculator(600, 400, 0.75);
+ * console.log(ead.ead, ead.utilization, ead.totalCommitment);
+ * ead.free();
+ * ```
+ */
+export interface EadCalculatorConstructor {
+  /**
+   * JavaScript prototype of `EadCalculator`; instances are created with `new` or the static factories.
+   */
+  readonly prototype: EadCalculator;
+  /**
+   * EAD inputs with an explicit credit conversion factor.
+   * @returns Returns a `EadCalculator` handle.
+   * @param drawn - Drawn balance in monetary units; non-negative.
+   * @param undrawn - Undrawn commitment in monetary units; non-negative.
+   * @param ccf - Credit conversion factor applied to the undrawn amount, from 0 through 1.
+   * @throws Error - Throws a `validation` error on negative, non-finite or out-of-range inputs.
+   */
+  new (drawn: number, undrawn: number, ccf: number): EadCalculator;
+  /**
+   * Load a handle from its canonical JSON wire form, the same form
+   * Python `from_json` reads.
+   *
+   * Unknown fields are rejected where the Rust type denies them and
+   * the Rust validation rules are applied again.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
+   */
+  fromJson(json: JsonInput): EadCalculator;
+  /**
+   * Revolver with the Basel credit conversion factor on the undrawn amount.
+   * @param drawn - Drawn balance in monetary units; non-negative.
+   * @param undrawn - Undrawn commitment in monetary units; non-negative.
+   * @returns The revolver EAD calculator.
+   * @throws Error - Throws a `validation` error on negative or non-finite inputs.
+   */
+  revolver(drawn: number, undrawn: number): EadCalculator;
+  /**
+   * Fully drawn term loan: EAD equals the drawn balance.
+   * @param drawn - Drawn balance in monetary units; non-negative.
+   * @returns The term-loan EAD calculator.
+   * @throws Error - Throws a `validation` error if `drawn` is negative or non-finite.
+   */
+  termLoan(drawn: number): EadCalculator;
+}
+
+/**
+ * Leverage-dependent hazard-rate feedback for PIK-accreting instruments.
+ */
+export interface EndogenousHazardSpec extends WasmOwned {
+  /**
+   * Hazard rate after PIK accretion, with leverage `accretedNotional / assetValue`.
+   * @param accretedNotional - Notional outstanding after PIK accrual, in the instrument's currency.
+   * @param assetValue - Firm asset value in the same currency; strictly positive.
+   * @returns Hazard rate per year, as a decimal.
+   * @throws Error - Throws a `TypeError` if an argument is not a number.
+   */
+  hazardAfterPikAccrual(accretedNotional: number, assetValue: number): number;
+  /**
+   * Annualized hazard rate at a leverage ratio, floored at zero.
+   * @param leverage - Debt-to-assets leverage ratio; non-negative.
+   * @returns Hazard rate per year, as a decimal.
+   * @throws Error - Throws a `TypeError` if `leverage` is not a number.
+   */
+  hazardAtLeverage(leverage: number): number;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson`
+   * and by Python `from_json`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   */
+  toJson(): string;
+  /**
+   * Base (reference) hazard rate, annualized, as a decimal.
+   */
+  readonly baseHazardRate: number;
+  /**
+   * Base (reference) leverage the hazard mapping is anchored to.
+   */
+  readonly baseLeverage: number;
+  /**
+   * Canonical name of the active mapping: `"power_law"`, `"exponential"` or
+   * `"tabular"`.
+   */
+  readonly kind: string;
+  /**
+   * Leverage-to-hazard mapping in canonical JSON form: a single-key object
+   * (`power_law`, `exponential`, `tabular`) carrying that model's parameters.
+   */
+  readonly leverageHazardMap: generated.models.LeverageHazardMap;
+}
+
+/**
+ * Validating factories of the leverage-dependent hazard specification.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const spec = models.credit.EndogenousHazardSpec.powerLaw(0.05, 0.6, 2.0);
+ * console.log(spec.kind, spec.hazardAtLeverage(0.8));
+ * spec.free();
+ * ```
+ */
+export interface EndogenousHazardSpecConstructor {
+  /**
+   * JavaScript prototype of `EndogenousHazardSpec`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: EndogenousHazardSpec;
+  /**
+   * Exponential mapping `lambda(L) = baseHazard * exp(sensitivity * (L - baseLeverage))`.
+   * @param baseHazard - Annualized hazard rate at the base leverage, as a decimal; non-negative.
+   * @param baseLeverage - Positive reference debt-to-assets leverage ratio.
+   * @param sensitivity - Log-hazard change per unit of leverage above the base.
+   * @returns The exponential hazard specification.
+   * @throws Error - Throws a `validation` error on non-finite or out-of-range inputs.
+   */
+  exponential(baseHazard: number, baseLeverage: number, sensitivity: number): EndogenousHazardSpec;
+  /**
+   * Load a handle from its canonical JSON wire form, the same form
+   * Python `from_json` reads.
+   *
+   * Unknown fields are rejected where the Rust type denies them and
+   * the Rust validation rules are applied again.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
+   */
+  fromJson(json: JsonInput): EndogenousHazardSpec;
+  /**
+   * Power-law mapping `lambda(L) = baseHazard * (L / baseLeverage)^exponent`.
+   * @param baseHazard - Annualized hazard rate at the base leverage, as a decimal; non-negative.
+   * @param baseLeverage - Positive reference debt-to-assets leverage ratio.
+   * @param exponent - Power-law exponent applied to the leverage ratio.
+   * @returns The power-law hazard specification.
+   * @throws Error - Throws a `validation` error on non-finite or out-of-range inputs.
+   */
+  powerLaw(baseHazard: number, baseLeverage: number, exponent: number): EndogenousHazardSpec;
+  /**
+   * Piecewise-linear leverage-to-hazard table.
+   * @param leveragePoints - Strictly increasing leverage ratios, at least two, as a `number[]` or `Float64Array`.
+   * @param hazardPoints - Annualized hazard rates at those leverage points; same length, non-negative.
+   * @returns The tabular hazard specification.
+   * @throws Error - Throws a `validation` error if the arrays differ in length, hold fewer than two points, are not strictly increasing in leverage, or contain non-finite or negative values.
+   */
+  tabular(leveragePoints: NumericArray, hazardPoints: NumericArray): EndogenousHazardSpec;
+}
+
+/**
+ * Continuous-time Markov-chain generator (intensity) matrix; rows sum to zero.
+ */
+export interface GeneratorMatrix extends WasmOwned {
+  /**
+   * Total intensity per year of leaving a state.
+   * @param state - Label of the state.
+   * @returns The exit rate, the negated diagonal entry.
+   * @throws Error - Throws a `not_found` error if the label is not in the scale.
+   */
+  exitRate(state: string): number;
+  /**
+   * Transition intensity between two labelled states.
+   * @param from - Label of the starting state.
+   * @param to - Label of the ending state.
+   * @returns The intensity per year of moving from `from` to `to`.
+   * @throws Error - Throws a `not_found` error if either label is not in the scale.
+   */
+  intensity(from: string, to: string): number;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson`
+   * and by Python `from_json`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   */
+  toJson(): string;
+  /**
+   * Intensities as one row per starting state.
+   * @returns An array of `number[]` rows in scale order.
+   * @throws Error - Throws a `validation` error if the rows cannot be converted.
+   */
+  toMatrix(): number[][];
+  /**
+   * Number of states in the scale.
+   */
+  readonly nStates: number;
+  /**
+   * L1 size of the regularization applied when the generator was estimated (0 when built directly).
+   */
+  readonly regularizationL1: number;
+  /**
+   * Largest absolute round-trip error of the estimated generator (0 when built directly).
+   */
+  readonly roundTripError: number;
+  /**
+   * Rating scale that orders the rows and columns.
+   */
+  readonly scale: RatingScale;
+}
+
+/**
+ * Constructor and estimators of the generator matrix.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const scale = models.credit.RatingScale.custom(["A", "B", "D"]);
+ * const generator = new models.credit.GeneratorMatrix(scale, [
+ *   [-0.1, 0.08, 0.02],
+ *   [0.1, -0.2, 0.1],
+ *   [0, 0, 0],
+ * ]);
+ * console.log(generator.exitRate("A"), models.credit.project(generator, 2).probability("A", "D"));
+ * ```
+ */
+export interface GeneratorMatrixConstructor {
+  /**
+   * JavaScript prototype of `GeneratorMatrix`; instances are created with `new` or the static factories.
+   */
+  readonly prototype: GeneratorMatrix;
+  /**
+   * Generator matrix from transition intensities.
+   * @returns Returns a `GeneratorMatrix` handle.
+   * @param scale - `RatingScale` handle defining the state order.
+   * @param data - Intensities per year, either flat row-major (`nStates * nStates` numbers) or as an array of rows; off-diagonals non-negative and each row summing to zero.
+   * @throws Error - Throws a `validation` error if the dimensions do not match the scale or the entries do not form a valid generator.
+   */
+  new (scale: RatingScale, data: NumericArray | NumericArray[]): GeneratorMatrix;
+  /**
+   * Load a handle from its canonical JSON wire form, the same form
+   * Python `from_json` reads.
+   *
+   * Unknown fields are rejected where the Rust type denies them and
+   * the Rust validation rules are applied again.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
+   */
+  fromJson(json: JsonInput): GeneratorMatrix;
+  /**
+   * Estimate the generator of a transition matrix by matrix logarithm with
+   * regularization (Israel-Rosenthal-Wei).
+   * @param p - `TransitionMatrix` whose generator to extract.
+   * @returns The regularized generator; `roundTripError` reports the fit.
+   * @throws Error - Throws a `computation` error if no valid generator exists or the round trip exceeds the default tolerance.
+   */
+  fromTransitionMatrix(p: TransitionMatrix): GeneratorMatrix;
+  /**
+   * Estimate the generator of a transition matrix with an explicit round-trip tolerance.
+   * @param p - `TransitionMatrix` whose generator to extract.
+   * @param roundTripTol - Largest accepted absolute difference between `exp(Q * horizon)` and `p`.
+   * @returns The regularized generator.
+   * @throws Error - Throws a `computation` error if no valid generator exists or the round trip exceeds `roundTripTol`.
+   */
+  fromTransitionMatrixWithTol(p: TransitionMatrix, roundTripTol: number): GeneratorMatrix;
+}
+
+/**
+ * Rating master scale mapping default probabilities to grades.
+ */
+export interface MasterScale extends WasmOwned {
+  /**
+   * Map one PD to its grade: the first grade whose `upper_pd` is at or above it.
+   * @param pd - Default probability as a decimal from 0 through 1.
+   * @returns The `MasterScaleResult` object (`grade`, `central_pd`, `input_pd`, `grade_index`).
+   * @throws Error - Throws a `validation` error if `pd` is non-finite or outside `[0, 1]`.
+   */
+  mapPd(pd: number): generated.models.MasterScaleResult;
+  /**
+   * Map a batch of PDs to their grades (Python returns the same rows as a DataFrame).
+   * @param pds - Default probabilities as decimals from 0 through 1, as a `number[]` or `Float64Array`.
+   * @returns One `MasterScaleResult` object per PD, in input order.
+   * @throws Error - Throws a `validation` error if any PD is non-finite or outside `[0, 1]`.
+   */
+  mapPds(pds: NumericArray): generated.models.MasterScaleResult[];
+  /**
+   * Map a credit-scoring result to a grade through its implied PD.
+   * @param result - `ScoringResult` object or JSON, as returned by the `models.credit` scoring functions.
+   * @returns The `MasterScaleResult` object for the score's implied PD.
+   * @throws Error - Throws a `validation` error if the result is malformed, has no implied PD, or its PD is non-finite.
+   */
+  mapScore(result: generated.models.ScoringResult | string): generated.models.MasterScaleResult;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson`
+   * and by Python `from_json`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   */
+  toJson(): string;
+  /**
+   * Grades in ascending PD order, as `MasterScaleGrade` objects.
+   */
+  readonly grades: generated.models.MasterScaleGrade[];
+  /**
+   * Number of grades in the scale.
+   */
+  readonly nGrades: number;
+}
+
+/**
+ * Constructor and registry loaders of the rating master scale.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const scale = new models.credit.MasterScale([
+ *   { label: "A", upper_pd: 0.01, central_pd: 0.005 },
+ *   { label: "B", upper_pd: 0.1, central_pd: 0.04 },
+ *   { label: "C", upper_pd: 1.0, central_pd: 0.3 },
+ * ]);
+ * console.log(scale.nGrades, scale.mapPd(0.02).grade);
+ * scale.free();
+ * ```
+ */
+export interface MasterScaleConstructor {
+  /**
+   * JavaScript prototype of `MasterScale`; instances are created with `new` or the static factories.
+   */
+  readonly prototype: MasterScale;
+  /**
+   * Master scale from explicit grades.
+   * @returns Returns a `MasterScale` handle.
+   * @param grades - Array of `MasterScaleGrade` objects (`label`, `upper_pd`, `central_pd`) in ascending `upper_pd` order, or its JSON text.
+   * @throws Error - Throws a `validation` error if the list is empty, a PD is out of range, or the grades are not sorted by `upper_pd`.
+   */
+  new (grades: readonly generated.models.MasterScaleGrade[] | string): MasterScale;
+  /**
+   * Load a handle from its canonical JSON wire form, the same form
+   * Python `from_json` reads.
+   *
+   * Unknown fields are rejected where the Rust type denies them and
+   * the Rust validation rules are applied again.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
+   */
+  fromJson(json: JsonInput): MasterScale;
+  /**
+   * Master scale registered under an explicit registry identifier.
+   * @param scaleId - Registry identifier of the master scale.
+   * @returns The registered master scale.
+   * @throws Error - Throws a `validation` error if no scale is registered under `scaleId`.
+   */
+  fromRegistryId(scaleId: string): MasterScale;
+  /**
+   * Moody's-style master scale from the embedded credit-assumption registry.
+   * @returns The Moody's assumptions master scale.
+   * @throws Error - Throws a `validation` error if the registry cannot supply the scale.
+   */
+  moodysAssumptions(): MasterScale;
+  /**
+   * S&P-style master scale from the embedded credit-assumption registry.
+   * @returns The S&P assumptions master scale.
+   * @throws Error - Throws a `validation` error if the registry cannot supply the scale.
+   */
+  spAssumptions(): MasterScale;
+}
+
+/**
+ * Default-barrier monitoring rule of a structural model: terminal (Merton) or
+ * first-passage (Black-Cox).
+ */
+export interface MertonBarrierType extends WasmOwned {
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson`
+   * and by Python `from_json`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   */
+  toJson(): string;
+}
+
+/**
+ * Factories of the default-barrier monitoring rule.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const barrier = models.credit.MertonBarrierType.firstPassage(0.02);
+ * console.log(barrier.toJson());
+ * barrier.free();
+ * ```
+ */
+export interface MertonBarrierTypeConstructor {
+  /**
+   * JavaScript prototype of `MertonBarrierType`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: MertonBarrierType;
+  /**
+   * Default occurs the first time assets touch a growing barrier (Black-Cox 1976).
+   * @param barrierGrowthRate - Continuously compounded growth rate of the barrier per year, as a decimal (`0.0` keeps the barrier flat).
+   * @returns The first-passage barrier rule.
+   * @throws Error - Throws a `TypeError` if `barrierGrowthRate` is not a number.
+   */
+  firstPassage(barrierGrowthRate: number): MertonBarrierType;
+  /**
+   * Load a handle from its canonical JSON wire form, the same form
+   * Python `from_json` reads.
+   *
+   * Unknown fields are rejected where the Rust type denies them and
+   * the Rust validation rules are applied again.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
+   */
+  fromJson(json: JsonInput): MertonBarrierType;
+  /**
+   * Default is tested only at the horizon (Merton 1974).
+   * @returns The terminal-barrier rule.
+   */
+  terminal(): MertonBarrierType;
+}
+
+/**
+ * Structural (Merton-family) credit model of one firm.
+ *
+ * Rates and volatilities are annualized decimals, horizons are in years and
+ * monetary inputs share one caller-defined unit.
+ */
+export interface MertonModel extends WasmOwned {
+  /**
+   * ISDA-style CDS par spread implied by the model's survival curve.
+   * @param maturity - CDS maturity in years; positive and finite.
+   * @param recovery - Recovery rate at default as a fraction of par from 0 through 1.
+   * @returns CDS par spread per year, as a decimal.
+   * @throws Error - Throws a `validation` error if `maturity` is not positive, `recovery` is outside `[0, 1]` or contradicts the CreditGrades `mean_recovery`, or the implied survival curve cannot be bootstrapped.
+   */
+  cdsParSpread(maturity: number, recovery: number): number;
+  /**
+   * Merton (1974) endogenous debt spread, where recovery is the firm's own
+   * terminal asset value.
+   * @param horizon - Maturity of the firm's debt in years; positive.
+   * @returns Debt spread per year, as a decimal.
+   * @throws Error - Throws a `validation` error if `horizon` is not positive, the barrier is not terminal, or the implied debt value is not positive.
+   */
+  debtSpread(horizon: number): number;
+  /**
+   * Risk-neutral default probabilities over a grid of horizons.
+   *
+   * Python returns the same values as a pandas Series labelled by horizon.
+   * @param horizons - Horizons in years, as a `number[]` or `Float64Array`.
+   * @returns One default probability per horizon, in input order.
+   * @throws Error - Throws a `TypeError` if `horizons` is not an array of numbers.
+   */
+  defaultProbabilities(horizons: NumericArray): Float64Array;
+  /**
+   * Risk-neutral cumulative default probability over a horizon.
+   * @param horizon - Forward-looking horizon in years; a non-positive horizon returns 0.
+   * @returns Default probability in `[0, 1]`.
+   * @throws Error - Throws a `TypeError` if `horizon` is not a number.
+   */
+  defaultProbability(horizon: number): number;
+  /**
+   * Physical-measure (Moody's KMV) default probability, the theoretical EDF.
+   * @param assetDrift - Expected physical total return on firm assets as a continuously compounded decimal, replacing the risk-free rate.
+   * @param horizon - Forward-looking horizon in years.
+   * @returns Default probability in `[0, 1]` under the physical drift.
+   * @throws Error - Throws a `validation` error if `assetDrift` is not finite or the model uses driftless CreditGrades dynamics.
+   */
+  defaultProbabilityWithDrift(assetDrift: number, horizon: number): number;
+  /**
+   * Risk-neutral distance to default `d2` over a horizon.
+   *
+   * Lower values indicate higher default risk. This is not the Moody's KMV
+   * distance to default; use `distanceToDefaultWithDrift` for that.
+   * @param horizon - Forward-looking horizon in years.
+   * @returns Distance to default in standard deviations.
+   * @throws Error - Throws a `TypeError` if `horizon` is not a number.
+   */
+  distanceToDefault(horizon: number): number;
+  /**
+   * Physical-measure (Moody's KMV) distance to default.
+   * @param assetDrift - Expected physical total return on firm assets as a continuously compounded decimal, replacing the risk-free rate.
+   * @param horizon - Forward-looking horizon in years.
+   * @returns Distance to default in standard deviations under the physical drift.
+   * @throws Error - Throws a `validation` error if `assetDrift` is not finite or the model uses driftless CreditGrades dynamics.
+   */
+  distanceToDefaultWithDrift(assetDrift: number, horizon: number): number;
+  /**
+   * Zero-coupon credit spread given an exogenous recovery paid at maturity.
+   * @param horizon - Maturity in years; positive and finite.
+   * @param recovery - Recovery rate at default as a fraction of par from 0 through 1.
+   * @returns Credit spread per year, as a decimal.
+   * @throws Error - Throws a `validation` error if `horizon` is not positive and finite or `recovery` is outside `[0, 1]`.
+   */
+  impliedSpread(horizon: number, recovery: number): number;
+  /**
+   * Simulate firm-asset paths by Monte Carlo.
+   * @param numPaths - Number of paths to simulate; a safe non-negative integer.
+   * @param numSteps - Number of time steps per path; at least 1.
+   * @param horizon - Simulation horizon in years; positive and finite.
+   * @param seed - Seed for reproducible draws, as a safe integer or `bigint`; the Rust generator (PCG64) gives equal paths for equal seeds in every host.
+   * @param antithetic - When `true`, use antithetic variates for variance reduction.
+   * @returns The simulated paths.
+   * @throws Error - Throws a `TypeError` if a count is not a safe integer, and a `validation` error if `numSteps` is zero, `horizon` is not positive and finite, or the path storage size overflows.
+   */
+  simulatePaths(
+    numPaths: number,
+    numSteps: number,
+    horizon: number,
+    seed: number | bigint,
+    antithetic: boolean
+  ): SimulatedPaths;
+  /**
+   * Bootstrap a piecewise-constant hazard curve from the structural default
+   * probabilities.
+   * @param id - Identifier assigned to the hazard curve.
+   * @param baseDate - Valuation date in ISO-8601 form, such as `"2025-01-15"`.
+   * @param tenors - Tenor grid in years as a `number[]` or `Float64Array`; non-empty, positive and distinct.
+   * @param recovery - Recovery rate as a fraction from 0 through 1; must equal the model's `mean_recovery` under CreditGrades dynamics.
+   * @param dayCount - Day-count convention the curve uses for year fractions, such as `"act_365f"` or `"act_360"`.
+   * @returns The bootstrapped `core.HazardCurve` handle.
+   * @throws Error - Throws a `validation` error if the date or day count does not parse, `tenors` is empty or non-positive, `recovery` is out of range, or the implied survival curve is not monotone.
+   */
+  toHazardCurve(
+    id: string,
+    baseDate: string,
+    tenors: NumericArray,
+    recovery: number,
+    dayCount: string
+  ): HazardCurve;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson`
+   * and by Python `from_json`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   */
+  toJson(): string;
+  /**
+   * Equity value and equity volatility implied by the model.
+   * @param horizon - Debt maturity in years; positive and finite.
+   * @returns A `Float64Array` of length 2: `[equityValue, equityVolatility]`.
+   * @throws Error - Throws a `validation` error if `horizon` is not positive and finite, the firm is economically in default, or the inversion is ill-conditioned.
+   */
+  tryImpliedEquity(horizon: number): Float64Array;
+  /**
+   * Current fair value of the firm's assets, in monetary units.
+   */
+  readonly assetValue: number;
+  /**
+   * Annualized asset-return volatility, as a decimal.
+   */
+  readonly assetVol: number;
+  /**
+   * Default-barrier monitoring rule of this model.
+   */
+  readonly barrierType: MertonBarrierType;
+  /**
+   * Debt face value that defines the default barrier, in monetary units.
+   */
+  readonly debtBarrier: number;
+  /**
+   * Asset-value dynamics of this model.
+   */
+  readonly dynamics: AssetDynamics;
+  /**
+   * Continuous payout rate on assets, as a decimal.
+   */
+  readonly payoutRate: number;
+  /**
+   * Continuously compounded risk-free rate, as a decimal.
+   */
+  readonly riskFreeRate: number;
+}
+
+/**
+ * Constructor and calibrating factories of the structural credit model.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const model = new models.credit.MertonModel(100, 0.25, 60, 0.03);
+ * console.log(model.defaultProbability(1), model.distanceToDefault(1));
+ * const curve = model.toHazardCurve("ACME", "2025-01-15", [1, 3, 5], 0.4, "act_365f");
+ * console.log(curve.sp(5));
+ * curve.free();
+ * model.free();
+ * ```
+ */
+export interface MertonModelConstructor {
+  /**
+   * JavaScript prototype of `MertonModel`; instances are created with `new` or the static factories.
+   */
+  readonly prototype: MertonModel;
+  /**
+   * Terminal-barrier Merton model with geometric-Brownian assets and no payout.
+   * @returns Returns a `MertonModel` handle.
+   * @param assetValue - Current fair value of the firm's assets in monetary units; positive.
+   * @param assetVol - Annualized volatility of firm-asset returns, as a decimal; positive.
+   * @param debtBarrier - Positive debt face value defining the default barrier.
+   * @param riskFreeRate - Continuously compounded risk-free rate as a decimal, such as 0.05 for 5%.
+   * @throws Error - Throws a `TypeError` if an argument is not a number, and a `validation` error if `assetValue`, `assetVol` or `debtBarrier` is not positive and finite or `riskFreeRate` is non-finite.
+   */
+  new (
+    assetValue: number,
+    assetVol: number,
+    debtBarrier: number,
+    riskFreeRate: number
+  ): MertonModel;
+  /**
+   * CreditGrades model calibrated from equity observables.
+   * @param equityValue - Current market value of equity in the firm's monetary units.
+   * @param equityVol - Annualized equity-return volatility as a decimal.
+   * @param totalDebt - Total debt face value in the firm's monetary units.
+   * @param riskFreeRate - Continuously compounded risk-free rate as a decimal.
+   * @param barrierUncertainty - Lognormal dispersion of the CreditGrades default barrier.
+   * @param meanRecovery - Mean recovery rate at default as a fraction from 0 through 1.
+   * @returns The CreditGrades model.
+   * @throws Error - Throws a `validation` error if an input is out of range.
+   */
+  creditGrades(
+    equityValue: number,
+    equityVol: number,
+    totalDebt: number,
+    riskFreeRate: number,
+    barrierUncertainty: number,
+    meanRecovery: number
+  ): MertonModel;
+  /**
+   * Calibrate asset volatility to a target CDS par spread.
+   *
+   * The objective is a full ISDA-style par spread built from the model's
+   * survival curve. A quote that no volatility in `[0.01, 2.0]` reproduces,
+   * or one consistent with several volatilities, is rejected rather than
+   * resolved arbitrarily.
+   * @param cdsSpreadBp - Target CDS par spread in basis points.
+   * @param recovery - Recovery rate at default as a fraction from 0 through 1.
+   * @param totalDebt - Total debt face value in the firm's monetary units.
+   * @param riskFreeRate - Continuously compounded risk-free rate as a decimal.
+   * @param maturity - CDS maturity in years; positive and finite.
+   * @param assetValue - Assumed current firm asset value in monetary units.
+   * @param payoutRate - Continuous payout rate on assets, as a decimal.
+   * @returns The calibrated model.
+   * @throws Error - Throws a `validation` error if an input is out of range or the quote is unattainable or ambiguous.
+   */
+  fromCdsSpread(
+    cdsSpreadBp: number,
+    recovery: number,
+    totalDebt: number,
+    riskFreeRate: number,
+    maturity: number,
+    assetValue: number,
+    payoutRate: number
+  ): MertonModel;
+  /**
+   * Calibrate asset value and volatility from observable equity (KMV iteration).
+   * @param equityValue - Current market value of equity in the firm's monetary units.
+   * @param equityVol - Annualized equity-return volatility as a decimal.
+   * @param totalDebt - Total debt face value used as the default barrier.
+   * @param riskFreeRate - Continuously compounded risk-free rate as a decimal.
+   * @param payoutRate - Continuous dividend or payout yield on assets, as a decimal.
+   * @param maturity - Calibration horizon in years; positive and finite.
+   * @returns The calibrated model.
+   * @throws Error - Throws a `validation` error if an input is out of range and a `computation` error if the calibration does not converge.
+   */
+  fromEquity(
+    equityValue: number,
+    equityVol: number,
+    totalDebt: number,
+    riskFreeRate: number,
+    payoutRate: number,
+    maturity: number
+  ): MertonModel;
+  /**
+   * Load a handle from its canonical JSON wire form, the same form
+   * Python `from_json` reads.
+   *
+   * Unknown fields are rejected where the Rust type denies them and
+   * the Rust validation rules are applied again.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
+   */
+  fromJson(json: JsonInput): MertonModel;
+  /**
+   * Calibrate the default barrier to a target cumulative default probability.
+   * @param assetValue - Current fair value of the firm's assets in monetary units.
+   * @param assetVol - Annualized volatility of firm-asset returns as a decimal; positive.
+   * @param riskFreeRate - Continuously compounded risk-free rate as a decimal; pass the physical asset return to calibrate against a real-world default rate.
+   * @param payoutRate - Continuous payout rate on assets as a decimal; it enters the calibration drift and is carried on the model.
+   * @param targetPd - Target cumulative default probability strictly between 0 and 1.
+   * @param maturity - Calibration horizon in years; positive and finite.
+   * @returns The calibrated model.
+   * @throws Error - Throws a `validation` error if an input is out of range.
+   */
+  fromTargetPd(
+    assetValue: number,
+    assetVol: number,
+    riskFreeRate: number,
+    payoutRate: number,
+    targetPd: number,
+    maturity: number
+  ): MertonModel;
+  /**
+   * Moody's KMV default point: short-term debt plus half of long-term debt.
+   * @param shortTermDebt - Liabilities due within one year, in the firm's monetary units.
+   * @param longTermDebt - Liabilities maturing beyond one year, in the same units; half of it enters the default point.
+   * @returns The default point in the same monetary units.
+   * @throws Error - Throws a `validation` error if either input is negative or non-finite, or the resulting default point is zero.
+   */
+  kmvDefaultPoint(shortTermDebt: number, longTermDebt: number): number;
+  /**
+   * Model with an explicit barrier rule and asset dynamics.
+   * @param assetValue - Current fair value of the firm's assets in monetary units; positive.
+   * @param assetVol - Annualized volatility of firm-asset returns as a decimal; positive.
+   * @param debtBarrier - Positive debt face value defining the default barrier.
+   * @param riskFreeRate - Continuously compounded risk-free rate as a decimal.
+   * @param payoutRate - Continuous payout rate on assets, as a decimal.
+   * @param barrierType - `MertonBarrierType` handle selecting terminal or first-passage default.
+   * @param dynamics - `AssetDynamics` handle selecting GBM, jump-diffusion or CreditGrades assets.
+   * @returns The validated model.
+   * @throws Error - Throws a `validation` error if an input is out of range or the barrier rule and dynamics are incompatible (for example jump-diffusion with a first-passage barrier).
+   */
+  newWithDynamics(
+    assetValue: number,
+    assetVol: number,
+    debtBarrier: number,
+    riskFreeRate: number,
+    payoutRate: number,
+    barrierType: MertonBarrierType,
+    dynamics: AssetDynamics
+  ): MertonModel;
+}
+
+/**
+ * Gillespie simulator of rating migration under a generator matrix.
+ */
+export interface MigrationSimulator extends WasmOwned {
+  /**
+   * Estimate the transition matrix over the horizon by simulation.
+   * @param nPathsPerState - Paths simulated from every starting state; positive.
+   * @param seed - Seed of the Rust PCG64 generator, as a safe integer or `bigint`.
+   * @returns The empirical `TransitionMatrix`.
+   * @throws Error - Throws a `validation` error if `nPathsPerState` is zero.
+   */
+  empiricalMatrix(nPathsPerState: number, seed: number | bigint): TransitionMatrix;
+  /**
+   * Simulate independent rating paths from one starting state.
+   * @param initialState - Zero-based starting state index.
+   * @param nPaths - Number of paths; a safe non-negative integer.
+   * @param seed - Seed of the Rust PCG64 generator, as a safe integer or `bigint`; equal seeds give equal paths in every host.
+   * @returns The simulated `RatingPaths` batch.
+   * @throws Error - Throws a `validation` error if `initialState` is outside the scale.
+   */
+  simulate(initialState: number, nPaths: number, seed: number | bigint): RatingPaths;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson`
+   * and by Python `from_json`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   */
+  toJson(): string;
+  /**
+   * Generator matrix driving the simulation.
+   */
+  readonly generator: GeneratorMatrix;
+  /**
+   * Simulation horizon in years.
+   */
+  readonly horizon: number;
+}
+
+/**
+ * Constructor and JSON loader of the rating-migration simulator.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const scale = models.credit.RatingScale.custom(["A", "B", "D"]);
+ * const generator = new models.credit.GeneratorMatrix(scale, [-0.1, 0.08, 0.02, 0.1, -0.2, 0.1, 0, 0, 0]);
+ * const simulator = new models.credit.MigrationSimulator(generator, 5);
+ * console.log(simulator.simulate(0, 100, 7).defaultRate);
+ * console.log(simulator.empiricalMatrix(200, 7).probability("A", "D"));
+ * ```
+ */
+export interface MigrationSimulatorConstructor {
+  /**
+   * JavaScript prototype of `MigrationSimulator`; instances are created with `new` or the static factories.
+   */
+  readonly prototype: MigrationSimulator;
+  /**
+   * Simulator over a fixed horizon.
+   * @returns Returns a `MigrationSimulator` handle.
+   * @param generator - `GeneratorMatrix` handle driving the migration.
+   * @param horizon - Simulation horizon in years; positive and finite.
+   * @throws Error - Throws a `validation` error if `horizon` is not positive and finite.
+   */
+  new (generator: GeneratorMatrix, horizon: number): MigrationSimulator;
+  /**
+   * Load a handle from its canonical JSON wire form, the same form
+   * Python `from_json` reads.
+   *
+   * Unknown fields are rejected where the Rust type denies them and
+   * the Rust validation rules are applied again.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
+   */
+  fromJson(json: JsonInput): MigrationSimulator;
+}
+
+/**
+ * Rating-to-factor table used for WARF-style portfolio credit quality.
+ */
+export interface RatingFactorTable extends WasmOwned {
+  /**
+   * Factor assigned to one rating; unlisted ratings fall back to `defaultFactor`.
+   * @param rating - Rating label such as `"Baa3"`, `"BBB-"` or `"B2"`.
+   * @returns The dimensionless rating factor for that rating.
+   * @throws Error - Throws a `TypeError` if `rating` is not a string, and a `validation` error if it is not a recognized rating.
+   */
+  getFactor(rating: string): number;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson`
+   * and by Python `from_json`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   */
+  toJson(): string;
+  /**
+   * Rating agency the table belongs to, such as `"Moodys"`.
+   */
+  readonly agency: string;
+  /**
+   * Factor applied to ratings the table does not list.
+   */
+  readonly defaultFactor: number;
+  /**
+   * Methodology label of the table, such as the CLO methodology it was taken from.
+   */
+  readonly methodology: string;
+}
+
+/**
+ * Registry and JSON loaders of rating-factor tables.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const table = models.credit.RatingFactorTable.moodysStandard();
+ * console.log(table.agency, table.getFactor("B2"));
+ * table.free();
+ * ```
+ */
+export interface RatingFactorTableConstructor {
+  /**
+   * JavaScript prototype of `RatingFactorTable`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: RatingFactorTable;
+  /**
+   * Load a handle from its canonical JSON wire form, the same form
+   * Python `from_json` reads.
+   *
+   * Unknown fields are rejected where the Rust type denies them and
+   * the Rust validation rules are applied again.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
+   */
+  fromJson(json: JsonInput): RatingFactorTable;
+  /**
+   * Rating-factor table registered under an explicit registry identifier.
+   * @param id - Registry identifier of the table, such as `"moodys_standard"`.
+   * @returns The rating-factor table registered under `id`.
+   * @throws Error - Throws a `TypeError` if `id` is not a string, and a `validation` error if no table is registered under it.
+   */
+  fromRegistryId(id: string): RatingFactorTable;
+  /**
+   * Moody's standard WARF table from the embedded credit-assumption registry.
+   * @returns The Moody's standard rating-factor table.
+   * @throws Error - Throws a `validation` error if the embedded registry cannot supply the table.
+   */
+  moodysStandard(): RatingFactorTable;
+}
+
+/**
+ * One simulated rating trajectory: piecewise-constant, right-continuous.
+ */
+export interface RatingPath extends WasmOwned {
+  /**
+   * Time of default in years.
+   * @returns The default time, or `undefined` when the path did not default.
+   */
+  defaultTime(): number | undefined;
+  /**
+   * Whether the path reached the default state.
+   * @returns `true` when the path defaulted within the horizon.
+   */
+  defaulted(): boolean;
+  /**
+   * State label at a time.
+   * @param t - Time in years from the start of the path.
+   * @returns The label of the state occupied at `t`.
+   * @throws Error - Throws a `TypeError` if `t` is not a number.
+   */
+  labelAt(t: number): string;
+  /**
+   * Number of rating changes after the initial state.
+   * @returns The count of transitions along the path.
+   */
+  nTransitions(): number;
+  /**
+   * State index at a time; the initial state before 0 and the terminal state after the horizon.
+   * @param t - Time in years from the start of the path.
+   * @returns The zero-based state index occupied at `t`.
+   * @throws Error - Throws a `TypeError` if `t` is not a number.
+   */
+  stateAt(t: number): number;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson`
+   * and by Python `from_json`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   */
+  toJson(): string;
+  /**
+   * Transition events as `[time, stateIndex]` pairs, starting with `[0, initialState]`.
+   * @returns The events in time order.
+   * @throws Error - Throws a `validation` error if the events cannot be converted.
+   */
+  transitions(): [number, number][];
+  /**
+   * Simulation horizon in years.
+   */
+  readonly horizon: number;
+  /**
+   * Rating scale the state indices refer to.
+   */
+  readonly scale: RatingScale;
+}
+
+/**
+ * JSON loader of a simulated rating trajectory.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const scale = models.credit.RatingScale.custom(["A", "B", "D"]);
+ * const generator = new models.credit.GeneratorMatrix(scale, [-0.1, 0.08, 0.02, 0.1, -0.2, 0.1, 0, 0, 0]);
+ * const path = new models.credit.MigrationSimulator(generator, 5).simulate(0, 1, 7).paths[0];
+ * const copy = models.credit.RatingPath.fromJson(path.toJson());
+ * console.log(copy.labelAt(5), copy.defaulted());
+ * ```
+ */
+export interface RatingPathConstructor {
+  /**
+   * JavaScript prototype of `RatingPath`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: RatingPath;
+  /**
+   * Load a handle from its canonical JSON wire form, the same form
+   * Python `from_json` reads.
+   *
+   * Unknown fields are rejected where the Rust type denies them and
+   * the Rust validation rules are applied again.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
+   */
+  fromJson(json: JsonInput): RatingPath;
+}
+
+/**
+ * A batch of simulated rating paths from `MigrationSimulator.simulate`.
+ */
+export interface RatingPaths extends WasmOwned {
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson`
+   * and by Python `from_json`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   */
+  toJson(): string;
+  /**
+   * Fraction of paths that ended in default (0 for an empty batch).
+   */
+  readonly defaultRate: number;
+  /**
+   * Number of paths in the batch (twin of Python `len(paths)`).
+   */
+  readonly length: number;
+  /**
+   * The simulated paths, in simulation order.
+   */
+  readonly paths: RatingPath[];
+}
+
+/**
+ * JSON loader of a batch of simulated rating paths.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const scale = models.credit.RatingScale.custom(["A", "B", "D"]);
+ * const generator = new models.credit.GeneratorMatrix(scale, [-0.1, 0.08, 0.02, 0.1, -0.2, 0.1, 0, 0, 0]);
+ * const batch = new models.credit.MigrationSimulator(generator, 5).simulate(0, 100, 7);
+ * const copy = models.credit.RatingPaths.fromJson(batch.toJson());
+ * console.log(copy.length, copy.defaultRate);
+ * ```
+ */
+export interface RatingPathsConstructor {
+  /**
+   * JavaScript prototype of `RatingPaths`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: RatingPaths;
+  /**
+   * Load a handle from its canonical JSON wire form, the same form
+   * Python `from_json` reads.
+   *
+   * Unknown fields are rejected where the Rust type denies them and
+   * the Rust validation rules are applied again.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
+   */
+  fromJson(json: JsonInput): RatingPaths;
+}
+
+/**
+ * Ordered set of rating states, optionally with an absorbing default state.
+ */
+export interface RatingScale extends WasmOwned {
+  /**
+   * Index of the absorbing default state.
+   * @returns The default-state index, or `undefined` when the scale has none.
+   */
+  defaultState(): number | undefined;
+  /**
+   * Zero-based index of a state label.
+   * @param label - State label to look up, such as `"BBB"`.
+   * @returns The index, or `undefined` when the label is not in the scale.
+   * @throws Error - Throws a `TypeError` if `label` is not a string.
+   */
+  indexOf(label: string): number | undefined;
+  /**
+   * Zero-based index of a state label that must exist.
+   * @param label - State label to look up, such as `"BBB"`.
+   * @returns The index of the label.
+   * @throws Error - Throws a `not_found` error if the label is not in the scale.
+   */
+  indexOfRequired(label: string): number;
+  /**
+   * Label of a state index.
+   * @param index - Zero-based state index.
+   * @returns The label, or `undefined` when the index is out of range.
+   * @throws Error - Throws a `TypeError` if `index` is not a safe non-negative integer.
+   */
+  labelOf(index: number): string | undefined;
+  /**
+   * State labels in scale order.
+   * @returns The labels, best credit first.
+   */
+  labels(): string[];
+  /**
+   * Rating whose WARF band contains a portfolio WARF.
+   * @param warf - Weighted-average rating factor; finite and non-negative.
+   * @returns The label of the rating equivalent to that WARF.
+   * @throws Error - Throws a `validation` error if `warf` is invalid or the scale has no WARF mapping.
+   */
+  ratingFromWarf(warf: number): string;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson`
+   * and by Python `from_json`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   */
+  toJson(): string;
+  /**
+   * Moody's WARF factor of a rating label.
+   * @param label - Rating label in this scale, such as `"BBB"`.
+   * @returns The weighted-average rating factor of that rating.
+   * @throws Error - Throws a `not_found` error if the label is unknown or has no WARF factor.
+   */
+  warf(label: string): number;
+  /**
+   * Number of states in the scale.
+   */
+  readonly nStates: number;
+}
+
+/**
+ * Standard and custom rating-scale factories.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const scale = models.credit.RatingScale.custom(["A", "B", "D"]);
+ * console.log(scale.nStates, scale.labels(), scale.defaultState());
+ * scale.free();
+ * ```
+ */
+export interface RatingScaleConstructor {
+  /**
+   * JavaScript prototype of `RatingScale`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: RatingScale;
+  /**
+   * Custom scale from explicit labels, best credit first.
+   * @param labels - Distinct state labels in order, at least two; a label `"D"` is treated as the default state.
+   * @returns The custom rating scale.
+   * @throws Error - Throws a `validation` error if fewer than two labels are given or a label repeats.
+   */
+  custom(labels: string[]): RatingScale;
+  /**
+   * Custom scale with an explicitly named default state.
+   * @param labels - Distinct state labels in order, at least two.
+   * @param defaultLabel - Label of the absorbing default state; must be one of `labels`.
+   * @returns The custom rating scale.
+   * @throws Error - Throws a `validation` error if the labels are invalid, and a `not_found` error if `defaultLabel` is not among them.
+   */
+  customWithDefault(labels: string[], defaultLabel: string): RatingScale;
+  /**
+   * Load a handle from its canonical JSON wire form, the same form
+   * Python `from_json` reads.
+   *
+   * Unknown fields are rejected where the Rust type denies them and
+   * the Rust validation rules are applied again.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
+   */
+  fromJson(json: JsonInput): RatingScale;
+  /**
+   * Notched scale (`AA+`, `AA`, `AA-`, ...) with `D` as the default state.
+   * @returns The notched rating scale.
+   */
+  notched(): RatingScale;
+  /**
+   * Standard letter scale `AAA, AA, A, BBB, BB, B, CCC, D`.
+   * @returns The standard eight-state scale with `D` as the default state.
+   */
+  standard(): RatingScale;
+  /**
+   * Standard letter scale with an additional not-rated (`NR`) state.
+   * @returns The standard scale extended with `NR`.
+   */
+  standardWithNr(): RatingScale;
+}
+
+/**
+ * Monte Carlo asset-value paths from `MertonModel.simulatePaths`.
+ *
+ * `assetValues` is row-major: path `p` occupies indices
+ * `p * valuesPerPath .. (p + 1) * valuesPerPath`, where
+ * `valuesPerPath == numSteps + 1` (the grid includes `t = 0`).
+ */
+export interface SimulatedPaths extends WasmOwned {
+  /**
+   * One asset value by path and time-grid index.
+   * @param pathIdx - Zero-based path index.
+   * @param timeIdx - Zero-based time-grid index (index 0 is `t = 0`).
+   * @returns The asset value, or `undefined` when either index is out of range.
+   * @throws Error - Throws a `TypeError` if an index is not a safe non-negative integer.
+   */
+  get(pathIdx: number, timeIdx: number): number | undefined;
+  /**
+   * The contiguous asset-value row of one path.
+   * @param pathIdx - Zero-based path index.
+   * @returns The path's values on the time grid, or `undefined` when the index is out of range.
+   * @throws Error - Throws a `TypeError` if `pathIdx` is not a safe non-negative integer.
+   */
+  path(pathIdx: number): Float64Array | undefined;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson`
+   * and by Python `from_json`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   */
+  toJson(): string;
+  /**
+   * Materialize the paths as one row of values per path.
+   * @returns An array with one `number[]` per path, each of length `valuesPerPath`.
+   * @throws Error - Throws a `validation` error if the rows cannot be converted.
+   */
+  toNested(): number[][];
+  /**
+   * Asset values in row-major order (path by path).
+   */
+  readonly assetValues: Float64Array;
+  /**
+   * Number of simulated paths.
+   */
+  readonly numPaths: number;
+  /**
+   * Number of time steps between grid points.
+   */
+  readonly numSteps: number;
+  /**
+   * Time grid in years from 0 to the simulation horizon.
+   */
+  readonly times: Float64Array;
+  /**
+   * Number of stored values per path (`numSteps + 1`, including `t = 0`).
+   */
+  readonly valuesPerPath: number;
+}
+
+/**
+ * JSON loader of simulated asset-value paths.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const model = new models.credit.MertonModel(100, 0.25, 60, 0.03);
+ * const paths = model.simulatePaths(4, 12, 1.0, 42, false);
+ * const copy = models.credit.SimulatedPaths.fromJson(paths.toJson());
+ * console.log(copy.numPaths, copy.valuesPerPath, copy.get(0, 0));
+ * ```
+ */
+export interface SimulatedPathsConstructor {
+  /**
+   * JavaScript prototype of `SimulatedPaths`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: SimulatedPaths;
+  /**
+   * Load a handle from its canonical JSON wire form, the same form
+   * Python `from_json` reads.
+   *
+   * Unknown fields are rejected where the Rust type denies them and
+   * the Rust validation rules are applied again.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
+   */
+  fromJson(json: JsonInput): SimulatedPaths;
+}
+
+/**
+ * PIK/cash toggle exercise rule: threshold, stochastic (logistic) or nested
+ * optimal exercise.
+ */
+export interface ToggleExerciseModel extends WasmOwned {
+  /**
+   * Whether the rule elects PIK for a credit state given one uniform draw.
+   *
+   * Threshold rules ignore `u`; stochastic rules use it as the Bernoulli
+   * draw; optimal-exercise rules need nested simulation and return `false`.
+   * @param state - `CreditState` JSON or plain object (`hazard_rate`, `distance_to_default`, `leverage`, `accreted_notional`, `coupon_due`, `asset_value`).
+   * @param u - Uniform draw in `[0, 1)`.
+   * @returns `true` when the rule elects to pay in kind.
+   * @throws Error - Throws a `TypeError` if `state` is neither a string nor a plain object or `u` is not a number, and a `validation` error if `state` is malformed.
+   */
+  shouldPikWithUniform(state: generated.models.CreditState | string, u: number): boolean;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson`
+   * and by Python `from_json`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   */
+  toJson(): string;
+  /**
+   * Which rule this model carries: `"threshold"`, `"stochastic"` or
+   * `"optimal_exercise"` (the canonical serde tag).
+   */
+  readonly kind: string;
+  /**
+   * Parameters of the active rule as a plain object in canonical JSON form.
+   */
+  readonly params: Record<string, unknown>;
+}
+
+/**
+ * Validating factories of the PIK/cash toggle exercise rule.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const rule = models.credit.ToggleExerciseModel.threshold("leverage", 0.7, "above");
+ * const state = { hazard_rate: 0.05, distance_to_default: null, leverage: 0.8, accreted_notional: 100, coupon_due: 4, asset_value: null };
+ * console.log(rule.kind, rule.shouldPikWithUniform(state, 0.5));
+ * rule.free();
+ * ```
+ */
+export interface ToggleExerciseModelConstructor {
+  /**
+   * JavaScript prototype of `ToggleExerciseModel`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: ToggleExerciseModel;
+  /**
+   * Load a handle from its canonical JSON wire form, the same form
+   * Python `from_json` reads.
+   *
+   * Unknown fields are rejected where the Rust type denies them and
+   * the Rust validation rules are applied again.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
+   */
+  fromJson(json: JsonInput): ToggleExerciseModel;
+  /**
+   * Nested-Monte-Carlo optimal exercise rule.
+   * @param nestedPaths - Inner simulation paths per decision date; a positive safe integer.
+   * @param equityDiscountRate - Continuously compounded equity discount rate, as a decimal.
+   * @param assetVol - Annualized asset volatility as a decimal; non-negative.
+   * @param riskFreeRate - Continuously compounded risk-free rate, as a decimal.
+   * @param horizon - Inner simulation horizon in years; positive and finite.
+   * @returns The optimal-exercise rule.
+   * @throws Error - Throws a `TypeError` if `nestedPaths` is not a safe non-negative integer, and a `validation` error if it is zero, a rate is non-finite, `assetVol` is negative, or `horizon` is not positive and finite.
+   */
+  optimal(
+    nestedPaths: number,
+    equityDiscountRate: number,
+    assetVol: number,
+    riskFreeRate: number,
+    horizon: number
+  ): ToggleExerciseModel;
+  /**
+   * Stochastic rule: PIK with probability `logistic(intercept + sensitivity * x)`.
+   * @param variable - Credit-state variable `x` observed: `"hazard_rate"`, `"distance_to_default"` or `"leverage"`.
+   * @param intercept - Logit intercept (dimensionless).
+   * @param sensitivity - Logit slope per unit of the variable.
+   * @returns The stochastic rule.
+   * @throws Error - Throws a `validation` error for an unknown variable or a non-finite intercept or sensitivity.
+   */
+  stochastic(variable: string, intercept: number, sensitivity: number): ToggleExerciseModel;
+  /**
+   * Deterministic rule: PIK when `variable` is `direction` the threshold.
+   * @param variable - Credit-state variable observed: `"hazard_rate"`, `"distance_to_default"` or `"leverage"`.
+   * @param threshold - Trigger level in the variable's own units (annualized decimal hazard, standard deviations, or leverage ratio).
+   * @param direction - `"above"` to PIK when the variable exceeds the threshold, `"below"` when it falls under it.
+   * @returns The threshold rule.
+   * @throws Error - Throws a `validation` error for an unknown variable or direction, or a non-finite threshold.
+   */
+  threshold(variable: string, threshold: number, direction: string): ToggleExerciseModel;
+}
+
+/**
+ * Rating transition matrix over a fixed horizon; rows sum to one.
+ */
+export interface TransitionMatrix extends WasmOwned {
+  /**
+   * Chain this matrix with another over the same scale (matrix product).
+   * @param other - `TransitionMatrix` applied after this one; its horizon is added.
+   * @returns The composed transition matrix over the combined horizon.
+   * @throws Error - Throws a `validation` error if the two matrices use different scales.
+   */
+  compose(other: TransitionMatrix): TransitionMatrix;
+  /**
+   * Default probability of each state over the horizon.
+   * @returns One probability per state in scale order, or `undefined` when the scale has no default state.
+   */
+  defaultProbabilities(): Float64Array | undefined;
+  /**
+   * Transition probability between two labelled states.
+   * @param from - Label of the starting state.
+   * @param to - Label of the ending state.
+   * @returns The probability of moving from `from` to `to` over the horizon.
+   * @throws Error - Throws a `not_found` error if either label is not in the scale.
+   */
+  probability(from: string, to: string): number;
+  /**
+   * Transition probability between two state indices.
+   * @param from - Zero-based index of the starting state.
+   * @param to - Zero-based index of the ending state.
+   * @returns The probability of moving from `from` to `to` over the horizon.
+   * @throws Error - Throws a `validation` error if either index is outside the scale.
+   */
+  probabilityByIndex(from: string, to: string): number;
+  /**
+   * One row of transition probabilities, indexed by destination state.
+   * @param from - Label of the starting state.
+   * @returns The probabilities of ending in each state, in scale order.
+   * @throws Error - Throws a `not_found` error if the label is not in the scale.
+   */
+  row(from: string): Float64Array;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson`
+   * and by Python `from_json`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   */
+  toJson(): string;
+  /**
+   * Transition probabilities as one row per starting state.
+   * @returns An array of `number[]` rows in scale order.
+   * @throws Error - Throws a `validation` error if the rows cannot be converted.
+   */
+  toMatrix(): number[][];
+  /**
+   * Horizon the probabilities apply to, in years.
+   */
+  readonly horizon: number;
+  /**
+   * Number of states in the scale.
+   */
+  readonly nStates: number;
+  /**
+   * Rating scale that orders the rows and columns.
+   */
+  readonly scale: RatingScale;
+}
+
+/**
+ * Constructor and JSON loader of the rating transition matrix.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const scale = models.credit.RatingScale.custom(["A", "B", "D"]);
+ * const matrix = new models.credit.TransitionMatrix(
+ *   scale,
+ *   [[0.9, 0.08, 0.02], [0.1, 0.8, 0.1], [0, 0, 1]],
+ *   1.0,
+ * );
+ * console.log(matrix.probability("A", "D"), matrix.defaultProbabilities());
+ * ```
+ */
+export interface TransitionMatrixConstructor {
+  /**
+   * JavaScript prototype of `TransitionMatrix`; instances are created with `new` or the static factories.
+   */
+  readonly prototype: TransitionMatrix;
+  /**
+   * Transition matrix from probabilities.
+   * @returns Returns a `TransitionMatrix` handle.
+   * @param scale - `RatingScale` handle defining the state order.
+   * @param data - Transition probabilities, either flat row-major (`nStates * nStates` numbers) or as an array of rows; each row sums to one.
+   * @param horizon - Horizon the probabilities apply to, in years; positive.
+   * @throws Error - Throws a `validation` error if the dimensions do not match the scale, an entry is outside `[0, 1]`, a row does not sum to one, the default state is not absorbing, or `horizon` is not positive.
+   */
+  new (scale: RatingScale, data: NumericArray | NumericArray[], horizon: number): TransitionMatrix;
+  /**
+   * Load a handle from its canonical JSON wire form, the same form
+   * Python `from_json` reads.
+   *
+   * Unknown fields are rejected where the Rust type denies them and
+   * the Rust validation rules are applied again.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
+   */
+  fromJson(json: JsonInput): TransitionMatrix;
+}
+
+/**
+ * Direct and indirect workout cost rates, each a fraction of exposure at default.
+ */
+export interface WorkoutCosts extends WasmOwned {
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson`
+   * and by Python `from_json`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   */
+  toJson(): string;
+  /**
+   * Direct cost rate, as a fraction of EAD.
+   */
+  readonly directCostRate: number;
+  /**
+   * Indirect cost rate, as a fraction of EAD.
+   */
+  readonly indirectCostRate: number;
+  /**
+   * Direct plus indirect cost rate, as a fraction of EAD.
+   */
+  readonly totalRate: number;
+}
+
+/**
+ * Constructor and presets of workout cost rates.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const costs = new models.credit.WorkoutCosts(0.05, 0.03);
+ * console.log(costs.totalRate, models.credit.WorkoutCosts.zero().totalRate);
+ * costs.free();
+ * ```
+ */
+export interface WorkoutCostsConstructor {
+  /**
+   * JavaScript prototype of `WorkoutCosts`; instances are created with `new` or the static factories.
+   */
+  readonly prototype: WorkoutCosts;
+  /**
+   * Workout cost rates.
+   * @returns Returns a `WorkoutCosts` handle.
+   * @param directCostRate - Direct costs (legal, administrative) as a fraction of EAD; non-negative.
+   * @param indirectCostRate - Indirect costs (internal overhead) as a fraction of EAD; non-negative.
+   * @throws Error - Throws a `validation` error if a rate is negative or non-finite.
+   */
+  new (directCostRate: number, indirectCostRate: number): WorkoutCosts;
+  /**
+   * Load a handle from its canonical JSON wire form, the same form
+   * Python `from_json` reads.
+   *
+   * Unknown fields are rejected where the Rust type denies them and
+   * the Rust validation rules are applied again.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
+   */
+  fromJson(json: JsonInput): WorkoutCosts;
+  /**
+   * Standard workout costs from the embedded credit-assumption registry.
+   * @returns The registry's default direct and indirect cost rates.
+   * @throws Error - Throws a `validation` error if the registry cannot supply the defaults.
+   */
+  standard(): WorkoutCosts;
+  /**
+   * No workout costs.
+   * @returns Cost rates of zero.
+   */
+  zero(): WorkoutCosts;
+}
+
+/**
+ * Workout LGD model: collateral waterfall, resolution costs and time value.
+ */
+export interface WorkoutLgd extends WasmOwned {
+  /**
+   * Net recovery, LGD and recovery rate for an exposure.
+   * @param ead - Exposure at default in monetary units; positive.
+   * @returns The `WorkoutLgdResult` object (`net_recovery`, `lgd`, `recovery_rate`).
+   * @throws Error - Throws a `validation` error if `ead` is not positive and finite.
+   */
+  evaluate(ead: number): generated.models.WorkoutLgdResult;
+  /**
+   * Loss given default for an exposure, as a fraction of EAD in `[0, 1]`.
+   * @param ead - Exposure at default in monetary units; positive.
+   * @returns The workout LGD.
+   * @throws Error - Throws a `validation` error if `ead` is not positive and finite.
+   */
+  lgd(ead: number): number;
+  /**
+   * Discounted net recovery after costs, in monetary units.
+   * @param ead - Exposure at default in monetary units; positive.
+   * @returns The net recovery amount.
+   * @throws Error - Throws a `validation` error if `ead` is not positive and finite.
+   */
+  netRecovery(ead: number): number;
+  /**
+   * Net recovery as a fraction of EAD.
+   * @param ead - Exposure at default in monetary units; positive.
+   * @returns The recovery rate in `[0, 1]`.
+   * @throws Error - Throws a `validation` error if `ead` is not positive and finite.
+   */
+  recoveryRate(ead: number): number;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson`
+   * and by Python `from_json`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   */
+  toJson(): string;
+  /**
+   * Collateral pieces in waterfall order, as `CollateralPiece` objects.
+   */
+  readonly collateral: generated.models.CollateralPiece[];
+  /**
+   * Direct and indirect resolution cost rates.
+   */
+  readonly costs: WorkoutCosts;
+  /**
+   * Annual discount rate applied over the workout period, as a decimal.
+   */
+  readonly discountRate: number;
+  /**
+   * Expected workout duration in years.
+   */
+  readonly workoutYears: number;
+}
+
+/**
+ * Builder entry point and JSON loader of the workout LGD model.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const workout = models.credit.WorkoutLgd.builder()
+ *   .collateral({ collateral_type: "real_estate", book_value: 800000, haircut: 0.3 })
+ *   .workoutYears(2)
+ *   .discountRate(0.05)
+ *   .costs(new models.credit.WorkoutCosts(0.05, 0.03))
+ *   .build();
+ * console.log(workout.lgd(1000000), workout.evaluate(1000000).recovery_rate);
+ * workout.free();
+ * ```
+ */
+export interface WorkoutLgdConstructor {
+  /**
+   * JavaScript prototype of `WorkoutLgd`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: WorkoutLgd;
+  /**
+   * Start a fluent `WorkoutLgdBuilder`.
+   * @returns An empty builder; workout years, discount rate and costs default to the registry values.
+   */
+  builder(): WorkoutLgdBuilder;
+  /**
+   * Load a handle from its canonical JSON wire form, the same form
+   * Python `from_json` reads.
+   *
+   * Unknown fields are rejected where the Rust type denies them and
+   * the Rust validation rules are applied again.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
+   */
+  fromJson(json: JsonInput): WorkoutLgd;
+}
+
+/**
+ * Fluent builder for `WorkoutLgd`. Each setter consumes the builder and
+ * returns the updated one, so chain the calls.
+ */
+export interface WorkoutLgdBuilder extends WasmOwned {
+  /**
+   * Validate the inputs and build the model.
+   * @returns The `WorkoutLgd` handle.
+   * @throws Error - Throws a `validation` error if the workout years or discount rate is negative or non-finite.
+   */
+  build(): WorkoutLgd;
+  /**
+   * Add one collateral piece to the waterfall.
+   * @param piece - `CollateralPiece` object or JSON: `collateral_type` (for example `"real_estate"`), `book_value` (non-negative) and `haircut` in `[0, 1]`.
+   * @returns The updated builder.
+   * @throws Error - Throws a `validation` error if the piece is malformed, its book value is negative or its haircut is outside `[0, 1]`.
+   */
+  collateral(piece: generated.models.CollateralPiece | string): WorkoutLgdBuilder;
+  /**
+   * Add several collateral pieces.
+   * @param pieces - Array of `CollateralPiece` objects, or its JSON text.
+   * @returns The updated builder.
+   * @throws Error - Throws a `validation` error if any piece is malformed or out of range.
+   */
+  collateralPieces(pieces: readonly generated.models.CollateralPiece[] | string): WorkoutLgdBuilder;
+  /**
+   * Set the workout cost rates.
+   * @param costs - `WorkoutCosts` handle (registry default costs when not set).
+   * @returns The updated builder.
+   */
+  costs(costs: WorkoutCosts): WorkoutLgdBuilder;
+  /**
+   * Set the discount rate applied over the workout period.
+   * @param rate - Annual discount rate as a decimal; non-negative (registry default when not set).
+   * @returns The updated builder.
+   * @throws Error - Throws a `TypeError` if `rate` is not a number; the range is checked by `build`.
+   */
+  discountRate(rate: number): WorkoutLgdBuilder;
+  /**
+   * Set the expected workout duration.
+   * @param years - Workout duration in years; non-negative (registry default when not set).
+   * @returns The updated builder.
+   * @throws Error - Throws a `TypeError` if `years` is not a number; the range is checked by `build`.
+   */
+  workoutYears(years: number): WorkoutLgdBuilder;
+}
+
+/**
+ * Constructor and factory functions of `WorkoutLgdBuilder`.
+ */
+export interface WorkoutLgdBuilderClass {
+  /**
+   * JavaScript prototype of `WorkoutLgdBuilder`; instances are returned by other `credit` calls.
+   */
+  readonly prototype: WorkoutLgdBuilder;
+}
+
+/**
+ * Structural credit models, LGD / EAD / PD calibration, rating migration,
+ * credit scoring, recovery waterfalls and liability-management analytics.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const model = new models.credit.MertonModel(100, 0.25, 60, 0.03);
+ * console.log(model.defaultProbability(1), models.credit.pitToTtc(0.02, 0.15, -1.0));
+ * model.free();
  * ```
  */
 export interface ModelCreditNamespace {
@@ -7370,360 +10768,357 @@ export interface ModelCreditNamespace {
     ebitda?: number | null
   ): LmeAnalysis;
   /**
-   * Build a structural Merton model JSON payload.
-   * @returns Canonical Merton structural-model JSON.
-   * @param assetValue - Current fair value of the firm's assets in monetary units.
-   * @param assetVol - Annualized volatility of firm-asset returns, expressed as a decimal.
-   * @param debtBarrier - Positive debt face value defining the structural-model default barrier.
-   * @param riskFreeRate - Annualized risk-free rate expressed as a decimal, such as 0.05 for 5%.
-   * @throws Error - Throws a JavaScript exception if `asset_value`, `asset_vol`, or `debt_barrier` is non-positive, or if the model cannot be serialized to JSON.
+   * Asset-value dynamics: geometric Brownian, jump-diffusion or CreditGrades.
    */
-  mertonModelJson(
-    assetValue: number,
-    assetVol: number,
-    debtBarrier: number,
-    riskFreeRate: number
-  ): string;
+  AssetDynamics: AssetDynamicsConstructor;
   /**
-   * Build a CreditGrades structural model JSON payload.
-   * @returns Canonical CreditGrades structural-model JSON.
-   * @param equityValue - Current market value of equity in the firm's monetary units.
-   * @param equityVol - Annualized equity-return volatility expressed as a decimal.
-   * @param totalDebt - Total debt face value in the firm's monetary units.
-   * @param riskFreeRate - Annualized risk-free rate expressed as a decimal, such as 0.05 for 5%.
-   * @param barrierUncertainty - Lognormal dispersion of the CreditGrades default barrier, not a generic uncertainty score.
-   * @param meanRecovery - Mean recovery rate at default expressed as a fraction from 0 through 1.
-   * @throws Error - Throws a JavaScript exception if CreditGrades or Merton model validation rejects the supplied equity, volatility, debt, barrier-uncertainty, or recovery inputs, or if the model cannot be serialized to JSON.
+   * Beta-distributed recovery rate.
    */
-  creditGradesModelJson(
-    equityValue: number,
-    equityVol: number,
-    totalDebt: number,
-    riskFreeRate: number,
-    barrierUncertainty: number,
-    meanRecovery: number
-  ): string;
+  BetaRecovery: BetaRecoveryConstructor;
   /**
-   * Compute structural default probability from model JSON.
-   * @returns Risk-neutral default probability in `[0, 1]` over `horizon` years.
-   * @param modelJson - Serialized Merton structural-credit model produced by this API's model builder.
-   * @param horizon - Forward-looking model horizon measured in years.
-   * @throws Error - Throws a JavaScript exception if `model_json` is malformed or does not deserialize as a Merton model.
+   * Downturn LGD adjustment.
    */
-  mertonDefaultProbability(modelJson: JsonInput, horizon: number): number;
+  DownturnLgd: DownturnLgdConstructor;
   /**
-   * Compute the physical-measure (Moody's KMV) default probability, the theoretical EDF, from a Merton model JSON payload.
-   * @returns Physical-measure default probability in `[0, 1]` over `horizon` years.
-   * @param modelJson - Serialized Merton structural-credit model produced by this API's model builder.
-   * @param assetDrift - Expected physical total return on firm assets as a continuously compounded decimal, replacing the risk-free rate.
-   * @param horizon - Forward-looking model horizon measured in years.
-   * @throws Error - Throws a JavaScript exception if `model_json` is malformed, if `asset_drift` is not finite, or if the model uses driftless CreditGrades dynamics.
+   * Notional-dependent recovery specification for PIK instruments.
    */
-  mertonDefaultProbabilityWithDrift(
-    modelJson: JsonInput,
-    assetDrift: number,
-    horizon: number
+  DynamicRecoverySpec: DynamicRecoverySpecConstructor;
+  /**
+   * Exposure-at-default calculator.
+   */
+  EadCalculator: EadCalculatorConstructor;
+  /**
+   * Leverage-dependent hazard-rate specification for PIK instruments.
+   */
+  EndogenousHazardSpec: EndogenousHazardSpecConstructor;
+  /**
+   * Continuous-time Markov-chain generator matrix.
+   */
+  GeneratorMatrix: GeneratorMatrixConstructor;
+  /**
+   * Rating master scale mapping PDs to grades.
+   */
+  MasterScale: MasterScaleConstructor;
+  /**
+   * Default-barrier monitoring rule: terminal or first-passage.
+   */
+  MertonBarrierType: MertonBarrierTypeConstructor;
+  /**
+   * Structural (Merton-family) credit model of one firm.
+   */
+  MertonModel: MertonModelConstructor;
+  /**
+   * Gillespie simulator of rating migration.
+   */
+  MigrationSimulator: MigrationSimulatorConstructor;
+  /**
+   * Rating-to-factor table for WARF-style portfolio credit quality.
+   */
+  RatingFactorTable: RatingFactorTableConstructor;
+  /**
+   * One simulated rating trajectory.
+   */
+  RatingPath: RatingPathConstructor;
+  /**
+   * A batch of simulated rating paths.
+   */
+  RatingPaths: RatingPathsConstructor;
+  /**
+   * Ordered set of rating states.
+   */
+  RatingScale: RatingScaleConstructor;
+  /**
+   * Monte Carlo asset-value paths returned by `MertonModel.simulatePaths`.
+   */
+  SimulatedPaths: SimulatedPathsConstructor;
+  /**
+   * PIK/cash toggle exercise rule.
+   */
+  ToggleExerciseModel: ToggleExerciseModelConstructor;
+  /**
+   * Rating transition matrix over a fixed horizon.
+   */
+  TransitionMatrix: TransitionMatrixConstructor;
+  /**
+   * Direct and indirect workout cost rates.
+   */
+  WorkoutCosts: WorkoutCostsConstructor;
+  /**
+   * Workout LGD model: collateral waterfall, costs and time value.
+   */
+  WorkoutLgd: WorkoutLgdConstructor;
+  /**
+   * Fluent builder returned by `WorkoutLgd.builder()`.
+   */
+  WorkoutLgdBuilder: WorkoutLgdBuilderClass;
+  /**
+   * Allocate a bankruptcy estate across claims under the absolute priority rule.
+   *
+   * Secured claims first recover from their own collateral (after the haircut);
+   * the remaining estate is then distributed by `priority`, pro rata within a
+   * priority level.
+   * @param estateValue - Distributable estate value in monetary units; non-negative.
+   * @param claims - Array of `RecoveryClaim` objects, or its JSON text. Each claim holds `id`, `seniority`, `priority` (lower is more senior), `principal`, `accrued`, `penalties`, `collateral_value` (or `null`) and `collateral_haircut` in `[0, 1]`.
+   * @returns The `RecoveryWaterfallResult` object (`allocations`, `total_distributed`, `undistributed_estate`, `apr_satisfied`).
+   * @throws Error - Throws a `TypeError` if `claims` is neither a string nor a plain array, and a `validation` error if the estate or a claim amount is negative or non-finite, a haircut is out of range, or claim identifiers repeat.
+   */
+  allocateRecovery(
+    estateValue: number,
+    claims: readonly generated.models.RecoveryClaim[] | string
+  ): generated.models.RecoveryWaterfallResult;
+  /**
+   * Altman emerging-market score: the Z''-Score plus a constant of 3.25.
+   * @param workingCapitalToTotalAssets - Working capital divided by total assets (ratio X1).
+   * @param retainedEarningsToTotalAssets - Retained earnings divided by total assets (ratio X2).
+   * @param ebitToTotalAssets - Earnings before interest and taxes divided by total assets (ratio X3).
+   * @param bookEquityToTotalLiabilities - Book value of equity divided by total liabilities (ratio X4).
+   * @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`).
+   * @throws Error - Throws a `validation` error if any ratio is non-finite.
+   */
+  altmanEmScore(
+    workingCapitalToTotalAssets: number,
+    retainedEarningsToTotalAssets: number,
+    ebitToTotalAssets: number,
+    bookEquityToTotalLiabilities: number
+  ): generated.models.ScoringResult;
+  /**
+   * Altman Z''-Score for non-manufacturers (no sales ratio).
+   * @param workingCapitalToTotalAssets - Working capital divided by total assets (ratio X1).
+   * @param retainedEarningsToTotalAssets - Retained earnings divided by total assets (ratio X2).
+   * @param ebitToTotalAssets - Earnings before interest and taxes divided by total assets (ratio X3).
+   * @param bookEquityToTotalLiabilities - Book value of equity divided by total liabilities (ratio X4).
+   * @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`).
+   * @throws Error - Throws a `validation` error if any ratio is non-finite.
+   */
+  altmanZDoublePrime(
+    workingCapitalToTotalAssets: number,
+    retainedEarningsToTotalAssets: number,
+    ebitToTotalAssets: number,
+    bookEquityToTotalLiabilities: number
+  ): generated.models.ScoringResult;
+  /**
+   * Altman Z'-Score for private firms (book equity replaces market equity).
+   * @param workingCapitalToTotalAssets - Working capital divided by total assets (ratio X1).
+   * @param retainedEarningsToTotalAssets - Retained earnings divided by total assets (ratio X2).
+   * @param ebitToTotalAssets - Earnings before interest and taxes divided by total assets (ratio X3).
+   * @param bookEquityToTotalLiabilities - Book value of equity divided by total liabilities (ratio X4).
+   * @param salesToTotalAssets - Sales divided by total assets (ratio X5).
+   * @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`).
+   * @throws Error - Throws a `validation` error if any ratio is non-finite.
+   */
+  altmanZPrime(
+    workingCapitalToTotalAssets: number,
+    retainedEarningsToTotalAssets: number,
+    ebitToTotalAssets: number,
+    bookEquityToTotalLiabilities: number,
+    salesToTotalAssets: number
+  ): generated.models.ScoringResult;
+  /**
+   * Original Altman (1968) Z-Score for publicly traded manufacturers.
+   * @param workingCapitalToTotalAssets - Working capital divided by total assets (ratio X1).
+   * @param retainedEarningsToTotalAssets - Retained earnings divided by total assets (ratio X2).
+   * @param ebitToTotalAssets - Earnings before interest and taxes divided by total assets (ratio X3).
+   * @param marketEquityToTotalLiabilities - Market value of equity divided by total liabilities (ratio X4).
+   * @param salesToTotalAssets - Sales divided by total assets (ratio X5).
+   * @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`).
+   * @throws Error - Throws a `validation` error if any ratio is non-finite.
+   */
+  altmanZScore(
+    workingCapitalToTotalAssets: number,
+    retainedEarningsToTotalAssets: number,
+    ebitToTotalAssets: number,
+    marketEquityToTotalLiabilities: number,
+    salesToTotalAssets: number
+  ): generated.models.ScoringResult;
+  /**
+   * Apply the Basel IRB regulatory PD floor.
+   * @param pd - Default probability as a decimal.
+   * @returns `max(pd, 0.0003)`.
+   * @throws Error - Throws a `TypeError` if `pd` is not a number.
+   */
+  applyBaselIrbPdFloor(pd: number): number;
+  /**
+   * Basel IRB regulatory PD floor (0.03%), as a decimal. Twin of the Rust and
+   * Python constant `BASEL_IRB_PD_FLOOR`.
+   * @returns The floor, `0.0003`.
+   */
+  baselIrbPdFloor(): number;
+  /**
+   * Quantile of a Beta recovery distribution given its mean and standard deviation.
+   * @param mean - Mean recovery rate as a fraction strictly between 0 and 1.
+   * @param std - Recovery standard deviation as a fraction.
+   * @param q - Probability level from 0 through 1.
+   * @returns The recovery rate at probability level `q`.
+   * @throws Error - Throws a `validation` error if the moments or `q` are out of range.
+   */
+  betaRecoveryQuantile(mean: number, std: number, q: number): number;
+  /**
+   * Draw Beta-distributed recovery rates from a mean and standard deviation.
+   * @param mean - Mean recovery rate as a fraction strictly between 0 and 1.
+   * @param std - Recovery standard deviation as a fraction.
+   * @param nSamples - Number of draws; a safe non-negative integer.
+   * @param seed - Seed for reproducible draws, as a safe integer or `bigint`.
+   * @returns The sampled recovery rates.
+   * @throws Error - Throws a `validation` error if the moments do not define a Beta distribution.
+   */
+  betaRecoverySample(
+    mean: number,
+    std: number,
+    nSamples: number,
+    seed: number | bigint
+  ): Float64Array;
+  /**
+   * Long-run central-tendency PD from a history of annual default rates.
+   * @param annualDefaultRates - Annual default rates as decimals in `[0, 1]`, as a `number[]` or `Float64Array`; non-empty.
+   * @returns The central-tendency default probability.
+   * @throws Error - Throws a `validation` error if the series is empty or a rate is non-finite or outside `[0, 1]`.
+   */
+  centralTendency(annualDefaultRates: NumericArray): number;
+  /**
+   * Regulatory downturn LGD: `max(baseLgd + addOn, floor)`.
+   * @param baseLgd - Through-the-cycle LGD as a fraction from 0 through 1.
+   * @param addOn - Additive LGD add-on as a fraction; non-negative.
+   * @param floor - Minimum downturn LGD as a fraction from 0 through 1.
+   * @returns The downturn LGD as a fraction in `[0, 1]`.
+   * @throws Error - Throws a `validation` error on out-of-range inputs.
+   */
+  downturnLgdRegulatoryFloor(baseLgd: number, addOn: number, floor: number): number;
+  /**
+   * Stressed-factor downturn LGD for a base LGD.
+   * @param baseLgd - Through-the-cycle LGD as a fraction from 0 through 1.
+   * @param assetCorrelation - Asset correlation with the systematic factor, from 0 to 1.
+   * @param lgdSensitivity - Sensitivity of LGD to the systematic factor; non-negative.
+   * @param stressQuantile - Stress quantile of the systematic factor, strictly between 0 and 1.
+   * @returns The downturn LGD as a fraction in `[0, 1]`.
+   * @throws Error - Throws a `validation` error on out-of-range inputs.
+   */
+  downturnLgdStressed(
+    baseLgd: number,
+    assetCorrelation: number,
+    lgdSensitivity: number,
+    stressQuantile: number
   ): number;
   /**
-   * Compute distance-to-default from a Merton model JSON payload.
-   *
-   * Distance-to-default is `ln(V/B)/(sigma*sqrt(T))` plus drift adjustments.
-   * Lower values indicate higher default risk. This is the risk-neutral `d2`,
-   * not the Moody's KMV distance-to-default.
-   * @returns Distance-to-default in standard-deviation units over `horizon` years.
-   * @param modelJson - Serialized Merton structural-credit model produced by this API's model builder.
-   * @param horizon - Forward-looking model horizon measured in years.
-   * @throws Error - Throws a JavaScript exception if `model_json` is malformed or does not deserialize as a Merton model.
+   * Exposure at default of a revolver: `drawn + ccf * undrawn`.
+   * @param drawn - Drawn balance in monetary units; non-negative.
+   * @param undrawn - Undrawn commitment in monetary units; non-negative.
+   * @param ccf - Credit conversion factor applied to the undrawn amount, from 0 through 1.
+   * @returns The EAD in monetary units.
+   * @throws Error - Throws a `validation` error on negative, non-finite or out-of-range inputs.
    */
-  mertonDistanceToDefault(modelJson: JsonInput, horizon: number): number;
+  eadRevolver(drawn: number, undrawn: number, ccf: number): number;
   /**
-   * Compute the physical-measure (Moody's KMV) distance-to-default from a Merton model JSON payload.
-   * @returns Physical-measure distance-to-default in standard-deviation units over `horizon` years.
-   * @param modelJson - Serialized Merton structural-credit model produced by this API's model builder.
-   * @param assetDrift - Expected physical total return on firm assets as a continuously compounded decimal, replacing the risk-free rate.
-   * @param horizon - Forward-looking model horizon measured in years.
-   * @throws Error - Throws a JavaScript exception if `model_json` is malformed, if `asset_drift` is not finite, or if the model uses driftless CreditGrades dynamics.
+   * Exposure at default of a fully drawn term loan.
+   * @param principal - Outstanding principal in monetary units; non-negative.
+   * @returns The EAD, equal to the principal.
+   * @throws Error - Throws a `validation` error if `principal` is negative or non-finite.
    */
-  mertonDistanceToDefaultWithDrift(
-    modelJson: JsonInput,
-    assetDrift: number,
-    horizon: number
-  ): number;
+  eadTermLoan(principal: number): number;
   /**
-   * Compute the Moody's KMV default point, short-term debt plus half of long-term debt, for use as a structural default barrier.
-   * @returns Default point in the same monetary units as the debt inputs.
-   * @param shortTermDebt - Liabilities due within one year, in the firm's monetary units.
-   * @param longTermDebt - Liabilities maturing beyond one year, in the same units; half of it enters the default point.
-   * @throws Error - Throws a JavaScript exception if either input is negative or non-finite, or if the resulting default point is zero.
+   * Moody's WARF rating factor for one credit rating.
+   * @param rating - Rating label such as `"Baa3"`, `"BBB-"` or `"B2"`; agency notches are normalized by the Rust parser.
+   * @returns The Moody's weighted-average rating factor for that rating (for example 610 for Baa3).
+   * @throws Error - Throws a `TypeError` if `rating` is not a string, and a `validation` error if it is not a recognized rating or has no factor in the Moody's table.
    */
-  mertonKmvDefaultPoint(shortTermDebt: number, longTermDebt: number): number;
+  moodysWarfFactor(rating: string): number;
   /**
-   * Compute the zero-coupon bond credit spread (per year) from a Merton model
-   * JSON payload, given an exogenous recovery rate paid at maturity.
-   * @returns Zero-coupon credit spread per year as a decimal, such as `0.015` for 150 bp.
-   * @param modelJson - Serialized Merton structural-credit model produced by this API's model builder.
-   * @param horizon - Forward-looking model horizon measured in years.
-   * @param recovery - Recovery rate at default expressed as a fraction of par from 0 through 1.
-   * @throws Error - Throws a JavaScript exception if `model_json` is malformed or does not deserialize as a Merton model, `horizon` is non-finite or non-positive, or `recovery` is outside `[0, 1]`.
+   * Ohlson (1980) O-Score logit bankruptcy model.
+   * @param logTotalAssetsAdjusted - Natural log of total assets deflated by the GNP price-level index.
+   * @param totalLiabilitiesToTotalAssets - Total liabilities divided by total assets.
+   * @param workingCapitalToTotalAssets - Working capital divided by total assets.
+   * @param currentLiabilitiesToCurrentAssets - Current liabilities divided by current assets.
+   * @param liabilitiesExceedAssets - Indicator, exactly 1 when total liabilities exceed total assets and 0 otherwise.
+   * @param netIncomeToTotalAssets - Net income divided by total assets.
+   * @param fundsFromOperationsToTotalLiabilities - Funds from operations divided by total liabilities.
+   * @param negativeNetIncomeTwoYears - Indicator, exactly 1 when net income was negative in each of the last two years and 0 otherwise.
+   * @param netIncomeChange - Scaled change in net income, `(NI_t - NI_{t-1}) / (|NI_t| + |NI_{t-1}|)`.
+   * @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`).
+   * @throws Error - Throws a `validation` error if any input is non-finite or an indicator is not exactly 0 or 1.
    */
-  mertonImpliedSpread(modelJson: JsonInput, horizon: number, recovery: number): number;
+  ohlsonOScore(
+    logTotalAssetsAdjusted: number,
+    totalLiabilitiesToTotalAssets: number,
+    workingCapitalToTotalAssets: number,
+    currentLiabilitiesToCurrentAssets: number,
+    liabilitiesExceedAssets: number,
+    netIncomeToTotalAssets: number,
+    fundsFromOperationsToTotalLiabilities: number,
+    negativeNetIncomeTwoYears: number,
+    netIncomeChange: number
+  ): generated.models.ScoringResult;
   /**
-   * Compute the Merton (1974) endogenous debt spread (per year) from a Merton
-   * model JSON payload, where recovery is the firm's own terminal asset value.
-   * @returns Endogenous debt spread per year as a decimal, such as `0.004` for 40 bp.
-   * @param modelJson - Serialized Merton structural-credit model produced by this API's model builder.
-   * @param horizon - Maturity of the firm's debt measured in years.
-   * @throws Error - Throws a JavaScript exception if `model_json` is malformed, if `horizon` is non-positive, if the barrier type is not terminal, or if the implied debt value is non-positive.
+   * Convert a point-in-time PD to through-the-cycle under the Vasicek single-factor model.
+   * @param pdPit - Point-in-time default probability, strictly between 0 and 1.
+   * @param assetCorrelation - Asset correlation with the systematic factor, strictly between 0 and 1.
+   * @param cycleIndex - Standardized credit-cycle index; positive in benign conditions, negative in stress.
+   * @returns The through-the-cycle default probability.
+   * @throws Error - Throws a `validation` error if the PD or correlation is outside `(0, 1)` or an input is non-finite.
    */
-  mertonDebtSpread(modelJson: JsonInput, horizon: number): number;
+  pitToTtc(pdPit: number, assetCorrelation: number, cycleIndex: number): number;
   /**
-   * Compute the ISDA-style CDS par spread (per year, as a decimal) implied by a Merton model's survival curve.
-   * @returns CDS par spread per year as a decimal, such as `0.015` for 150 bp.
-   * @param modelJson - Serialized Merton structural-credit model produced by this API's model builder.
-   * @param maturity - CDS maturity in years; must be positive and finite.
-   * @param recovery - Recovery rate at default expressed as a fraction of par from 0 through 1.
-   * @throws Error - Throws a JavaScript exception if `model_json` is malformed, if `maturity` is non-positive, if `recovery` is outside `[0, 1]` or contradicts the model's CreditGrades `mean_recovery`, or if the implied survival curve cannot be bootstrapped.
+   * Transition matrix implied by a generator over a horizon, `exp(Q * t)`.
+   * @param generator - `GeneratorMatrix` handle to exponentiate.
+   * @param t - Horizon in years; positive and finite.
+   * @returns The projected `TransitionMatrix` with horizon `t`.
+   * @throws Error - Throws a `validation` error if `t` is not positive and finite, and a `computation` error if the matrix exponential fails.
    */
-  mertonCdsParSpread(modelJson: JsonInput, maturity: number, recovery: number): number;
+  project(generator: GeneratorMatrix, t: number): TransitionMatrix;
   /**
-   * Build a Merton model JSON payload from observable equity inputs (KMV calibration).
-   * @returns Canonical Merton model JSON calibrated from equity observables.
-   * @param equityValue - Current market value of equity in the firm's monetary units.
-   * @param equityVol - Annualized equity-return volatility expressed as a decimal.
-   * @param totalDebt - Total debt face value used as the structural default barrier.
-   * @param riskFreeRate - Annualized risk-free rate expressed as a decimal, such as 0.05 for 5%.
-   * @param payoutRate - Continuous dividend or payout yield on assets, expressed as a decimal.
-   * @param maturity - Calibration horizon in years; must be positive and finite.
-   * @throws Error - Throws a JavaScript exception if equity, volatility, debt, rate, or maturity inputs are invalid, or if the model cannot be serialized to JSON.
+   * Historical Beta recovery distribution for a debt seniority class.
+   * @param seniority - Seniority class label such as `"senior_secured"`, `"senior_unsecured"` or `"subordinated"`.
+   * @param ratingAgency - Agency whose calibration to use, such as `"moodys"` or `"sp"`; omitted uses the registry default.
+   * @returns The calibrated `BetaRecovery` handle.
+   * @throws Error - Throws a `validation` error if the seniority or agency is not recognized.
    */
-  mertonFromEquityJson(
-    equityValue: number,
-    equityVol: number,
-    totalDebt: number,
-    riskFreeRate: number,
-    payoutRate: number,
-    maturity: number
-  ): string;
+  seniorityRecoveryStats(seniority: string, ratingAgency?: string): BetaRecovery;
   /**
-   * Build a Merton model JSON payload from a target CDS par spread.
-   *
-   * The objective is a full ISDA-style par spread built from the model's
-   * survival curve. A quote that no volatility in `[0.01, 2.0]` reproduces, or
-   * one consistent with several volatilities, is rejected rather than resolved
-   * arbitrarily.
-   * @returns Canonical Merton model JSON calibrated to a CDS par spread.
-   * @param cdsSpreadBp - Target CDS par spread in basis points.
-   * @param recovery - Recovery rate at default expressed as a fraction from 0 through 1.
-   * @param totalDebt - Total debt face value in the firm's monetary units.
-   * @param riskFreeRate - Annualized risk-free rate expressed as a decimal, such as 0.05 for 5%.
-   * @param maturity - Calibration horizon in years; must be positive and finite.
-   * @param assetValue - Assumed initial firm asset value in monetary units.
-   * @param payoutRate - Continuous payout rate on assets, expressed as a decimal.
-   * @throws Error - Throws a JavaScript exception if spread, recovery, debt, rate, maturity, asset value, or payout inputs are invalid, if the quote is unattainable or ambiguous, or if the model cannot be serialized to JSON.
+   * Minimum NPV ratio at which a tender is recommended. Twin of the Rust and
+   * Python constant `TENDER_RECOMMENDATION_HURDLE`: a holder is advised to
+   * tender when the tender NPV is at least `old_npv` times this hurdle.
+   * @returns The dimensionless hurdle multiple.
    */
-  mertonFromCdsSpreadJson(
-    cdsSpreadBp: number,
-    recovery: number,
-    totalDebt: number,
-    riskFreeRate: number,
-    maturity: number,
-    assetValue: number,
-    payoutRate: number
-  ): string;
+  tenderRecommendationHurdle(): number;
   /**
-   * Build a Merton model JSON payload calibrated to a target cumulative default probability.
-   * @returns Canonical Merton model JSON calibrated to a target cumulative PD.
-   * @param assetValue - Current fair value of the firm's assets in monetary units.
-   * @param assetVol - Annualized volatility of firm-asset returns, expressed as a decimal; must be positive.
-   * @param riskFreeRate - Annualized risk-free rate expressed as a decimal, such as 0.05 for 5%. Pass the expected physical asset return to calibrate against a real-world default rate.
-   * @param payoutRate - Continuous payout rate on assets, expressed as a decimal; it enters the calibration drift and is carried on the returned model.
-   * @param targetPd - Target cumulative default probability in `(0, 1)`.
-   * @param maturity - Calibration horizon in years; must be positive and finite.
-   * @throws Error - Throws a JavaScript exception if asset value, volatility, rate, target PD, or maturity inputs are invalid, or if the model cannot be serialized to JSON.
+   * Convert a through-the-cycle PD to point-in-time under the Vasicek single-factor model.
+   * @param pdTtc - Through-the-cycle default probability, strictly between 0 and 1.
+   * @param assetCorrelation - Asset correlation with the systematic factor, strictly between 0 and 1.
+   * @param cycleIndex - Standardized credit-cycle index; positive in benign conditions, negative in stress.
+   * @returns The point-in-time default probability.
+   * @throws Error - Throws a `validation` error if the PD or correlation is outside `(0, 1)` or an input is non-finite.
    */
-  mertonFromTargetPdJson(
-    assetValue: number,
-    assetVol: number,
-    riskFreeRate: number,
-    payoutRate: number,
-    targetPd: number,
-    maturity: number
-  ): string;
+  ttcToPit(pdTtc: number, assetCorrelation: number, cycleIndex: number): number;
   /**
-   * Build a Merton model JSON payload with explicit barrier and asset-dynamics specifications.
-   * @returns Canonical Merton model JSON with explicit barrier and asset dynamics.
-   * @param assetValue - Current fair value of the firm's assets in monetary units.
-   * @param assetVol - Annualized volatility of firm-asset returns, expressed as a decimal.
-   * @param debtBarrier - Positive debt face value defining the structural-model default barrier.
-   * @param riskFreeRate - Annualized risk-free rate expressed as a decimal, such as 0.05 for 5%.
-   * @param payoutRate - Continuous payout rate on assets, expressed as a decimal.
-   * @param barrierTypeJson - Serialized `MertonBarrierType` JSON (terminal or first-passage).
-   * @param dynamicsJson - Serialized `AssetDynamics` JSON (GBM, jump-diffusion, or CreditGrades).
-   * @throws Error - Throws a JavaScript exception if model inputs are invalid, if `barrier_type_json` or `dynamics_json` does not deserialize, or if the model cannot be serialized to JSON.
+   * One-call workout LGD from collateral tuples and cost assumptions.
+   * @param ead - Exposure at default in monetary units; positive.
+   * @param collateral - Array of `[collateralType, bookValue, haircut]` tuples, such as `[["real_estate", 800000, 0.3]]`.
+   * @param directCostPct - Direct workout costs as a fraction of EAD.
+   * @param indirectCostPct - Indirect workout costs as a fraction of EAD.
+   * @param timeToResolutionYears - Expected workout duration in years.
+   * @param discountRate - Annual discount rate over the workout period, as a decimal.
+   * @returns The `WorkoutLgdResult` object (`net_recovery`, `lgd`, `recovery_rate`).
+   * @throws Error - Throws a `validation` error if any input is out of range or a collateral type is not recognized.
    */
-  mertonModelWithDynamicsJson(
-    assetValue: number,
-    assetVol: number,
-    debtBarrier: number,
-    riskFreeRate: number,
-    payoutRate: number,
-    barrierTypeJson: JsonInput,
-    dynamicsJson: JsonInput
-  ): string;
+  workoutLgd(
+    ead: number,
+    collateral: readonly (readonly [string, number, number])[] | string,
+    directCostPct: number,
+    indirectCostPct: number,
+    timeToResolutionYears: number,
+    discountRate: number
+  ): generated.models.WorkoutLgdResult;
   /**
-   * Compute implied equity value and equity volatility from a Merton model JSON payload.
-   * @param modelJson - Serialized Merton structural-credit model produced by this API's model builder.
-   * @param horizon - Forward-looking model horizon measured in years.
-   * @returns A `Float64Array` of length 2: `[equityValue, equityVolatility]`.
-   * @throws Error - Throws a JavaScript exception if `model_json` is malformed, if `horizon` is non-positive or non-finite, or if the inversion is numerically ill-conditioned.
+   * Zmijewski (1984) probit financial-distress model.
+   * @param netIncomeToTotalAssets - Net income divided by total assets.
+   * @param totalLiabilitiesToTotalAssets - Total liabilities divided by total assets.
+   * @param currentAssetsToCurrentLiabilities - Current assets divided by current liabilities.
+   * @returns The `ScoringResult` object (`score`, `zone`, `implied_pd`, `model`).
+   * @throws Error - Throws a `validation` error if any ratio is non-finite.
    */
-  mertonTryImpliedEquity(modelJson: JsonInput, horizon: number): Float64Array;
-  /**
-   * Bootstrap a hazard-curve JSON payload from structural default probabilities.
-   * @returns Hazard-curve JSON bootstrapped from structural default probabilities.
-   * @param modelJson - Serialized Merton structural-credit model produced by this API's model builder.
-   * @param id - Hazard-curve identifier string.
-   * @param baseDate - Valuation date in ISO-8601 form, such as `"2025-01-15"`.
-   * @param tenors - Tenor grid in years as a `number[]` or `Float64Array`; entries must be positive and distinct.
-   * @param recovery - Recovery rate at default expressed as a fraction from 0 through 1.
-   * @param dayCount - Day-count convention the curve uses to turn dates into year fractions, such as `"act_365f"` or `"act_360"`.
-   * @throws Error - Throws a JavaScript exception if `model_json` is malformed, if `base_date` is not a valid ISO-8601 calendar date (`YYYY-MM-DD`), if `tenors` is empty or contains non-positive values, if `recovery` is out of range or contradicts the model's CreditGrades `mean_recovery`, if `day_count` is not a recognized convention, if the implied survival curve is non-monotonic, or if the hazard curve cannot be serialized to JSON.
-   */
-  mertonToHazardCurveJson(
-    modelJson: JsonInput,
-    id: string,
-    baseDate: string,
-    tenors: NumericArray,
-    recovery: number,
-    dayCount: string
-  ): string;
-  /**
-   * Simulate firm-asset paths and return a JSON payload with the time grid and row-major asset values.
-   * @returns JSON payload with the time grid and row-major simulated asset values.
-   * @param modelJson - Serialized Merton structural-credit model produced by this API's model builder.
-   * @param numPaths - Number of Monte Carlo paths to simulate.
-   * @param numSteps - Number of time steps per path; must be at least 1.
-   * @param horizon - Simulation horizon in years; must be positive and finite.
-   * @param seed - Seed for reproducible draws; the Rust `MertonModel::simulate_paths_seeded` owns the generator (PCG64), so equal seeds give equal paths in every host.
-   * @param antithetic - When `true`, use antithetic variates for variance reduction.
-   * @throws Error - Throws a JavaScript exception if `model_json` is malformed, if path or step counts exceed the safe-integer range, if `num_steps` is zero, if `horizon` is non-positive or non-finite, or if the result cannot be serialized to JSON.
-   */
-  mertonSimulatePathsJson(
-    modelJson: JsonInput,
-    numPaths: number,
-    numSteps: number,
-    horizon: number,
-    seed: bigint,
-    antithetic: boolean
-  ): string;
-  /**
-   * Evaluate a `DynamicRecoverySpec` JSON payload at a given accreted
-   * notional, returning the implied recovery rate. Result is clamped to
-   * `[0, base_recovery]`.
-   * @returns Implied recovery rate as a fraction of par, clamped to `[0, base_recovery]`.
-   * @param specJson - Serialized DynamicRecoverySpec JSON defining the notional-to-recovery mapping.
-   * @param notional - Signed trade notional in the instrument's native currency units.
-   * @throws Error - Throws a JavaScript exception if `spec_json` is malformed or does not deserialize as a dynamic-recovery specification.
-   */
-  dynamicRecoveryAtNotional(specJson: JsonInput, notional: number): number;
-  /**
-   * Evaluate an `EndogenousHazardSpec` JSON payload at a given leverage
-   * level, returning the implied hazard rate. Floored at 0.
-   * @returns Annualized hazard rate as a decimal, floored at 0.
-   * @param specJson - Serialized EndogenousHazardSpec JSON defining the leverage-to-hazard mapping.
-   * @param leverage - Debt-to-assets leverage ratio used by the structural credit model.
-   * @throws Error - Throws a JavaScript exception if `spec_json` is malformed or does not deserialize as an endogenous-hazard specification.
-   */
-  endogenousHazardAtLeverage(specJson: JsonInput, leverage: number): number;
-  /**
-   * Convenience evaluator: hazard rate after a PIK accrual updates the
-   * outstanding notional. Computes leverage = `accreted_notional / asset_value`
-   * then evaluates the hazard mapping.
-   * @returns Annualized hazard rate as a decimal after the PIK leverage update.
-   * @param specJson - Serialized EndogenousHazardSpec JSON defining the leverage-to-hazard mapping.
-   * @param accretedNotional - Outstanding notional after PIK accrual, in the debt's monetary units.
-   * @param assetValue - Current fair value of the firm's assets in monetary units.
-   * @throws Error - Throws a JavaScript exception if `spec_json` is malformed or does not deserialize as an endogenous-hazard specification.
-   */
-  endogenousHazardAfterPikAccrual(
-    specJson: JsonInput,
-    accretedNotional: number,
-    assetValue: number
-  ): number;
-  /**
-   * Build a constant dynamic-recovery spec JSON payload.
-   * @returns Canonical constant dynamic-recovery specification JSON.
-   * @param recovery - Recovery rate at default expressed as a fraction of par from 0 through 1.
-   * @throws Error - Throws a JavaScript exception if `recovery` is outside `[0, 1]` or the specification cannot be serialized to JSON.
-   */
-  dynamicRecoveryConstantJson(recovery: number): string;
-  /**
-   * Build an endogenous hazard power-law spec JSON payload.
-   * @returns Canonical endogenous-hazard power-law specification JSON.
-   * @param baseHazard - Reference annual default intensity used by the leverage-to-hazard mapping.
-   * @param baseLeverage - Positive reference debt-to-assets leverage ratio for the hazard mapping.
-   * @param exponent - Power-law exponent in `lambda(L) = baseHazard * (L / baseLeverage)^exponent`.
-   * @throws Error - Throws a JavaScript exception if `base_hazard` is negative, `base_leverage` is non-positive, or the specification cannot be serialized to JSON.
-   */
-  endogenousHazardPowerLawJson(baseHazard: number, baseLeverage: number, exponent: number): string;
-  /**
-   * Build a credit-state JSON payload for toggle-exercise decisions.
-   *
-   * Parameter order follows the canonical Rust `CreditState` field order
-   * (and the Python binding): `hazardRate`, `distanceToDefault`, `leverage`,
-   * `accretedNotional`, `couponDue`, `assetValue`.
-   * @returns Canonical credit-state JSON for toggle-exercise decisions.
-   * @param hazardRate - Annualized instantaneous default intensity, expressed as a decimal.
-   * @param distanceToDefault - Optional distance to default, measured as standard deviations from the default point.
-   * @param leverage - Debt-to-assets leverage ratio used by the structural credit model.
-   * @param accretedNotional - Outstanding notional after PIK accrual, in the debt's monetary units.
-   * @param couponDue - Cash coupon amount due at the toggle decision date, in debt monetary units.
-   * @param assetValue - Current fair value of the firm's assets in monetary units.
-   * @throws Error - Throws a `validation` error if any supplied value is non-finite (JSON cannot carry `NaN` or infinities).
-   */
-  creditStateJson(
-    hazardRate: number,
-    distanceToDefault: number | null | undefined,
-    leverage: number,
-    accretedNotional: number,
-    couponDue: number,
-    assetValue?: number | null
-  ): string;
-  /**
-   * Build a threshold toggle-exercise model JSON payload.
-   * @returns Canonical threshold toggle-exercise model JSON.
-   * @param variable - Credit-state variable: `"hazard_rate"`, `"distance_to_default"`, or `"leverage"`.
-   * @param threshold - Threshold value in the units of the selected credit-state variable.
-   * @param direction - Threshold comparison: `"above"` selects PIK above the level and `"below"` below it.
-   * @throws Error - Throws a `validation` error if `variable` or `direction` is not a supported value or `threshold` is non-finite.
-   */
-  toggleExerciseThresholdJson(
-    variable: 'hazard_rate' | 'distance_to_default' | 'leverage',
-    threshold: number,
-    direction: 'above' | 'below'
-  ): string;
-  /**
-   * Build an optimal toggle-exercise model JSON payload.
-   *
-   * `nested_paths` is the Monte-Carlo path count for the nested optimal-exercise
-   * simulation. It is rejected if it exceeds `Number.MAX_SAFE_INTEGER` (`2^53-1`):
-   * `usize` counts marshal across the wasm boundary as IEEE-754 doubles, so a
-   * larger value would round silently rather than fail loudly.
-   * @returns Canonical optimal toggle-exercise model JSON.
-   * @param nestedPaths - Number of nested Monte Carlo paths for continuation-value estimation; must fit JavaScript's safe integer range.
-   * @param equityDiscountRate - Annual equity-holder discount rate used in the nested toggle decision.
-   * @param assetVol - Annualized volatility of firm-asset returns, expressed as a decimal.
-   * @param riskFreeRate - Annualized risk-free rate expressed as a decimal, such as 0.05 for 5%.
-   * @param horizon - Forward-looking model horizon measured in years.
-   * @throws Error - Throws a `TypeError` if `nested_paths` is not a safe non-negative integer, and a `validation` error if it is zero, a rate is non-finite, `asset_vol` is negative or non-finite, or `horizon` is not finite and positive.
-   */
-  toggleExerciseOptimalJson(
-    nestedPaths: number,
-    equityDiscountRate: number,
-    assetVol: number,
-    riskFreeRate: number,
-    horizon: number
-  ): string;
+  zmijewskiScore(
+    netIncomeToTotalAssets: number,
+    totalLiabilitiesToTotalAssets: number,
+    currentAssetsToCurrentLiabilities: number
+  ): generated.models.ScoringResult;
 }
 
 /**
@@ -7887,6 +11282,328 @@ export interface CompositeNamespace {
 }
 
 /**
+ * Diebold-Li (2006) dynamic Nelson-Siegel model with VAR(1) factor dynamics.
+ */
+export interface DieboldLi extends WasmOwned {
+  /**
+   * Extract the factor time series by cross-sectional OLS on each date.
+   * @param panel - `YieldPanel` handle of observed yields.
+   * @returns A new model carrying the extracted factors.
+   * @throws Error - Throws a `validation` error if the panel has too few tenors or dates.
+   */
+  extractFactors(panel: YieldPanel): DieboldLi;
+  /**
+   * Extract the factors and fit their VAR(1) dynamics in one call.
+   * @param panel - `YieldPanel` handle of observed yields.
+   * @returns A new fully fitted model.
+   * @throws Error - Throws a `validation` error if the panel is too small, and a `computation` error if the regression is singular.
+   */
+  fit(panel: YieldPanel): DieboldLi;
+  /**
+   * Fit the VAR(1) dynamics of the extracted factors.
+   * @returns A new model carrying `phi`, `mu` and `qCov`.
+   * @throws Error - Throws a `validation` error if factors have not been extracted or there are too few observations, and a `computation` error if the regression is singular.
+   */
+  fitVar(): DieboldLi;
+  /**
+   * Forecast the yield curve a number of periods ahead.
+   * @param horizon - Forecast horizon in observation periods; a positive safe integer.
+   * @returns The `YieldForecast` object (`horizon`, `yields`, `tenors`, `factors`, `lower_95`, `upper_95`).
+   * @throws Error - Throws a `validation` error if the model is not fitted or `horizon` is zero.
+   */
+  forecast(horizon: number): generated.models.YieldForecast;
+  /**
+   * Nelson-Siegel loading matrix for the fitted tenors.
+   * @returns Nested rows, one per tenor, each `[level, slope, curvature]` loading.
+   * @throws Error - Throws a `validation` error if the rows cannot be converted.
+   */
+  loadingMatrix(): number[][];
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson`
+   * and by Python `from_json`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   */
+  toJson(): string;
+  /**
+   * Extracted level, slope and curvature factors as a `FactorTimeSeries` object, or `undefined` before extraction.
+   */
+  readonly factors: generated.models.FactorTimeSeries | undefined;
+  /**
+   * Exponential decay parameter (Python `lambda_`).
+   */
+  readonly lambda: number;
+  /**
+   * VAR(1) intercept `[level, slope, curvature]`, or `undefined` before `fitVar`.
+   */
+  readonly mu: Float64Array | undefined;
+  /**
+   * VAR(1) transition matrix as 3 by 3 nested rows, or `undefined` before `fitVar`.
+   */
+  readonly phi: number[][] | undefined;
+  /**
+   * VAR(1) innovation covariance as 3 by 3 nested rows, or `undefined` before `fitVar`.
+   */
+  readonly qCov: number[][] | undefined;
+  /**
+   * Tenors in years of the fitted panel (empty before factor extraction).
+   */
+  readonly tenors: Float64Array;
+}
+
+/**
+ * Constructor and JSON loader of the Diebold-Li model.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const model = new models.rates.dtsm.DieboldLi();
+ * console.log(model.lambda, model.factors === undefined);
+ * model.free();
+ * ```
+ */
+export interface DieboldLiConstructor {
+  /**
+   * JavaScript prototype of `DieboldLi`; instances are created with `new` or the static factories.
+   */
+  readonly prototype: DieboldLi;
+  /**
+   * Unfitted model with a decay parameter.
+   * @returns Returns a `DieboldLi` handle.
+   * @param lambda - Optional exponential decay parameter for tenors in years; positive. Omitted uses the Rust default (0.7308).
+   * @throws Error - Throws a `validation` error if `lambda` is not positive and finite.
+   */
+  new (lambda?: number): DieboldLi;
+  /**
+   * Load a handle from its canonical JSON wire form, the same form
+   * Python `from_json` reads.
+   *
+   * Unknown fields are rejected where the Rust type denies them and
+   * the Rust validation rules are applied again.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
+   */
+  fromJson(json: JsonInput): DieboldLi;
+}
+
+/**
+ * A panel of yield observations: one row per date, one column per tenor.
+ */
+export interface YieldPanel extends WasmOwned {
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson`
+   * and by Python `from_json`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   */
+  toJson(): string;
+  /**
+   * First differences of the yields across dates.
+   * @returns Nested rows with `numDates - 1` rows of per-tenor yield changes.
+   * @throws Error - Throws a `validation` error if the rows cannot be converted.
+   */
+  yieldChanges(): number[][];
+  /**
+   * Observation dates as ISO-8601 strings, or `undefined` when the panel has none.
+   */
+  readonly dates: string[] | undefined;
+  /**
+   * Number of observation dates (rows).
+   */
+  readonly numDates: number;
+  /**
+   * Number of tenors (columns).
+   */
+  readonly numTenors: number;
+  /**
+   * Maturities in years, one per column.
+   */
+  readonly tenors: Float64Array;
+  /**
+   * Yields as nested rows: one `number[]` per date.
+   */
+  readonly yields: number[][];
+}
+
+/**
+ * Constructor and JSON loader of the yield panel.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const panel = new models.rates.dtsm.YieldPanel(
+ *   [1, 5, 10],
+ *   [[0.03, 0.035, 0.04], [0.031, 0.036, 0.04], [0.029, 0.034, 0.041]],
+ *   ["2025-01-31", "2025-02-28", "2025-03-31"],
+ * );
+ * console.log(panel.numDates, panel.numTenors, panel.yieldChanges());
+ * panel.free();
+ * ```
+ */
+export interface YieldPanelConstructor {
+  /**
+   * JavaScript prototype of `YieldPanel`; instances are created with `new` or the static factories.
+   */
+  readonly prototype: YieldPanel;
+  /**
+   * Panel from tenors and yield rows.
+   * @returns Returns a `YieldPanel` handle.
+   * @param tenors - Maturities in years, strictly increasing and positive, one per column.
+   * @param yields - Yields as nested rows: one `number[]` per date, each with one decimal yield per tenor.
+   * @param dates - Optional observation dates as ISO-8601 strings, ascending, one per row.
+   * @throws Error - Throws a `validation` error if the rows are ragged, the dimensions do not match, a value is non-finite, or a date does not parse.
+   */
+  new (tenors: NumericArray, yields: NumericArray[], dates?: string[]): YieldPanel;
+  /**
+   * Load a handle from its canonical JSON wire form, the same form
+   * Python `from_json` reads.
+   *
+   * Unknown fields are rejected where the Rust type denies them and
+   * the Rust validation rules are applied again.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
+   */
+  fromJson(json: JsonInput): YieldPanel;
+}
+
+/**
+ * Principal-component analysis of yield-curve changes.
+ */
+export interface YieldPca extends WasmOwned {
+  /**
+   * Apply a component-shock scenario to a base yield curve.
+   * @param baseYields - Base yields per tenor, as decimals; one per tenor.
+   * @param shocks - One shock per leading component, in standard deviations of that component's score.
+   * @returns The shocked yields per tenor.
+   * @throws Error - Throws a `validation` error if the lengths do not match the model.
+   */
+  applyScenario(baseYields: NumericArray, shocks: NumericArray): Float64Array;
+  /**
+   * Smallest number of leading components whose cumulative variance reaches a threshold.
+   * @param threshold - Target cumulative explained-variance fraction, from 0 through 1.
+   * @returns The number of components needed.
+   * @throws Error - Throws a `TypeError` if `threshold` is not a number.
+   */
+  componentsForThreshold(threshold: number): number;
+  /**
+   * Loading vector of one component across tenors.
+   * @param k - Zero-based component index.
+   * @returns One loading per tenor.
+   * @throws Error - Throws a `validation` error if `k` is not below `numComponents`.
+   */
+  loading(k: number): Float64Array;
+  /**
+   * Reconstruct the yield changes from the leading components.
+   * @param numComponents - Number of leading components to keep.
+   * @returns Nested rows: one row per date, one reconstructed change per tenor.
+   * @throws Error - Throws a `validation` error if `numComponents` is zero or exceeds the model.
+   */
+  reconstruct(numComponents: number): number[][];
+  /**
+   * Yield-change scenario from component shocks in standard deviations.
+   * @param shocks - One shock per leading component, in standard deviations of that component's score.
+   * @returns The yield change per tenor, as decimals.
+   * @throws Error - Throws a `validation` error if more shocks than components are given.
+   */
+  scenario(shocks: NumericArray): Float64Array;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson`
+   * and by Python `from_json`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   */
+  toJson(): string;
+  /**
+   * Reporting view restricted to the leading components.
+   * @param nComponents - Number of leading components to keep.
+   * @returns The `YieldPcaView` object (`loadings`, `scores`, `eigenvalues`, `explained_variance_ratio`, `cumulative_variance`, `mean_change`, `tenors`).
+   * @throws Error - Throws a `validation` error if `nComponents` is zero or exceeds the model.
+   */
+  truncated(nComponents: number): generated.models.YieldPcaView;
+  /**
+   * Cumulative fraction of variance explained by the leading components.
+   */
+  readonly cumulativeVariance: Float64Array;
+  /**
+   * Eigenvalues of the covariance of yield changes, largest first.
+   */
+  readonly eigenvalues: Float64Array;
+  /**
+   * Loadings as nested rows: one row per tenor, one column per component.
+   */
+  readonly loadings: number[][];
+  /**
+   * Mean yield change per tenor removed before the decomposition.
+   */
+  readonly meanChange: Float64Array;
+  /**
+   * Number of principal components (equal to the number of tenors).
+   */
+  readonly numComponents: number;
+  /**
+   * Scores as nested rows: one row per date, one column per component.
+   */
+  readonly scores: number[][];
+  /**
+   * Tenors in years, one per loading row.
+   */
+  readonly tenors: Float64Array;
+  /**
+   * Fraction of total variance explained by each component.
+   */
+  readonly varianceExplained: Float64Array;
+}
+
+/**
+ * Fitting factories and JSON loader of the yield-curve PCA.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const changes = [
+ *   [0.001, 0.0012, 0.0011], [-0.0005, -0.0004, -0.0006], [0.0008, 0.0005, 0.0002],
+ *   [-0.001, -0.0007, -0.0003], [0.0002, 0.0004, 0.0007],
+ * ];
+ * const pca = models.rates.dtsm.YieldPca.fitYieldChanges(changes);
+ * console.log(pca.varianceExplained, pca.scenario([1]));
+ * pca.free();
+ * ```
+ */
+export interface YieldPcaConstructor {
+  /**
+   * JavaScript prototype of `YieldPca`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: YieldPca;
+  /**
+   * Fit the PCA to the yield changes of a panel.
+   * @param panel - `YieldPanel` handle of observed yields.
+   * @returns The fitted PCA.
+   * @throws Error - Throws a `validation` error if the panel has too few dates or tenors, and a `computation` error if the eigendecomposition fails.
+   */
+  fit(panel: YieldPanel): YieldPca;
+  /**
+   * Fit the PCA directly to a matrix of yield changes.
+   * @param yieldChanges - Yield changes as nested rows: one `number[]` per date, one decimal change per tenor.
+   * @returns The fitted PCA.
+   * @throws Error - Throws a `validation` error if the rows are ragged or too few, and a `computation` error if the eigendecomposition fails.
+   */
+  fitYieldChanges(yieldChanges: NumericArray[]): YieldPca;
+  /**
+   * Load a handle from its canonical JSON wire form, the same form
+   * Python `from_json` reads.
+   *
+   * Unknown fields are rejected where the Rust type denies them and
+   * the Rust validation rules are applied again.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
+   */
+  fromJson(json: JsonInput): YieldPca;
+}
+
+/**
  * Dynamic Nelson-Siegel and statistical yield-curve models.
  *
  * @example
@@ -7917,6 +11634,268 @@ export interface DtsmNamespace {
    * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `factors` or `tenors` is not an array of numbers, and a `FinstackError` (`kind: "validation"`) if `factors` does not hold exactly three entries, `lambda` is non-finite or non-positive, any factor loading is non-finite, or any tenor is non-finite or negative.
    */
   nelsonSiegelYields(lambda: number, factors: NumericArray, tenors: NumericArray): Float64Array;
+  /**
+   * Diebold-Li dynamic Nelson-Siegel model.
+   */
+  DieboldLi: DieboldLiConstructor;
+  /**
+   * Panel of yield observations by date and tenor.
+   */
+  YieldPanel: YieldPanelConstructor;
+  /**
+   * Principal-component analysis of yield-curve changes.
+   */
+  YieldPca: YieldPcaConstructor;
+  /**
+   * Extract Diebold-Li level, slope and curvature factors from a yield matrix.
+   * @param tenors - Maturities in years, one per column of `yieldsMatrix`.
+   * @param yieldsMatrix - Yields as nested rows: one `number[]` per date, one decimal yield per tenor.
+   * @param lambda - Optional decay parameter; omitted uses the Rust default (0.7308).
+   * @returns The `FactorTimeSeries` object (`factors`, `residuals`, `r_squared`, `r_squared_avg`, `dates`).
+   * @throws Error - Throws a `validation` error if the inputs are ragged, too small or non-finite.
+   */
+  dieboldLiFitFactors(
+    tenors: NumericArray,
+    yieldsMatrix: NumericArray[],
+    lambda?: number
+  ): generated.models.FactorTimeSeries;
+  /**
+   * Fit Diebold-Li to a yield matrix and forecast the curve.
+   * @param tenors - Maturities in years, one per column of `yieldsMatrix`.
+   * @param yieldsMatrix - Yields as nested rows: one `number[]` per date, one decimal yield per tenor.
+   * @param horizon - Forecast horizon in observation periods; a positive safe integer.
+   * @param lambda - Optional decay parameter; omitted uses the Rust default (0.7308).
+   * @returns The `YieldForecast` object (`horizon`, `yields`, `tenors`, `factors`, `lower_95`, `upper_95`).
+   * @throws Error - Throws a `validation` error if the inputs are ragged, too small or non-finite, and a `computation` error if the VAR regression is singular.
+   */
+  dieboldLiForecast(
+    tenors: NumericArray,
+    yieldsMatrix: NumericArray[],
+    horizon: number,
+    lambda?: number
+  ): generated.models.YieldForecast;
+  /**
+   * Fit a yield-curve PCA and return the leading components.
+   * @param yieldChanges - Yield changes as nested rows: one `number[]` per date, one decimal change per tenor.
+   * @param nComponents - Optional number of leading components to keep; omitted uses the Rust default (3).
+   * @returns The `YieldPcaView` object (`loadings`, `scores`, `eigenvalues`, `explained_variance_ratio`, `cumulative_variance`, `mean_change`, `tenors`).
+   * @throws Error - Throws a `validation` error if the rows are ragged or too few or `nComponents` exceeds the number of tenors.
+   */
+  yieldPcaFit(yieldChanges: NumericArray[], nComponents?: number): generated.models.YieldPcaView;
+  /**
+   * Yield-change scenario from a shock to one principal component.
+   * @param yieldChanges - Yield changes as nested rows: one `number[]` per date, one decimal change per tenor.
+   * @param componentIndex - Zero-based index of the shocked component.
+   * @param sigmaShock - Shock size in standard deviations of that component's score.
+   * @param nComponents - Optional number of leading components retained; omitted uses the Rust default (3).
+   * @returns The yield change per tenor, as decimals.
+   * @throws Error - Throws a `validation` error if the rows are ragged or too few or `componentIndex` is not below `nComponents`.
+   */
+  yieldPcaScenario(
+    yieldChanges: NumericArray[],
+    componentIndex: number,
+    sigmaShock: number,
+    nComponents?: number
+  ): Float64Array;
+}
+
+/**
+ * Hull-White one-factor parameters: constant mean reversion and a
+ * piecewise-constant volatility schedule.
+ */
+export interface HullWhiteParams extends WasmOwned {
+  /**
+   * Volatility of the forward zero-coupon bond price under the volatility schedule.
+   * @param t - Valuation time in years.
+   * @param expiry - Option expiry in years; at or after `t`.
+   * @param maturity - Bond maturity in years; at or after `expiry`.
+   * @returns The integrated bond-price volatility (total standard deviation of the log bond price).
+   * @throws Error - Throws a `validation` error if the times are out of order or non-finite.
+   */
+  bondVol(t: number, expiry: number, maturity: number): number;
+  /**
+   * Short-rate volatility in force at a time.
+   * @param t - Time in years from the valuation date.
+   * @returns The volatility of the segment containing `t`.
+   * @throws Error - Throws a `TypeError` if `t` is not a number.
+   */
+  sigma(t: number): number;
+  /**
+   * Covariance of the short-rate state variable at two times.
+   * @param leftTime - First time in years; non-negative.
+   * @param rightTime - Second time in years; non-negative.
+   * @returns `Cov[x(leftTime), x(rightTime)]`.
+   * @throws Error - Throws a `validation` error if a time is negative or non-finite.
+   */
+  stateCovariance(leftTime: number, rightTime: number): number;
+  /**
+   * Variance of the short-rate state variable at a time.
+   * @param t - Time in years from the valuation date; non-negative.
+   * @returns `Var[x(t)]`.
+   * @throws Error - Throws a `validation` error if `t` is negative or non-finite.
+   */
+  stateVariance(t: number): number;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson`
+   * and by Python `from_json`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   */
+  toJson(): string;
+  /**
+   * Mean-reversion speed per year.
+   */
+  readonly kappa: number;
+  /**
+   * Segment end times of the volatility schedule, in years.
+   */
+  readonly times: Float64Array;
+  /**
+   * Volatility on each schedule segment, as decimals.
+   */
+  readonly values: Float64Array;
+}
+
+/**
+ * Constructors and JSON loader of the Hull-White parameters.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const params = models.rates.hullWhite.HullWhiteParams.piecewise(0.05, [0, 2.5], [0.01, 0.012]);
+ * console.log(params.sigma(3), params.stateVariance(2), params.bondVol(0, 1, 5));
+ * params.free();
+ * ```
+ */
+export interface HullWhiteParamsConstructor {
+  /**
+   * JavaScript prototype of `HullWhiteParams`; instances are created with `new` or the static factories.
+   */
+  readonly prototype: HullWhiteParams;
+  /**
+   * Parameters with a constant volatility.
+   * @returns Returns a `HullWhiteParams` handle.
+   * @param kappa - Mean-reversion speed per year; positive.
+   * @param sigma - Short-rate volatility per square-root year, as a decimal; non-negative.
+   * @throws Error - Throws a `validation` error if `kappa` is not positive or `sigma` is negative or non-finite.
+   */
+  new (kappa: number, sigma: number): HullWhiteParams;
+  /**
+   * Load a handle from its canonical JSON wire form, the same form
+   * Python `from_json` reads.
+   *
+   * Unknown fields are rejected where the Rust type denies them and
+   * the Rust validation rules are applied again.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
+   */
+  fromJson(json: JsonInput): HullWhiteParams;
+  /**
+   * Parameters with a piecewise-constant volatility schedule.
+   * @param kappa - Mean-reversion speed per year; positive.
+   * @param times - Segment start times in years: the first must be 0 and the rest strictly increasing; the last segment extends to infinity.
+   * @param values - Short-rate volatility on each segment, as decimals; same length as `times`, non-negative.
+   * @returns The piecewise-volatility parameters.
+   * @throws Error - Throws a `validation` error if the schedule is empty, the lengths differ, the first time is not 0, the times are not increasing, or a value is out of range.
+   */
+  piecewise(kappa: number, times: NumericArray, values: NumericArray): HullWhiteParams;
+}
+
+/**
+ * Hull-White one-factor short-rate kernels: bond volatility, zero-coupon bond
+ * options, caplet normal volatility, caps and floors, and the futures
+ * convexity adjustment.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const bondVol = models.rates.hullWhite.hwBondVol(0.05, 0.01, 0, 1, 5);
+ * console.log(models.rates.hullWhite.hw1fZcbOptionPrice(0.95, 0.8, 0.84, bondVol, true));
+ * ```
+ */
+export interface HullWhiteNamespace {
+  /**
+   * Hull-White one-factor parameters.
+   */
+  HullWhiteParams: HullWhiteParamsConstructor;
+  /**
+   * Price of a cap or floor under Hull-White one-factor, per unit notional.
+   *
+   * The facade makes `forwardCurve` optional and passes the discount curve when
+   * it is omitted, as Python does.
+   * @param kappa - Mean-reversion speed per year; positive.
+   * @param sigma - Short-rate volatility per square-root year, as a decimal; positive.
+   * @param periods - Array of `[tFix, tPay, accrual]` triples in years, one per caplet or floorlet.
+   * @param strike - Cap or floor strike rate, as a decimal.
+   * @param isCap - `true` for a cap, `false` for a floor.
+   * @param discountCurve - `core.DiscountCurve` handle used to discount the payoffs.
+   * @param forwardCurve - `core.DiscountCurve` handle that projects the forward rates.
+   * @returns The cap or floor price per unit notional.
+   * @throws Error - Throws a `validation` error if `kappa` or `sigma` is out of range or `periods` is malformed.
+   */
+  hw1fCapFloorPrice(
+    kappa: number,
+    sigma: number,
+    periods: readonly (readonly [number, number, number])[] | string,
+    strike: number,
+    isCap: boolean,
+    discountCurve: DiscountCurve,
+    forwardCurve?: DiscountCurve
+  ): number;
+  /**
+   * Normal volatility of a caplet's forward rate implied by Hull-White one-factor.
+   * @param kappa - Mean-reversion speed per year.
+   * @param sigma - Short-rate volatility per square-root year, as a decimal.
+   * @param tFix - Fixing time of the forward rate in years.
+   * @param accrual - Accrual year fraction of the forward-rate period.
+   * @returns The annualized normal (Bachelier) volatility of the forward rate, as a decimal.
+   * @throws Error - Throws a `TypeError` if an argument is not a number.
+   */
+  hw1fCapletForwardRateNormalVol(
+    kappa: number,
+    sigma: number,
+    tFix: number,
+    accrual: number
+  ): number;
+  /**
+   * Futures-forward convexity adjustment under Hull-White one-factor.
+   * @param kappa - Mean-reversion speed per year.
+   * @param sigma - Short-rate volatility per square-root year, as a decimal.
+   * @param tSettle - Futures settlement time in years.
+   * @param tEnd - End of the underlying rate period in years.
+   * @returns The futures rate minus the forward rate, as a decimal.
+   * @throws Error - Throws a `TypeError` if an argument is not a number.
+   */
+  hw1fConvexityAdjustment(kappa: number, sigma: number, tSettle: number, tEnd: number): number;
+  /**
+   * Price of a European option on a zero-coupon bond (Jamshidian 1989).
+   * @param p0Expiry - Discount factor to the option expiry.
+   * @param p0Maturity - Discount factor to the bond maturity.
+   * @param strike - Strike price of the bond, per unit of face value.
+   * @param bondVol - Integrated bond-price volatility, as returned by `hwBondVol`.
+   * @param isCall - `true` for a call on the bond, `false` for a put.
+   * @returns The option price per unit of face value.
+   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type.
+   */
+  hw1fZcbOptionPrice(
+    p0Expiry: number,
+    p0Maturity: number,
+    strike: number,
+    bondVol: number,
+    isCall: boolean
+  ): number;
+  /**
+   * Forward zero-coupon bond price volatility under constant Hull-White parameters.
+   * @param kappa - Mean-reversion speed per year.
+   * @param sigma - Short-rate volatility per square-root year, as a decimal.
+   * @param t - Valuation time in years.
+   * @param expiry - Option expiry in years.
+   * @param maturity - Bond maturity in years.
+   * @returns The integrated bond-price volatility (total standard deviation of the log bond price).
+   * @throws Error - Throws a `TypeError` if an argument is not a number.
+   */
+  hwBondVol(kappa: number, sigma: number, t: number, expiry: number, maturity: number): number;
 }
 
 /**
@@ -7936,6 +11915,10 @@ export interface RatesNamespace {
    * Dynamic term-structure models.
    */
   dtsm: DtsmNamespace;
+  /**
+   * Hull-White one-factor short-rate kernels.
+   */
+  hullWhite: HullWhiteNamespace;
 }
 
 /**
@@ -8090,6 +12073,371 @@ export interface VolatilityNamespace {
    * @throws Error - Throws a JavaScript exception if `params` fails validation, `t` is not positive, or the total variance at `k` is negative.
    */
   sviImpliedVol(params: SviParams, k: number, t: number): number;
+  /**
+   * Butterfly-arbitrage check on a strike by expiry volatility grid.
+   * @param strikes - Strictly increasing strike grid shared by every row.
+   * @param expiries - Strictly increasing expiries in years, one per row of `vols`.
+   * @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
+   * @param forwardPrices - One forward price to broadcast, or one per expiry.
+   * @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_GRID_TOLERANCE` (1e-6).
+   * @returns The `ArbitrageViolation` objects found (empty when the grid is clean).
+   * @throws Error - Throws a `validation` error if the grid or forwards are invalid or the tolerance is negative or non-finite.
+   */
+  checkButterflyGrid(
+    strikes: NumericArray,
+    expiries: NumericArray,
+    vols: NumericArray[],
+    forwardPrices: NumericArray,
+    tolerance?: number
+  ): generated.models.ArbitrageViolation[];
+  /**
+   * Calendar-spread arbitrage check on a strike by expiry volatility grid.
+   * @param strikes - Strictly increasing strike grid shared by every row.
+   * @param expiries - Strictly increasing expiries in years, one per row of `vols`.
+   * @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
+   * @param forwardPrices - One forward price to broadcast, or one per expiry.
+   * @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_GRID_TOLERANCE` (1e-6).
+   * @returns The `ArbitrageViolation` objects found (empty when the grid is clean).
+   * @throws Error - Throws a `validation` error if the grid or forwards are invalid or the tolerance is negative or non-finite.
+   */
+  checkCalendarSpreadGrid(
+    strikes: NumericArray,
+    expiries: NumericArray,
+    vols: NumericArray[],
+    forwardPrices: NumericArray,
+    tolerance?: number
+  ): generated.models.ArbitrageViolation[];
+  /**
+   * Local-volatility density check (Dupire denominator positivity) on a volatility grid.
+   * @param strikes - Strictly increasing strike grid shared by every row.
+   * @param expiries - Strictly increasing expiries in years, one per row of `vols`.
+   * @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
+   * @param forwardPrices - One forward price per expiry.
+   * @returns The `ArbitrageViolation` objects found (empty when the grid is clean).
+   * @throws Error - Throws a `validation` error if the grid is invalid or the forwards do not match the expiries.
+   */
+  checkLocalVolDensityGrid(
+    strikes: NumericArray,
+    expiries: NumericArray,
+    vols: NumericArray[],
+    forwardPrices: NumericArray
+  ): generated.models.ArbitrageViolation[];
+  /**
+   * Run every static-arbitrage check on a strike by expiry volatility grid.
+   * @param strikes - Strictly increasing strike grid shared by every row.
+   * @param expiries - Strictly increasing expiries in years, one per row of `vols`.
+   * @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
+   * @param forwardPrices - One forward price to broadcast, or one per expiry.
+   * @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_GRID_TOLERANCE` (1e-6).
+   * @returns The `ArbitrageReport` object (`vol_surface_id`, `violations`, `passed`, `counts_by_type`, `counts_by_severity`).
+   * @throws Error - Throws a `validation` error if the grid or forwards are invalid or the tolerance is negative or non-finite.
+   */
+  checkSurfaceGrid(
+    strikes: NumericArray,
+    expiries: NumericArray,
+    vols: NumericArray[],
+    forwardPrices: NumericArray,
+    tolerance?: number
+  ): generated.models.ArbitrageReport;
+  /**
+   * Interpolate a volatility surface; coordinates outside the grid are rejected.
+   * @param surface - `VolSurface` object or JSON in the canonical wire form (`id`, `expiries`, `strikes`, `vols_row_major`, ...), such as a `materializeCube*` result.
+   * @param expiry - Option expiry in years, within the surface grid.
+   * @param strike - Strike in the surface's own units, within the surface grid.
+   * @returns The interpolated volatility, as a decimal.
+   * @throws Error - Throws a `validation` error if `surface` is malformed or a coordinate is outside the grid.
+   */
+  getSurfaceVol(
+    surface: generated.core.VolSurface | string,
+    expiry: number,
+    strike: number
+  ): number;
+  /**
+   * Interpolate a volatility surface with flat clamping to the grid edges.
+   * @param surface - `VolSurface` object or JSON in the canonical wire form.
+   * @param expiry - Option expiry in years; clamped to the surface grid.
+   * @param strike - Strike in the surface's own units; clamped to the surface grid.
+   * @returns The interpolated volatility, as a decimal; `NaN` for non-finite coordinates.
+   * @throws Error - Throws a `validation` error if `surface` is malformed.
+   */
+  getSurfaceVolClamped(
+    surface: generated.core.VolSurface | string,
+    expiry: number,
+    strike: number
+  ): number;
+  /**
+   * Materialize the Black volatility slice of a SABR cube at one option expiry.
+   * @param cube - `core.VolCube` handle.
+   * @param expiry - Option expiry in years, within the cube grid.
+   * @param strikes - Strictly increasing strikes of the output surface.
+   * @returns The tenor by strike `VolSurface` object in its canonical wire form.
+   * @throws Error - Throws a `validation` error if the expiry is outside the cube, the strikes are invalid, or a SABR evaluation fails.
+   */
+  materializeCubeExpirySlice(
+    cube: VolCube,
+    expiry: number,
+    strikes: NumericArray
+  ): generated.core.VolSurface;
+  /**
+   * Materialize the normal (Bachelier) volatility slice of a SABR cube at one option expiry.
+   * @param cube - `core.VolCube` handle.
+   * @param expiry - Option expiry in years, within the cube grid.
+   * @param strikes - Strictly increasing strikes of the output surface.
+   * @returns The tenor by strike `VolSurface` object of normal volatilities.
+   * @throws Error - Throws a `validation` error if the expiry is outside the cube, the strikes are invalid, or a SABR evaluation fails.
+   */
+  materializeCubeExpirySliceNormal(
+    cube: VolCube,
+    expiry: number,
+    strikes: NumericArray
+  ): generated.core.VolSurface;
+  /**
+   * Materialize the Black volatility slice of a SABR cube at one underlying tenor.
+   * @param cube - `core.VolCube` handle.
+   * @param tenor - Underlying tenor in years, within the cube grid.
+   * @param strikes - Strictly increasing strikes of the output surface.
+   * @returns The expiry by strike `VolSurface` object in its canonical wire form.
+   * @throws Error - Throws a `validation` error if the tenor is outside the cube, the strikes are invalid, or a SABR evaluation fails.
+   */
+  materializeCubeTenorSlice(
+    cube: VolCube,
+    tenor: number,
+    strikes: NumericArray
+  ): generated.core.VolSurface;
+  /**
+   * Materialize the normal (Bachelier) volatility slice of a SABR cube at one underlying tenor.
+   * @param cube - `core.VolCube` handle.
+   * @param tenor - Underlying tenor in years, within the cube grid.
+   * @param strikes - Strictly increasing strikes of the output surface.
+   * @returns The expiry by strike `VolSurface` object of normal volatilities.
+   * @throws Error - Throws a `validation` error if the tenor is outside the cube, the strikes are invalid, or a SABR evaluation fails.
+   */
+  materializeCubeTenorSliceNormal(
+    cube: VolCube,
+    tenor: number,
+    strikes: NumericArray
+  ): generated.core.VolSurface;
+  /**
+   * Materialize an FX delta-quoted surface as an expiry by strike volatility surface.
+   * @param surface - `core.FxDeltaVolSurface` handle.
+   * @param spot - FX spot rate (domestic per unit of foreign); positive.
+   * @param domesticRate - Continuously compounded domestic rate, as a decimal.
+   * @param foreignRate - Continuously compounded foreign rate, as a decimal.
+   * @returns The strike-space `VolSurface` object in its canonical wire form.
+   * @throws Error - Throws a `validation` error if an input is non-finite or out of range or a delta-to-strike conversion fails.
+   */
+  materializeFxDeltaSurface(
+    surface: FxDeltaVolSurface,
+    spot: number,
+    domesticRate: number,
+    foreignRate: number
+  ): generated.core.VolSurface;
+  /**
+   * Durrleman's function `g(k)` of an SVI slice; the slice is free of butterfly
+   * arbitrage where `g(k) >= 0`.
+   *
+   * Twin of the Rust and Python `SviParams.durrleman_g`.
+   * @param params - `SviParams` object or JSON (`a`, `b`, `rho`, `m`, `sigma`).
+   * @param k - Log-moneyness `ln(K / F)`.
+   * @returns `g(k)`; `-Infinity` where the total variance is not positive.
+   * @throws Error - Throws a `validation` error if `params` is malformed or fails validation.
+   */
+  sviDurrlemanG(params: SviParams, k: number): number;
+  /**
+   * SVI total implied variance `w(k)` at a log-moneyness.
+   *
+   * Twin of the Rust and Python `SviParams.total_variance`.
+   * @param params - `SviParams` object or JSON (`a`, `b`, `rho`, `m`, `sigma`).
+   * @param k - Log-moneyness `ln(K / F)`.
+   * @returns Total variance `sigma^2 * T` at `k`.
+   * @throws Error - Throws a `validation` error if `params` is malformed or fails validation.
+   */
+  sviTotalVariance(params: SviParams, k: number): number;
+}
+
+/**
+ * Almgren-Chriss market-impact model with linear permanent impact and
+ * power-law temporary impact.
+ */
+export interface AlmgrenChrissModel extends WasmOwned {
+  /**
+   * Expected cost and risk of executing a trade at a uniform rate.
+   * @param params - `TradeParams` object or JSON: `quantity` (signed, in units), `horizon_days`, `daily_volatility`, `profile` (a `LiquidityProfile`), and optional `risk_aversion` and `reference_price`.
+   * @returns The `ImpactEstimate` object (`permanent_impact`, `temporary_impact`, `total_cost`, `cost_bp`, `execution_risk`).
+   * @throws Error - Throws a `validation` error if the parameters are malformed or out of range.
+   */
+  estimateCost(params: generated.models.TradeParams | string): ImpactEstimate;
+  /**
+   * Risk-averse optimal execution schedule (Almgren-Chriss 2000).
+   * @param params - `TradeParams` object or JSON; `risk_aversion` selects the urgency of the schedule.
+   * @param numBuckets - Number of equal time buckets over the horizon; a positive safe integer.
+   * @returns The `ExecutionTrajectory` object (`quantities`, `remaining`, `time_points`, `expected_cost`, `cost_variance`).
+   * @throws Error - Throws a `validation` error if the parameters are malformed or `numBuckets` is zero.
+   */
+  optimalTrajectory(
+    params: generated.models.TradeParams | string,
+    numBuckets: number
+  ): generated.models.ExecutionTrajectory;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson`
+   * and by Python `from_json`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   */
+  toJson(): string;
+  /**
+   * Temporary-impact exponent on the trading rate.
+   */
+  readonly delta: number;
+  /**
+   * Temporary-impact coefficient.
+   */
+  readonly eta: number;
+  /**
+   * Permanent-impact coefficient.
+   */
+  readonly gamma: number;
+  /**
+   * Model name for diagnostics.
+   */
+  readonly modelName: string;
+}
+
+/**
+ * Constructor and calibrating factory of the Almgren-Chriss model.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const profile = {
+ *   instrument_id: "ACME", mid: 100, bid: 99.95, ask: 100.05, avg_daily_volume: 1000000,
+ *   avg_trade_size: 500, spread_volatility: 0.0002, spread_volatility_kind: "relative", observation_days: 20,
+ * };
+ * const model = new models.liquidity.AlmgrenChrissModel(1e-7, 1e-6, 1.0);
+ * const params = { quantity: 50000, horizon_days: 5, daily_volatility: 0.02, profile, risk_aversion: 1e-6, reference_price: null };
+ * console.log(model.estimateCost(params).total_cost, model.optimalTrajectory(params, 5).quantities);
+ * model.free();
+ * ```
+ */
+export interface AlmgrenChrissModelConstructor {
+  /**
+   * JavaScript prototype of `AlmgrenChrissModel`; instances are created with `new` or the static factories.
+   */
+  readonly prototype: AlmgrenChrissModel;
+  /**
+   * Model from explicit impact coefficients.
+   * @returns Returns a `AlmgrenChrissModel` handle.
+   * @param gamma - Permanent-impact coefficient: price move per unit traded; non-negative.
+   * @param eta - Temporary-impact coefficient: price concession per unit of trading rate; non-negative.
+   * @param delta - Temporary-impact exponent on the trading rate, in `(0, 1]`; 1 is the linear model.
+   * @throws Error - Throws a `validation` error if a coefficient is negative, non-finite, or `delta` is outside `(0, 1]`.
+   */
+  new (gamma: number, eta: number, delta: number): AlmgrenChrissModel;
+  /**
+   * Load a handle from its canonical JSON wire form, the same form
+   * Python `from_json` reads.
+   *
+   * Unknown fields are rejected where the Rust type denies them and
+   * the Rust validation rules are applied again.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
+   */
+  fromJson(json: JsonInput): AlmgrenChrissModel;
+  /**
+   * Calibrate the impact coefficients from a liquidity profile.
+   * @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
+   * @param dailyVolatility - Daily return volatility as a decimal; positive.
+   * @returns The calibrated model.
+   * @throws Error - Throws a `validation` error if the profile is malformed or the volatility or volume is not positive.
+   */
+  fromProfile(
+    profile: generated.models.LiquidityProfile | string,
+    dailyVolatility: number
+  ): AlmgrenChrissModel;
+}
+
+/**
+ * Kyle (1985) linear price-impact model.
+ */
+export interface KyleLambdaModel extends WasmOwned {
+  /**
+   * Expected cost and risk of executing a trade at a uniform rate.
+   * @param params - `TradeParams` object or JSON: `quantity` (signed, in units), `horizon_days`, `daily_volatility`, `profile` (a `LiquidityProfile`), and optional `risk_aversion` and `reference_price`.
+   * @returns The `ImpactEstimate` object (`permanent_impact`, `temporary_impact`, `total_cost`, `cost_bp`, `execution_risk`).
+   * @throws Error - Throws a `validation` error if the parameters are malformed or out of range.
+   */
+  estimateCost(params: generated.models.TradeParams | string): ImpactEstimate;
+  /**
+   * Execution schedule under linear impact.
+   * @param params - `TradeParams` object or JSON describing the trade.
+   * @param numBuckets - Number of equal time buckets over the horizon; a positive safe integer.
+   * @returns The `ExecutionTrajectory` object (`quantities`, `remaining`, `time_points`, `expected_cost`, `cost_variance`).
+   * @throws Error - Throws a `validation` error if the parameters are malformed or `numBuckets` is zero.
+   */
+  optimalTrajectory(
+    params: generated.models.TradeParams | string,
+    numBuckets: number
+  ): generated.models.ExecutionTrajectory;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson`
+   * and by Python `from_json`.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
+   */
+  toJson(): string;
+  /**
+   * Kyle's lambda: price change per unit of signed order flow (Python `lambda_`).
+   */
+  readonly lambda: number;
+  /**
+   * Model name for diagnostics.
+   */
+  readonly modelName: string;
+}
+
+/**
+ * Constructor and Amihud-implied factory of the Kyle model.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const model = models.liquidity.KyleLambdaModel.fromAmihud(1e-9, 100);
+ * console.log(model.lambda, model.modelName);
+ * model.free();
+ * ```
+ */
+export interface KyleLambdaModelConstructor {
+  /**
+   * JavaScript prototype of `KyleLambdaModel`; instances are created with `new` or the static factories.
+   */
+  readonly prototype: KyleLambdaModel;
+  /**
+   * Model from an explicit price-impact slope.
+   * @returns Returns a `KyleLambdaModel` handle.
+   * @param lambda - Kyle's lambda: price change per unit of signed order flow; non-negative.
+   * @throws Error - Throws a `validation` error if `lambda` is negative or non-finite.
+   */
+  new (lambda: number): KyleLambdaModel;
+  /**
+   * Model whose lambda is implied by an Amihud illiquidity ratio.
+   * @param amihudRatio - Amihud ratio: average absolute return per unit of traded value; non-negative.
+   * @param referencePrice - Reference price used to turn the return impact into a price impact; positive.
+   * @returns The Kyle model with `lambda = amihudRatio * referencePrice`.
+   * @throws Error - Throws a `validation` error if an input is negative or non-finite.
+   */
+  fromAmihud(amihudRatio: number, referencePrice: number): KyleLambdaModel;
+  /**
+   * Load a handle from its canonical JSON wire form, the same form
+   * Python `from_json` reads.
+   *
+   * Unknown fields are rejected where the Rust type denies them and
+   * the Rust validation rules are applied again.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
+   */
+  fromJson(json: JsonInput): KyleLambdaModel;
 }
 
 /**
@@ -8188,6 +12536,14 @@ export interface LiquidityNamespace {
     volumes: NumericArray,
     referencePrice: number
   ): number | undefined;
+  /**
+   * Almgren-Chriss market-impact model.
+   */
+  AlmgrenChrissModel: AlmgrenChrissModelConstructor;
+  /**
+   * Kyle linear price-impact model.
+   */
+  KyleLambdaModel: KyleLambdaModelConstructor;
 }
 
 /**
@@ -8757,6 +13113,17 @@ export interface ModelsNamespace {
     isCall: boolean,
     nTerms?: number
   ): number;
+  /**
+   * Whether a set of Black-Scholes Greeks is internally consistent: gamma and
+   * vega non-negative and every value finite.
+   *
+   * Twin of the Rust and Python `BsGreeks.is_valid`. Delta is not bounded here
+   * because its true bound `exp(-q T)` depends on the carry.
+   * @param greeks - `BsGreeks` object or JSON, as returned by `bsGreeks`.
+   * @returns `true` when the Greeks pass the consistency checks.
+   * @throws Error - Throws a `TypeError` if `greeks` is neither a string nor a plain object, and a `validation` error if it is malformed.
+   */
+  bsGreeksIsValid(greeks: BsGreeks | string): boolean;
 }
 
 /**

@@ -13,17 +13,6 @@ pub(super) fn decomposition_method_label(method: DecompositionMethod) -> PyResul
     finstack_quant_core::wire::serde_label(&method).map_err(core_to_py)
 }
 
-/// Canonical descriptor string of a [`VolHorizon`], accepted back by
-/// [`VolHorizon::parse`]. This is the pickle payload.
-fn vol_horizon_descriptor(horizon: VolHorizon) -> String {
-    match horizon {
-        VolHorizon::OneStep => "one_step".to_owned(),
-        VolHorizon::Unconditional => "unconditional".to_owned(),
-        VolHorizon::NSteps(n) => format!("{{\"n_steps\": {n}}}"),
-        VolHorizon::Years(years) => format!("{{\"years\": {years}}}"),
-    }
-}
-
 /// Extract a [`VolHorizon`] from either a `VolHorizon` instance or a
 /// descriptor string (`"one_step"`, `"unconditional"`, `'{"n_steps": N}'`,
 /// `'{"years": Y}'`).
@@ -114,11 +103,9 @@ impl PyVolHorizon {
     #[classmethod]
     #[pyo3(text_signature = "(cls, years)")]
     fn years(_cls: &Bound<'_, PyType>, years: f64) -> PyResult<Self> {
-        if years.is_finite() && years >= 0.0 {
-            Ok(Self::from_inner(VolHorizon::Years(years)))
-        } else {
-            Err(value_error("years must be finite and non-negative"))
-        }
+        VolHorizon::years(years)
+            .map(Self::from_inner)
+            .map_err(value_error)
     }
 
     /// Parse a horizon descriptor string (matches the Rust ``VolHorizon::parse``).
@@ -140,18 +127,13 @@ impl PyVolHorizon {
     /// Support pickle through the canonical descriptor string.
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let parse = py.get_type::<Self>().getattr("parse")?;
-        reduce_via_json(parse, vol_horizon_descriptor(self.inner))
+        reduce_via_json(parse, self.inner.descriptor())
     }
 
     /// Variant label: ``"one_step"`` / ``"unconditional"`` / ``"n_steps"`` / ``"years"``.
     #[getter]
     fn kind(&self) -> &'static str {
-        match self.inner {
-            VolHorizon::OneStep => "one_step",
-            VolHorizon::Unconditional => "unconditional",
-            VolHorizon::NSteps(_) => "n_steps",
-            VolHorizon::Years(_) => "years",
-        }
+        self.inner.kind()
     }
 
     /// Step count when ``kind == "n_steps"``, ``None`` otherwise.

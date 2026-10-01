@@ -397,6 +397,7 @@ fn fill_gbm_antithetic_pair(
 ///
 /// Uses backward induction with least-squares regression to estimate
 /// continuation values and optimal exercise decisions.
+#[derive(Debug, Clone)]
 pub struct LsmcPricer {
     config: LsmcConfig,
 }
