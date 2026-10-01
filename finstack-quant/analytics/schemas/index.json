@@ -11,7 +11,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/analytics/1/cagr_day_count.schema.json",
-      "bytes": 15084,
+      "bytes": 15702,
       "kind": "component",
       "path": "schemas/analytics/1/cagr_day_count.schema.json",
       "summary": "Day-count convention for CAGR annualization over explicit calendar dates.",

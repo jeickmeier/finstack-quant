@@ -30,18 +30,36 @@ export default [
             ],
             "forward_curve_id": "USD-LIBOR-3M",
             "funding_leg": {
-              "accrual_fractions": [
-                0.25,
-                0.25,
-                0.25,
-                0.25
-              ],
               "day_count": "30_360",
-              "payment_dates": [
-                "2025-06-20",
-                "2025-09-22",
-                "2025-12-22",
-                "2026-03-20"
+              "periods": [
+                {
+                  "accrual_end": "2025-06-20",
+                  "accrual_start": "2025-03-20",
+                  "accrual_year_fraction": 0.25,
+                  "payment_date": "2025-06-20",
+                  "reset_date": "2025-03-20"
+                },
+                {
+                  "accrual_end": "2025-09-22",
+                  "accrual_start": "2025-06-20",
+                  "accrual_year_fraction": 0.25,
+                  "payment_date": "2025-09-22",
+                  "reset_date": "2025-06-20"
+                },
+                {
+                  "accrual_end": "2025-12-22",
+                  "accrual_start": "2025-09-22",
+                  "accrual_year_fraction": 0.25,
+                  "payment_date": "2025-12-22",
+                  "reset_date": "2025-09-22"
+                },
+                {
+                  "accrual_end": "2026-03-20",
+                  "accrual_start": "2025-12-22",
+                  "accrual_year_fraction": 0.25,
+                  "payment_date": "2026-03-20",
+                  "reset_date": "2025-12-22"
+                }
               ],
               "rate": "0.03",
               "type": "fixed"
@@ -339,7 +357,7 @@ export default [
   {
     "path": "#/$defs/d_16451e0bf3b6b78178d8",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/DynamicRecoverySpec",
-    "description": "Specification for dynamic (notional-dependent) recovery rate.\n\nModels the relationship between the accreted notional and the recovery\nrate in default. As PIK accrual increases the notional relative to the\noriginal base, recovery declines according to the chosen [`RecoveryModel`]."
+    "description": "Specification for dynamic (notional-dependent) recovery rate.\n\nModels the relationship between the accreted notional and the recovery\nrate in default. As PIK accrual increases the notional relative to the\noriginal base, recovery declines according to the chosen [`RecoveryModel`].\nDeserialization enforces the same parameter invariants as the constructors."
   },
   {
     "path": "#/$defs/d_16451e0bf3b6b78178d8/properties/base_notional",
@@ -762,7 +780,7 @@ export default [
   {
     "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/index_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/index_id",
-    "description": "Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`)."
+    "description": "Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`).\nRequired for USD CMS; legacy contracts must name their legacy index explicitly."
   },
   {
     "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/index_id/anyOf/0",
@@ -1052,35 +1070,25 @@ export default [
   {
     "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/0",
-    "description": "Fixed rate funding leg."
-  },
-  {
-    "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/0/properties/accrual_fractions",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/0/properties/accrual_fractions",
-    "description": "Accrual fractions for each period."
-  },
-  {
-    "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/0/properties/accrual_fractions/items",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/0/properties/accrual_fractions/items",
-    "format": "double"
+    "description": "Fixed rate funding leg with explicit contractual periods."
   },
   {
     "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/0/properties/day_count",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/0/properties/day_count",
-    "description": "Day count convention.",
+    "description": "Day count convention used to calculate period year fractions.",
     "ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#"
   },
   {
-    "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/0/properties/payment_dates",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/0/properties/payment_dates",
-    "description": "Payment dates for each period."
+    "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/0/properties/periods",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/0/properties/periods",
+    "description": "Funding accrual and payment schedule, in chronological order."
   },
   {
-    "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/0/properties/payment_dates/items",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/0/properties/payment_dates/items",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+    "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/0/properties/periods/items",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/0/properties/periods/items",
+    "ref": "#/$defs/FundingPeriod",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingPeriod"
   },
   {
     "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/0/properties/rate",
@@ -1097,22 +1105,12 @@ export default [
   {
     "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/1",
-    "description": "Floating rate funding leg.\n\n# Convention: no payment lag\n\nThis leg models each period by its `payment_dates` only and assumes the\n**accrual end equals the payment date** (no payment lag, no\naccrual-vs-pay adjustment). The pricer projects the floating forward over\n`[previous payment date, payment date]` and discounts to the payment\ndate. For funding with a genuine payment lag or accrual end ≠ payment\ndate, model the floating side as a full IRS float leg (which carries\nexplicit accrual start/end and payment dates) instead of this simplified\nfunding leg."
-  },
-  {
-    "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/1/properties/accrual_fractions",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/1/properties/accrual_fractions",
-    "description": "Accrual fractions for each period."
-  },
-  {
-    "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/1/properties/accrual_fractions/items",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/1/properties/accrual_fractions/items",
-    "format": "double"
+    "description": "Simple floating funding coupons with independent reset/accrual/payment dates."
   },
   {
     "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/1/properties/day_count",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/1/properties/day_count",
-    "description": "Day count convention.",
+    "description": "Day count convention used to calculate period year fractions.",
     "ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#"
   },
@@ -1124,15 +1122,15 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
-    "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/1/properties/payment_dates",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/1/properties/payment_dates",
-    "description": "Payment dates for each period. Each is also treated as the period's\naccrual-end date (no payment lag — see the variant docs)."
+    "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/1/properties/periods",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/1/properties/periods",
+    "description": "Funding accrual, reset and payment schedule, in chronological order."
   },
   {
-    "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/1/properties/payment_dates/items",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/1/properties/payment_dates/items",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+    "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/1/properties/periods/items",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/1/properties/periods/items",
+    "ref": "#/$defs/FundingPeriod",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingPeriod"
   },
   {
     "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/1/properties/spread_bp",
@@ -1348,7 +1346,7 @@ export default [
   {
     "path": "#/$defs/d_5c13df5a55f1da604df2",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding",
-    "description": "Compounding convention for interest rates.\n\nUsed to specify how interest rates should be quoted or converted.\nAll variants produce mathematically equivalent discount factors when\napplied consistently.\n\n# Relationship Between Conventions\n\nFor a given discount factor DF at time t, the rates under different\nconventions are related by:\n\n```text\nDF = e^(-r_cc × t)                    [Continuous]\n   = (1 + r_ann)^(-t)                 [Annual]\n   = (1 + r_per/n)^(-n×t)             [Periodic(n)]\n   = 1 / (1 + r_simple × t)           [Simple]\n```\n\n# Ordering of Rates\n\nFor positive rates and t > 0: `r_simple > r_annual > r_continuous`\n(less frequent compounding requires a higher quoted rate for the same DF)."
+    "description": "Compounding convention for interest rates.\n\nUsed to specify how interest rates should be quoted or converted.\nAll variants produce mathematically equivalent discount factors when\napplied consistently.\n\n# Relationship Between Conventions\n\nFor a given discount factor DF at time t, the rates under different\nconventions are related by:\n\n```text\nDF = e^(-r_cc × t)                    [Continuous]\n   = (1 + r_ann)^(-t)                 [Annual]\n   = (1 + r_per/n)^(-n×t)             [Periodic(n)]\n   = 1 / (1 + r_simple × t)           [Simple]\n```\n\n# Ordering of Rates\n\nFor a common discount factor below one, annual and simple rates both exceed\nthe continuous rate. Their ordering depends on the maturity `t` in years:\n`r_annual > r_simple` for `0 < t < 1`, they agree at `t = 1`, and\n`r_simple > r_annual` for `t > 1`."
   },
   {
     "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/0",
@@ -3838,7 +3836,7 @@ export default [
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/10",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/10",
     "const": "act_act_isma",
-    "description": "Actual/Actual (ICMA) day count convention.\n\nActual days over (actual days in the coupon period × coupons per year).\nRequires a coupon frequency.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251 - \"Actual/Actual (ICMA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ICMA\" (A007)\n- **Also known as**: Act/Act (ICMA), Act/Act (ISMA), ISMA-99"
+    "description": "Actual/Actual (ICMA) day count convention.\n\nActual days over (actual days in the coupon period × coupons per year).\nRequires a coupon frequency. Explicit reference coupon boundaries must\nbe unadjusted regular dates from the contractual nominal month grid,\nnot payment dates.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251 - \"Actual/Actual (ICMA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ICMA\" (A007)\n- **Also known as**: Act/Act (ICMA), Act/Act (ISMA), ISMA-99"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/11",
@@ -3862,7 +3860,7 @@ export default [
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/3",
     "const": "act_365l",
-    "description": "Actual/365 Leap day count convention (Actual/365L).\n\nYear fraction = (actual days) / (365 or 366). Annual or unspecified\nfrequency: 366 if February 29 falls in (start, end]. Other frequencies:\n366 if the end date falls in a leap year. Not Actual/Actual AFB.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251.1(i)(c)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365L\" (A008)\n- **Also known as**: Act/365L, ISMA-Year"
+    "description": "Actual/365 Leap day count convention (Actual/365L).\n\nYear fraction = (actual days) / (365 or 366). Requires the coupon\nfrequency and the enclosing coupon period. Annual: 366 if February 29\nfalls in (coupon_start, coupon_end]. Other frequencies: 366 if the next\ncoupon date falls in a leap year. Not Actual/Actual AFB.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251.1(i)(c)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365L\" (A008)\n- **Also known as**: Act/365L, ISMA-Year"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/4",
@@ -3926,7 +3924,7 @@ export default [
   {
     "path": "#/$defs/d_cc8ed166abbb10ad4451",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/EndogenousHazardSpec",
-    "description": "Specification for endogenous (leverage-dependent) hazard rate.\n\nModels the relationship between a firm's leverage and its instantaneous\nhazard rate, enabling a feedback loop where PIK accrual increases the\nnotional (and hence leverage), which drives the hazard rate higher."
+    "description": "Specification for endogenous (leverage-dependent) hazard rate.\n\nModels the relationship between a firm's leverage and its instantaneous\nhazard rate, enabling a feedback loop where PIK accrual increases the\nnotional (and hence leverage), which drives the hazard rate higher.\nDeserialization validates the parameters and rejects incomplete or\ninconsistent tabular calibrations before they can be evaluated."
   },
   {
     "path": "#/$defs/d_cc8ed166abbb10ad4451/properties/base_hazard_rate",
@@ -3969,6 +3967,45 @@ export default [
     "path": "#/$defs/d_cdb8fddc0106047270c4/properties/values/items",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PiecewiseConstantCurve/properties/values/items",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_d1c6696e73834b17d83f",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingPeriod",
+    "description": "Contractual dates and accrual fraction of one CMS funding coupon."
+  },
+  {
+    "path": "#/$defs/d_d1c6696e73834b17d83f/properties/accrual_end",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingPeriod/properties/accrual_end",
+    "description": "Exclusive accrual end, independent of payment-date adjustment.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_d1c6696e73834b17d83f/properties/accrual_start",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingPeriod/properties/accrual_start",
+    "description": "Inclusive accrual start, independent of the CMS observation date.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_d1c6696e73834b17d83f/properties/accrual_year_fraction",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingPeriod/properties/accrual_year_fraction",
+    "description": "Positive year fraction measured using the funding leg day count.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_d1c6696e73834b17d83f/properties/payment_date",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingPeriod/properties/payment_date",
+    "description": "Contractual payment date after business-day adjustment.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_d1c6696e73834b17d83f/properties/reset_date",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingPeriod/properties/reset_date",
+    "description": "Floating index observation date; ignored for fixed funding.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
     "path": "#/$defs/d_d30540ea90ce7eca3dee",
@@ -4289,7 +4326,7 @@ export default [
     "path": "#/$defs/d_f80f2b90e7af690c5898/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/VarMethod/oneOf/1",
     "const": "taylor_approximation",
-    "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options)."
+    "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options).\nEquity Greeks are associated with their actual market-scalar identifier.\nInstruments with multiple underlying spots or ambiguous scalar ownership\nrequire full revaluation; aggregate gamma is not a multi-asset Hessian."
   },
   {
     "path": "#/$defs/d_fd618cd5743ec18a168f",

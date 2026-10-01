@@ -40,7 +40,7 @@
     },
     "Book": {
       "additionalProperties": false,
-      "description": "A book represents a folder-like organizational unit within a portfolio.\n\nBooks can contain positions and/or child books, forming a hierarchical tree.\nThis allows multi-level aggregation (e.g., Americas > Credit > Investment Grade).\n\n# Design\n\n- Flat position list is default; books are optional\n- Parent-child relationships tracked via `parent_id` field\n- Positions reference books via optional `book_id` field\n- Positions without `book_id` are not in any book\n- Book hierarchies are expected to be acyclic trees or forests; aggregation\n  helpers reject cycles and excessively deep nesting instead of recursing\n  indefinitely\n- [`Book::child_book_ids`] drives rollup in [`crate::grouping::aggregate_by_book`];\n  [`crate::portfolio::Portfolio::validate`] checks parent/child consistency\n  between child lists and [`Book::parent_id`]",
+      "description": "A book represents a folder-like organizational unit within a portfolio.\n\nBooks can contain positions and/or child books, forming a hierarchical tree.\nThis allows multi-level aggregation (e.g., Americas > Credit > Investment Grade).\n\n# Design\n\n- Flat position list is default; books are optional\n- Parent-child relationships tracked via `parent_id` field\n- Positions reference books via optional `book_id` field\n- Positions without `book_id` are not in any book\n- Book hierarchies are expected to be acyclic trees or forests; aggregation\n  helpers reject cycles and excessively deep nesting instead of recursing\n  indefinitely. A portfolio supports at most 100,000 books and 512 levels\n  of ancestry, including the root.\n- [`Book::child_book_ids`] drives rollup in [`crate::grouping::aggregate_by_book`];\n  [`crate::portfolio::Portfolio::validate`] checks parent/child consistency\n  between child lists and [`Book::parent_id`]",
       "properties": {
         "child_book_ids": {
           "description": "Child book IDs (for hierarchical organization)",
@@ -1270,7 +1270,7 @@
         },
         {
           "const": "exclude",
-          "description": "Freeze the position at its current weight and drop it from metric\ncoefficient vectors (`WeightedSum` and `ValueWeightedAverage` alike).\n\nMissing metrics are not treated as zero in the objective or in\nconstraint rows: the coefficient is `0` and the name is omitted from\na `ValueWeightedAverage` denominator, matching “excluded from\nconstraint evaluation”.",
+          "description": "Freeze the position at its current quantity and drop missing inputs from metric\ncoefficient vectors (`WeightedSum` and `ValueWeightedAverage` alike).\n\nMissing metrics are not treated as zero in the objective or in\nconstraint rows: the coefficient is `0` and the name is omitted from\na `ValueWeightedAverage` denominator, matching “excluded from\nconstraint evaluation”. This applies to standard metrics, custom keys,\nand numeric attributes only where the expression's filter matches.",
           "type": "string"
         },
         {
@@ -1668,7 +1668,7 @@
     },
     "TradeUniverse": {
       "additionalProperties": false,
-      "description": "Defines which instruments the optimizer can trade.\n\nThe trade universe consists of:\n\n1. **Tradeable positions**: existing portfolio positions that can be adjusted\n2. **Held positions**: existing positions locked at current weight\n3. **Candidate positions**: new instruments that could be added\n\nSerializes with serde; candidate instruments travel as their canonical\ntagged JSON payload (see [`CandidatePosition`]).",
+      "description": "Defines which instruments the optimizer can trade.\n\nThe trade universe consists of:\n\n1. **Tradeable positions**: existing portfolio positions that can be adjusted\n2. **Held positions**: existing positions locked at current weight and exact quantity\n3. **Candidate positions**: new instruments that could be added\n\nSerializes with serde; candidate instruments travel as their canonical\ntagged JSON payload (see [`CandidatePosition`]).",
       "properties": {
         "allow_short_candidates": {
           "default": false,
@@ -1677,7 +1677,7 @@
         },
         "candidates": {
           "default": [],
-          "description": "Candidate instruments not currently in the portfolio.\nThese start with weight 0 and can be added by the optimizer.",
+          "description": "Candidate instruments not currently in the portfolio.\nThese start with weight 0 and can be added by the optimizer. Their IDs\nmust be unique among candidates and absent from existing positions.",
           "items": {
             "$ref": "#/$defs/CandidatePosition"
           },
@@ -1693,7 +1693,7 @@
             }
           ],
           "default": null,
-          "description": "Filter for existing positions that are held constant.\nPositions matching this filter keep their current weight.\nTakes precedence over `tradeable_filter` if both match."
+          "description": "Filter for existing positions that are held constant.\nPositions matching this filter keep their current weight and exact\nquantity under every weighting scheme, including zero-PV holdings.\nTakes precedence over `tradeable_filter` if both match."
         },
         "tradeable_filter": {
           "$ref": "#/$defs/PositionFilter",
@@ -1708,7 +1708,7 @@
       "oneOf": [
         {
           "const": "value_weight",
-          "description": "`w_i` is share of gross portfolio base-currency PV.\n\nWeights are computed against `gross_pv_base = Σ |pv_i|`, so for a\nlong-only portfolio `∑ w_i = 1`. When shorts are permitted the sum can\ndiffer from `1` because shorts enter the denominator as absolute value\nwhile contributing negatively to `w_i`.\n\nQuantity reconstruction converts the target PV share back to\n`Position::quantity` via `pv_per_unit`, which is base-currency PV per\n1.0 of [`crate::position::Position::scale_factor`] (a `Percentage`\nholding of `50` uses scale `0.5`, not raw `50`). Each candidate must\nhave non-zero `pv_per_unit`. Zero-PV candidates are rejected at\ndecision-space construction time under this scheme because their\nimplied quantity would be undefined.",
+          "description": "`w_i` is share of gross portfolio base-currency PV.\n\nWeights are computed against `gross_pv_base = Σ |pv_i|`, so for a\nlong-only portfolio `∑ w_i = 1`. When shorts are permitted the sum can\ndiffer from `1` because shorts enter the denominator as absolute value\nwhile contributing negatively to `w_i`.\n\nQuantity reconstruction converts the target PV share back to\n`Position::quantity` via `pv_per_unit`, which is base-currency PV per\n1.0 of [`crate::position::Position::scale_factor`] (a `Percentage`\nholding of `50` uses scale `0.5`, not raw `50`). Each candidate must\nhave non-zero `pv_per_unit`. Zero-PV candidates are rejected at\ndecision-space construction time under this scheme because their\nimplied quantity would be undefined.\nHeld existing positions retain their exact current quantity, including\nholdings with zero or negligible PV.",
           "type": "string"
         },
         {

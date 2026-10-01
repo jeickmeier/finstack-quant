@@ -89,13 +89,16 @@ export type CagrDayCount =
  * The actual-day conventions:
  *
  * - **`Act365L`** (ICMA Rule 251.1(i)(c)): the denominator depends on the
- *   coupon frequency supplied via [`DayCountContext`]. Annual, or no frequency
- *   supplied: 366 if February 29 falls in `(start, end]` (exclusive of start,
- *   inclusive of end), else 365. Non-annual: 366 if the period end date falls
- *   in a leap year, else 365. This is **not** ACT/ACT AFB, which uses a
- *   sub-period splitting algorithm; use [`DayCount::ActActAfb`] for AFB /
- *   Actual/Actual Euro.
- * - **`Nl365`**: counts the actual calendar days in `[start, end)` and removes
+ *   coupon frequency and the enclosing `coupon_period` supplied via
+ *   [`DayCountContext`]; both are required. Annual: 366 if February 29 falls
+ *   in `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),
+ *   else 365. Non-annual: 366 if the next coupon date falls in a leap year,
+ *   else 365. Partial accrual keeps the enclosing coupon's denominator.
+ *   Accrual dates outside that coupon are rejected; sum separate coupon
+ *   slices for calculations spanning multiple coupon periods. This is **not**
+ *   ACT/ACT AFB, which uses a sub-period splitting algorithm; use
+ *   [`DayCount::ActActAfb`] for AFB / Actual/Actual Euro.
+ * - **`Nl365`**: counts the actual calendar days in `(start, end]` and removes
  *   every February 29 that falls in the period, so a full leap year still
  *   yields exactly 1.0.
  * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take

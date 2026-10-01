@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
-      "bytes": 20434,
+      "bytes": 21197,
       "kind": "input",
       "path": "schemas/statements/1/check_suite_spec.schema.json",
       "summary": "Serializable check suite: built-in checks, formula checks and filtering configuration.",
@@ -11,7 +11,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
-      "bytes": 374760,
+      "bytes": 379642,
       "kind": "input",
       "path": "schemas/statements/1/financial_model_spec.schema.json",
       "summary": "Statement model graph: periods, nodes and the Value > Forecast > Formula precedence.",
@@ -65,7 +65,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
-      "bytes": 61618,
+      "bytes": 61683,
       "kind": "output",
       "path": "schemas/statements/1/statement_result.schema.json",
       "summary": "Evaluated node values per period, with policy stamps.",

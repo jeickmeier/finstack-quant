@@ -32,7 +32,7 @@ if (!existsSync(WASM_BG)) {
 }
 
 const facade = await import('../../index.js');
-const { default: init, calibration, valuations } = facade;
+const { default: init, calibration, core, valuations } = facade;
 await init({ module_or_path: readFileSync(WASM_BG) });
 
 function captureError(operation) {
@@ -89,16 +89,32 @@ function swapEnvelope(spread) {
 }
 
 test('object calibration inputs reject non-finite optional spreads before JSON conversion', () => {
-  for (const spread of [NaN, Infinity, -Infinity]) {
+  for (const [spread, text] of [
+    [NaN, 'NaN'],
+    [Infinity, 'inf'],
+    [-Infinity, '-inf'],
+  ]) {
     for (const operation of [
       calibration.calibrate,
       calibration.validateCalibrationJson,
       calibration.dryRun,
     ]) {
-      assert.throws(() => operation(swapEnvelope(spread)), {
-        name: 'TypeError',
-        message: 'Calibration input cannot contain non-finite numbers',
-      });
+      // The Rust `json_text` boundary rejects a non-finite number before any JSON is built.
+      assert.throws(
+        () => operation(swapEnvelope(spread)),
+        (error) => {
+          assert.ok(error instanceof TypeError);
+          assert.equal(error.kind, 'invalid_type');
+          assert.match(
+            error.message,
+            new RegExp(
+              `^(\\w+): \\1\\.market_data\\[0\\]\\.spread_decimal is ${text}, ` +
+                'which JSON cannot represent$'
+            )
+          );
+          return true;
+        }
+      );
     }
   }
 });
@@ -131,8 +147,14 @@ test('calibrated final market restores through the reusable market handle', () =
     plan: { id: 'market-round-trip', quote_sets: {}, steps: [], settings: {} },
   });
   const state = result.result.final_market;
-  const market = new valuations.Market(JSON.stringify(state));
-  assert.deepEqual(JSON.parse(market.toJson()), state);
+  for (const input of [JSON.stringify(state), state]) {
+    const market = core.MarketContext.fromJson(input);
+    try {
+      assert.deepEqual(JSON.parse(market.toJson()), state);
+    } finally {
+      market.free();
+    }
+  }
 });
 
 test('market re-ingestion rejects hierarchy nesting beyond canonical limits', () => {
@@ -146,7 +168,36 @@ test('market re-ingestion rejects hierarchy nesting beyond canonical limits', ()
     node = { children: { [`Level${level}`]: node } };
   }
   state.hierarchy = { roots: { Rates: node } };
-  assert.throws(() => new valuations.Market(JSON.stringify(state)), /JSON depth.*96/);
+  assert.throws(
+    () => core.MarketContext.fromJson(JSON.stringify(state)),
+    (error) => {
+      assert.equal(error.name, 'ContractValidationError');
+      assert.equal(error.kind, 'validation');
+      assert.equal(error.code, 'limit_exceeded');
+      assert.match(error.message, /JSON depth.*96/);
+      return true;
+    }
+  );
+});
+
+test('market re-ingestion requires an explicit supported schema version', () => {
+  const result = calibration.calibrate({
+    schema: 'finstack_quant.calibration/1',
+    plan: { id: 'market-version', quote_sets: {}, steps: [], settings: {} },
+  });
+  const unversioned = { ...result.result.final_market };
+  delete unversioned.schema_version;
+  for (const state of [unversioned, { ...unversioned, schema_version: 2 }]) {
+    assert.throws(
+      () => core.MarketContext.fromJson(state),
+      (error) => {
+        assert.equal(error.name, 'ContractValidationError');
+        assert.equal(error.kind, 'validation');
+        assert.match(`${error.message} ${JSON.stringify(error.report ?? null)}`, /version/);
+        return true;
+      }
+    );
+  }
 });
 
 test('malformed calibration input exposes canonical ingestion details', () => {
@@ -264,8 +315,9 @@ test('cap/floor Hull-White inputs require index conventions and reject frequency
   assert.match(missingIndex.message, /index_id/);
 
   envelope.plan.steps[0].index_id = 'EUR-EURIBOR-3M';
-  const report = JSON.parse(calibration.dryRun(envelope));
+  const report = calibration.dryRun(envelope);
   assert.ok(Array.isArray(report.errors));
+  assert.deepEqual(report, JSON.parse(calibration.dryRunJson(envelope)));
 
   envelope.plan.steps[0].payment_frequency = 'quarterly';
   const override = captureError(() => calibration.dryRun(envelope));

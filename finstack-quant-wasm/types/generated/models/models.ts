@@ -138,6 +138,7 @@ export type CashflowType =
   | "recovery"
   | "mark_to_market"
   | "other";
+export type Interpolation = "linear" | "constant_intervals";
 /**
  * Finite JSON number in the closed interval `[0, 1]`.
  */
@@ -490,7 +491,7 @@ export type RiskMeasure =
  * Serializes in `snake_case`, matching the crate-wide wire convention and
  * this type's own `Display` representation.
  */
-export type UnmatchedPolicy = "strict" | "residual" | "warn";
+export type UnmatchedPolicy = "strict" | "warn";
 /**
  * Sole supported credit-factor-model contract marker.
  */
@@ -1842,9 +1843,21 @@ export interface CheyetteRoughVolParams {
    */
   kappa: number;
   /**
+   * Time knots for the initial forward rate curve φ(t) = f(0, t).
+   */
+  phi_times: number[];
+  /**
+   * Value knots for the initial forward rate curve φ(t) = f(0, t).
+   */
+  phi_values: number[];
+  /**
    * Correlation between rate and vol innovations ρ ∈ [-1, 1].
    */
   rho: number;
+  /**
+   * Base volatility term structure σ₀(t) for the rate process.
+   */
+  sigma_base: ForwardVarianceCurve;
   [k: string]: unknown;
 }
 /**
@@ -1857,10 +1870,33 @@ export interface CheyetteRoughVolParams {
  * - H > 0.5 — smooth (persistent increments)
  */
 export interface HurstExponent {
-  /**
-   * The Hurst parameter value.
-   */
   h: number;
+  [k: string]: unknown;
+}
+/**
+ * Forward variance curve ξ₀(t) for rough volatility models.
+ *
+ * Represents `ξ₀(t) = E^Q[V_t | F₀]`, expected instantaneous variance under
+ * the consuming model's pricing measure. Values are supplied or calibrated by
+ * the caller. The integral sets the model's expected accumulated variance.
+ *
+ * Differencing ATM implied total variance is an optional proxy, not an exact
+ * variance-swap bootstrap. This type interpolates the supplied curve; it does
+ * not perform market calibration.
+ */
+export interface ForwardVarianceCurve {
+  /**
+   * Interpolation contract used by the constructor.
+   */
+  interpolation: Interpolation;
+  /**
+   * Point times or interval ends (strictly increasing year fractions).
+   */
+  times: number[];
+  /**
+   * Point samples or constant interval variances (all > 0).
+   */
+  values: number[];
   [k: string]: unknown;
 }
 /**
@@ -2307,32 +2343,13 @@ export interface CreditFactorModel {
    */
   schema: CreditFactorModelSchema;
   /**
-   * Static factor correlation matrix `ρ` for `Σ(t) = D(t)·ρ·D(t)`.
+   * Correlation estimate retained from covariance calibration.
    *
-   * **Which matrix is authoritative:** vol forecasting rebuilds
-   * `Σ(t, h) = D·ρ·D` from this matrix plus `vol_state`; point-in-time
-   * risk uses `config.covariance` directly. Under
-   * [`CovarianceStrategy::Ridge`][crate::factor::credit::calibration::CovarianceStrategy::Ridge]
-   * the two deliberately differ —
-   * `config.covariance = D·ρ·D + α·I`, so its implied correlations are
-   * shrunk relative to `ρ` by `σᵢσⱼ/√((σᵢ²+α)(σⱼ²+α))`.
-   *
-   * Under
-   * [`CovarianceStrategy::LedoitWolf`][crate::factor::credit::calibration::CovarianceStrategy::LedoitWolf]
-   * the divergence is larger still, and affects both the diagonal and the
-   * off-diagonal: `config.covariance` is the shrinkage estimator's own
-   * `periods_per_year · (δ*·μ·I + (1 − δ*)·S)`, computed once over the
-   * complete-case rows (dates where every factor is observed), and is
-   * authoritative for point-in-time risk. The rebuilt `D·ρ·D` instead
-   * combines this same `ρ` with `vol_state` variances — which are
-   * estimated per-factor over all available observations (not just the
-   * complete-case subset) via whichever
-   * [`VolModelChoice`][crate::factor::credit::calibration::VolModelChoice] was
-   * configured (`Sample` or `Ewma`). Because the diagonals come from two
-   * different estimators over two different observation sets, `D·ρ·D`
-   * deliberately differs from `config.covariance` on **both** the
-   * diagonal and the off-diagonal; treat it as an approximation for
-   * horizon scaling, not as a substitute for `config.covariance`.
+   * `config.covariance` is authoritative for both point-in-time risk and
+   * horizon forecasts. Under ridge this correlation precedes the diagonal
+   * ridge addition; under Ledoit-Wolf it is derived from the shrunk
+   * covariance. Combining it with the unregularized `vol_state.factors`
+   * does not generally reconstruct the selected covariance estimator.
    */
   static_correlation: FactorCorrelationMatrix;
   /**
@@ -2431,6 +2448,8 @@ export interface FactorModelConfig {
   risk_measure?: RiskMeasure;
   /**
    * Policy used when a dependency does not map to a configured factor.
+   * `None` selects `Strict`, which fails the run. Select `Warn` explicitly
+   * to continue with unmatched dependencies reported to the caller.
    */
   unmatched_policy?: UnmatchedPolicy | null;
 }
@@ -2756,7 +2775,9 @@ export interface FactorCorrelationMatrix {
 /**
  * Complete vol state for all factors and all issuers at the calibration date.
  *
- * Feeds `Σ(t) = D(t) · ρ · D(t)` and per-issuer idiosyncratic vol forecasts.
+ * Records unregularized per-factor variance estimates and drives per-issuer
+ * idiosyncratic volatility forecasts. Systematic covariance forecasts scale
+ * the calibrated covariance, preserving the selected covariance estimator.
  */
 export interface VolState {
   /**
@@ -4395,7 +4416,8 @@ export interface PositionEsContribution {
    * CES_i = w_i * (Sigma * w)_i / sigma_p * phi(z_alpha) / (1 - alpha)
    * ```
    *
-   * Historical: average of position-level losses in tail scenarios.
+   * Historical: probability-weighted position P&L over the exact loss-tail
+   * mass. Boundary ties share their tail weight equally.
    * ```text
    * CES_i = E[L_i | L_portfolio > VaR_portfolio]
    * ```
@@ -4450,8 +4472,9 @@ export interface PositionResidualContribution {
    */
   position_id: string;
   /**
-   * Annualized variance contributed by this position's idiosyncratic risk.
-   * Always non-negative.
+   * Annualized variance allocated to this position's idiosyncratic risk.
+   * A hedge sharing another position's issuer shock may receive a negative
+   * allocation; the total residual variance must remain non-negative.
    */
   residual_variance: number;
   /**
@@ -5194,7 +5217,7 @@ export interface TradeParams {
    */
   quantity: number;
   /**
-   * Reference price used to convert the return-space volatility
+   * Finite, strictly positive reference price used to convert the return-space volatility
    * `daily_volatility` into a currency-space risk term (execution risk,
    * variance, etc.).
    *
@@ -5421,7 +5444,7 @@ export interface YieldPca {
    */
   cumulative_variance: number[];
   /**
-   * Eigenvalues in descending order (length min(T-1, N)).
+   * Eigenvalues in descending order (one per tenor, including zero-variance components).
    */
   eigenvalues: number[];
   /**

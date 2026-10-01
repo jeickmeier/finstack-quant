@@ -190,7 +190,7 @@
           "description": "Explicit change in outstanding principal, in the cashflow currency.\nPositive increases outstanding. When absent, the flow kind and amount\ndetermine the balance movement. Initial funding remains represented by\nthe schedule's initial notional rather than being counted twice."
         },
         "rate": {
-          "description": "Effective rate used to calculate this cashflow (None if not rate-based or unknown).\n\nFor interest/fees: the annual rate used in the calculation\nFor notional/amortization/PIK: typically None\n\nThis is stored at cashflow creation time when available.\nFor instruments with intra-period events (e.g., revolving credit with draws/repays),\nthis may represent a time-weighted average rate across sub-periods.",
+          "description": "Effective rate used to calculate this cashflow (None if not rate-based or unknown).\n\nFor interest/fees: the annual rate used in the calculation\nFor notional/amortization/PIK: typically None\n\nThis is stored at cashflow creation time when available.\nFor instruments with intra-period events (e.g., revolving credit with draws/repays),\nthis may represent a time-weighted average rate across sub-periods.\nSerialization rejects non-finite rates instead of encoding them as absent.",
           "format": "double",
           "type": [
             "number",
@@ -230,7 +230,7 @@
           ]
         },
         "coupon_period": {
-          "description": "Regular reference coupon period for ACT/ACT ICMA, including stub accrual.\n`None` leaves reference-period selection to the schedule accrual caller.",
+          "description": "Unadjusted regular reference coupon period for ACT/ACT ICMA, or the\nactual full contractual coupon period for ACT/365L, including when\nthis flow represents only a rate or balance subinterval.\nACT/365L metadata must retain these boundaries to select the original\ncoupon's denominator; other conventions may leave this field `None`.",
           "maxItems": 2,
           "minItems": 2,
           "prefixItems": [
@@ -260,7 +260,7 @@
           "type": "boolean"
         },
         "projected_index_rate": {
-          "description": "Projected index rate before spread, gearing, caps, or floors.",
+          "description": "Projected index rate before spread, gearing, caps, or floors.\nSerialization rejects non-finite rates instead of encoding them as absent.",
           "format": "double",
           "type": [
             "number",

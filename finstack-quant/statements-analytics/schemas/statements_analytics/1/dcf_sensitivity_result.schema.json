@@ -833,7 +833,7 @@
           "type": "number"
         },
         "parameter_id": {
-          "description": "Parameter node identifier.",
+          "description": "Parameter identifier: `node@period` for statement sensitivities, or\nthe shocked assumption name for DCF sensitivities.",
           "type": "string"
         },
         "upside": {

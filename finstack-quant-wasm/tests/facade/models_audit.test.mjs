@@ -41,10 +41,18 @@ test('SABR diagnostics accept a flat smile on uneven strikes', () => {
   const params = new facade.models.volatility.SabrParameters(0.2, 1, 0, 0);
   const smile = new facade.models.volatility.SabrSmile(params, 100, 1);
   try {
-    const result = smile.arbitrageDiagnostics([99, 100, 120]);
+    const result = smile.validateNoArbitrage([99, 100, 120], 0);
     assert.equal(result.arbitrage_free, true);
     assert.deepEqual(result.butterfly_violations, []);
-    assert.throws(() => smile.arbitrageDiagnostics([100, 99, 120]), /ascending/);
+    assert.deepEqual(result.monotonicity_violations, []);
+    assert.throws(
+      () => smile.validateNoArbitrage([100, 99, 120], 0),
+      (error) => {
+        assert.equal(error.kind, 'validation');
+        assert.match(error.message, /strikes must be finite and strictly ascending/);
+        return true;
+      }
+    );
   } finally {
     smile.free();
     params.free();

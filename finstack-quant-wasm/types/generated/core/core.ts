@@ -239,6 +239,10 @@ export type CurveState =
        * Exact typed calibration replay recipe.
        */
       rate_calibration?: RateCalibrationRecipe | null;
+      /**
+       * Canonical source interpolation and accumulated continuous transformations.
+       */
+      transform?: DiscountCurveTransform | null;
       type: "discount";
     }
   | {
@@ -288,6 +292,10 @@ export type CurveState =
        * Index tenor in years
        */
       tenor: number;
+      /**
+       * Canonical source interpolation and cumulative continuous transformations.
+       */
+      transform?: ForwardCurveTransform | null;
       type: "forward";
     }
   | {
@@ -573,13 +581,16 @@ export type DateWire = string;
  * The actual-day conventions:
  *
  * - **`Act365L`** (ICMA Rule 251.1(i)(c)): the denominator depends on the
- *   coupon frequency supplied via [`DayCountContext`]. Annual, or no frequency
- *   supplied: 366 if February 29 falls in `(start, end]` (exclusive of start,
- *   inclusive of end), else 365. Non-annual: 366 if the period end date falls
- *   in a leap year, else 365. This is **not** ACT/ACT AFB, which uses a
- *   sub-period splitting algorithm; use [`DayCount::ActActAfb`] for AFB /
- *   Actual/Actual Euro.
- * - **`Nl365`**: counts the actual calendar days in `[start, end)` and removes
+ *   coupon frequency and the enclosing `coupon_period` supplied via
+ *   [`DayCountContext`]; both are required. Annual: 366 if February 29 falls
+ *   in `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),
+ *   else 365. Non-annual: 366 if the next coupon date falls in a leap year,
+ *   else 365. Partial accrual keeps the enclosing coupon's denominator.
+ *   Accrual dates outside that coupon are rejected; sum separate coupon
+ *   slices for calculations spanning multiple coupon periods. This is **not**
+ *   ACT/ACT AFB, which uses a sub-period splitting algorithm; use
+ *   [`DayCount::ActActAfb`] for AFB / Actual/Actual Euro.
+ * - **`Nl365`**: counts the actual calendar days in `(start, end]` and removes
  *   every February 29 that falls in the period, so a full leap year still
  *   yields exactly 1.0.
  * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
@@ -991,11 +1002,12 @@ export type FxConversionPolicy = "cashflow_date" | "period_end" | "period_averag
  */
 export type InflationInterpolation = "step" | "linear";
 /**
- * Publication lag for inflation index reference dates.
+ * Contractual observation lag for inflation index reference dates.
  *
  * Inflation indices are published with a delay (typically 2-4 weeks). Securities
- * using these indices incorporate a lag to ensure the reference index is published
- * by the settlement date.
+ * using these indices incorporate an observation lag to ensure the reference
+ * index is published by settlement. This lag does not specify the actual
+ * publication date; use [`InflationIndex::with_publication_dates`] for that.
  *
  * # Standard Lags by Market
  *
@@ -1065,7 +1077,7 @@ export type VolInterpolationMode = "vol" | "total_variance";
  * quote type lets consumers enforce their convention via
  * [`VolSurface::require_quote_type`].
  */
-export type VolQuoteType = "black_lognormal" | "normal";
+export type VolQuoteType = "black_lognormal" | "shifted_black_lognormal" | "normal";
 /**
  * Semantic meaning of the secondary axis on a [`VolSurface`].
  *
@@ -1245,6 +1257,20 @@ export interface CreditIndexState {
    */
   recovery_rate: number;
 }
+export interface CurveAdjustmentSegment {
+  /**
+   * Function slope on this segment.
+   */
+  slope: number;
+  /**
+   * Segment origin in the source curve's time coordinates.
+   */
+  start: number;
+  /**
+   * Right-hand function value at the segment origin.
+   */
+  value: number;
+}
 /**
  * Typed conventions required to replay a rate-curve calibration.
  */
@@ -1291,6 +1317,58 @@ export interface Tenor {
    * or years.
    */
   unit: TenorUnit;
+}
+/**
+ * Source interpolation and a single accumulated transformation, never a chain
+ * of nested curves. The adjustment is stored as its piecewise-linear derivative
+ * so evaluating beyond a completed triangular shock does not subtract large
+ * quadratic polynomials.
+ */
+export interface DiscountCurveTransform {
+  /**
+   * Cumulative derivative of the additive log-discount adjustment.
+   */
+  adjustment: PiecewiseLinearAdjustment;
+  /**
+   * Current origin in the source interpolation's year-fraction coordinates.
+   */
+  offset: number;
+  /**
+   * Original, untransformed interpolation pillars.
+   */
+  source_points: [unknown, unknown][];
+}
+/**
+ * A flat function representation: repeated shocks merge on a breakpoint union
+ * rather than forming a recursively nested transformation history.
+ */
+export interface PiecewiseLinearAdjustment {
+  /**
+   * Constant value before the first breakpoint.
+   */
+  initial_value: number;
+  /**
+   * Sorted, merged linear segments.
+   */
+  segments: CurveAdjustmentSegment[];
+}
+export interface ForwardCurveTransform {
+  /**
+   * Cumulative additive rate adjustment in source time coordinates.
+   */
+  adjustment: PiecewiseLinearAdjustment;
+  /**
+   * Current curve origin in the source curve's year-fraction coordinates.
+   */
+  offset: number;
+  /**
+   * Accumulated parallel multiplicative factor on the source interpolation.
+   */
+  scale: number;
+  /**
+   * Original interpolation pillars, independent of current curve samples.
+   */
+  source_points: [unknown, unknown][];
 }
 /**
  * Exact valuation-layer inputs required to replay a hazard-curve calibration.
@@ -1477,6 +1555,9 @@ export interface FxDeltaVolSurface {
 /**
  * Serializable state of an FxMatrix.
  * Contains the configuration and cached quotes that can be persisted and restored.
+ * Serialization fails with an ordinary serializer error if any captured
+ * explicit or provider rate is non-finite or non-positive, including rates
+ * that overflow after a mutable underlying provider changes under a shock.
  */
 export interface FxMatrixState {
   /**
@@ -1490,6 +1571,12 @@ export interface FxMatrixState {
    * dates from the provider instead of restoring the pinned fixings.
    */
   pinned_quotes: [unknown, unknown, unknown, unknown, unknown][];
+  /**
+   * Captured date/policy-scoped provider quotes. These override captured
+   * pair-global provider quotes for their scope while remaining below
+   * explicit matrix quotes in either direction. Required even when empty.
+   */
+  provider_pinned_quotes: [unknown, unknown, unknown, unknown, unknown][];
   /**
    * Captured provider quotes, below explicit global and date/policy-pinned
    * quotes in lookup priority. Market-context restoration uses these to
@@ -1537,9 +1624,10 @@ export interface HierarchyNode {
  *
  * # Components
  *
- * - **Observations**: Historical index levels by publication date
+ * - **Observations**: Index levels labelled by reference date/month
  * - **Interpolation**: Daily interpolation between monthly observations
- * - **Lag**: Publication lag (typically 3 months for TIPS)
+ * - **Lag**: Contractual observation lag (typically 3 months for TIPS)
+ * - **Publication dates**: Optional explicit availability dates by reference month
  * - **Seasonality**: Optional monthly adjustment factors
  *
  * # Interpolation Methods
@@ -1596,12 +1684,26 @@ export interface InflationIndex {
    */
   observations: [unknown, unknown][];
   /**
+   * Explicit monthly observation availability; no release dates are inferred.
+   */
+  publication_dates?: InflationPublicationWire[];
+  /**
    * Optional seasonality factors
    *
    * @minItems 12
    * @maxItems 12
    */
   seasonality?: [number, number, number, number, number, number, number, number, number, number, number, number] | null;
+}
+export interface InflationPublicationWire {
+  /**
+   * Inclusive date on which the observation must be available.
+   */
+  publication_date: DateWire;
+  /**
+   * First calendar day of the reference month.
+   */
+  reference_month: DateWire;
 }
 /**
  * Canonical v1 persisted snapshot of a complete market-data context.
@@ -1735,6 +1837,10 @@ export interface ScalarTimeSeries {
  * Internally stores volatilities in row-major order as a boxed slice.
  */
 export interface VolSurface {
+  /**
+   * Additive displacements in forward/strike units, one per expiry for shifted Black quotes.
+   */
+  displacements?: number[] | null;
   /**
    * Expiry times in years
    */
@@ -1972,4 +2078,16 @@ export interface TableEnvelope {
    */
   row_count: number;
   [k: string]: unknown;
+}
+/**
+ * Tenor-by-strike volatility quotes at a fixed option expiry, preserving quote convention and displacement.
+ */
+export interface VolCubeExpirySlice {
+  displacements?: number[] | null;
+  expiry: number;
+  id: string;
+  quote_type: VolQuoteType;
+  strikes: number[];
+  tenors: number[];
+  vols_row_major: number[];
 }

@@ -167,26 +167,6 @@
       ],
       "title": "Business Day Convention"
     },
-    "d_022e5f44e59eaa6c084b": {
-      "description": "Number of coupon payments per year for the underlying swap in HW1F calibration.\n\nUSD swaps are semi-annual (2), EUR swaps are annual (1).",
-      "oneOf": [
-        {
-          "const": "annual",
-          "description": "1 payment per year (EUR, GBP standard).",
-          "type": "string"
-        },
-        {
-          "const": "semi_annual",
-          "description": "2 payments per year (USD standard).",
-          "type": "string"
-        },
-        {
-          "const": "quarterly",
-          "description": "4 payments per year.",
-          "type": "string"
-        }
-      ]
-    },
     "d_08aea844abd10cb00e40": {
       "description": "A single step in the calibration process.\n\nEach step targets the construction or update of a specific market object\n(e.g., a yield curve) using a specified set of quotes.",
       "oneOf": [
@@ -459,19 +439,8 @@
               "type": "number"
             },
             "observation_lag": {
-              "description": "Observation lag (e.g. \"3M\").\n\nOverrides the quote convention's lag and must match any supplied index\nlag. The same lag determines the output curve's reference-date origin and the dates\nof the CPI observations consumed by calibration instruments.",
+              "description": "Month observation lag (e.g. \"3M\"); \"none\" means zero months.\nDay-based lags are unsupported because output curves carry month lags.\n\nOverrides the quote convention's lag and must match any supplied index\nlag. The same lag determines the output curve's reference-date origin and the dates\nof the CPI observations consumed by calibration instruments.",
               "type": "string"
-            },
-            "seasonal_factors": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/d_f4c196ca4f3c0a638b09"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Optional seasonal adjustment factors for deseasonalizing CPI observations.\n\nWhen provided, the calibrator will:\n1. Deseasonalize input CPI levels using the monthly factors\n2. Fit the smooth zero-coupon curve to deseasonalized levels\n3. Reseasonalize the output CPI path\n\nMonthly adjustments are additive to log CPI level. They should approximately\nsum to zero over 12 months."
             }
           },
           "required": [
@@ -616,7 +585,7 @@
                 }
               ],
               "default": null,
-              "description": "Optional day count convention for fixed leg calculations."
+              "description": "Optional day count convention for fixed-leg coupon accrual only.\nOption expiry and variance always use ACT/365F."
             },
             "forward_id": {
               "default": null,
@@ -660,7 +629,7 @@
             },
             "target_expiries": {
               "default": [],
-              "description": "Target expiry times (in years) for the surface grid.",
+              "description": "Target option expiry times in ACT/365F years from `base_date`, independent\nof the fixed-leg coupon day-count convention.",
               "items": {
                 "format": "double",
                 "type": "number"
@@ -781,7 +750,7 @@
               "type": "string"
             },
             "maturity_years": {
-              "description": "Maturity of the tranches in years.",
+              "description": "Finite positive CDS tenor in years, representable as a whole number of months.\nQuotes must resolve to the same CDS convention maturity as this tenor.",
               "format": "double",
               "type": "number"
             },
@@ -967,6 +936,10 @@
               "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
               "description": "Forward/projection curve ID. If equal to `discount_curve_id`, the\ndiscount curve is used as the single-curve projection proxy."
             },
+            "index_id": {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+              "description": "Term-rate index defining settlement, reset tenor, accrual day count,\ncalendar, business-day adjustments, and payment lag for caplets.\nIts currency must match `currency`; overnight indices are unsupported."
+            },
             "initial_kappa": {
               "default": null,
               "description": "Optional initial guess for mean reversion κ when solving both κ and σ.",
@@ -989,11 +962,6 @@
               "const": "cap_floor_hull_white",
               "type": "string"
             },
-            "payment_frequency": {
-              "$ref": "#/$defs/d_022e5f44e59eaa6c084b",
-              "default": "semi_annual",
-              "description": "Payment frequency used to decompose quoted caps/floors into caplets."
-            },
             "volatility_mode": {
               "$ref": "#/$defs/d_eebd94a9f6b002873248",
               "default": "scalar",
@@ -1006,7 +974,8 @@
             "discount_curve_id",
             "forward_curve_id",
             "currency",
-            "base_date"
+            "base_date",
+            "index_id"
           ],
           "type": "object"
         },
@@ -1031,7 +1000,7 @@
             },
             "dividend_yield_override": {
               "default": null,
-              "description": "Optional continuous dividend yield; defaults to the market scalar\n`\"<underlying_ticker>-DIVYIELD\"` or zero.",
+              "description": "Optional continuous dividend yield in decimal units. Without an override,\nuses the unitless market scalar `\"<underlying_ticker>-DIVYIELD\"`. When a\ndiscount curve is supplied, a matching cash-dividend schedule may supply\ncarry instead; otherwise an explicit yield is required.",
               "format": "double",
               "type": [
                 "number",
@@ -1147,7 +1116,7 @@
             "method": {
               "$ref": "#/$defs/d_3ae1d648491d93be37b3",
               "default": "bootstrap",
-              "description": "Calibration method to use."
+              "description": "Sequential bootstrap method. `GlobalSolve` is unsupported and rejected."
             }
           },
           "required": [
@@ -1341,6 +1310,32 @@
         }
       ]
     },
+    "d_1a0c0b834c9e63a93be3": {
+      "additionalProperties": false,
+      "properties": {
+        "slope": {
+          "description": "Function slope on this segment.",
+          "format": "double",
+          "type": "number"
+        },
+        "start": {
+          "description": "Segment origin in the source curve's time coordinates.",
+          "format": "double",
+          "type": "number"
+        },
+        "value": {
+          "description": "Right-hand function value at the segment origin.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "start",
+        "value",
+        "slope"
+      ],
+      "type": "object"
+    },
     "d_1b2ccb88c9229e7463e8": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "description": "ISO 8601 calendar date string.",
@@ -1466,14 +1461,15 @@
       "properties": {
         "max_iterations": {
           "default": 100,
-          "description": "Maximum iterations available to each solver invocation.",
+          "description": "Positive maximum number of iterations available to each solver invocation.",
           "format": "uint",
-          "minimum": 0,
+          "minimum": 1,
           "type": "integer"
         },
         "tolerance": {
           "default": 1e-12,
-          "description": "Numerical convergence tolerance; distinct from economic fit acceptance.",
+          "description": "Positive finite numerical convergence tolerance, distinct from economic fit acceptance.",
+          "exclusiveMinimum": 0,
           "format": "double",
           "type": "number"
         }
@@ -1748,7 +1744,7 @@
         },
         {
           "const": "bloomberg_cdsw_clean",
-          "description": "Bloomberg CDSW clean principal presentation and premium-leg policy.\n\nThis is the industry-standard convention used by Bloomberg CDSW and\nthe ISDA Standard Upfront Model. It is the default for new\n`CreditDefaultSwap` instances:\n\n- Premium cashflows accrue between business-day-adjusted dates that\n  match the Bloomberg CDSW cashflow schedule.\n- The final coupon period is inclusive of the maturity date (extra\n  day) per CDSW convention.\n- The reported NPV is the clean principal value (Bloomberg\n  \"Principal\" line). Cash settlement is `Principal + Accrued`.\n- Par spread uses the risky annuity denominator (matches the CDSW\n  screen for investment-grade credits).\n- Hazard rebootstrap inside risk metrics (CS01, recovery01, etc.)\n  inherits the same CDSW pricer convention so sensitivities are\n  self-consistent with the base PV.",
+          "description": "Bloomberg CDSW clean principal presentation and premium-leg policy.\n\nThis is the industry-standard convention used by Bloomberg CDSW and\nthe ISDA Standard Upfront Model. It is the default for new\n`CreditDefaultSwap` instances:\n\n- Intermediate premium cashflows accrue between business-day-adjusted\n  dates. Final accrual ends on unadjusted maturity; the final payment\n  follows the business-day convention independently.\n- The final coupon period is inclusive of the maturity date (extra\n  day) per CDSW convention.\n- The reported NPV is the clean principal value (Bloomberg\n  \"Principal\" line). Cash settlement is `Principal + Accrued`.\n- Par spread uses the risky annuity denominator (matches the CDSW\n  screen for investment-grade credits).\n- Hazard rebootstrap inside risk metrics (CS01, recovery01, etc.)\n  inherits the same CDSW pricer convention so sensitivities are\n  self-consistent with the base PV.",
           "type": "string"
         },
         {
@@ -1774,6 +1770,46 @@
           "type": "number"
         }
       },
+      "type": "object"
+    },
+    "d_44550d6839f96bb19179": {
+      "additionalProperties": false,
+      "description": "Source interpolation and a single accumulated transformation, never a chain\nof nested curves. The adjustment is stored as its piecewise-linear derivative\nso evaluating beyond a completed triangular shock does not subtract large\nquadratic polynomials.",
+      "properties": {
+        "adjustment": {
+          "$ref": "#/$defs/d_f1a590578006650bb43d",
+          "description": "Cumulative derivative of the additive log-discount adjustment."
+        },
+        "offset": {
+          "description": "Current origin in the source interpolation's year-fraction coordinates.",
+          "format": "double",
+          "type": "number"
+        },
+        "source_points": {
+          "description": "Original, untransformed interpolation pillars.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "format": "double",
+                "type": "number"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "source_points",
+        "offset",
+        "adjustment"
+      ],
       "type": "object"
     },
     "d_47e5e74524615b78a19f": {
@@ -1810,7 +1846,7 @@
       "type": "object"
     },
     "d_482bae9be5d021df13ce": {
-      "description": "Publication lag for inflation index reference dates.\n\nInflation indices are published with a delay (typically 2-4 weeks). Securities\nusing these indices incorporate a lag to ensure the reference index is published\nby the settlement date.\n\n# Standard Lags by Market\n\n- **US TIPS**: 3-month lag (reference index from 3 months prior)\n- **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)\n- **French OATi**: 3-month lag\n- **German index-linked**: 3-month lag\n\n# Rationale\n\nThe lag ensures:\n1. Reference index is published before settlement\n2. Index value is known at coupon payment date\n3. No estimation or forecasting required for payment calculation\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationLag;\n\nlet tips_lag = InflationLag::Months(3);  // US TIPS standard\nlet gilt_lag = InflationLag::Months(3);  // UK modern gilts\nlet no_lag = InflationLag::None;         // Inflation swaps (forecast-based)\n```",
+      "description": "Contractual observation lag for inflation index reference dates.\n\nInflation indices are published with a delay (typically 2-4 weeks). Securities\nusing these indices incorporate an observation lag to ensure the reference\nindex is published by settlement. This lag does not specify the actual\npublication date; use [`InflationIndex::with_publication_dates`] for that.\n\n# Standard Lags by Market\n\n- **US TIPS**: 3-month lag (reference index from 3 months prior)\n- **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)\n- **French OATi**: 3-month lag\n- **German index-linked**: 3-month lag\n\n# Rationale\n\nThe lag ensures:\n1. Reference index is published before settlement\n2. Index value is known at coupon payment date\n3. No estimation or forecasting required for payment calculation\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationLag;\n\nlet tips_lag = InflationLag::Months(3);  // US TIPS standard\nlet gilt_lag = InflationLag::Months(3);  // UK modern gilts\nlet no_lag = InflationLag::None;         // Inflation swaps (forecast-based)\n```",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -2217,7 +2253,7 @@
     },
     "d_65447e12defc07e99879": {
       "additionalProperties": false,
-      "description": "Discount-curve specific numerical solver configuration.\n\nControls the search space and numerical stability of the discount curve\nbootstrapping or global solve process.\n\n# Invariants\n- `df_hard_min` > 0\n- `scan_grid_points` > 0\n\n# Examples\n```\nuse finstack_quant_calibration::DiscountCurveSolveConfig;\n\nlet config = DiscountCurveSolveConfig {\n    scan_grid_points: 64,\n    df_hard_min: 1e-10,\n    ..Default::default()\n};\n```",
+      "description": "Discount-curve specific numerical solver configuration.\n\nControls the search space and numerical stability of the discount curve\nbootstrapping or global solve process.\n\n# Invariants\n- `0 < df_hard_min < df_hard_max`, with finite bounds\n- `scan_grid_points` > 0\n- Scan and finite-difference step sizes are finite and strictly positive\n\n# Examples\n```\nuse finstack_quant_calibration::DiscountCurveSolveConfig;\n\nlet config = DiscountCurveSolveConfig {\n    scan_grid_points: 64,\n    df_hard_min: 1e-10,\n    ..Default::default()\n};\n```",
       "properties": {
         "allow_non_monotonic_final": {
           "default": null,
@@ -2234,19 +2270,19 @@
         },
         "df_hard_max": {
           "default": 1000000,
-          "description": "Absolute maximum allowed discount factor (prevents divergence).",
+          "description": "Finite upper discount-factor bound, strictly above `df_hard_min`.",
           "format": "double",
           "type": "number"
         },
         "df_hard_min": {
           "default": 1e-12,
-          "description": "Absolute minimum allowed discount factor (prevents singularity).",
+          "description": "Finite, strictly positive lower discount-factor bound, below `df_hard_max`.",
           "format": "double",
           "type": "number"
         },
         "jacobian_step_size": {
-          "default": 0,
-          "description": "Step size (h) for finite-difference Jacobian calculation.",
+          "default": 0.000001,
+          "description": "Finite, strictly positive relative step for finite-difference Jacobians.\nThe parameter bump is `max(h, abs(parameter) * h)`.",
           "format": "double",
           "type": "number"
         },
@@ -2272,7 +2308,7 @@
         },
         "scan_grid_step": {
           "default": 0.0001,
-          "description": "Initial step size for geometric scan grid.",
+          "description": "Finite, strictly positive initial step size for the geometric scan grid.",
           "format": "double",
           "type": "number"
         },
@@ -2503,6 +2539,24 @@
           "type": "object"
         }
       ]
+    },
+    "d_7badbe6d060a37bc56dc": {
+      "additionalProperties": false,
+      "properties": {
+        "publication_date": {
+          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
+          "description": "Inclusive date on which the observation must be available."
+        },
+        "reference_month": {
+          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
+          "description": "First calendar day of the reference month."
+        }
+      },
+      "required": [
+        "reference_month",
+        "publication_date"
+      ],
+      "type": "object"
     },
     "d_7d8265a72b3debd33f3e": {
       "additionalProperties": false,
@@ -3077,7 +3131,7 @@
                     },
                     "quote_type": {
                       "$ref": "#/$defs/d_f6b6b6746b36a7a4a06d",
-                      "description": "Volatility quoting convention."
+                      "description": "Volatility quoting convention. Shifted Black quotes require a\n`ShiftedLognormal` calibration plan supplying their displacement;\nHull-White calibration rejects them because its quote contract\ncarries no displacement."
                     },
                     "strike": {
                       "description": "Strike rate",
@@ -3127,7 +3181,7 @@
                     },
                     "quote_type": {
                       "$ref": "#/$defs/d_f6b6b6746b36a7a4a06d",
-                      "description": "Volatility quoting convention."
+                      "description": "Volatility quoting convention. Hull-White calibration accepts\nnormal and unshifted Black quotes; it rejects shifted Black\nbecause this quote does not carry a displacement."
                     },
                     "strike": {
                       "description": "Strike rate.",
@@ -3382,6 +3436,13 @@
                   }
                 ],
                 "type": "array"
+              },
+              "type": "array"
+            },
+            "publication_dates": {
+              "description": "Explicit monthly observation availability; no release dates are inferred.",
+              "items": {
+                "$ref": "#/$defs/d_7badbe6d060a37bc56dc"
               },
               "type": "array"
             },
@@ -3721,17 +3782,17 @@
         },
         {
           "const": "lognormal",
-          "description": "Lognormal (Black) volatility in decimal units.\n\nExample: `0.20` means 20% Black volatility.",
+          "description": "Lognormal (Black) volatility in decimal units.\n\nExample: `0.20` means 20% Black volatility.\nRequires `black_lognormal` quotes and positive forwards/strikes;\ncalibration does not introduce a displacement automatically.",
           "type": "string"
         },
         {
           "additionalProperties": false,
-          "description": "Shifted lognormal (Black) volatility in decimal units, with an explicit shift.\n\nExample: `0.20` means 20% Black volatility.",
+          "description": "Shifted lognormal (Black) volatility in decimal units, with an explicit shift.\n\nExample: `0.20` means 20% Black volatility on displaced forward/strike\ncoordinates. Requires `shifted_black_lognormal` quotes.",
           "properties": {
             "shifted_lognormal": {
               "properties": {
                 "shift": {
-                  "description": "Shift amount for negative rate handling",
+                  "description": "Finite positive additive shift in decimal rate units, applied to\nboth forwards and strikes and retained in calibrated artifacts.",
                   "format": "double",
                   "type": "number"
                 }
@@ -5747,7 +5808,7 @@
         },
         {
           "const": "act_365l",
-          "description": "Actual/365 Leap day count convention (Actual/365L).\n\nYear fraction = (actual days) / (365 or 366). Annual or unspecified\nfrequency: 366 if February 29 falls in (start, end]. Other frequencies:\n366 if the end date falls in a leap year. Not Actual/Actual AFB.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251.1(i)(c)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365L\" (A008)\n- **Also known as**: Act/365L, ISMA-Year",
+          "description": "Actual/365 Leap day count convention (Actual/365L).\n\nYear fraction = (actual days) / (365 or 366). Requires the coupon\nfrequency and the enclosing coupon period. Annual: 366 if February 29\nfalls in (coupon_start, coupon_end]. Other frequencies: 366 if the next\ncoupon date falls in a leap year. Not Actual/Actual AFB.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251.1(i)(c)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365L\" (A008)\n- **Also known as**: Act/365L, ISMA-Year",
           "type": "string"
         },
         {
@@ -5782,7 +5843,7 @@
         },
         {
           "const": "act_act_isma",
-          "description": "Actual/Actual (ICMA) day count convention.\n\nActual days over (actual days in the coupon period × coupons per year).\nRequires a coupon frequency.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251 - \"Actual/Actual (ICMA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ICMA\" (A007)\n- **Also known as**: Act/Act (ICMA), Act/Act (ISMA), ISMA-99",
+          "description": "Actual/Actual (ICMA) day count convention.\n\nActual days over (actual days in the coupon period × coupons per year).\nRequires a coupon frequency. Explicit reference coupon boundaries must\nbe unadjusted regular dates from the contractual nominal month grid,\nnot payment dates.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251 - \"Actual/Actual (ICMA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ICMA\" (A007)\n- **Also known as**: Act/Act (ICMA), Act/Act (ISMA), ISMA-99",
           "type": "string"
         },
         {
@@ -6306,6 +6367,17 @@
                 }
               ],
               "description": "Exact typed calibration replay recipe."
+            },
+            "transform": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/d_44550d6839f96bb19179"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Canonical source interpolation and accumulated continuous transformations."
             }
           },
           "required": [
@@ -6406,6 +6478,17 @@
               "description": "Index tenor in years",
               "format": "double",
               "type": "number"
+            },
+            "transform": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/d_fb5d44c23c59cc156917"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Canonical source interpolation and cumulative continuous transformations."
             }
           },
           "required": [
@@ -6908,6 +6991,17 @@
           "additionalProperties": false,
           "description": "Pre-built volatility surface (expiry x strike).",
           "properties": {
+            "displacements": {
+              "description": "Additive displacements in forward/strike units, one per expiry for shifted Black quotes.",
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "expiries": {
               "description": "Expiry times in years",
               "items": {
@@ -6998,29 +7092,32 @@
         }
       ]
     },
-    "d_f2494b65293b81ee2ea2": {
-      "description": "Stable identifier for an Interest Rate Future contract (e.g., \"CME:SR3\").\n\nUsed to look up [`IrFutureConventions`](crate::market::conventions::defs::IrFutureConventions)\nfrom the convention registry.",
-      "type": "string"
-    },
-    "d_f4c196ca4f3c0a638b09": {
+    "d_f1a590578006650bb43d": {
       "additionalProperties": false,
-      "description": "Monthly seasonal adjustment factors for inflation curves.\n\nUsed to deseasonalize CPI observations before fitting a smooth\nzero-coupon inflation curve, then reseasonalize the output.\nMonthly adjustments should approximately sum to zero.",
+      "description": "A flat function representation: repeated shocks merge on a breakpoint union\nrather than forming a recursively nested transformation history.",
       "properties": {
-        "monthly_adjustments": {
-          "description": "Monthly adjustment factors (Jan=index 0 through Dec=index 11).\nThese are additive adjustments to the log CPI level.",
+        "initial_value": {
+          "description": "Constant value before the first breakpoint.",
+          "format": "double",
+          "type": "number"
+        },
+        "segments": {
+          "description": "Sorted, merged linear segments.",
           "items": {
-            "format": "double",
-            "type": "number"
+            "$ref": "#/$defs/d_1a0c0b834c9e63a93be3"
           },
-          "maxItems": 12,
-          "minItems": 12,
           "type": "array"
         }
       },
       "required": [
-        "monthly_adjustments"
+        "initial_value",
+        "segments"
       ],
       "type": "object"
+    },
+    "d_f2494b65293b81ee2ea2": {
+      "description": "Stable identifier for an Interest Rate Future contract (e.g., \"CME:SR3\").\n\nUsed to look up [`IrFutureConventions`](crate::market::conventions::defs::IrFutureConventions)\nfrom the convention registry.",
+      "type": "string"
     },
     "d_f6b6b6746b36a7a4a06d": {
       "description": "Quoting convention of the volatilities stored on a [`VolSurface`].\n\nThe same `vol_surface_id` channel is read by consumers with very different\nexpectations: rates calibrations typically read normal (Bachelier, absolute)\nvols on an `expiry × tenor` ATM matrix, while equity/FX/swaption smile\nconsumers read Black (lognormal, relative) vols on `expiry × strike`. The\nstored numbers are an order of magnitude apart (e.g. 0.008 normal vs 0.20\nBlack), so misreading one as the other silently mis-prices. Tagging the\nquote type lets consumers enforce their convention via\n[`VolSurface::require_quote_type`].",
@@ -7031,6 +7128,11 @@
           "type": "string"
         },
         {
+          "const": "shifted_black_lognormal",
+          "description": "Displaced Black volatility; per-expiry displacements accompany the grid.",
+          "type": "string"
+        },
+        {
           "const": "normal",
           "description": "Normal (Bachelier) implied volatility, absolute rate units.",
           "type": "string"
@@ -7038,7 +7140,7 @@
       ]
     },
     "d_fa1f99a63e484452eafa": {
-      "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode. The IMM modes\nforce a quarterly grid: the schedule frequency and stub rule configured on\n[`ScheduleParams`] are overridden with quarterly / short-back, matching\n`ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates\n  for rate, currency, and equity index futures).\n- **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll\n  dates). When the start date is not itself a roll date, the first period\n  accrues from the roll date immediately **preceding** the start (standard\n  front accrual per the ISDA Big Bang Protocol, April 2009).\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::specs::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)",
+      "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode. The IMM modes\nforce a quarterly grid: the schedule frequency and stub rule configured on\n[`ScheduleParams`] are overridden with quarterly / short-back, matching\n`ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates\n  for rate, currency, and equity index futures). Cashflow schedules retain\n  the contractual maturity as a short final stub when it is off-grid.\n- **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll\n  dates). When the start date is not itself a roll date, the first period\n  accrues from the roll date immediately **preceding** the start (standard\n  front accrual per the ISDA Big Bang Protocol, April 2009).\n  Interior coupon or payment-program windows start at their declared\n  boundary; front accrual is applied only once at the instrument start.\n\nExplicit roll grids cannot be combined with `end_of_month`. ACT/ACT ICMA\nsupports the CDS twentieth grid; third-Wednesday IMM with ACT/ACT ICMA is\nrejected because the available ICMA reference calculation requires nominal\nmonth-grid coupons.\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::specs::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)",
       "oneOf": [
         {
           "const": "none",
@@ -7056,6 +7158,51 @@
           "type": "string"
         }
       ]
+    },
+    "d_fb5d44c23c59cc156917": {
+      "additionalProperties": false,
+      "properties": {
+        "adjustment": {
+          "$ref": "#/$defs/d_f1a590578006650bb43d",
+          "description": "Cumulative additive rate adjustment in source time coordinates."
+        },
+        "offset": {
+          "description": "Current curve origin in the source curve's year-fraction coordinates.",
+          "format": "double",
+          "type": "number"
+        },
+        "scale": {
+          "description": "Accumulated parallel multiplicative factor on the source interpolation.",
+          "format": "double",
+          "type": "number"
+        },
+        "source_points": {
+          "description": "Original interpolation pillars, independent of current curve samples.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "format": "double",
+                "type": "number"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "source_points",
+        "offset",
+        "scale",
+        "adjustment"
+      ],
+      "type": "object"
     },
     "d_fc123a39e4a8423ed13b": {
       "description": "Selected side of the market snapshot.",

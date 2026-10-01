@@ -44,8 +44,12 @@
       "description": "Mean Absolute Error: average of |actual - forecast|\n\nInterpretation: Average magnitude of errors in the same units as the data.\nLower is better. Not sensitive to outliers."
     },
     "mape": {
-      "$ref": "#/$defs/NonFiniteF64Wire",
-      "description": "Mean Absolute Percentage Error: average of |actual - forecast| / |actual| × 100\n\nInterpretation: Average error as a percentage. Scale-independent.\nBe cautious when actual values are near zero (can produce extreme values).\nThe implementation treats `|actual| < ZERO_TOLERANCE` as a zero-weight\nterm and excludes that sample from both the numerator and the count;\n[`ForecastMetrics::mape_effective_n`] records how many samples were\nused so callers can tell a low MAPE from a MAPE that was computed on\nvery few points. Very small non-zero actuals can still dominate the\nmetric. If `mape_effective_n == 0`, `mape` is `NaN`; prefer\n[`ForecastMetrics::smape`] in that case.\nLower is better."
+      "description": "Mean Absolute Percentage Error: average of |actual - forecast| / |actual| × 100\n\nInterpretation: Average error as a percentage. Scale-independent.\nBe cautious when actual values are near zero (can produce extreme values).\nThe implementation treats `|actual| < ZERO_TOLERANCE` as a zero-weight\nterm and excludes that sample from both the numerator and the count;\n[`ForecastMetrics::mape_effective_n`] records how many samples were\nused so callers can tell a low MAPE from a MAPE that was computed on\nvery few points. Very small non-zero actuals can still dominate the\nmetric. If `mape_effective_n == 0`, `mape` is `None`; prefer\n[`ForecastMetrics::smape`] in that case.\nLower is better.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
     },
     "mape_effective_n": {
       "description": "Number of samples that actually contributed to MAPE (i.e. had\n`|actual| >= ZERO_TOLERANCE`). Always `<= n`.",
@@ -64,15 +68,17 @@
       "description": "Root Mean Squared Error: sqrt(average((actual - forecast)²))\n\nInterpretation: Penalizes larger errors more heavily than MAE.\nSame units as the data. Always >= MAE.\nLower is better."
     },
     "smape": {
-      "$ref": "#/$defs/NonFiniteF64Wire",
-      "description": "Symmetric Mean Absolute Percentage Error:\n`mean( |a - f| / ((|a| + |f|) / 2) ) × 100`.\n\nAlways well-defined when at least one of `|a|` or `|f|` is positive,\nand always bounded in `[0, 200]`. Preferred over MAPE when the actual\nseries contains zeros or near-zeros. Terms where both `a` and `f`\nare within `ZERO_TOLERANCE` of zero are skipped."
+      "description": "Symmetric Mean Absolute Percentage Error:\n`mean( |a - f| / ((|a| + |f|) / 2) ) × 100`.\n\nBounded in `[0, 200]` for available observations. Preferred over MAPE\nwhen the actual series contains zeros or near-zeros. Terms whose\ndenominator is below `ZERO_TOLERANCE` are skipped. Returns `None` when\nevery denominator is below that threshold.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
     }
   },
   "required": [
     "mae",
-    "mape",
     "mape_effective_n",
-    "smape",
     "rmse",
     "n"
   ],

@@ -135,7 +135,7 @@
       "type": "string"
     },
     "weight": {
-      "description": "Weight of this dimension in the composite score (0.0 to 1.0).",
+      "description": "Finite, non-negative relative weight in the composite score; zero disables it.",
       "format": "double",
       "type": "number"
     },

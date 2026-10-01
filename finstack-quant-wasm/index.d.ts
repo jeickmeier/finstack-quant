@@ -2693,7 +2693,7 @@ export interface DayCountConstructor {
    * @param startEpochDays - Start date as days since 1970-01-01.
    * @param endEpochDays - End date as days since 1970-01-01.
    * @returns Signed calendar-day count from start to end.
-   * @throws Error - Throws a JavaScript exception if either epoch-day value is outside the representable date range.
+   * @throws Error - Throws a JavaScript exception if either epoch-day value is non-finite, fractional, or outside the representable date range.
    */
   calendarDays(startEpochDays: number, endEpochDays: number): bigint;
   /**
@@ -2830,12 +2830,12 @@ export interface DayCountContextConstructor {
    * core.DayCountContext.fromJson(ctx.toJson()).busBasis;  // 252
    * ```
    * @param calendarId - Registered holiday-calendar identifier (for example `"nyse"`) used by Bus/252; resolved when the context is used.
-   * @param frequency - Coupon frequency as tenor text (for example `"6M"`; use `tenor.toString()` for a `Tenor`), required by Act/Act ICMA and used by Act/365L.
-   * @param busBasis - Business-day denominator for Bus/252 (an integer in `0..=65535`, normally `252`).
-   * @param couponPeriod - Reference coupon period `[startEpochDays, endEpochDays]` (days since 1970-01-01) for Act/Act ICMA; the start must precede the end.
+   * @param frequency - Coupon frequency as tenor text (for example `"6M"`; use `tenor.toString()` for a `Tenor`), required by Act/Act ICMA and Act/365L.
+   * @param busBasis - Business-day denominator for Bus/252 (an integer in `1..=65535`, normally `252`).
+   * @param couponPeriod - `[startEpochDays, endEpochDays]` (days since 1970-01-01): the unadjusted regular reference period for Act/Act ICMA, or the full enclosing contractual coupon for Act/365L; the start must precede the end. ICMA endpoints must share the contractual nominal month grid, rather than adjusted payment dates.
    * @param endIsTerminationDate - Whether the accrual end is the instrument's termination date (30E/360 ISDA February-end handling); omitted means `false`.
    * @returns A new `DayCountContext`.
-   * @throws `TypeError` (kind `invalid_type`) for a mistyped argument or a `couponPeriod` that is not a two-element array of epoch days; `FinstackError` (kind `validation`) if `frequency` is not a tenor or the coupon period is inverted or out of range.
+   * @throws `TypeError` (kind `invalid_type`) for a mistyped argument or a `couponPeriod` that is not a two-element array of epoch days; `FinstackError` (kind `validation`) if `frequency` is not a tenor, the coupon period is inverted or out of range, or `busBasis` is zero.
    */
   new (
     calendarId?: string | null,
@@ -3858,7 +3858,7 @@ export interface VolCubeConstructor {
    * @param paramsFlat - Row-major flat array of SABR parameters: `[alpha0, beta0, rho0, nu0, shift0, alpha1, …]`. Length must equal `expiries.len() * tenors.len() * 5`. Pass `NaN` for the shift element of a node to omit the shift. The `nu` component is nonnegative; zero gives deterministic volatility.
    * @param forwards - Row-major forward rates, one per grid node.
    * @param interpolationMode - Interpolation across the expiry axis: `"vol"` or `"total_variance"`; omitted keeps the Rust `VolCube::from_grid` default (`"vol"`).
-   * @throws Error - Throws a JavaScript exception if an axis is empty, non-finite, non-positive, or not strictly increasing; the parameter or forward array has the wrong length; a forward is non-finite; any SABR node has invalid alpha, beta, rho, nu, or shift; or `interpolationMode` is neither `vol` nor `total_variance`.
+   * @throws Error - Throws a JavaScript exception if an axis is empty, non-finite, non-positive, or not strictly increasing; the parameter or forward array has the wrong length or its grid-size product overflows; a forward is non-finite; any SABR node has invalid alpha, beta, rho, nu, or shift; or `interpolationMode` is neither `vol` nor `total_variance`.
    */
   new (
     id: string,
@@ -4613,9 +4613,9 @@ export interface MarketContextConstructor {
   /**
    * Parse a market context from its canonical JSON representation.
    *
-   * @param json - Canonical MarketContext JSON (string or plain object), the same payload accepted by pricing `marketJson` arguments. Unknown fields are rejected.
+   * @param json - Canonical MarketContext JSON (string or plain object), the same payload accepted by pricing `marketJson` arguments, with the required `schema_version: 1`. Unknown fields are rejected.
    * @returns A `MarketContext` handle that can be reused across pricing calls; release it with free().
-   * @throws Error - Throws with kind `validation` when the JSON is malformed or does not match the MarketContext schema, and a `TypeError` when `json` is neither a string nor a plain object.
+   * @throws Error - Throws a `ContractValidationError` with kind `validation` when the JSON is malformed, exceeds the canonical byte or depth limits (`code` `limit_exceeded`), has a missing or unsupported schema version, or has invalid market objects, duplicate ids or unresolved curve references (`code` `report`, with the diagnostics on `error.report`), and a `TypeError` when `json` is neither a string nor a plain object.
    */
   fromJson(json: JsonInput): MarketContext;
 }
@@ -8160,10 +8160,10 @@ export interface CoreNamespace {
    * `L z ~ N(0, A)`. Accepts L as `n * n` row-major entries; only the lower
    * triangle is read and the upper triangle is assumed zero.
    * @returns Transformed vector `L z` as a `Float64Array` of length `n`.
-   * @param l - Lower-triangular Cholesky factor as a flat row-major array of n × n entries.
-   * @param n - Positive square-matrix dimension; flat arrays must contain n × n entries.
-   * @param z - Vector of length n to transform, typically independent standard-normal draws.
-   * @throws Error - Throws a JavaScript exception if `l` does not contain exactly `n * n` entries (including when `n * n` overflows) or `z` does not contain exactly `n` entries.
+   * @param l - Lower-triangular factor stored as `n * n` row-major entries; the upper triangle is ignored.
+   * @param n - Positive integral dimension in `1..=4294967295`, shared by the factor and vector.
+   * @param z - Vector of exactly `n` observations to transform, typically independent standard normals.
+   * @throws Error - Throws a `TypeError` if `n` is non-finite, fractional, or negative. Throws a JavaScript exception if `l` does not contain exactly `n * n` entries (including when `n * n` overflows) or `z` does not contain exactly `n` entries.
    */
   applyLowerTriangular(l: NumericArray, n: number, z: NumericArray): Float64Array;
   /**
@@ -8178,15 +8178,15 @@ export interface CoreNamespace {
    * @param matrix - Flat row-major finite entries of a symmetric positive-definite matrix.
    * @param n - Positive integral dimension in `1..=4294967295`; the input must have exactly `n * n` entries.
    * @returns Lower-triangular factor L as a flat row-major `Float64Array`.
-   * @throws Error - Throws a JavaScript exception if `matrix` does not contain exactly `n * n` entries (including when `n * n` overflows), or the matrix contains a non-finite value, is singular, or is not positive definite.
+   * @throws Error - Throws a `TypeError` if `n` is non-finite, fractional, or negative. Throws a JavaScript exception if `matrix` does not contain exactly `n * n` entries (including when `n * n` overflows), or the matrix contains a non-finite value, is numerically singular under that relative criterion, or is not positive definite.
    */
   choleskyDecomposition(matrix: NumericArray, n: number): Float64Array;
   /**
    * Solve a symmetric positive-definite linear system from a flat Cholesky factor.
-   * @param chol - Lower-triangular Cholesky factor as a flat row-major array of `b.length * b.length` entries.
-   * @param b - Right-hand-side vector of the linear system; its length is the system dimension.
+   * @param chol - Cholesky factor as a flat row-major array of `b.length * b.length` entries; consumed lower-triangular entries must be finite, and the upper triangle is ignored.
+   * @param b - Finite right-hand-side vector of the linear system; its length is the system dimension.
    * @returns Solution vector `x` of `L Lᵀ x = b`, with the same length as `b`.
-   * @throws Error - Throws a JavaScript exception if `chol` does not contain exactly `b.length * b.length` entries or a diagonal factor is singular.
+   * @throws Error - Throws a JavaScript exception if `chol` does not contain exactly `b.length * b.length` entries, a consumed lower-triangular or right-hand-side entry is non-finite, a diagonal factor is numerically singular under that relative criterion, or the solution overflows to a non-finite value.
    */
   choleskySolve(chol: NumericArray, b: NumericArray): Float64Array;
   /**
@@ -8276,9 +8276,9 @@ export interface CoreNamespace {
   normCdf(x: number): number;
   /**
    * Natural logarithm of the standard normal CDF, stable in the negative tail.
-   * @param x - Standard-normal threshold in standard-deviation units; infinities are accepted.
+   * @param x - Standard-normal threshold in standard-deviation units; infinities are accepted and NaN propagates.
    * @returns Natural log probability; negative infinity at negative infinity, zero at positive infinity, and NaN for NaN.
-   * @throws Does not throw; special floating-point inputs follow the documented limits.
+   * @throws `TypeError` if `x` is not a number; special floating-point inputs follow the documented limits.
    */
   logNormCdf(x: number): number;
   /**
@@ -10342,7 +10342,7 @@ export interface FactorRiskNamespace {
    * @param targetVarPct - Target share of portfolio VaR per position; non-empty targets must sum to one.
    * @param portfolioVar - Total portfolio VaR used to convert risk-budget shares into absolute amounts.
    * @param utilizationThreshold - Optional actual-to-target risk ratio that flags a budget breach; omit for the Rust default of 1.2.
-   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if actual or target arrays do not match the identifier count, a position id is duplicated, non-empty target shares do not sum to one within tolerance, or nonzero component risk is paired with zero `portfolioVar`.
+   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if actual or target arrays do not match the identifier count, a position id is duplicated, target shares are non-finite or outside [0, 1], non-empty target shares do not sum to one within 0.05, risk inputs are non-finite, the utilization threshold is non-finite or non-positive, or nonzero component risk is paired with zero `portfolioVar`.
    */
   evaluateRiskBudget(
     positionIds: string[],
@@ -10728,7 +10728,7 @@ export interface Copula extends WasmOwned {
    * calibrated clipped-normal loading distribution. Gaussian models have
    * zero tail dependence except at perfect correlation.
    * @returns Lower-tail dependence `λ_L` in `[0, 1]` for valid inputs; a non-finite `correlation` yields `NaN`.
-   * @param correlation - Asset correlation as a decimal in `[0, 1]`. Out-of-range values are clamped by the model, not rejected (Student-t clamps to its supported correlation range; Gaussian models ignore the value and return 0).
+   * @param correlation - Dependence correlation from -1 through 1 under the selected copula or recovery model.
    */
   tailDependence(correlation: number): number;
   /**
@@ -11501,10 +11501,10 @@ export interface CorrelationNamespace {
    * Gross input violations raise rather than being silently reshaped.
    * @returns Nearest valid correlation matrix as a flat row-major `Float64Array` of `n * n` entries.
    * @param matrix - Flat row-major `n * n` near-correlation matrix to project onto the correlation set.
-   * @param n - Positive square-matrix dimension; `matrix` must contain exactly `n * n` entries.
-   * @param maxIter - Maximum number of Higham nearest-correlation projection iterations; omitted uses Rust `NearestCorrelationOpts::default()` (200).
-   * @param tol - Positive convergence tolerance for the nearest-correlation projection; omitted uses Rust `NearestCorrelationOpts::default()` (`1e-10`).
-   * @throws Error - Throws a `validation` error if the flat length is not `n * n` or the input has a gross diagonal or symmetry violation, and a `computation` error if the projection does not converge within `maxIter` iterations at `tol`.
+   * @param n - Non-negative integer square-matrix dimension; `matrix` must contain exactly `n * n` entries, and an empty matrix uses zero.
+   * @param maxIter - Optional non-negative integer limit on Higham projection iterations; omitted uses Rust `NearestCorrelationOpts::default()` (200).
+   * @param tol - Optional positive convergence tolerance for the projection; omitted uses Rust `NearestCorrelationOpts::default()` (`1e-10`).
+   * @throws Error - Throws a `TypeError` if `n` or `maxIter` is non-finite, fractional, negative, or exceeds the WebAssembly `usize` range; a `validation` error if `n * n` overflows, the flat length is not `n * n` or the input has a gross diagonal or symmetry violation; and a `computation` error if the projection does not converge within `maxIter` iterations at `tol`.
    */
   nearestCorrelation(matrix: NumericArray, n: number, maxIter?: number, tol?: number): Float64Array;
   /**
@@ -11990,12 +11990,12 @@ export interface MonteCarloNamespace {
    * @param rho - Instantaneous correlation between the asset and variance shocks.
    * @param v0 - Initial instantaneous variance in the Heston stochastic-volatility model.
    * @param expiry - Time to option expiry in years on the model's annual time basis.
-   * @param numPaths - Number of simulated stochastic paths; omitted or `null` uses the Rust registry European-pricer default (100 000).
+   * @param numPaths - Integer number of independent path estimators in [2, 10000000]; each antithetic pair counts once. Omitted or `null` uses the Rust registry European-pricer default (100 000).
    * @param seed - Deterministic random-number seed (number or BigInt); omitted or `null` uses the Rust registry default seed, so results stay reproducible.
-   * @param numSteps - Optional time steps per simulated path; omitted uses the Rust registry default.
+   * @param numSteps - Optional positive integer number of time steps per simulated path; omitted uses the Rust registry default.
    * @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the Rust registry default currency.
    * @returns The Rust `MoneyEstimate` serde object: `mean` and `ci_95` as `{amount, currency}` money, plus `stderr`, `num_paths`, `num_simulated_paths` and the optional statistics (`null` when not captured).
-   * @throws Error - Throws a JavaScript exception if `currency` is unknown; embedded defaults cannot be loaded when `num_steps` is omitted; `rate` or `div_yield` is non-finite; `kappa`, `theta`, `vol_of_vol`, or `v0` is non-finite or non-positive; `rho` is outside `[-1, 1]`; the expiry, step count, path count, or computed discount factor fails validation; a simulated discounted payoff is non-finite; or the result cannot be serialized.
+   * @throws Error - Throws a JavaScript exception if `currency` is unknown; embedded defaults cannot be loaded when `num_steps` is omitted; `rate` or `div_yield` is non-finite; `kappa`, `theta`, `vol_of_vol`, or `v0` is non-finite or non-positive; `rho` is outside `[-1, 1]`; a count is fractional or exceeds the wasm32 integer range; the expiry, step count, path count, or computed discount factor fails validation; a simulated discounted payoff is non-finite; or the result cannot be serialized.
    */
   priceHestonCall(
     spot: number,
@@ -12025,12 +12025,12 @@ export interface MonteCarloNamespace {
    * @param rho - Instantaneous correlation between the asset and variance shocks.
    * @param v0 - Initial instantaneous variance in the Heston stochastic-volatility model.
    * @param expiry - Time to option expiry in years on the model's annual time basis.
-   * @param numPaths - Number of simulated stochastic paths; omitted or `null` uses the Rust registry European-pricer default (100 000).
+   * @param numPaths - Integer number of independent path estimators in [2, 10000000]; each antithetic pair counts once. Omitted or `null` uses the Rust registry European-pricer default (100 000).
    * @param seed - Deterministic random-number seed (number or BigInt); omitted or `null` uses the Rust registry default seed, so results stay reproducible.
-   * @param numSteps - Optional time steps per simulated path; omitted uses the Rust registry default.
+   * @param numSteps - Optional positive integer number of time steps per simulated path; omitted uses the Rust registry default.
    * @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the Rust registry default currency.
    * @returns The Rust `MoneyEstimate` serde object: `mean` and `ci_95` as `{amount, currency}` money, plus `stderr`, `num_paths`, `num_simulated_paths` and the optional statistics (`null` when not captured).
-   * @throws Error - Throws a JavaScript exception if `currency` is unknown; embedded defaults cannot be loaded when `num_steps` is omitted; `rate` or `div_yield` is non-finite; `kappa`, `theta`, `vol_of_vol`, or `v0` is non-finite or non-positive; `rho` is outside `[-1, 1]`; the expiry, step count, path count, or computed discount factor fails validation; a simulated discounted payoff is non-finite; or the result cannot be serialized.
+   * @throws Error - Throws a JavaScript exception if `currency` is unknown; embedded defaults cannot be loaded when `num_steps` is omitted; `rate` or `div_yield` is non-finite; `kappa`, `theta`, `vol_of_vol`, or `v0` is non-finite or non-positive; `rho` is outside `[-1, 1]`; a count is fractional or exceeds the wasm32 integer range; the expiry, step count, path count, or computed discount factor fails validation; a simulated discounted payoff is non-finite; or the result cannot be serialized.
    */
   priceHestonPut(
     spot: number,
@@ -14514,8 +14514,8 @@ export interface CashflowsNamespace {
    * Extract dated flows from a cashflow schedule JSON string.
    *
    * @param scheduleJson - JSON-encoded `CashFlowSchedule`.
-   * @returns JSON array of settlement cash entries. PIK and `DefaultedNotional` state rows are omitted; parse the full schedule JSON when flow classification is required.
-   * @throws If the schedule JSON is malformed or the schedule fails `CashFlowSchedule` validation (kind `"validation"`).
+   * @returns JSON array of settlement cash entries. PIK and `DefaultedNotional` state rows and zero-cash principal markers are omitted. Native currencies are retained without conversion or netting; parse the full schedule JSON when flow classification is required.
+   * @throws If the schedule JSON, flow amounts, accrual metadata, row currencies, or dates are invalid, or a single-currency principal path fails balance reconciliation (kind `"validation"`). Composite principal paths in multiple currencies receive structural validation without scalar balance reconciliation.
    */
   datedFlowsJson(scheduleJson: JsonInput): string;
 
@@ -22428,7 +22428,7 @@ export interface ValuationInstrumentsNamespace {
    * Bare instrument payloads are rejected. Returns canonical re-serialized JSON.
    * @returns Canonical instrument envelope JSON after schema validation.
    * @param json - Required `finstack_quant.instrument/1` envelope.
-   * @param metricPricingOverrides - Serialized metric-pricing override object merged before native instrument validation; omit it, or pass `null` or `undefined`, to keep the envelope configuration as-is.
+   * @param metricPricingOverrides - Serialized JSON object patch applied before native validation. Only supplied fields replace stored overrides; `{}` preserves them. Supplied `bump_config` fields merge into the stored object. Explicit `null` clears nullable fields to their Rust fallback. Omitting the argument or passing JavaScript `null`/`undefined` retains the envelope configuration.
    * @throws Error - Throws a JavaScript exception if the instrument or override JSON is malformed, the merged payload is not a canonical v1 instrument envelope, instrument validation fails, or the envelope cannot be canonically serialized.
    */
   validateInstrumentJson(json: JsonInput, metricPricingOverrides?: JsonInput | null): string;
@@ -24085,9 +24085,9 @@ export interface SabrSmile extends WasmOwned {
    * `butterfly_violations`, `monotonicity_violations`), the same shape Python
    * `SabrSmile.validate_no_arbitrage` returns.
    * @returns The Rust `ArbitrageValidationResult` for the supplied strike grid.
-   * @param strikes - Ascending option strikes used to test the smile for static arbitrage.
-   * @param r - Continuously compounded risk-free rate (decimal) that discounts the forward-based Black call prices compared against the 1e-6 tolerance.
-   * @throws Error - Throws a JavaScript exception if volatility generation fails for the stored smile and supplied strikes, or the result cannot be converted to a JavaScript value.
+   * @param strikes - Finite, strictly ascending strikes with arbitrary spacing; convexity uses the actual strike distances.
+   * @param r - Finite continuously compounded risk-free rate (decimal) that discounts the forward-based Black call prices compared against the 1e-6 tolerance.
+   * @throws Error - Throws a JavaScript exception if volatility generation fails for the stored smile and supplied strikes, strikes are non-finite or not strictly ascending, the rate is non-finite, call prices are non-finite, or the result cannot be converted to a JavaScript value.
    */
   validateNoArbitrage(strikes: NumericArray, r: number): ArbitrageValidationResult;
   /**
@@ -28614,7 +28614,7 @@ export interface ModelsNamespace {
    * @param numFixings - Non-negative integer number of equally spaced averaging observations, at most 4294967295; zero selects continuous monitoring.
    * @param averaging - Asian averaging convention: `"arithmetic"` (default) or `"geometric"`.
    * @param isCall - Whether to value a call (`true`, default) or put (`false`).
-   * @throws Error - Throws a JavaScript exception if `numFixings` is not a positive whole number, `averaging` is not `"arithmetic"` or `"geometric"`, or the supplied model inputs produce a non-finite option price.
+   * @throws Error - Throws a JavaScript exception if `numFixings` is not a non-negative whole number, `averaging` is not `"arithmetic"` or `"geometric"`, or the supplied model inputs produce a non-finite option price.
    */
   asianOptionPrice(
     spot: number,
@@ -28731,8 +28731,8 @@ export interface ModelsNamespace {
    * @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%; must be positive.
    * @param expiry - Time to option expiry in years.
    * @param isCall - Whether to value a call (`true`) or put (`false`).
-   * @param nTerms - Optional number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
-   * @throws Error - Throws a `validation` error if `nTerms` is outside `1..=65536` or `vol` is not positive, and a `computation` error if the model produces a degenerate or invalid COS truncation range, a non-finite characteristic-function value or forward moment, or a non-finite option price.
+   * @param nTerms - Optional positive integer number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
+   * @throws Error - Throws if spot, strike, expiry, or volatility is not finite and positive, or rates/carry are non-finite. Throws a `validation` error if `nTerms` is outside `1..=65536` or `vol` is not positive, and a `computation` error if the model produces a degenerate or invalid COS truncation range, a non-finite characteristic-function value or forward moment, or a non-finite option price.
    */
   bsCosPrice(
     spot: number,
@@ -28759,8 +28759,8 @@ export interface ModelsNamespace {
    * @param nu - Positive finite variance rate of the Gamma time change, in years; larger values increase tail thickness.
    * @param expiry - Time to option expiry in years.
    * @param isCall - Whether to value a call (`true`) or put (`false`).
-   * @param nTerms - Optional number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
-   * @throws Error - Throws a `validation` error if `nTerms` is outside `1..=65536`, and a `computation` error if the model produces a degenerate or invalid COS truncation range, a non-finite characteristic-function value or forward moment, or a non-finite option price.
+   * @param nTerms - Optional positive integer number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
+   * @throws Error - Throws if spot, strike, expiry, sigma, or nu is not finite and positive, rates/carry/theta are non-finite, or the VG martingale condition fails. Throws a `validation` error if `nTerms` is outside `1..=65536`, and a `computation` error if the model produces a degenerate or invalid COS truncation range, a non-finite characteristic-function value or forward moment, or a non-finite option price.
    */
   vgCosPrice(
     spot: number,
@@ -28790,8 +28790,8 @@ export interface ModelsNamespace {
    * @param lambda - Annual jump-arrival intensity in the Merton jump-diffusion model.
    * @param expiry - Time to option expiry in years.
    * @param isCall - Whether to value a call (`true`) or put (`false`).
-   * @param nTerms - Optional number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
-   * @throws Error - Throws a `validation` error if `nTerms` is outside `1..=65536`, and a `computation` error if the model produces a degenerate or invalid COS truncation range, a non-finite characteristic-function value or forward moment, or a non-finite option price.
+   * @param nTerms - Optional positive integer number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
+   * @throws Error - Throws if spot, strike, or expiry is not finite and positive, rates/carry or log-jump mean are non-finite, volatility/intensity is negative or non-finite, or the jump compensator overflows. Throws a `validation` error if `nTerms` is outside `1..=65536`, and a `computation` error if the model produces a degenerate or invalid COS truncation range, a non-finite characteristic-function value or forward moment, or a non-finite option price.
    */
   mertonJumpCosPrice(
     spot: number,
@@ -28846,7 +28846,7 @@ export interface CalibrationNamespace {
    * Execute a calibration envelope and return its fitted market and reports.
    * @returns Calibration result including the materialized market and per-step reports.
    * @param envelope - `CalibrationEnvelope` as a plain object or its JSON string: the plan (steps, quote sets, settings) plus `market_data` and optional `prior_market`.
-   * @throws Error - Throws a `CalibrationEnvelopeError` if the envelope is malformed or violates the calibration schema or static plan contract (fail-fast: first static error; `dryRun` lists every static error), market context construction or a calibration step fails, a solver does not converge, or the result envelope cannot be converted to a JavaScript value.
+   * @throws Error - Throws a `CalibrationEnvelopeError` if the envelope is malformed or violates the calibration schema or static plan contract (fail-fast: first static error; `dryRun` lists every static error), solver configuration is invalid, market context construction or a calibration step fails, a solver does not converge, or the result envelope cannot be converted to a JavaScript value.
    */
   calibrate(envelope: CalibrationEnvelope | string): CalibrationResultEnvelope;
   /**
@@ -28876,7 +28876,7 @@ export interface CalibrationNamespace {
    * @param market - Reusable market handle containing discount and swaption-volatility inputs.
    * @param asOf - ISO-8601 valuation date.
    * @returns Positive finite LMM base volatility.
-   * @throws Error - Throws if the envelope is not a Bermudan swaption, the date or market inputs are invalid, or the Rebonato calibration cannot be completed.
+   * @throws Error - The JavaScript facade rejects object inputs containing non-finite numbers with `TypeError` before serialization. Explicit JSON strings are parsed in Rust. Throws if the envelope is not a Bermudan swaption, the date or market inputs are invalid, or the Rebonato calibration cannot be completed.
    */
   calibrateBermudanLmmBaseVol(
     instrument: Record<string, unknown> | string,
@@ -31957,7 +31957,7 @@ export interface StatementsAnalyticsNamespace {
    * @param modelJson - Financial-model specification JSON.
    * @param wacc - Baseline weighted average cost of capital in decimal form (0.10 = 10%).
    * @param terminalValueJson - Terminal-value spec JSON selecting whether growth or the exit multiple is shocked.
-   * @param ufcfNode - Node identifier holding unlevered free cash flow for the forecast periods; omitted uses the canonical "ufcf" node.
+   * @param ufcfNode - Node identifier holding monetary unlevered free cash flow in model currency for the forecast periods; omitted uses the canonical "ufcf" node. Gordon Growth / H-Model terminal cash flow requires a complete contiguous calendar year at the forecast end.
    * @param netDebtOverride - Optional net debt in model currency; otherwise requires debt and cash in that currency from a period ending on or before valuation.
    * @param optionsJson - Optional Rust `DcfOptions` JSON; every field is optional and a missing one takes its default: `mid_year_convention` (false), `wacc_sensitivity_bump` (0.01 = +/-100 bp), `wacc_denominator_epsilon` (0.005), `max_stable_growth_rate` (0.05), `exit_multiple_bump` (`{"absolute": 1.0}` turns or `{"relative": 0.10}`), `exit_multiple_metric_node` (flow node whose complete trailing year supplies the exit-multiple metric), `equity_bridge`, `shares_outstanding`, `valuation_discounts`, `discount_curve_id`. Unknown keys are rejected.
    * @param marketJson - Optional canonical market-context JSON used for statement evaluation, not WACC discounting.
@@ -33360,8 +33360,8 @@ export interface PortfolioNamespace {
    *
    * Binds Rust `mwr_xirr_from_cashflows` (Act/365F).
    * @returns Annualized money-weighted return as a decimal.
-   * @param cashflowsJson - JSON array of `{ date, amount }` flows from the investor's cash account: contributions negative, distributions and terminal value positive.
-   * @throws Error - Throws a JavaScript exception if `cashflowsJson` is malformed, contains an invalid date or insufficient cash flows for XIRR, or the numerical root cannot be found.
+   * @param cashflowsJson - JSON array of `{ date, amount }` flows from the investor's cash account (contributions negative, distributions and terminal value positive). Dates are sorted and equal-date amounts netted; remaining nonzero flows must change sign exactly once.
+   * @throws Error - Throws a JavaScript exception if `cashflowsJson` is malformed, contains an invalid date or insufficient net cash flows, the nonzero net flows do not change sign exactly once, or no sufficiently accurate finite return greater than -1 can be found.
    */
   mwrXirr(cashflowsJson: JsonInput): number;
   /**
@@ -33698,7 +33698,7 @@ export interface PortfolioNamespace {
    * object carrying `confidence` for `var` / `expected_shortfall`. The Python
    * `RiskDecomposition.measure` getter returns the same value.
    * @returns Returns a structured `RiskDecomposition` object.
-   * @param sensitivitiesJson - Canonical sensitivity-matrix JSON `{ base_currency, position_ids, factor_ids, data }` with one `data` row per position and one entry per factor; unknown keys are rejected.
+   * @param sensitivitiesJson - Canonical factor-sensitivity JSON with required `base_currency`, ordered `position_ids`/`factor_ids`, and nested `data[position][factor]` rows; `JSON.stringify` the result of `computeFactorSensitivities`. Python `SensitivityMatrix.to_json()` uses the same contract. Unknown fields, inconsistent dimensions, and non-finite entries are rejected.
    * @param covarianceJson - Factor covariance-matrix JSON aligned with the supplied sensitivities.
    * @param riskMeasureJson - `RiskMeasure` wire value selecting the decomposition metric: `"variance"`, `"volatility"`, an object such as `{ var: { confidence: 0.99 } }`, or the same value as JSON text; omit for `"variance"`.
    * @throws Error - Throws a JavaScript exception (`kind` `validation`) if any JSON input is malformed or has unknown keys; `base_currency` is not an ISO-4217 code; the sensitivity rows do not match `position_ids` / `factor_ids`; sensitivity and covariance factor axes disagree; the covariance matrix or risk measure is invalid; or decomposition produces invalid variance or another non-finite value.
@@ -34278,10 +34278,10 @@ export interface ScenariosNamespace {
    * @param marketJson - JSON-serialized `MarketContext`.
    * @param asOf - Valuation date (ISO 8601).
    * @param scenarioJson - JSON-serialized `ScenarioSpec`.
-   * @param method - Attribution method: "parallel", "waterfall", "metrics_based", "taylor". Omit for the Rust default (`AttributionMethod::default()`, currently "parallel").
+   * @param method - Attribution method: "parallel", "waterfall", "metrics_based", or "taylor". Omit for the Rust default (`AttributionMethod::default()`, currently "parallel"). "metrics_based" calculates the canonical registry's applicable subset of default attribution metrics at the opening snapshot; metrics unsupported by the instrument type are omitted, while failures calculating selected metrics throw.
    * @param configJson - Optional FinstackConfig JSON for horizon analysis; omit to use defaults.
-   * @param calendarId - Optional holiday calendar (e.g. "nyse", "target") used to business-day adjust `time_roll_forward` targets under `business_days` mode. Omit for a weekends-only calendar; unknown identifiers throw.
-   * @returns The serde `HorizonResult` (`attribution`, `initial_value` and `terminal_value` as exact-decimal Money objects, `horizon_days`, null without a time roll, and `scenario_report`) plus `summary`: the Rust-computed `total_return`, `annualized_return`, `currency` and `factor_contributions` that Python exposes as `HorizonResult` accessors. Undefined returns (currency mismatch, non-positive initial value) are null here and NaN in Python.
+   * @param calendarId - Optional built-in holiday calendar (e.g. "nyse", "target") used to business-day adjust `time_roll_forward` targets under `business_days` mode. Omit for a weekends-only calendar; unknown identifiers throw.
+   * @returns The serde `HorizonResult` (`attribution`, `initial_value` and `terminal_value` as exact-decimal Money objects, `horizon_days`, null without a time roll, and `scenario_report`) plus `summary`: the Rust-computed `total_return`, `annualized_return`, `currency` and `factor_contributions` that Python exposes as `HorizonResult` accessors. Rust computes every derived value. Undefined derived values are null here and NaN in Python: total return and factor contributions require positive initial value and matching P&L currency; annualization also requires a positive horizon and total return at or above -100%.
    * @throws Error - Rejects a malformed or invalid scenario; malformed instrument, market, or configuration JSON; an invalid ISO `as_of` date; an unsupported attribution `method`; an unknown `calendar_id`; invalid, unsupported, or unresolved scenario operations; missing market data; pricing or attribution failures; or failure to serialize the horizon result to JavaScript.
    */
   computeHorizonReturn(

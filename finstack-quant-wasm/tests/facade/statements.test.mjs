@@ -51,8 +51,23 @@ test('statements model ingestion rejects node IDs that alias another forecast ca
     values: { '2025Q1': 40000.0 },
   };
   const payload = JSON.stringify(model);
-  for (const load of [statements.validateFinancialModelJson, statements.evaluateModel]) {
-    assert.throws(() => load(payload), /does not match its embedded node_id/);
+  const evaluator = new statements.Evaluator();
+  try {
+    for (const load of [
+      statements.validateFinancialModelJson,
+      (json) => evaluator.evaluate(json),
+    ]) {
+      assert.throws(
+        () => load(payload),
+        (error) => {
+          assert.equal(error.kind, 'validation');
+          assert.match(error.message, /does not match its embedded node_id/);
+          return true;
+        }
+      );
+    }
+  } finally {
+    evaluator.free();
   }
 });
 

@@ -1,7 +1,7 @@
 {
   "$defs": {
     "BalanceSheetArticulation": {
-      "description": "Verifies that Assets = Liabilities + Equity for every period.",
+      "description": "Verifies that Assets = Liabilities + Equity for every period.\n\nAll configured operands must have compatible scalar/monetary units and one\ncurrency. Execution rejects incompatible units or invalid numeric tolerances;\nit performs no FX conversion.",
       "properties": {
         "assets_nodes": {
           "description": "Node IDs whose values represent total assets.",
@@ -130,7 +130,7 @@
       ]
     },
     "CashReconciliation": {
-      "description": "Checks Cash(t) = Cash(t−1) + TotalCF(t) and optionally\nTotalCF = CFO + CFI + CFF.",
+      "description": "Checks Cash(t) = Cash(t−1) + TotalCF(t) and optionally\nTotalCF = CFO + CFI + CFF.\n\nEvery configured operand must have the same scalar/monetary units and\ncurrency. Execution rejects incompatible units or non-finite/negative\ntolerances; it performs no FX conversion.",
       "properties": {
         "cash_balance_node": {
           "$ref": "#/$defs/NodeId",
@@ -349,7 +349,7 @@
           "description": "Severity assigned to findings when the formula fails."
         },
         "tolerance": {
-          "description": "Numeric tolerance for floating-point comparisons.",
+          "description": "Finite, nonnegative absolute residual bound in the formula's result units.\nWhen present, the formula passes when its absolute result is at most\nthis bound. When absent, the formula is a predicate and any finite\nnonzero result passes.",
           "format": "double",
           "type": [
             "number",
@@ -368,7 +368,7 @@
       "type": "object"
     },
     "MissingValueCheck": {
-      "description": "Flags required nodes that lack values in applicable periods.\n\n**Advisory-only**: findings are `Severity::Warning`, so\n`CheckResult::passed` is always `true`; the check surfaces gaps without\nfailing a pipeline gate.",
+      "description": "Flags required nodes that lack values in applicable periods.\n\nMissing actual observations produce `Severity::Error` and fail the check.\nMissing forecast observations produce advisory `Severity::Warning` findings.",
       "properties": {
         "required_nodes": {
           "description": "Nodes that must have values in every in-scope period.",
@@ -427,7 +427,7 @@
       ]
     },
     "RetainedEarningsReconciliation": {
-      "description": "Checks that retained earnings flow correctly across periods:\nRE(t) = RE(t−1) + NI(t) − Dividends(t) ± Adjustments(t).\n\n# Sign convention\n\n* `net_income_node` carries the [`SignConventionPolicy::InflowPositive`]\n  convention — positive values increase RE (profit), negative values\n  decrease it (loss). No validation is emitted for NI since both signs\n  are meaningful.\n* `dividends_node` carries the [`SignConventionPolicy::MagnitudePositive`]\n  convention by default — the formula subtracts dividends explicitly.\n* `other_adjustments` carry\n  [`SignConventionPolicy::InflowPositive`] — they are signed amounts\n  added directly.",
+      "description": "Checks that retained earnings flow correctly across periods:\nRE(t) = RE(t−1) + NI(t) − Dividends(t) ± Adjustments(t).\n\nEvery configured balance, flow, and adjustment must use the same\nscalar/monetary units and currency. Execution rejects incompatible units or\ninvalid numeric tolerances; it performs no FX conversion.\n\n# Sign convention\n\n* `net_income_node` carries the [`SignConventionPolicy::InflowPositive`]\n  convention — positive values increase RE (profit), negative values\n  decrease it (loss). No validation is emitted for NI since both signs\n  are meaningful.\n* `dividends_node` carries the [`SignConventionPolicy::MagnitudePositive`]\n  convention by default — the formula subtracts dividends explicitly.\n* `other_adjustments` carry\n  [`SignConventionPolicy::InflowPositive`] — they are signed amounts\n  added directly.",
       "properties": {
         "dividends_node": {
           "anyOf": [

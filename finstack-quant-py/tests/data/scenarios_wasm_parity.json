@@ -987,10 +987,10 @@
     }
    ]
   },
-  "explain": "Horizon Total Return: 0.2378%\nAnnualized: 2.8357%\nHorizon: 31 days\nInitial Value: USD 999876.60\nTerminal Value: USD 1002254.06\nTotal P&L: USD 2377.46\n  Carry: USD 3407.70\n  Rates: USD -1030.24\n  Credit: USD 0.00\n  Residual: USD 0.00\n",
+  "explain": "Horizon Total Return: 0.2390%\nAnnualized: 2.8505%\nHorizon: 31 days\nInitial Value: USD 999876.59\nTerminal Value: USD 1002266.27\nTotal P&L: USD 2389.67\n  Carry: USD 3419.93\n  Rates: USD -1030.25\n  Credit: USD 0.00\n  Residual: USD 0.00\n",
   "factor_contribution": {
-   "carry": 0.003408116341277966,
-   "rates_curves": -0.0010303679309610666,
+   "carry": 0.0034203488888837974,
+   "rates_curves": -0.0010303819209355747,
    "credit_curves": 0.0,
    "inflation_curves": 0.0,
    "correlations": 0.0,

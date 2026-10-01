@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
-      "bytes": 1115568,
+      "bytes": 1125089,
       "kind": "output",
       "path": "schemas/scenarios/1/application_envelope.schema.json",
       "summary": "Scenario application result: mutated market, model and instruments with the report.",
@@ -11,7 +11,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/scenarios/1/horizon_result.schema.json",
-      "bytes": 119094,
+      "bytes": 119320,
       "kind": "output",
       "path": "schemas/scenarios/1/horizon_result.schema.json",
       "summary": "Horizon total return: factor-decomposed P&L with scenario context.",
@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/scenarios/1/scenario.schema.json",
-      "bytes": 102364,
+      "bytes": 103280,
       "kind": "input",
       "path": "schemas/scenarios/1/scenario.schema.json",
       "summary": "Ordered shock and roll operations over market, statement and valuation targets.",

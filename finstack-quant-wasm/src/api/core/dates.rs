@@ -51,7 +51,7 @@ impl JsDayCountContext {
     ///   `tenor.toString()` for a `Tenor`), required by Act/Act ICMA and
     ///   Act/365L.
     /// * `bus_basis` - Business-day denominator for Bus/252 (an integer in
-    ///   `0..=65535`, normally `252`).
+    ///   `1..=65535`, normally `252`).
     /// * `coupon_period` - `[startEpochDays, endEpochDays]` (days since
     ///   1970-01-01): the unadjusted regular reference period for Act/Act ICMA,
     ///   or the full enclosing contractual coupon for Act/365L; the start must
@@ -64,8 +64,8 @@ impl JsDayCountContext {
     /// @returns A new `DayCountContext`.
     /// @throws `TypeError` (kind `invalid_type`) for a mistyped argument or a
     /// `couponPeriod` that is not a two-element array of epoch days;
-    /// `FinstackError` (kind `validation`) if `frequency` is not a tenor or
-    /// the coupon period is inverted or out of range.
+    /// `FinstackError` (kind `validation`) if `frequency` is not a tenor, the
+    /// coupon period is inverted or out of range, or `busBasis` is zero.
     ///
     /// @example
     /// ```javascript

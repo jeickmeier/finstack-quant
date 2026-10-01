@@ -384,7 +384,10 @@ export type MarketDatum =
              */
             maturity: valuations.DateWire;
             /**
-             * Volatility quoting convention.
+             * Volatility quoting convention. Shifted Black quotes require a
+             * `ShiftedLognormal` calibration plan supplying their displacement;
+             * Hull-White calibration rejects them because its quote contract
+             * carries no displacement.
              */
             quote_type: VolQuoteType;
             /**
@@ -415,7 +418,9 @@ export type MarketDatum =
              */
             is_cap: boolean;
             /**
-             * Volatility quoting convention.
+             * Volatility quoting convention. Hull-White calibration accepts
+             * normal and unshifted Black quotes; it rejects shifted Black
+             * because this quote does not carry a displacement.
              */
             quote_type: VolQuoteType;
             /**
@@ -532,6 +537,10 @@ export type MarketDatum =
        * Observations as (date, value) pairs
        */
       observations: [unknown, unknown][];
+      /**
+       * Explicit monthly observation availability; no release dates are inferred.
+       */
+      publication_dates?: InflationPublicationWire[];
       /**
        * Optional seasonality factors
        *
@@ -728,7 +737,7 @@ export type SwaptionConventionId = string;
  * quote type lets consumers enforce their convention via
  * [`VolSurface::require_quote_type`].
  */
-export type VolQuoteType = "black_lognormal" | "normal";
+export type VolQuoteType = "black_lognormal" | "shifted_black_lognormal" | "normal";
 /**
  * Identifier for cross-currency swap market conventions (e.g., "EUR/USD-XCCY").
  */
@@ -801,11 +810,12 @@ export type SeriesInterpolation = "step" | "linear";
  */
 export type InflationInterpolation = "step" | "linear";
 /**
- * Publication lag for inflation index reference dates.
+ * Contractual observation lag for inflation index reference dates.
  *
  * Inflation indices are published with a delay (typically 2-4 weeks). Securities
- * using these indices incorporate a lag to ensure the reference index is published
- * by the settlement date.
+ * using these indices incorporate an observation lag to ensure the reference
+ * index is published by settlement. This lag does not specify the actual
+ * publication date; use [`InflationIndex::with_publication_dates`] for that.
  *
  * # Standard Lags by Market
  *
@@ -1077,25 +1087,14 @@ export type CalibrationStep =
        */
       notional?: number;
       /**
-       * Observation lag (e.g. "3M").
+       * Month observation lag (e.g. "3M"); "none" means zero months.
+       * Day-based lags are unsupported because output curves carry month lags.
        *
        * Overrides the quote convention's lag and must match any supplied index
        * lag. The same lag determines the output curve's reference-date origin and the dates
        * of the CPI observations consumed by calibration instruments.
        */
       observation_lag: string;
-      /**
-       * Optional seasonal adjustment factors for deseasonalizing CPI observations.
-       *
-       * When provided, the calibrator will:
-       * 1. Deseasonalize input CPI levels using the monthly factors
-       * 2. Fit the smooth zero-coupon curve to deseasonalized levels
-       * 3. Reseasonalize the output CPI path
-       *
-       * Monthly adjustments are additive to log CPI level. They should approximately
-       * sum to zero over 12 months.
-       */
-      seasonal_factors?: SeasonalFactors | null;
     }
   | {
       /**
@@ -1192,7 +1191,8 @@ export type CalibrationStep =
        */
       discount_curve_id: valuations.Id;
       /**
-       * Optional day count convention for fixed leg calculations.
+       * Optional day count convention for fixed-leg coupon accrual only.
+       * Option expiry and variance always use ACT/365F.
        */
       fixed_day_count?: valuations.DayCount | null;
       /**
@@ -1223,7 +1223,8 @@ export type CalibrationStep =
        */
       swap_index?: valuations.Id | null;
       /**
-       * Target expiry times (in years) for the surface grid.
+       * Target option expiry times in ACT/365F years from `base_date`, independent
+       * of the fixed-leg coupon day-count convention.
        */
       target_expiries?: number[];
       /**
@@ -1296,7 +1297,8 @@ export type CalibrationStep =
       index_id: string;
       kind: "base_correlation";
       /**
-       * Maturity of the tranches in years.
+       * Finite positive CDS tenor in years, representable as a whole number of months.
+       * Quotes must resolve to the same CDS convention maturity as this tenor.
        */
       maturity_years: number;
       /**
@@ -1435,6 +1437,12 @@ export type CalibrationStep =
        */
       forward_curve_id: valuations.Id;
       /**
+       * Term-rate index defining settlement, reset tenor, accrual day count,
+       * calendar, business-day adjustments, and payment lag for caplets.
+       * Its currency must match `currency`; overnight indices are unsupported.
+       */
+      index_id: valuations.Id;
+      /**
        * Optional initial guess for mean reversion κ when solving both κ and σ.
        */
       initial_kappa?: number | null;
@@ -1443,10 +1451,6 @@ export type CalibrationStep =
        */
       initial_sigma?: number | null;
       kind: "cap_floor_hull_white";
-      /**
-       * Payment frequency used to decompose quoted caps/floors into caplets.
-       */
-      payment_frequency?: SwapFrequency;
       /**
        * Scalar or expiry-bootstraped piecewise short-rate volatility calibration.
        */
@@ -1470,8 +1474,10 @@ export type CalibrationStep =
        */
       discount_curve_id?: valuations.Id | null;
       /**
-       * Optional continuous dividend yield; defaults to the market scalar
-       * `"<underlying_ticker>-DIVYIELD"` or zero.
+       * Optional continuous dividend yield in decimal units. Without an override,
+       * uses the unitless market scalar `"<underlying_ticker>-DIVYIELD"`. When a
+       * discount curve is supplied, a matching cash-dividend schedule may supply
+       * carry instead; otherwise an explicit yield is required.
        */
       dividend_yield_override?: number | null;
       kind: "svi_surface";
@@ -1552,7 +1558,7 @@ export type CalibrationStep =
       interpolation?: InterpStyle;
       kind: "xccy_basis";
       /**
-       * Calibration method to use.
+       * Sequential bootstrap method. `GlobalSolve` is unsupported and rejected.
        */
       method?: CalibrationMethod;
     }
@@ -1716,7 +1722,8 @@ export type SwaptionVolConvention =
   | {
       shifted_lognormal: {
         /**
-         * Shift amount for negative rate handling
+         * Finite positive additive shift in decimal rate units, applied to
+         * both forwards and strikes and retained in calibrated artifacts.
          */
         shift: number;
         [k: string]: unknown;
@@ -1734,11 +1741,19 @@ export type SwaptionVolConvention =
  *
  * - **`None`**: plain tenor stepping from the schedule boundaries (default).
  * - **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates
- *   for rate, currency, and equity index futures).
+ *   for rate, currency, and equity index futures). Cashflow schedules retain
+ *   the contractual maturity as a short final stub when it is off-grid.
  * - **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll
  *   dates). When the start date is not itself a roll date, the first period
  *   accrues from the roll date immediately **preceding** the start (standard
  *   front accrual per the ISDA Big Bang Protocol, April 2009).
+ *   Interior coupon or payment-program windows start at their declared
+ *   boundary; front accrual is applied only once at the instrument start.
+ *
+ * Explicit roll grids cannot be combined with `end_of_month`. ACT/ACT ICMA
+ * supports the CDS twentieth grid; third-Wednesday IMM with ACT/ACT ICMA is
+ * rejected because the available ICMA reference calculation requires nominal
+ * month-grid coupons.
  *
  * # References
  *
@@ -1746,12 +1761,6 @@ export type SwaptionVolConvention =
  * - CME IMM date rules (third Wednesday of the contract month)
  */
 export type RollRule = "none" | "imm" | "cds_imm";
-/**
- * Number of coupon payments per year for the underlying swap in HW1F calibration.
- *
- * USD swaps are semi-annual (2), EUR swaps are annual (1).
- */
-export type SwapFrequency = "annual" | "semi_annual" | "quarterly";
 /**
  * Parameters for Hull-White 1-factor calibration to cap/floor volatility quotes.
  */
@@ -1872,6 +1881,10 @@ export type PriorMarketObject =
        * Exact typed calibration replay recipe.
        */
       rate_calibration?: RateCalibrationRecipe | null;
+      /**
+       * Canonical source interpolation and accumulated continuous transformations.
+       */
+      transform?: DiscountCurveTransform | null;
     }
   | {
       /**
@@ -1921,6 +1934,10 @@ export type PriorMarketObject =
        * Index tenor in years
        */
       tenor: number;
+      /**
+       * Canonical source interpolation and cumulative continuous transformations.
+       */
+      transform?: ForwardCurveTransform | null;
     }
   | {
       /**
@@ -2135,6 +2152,10 @@ export type PriorMarketObject =
       spot_price?: number | null;
     }
   | {
+      /**
+       * Additive displacements in forward/strike units, one per expiry for shifted Black quotes.
+       */
+      displacements?: number[] | null;
       /**
        * Expiry times in years
        */
@@ -2535,6 +2556,10 @@ export type CurveState =
        * Exact typed calibration replay recipe.
        */
       rate_calibration?: RateCalibrationRecipe | null;
+      /**
+       * Canonical source interpolation and accumulated continuous transformations.
+       */
+      transform?: DiscountCurveTransform | null;
       type: "discount";
     }
   | {
@@ -2584,6 +2609,10 @@ export type CurveState =
        * Index tenor in years
        */
       tenor: number;
+      /**
+       * Canonical source interpolation and cumulative continuous transformations.
+       */
+      transform?: ForwardCurveTransform | null;
       type: "forward";
     }
   | {
@@ -2988,6 +3017,12 @@ export type EnvelopeError =
       target: string;
       [k: string]: unknown;
     };
+/**
+ * Number of coupon payments per year for the underlying swap in HW1F calibration.
+ *
+ * USD swaps are semi-annual (2), EUR swaps are annual (1).
+ */
+export type SwapFrequency = "annual" | "semi_annual" | "quarterly";
 /**
  * Single-name CDS par-spread or upfront quote.
  */
@@ -3441,7 +3476,10 @@ export type MarketQuote =
              */
             maturity: valuations.DateWire;
             /**
-             * Volatility quoting convention.
+             * Volatility quoting convention. Shifted Black quotes require a
+             * `ShiftedLognormal` calibration plan supplying their displacement;
+             * Hull-White calibration rejects them because its quote contract
+             * carries no displacement.
              */
             quote_type: VolQuoteType;
             /**
@@ -3472,7 +3510,9 @@ export type MarketQuote =
              */
             is_cap: boolean;
             /**
-             * Volatility quoting convention.
+             * Volatility quoting convention. Hull-White calibration accepts
+             * normal and unshifted Black quotes; it rejects shifted Black
+             * because this quote does not carry a displacement.
              */
             quote_type: VolQuoteType;
             /**
@@ -3826,25 +3866,14 @@ export type StepParams =
        */
       notional?: number;
       /**
-       * Observation lag (e.g. "3M").
+       * Month observation lag (e.g. "3M"); "none" means zero months.
+       * Day-based lags are unsupported because output curves carry month lags.
        *
        * Overrides the quote convention's lag and must match any supplied index
        * lag. The same lag determines the output curve's reference-date origin and the dates
        * of the CPI observations consumed by calibration instruments.
        */
       observation_lag: string;
-      /**
-       * Optional seasonal adjustment factors for deseasonalizing CPI observations.
-       *
-       * When provided, the calibrator will:
-       * 1. Deseasonalize input CPI levels using the monthly factors
-       * 2. Fit the smooth zero-coupon curve to deseasonalized levels
-       * 3. Reseasonalize the output CPI path
-       *
-       * Monthly adjustments are additive to log CPI level. They should approximately
-       * sum to zero over 12 months.
-       */
-      seasonal_factors?: SeasonalFactors | null;
     }
   | {
       /**
@@ -3925,7 +3954,8 @@ export type StepParams =
        */
       discount_curve_id: valuations.Id;
       /**
-       * Optional day count convention for fixed leg calculations.
+       * Optional day count convention for fixed-leg coupon accrual only.
+       * Option expiry and variance always use ACT/365F.
        */
       fixed_day_count?: valuations.DayCount | null;
       /**
@@ -3956,7 +3986,8 @@ export type StepParams =
        */
       swap_index?: valuations.Id | null;
       /**
-       * Target expiry times (in years) for the surface grid.
+       * Target option expiry times in ACT/365F years from `base_date`, independent
+       * of the fixed-leg coupon day-count convention.
        */
       target_expiries?: number[];
       /**
@@ -4021,7 +4052,8 @@ export type StepParams =
       index_id: string;
       kind: "base_correlation";
       /**
-       * Maturity of the tranches in years.
+       * Finite positive CDS tenor in years, representable as a whole number of months.
+       * Quotes must resolve to the same CDS convention maturity as this tenor.
        */
       maturity_years: number;
       /**
@@ -4136,6 +4168,12 @@ export type StepParams =
        */
       forward_curve_id: valuations.Id;
       /**
+       * Term-rate index defining settlement, reset tenor, accrual day count,
+       * calendar, business-day adjustments, and payment lag for caplets.
+       * Its currency must match `currency`; overnight indices are unsupported.
+       */
+      index_id: valuations.Id;
+      /**
        * Optional initial guess for mean reversion κ when solving both κ and σ.
        */
       initial_kappa?: number | null;
@@ -4144,10 +4182,6 @@ export type StepParams =
        */
       initial_sigma?: number | null;
       kind: "cap_floor_hull_white";
-      /**
-       * Payment frequency used to decompose quoted caps/floors into caplets.
-       */
-      payment_frequency?: SwapFrequency;
       /**
        * Scalar or expiry-bootstraped piecewise short-rate volatility calibration.
        */
@@ -4163,8 +4197,10 @@ export type StepParams =
        */
       discount_curve_id?: valuations.Id | null;
       /**
-       * Optional continuous dividend yield; defaults to the market scalar
-       * `"<underlying_ticker>-DIVYIELD"` or zero.
+       * Optional continuous dividend yield in decimal units. Without an override,
+       * uses the unitless market scalar `"<underlying_ticker>-DIVYIELD"`. When a
+       * discount curve is supplied, a matching cash-dividend schedule may supply
+       * carry instead; otherwise an explicit yield is required.
        */
       dividend_yield_override?: number | null;
       kind: "svi_surface";
@@ -4237,7 +4273,7 @@ export type StepParams =
       interpolation?: InterpStyle;
       kind: "xccy_basis";
       /**
-       * Calibration method to use.
+       * Sequential bootstrap method. `GlobalSolve` is unsupported and rejected.
        */
       method?: CalibrationMethod;
     }
@@ -4312,7 +4348,10 @@ export type VolQuote =
          */
         maturity: valuations.DateWire;
         /**
-         * Volatility quoting convention.
+         * Volatility quoting convention. Shifted Black quotes require a
+         * `ShiftedLognormal` calibration plan supplying their displacement;
+         * Hull-White calibration rejects them because its quote contract
+         * carries no displacement.
          */
         quote_type: VolQuoteType;
         /**
@@ -4341,7 +4380,9 @@ export type VolQuote =
          */
         is_cap: boolean;
         /**
-         * Volatility quoting convention.
+         * Volatility quoting convention. Hull-White calibration accepts
+         * normal and unshifted Black quotes; it rejects shifted Black
+         * because this quote does not carry a displacement.
          */
         quote_type: VolQuoteType;
         /**
@@ -4509,8 +4550,9 @@ export interface CalibrationConfig {
  * bootstrapping or global solve process.
  *
  * # Invariants
- * - `df_hard_min` > 0
+ * - `0 < df_hard_min < df_hard_max`, with finite bounds
  * - `scan_grid_points` > 0
+ * - Scan and finite-difference step sizes are finite and strictly positive
  */
 export interface DiscountCurveSolveConfig {
   /**
@@ -4522,15 +4564,16 @@ export interface DiscountCurveSolveConfig {
    */
   bootstrap_seed_global_solve?: boolean;
   /**
-   * Absolute maximum allowed discount factor (prevents divergence).
+   * Finite upper discount-factor bound, strictly above `df_hard_min`.
    */
   df_hard_max?: number;
   /**
-   * Absolute minimum allowed discount factor (prevents singularity).
+   * Finite, strictly positive lower discount-factor bound, below `df_hard_max`.
    */
   df_hard_min?: number;
   /**
-   * Step size (h) for finite-difference Jacobian calculation.
+   * Finite, strictly positive relative step for finite-difference Jacobians.
+   * The parameter bump is `max(h, abs(parameter) * h)`.
    */
   jacobian_step_size?: number;
   /**
@@ -4546,7 +4589,7 @@ export interface DiscountCurveSolveConfig {
    */
   scan_grid_points?: number;
   /**
-   * Initial step size for geometric scan grid.
+   * Finite, strictly positive initial step size for the geometric scan grid.
    */
   scan_grid_step?: number;
   /**
@@ -4788,11 +4831,11 @@ export interface RateBounds {
  */
 export interface SolverConfig {
   /**
-   * Maximum iterations available to each solver invocation.
+   * Positive maximum number of iterations available to each solver invocation.
    */
   max_iterations?: number;
   /**
-   * Numerical convergence tolerance; distinct from economic fit acceptance.
+   * Positive finite numerical convergence tolerance, distinct from economic fit acceptance.
    */
   tolerance?: number;
 }
@@ -4917,7 +4960,8 @@ export interface VolSurfaceSolveConfig {
  */
 export interface CalibrationDiagnostics {
   /**
-   * Condition number of the Jacobian's normal equations (J^T * J).
+   * Condition number of the weighted Jacobian's normal equations (J^T * W * J).
+   * `W` contains the configured residual weights; unweighted fits use identity.
    *
    * A high condition number (e.g., > 1e10) indicates an ill-conditioned
    * calibration problem where small changes in market data can produce
@@ -5069,6 +5113,16 @@ export interface DividendEvent {
   kind: DividendKind;
   [k: string]: unknown;
 }
+export interface InflationPublicationWire {
+  /**
+   * Inclusive date on which the observation must be available.
+   */
+  publication_date: valuations.DateWire;
+  /**
+   * First calendar day of the reference month.
+   */
+  reference_month: valuations.DateWire;
+}
 /**
  * Data-only SABR parameters for one volatility-cube node.
  *
@@ -5141,23 +5195,6 @@ export interface RatesStepConventions {
   ois_compounding?: FloatingLegCompounding | null;
 }
 /**
- * Monthly seasonal adjustment factors for inflation curves.
- *
- * Used to deseasonalize CPI observations before fitting a smooth
- * zero-coupon inflation curve, then reseasonalize the output.
- * Monthly adjustments should approximately sum to zero.
- */
-export interface SeasonalFactors {
-  /**
-   * Monthly adjustment factors (Jan=index 0 through Dec=index 11).
-   * These are additive adjustments to the log CPI level.
-   *
-   * @minItems 12
-   * @maxItems 12
-   */
-  monthly_adjustments: [number, number, number, number, number, number, number, number, number, number, number, number];
-}
-/**
  * Typed conventions required to replay a rate-curve calibration.
  */
 export interface RateCalibrationRecipe {
@@ -5185,6 +5222,72 @@ export interface RateCalibrationRecipe {
    * Discount/projection role and linked curve identifier.
    */
   role: RateCalibrationCurveRole;
+}
+/**
+ * Source interpolation and a single accumulated transformation, never a chain
+ * of nested curves. The adjustment is stored as its piecewise-linear derivative
+ * so evaluating beyond a completed triangular shock does not subtract large
+ * quadratic polynomials.
+ */
+export interface DiscountCurveTransform {
+  /**
+   * Cumulative derivative of the additive log-discount adjustment.
+   */
+  adjustment: PiecewiseLinearAdjustment;
+  /**
+   * Current origin in the source interpolation's year-fraction coordinates.
+   */
+  offset: number;
+  /**
+   * Original, untransformed interpolation pillars.
+   */
+  source_points: [unknown, unknown][];
+}
+/**
+ * A flat function representation: repeated shocks merge on a breakpoint union
+ * rather than forming a recursively nested transformation history.
+ */
+export interface PiecewiseLinearAdjustment {
+  /**
+   * Constant value before the first breakpoint.
+   */
+  initial_value: number;
+  /**
+   * Sorted, merged linear segments.
+   */
+  segments: CurveAdjustmentSegment[];
+}
+export interface CurveAdjustmentSegment {
+  /**
+   * Function slope on this segment.
+   */
+  slope: number;
+  /**
+   * Segment origin in the source curve's time coordinates.
+   */
+  start: number;
+  /**
+   * Right-hand function value at the segment origin.
+   */
+  value: number;
+}
+export interface ForwardCurveTransform {
+  /**
+   * Cumulative additive rate adjustment in source time coordinates.
+   */
+  adjustment: PiecewiseLinearAdjustment;
+  /**
+   * Current curve origin in the source curve's year-fraction coordinates.
+   */
+  offset: number;
+  /**
+   * Accumulated parallel multiplicative factor on the source interpolation.
+   */
+  scale: number;
+  /**
+   * Original interpolation pillars, independent of current curve samples.
+   */
+  source_points: [unknown, unknown][];
 }
 /**
  * Exact valuation-layer inputs required to replay a hazard-curve calibration.
@@ -5427,7 +5530,7 @@ export interface ResultsMeta {
  */
 export interface RoundingContext {
   /**
-   * Ingest scale map snapshot by currency code.
+   * Validated ingest scale snapshot by currency code, with values in `0..=28`.
    */
   ingest_scale_by_currency: {
     [k: string]: number;
@@ -5437,7 +5540,7 @@ export interface RoundingContext {
    */
   mode: RoundingMode;
   /**
-   * Output scale map snapshot by currency code.
+   * Validated output scale snapshot by currency code, with values in `0..=28`.
    */
   output_scale_by_currency: {
     [k: string]: number;
@@ -5613,6 +5716,9 @@ export interface CreditIndexState {
 /**
  * Serializable state of an FxMatrix.
  * Contains the configuration and cached quotes that can be persisted and restored.
+ * Serialization fails with an ordinary serializer error if any captured
+ * explicit or provider rate is non-finite or non-positive, including rates
+ * that overflow after a mutable underlying provider changes under a shock.
  */
 export interface FxMatrixState {
   /**
@@ -5626,6 +5732,12 @@ export interface FxMatrixState {
    * dates from the provider instead of restoring the pinned fixings.
    */
   pinned_quotes: [unknown, unknown, unknown, unknown, unknown][];
+  /**
+   * Captured date/policy-scoped provider quotes. These override captured
+   * pair-global provider quotes for their scope while remaining below
+   * explicit matrix quotes in either direction. Required even when empty.
+   */
+  provider_pinned_quotes: [unknown, unknown, unknown, unknown, unknown][];
   /**
    * Captured provider quotes, below explicit global and date/policy-pinned
    * quotes in lookup priority. Market-context restoration uses these to
@@ -5684,9 +5796,10 @@ export interface FxDeltaVolSurface {
  *
  * # Components
  *
- * - **Observations**: Historical index levels by publication date
+ * - **Observations**: Index levels labelled by reference date/month
  * - **Interpolation**: Daily interpolation between monthly observations
- * - **Lag**: Publication lag (typically 3 months for TIPS)
+ * - **Lag**: Contractual observation lag (typically 3 months for TIPS)
+ * - **Publication dates**: Optional explicit availability dates by reference month
  * - **Seasonality**: Optional monthly adjustment factors
  *
  * # Interpolation Methods
@@ -5742,6 +5855,10 @@ export interface InflationIndex {
    * Observations as (date, value) pairs
    */
   observations: [unknown, unknown][];
+  /**
+   * Explicit monthly observation availability; no release dates are inferred.
+   */
+  publication_dates?: InflationPublicationWire[];
   /**
    * Optional seasonality factors
    *
@@ -5800,6 +5917,10 @@ export interface ScalarTimeSeries {
  * Internally stores volatilities in row-major order as a boxed slice.
  */
 export interface VolSurface {
+  /**
+   * Additive displacements in forward/strike units, one per expiry for shifted Black quotes.
+   */
+  displacements?: number[] | null;
   /**
    * Expiry times in years
    */
@@ -5895,7 +6016,7 @@ export interface CalibrationValidationReport {
  */
 export interface DependencyGraph {
   /**
-   * Curve / surface IDs available at the start of execution, contributed
+   * Market-object IDs available at the start of execution, contributed
    * by `market_data` and `prior_market`.
    */
   initial_ids: string[];
@@ -5914,7 +6035,8 @@ export interface DependencyNode {
    */
   kind: string;
   /**
-   * Curve / surface IDs the step depends on. Each must be either in
+   * Market-object IDs the step depends on, including quote-derived curve
+   * roles and selected spot/carry inputs. Each must be either in
    * `initial_ids` or produced by an earlier step.
    */
   reads: string[];
@@ -5927,7 +6049,7 @@ export interface DependencyNode {
    */
   step_index: number;
   /**
-   * Curve / surface ID(s) the step produces.
+   * Market-object IDs the step produces, including scalar and series outputs.
    */
   writes: string[];
   [k: string]: unknown;
@@ -5981,8 +6103,8 @@ export interface StrictLoadDiagnostic {
  */
 export interface CapFloorCalibrationConfig {
   /**
-   * Required positive maximum implied-quote error in quoted volatility units.
-   * Normal quotes use decimal rate volatility; Black quotes use relative volatility.
+   * Required positive maximum implied-normal-volatility error in decimal rate units.
+   * Cap/floor quotes use the normal (Bachelier) convention only.
    * This acceptance budget is independent of the numerical solver tolerance.
    */
   fit_tolerance: number;
@@ -5992,7 +6114,7 @@ export interface CapFloorCalibrationConfig {
    */
   fixed_kappa?: number | null;
   /**
-   * Payment frequency used to decompose full caps/floors into caplets.
+   * Synthetic caplet frequency used only when contractual schedules are absent.
    */
   frequency?: SwapFrequency;
   /**
@@ -6080,8 +6202,8 @@ export interface CdsTrancheQuote {
  */
 export interface PiecewiseSigmaCalibrationConfig {
   /**
-   * Required positive maximum implied-quote error in quoted volatility units.
-   * Normal quotes use decimal rate volatility; Black quotes use relative volatility.
+   * Required positive maximum implied-normal-volatility error in decimal rate units.
+   * Cap/floor quotes use the normal (Bachelier) convention only.
    * This acceptance budget is independent of the numerical solver tolerance.
    */
   fit_tolerance: number;
@@ -6090,7 +6212,7 @@ export interface PiecewiseSigmaCalibrationConfig {
    */
   fixed_kappa: number;
   /**
-   * Coupon frequency used to decompose each market cap/floor quote.
+   * Synthetic coupon frequency used only when contractual schedules are absent.
    */
   frequency?: SwapFrequency;
   /**

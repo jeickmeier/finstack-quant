@@ -104,7 +104,7 @@
     },
     "reference_price": {
       "default": null,
-      "description": "Reference price used to convert the return-space volatility\n`daily_volatility` into a currency-space risk term (execution risk,\nvariance, etc.).\n\n`None` means fall back to `profile.mid`, which matches the\nhistorical default. Set explicitly when the arrival price or\ndecision-time price differs materially from the profile mid (e.g.\nwhen the profile was calibrated from a snapshot stale relative to\nthe order).",
+      "description": "Finite, strictly positive reference price used to convert the return-space volatility\n`daily_volatility` into a currency-space risk term (execution risk,\nvariance, etc.).\n\n`None` means fall back to `profile.mid`, which matches the\nhistorical default. Set explicitly when the arrival price or\ndecision-time price differs materially from the profile mid (e.g.\nwhen the profile was calibrated from a snapshot stale relative to\nthe order).",
       "format": "double",
       "type": [
         "number",

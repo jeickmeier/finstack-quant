@@ -17,7 +17,7 @@
           "description": "Period to vary"
         },
         "perturbations": {
-          "description": "Perturbations to apply (e.g., [-10%, 0%, +10%])",
+          "description": "Absolute values to substitute for this node/period; use\n[`Self::with_percentages`] to construct shocks from percentage inputs.",
           "items": {
             "format": "double",
             "type": "number"
@@ -123,7 +123,7 @@
           "type": "null"
         }
       ],
-      "description": "Unperturbed baseline evaluation of the model (populated by tornado\nruns). Used by tornado chart generation as the reference metric\nwhen a parameter's base value is not part of the perturbation grid."
+      "description": "Unperturbed baseline evaluation of the model (populated by every run).\nUsed by tornado chart generation as the reference metric\nwhen a parameter's base value is not part of the perturbation grid."
     },
     "config": {
       "$ref": "#/$defs/SensitivityConfig",

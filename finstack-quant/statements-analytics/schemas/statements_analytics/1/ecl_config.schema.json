@@ -105,34 +105,6 @@
         }
       ]
     },
-    "MacroScenario": {
-      "additionalProperties": false,
-      "description": "A forward-looking macro scenario with a probability weight.\n\nUsed for probability-weighted ECL calculation per IFRS 9 B5.5.42.",
-      "properties": {
-        "id": {
-          "description": "Scenario identifier (e.g., \"base\", \"upside\", \"downside\").",
-          "type": "string"
-        },
-        "lgd_override": {
-          "description": "Optional LGD override for this scenario (downturn LGD).",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "weight": {
-          "description": "Probability weight in \\[0, 1\\]. All scenario weights must sum to 1.0.",
-          "format": "double",
-          "type": "number"
-        }
-      },
-      "required": [
-        "id",
-        "weight"
-      ],
-      "type": "object"
-    },
     "StagingConfig": {
       "additionalProperties": false,
       "description": "Configuration for IFRS 9 stage classification.\n\nControls the quantitative and qualitative thresholds used in the staging\nwaterfall, plus curing rules for step-down from higher stages.",
@@ -167,9 +139,12 @@
           "type": "number"
         },
         "pd_delta_relative": {
-          "description": "Relative PD increase threshold for SICR (e.g., 2.0 = PD doubled).\nApplied as: current_pd / origination_pd > threshold.",
+          "description": "Relative PD increase threshold for SICR (e.g., 2.0 = PD doubled).\n`Some(threshold)` applies current_pd / origination_pd > threshold;\nthe threshold must be finite and non-negative. `None` disables this\ntrigger. Positive current PD against zero origination PD is undefined\nand errors when this trigger is enabled; both PDs zero mean no increase.\nDefault: `Some(2.0)`.",
           "format": "double",
-          "type": "number"
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "qualitative_triggers_enabled": {
           "description": "Whether any qualitative SICR flag triggers Stage 2.",
@@ -199,7 +174,6 @@
       },
       "required": [
         "pd_delta_absolute",
-        "pd_delta_relative",
         "rating_downgrade_notches",
         "dpd_stage2_threshold",
         "dpd_stage3_threshold",
@@ -236,13 +210,6 @@
       "$ref": "#/$defs/LgdType",
       "description": "LGD methodology label; see [`LgdType`] for the formulas each variant\napplies and the companion field it requires."
     },
-    "scenarios": {
-      "description": "Macro scenario specifications with probability weights.\nWeights must sum to 1.0 and each weight must lie in \\[0, 1\\].\n\nWhen non-empty, [`compute_ecl_weighted`] and [`EclEngine`] require\nthe same ids and weights (tolerance 1e-6, same order) as the\n`pd_sources` argument. The `pd_sources` weights remain the priced\nweights and are still validated independently.",
-      "items": {
-        "$ref": "#/$defs/MacroScenario"
-      },
-      "type": "array"
-    },
     "stage3_time_to_recovery_years": {
       "default": 1.0,
       "description": "Assumed time (in years) from the reporting date to recovery\nrealisation for Stage 3 (credit-impaired) exposures. Used to\ndiscount expected recoveries `(1 - LGD) x EAD` at the EIR.\nThe allowance is current EAD less those discounted recoveries.\nDefault: 1.0 year, a common practical recovery-lag assumption.",
@@ -264,7 +231,6 @@
   },
   "required": [
     "bucket_width_years",
-    "scenarios",
     "staging",
     "lgd_type"
   ],

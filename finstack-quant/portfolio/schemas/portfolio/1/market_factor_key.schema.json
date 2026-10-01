@@ -872,6 +872,32 @@
     },
     {
       "additionalProperties": false,
+      "description": "Base-correlation curve used by credit-index loss pricing.",
+      "properties": {
+        "base_correlation": {
+          "$ref": "#/$defs/Id"
+        }
+      },
+      "required": [
+        "base_correlation"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Composite credit-index data resolved against the request market.",
+      "properties": {
+        "credit_index": {
+          "$ref": "#/$defs/Id"
+        }
+      },
+      "required": [
+        "credit_index"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
       "description": "Equity, commodity, or other spot price identifier.",
       "properties": {
         "spot": {

@@ -28,17 +28,14 @@ test('ACT/ACT ICMA keeps the January roll day after February clamping', () => {
   const start = core.createDate(2025, 1, 30);
   const february = core.createDate(2025, 2, 28);
   const end = core.createDate(2025, 3, 15);
-  const base = new core.DayCountContext();
-  const tenor = core.Tenor.monthly();
-  const frequency = base.withFrequency(tenor);
-  const context = frequency.withCouponPeriod(start, february);
+  const context = new core.DayCountContext(null, core.Tenor.monthly().toString(), null, [
+    start,
+    february,
+  ]);
   try {
-    assert.ok(Math.abs(dc.yearFractionWithContext(start, end, context) - 0.125) < 1e-14);
+    assert.ok(Math.abs(dc.yearFraction(start, end, context) - 0.125) < 1e-14);
   } finally {
     context.free();
-    frequency.free();
-    tenor.free();
-    base.free();
     dc.free();
   }
 });
@@ -48,52 +45,45 @@ test('ACT/365L partial accrual uses the enclosing coupon denominator', () => {
   const start = core.createDate(2023, 10, 15);
   const middle = core.createDate(2023, 12, 15);
   const end = core.createDate(2024, 4, 15);
-  const base = new core.DayCountContext();
-  const tenor = core.Tenor.semiAnnual();
-  const frequency = base.withFrequency(tenor);
-  const context = frequency.withCouponPeriod(start, end);
+  const semiAnnual = core.Tenor.semiAnnual().toString();
+  const frequency = new core.DayCountContext(null, semiAnnual);
+  const context = new core.DayCountContext(null, semiAnnual, null, [start, end]);
+  const validation = (fragment) => (error) => {
+    assert.equal(error.kind, 'validation');
+    assert.match(error.message, fragment);
+    return true;
+  };
   try {
-    const partial = dc.yearFractionWithContext(start, middle, context);
-    const remaining = dc.yearFractionWithContext(middle, end, context);
+    const partial = dc.yearFraction(start, middle, context);
+    const remaining = dc.yearFraction(middle, end, context);
     assert.ok(Math.abs(partial - 61 / 366) < 1e-14);
-    assert.ok(
-      Math.abs(partial + remaining - dc.yearFractionWithContext(start, end, context)) < 1e-14
-    );
-    assert.throws(() => dc.yearFraction(start, middle), /frequency/);
-    assert.throws(() => dc.yearFractionWithContext(start, middle, frequency), /coupon_period/);
+    assert.ok(Math.abs(partial + remaining - dc.yearFraction(start, end, context)) < 1e-14);
+    assert.throws(() => dc.yearFraction(start, middle), validation(/frequency/));
+    assert.throws(() => dc.yearFraction(start, middle, frequency), validation(/coupon_period/));
   } finally {
     context.free();
     frequency.free();
-    tenor.free();
-    base.free();
     dc.free();
   }
 });
 
 test('ICMA rejects reference dates that do not share the nominal coupon grid', () => {
   const dc = core.DayCount.actActIsma();
-  const base = new core.DayCountContext();
-  const tenor = core.Tenor.semiAnnual();
-  const frequency = base.withFrequency(tenor);
-  const context = frequency.withCouponPeriod(
+  const context = new core.DayCountContext(null, core.Tenor.semiAnnual().toString(), null, [
     core.createDate(2025, 1, 15),
-    core.createDate(2025, 7, 16)
-  );
+    core.createDate(2025, 7, 16),
+  ]);
   try {
     assert.throws(
-      () =>
-        dc.yearFractionWithContext(
-          core.createDate(2024, 7, 15),
-          core.createDate(2025, 1, 15),
-          context
-        ),
-      /unadjusted/
+      () => dc.yearFraction(core.createDate(2024, 7, 15), core.createDate(2025, 1, 15), context),
+      (error) => {
+        assert.equal(error.kind, 'validation');
+        assert.match(error.message, /unadjusted/);
+        return true;
+      }
     );
   } finally {
     context.free();
-    frequency.free();
-    tenor.free();
-    base.free();
     dc.free();
   }
 });

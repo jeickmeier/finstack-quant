@@ -178,13 +178,16 @@ export type D_557De6D70142Abc041E8 = string;
  * The actual-day conventions:
  *
  * - **`Act365L`** (ICMA Rule 251.1(i)(c)): the denominator depends on the
- *   coupon frequency supplied via [`DayCountContext`]. Annual, or no frequency
- *   supplied: 366 if February 29 falls in `(start, end]` (exclusive of start,
- *   inclusive of end), else 365. Non-annual: 366 if the period end date falls
- *   in a leap year, else 365. This is **not** ACT/ACT AFB, which uses a
- *   sub-period splitting algorithm; use [`DayCount::ActActAfb`] for AFB /
- *   Actual/Actual Euro.
- * - **`Nl365`**: counts the actual calendar days in `[start, end)` and removes
+ *   coupon frequency and the enclosing `coupon_period` supplied via
+ *   [`DayCountContext`]; both are required. Annual: 366 if February 29 falls
+ *   in `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),
+ *   else 365. Non-annual: 366 if the next coupon date falls in a leap year,
+ *   else 365. Partial accrual keeps the enclosing coupon's denominator.
+ *   Accrual dates outside that coupon are rejected; sum separate coupon
+ *   slices for calculations spanning multiple coupon periods. This is **not**
+ *   ACT/ACT AFB, which uses a sub-period splitting algorithm; use
+ *   [`DayCount::ActActAfb`] for AFB / Actual/Actual Euro.
+ * - **`Nl365`**: counts the actual calendar days in `(start, end]` and removes
  *   every February 29 that falls in the period, so a full leap year still
  *   yields exactly 1.0.
  * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
@@ -245,7 +248,12 @@ export type D_557De6D70142Abc041E8 = string;
  *
  * // Actual/365L: 29 days over a period containing Feb 29 → 366 denominator
  * let (start, end) = (date(2024, Month::February, 1), date(2024, Month::March, 1));
- * assert_eq!(yf(DayCount::Act365L, start, end, none()), 29.0 / 366.0);
+ * let ctx = DayCountContext {
+ *     frequency: Some(Tenor::annual()),
+ *     coupon_period: Some((start, end)),
+ *     ..Default::default()
+ * };
+ * assert_eq!(yf(DayCount::Act365L, start, end, ctx), 29.0 / 366.0);
  * // Actual/Actual AFB: 29 February lies in the residual period
  * assert_eq!(yf(DayCount::ActActAfb, start, end, none()), 29.0 / 366.0);
  *
@@ -277,10 +285,11 @@ export type D_557De6D70142Abc041E8 = string;
  * let ctx = DayCountContext { frequency: Some(Tenor::semi_annual()), ..Default::default() };
  * assert!((yf(DayCount::ActActIsma, start, end, ctx) - 0.5).abs() < 1e-6);
  *
- * // Business/252: Monday to next Monday is 5 business days
+ * // Business/252: Monday to next Monday is 4 business days, because the
+ * // NYSE was closed on January 9, 2025.
  * let (start, end) = (date(2025, Month::January, 6), date(2025, Month::January, 13));
  * let ctx = DayCountContext { calendar: Some(&NYSE), ..Default::default() };
- * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 5.0).abs() < 0.1);
+ * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 4.0).abs() < 1e-12);
  * ```
  */
 export type D_686A28Cd91Db32D9583D =
@@ -1482,6 +1491,11 @@ export interface DCdca3F67B974113083De {
   /**
    * Whether end-of-month rolling should be preserved when generating the
    * schedule.
+   *
+   * Incompatible with explicit IMM roll rules. With ACT/ACT ICMA, the
+   * regular grid anchor must be month-end: maturity for front stubs, or
+   * start for back stubs and schedules without stubs. An irregular opposite
+   * endpoint remains supported.
    */
   end_of_month?: boolean;
   frequency: DCc937Fbaa12E32D4187E;
@@ -1606,6 +1620,11 @@ export interface D_210Ab4B44Ffb533F1266 {
   /**
    * Whether end-of-month rolling should be preserved when generating the
    * schedule.
+   *
+   * Incompatible with explicit IMM roll rules. With ACT/ACT ICMA, the
+   * regular grid anchor must be month-end: maturity for front stubs, or
+   * start for back stubs and schedules without stubs. An irregular opposite
+   * endpoint remains supported.
    */
   end_of_month?: boolean;
   frequency: DCc937Fbaa12E32D4187E1;
@@ -1753,13 +1772,13 @@ export interface D_7Af15F20A258D1Def9Dd {
    */
   index_floor_bp?: DB375E274438Ab847F1Fc | null;
   /**
-   * Diagnostic tenor for term-index projection error context.
+   * Explicit term-index tenor when no forward curve resolves.
    *
    * The named forward curve is already the term index (for example a 3M
    * EURIBOR curve). Projection is `fwd.rate(reset_date)`, not a FRA-style
    * average over `[reset, reset + tenor]`. This field (or
-   * [`Self::reset_frequency`] when `None`) is used only to compute
-   * `index_maturity` for error messages. Ignored for overnight-compounded
+   * [`Self::reset_frequency`] when `None`) supplies the compiled term tenor
+   * when no forward curve resolves. Ignored for overnight-compounded
    * legs. When set, the builder warns at build time if it disagrees with
    * the resolved curve's tenor by more than 10% — the curve remains
    * authoritative.
@@ -1781,6 +1800,11 @@ export interface D_7Af15F20A258D1Def9Dd {
   overnight_basis?: D_686A28Cd91Db32D9583D | null;
   /**
    * Index floor/cap application policy for overnight-compounded coupons.
+   *
+   * With changing principal, the builder retains daily compounded-rate
+   * increments. Any bound applied to the final period index or all-in
+   * rate contributes a uniform annual-rate adjustment over the coupon's
+   * contractual accrual time; interim cumulative prefixes are not bounded.
    */
   overnight_index_constraints?: "daily" | "period";
   reset_frequency: DCc937Fbaa12E32D4187E3;
@@ -2060,13 +2084,16 @@ export interface D_78D4B16242Febe84F62B {
    * The actual-day conventions:
    *
    * - **`Act365L`** (ICMA Rule 251.1(i)(c)): the denominator depends on the
-   *   coupon frequency supplied via [`DayCountContext`]. Annual, or no frequency
-   *   supplied: 366 if February 29 falls in `(start, end]` (exclusive of start,
-   *   inclusive of end), else 365. Non-annual: 366 if the period end date falls
-   *   in a leap year, else 365. This is **not** ACT/ACT AFB, which uses a
-   *   sub-period splitting algorithm; use [`DayCount::ActActAfb`] for AFB /
-   *   Actual/Actual Euro.
-   * - **`Nl365`**: counts the actual calendar days in `[start, end)` and removes
+   *   coupon frequency and the enclosing `coupon_period` supplied via
+   *   [`DayCountContext`]; both are required. Annual: 366 if February 29 falls
+   *   in `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),
+   *   else 365. Non-annual: 366 if the next coupon date falls in a leap year,
+   *   else 365. Partial accrual keeps the enclosing coupon's denominator.
+   *   Accrual dates outside that coupon are rejected; sum separate coupon
+   *   slices for calculations spanning multiple coupon periods. This is **not**
+   *   ACT/ACT AFB, which uses a sub-period splitting algorithm; use
+   *   [`DayCount::ActActAfb`] for AFB / Actual/Actual Euro.
+   * - **`Nl365`**: counts the actual calendar days in `(start, end]` and removes
    *   every February 29 that falls in the period, so a full leap year still
    *   yields exactly 1.0.
    * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
@@ -2127,7 +2154,12 @@ export interface D_78D4B16242Febe84F62B {
    *
    * // Actual/365L: 29 days over a period containing Feb 29 → 366 denominator
    * let (start, end) = (date(2024, Month::February, 1), date(2024, Month::March, 1));
-   * assert_eq!(yf(DayCount::Act365L, start, end, none()), 29.0 / 366.0);
+   * let ctx = DayCountContext {
+   *     frequency: Some(Tenor::annual()),
+   *     coupon_period: Some((start, end)),
+   *     ..Default::default()
+   * };
+   * assert_eq!(yf(DayCount::Act365L, start, end, ctx), 29.0 / 366.0);
    * // Actual/Actual AFB: 29 February lies in the residual period
    * assert_eq!(yf(DayCount::ActActAfb, start, end, none()), 29.0 / 366.0);
    *
@@ -2159,10 +2191,11 @@ export interface D_78D4B16242Febe84F62B {
    * let ctx = DayCountContext { frequency: Some(Tenor::semi_annual()), ..Default::default() };
    * assert!((yf(DayCount::ActActIsma, start, end, ctx) - 0.5).abs() < 1e-6);
    *
-   * // Business/252: Monday to next Monday is 5 business days
+   * // Business/252: Monday to next Monday is 4 business days, because the
+   * // NYSE was closed on January 9, 2025.
    * let (start, end) = (date(2025, Month::January, 6), date(2025, Month::January, 13));
    * let ctx = DayCountContext { calendar: Some(&NYSE), ..Default::default() };
-   * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 5.0).abs() < 0.1);
+   * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 4.0).abs() < 1e-12);
    * ```
    */
   day_count:
@@ -2182,6 +2215,11 @@ export interface D_78D4B16242Febe84F62B {
   /**
    * Whether end-of-month rolling should be preserved when generating the
    * schedule.
+   *
+   * Incompatible with explicit IMM roll rules. With ACT/ACT ICMA, the
+   * regular grid anchor must be month-end: maturity for front stubs, or
+   * start for back stubs and schedules without stubs. An irregular opposite
+   * endpoint remains supported.
    */
   end_of_month?: boolean;
   frequency: DCc937Fbaa12E32D4187E4;
@@ -2692,13 +2730,16 @@ export interface D_09Ad66Dca63Dbc62Aee4 {
    * The actual-day conventions:
    *
    * - **`Act365L`** (ICMA Rule 251.1(i)(c)): the denominator depends on the
-   *   coupon frequency supplied via [`DayCountContext`]. Annual, or no frequency
-   *   supplied: 366 if February 29 falls in `(start, end]` (exclusive of start,
-   *   inclusive of end), else 365. Non-annual: 366 if the period end date falls
-   *   in a leap year, else 365. This is **not** ACT/ACT AFB, which uses a
-   *   sub-period splitting algorithm; use [`DayCount::ActActAfb`] for AFB /
-   *   Actual/Actual Euro.
-   * - **`Nl365`**: counts the actual calendar days in `[start, end)` and removes
+   *   coupon frequency and the enclosing `coupon_period` supplied via
+   *   [`DayCountContext`]; both are required. Annual: 366 if February 29 falls
+   *   in `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),
+   *   else 365. Non-annual: 366 if the next coupon date falls in a leap year,
+   *   else 365. Partial accrual keeps the enclosing coupon's denominator.
+   *   Accrual dates outside that coupon are rejected; sum separate coupon
+   *   slices for calculations spanning multiple coupon periods. This is **not**
+   *   ACT/ACT AFB, which uses a sub-period splitting algorithm; use
+   *   [`DayCount::ActActAfb`] for AFB / Actual/Actual Euro.
+   * - **`Nl365`**: counts the actual calendar days in `(start, end]` and removes
    *   every February 29 that falls in the period, so a full leap year still
    *   yields exactly 1.0.
    * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
@@ -2759,7 +2800,12 @@ export interface D_09Ad66Dca63Dbc62Aee4 {
    *
    * // Actual/365L: 29 days over a period containing Feb 29 → 366 denominator
    * let (start, end) = (date(2024, Month::February, 1), date(2024, Month::March, 1));
-   * assert_eq!(yf(DayCount::Act365L, start, end, none()), 29.0 / 366.0);
+   * let ctx = DayCountContext {
+   *     frequency: Some(Tenor::annual()),
+   *     coupon_period: Some((start, end)),
+   *     ..Default::default()
+   * };
+   * assert_eq!(yf(DayCount::Act365L, start, end, ctx), 29.0 / 366.0);
    * // Actual/Actual AFB: 29 February lies in the residual period
    * assert_eq!(yf(DayCount::ActActAfb, start, end, none()), 29.0 / 366.0);
    *
@@ -2791,10 +2837,11 @@ export interface D_09Ad66Dca63Dbc62Aee4 {
    * let ctx = DayCountContext { frequency: Some(Tenor::semi_annual()), ..Default::default() };
    * assert!((yf(DayCount::ActActIsma, start, end, ctx) - 0.5).abs() < 1e-6);
    *
-   * // Business/252: Monday to next Monday is 5 business days
+   * // Business/252: Monday to next Monday is 4 business days, because the
+   * // NYSE was closed on January 9, 2025.
    * let (start, end) = (date(2025, Month::January, 6), date(2025, Month::January, 13));
    * let ctx = DayCountContext { calendar: Some(&NYSE), ..Default::default() };
-   * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 5.0).abs() < 0.1);
+   * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 4.0).abs() < 1e-12);
    * ```
    */
   day_count:
@@ -2890,6 +2937,7 @@ export interface DCe740Ebb40B6A9A3Bc22 {
    * This is stored at cashflow creation time when available.
    * For instruments with intra-period events (e.g., revolving credit with draws/repays),
    * this may represent a time-weighted average rate across sub-periods.
+   * Serialization rejects non-finite rates instead of encoding them as absent.
    */
   rate?: number | null;
   /**
@@ -2907,8 +2955,11 @@ export interface D_63Aec3D47748D9F3D86A {
    */
   calendar_id?: string | null;
   /**
-   * Regular reference coupon period for ACT/ACT ICMA, including stub accrual.
-   * `None` leaves reference-period selection to the schedule accrual caller.
+   * Unadjusted regular reference coupon period for ACT/ACT ICMA, or the
+   * actual full contractual coupon period for ACT/365L, including when
+   * this flow represents only a rate or balance subinterval.
+   * ACT/365L metadata must retain these boundaries to select the original
+   * coupon's denominator; other conventions may leave this field `None`.
    *
    * @minItems 2
    * @maxItems 2
@@ -2981,13 +3032,16 @@ export interface D_63Aec3D47748D9F3D86A {
    * The actual-day conventions:
    *
    * - **`Act365L`** (ICMA Rule 251.1(i)(c)): the denominator depends on the
-   *   coupon frequency supplied via [`DayCountContext`]. Annual, or no frequency
-   *   supplied: 366 if February 29 falls in `(start, end]` (exclusive of start,
-   *   inclusive of end), else 365. Non-annual: 366 if the period end date falls
-   *   in a leap year, else 365. This is **not** ACT/ACT AFB, which uses a
-   *   sub-period splitting algorithm; use [`DayCount::ActActAfb`] for AFB /
-   *   Actual/Actual Euro.
-   * - **`Nl365`**: counts the actual calendar days in `[start, end)` and removes
+   *   coupon frequency and the enclosing `coupon_period` supplied via
+   *   [`DayCountContext`]; both are required. Annual: 366 if February 29 falls
+   *   in `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),
+   *   else 365. Non-annual: 366 if the next coupon date falls in a leap year,
+   *   else 365. Partial accrual keeps the enclosing coupon's denominator.
+   *   Accrual dates outside that coupon are rejected; sum separate coupon
+   *   slices for calculations spanning multiple coupon periods. This is **not**
+   *   ACT/ACT AFB, which uses a sub-period splitting algorithm; use
+   *   [`DayCount::ActActAfb`] for AFB / Actual/Actual Euro.
+   * - **`Nl365`**: counts the actual calendar days in `(start, end]` and removes
    *   every February 29 that falls in the period, so a full leap year still
    *   yields exactly 1.0.
    * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
@@ -3048,7 +3102,12 @@ export interface D_63Aec3D47748D9F3D86A {
    *
    * // Actual/365L: 29 days over a period containing Feb 29 → 366 denominator
    * let (start, end) = (date(2024, Month::February, 1), date(2024, Month::March, 1));
-   * assert_eq!(yf(DayCount::Act365L, start, end, none()), 29.0 / 366.0);
+   * let ctx = DayCountContext {
+   *     frequency: Some(Tenor::annual()),
+   *     coupon_period: Some((start, end)),
+   *     ..Default::default()
+   * };
+   * assert_eq!(yf(DayCount::Act365L, start, end, ctx), 29.0 / 366.0);
    * // Actual/Actual AFB: 29 February lies in the residual period
    * assert_eq!(yf(DayCount::ActActAfb, start, end, none()), 29.0 / 366.0);
    *
@@ -3080,10 +3139,11 @@ export interface D_63Aec3D47748D9F3D86A {
    * let ctx = DayCountContext { frequency: Some(Tenor::semi_annual()), ..Default::default() };
    * assert!((yf(DayCount::ActActIsma, start, end, ctx) - 0.5).abs() < 1e-6);
    *
-   * // Business/252: Monday to next Monday is 5 business days
+   * // Business/252: Monday to next Monday is 4 business days, because the
+   * // NYSE was closed on January 9, 2025.
    * let (start, end) = (date(2025, Month::January, 6), date(2025, Month::January, 13));
    * let ctx = DayCountContext { calendar: Some(&NYSE), ..Default::default() };
-   * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 5.0).abs() < 0.1);
+   * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 4.0).abs() < 1e-12);
    * ```
    */
   day_count:
@@ -3111,6 +3171,7 @@ export interface D_63Aec3D47748D9F3D86A {
   end_is_termination_date?: boolean;
   /**
    * Projected index rate before spread, gearing, caps, or floors.
+   * Serialization rejects non-finite rates instead of encoding them as absent.
    */
   projected_index_rate?: number | null;
   /**
@@ -4091,6 +4152,7 @@ export interface D_70Be17B53297F903E130 {
  * Models the relationship between the accreted notional and the recovery
  * rate in default. As PIK accrual increases the notional relative to the
  * original base, recovery declines according to the chosen [`RecoveryModel`].
+ * Deserialization enforces the same parameter invariants as the constructors.
  */
 export interface D_0E3D1D10849038Bb6F70 {
   /**
@@ -4145,6 +4207,8 @@ export interface D_0E3D1D10849038Bb6F70 {
  * Models the relationship between a firm's leverage and its instantaneous
  * hazard rate, enabling a feedback loop where PIK accrual increases the
  * notional (and hence leverage), which drives the hazard rate higher.
+ * Deserialization validates the parameters and rejects incomplete or
+ * inconsistent tabular calibrations before they can be evaluated.
  */
 export interface D_72A697Cad9Ad7609Eaf5 {
   /**
@@ -5711,13 +5775,16 @@ export interface D_756Aabf913F51B821A96 {
    * The actual-day conventions:
    *
    * - **`Act365L`** (ICMA Rule 251.1(i)(c)): the denominator depends on the
-   *   coupon frequency supplied via [`DayCountContext`]. Annual, or no frequency
-   *   supplied: 366 if February 29 falls in `(start, end]` (exclusive of start,
-   *   inclusive of end), else 365. Non-annual: 366 if the period end date falls
-   *   in a leap year, else 365. This is **not** ACT/ACT AFB, which uses a
-   *   sub-period splitting algorithm; use [`DayCount::ActActAfb`] for AFB /
-   *   Actual/Actual Euro.
-   * - **`Nl365`**: counts the actual calendar days in `[start, end)` and removes
+   *   coupon frequency and the enclosing `coupon_period` supplied via
+   *   [`DayCountContext`]; both are required. Annual: 366 if February 29 falls
+   *   in `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),
+   *   else 365. Non-annual: 366 if the next coupon date falls in a leap year,
+   *   else 365. Partial accrual keeps the enclosing coupon's denominator.
+   *   Accrual dates outside that coupon are rejected; sum separate coupon
+   *   slices for calculations spanning multiple coupon periods. This is **not**
+   *   ACT/ACT AFB, which uses a sub-period splitting algorithm; use
+   *   [`DayCount::ActActAfb`] for AFB / Actual/Actual Euro.
+   * - **`Nl365`**: counts the actual calendar days in `(start, end]` and removes
    *   every February 29 that falls in the period, so a full leap year still
    *   yields exactly 1.0.
    * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
@@ -5778,7 +5845,12 @@ export interface D_756Aabf913F51B821A96 {
    *
    * // Actual/365L: 29 days over a period containing Feb 29 → 366 denominator
    * let (start, end) = (date(2024, Month::February, 1), date(2024, Month::March, 1));
-   * assert_eq!(yf(DayCount::Act365L, start, end, none()), 29.0 / 366.0);
+   * let ctx = DayCountContext {
+   *     frequency: Some(Tenor::annual()),
+   *     coupon_period: Some((start, end)),
+   *     ..Default::default()
+   * };
+   * assert_eq!(yf(DayCount::Act365L, start, end, ctx), 29.0 / 366.0);
    * // Actual/Actual AFB: 29 February lies in the residual period
    * assert_eq!(yf(DayCount::ActActAfb, start, end, none()), 29.0 / 366.0);
    *
@@ -5810,10 +5882,11 @@ export interface D_756Aabf913F51B821A96 {
    * let ctx = DayCountContext { frequency: Some(Tenor::semi_annual()), ..Default::default() };
    * assert!((yf(DayCount::ActActIsma, start, end, ctx) - 0.5).abs() < 1e-6);
    *
-   * // Business/252: Monday to next Monday is 5 business days
+   * // Business/252: Monday to next Monday is 4 business days, because the
+   * // NYSE was closed on January 9, 2025.
    * let (start, end) = (date(2025, Month::January, 6), date(2025, Month::January, 13));
    * let ctx = DayCountContext { calendar: Some(&NYSE), ..Default::default() };
-   * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 5.0).abs() < 0.1);
+   * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 4.0).abs() < 1e-12);
    * ```
    */
   day_count:
@@ -7873,11 +7946,11 @@ export interface D_3B1170Fe3280Aa725Fb4 {
  * observations. Observation dates strictly before the forward curve base
  * date then resolve from that series instead of the curve:
  *
- * - **Overnight observations** (compounded/averaged paths) use LOCF lookup
- *   (last observation carried forward), matching RFR publication
- *   conventions where a fixing carries over non-publication days
- *   (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 §7.1(g)). A partially
- *   seasoned compounding window seamlessly mixes realized fixings and
+ * - **Overnight observations** (compounded/averaged paths) use exact-date
+ *   lookup on the index's fixing business days. Weekend and holiday carry
+ *   comes from each observation's accrual-day weight, so a missing required
+ *   business-day fixing is an error rather than reuse of an older fixing.
+ *   A partially seasoned compounding window mixes realized fixings and
  *   curve-projected forwards with identical `(rate, days)` weighting.
  * - **Term-rate resets** use exact-date lookup on the (business-day
  *   adjusted) reset date — a term rate fixes on a specific published date.
@@ -8026,13 +8099,13 @@ export interface D_7Af15F20A258D1Def9Dd1 {
    */
   index_floor_bp?: DB375E274438Ab847F1Fc | null;
   /**
-   * Diagnostic tenor for term-index projection error context.
+   * Explicit term-index tenor when no forward curve resolves.
    *
    * The named forward curve is already the term index (for example a 3M
    * EURIBOR curve). Projection is `fwd.rate(reset_date)`, not a FRA-style
    * average over `[reset, reset + tenor]`. This field (or
-   * [`Self::reset_frequency`] when `None`) is used only to compute
-   * `index_maturity` for error messages. Ignored for overnight-compounded
+   * [`Self::reset_frequency`] when `None`) supplies the compiled term tenor
+   * when no forward curve resolves. Ignored for overnight-compounded
    * legs. When set, the builder warns at build time if it disagrees with
    * the resolved curve's tenor by more than 10% — the curve remains
    * authoritative.
@@ -8054,6 +8127,11 @@ export interface D_7Af15F20A258D1Def9Dd1 {
   overnight_basis?: D_686A28Cd91Db32D9583D | null;
   /**
    * Index floor/cap application policy for overnight-compounded coupons.
+   *
+   * With changing principal, the builder retains daily compounded-rate
+   * increments. Any bound applied to the final period index or all-in
+   * rate contributes a uniform annual-rate adjustment over the coupon's
+   * contractual accrual time; interim cumulative prefixes are not bounded.
    */
   overnight_index_constraints?: "daily" | "period";
   reset_frequency: DCc937Fbaa12E32D4187E3;
@@ -8671,13 +8749,16 @@ export interface D_8Dd62D29564577Ef6F97 {
    * The actual-day conventions:
    *
    * - **`Act365L`** (ICMA Rule 251.1(i)(c)): the denominator depends on the
-   *   coupon frequency supplied via [`DayCountContext`]. Annual, or no frequency
-   *   supplied: 366 if February 29 falls in `(start, end]` (exclusive of start,
-   *   inclusive of end), else 365. Non-annual: 366 if the period end date falls
-   *   in a leap year, else 365. This is **not** ACT/ACT AFB, which uses a
-   *   sub-period splitting algorithm; use [`DayCount::ActActAfb`] for AFB /
-   *   Actual/Actual Euro.
-   * - **`Nl365`**: counts the actual calendar days in `[start, end)` and removes
+   *   coupon frequency and the enclosing `coupon_period` supplied via
+   *   [`DayCountContext`]; both are required. Annual: 366 if February 29 falls
+   *   in `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),
+   *   else 365. Non-annual: 366 if the next coupon date falls in a leap year,
+   *   else 365. Partial accrual keeps the enclosing coupon's denominator.
+   *   Accrual dates outside that coupon are rejected; sum separate coupon
+   *   slices for calculations spanning multiple coupon periods. This is **not**
+   *   ACT/ACT AFB, which uses a sub-period splitting algorithm; use
+   *   [`DayCount::ActActAfb`] for AFB / Actual/Actual Euro.
+   * - **`Nl365`**: counts the actual calendar days in `(start, end]` and removes
    *   every February 29 that falls in the period, so a full leap year still
    *   yields exactly 1.0.
    * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
@@ -8738,7 +8819,12 @@ export interface D_8Dd62D29564577Ef6F97 {
    *
    * // Actual/365L: 29 days over a period containing Feb 29 → 366 denominator
    * let (start, end) = (date(2024, Month::February, 1), date(2024, Month::March, 1));
-   * assert_eq!(yf(DayCount::Act365L, start, end, none()), 29.0 / 366.0);
+   * let ctx = DayCountContext {
+   *     frequency: Some(Tenor::annual()),
+   *     coupon_period: Some((start, end)),
+   *     ..Default::default()
+   * };
+   * assert_eq!(yf(DayCount::Act365L, start, end, ctx), 29.0 / 366.0);
    * // Actual/Actual AFB: 29 February lies in the residual period
    * assert_eq!(yf(DayCount::ActActAfb, start, end, none()), 29.0 / 366.0);
    *
@@ -8770,10 +8856,11 @@ export interface D_8Dd62D29564577Ef6F97 {
    * let ctx = DayCountContext { frequency: Some(Tenor::semi_annual()), ..Default::default() };
    * assert!((yf(DayCount::ActActIsma, start, end, ctx) - 0.5).abs() < 1e-6);
    *
-   * // Business/252: Monday to next Monday is 5 business days
+   * // Business/252: Monday to next Monday is 4 business days, because the
+   * // NYSE was closed on January 9, 2025.
    * let (start, end) = (date(2025, Month::January, 6), date(2025, Month::January, 13));
    * let ctx = DayCountContext { calendar: Some(&NYSE), ..Default::default() };
-   * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 5.0).abs() < 0.1);
+   * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 4.0).abs() < 1e-12);
    * ```
    */
   day_count:
@@ -10238,13 +10325,16 @@ export interface DF6Da7F7Ae3129Fc74F07 {
    * The actual-day conventions:
    *
    * - **`Act365L`** (ICMA Rule 251.1(i)(c)): the denominator depends on the
-   *   coupon frequency supplied via [`DayCountContext`]. Annual, or no frequency
-   *   supplied: 366 if February 29 falls in `(start, end]` (exclusive of start,
-   *   inclusive of end), else 365. Non-annual: 366 if the period end date falls
-   *   in a leap year, else 365. This is **not** ACT/ACT AFB, which uses a
-   *   sub-period splitting algorithm; use [`DayCount::ActActAfb`] for AFB /
-   *   Actual/Actual Euro.
-   * - **`Nl365`**: counts the actual calendar days in `[start, end)` and removes
+   *   coupon frequency and the enclosing `coupon_period` supplied via
+   *   [`DayCountContext`]; both are required. Annual: 366 if February 29 falls
+   *   in `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),
+   *   else 365. Non-annual: 366 if the next coupon date falls in a leap year,
+   *   else 365. Partial accrual keeps the enclosing coupon's denominator.
+   *   Accrual dates outside that coupon are rejected; sum separate coupon
+   *   slices for calculations spanning multiple coupon periods. This is **not**
+   *   ACT/ACT AFB, which uses a sub-period splitting algorithm; use
+   *   [`DayCount::ActActAfb`] for AFB / Actual/Actual Euro.
+   * - **`Nl365`**: counts the actual calendar days in `(start, end]` and removes
    *   every February 29 that falls in the period, so a full leap year still
    *   yields exactly 1.0.
    * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
@@ -10305,7 +10395,12 @@ export interface DF6Da7F7Ae3129Fc74F07 {
    *
    * // Actual/365L: 29 days over a period containing Feb 29 → 366 denominator
    * let (start, end) = (date(2024, Month::February, 1), date(2024, Month::March, 1));
-   * assert_eq!(yf(DayCount::Act365L, start, end, none()), 29.0 / 366.0);
+   * let ctx = DayCountContext {
+   *     frequency: Some(Tenor::annual()),
+   *     coupon_period: Some((start, end)),
+   *     ..Default::default()
+   * };
+   * assert_eq!(yf(DayCount::Act365L, start, end, ctx), 29.0 / 366.0);
    * // Actual/Actual AFB: 29 February lies in the residual period
    * assert_eq!(yf(DayCount::ActActAfb, start, end, none()), 29.0 / 366.0);
    *
@@ -10337,10 +10432,11 @@ export interface DF6Da7F7Ae3129Fc74F07 {
    * let ctx = DayCountContext { frequency: Some(Tenor::semi_annual()), ..Default::default() };
    * assert!((yf(DayCount::ActActIsma, start, end, ctx) - 0.5).abs() < 1e-6);
    *
-   * // Business/252: Monday to next Monday is 5 business days
+   * // Business/252: Monday to next Monday is 4 business days, because the
+   * // NYSE was closed on January 9, 2025.
    * let (start, end) = (date(2025, Month::January, 6), date(2025, Month::January, 13));
    * let ctx = DayCountContext { calendar: Some(&NYSE), ..Default::default() };
-   * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 5.0).abs() < 0.1);
+   * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 4.0).abs() < 1e-12);
    * ```
    */
   day_count:
@@ -10623,13 +10719,16 @@ export interface D_450829Dac3A74A5C8761 {
    * The actual-day conventions:
    *
    * - **`Act365L`** (ICMA Rule 251.1(i)(c)): the denominator depends on the
-   *   coupon frequency supplied via [`DayCountContext`]. Annual, or no frequency
-   *   supplied: 366 if February 29 falls in `(start, end]` (exclusive of start,
-   *   inclusive of end), else 365. Non-annual: 366 if the period end date falls
-   *   in a leap year, else 365. This is **not** ACT/ACT AFB, which uses a
-   *   sub-period splitting algorithm; use [`DayCount::ActActAfb`] for AFB /
-   *   Actual/Actual Euro.
-   * - **`Nl365`**: counts the actual calendar days in `[start, end)` and removes
+   *   coupon frequency and the enclosing `coupon_period` supplied via
+   *   [`DayCountContext`]; both are required. Annual: 366 if February 29 falls
+   *   in `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),
+   *   else 365. Non-annual: 366 if the next coupon date falls in a leap year,
+   *   else 365. Partial accrual keeps the enclosing coupon's denominator.
+   *   Accrual dates outside that coupon are rejected; sum separate coupon
+   *   slices for calculations spanning multiple coupon periods. This is **not**
+   *   ACT/ACT AFB, which uses a sub-period splitting algorithm; use
+   *   [`DayCount::ActActAfb`] for AFB / Actual/Actual Euro.
+   * - **`Nl365`**: counts the actual calendar days in `(start, end]` and removes
    *   every February 29 that falls in the period, so a full leap year still
    *   yields exactly 1.0.
    * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
@@ -10690,7 +10789,12 @@ export interface D_450829Dac3A74A5C8761 {
    *
    * // Actual/365L: 29 days over a period containing Feb 29 → 366 denominator
    * let (start, end) = (date(2024, Month::February, 1), date(2024, Month::March, 1));
-   * assert_eq!(yf(DayCount::Act365L, start, end, none()), 29.0 / 366.0);
+   * let ctx = DayCountContext {
+   *     frequency: Some(Tenor::annual()),
+   *     coupon_period: Some((start, end)),
+   *     ..Default::default()
+   * };
+   * assert_eq!(yf(DayCount::Act365L, start, end, ctx), 29.0 / 366.0);
    * // Actual/Actual AFB: 29 February lies in the residual period
    * assert_eq!(yf(DayCount::ActActAfb, start, end, none()), 29.0 / 366.0);
    *
@@ -10722,10 +10826,11 @@ export interface D_450829Dac3A74A5C8761 {
    * let ctx = DayCountContext { frequency: Some(Tenor::semi_annual()), ..Default::default() };
    * assert!((yf(DayCount::ActActIsma, start, end, ctx) - 0.5).abs() < 1e-6);
    *
-   * // Business/252: Monday to next Monday is 5 business days
+   * // Business/252: Monday to next Monday is 4 business days, because the
+   * // NYSE was closed on January 9, 2025.
    * let (start, end) = (date(2025, Month::January, 6), date(2025, Month::January, 13));
    * let ctx = DayCountContext { calendar: Some(&NYSE), ..Default::default() };
-   * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 5.0).abs() < 0.1);
+   * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 4.0).abs() < 1e-12);
    * ```
    */
   day_count:
@@ -12874,13 +12979,16 @@ export interface DB925Ced0Cbd67041A76F {
    * The actual-day conventions:
    *
    * - **`Act365L`** (ICMA Rule 251.1(i)(c)): the denominator depends on the
-   *   coupon frequency supplied via [`DayCountContext`]. Annual, or no frequency
-   *   supplied: 366 if February 29 falls in `(start, end]` (exclusive of start,
-   *   inclusive of end), else 365. Non-annual: 366 if the period end date falls
-   *   in a leap year, else 365. This is **not** ACT/ACT AFB, which uses a
-   *   sub-period splitting algorithm; use [`DayCount::ActActAfb`] for AFB /
-   *   Actual/Actual Euro.
-   * - **`Nl365`**: counts the actual calendar days in `[start, end)` and removes
+   *   coupon frequency and the enclosing `coupon_period` supplied via
+   *   [`DayCountContext`]; both are required. Annual: 366 if February 29 falls
+   *   in `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),
+   *   else 365. Non-annual: 366 if the next coupon date falls in a leap year,
+   *   else 365. Partial accrual keeps the enclosing coupon's denominator.
+   *   Accrual dates outside that coupon are rejected; sum separate coupon
+   *   slices for calculations spanning multiple coupon periods. This is **not**
+   *   ACT/ACT AFB, which uses a sub-period splitting algorithm; use
+   *   [`DayCount::ActActAfb`] for AFB / Actual/Actual Euro.
+   * - **`Nl365`**: counts the actual calendar days in `(start, end]` and removes
    *   every February 29 that falls in the period, so a full leap year still
    *   yields exactly 1.0.
    * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
@@ -12941,7 +13049,12 @@ export interface DB925Ced0Cbd67041A76F {
    *
    * // Actual/365L: 29 days over a period containing Feb 29 → 366 denominator
    * let (start, end) = (date(2024, Month::February, 1), date(2024, Month::March, 1));
-   * assert_eq!(yf(DayCount::Act365L, start, end, none()), 29.0 / 366.0);
+   * let ctx = DayCountContext {
+   *     frequency: Some(Tenor::annual()),
+   *     coupon_period: Some((start, end)),
+   *     ..Default::default()
+   * };
+   * assert_eq!(yf(DayCount::Act365L, start, end, ctx), 29.0 / 366.0);
    * // Actual/Actual AFB: 29 February lies in the residual period
    * assert_eq!(yf(DayCount::ActActAfb, start, end, none()), 29.0 / 366.0);
    *
@@ -12973,10 +13086,11 @@ export interface DB925Ced0Cbd67041A76F {
    * let ctx = DayCountContext { frequency: Some(Tenor::semi_annual()), ..Default::default() };
    * assert!((yf(DayCount::ActActIsma, start, end, ctx) - 0.5).abs() < 1e-6);
    *
-   * // Business/252: Monday to next Monday is 5 business days
+   * // Business/252: Monday to next Monday is 4 business days, because the
+   * // NYSE was closed on January 9, 2025.
    * let (start, end) = (date(2025, Month::January, 6), date(2025, Month::January, 13));
    * let ctx = DayCountContext { calendar: Some(&NYSE), ..Default::default() };
-   * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 5.0).abs() < 0.1);
+   * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 4.0).abs() < 1e-12);
    * ```
    */
   day_count:
@@ -14145,13 +14259,16 @@ export interface DF6Da7F7Ae3129Fc74F071 {
    * The actual-day conventions:
    *
    * - **`Act365L`** (ICMA Rule 251.1(i)(c)): the denominator depends on the
-   *   coupon frequency supplied via [`DayCountContext`]. Annual, or no frequency
-   *   supplied: 366 if February 29 falls in `(start, end]` (exclusive of start,
-   *   inclusive of end), else 365. Non-annual: 366 if the period end date falls
-   *   in a leap year, else 365. This is **not** ACT/ACT AFB, which uses a
-   *   sub-period splitting algorithm; use [`DayCount::ActActAfb`] for AFB /
-   *   Actual/Actual Euro.
-   * - **`Nl365`**: counts the actual calendar days in `[start, end)` and removes
+   *   coupon frequency and the enclosing `coupon_period` supplied via
+   *   [`DayCountContext`]; both are required. Annual: 366 if February 29 falls
+   *   in `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),
+   *   else 365. Non-annual: 366 if the next coupon date falls in a leap year,
+   *   else 365. Partial accrual keeps the enclosing coupon's denominator.
+   *   Accrual dates outside that coupon are rejected; sum separate coupon
+   *   slices for calculations spanning multiple coupon periods. This is **not**
+   *   ACT/ACT AFB, which uses a sub-period splitting algorithm; use
+   *   [`DayCount::ActActAfb`] for AFB / Actual/Actual Euro.
+   * - **`Nl365`**: counts the actual calendar days in `(start, end]` and removes
    *   every February 29 that falls in the period, so a full leap year still
    *   yields exactly 1.0.
    * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
@@ -14212,7 +14329,12 @@ export interface DF6Da7F7Ae3129Fc74F071 {
    *
    * // Actual/365L: 29 days over a period containing Feb 29 → 366 denominator
    * let (start, end) = (date(2024, Month::February, 1), date(2024, Month::March, 1));
-   * assert_eq!(yf(DayCount::Act365L, start, end, none()), 29.0 / 366.0);
+   * let ctx = DayCountContext {
+   *     frequency: Some(Tenor::annual()),
+   *     coupon_period: Some((start, end)),
+   *     ..Default::default()
+   * };
+   * assert_eq!(yf(DayCount::Act365L, start, end, ctx), 29.0 / 366.0);
    * // Actual/Actual AFB: 29 February lies in the residual period
    * assert_eq!(yf(DayCount::ActActAfb, start, end, none()), 29.0 / 366.0);
    *
@@ -14244,10 +14366,11 @@ export interface DF6Da7F7Ae3129Fc74F071 {
    * let ctx = DayCountContext { frequency: Some(Tenor::semi_annual()), ..Default::default() };
    * assert!((yf(DayCount::ActActIsma, start, end, ctx) - 0.5).abs() < 1e-6);
    *
-   * // Business/252: Monday to next Monday is 5 business days
+   * // Business/252: Monday to next Monday is 4 business days, because the
+   * // NYSE was closed on January 9, 2025.
    * let (start, end) = (date(2025, Month::January, 6), date(2025, Month::January, 13));
    * let ctx = DayCountContext { calendar: Some(&NYSE), ..Default::default() };
-   * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 5.0).abs() < 0.1);
+   * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 4.0).abs() < 1e-12);
    * ```
    */
   day_count:
@@ -14494,13 +14617,16 @@ export interface D_450829Dac3A74A5C87611 {
    * The actual-day conventions:
    *
    * - **`Act365L`** (ICMA Rule 251.1(i)(c)): the denominator depends on the
-   *   coupon frequency supplied via [`DayCountContext`]. Annual, or no frequency
-   *   supplied: 366 if February 29 falls in `(start, end]` (exclusive of start,
-   *   inclusive of end), else 365. Non-annual: 366 if the period end date falls
-   *   in a leap year, else 365. This is **not** ACT/ACT AFB, which uses a
-   *   sub-period splitting algorithm; use [`DayCount::ActActAfb`] for AFB /
-   *   Actual/Actual Euro.
-   * - **`Nl365`**: counts the actual calendar days in `[start, end)` and removes
+   *   coupon frequency and the enclosing `coupon_period` supplied via
+   *   [`DayCountContext`]; both are required. Annual: 366 if February 29 falls
+   *   in `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),
+   *   else 365. Non-annual: 366 if the next coupon date falls in a leap year,
+   *   else 365. Partial accrual keeps the enclosing coupon's denominator.
+   *   Accrual dates outside that coupon are rejected; sum separate coupon
+   *   slices for calculations spanning multiple coupon periods. This is **not**
+   *   ACT/ACT AFB, which uses a sub-period splitting algorithm; use
+   *   [`DayCount::ActActAfb`] for AFB / Actual/Actual Euro.
+   * - **`Nl365`**: counts the actual calendar days in `(start, end]` and removes
    *   every February 29 that falls in the period, so a full leap year still
    *   yields exactly 1.0.
    * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
@@ -14561,7 +14687,12 @@ export interface D_450829Dac3A74A5C87611 {
    *
    * // Actual/365L: 29 days over a period containing Feb 29 → 366 denominator
    * let (start, end) = (date(2024, Month::February, 1), date(2024, Month::March, 1));
-   * assert_eq!(yf(DayCount::Act365L, start, end, none()), 29.0 / 366.0);
+   * let ctx = DayCountContext {
+   *     frequency: Some(Tenor::annual()),
+   *     coupon_period: Some((start, end)),
+   *     ..Default::default()
+   * };
+   * assert_eq!(yf(DayCount::Act365L, start, end, ctx), 29.0 / 366.0);
    * // Actual/Actual AFB: 29 February lies in the residual period
    * assert_eq!(yf(DayCount::ActActAfb, start, end, none()), 29.0 / 366.0);
    *
@@ -14593,10 +14724,11 @@ export interface D_450829Dac3A74A5C87611 {
    * let ctx = DayCountContext { frequency: Some(Tenor::semi_annual()), ..Default::default() };
    * assert!((yf(DayCount::ActActIsma, start, end, ctx) - 0.5).abs() < 1e-6);
    *
-   * // Business/252: Monday to next Monday is 5 business days
+   * // Business/252: Monday to next Monday is 4 business days, because the
+   * // NYSE was closed on January 9, 2025.
    * let (start, end) = (date(2025, Month::January, 6), date(2025, Month::January, 13));
    * let ctx = DayCountContext { calendar: Some(&NYSE), ..Default::default() };
-   * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 5.0).abs() < 0.1);
+   * assert!((yf(DayCount::Bus252, start, end, ctx) * 252.0 - 4.0).abs() < 1e-12);
    * ```
    */
   day_count:
@@ -14791,13 +14923,15 @@ export interface D_7D9F94Bbd332B01035F6 {
    */
   available_cash_node: string;
   /**
-   * Excess Cash Flow (ECF) sweep specification
+   * Excess Cash Flow (ECF) sweep specification.
+   * A positive sweep percentage requires the `Sweep` payment priority.
    */
   ecf_sweep?: D_7A9D5Ee9143003A0618A | null;
   /**
    * Formula or node for the `MandatoryPrepayment` rung.
    *
    * Required when `MandatoryPrepayment` appears in `priority_of_payments`.
+   * When configured, that priority must be present so payment consumes cash.
    * Sized independently of the ECF sweep and voluntary prepay buckets.
    */
   mandatory_prepay_node?: string | null;
@@ -14821,6 +14955,7 @@ export interface D_7D9F94Bbd332B01035F6 {
    * Formula or node for the `VoluntaryPrepayment` rung.
    *
    * Required when `VoluntaryPrepayment` appears in `priority_of_payments`.
+   * When configured, that priority must be present so payment consumes cash.
    * Sized independently of the ECF sweep and mandatory prepay buckets.
    */
   voluntary_prepay_node?: string | null;
@@ -14832,9 +14967,9 @@ export interface D_7D9F94Bbd332B01035F6 {
  *
  * # ECF Calculation
  *
- * The standard ECF formula deducts cash interest from EBITDA. Fees and
- * scheduled principal are also deducted when those payment categories rank
- * ahead of the prepayment priority:
+ * The ECF formula deducts cash interest, fees and scheduled principal paid
+ * by payment categories ahead of the `Sweep` priority, including carried
+ * arrears. Unpaid claims, PIK and later payment priorities are not deducted:
  *
  * ```text
  * ECF = EBITDA - Taxes - CapEx - ΔWC - Cash Interest Paid
@@ -14843,8 +14978,7 @@ export interface D_7D9F94Bbd332B01035F6 {
  *   ```
  *
  * Set `cash_interest_node` to override the cash-interest input. If omitted,
- * contractual cash interest is deducted automatically using the period's
- * debt-service magnitude.
+ * the interest actually paid ahead of `Sweep` is deducted automatically.
  *
  * # References
  *
@@ -14858,8 +14992,10 @@ export interface D_7A9D5Ee9143003A0618A {
   /**
    * Formula or node reference for cash interest paid (e.g., "cs.interest_expense_cash.total").
    *
-   * Per S&P LCD / standard LPA definitions, ECF should deduct cash interest paid.
-   * If omitted, contractual cash interest is deducted automatically.
+   * If omitted, deducts cash interest actually paid by the `Interest` priority
+   * ahead of `Sweep`, including carried coupon arrears. If `Interest` follows
+   * `Sweep`, this automatic deduction is zero. An explicit node overrides
+   * that amount in the model's cash currency units.
    */
   cash_interest_node?: string | null;
   /**
@@ -14926,11 +15062,12 @@ export interface D_321Bf35B4A9Ae99F3Cf3 {
    */
   min_periods_in_pik?: number;
   /**
-   * Instruments that switch to PIK when the toggle triggers.
+   * Borrowing debt IDs whose cash coupons capitalize when the toggle triggers.
    *
    * Must be a non-empty list: instrument-level PIK capability is not
    * modeled, so `None` or an empty list is rejected by
    * [`PikToggleSpec::validate`] rather than meaning "every instrument".
+   * Swaps and options cannot be PIK targets.
    */
   target_instrument_ids?: string[] | null;
   /**

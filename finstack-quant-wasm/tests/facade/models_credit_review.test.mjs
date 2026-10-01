@@ -9,22 +9,20 @@ await init({
 
 test('high-intensity zero-size structural jumps preserve GBM default probability', () => {
   const credit = models.credit;
-  const diffusion = credit.mertonModelJson(100, 0.2, 80, 0.05);
-  const jumps = credit.mertonModelWithDynamicsJson(
-    100,
-    0.2,
-    80,
-    0.05,
-    0,
-    JSON.stringify('terminal'),
-    JSON.stringify({
-      jump_diffusion: { jump_intensity: 746, jump_mean: 0, jump_vol: 0 },
-    })
-  );
-
-  const expected = credit.mertonDefaultProbability(diffusion, 1);
-  assert.ok(expected > 0.01);
-  assert.ok(Math.abs(credit.mertonDefaultProbability(jumps, 1) - expected) < 1e-11);
+  const diffusion = new credit.MertonModel(100, 0.2, 80, 0.05);
+  const barrier = credit.MertonBarrierType.terminal();
+  const dynamics = credit.AssetDynamics.jumpDiffusion(746, 0, 0);
+  const jumps = credit.MertonModel.newWithDynamics(100, 0.2, 80, 0.05, 0, barrier, dynamics);
+  try {
+    const expected = diffusion.defaultProbability(1);
+    assert.ok(expected > 0.01);
+    assert.ok(Math.abs(jumps.defaultProbability(1) - expected) < 1e-11);
+  } finally {
+    jumps.free();
+    dynamics.free();
+    barrier.free();
+    diffusion.free();
+  }
 });
 
 for (const mean of [0.01, 0.99]) {

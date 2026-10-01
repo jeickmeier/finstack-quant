@@ -15,34 +15,6 @@
         }
       ]
     },
-    "MacroScenario": {
-      "additionalProperties": false,
-      "description": "A forward-looking macro scenario with a probability weight.\n\nUsed for probability-weighted ECL calculation per IFRS 9 B5.5.42.",
-      "properties": {
-        "id": {
-          "description": "Scenario identifier (e.g., \"base\", \"upside\", \"downside\").",
-          "type": "string"
-        },
-        "lgd_override": {
-          "description": "Optional LGD override for this scenario (downturn LGD).",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "weight": {
-          "description": "Probability weight in \\[0, 1\\]. All scenario weights must sum to 1.0.",
-          "format": "double",
-          "type": "number"
-        }
-      },
-      "required": [
-        "id",
-        "weight"
-      ],
-      "type": "object"
-    },
     "ReversionMethod": {
       "description": "How the PD curve reverts from forecast to historical after the R&S period.",
       "oneOf": [
@@ -128,13 +100,6 @@
       "$ref": "#/$defs/ReversionMethod",
       "description": "Reversion method: how PD transitions from R&S to historical."
     },
-    "scenarios": {
-      "description": "Macro scenario specifications (same structure as IFRS 9).",
-      "items": {
-        "$ref": "#/$defs/MacroScenario"
-      },
-      "type": "array"
-    },
     "warm_annual_loss_rate": {
       "description": "Average annual net charge-off rate (decimal) for the WARM method.\nRequired when `methodology == CeclMethodology::Warm`; rejected otherwise.",
       "format": "double",
@@ -149,7 +114,6 @@
     "forecast_horizon_years",
     "reversion_method",
     "historical_annual_pd",
-    "scenarios",
     "methodology"
   ],
   "title": "CeclConfig",

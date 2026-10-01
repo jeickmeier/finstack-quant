@@ -92,7 +92,7 @@
           "type": "string"
         },
         "residual_variance": {
-          "description": "Annualized variance contributed by this position's idiosyncratic risk.\nAlways non-negative.",
+          "description": "Annualized variance allocated to this position's idiosyncratic risk.\nA hedge sharing another position's issuer shock may receive a negative\nallocation; the total residual variance must remain non-negative.",
           "format": "double",
           "type": "number"
         },

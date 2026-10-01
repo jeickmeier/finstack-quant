@@ -650,7 +650,7 @@ export interface ResultsMeta {
  */
 export interface RoundingContext {
   /**
-   * Ingest scale map snapshot by currency code.
+   * Validated ingest scale snapshot by currency code, with values in `0..=28`.
    */
   ingest_scale_by_currency: {
     [k: string]: number;
@@ -660,7 +660,7 @@ export interface RoundingContext {
    */
   mode: RoundingMode;
   /**
-   * Output scale map snapshot by currency code.
+   * Validated output scale snapshot by currency code, with values in `0..=28`.
    */
   output_scale_by_currency: {
     [k: string]: number;

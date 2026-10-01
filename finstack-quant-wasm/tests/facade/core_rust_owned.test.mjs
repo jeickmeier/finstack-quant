@@ -97,13 +97,28 @@ test('yearFraction and signedYearFraction take an optional context', () => {
   const start = core.createDate(2024, 3, 1);
   const end = core.createDate(2024, 9, 1);
   const act365l = core.DayCount.act365l();
-  const semiAnnual = new core.DayCountContext(null, '6M');
-  // No context: annual Act/365L; a 6M context changes the denominator.
-  assert.equal(act365l.yearFraction(start, end), 0.5041095890410959);
-  assert.equal(act365l.yearFraction(start, end, null), 0.5041095890410959);
+  // Act/365L is defined per coupon period: it needs the coupon frequency and
+  // the enclosing coupon period, and the frequency selects the denominator.
+  const annual = new core.DayCountContext(null, '1Y', null, [start, core.createDate(2025, 3, 1)]);
+  const semiAnnual = new core.DayCountContext(null, '6M', null, [start, end]);
+  assert.equal(act365l.yearFraction(start, end, annual), 0.5041095890410959);
   assert.equal(act365l.yearFraction(start, end, semiAnnual), 0.5027322404371585);
   assert.equal(act365l.signedYearFraction(end, start, semiAnnual), -0.5027322404371585);
-  assert.equal(act365l.signedYearFraction(end, start), -0.5041095890410959);
+  assert.equal(act365l.signedYearFraction(end, start, annual), -0.5041095890410959);
+  // No context (omitted or null) is the empty context, which Act/365L rejects.
+  for (const call of [
+    () => act365l.yearFraction(start, end),
+    () => act365l.yearFraction(start, end, null),
+    () => act365l.signedYearFraction(end, start),
+  ]) {
+    assert.throws(
+      call,
+      validation('Validation error: ACT/365L requires coupon frequency in DayCountContext')
+    );
+  }
+  const act360 = core.DayCount.act360();
+  assert.equal(act360.yearFraction(start, end), act360.yearFraction(start, end, null));
+  assert.equal(act360.signedYearFraction(end, start), -act360.yearFraction(start, end));
 
   const bus252 = core.DayCount.bus252();
   const nyse = new core.DayCountContext('nyse');

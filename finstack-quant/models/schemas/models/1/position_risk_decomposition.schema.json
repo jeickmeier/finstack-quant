@@ -19,7 +19,7 @@
       "description": "Expected Shortfall decomposition result for a single portfolio position.",
       "properties": {
         "component_es": {
-          "description": "Component ES: position's contribution to portfolio Expected Shortfall.\n\nParametric: analytical formula using truncated normal moments.\n```text\nCES_i = w_i * (Sigma * w)_i / sigma_p * phi(z_alpha) / (1 - alpha)\n```\n\nHistorical: average of position-level losses in tail scenarios.\n```text\nCES_i = E[L_i | L_portfolio > VaR_portfolio]\n```",
+          "description": "Component ES: position's contribution to portfolio Expected Shortfall.\n\nParametric: analytical formula using truncated normal moments.\n```text\nCES_i = w_i * (Sigma * w)_i / sigma_p * phi(z_alpha) / (1 - alpha)\n```\n\nHistorical: probability-weighted position P&L over the exact loss-tail\nmass. Boundary ties share their tail weight equally.\n```text\nCES_i = E[L_i | L_portfolio > VaR_portfolio]\n```",
           "format": "double",
           "type": "number"
         },

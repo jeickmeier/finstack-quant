@@ -382,7 +382,7 @@ fn state_repr(name: &str, state: &DayCountContextState) -> String {
 /// frequency : Tenor | str | None
 ///     Coupon frequency (``Tenor`` or ``"6M"``).
 /// bus_basis : int | None
-///     Business-day divisor for ``BUS_252``; ``None`` selects 252.
+///     Positive business-day divisor for ``BUS_252``; ``None`` selects 252.
 /// coupon_period : tuple[datetime.date | str, datetime.date | str] | None
 ///     Unadjusted regular reference coupon period for ACT/ACT (ICMA), or the enclosing
 ///     contractual coupon for ACT/365L, as ``(start, end)``;
@@ -394,7 +394,8 @@ fn state_repr(name: &str, state: &DayCountContextState) -> String {
 /// Raises
 /// ------
 /// ValueError
-///     If ``coupon_period`` is inverted or ``frequency`` does not parse.
+///     If ``coupon_period`` is inverted, ``frequency`` does not parse or
+///     ``bus_basis`` is zero.
 ///
 /// Examples
 /// --------

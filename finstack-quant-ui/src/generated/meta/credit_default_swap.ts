@@ -460,7 +460,7 @@ export default [
   {
     "path": "#/$defs/d_16451e0bf3b6b78178d8",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/DynamicRecoverySpec",
-    "description": "Specification for dynamic (notional-dependent) recovery rate.\n\nModels the relationship between the accreted notional and the recovery\nrate in default. As PIK accrual increases the notional relative to the\noriginal base, recovery declines according to the chosen [`RecoveryModel`]."
+    "description": "Specification for dynamic (notional-dependent) recovery rate.\n\nModels the relationship between the accreted notional and the recovery\nrate in default. As PIK accrual increases the notional relative to the\noriginal base, recovery declines according to the chosen [`RecoveryModel`].\nDeserialization enforces the same parameter invariants as the constructors."
   },
   {
     "path": "#/$defs/d_16451e0bf3b6b78178d8/properties/base_notional",
@@ -875,7 +875,7 @@ export default [
     "path": "#/$defs/d_340600459464be36bb01/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json#/$defs/CdsValuationConvention/oneOf/1",
     "const": "bloomberg_cdsw_clean",
-    "description": "Bloomberg CDSW clean principal presentation and premium-leg policy.\n\nThis is the industry-standard convention used by Bloomberg CDSW and\nthe ISDA Standard Upfront Model. It is the default for new\n`CreditDefaultSwap` instances:\n\n- Premium cashflows accrue between business-day-adjusted dates that\n  match the Bloomberg CDSW cashflow schedule.\n- The final coupon period is inclusive of the maturity date (extra\n  day) per CDSW convention.\n- The reported NPV is the clean principal value (Bloomberg\n  \"Principal\" line). Cash settlement is `Principal + Accrued`.\n- Par spread uses the risky annuity denominator (matches the CDSW\n  screen for investment-grade credits).\n- Hazard rebootstrap inside risk metrics (CS01, recovery01, etc.)\n  inherits the same CDSW pricer convention so sensitivities are\n  self-consistent with the base PV."
+    "description": "Bloomberg CDSW clean principal presentation and premium-leg policy.\n\nThis is the industry-standard convention used by Bloomberg CDSW and\nthe ISDA Standard Upfront Model. It is the default for new\n`CreditDefaultSwap` instances:\n\n- Intermediate premium cashflows accrue between business-day-adjusted\n  dates. Final accrual ends on unadjusted maturity; the final payment\n  follows the business-day convention independently.\n- The final coupon period is inclusive of the maturity date (extra\n  day) per CDSW convention.\n- The reported NPV is the clean principal value (Bloomberg\n  \"Principal\" line). Cash settlement is `Principal + Accrued`.\n- Par spread uses the risky annuity denominator (matches the CDSW\n  screen for investment-grade credits).\n- Hazard rebootstrap inside risk metrics (CS01, recovery01, etc.)\n  inherits the same CDSW pricer convention so sensitivities are\n  self-consistent with the base PV."
   },
   {
     "path": "#/$defs/d_340600459464be36bb01/oneOf/2",
@@ -1363,7 +1363,7 @@ export default [
   {
     "path": "#/$defs/d_5c13df5a55f1da604df2",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding",
-    "description": "Compounding convention for interest rates.\n\nUsed to specify how interest rates should be quoted or converted.\nAll variants produce mathematically equivalent discount factors when\napplied consistently.\n\n# Relationship Between Conventions\n\nFor a given discount factor DF at time t, the rates under different\nconventions are related by:\n\n```text\nDF = e^(-r_cc × t)                    [Continuous]\n   = (1 + r_ann)^(-t)                 [Annual]\n   = (1 + r_per/n)^(-n×t)             [Periodic(n)]\n   = 1 / (1 + r_simple × t)           [Simple]\n```\n\n# Ordering of Rates\n\nFor positive rates and t > 0: `r_simple > r_annual > r_continuous`\n(less frequent compounding requires a higher quoted rate for the same DF)."
+    "description": "Compounding convention for interest rates.\n\nUsed to specify how interest rates should be quoted or converted.\nAll variants produce mathematically equivalent discount factors when\napplied consistently.\n\n# Relationship Between Conventions\n\nFor a given discount factor DF at time t, the rates under different\nconventions are related by:\n\n```text\nDF = e^(-r_cc × t)                    [Continuous]\n   = (1 + r_ann)^(-t)                 [Annual]\n   = (1 + r_per/n)^(-n×t)             [Periodic(n)]\n   = 1 / (1 + r_simple × t)           [Simple]\n```\n\n# Ordering of Rates\n\nFor a common discount factor below one, annual and simple rates both exceed\nthe continuous rate. Their ordering depends on the maturity `t` in years:\n`r_annual > r_simple` for `0 < t < 1`, they agree at `t = 1`, and\n`r_simple > r_annual` for `t > 1`."
   },
   {
     "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/0",
@@ -5360,7 +5360,7 @@ export default [
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/10",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/10",
     "const": "act_act_isma",
-    "description": "Actual/Actual (ICMA) day count convention.\n\nActual days over (actual days in the coupon period × coupons per year).\nRequires a coupon frequency.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251 - \"Actual/Actual (ICMA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ICMA\" (A007)\n- **Also known as**: Act/Act (ICMA), Act/Act (ISMA), ISMA-99"
+    "description": "Actual/Actual (ICMA) day count convention.\n\nActual days over (actual days in the coupon period × coupons per year).\nRequires a coupon frequency. Explicit reference coupon boundaries must\nbe unadjusted regular dates from the contractual nominal month grid,\nnot payment dates.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251 - \"Actual/Actual (ICMA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ICMA\" (A007)\n- **Also known as**: Act/Act (ICMA), Act/Act (ISMA), ISMA-99"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/11",
@@ -5384,7 +5384,7 @@ export default [
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/3",
     "const": "act_365l",
-    "description": "Actual/365 Leap day count convention (Actual/365L).\n\nYear fraction = (actual days) / (365 or 366). Annual or unspecified\nfrequency: 366 if February 29 falls in (start, end]. Other frequencies:\n366 if the end date falls in a leap year. Not Actual/Actual AFB.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251.1(i)(c)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365L\" (A008)\n- **Also known as**: Act/365L, ISMA-Year"
+    "description": "Actual/365 Leap day count convention (Actual/365L).\n\nYear fraction = (actual days) / (365 or 366). Requires the coupon\nfrequency and the enclosing coupon period. Annual: 366 if February 29\nfalls in (coupon_start, coupon_end]. Other frequencies: 366 if the next\ncoupon date falls in a leap year. Not Actual/Actual AFB.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251.1(i)(c)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365L\" (A008)\n- **Also known as**: Act/365L, ISMA-Year"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/4",
@@ -5483,7 +5483,7 @@ export default [
   {
     "path": "#/$defs/d_c4f0f60f0c3e41bff146",
     "source": "https://finstack_quant.dev/schemas/instrument/1/credit_derivatives/credit_default_swap.schema.json#/$defs/RollRule",
-    "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode. The IMM modes\nforce a quarterly grid: the schedule frequency and stub rule configured on\n[`ScheduleParams`] are overridden with quarterly / short-back, matching\n`ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates\n  for rate, currency, and equity index futures).\n- **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll\n  dates). When the start date is not itself a roll date, the first period\n  accrues from the roll date immediately **preceding** the start (standard\n  front accrual per the ISDA Big Bang Protocol, April 2009).\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::specs::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)"
+    "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode. The IMM modes\nforce a quarterly grid: the schedule frequency and stub rule configured on\n[`ScheduleParams`] are overridden with quarterly / short-back, matching\n`ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates\n  for rate, currency, and equity index futures). Cashflow schedules retain\n  the contractual maturity as a short final stub when it is off-grid.\n- **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll\n  dates). When the start date is not itself a roll date, the first period\n  accrues from the roll date immediately **preceding** the start (standard\n  front accrual per the ISDA Big Bang Protocol, April 2009).\n  Interior coupon or payment-program windows start at their declared\n  boundary; front accrual is applied only once at the instrument start.\n\nExplicit roll grids cannot be combined with `end_of_month`. ACT/ACT ICMA\nsupports the CDS twentieth grid; third-Wednesday IMM with ACT/ACT ICMA is\nrejected because the available ICMA reference calculation requires nominal\nmonth-grid coupons.\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::specs::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)"
   },
   {
     "path": "#/$defs/d_c4f0f60f0c3e41bff146/oneOf/0",
@@ -5506,7 +5506,7 @@ export default [
   {
     "path": "#/$defs/d_cc8ed166abbb10ad4451",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/EndogenousHazardSpec",
-    "description": "Specification for endogenous (leverage-dependent) hazard rate.\n\nModels the relationship between a firm's leverage and its instantaneous\nhazard rate, enabling a feedback loop where PIK accrual increases the\nnotional (and hence leverage), which drives the hazard rate higher."
+    "description": "Specification for endogenous (leverage-dependent) hazard rate.\n\nModels the relationship between a firm's leverage and its instantaneous\nhazard rate, enabling a feedback loop where PIK accrual increases the\nnotional (and hence leverage), which drives the hazard rate higher.\nDeserialization validates the parameters and rejects incomplete or\ninconsistent tabular calibrations before they can be evaluated."
   },
   {
     "path": "#/$defs/d_cc8ed166abbb10ad4451/properties/base_hazard_rate",
@@ -5965,7 +5965,7 @@ export default [
     "path": "#/$defs/d_f80f2b90e7af690c5898/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/VarMethod/oneOf/1",
     "const": "taylor_approximation",
-    "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options)."
+    "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options).\nEquity Greeks are associated with their actual market-scalar identifier.\nInstruments with multiple underlying spots or ambiguous scalar ownership\nrequire full revaluation; aggregate gamma is not a multi-asset Hessian."
   },
   {
     "path": "#/$defs/d_f94493549cb5ab005e8c",

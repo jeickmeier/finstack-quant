@@ -50,12 +50,14 @@ export type AmortizationSpec =
   | {
       linear_between: {
         /**
-         * Amortization end (full repayment), on or before maturity.
+         * Economic end of amortization (full repayment), which must be an
+         * actual coupon accrual boundary on or before the effective terminal
+         * accrual date. Cash settlement may follow this date due to payment lag.
          */
         end: valuations.DateWire;
         /**
-         * Amortization start; installments fall on payment dates strictly
-         * after it.
+         * Economic amortization start, on or after issue; installments fall
+         * on coupon accrual boundaries strictly after it.
          */
         start: valuations.DateWire;
       };
@@ -254,11 +256,19 @@ export type CouponType =
  *
  * - **`None`**: plain tenor stepping from the schedule boundaries (default).
  * - **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates
- *   for rate, currency, and equity index futures).
+ *   for rate, currency, and equity index futures). Cashflow schedules retain
+ *   the contractual maturity as a short final stub when it is off-grid.
  * - **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll
  *   dates). When the start date is not itself a roll date, the first period
  *   accrues from the roll date immediately **preceding** the start (standard
  *   front accrual per the ISDA Big Bang Protocol, April 2009).
+ *   Interior coupon or payment-program windows start at their declared
+ *   boundary; front accrual is applied only once at the instrument start.
+ *
+ * Explicit roll grids cannot be combined with `end_of_month`. ACT/ACT ICMA
+ * supports the CDS twentieth grid; third-Wednesday IMM with ACT/ACT ICMA is
+ * rejected because the available ICMA reference calculation requires nominal
+ * month-grid coupons.
  *
  * # References
  *
@@ -617,7 +627,10 @@ export interface AccrualConfig {
   method: AccrualMethod;
 }
 /**
- * Ex-coupon convention applied to coupon flows.
+ * Coupon record-date convention applied to coupon flows.
+ *
+ * Settlement on the record date retains the coupon. Settlement strictly
+ * after it and before payment trades ex-coupon, as in the UK gilt convention.
  */
 export interface ExCouponRule {
   /**
@@ -628,7 +641,7 @@ export interface ExCouponRule {
    */
   calendar_id?: valuations.Id | null;
   /**
-   * Number of days before coupon date that go ex.
+   * Number of days from the coupon record date to payment.
    *
    * Values greater than 366 are rejected by [`ExCouponRule::ex_date`].
    */
@@ -683,6 +696,7 @@ export interface CashFlow {
    * This is stored at cashflow creation time when available.
    * For instruments with intra-period events (e.g., revolving credit with draws/repays),
    * this may represent a time-weighted average rate across sub-periods.
+   * Serialization rejects non-finite rates instead of encoding them as absent.
    */
   rate?: number | null;
   /**
@@ -700,8 +714,11 @@ export interface CashFlowAccrual {
    */
   calendar_id?: string | null;
   /**
-   * Regular reference coupon period for ACT/ACT ICMA, including stub accrual.
-   * `None` leaves reference-period selection to the schedule accrual caller.
+   * Unadjusted regular reference coupon period for ACT/ACT ICMA, or the
+   * actual full contractual coupon period for ACT/365L, including when
+   * this flow represents only a rate or balance subinterval.
+   * ACT/365L metadata must retain these boundaries to select the original
+   * coupon's denominator; other conventions may leave this field `None`.
    *
    * @minItems 2
    * @maxItems 2
@@ -722,6 +739,7 @@ export interface CashFlowAccrual {
   end_is_termination_date?: boolean;
   /**
    * Projected index rate before spread, gearing, caps, or floors.
+   * Serialization rejects non-finite rates instead of encoding them as absent.
    */
   projected_index_rate?: number | null;
   /**
@@ -918,6 +936,11 @@ export interface FixedCouponSpec {
   /**
    * Whether end-of-month rolling should be preserved when generating the
    * schedule.
+   *
+   * Incompatible with explicit IMM roll rules. With ACT/ACT ICMA, the
+   * regular grid anchor must be month-end: maturity for front stubs, or
+   * start for back stubs and schedules without stubs. An irregular opposite
+   * endpoint remains supported.
    */
   end_of_month?: boolean;
   /**
@@ -1000,6 +1023,11 @@ export interface FloatingCouponSpec {
   /**
    * Whether end-of-month rolling should be preserved when generating the
    * schedule.
+   *
+   * Incompatible with explicit IMM roll rules. With ACT/ACT ICMA, the
+   * regular grid anchor must be month-end: maturity for front stubs, or
+   * start for back stubs and schedules without stubs. An irregular opposite
+   * endpoint remains supported.
    */
   end_of_month?: boolean;
   /**
@@ -1068,11 +1096,11 @@ export interface FloatingCouponSpec {
  * observations. Observation dates strictly before the forward curve base
  * date then resolve from that series instead of the curve:
  *
- * - **Overnight observations** (compounded/averaged paths) use LOCF lookup
- *   (last observation carried forward), matching RFR publication
- *   conventions where a fixing carries over non-publication days
- *   (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 §7.1(g)). A partially
- *   seasoned compounding window seamlessly mixes realized fixings and
+ * - **Overnight observations** (compounded/averaged paths) use exact-date
+ *   lookup on the index's fixing business days. Weekend and holiday carry
+ *   comes from each observation's accrual-day weight, so a missing required
+ *   business-day fixing is an error rather than reuse of an older fixing.
+ *   A partially seasoned compounding window mixes realized fixings and
  *   curve-projected forwards with identical `(rate, days)` weighting.
  * - **Term-rate resets** use exact-date lookup on the (business-day
  *   adjusted) reset date — a term rate fixes on a specific published date.
@@ -1157,13 +1185,13 @@ export interface FloatingRateSpec {
    */
   index_floor_bp?: valuations.DecimalWire | null;
   /**
-   * Diagnostic tenor for term-index projection error context.
+   * Explicit term-index tenor when no forward curve resolves.
    *
    * The named forward curve is already the term index (for example a 3M
    * EURIBOR curve). Projection is `fwd.rate(reset_date)`, not a FRA-style
    * average over `[reset, reset + tenor]`. This field (or
-   * [`Self::reset_frequency`] when `None`) is used only to compute
-   * `index_maturity` for error messages. Ignored for overnight-compounded
+   * [`Self::reset_frequency`] when `None`) supplies the compiled term tenor
+   * when no forward curve resolves. Ignored for overnight-compounded
    * legs. When set, the builder warns at build time if it disagrees with
    * the resolved curve's tenor by more than 10% — the curve remains
    * authoritative.
@@ -1185,14 +1213,21 @@ export interface FloatingRateSpec {
   overnight_basis?: valuations.DayCount | null;
   /**
    * Index floor/cap application policy for overnight-compounded coupons.
+   *
+   * With changing principal, the builder retains daily compounded-rate
+   * increments. Any bound applied to the final period index or all-in
+   * rate contributes a uniform annual-rate adjustment over the coupon's
+   * contractual accrual time; interim cumulative prefixes are not bounded.
    */
   overnight_index_constraints?: OvernightIndexConstraintApplication;
   /**
-   * Reset frequency for rate fixings.
+   * Fallback term-index tenor when [`Self::index_tenor`] is absent.
    *
-   * This is the cadence at which the rate refixes. When
-   * [`Self::index_tenor`] is `None`, it is also the tenor used only to
-   * build the diagnostic index-maturity date in projection error context.
+   * The bare cashflow builder observes one term fixing at each coupon
+   * period's accrual start, with the configured reset lag. This field does
+   * not create additional resets inside a payment period. The resolved
+   * forward curve owns the quoted index tenor; overnight methods observe
+   * their compiled daily fixing schedule independently of this field.
    */
   reset_frequency: valuations.Tenor;
   /**
@@ -1259,6 +1294,11 @@ export interface StepUpCouponSpec {
   /**
    * Whether end-of-month rolling should be preserved when generating the
    * schedule.
+   *
+   * Incompatible with explicit IMM roll rules. With ACT/ACT ICMA, the
+   * regular grid anchor must be month-end: maturity for front stubs, or
+   * start for back stubs and schedules without stubs. An irregular opposite
+   * endpoint remains supported.
    */
   end_of_month?: boolean;
   /**
@@ -1334,7 +1374,9 @@ export interface PaymentStepSpec {
  */
 export interface PrincipalEventSpec {
   /**
-   * Optional cash leg. When omitted, the cash leg equals `delta`.
+   * Optional settlement amount before classification-dependent sign handling.
+   * When omitted, amortization repayments use `-delta` and draws use `delta`.
+   * Amortization emits this amount as a receipt; other kinds negate it.
    */
   cash?: valuations.Money | null;
   /**
@@ -1475,6 +1517,11 @@ export interface ScheduleParams {
   /**
    * Whether end-of-month rolling should be preserved when generating the
    * schedule.
+   *
+   * Incompatible with explicit IMM roll rules. With ACT/ACT ICMA, the
+   * regular grid anchor must be month-end: maturity for front stubs, or
+   * start for back stubs and schedules without stubs. An irregular opposite
+   * endpoint remains supported.
    */
   end_of_month?: boolean;
   /**

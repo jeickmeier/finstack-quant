@@ -12,7 +12,7 @@
       "type": "array"
     },
     "eigenvalues": {
-      "description": "Eigenvalues in descending order (length min(T-1, N)).",
+      "description": "Eigenvalues in descending order (one per tenor, including zero-variance components).",
       "items": {
         "format": "double",
         "type": "number"

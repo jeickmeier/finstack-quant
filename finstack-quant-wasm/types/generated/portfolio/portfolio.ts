@@ -1135,6 +1135,12 @@ export type MarketFactorKey =
       };
     }
   | {
+      base_correlation: Id;
+    }
+  | {
+      credit_index: Id;
+    }
+  | {
       spot: string;
     }
   | {
@@ -1574,7 +1580,7 @@ export interface ResultsMeta {
  */
 export interface RoundingContext {
   /**
-   * Ingest scale map snapshot by currency code.
+   * Validated ingest scale snapshot by currency code, with values in `0..=28`.
    */
   ingest_scale_by_currency: {
     [k: string]: number;
@@ -1584,7 +1590,7 @@ export interface RoundingContext {
    */
   mode: RoundingMode;
   /**
-   * Output scale map snapshot by currency code.
+   * Validated output scale snapshot by currency code, with values in `0..=28`.
    */
   output_scale_by_currency: {
     [k: string]: number;
@@ -1750,7 +1756,9 @@ export interface AttributionMeta {
    */
   notes: string[];
   /**
-   * Number of repricings performed.
+   * Number of top-level valuation calls, including attempted carry-helper
+   * metric, flat-yield and funding valuations. Internal risk-metric bump
+   * valuations are not counted separately.
    */
   num_repricings: number;
   /**
@@ -1834,7 +1842,8 @@ export interface TaylorAttributionConfig {
  * - Positions without `book_id` are not in any book
  * - Book hierarchies are expected to be acyclic trees or forests; aggregation
  *   helpers reject cycles and excessively deep nesting instead of recursing
- *   indefinitely
+ *   indefinitely. A portfolio supports at most 100,000 books and 512 levels
+ *   of ancestry, including the root.
  * - [`Book::child_book_ids`] drives rollup in [`crate::grouping::aggregate_by_book`];
  *   [`crate::portfolio::Portfolio::validate`] checks parent/child consistency
  *   between child lists and [`Book::parent_id`]
@@ -2256,7 +2265,7 @@ export interface LevelCarry {
  * # Attribution method coverage
  *
  * All four methods populate `carry_detail`: Parallel, Waterfall and Taylor
- * via `apply_total_return_carry` (theta + coupon_income, with financing
+ * via `apply_total_return_carry` (theta + period economic cash, with financing
  * identified separately when configured), MetricsBased from the carry
  * decomposition metrics. `credit_carry_decomposition` is therefore emitted
  * on any path whose `carry_detail.coupon_income` is populated when a
@@ -4047,7 +4056,7 @@ export interface PnlAttribution {
    *
    * Separates the raw user-input price change from
    * the total-return view stamped on `total_pnl`. When the attribution path
-   * added coupon_income to `total_pnl` (the standard total-return convention
+   * added period economic cash to `total_pnl` (the standard total-return convention
    * in parallel / waterfall / taylor attribution), this field still reports
    * the raw `val_t1 − val_t0` so a downstream consumer that computed their
    * own total from the underlying valuations can reconcile cleanly.
@@ -4100,16 +4109,16 @@ export interface PnlAttribution {
    *
    * In the standard total-return convention (the default carry path uses
    * the internal total-return carry helper), this is
-   * `(val_t1 − val_t0) + coupon_income_between(T0, T1)`. Cashflows received
+   * `(val_t1 − val_t0) + economic_cash_between(T0, T1)`. Cashflows received
    * during the period are added back so that
    * `total_pnl == carry + factor_sum + residual` holds: the `carry` field
-   * includes the coupon income, and reconciliation against the user's
-   * observed val_t1 − val_t0 must subtract the coupon_income out of
+   * includes income and principal receipts, and reconciliation against the user's
+   * observed val_t1 − val_t0 must subtract the economic cash out of
    * `total_pnl` to recover the pure mark-to-market move.
    *
    * **For a raw mark-to-market view that excludes intra-period cashflows,
    * read [`Self::mark_to_market_pnl`].** That field, when present, is the
-   * untouched `val_t1 − val_t0` and never absorbs coupon income.
+   * untouched `val_t1 − val_t0` and never absorbs cash receipts.
    */
   total_pnl: Money;
   /**
@@ -4775,7 +4784,7 @@ export interface TradeSpec {
    */
   delta_quantity: number;
   /**
-   * Buy / Sell / Hold classification.
+   * Buy / Sell / Hold classification from the sign of `delta_quantity`.
    */
   direction: TradeDirection;
   /**
@@ -4948,7 +4957,7 @@ export interface PositionSpec {
  * The trade universe consists of:
  *
  * 1. **Tradeable positions**: existing portfolio positions that can be adjusted
- * 2. **Held positions**: existing positions locked at current weight
+ * 2. **Held positions**: existing positions locked at current weight and exact quantity
  * 3. **Candidate positions**: new instruments that could be added
  *
  * Serializes with serde; candidate instruments travel as their canonical
@@ -4962,12 +4971,14 @@ export interface TradeUniverse {
   allow_short_candidates?: boolean;
   /**
    * Candidate instruments not currently in the portfolio.
-   * These start with weight 0 and can be added by the optimizer.
+   * These start with weight 0 and can be added by the optimizer. Their IDs
+   * must be unique among candidates and absent from existing positions.
    */
   candidates?: CandidatePosition[];
   /**
    * Filter for existing positions that are held constant.
-   * Positions matching this filter keep their current weight.
+   * Positions matching this filter keep their current weight and exact
+   * quantity under every weighting scheme, including zero-PV holdings.
    * Takes precedence over `tradeable_filter` if both match.
    */
   held_filter?: PositionFilter | null;
@@ -5265,8 +5276,9 @@ export interface PositionResidualContribution {
    */
   position_id: string;
   /**
-   * Annualized variance contributed by this position's idiosyncratic risk.
-   * Always non-negative.
+   * Annualized variance allocated to this position's idiosyncratic risk.
+   * A hedge sharing another position's issuer shock may receive a negative
+   * allocation; the total residual variance must remain non-negative.
    */
   residual_variance: number;
   /**
@@ -5624,7 +5636,8 @@ export interface SensitivityMatrixJson {
  */
 export interface StrategyAllocation {
   /**
-   * Rounded capital allocation.
+   * Rounded capital allocation with the sign of total capital. Fractional
+   * minor units are assigned by largest remainder, breaking ties by input order.
    */
   capital: number;
   /**
@@ -5747,7 +5760,9 @@ export interface WeightAllocationSpec {
    */
   covariance?: number[][] | null;
   /**
-   * Number of decimal places for capital rounding.
+   * Number of decimal places for capital rounding, default 10 and at most 12.
+   * Rounded minor units must remain finite and representable by the
+   * floating-point output.
    */
   money_decimal_places?: number;
   /**
@@ -5759,7 +5774,8 @@ export interface WeightAllocationSpec {
    */
   strategies: StrategyAllocationInput[];
   /**
-   * Total capital to allocate across strategies.
+   * Finite signed capital to allocate across strategies. Rounded allocations
+   * retain this sign and sum to the total rounded at `money_decimal_places`.
    */
   total_capital: number;
 }

@@ -659,7 +659,7 @@
             "t0": "2025-01-15",
             "t1": "2025-01-16",
             "instrument_id": "DEP-0",
-            "num_repricings": 5,
+            "num_repricings": 7,
             "tolerance_abs": 1.0,
             "tolerance_pct": 0.1,
             "residual_pct": -0.0,
@@ -674,7 +674,9 @@
               "version": 1
             },
             "execution_policy": "serial",
-            "notes": []
+            "notes": [
+              "carry pull-to-par unavailable: flat-yield repricing could not be resolved; roll_down contains the unpartitioned price-carry residual"
+            ]
           },
           "result_invalid": false
         },
@@ -767,7 +769,7 @@
             "t0": "2025-01-15",
             "t1": "2025-01-16",
             "instrument_id": "DEP-1",
-            "num_repricings": 5,
+            "num_repricings": 7,
             "tolerance_abs": 1.0,
             "tolerance_pct": 0.1,
             "residual_pct": -0.0,
@@ -782,7 +784,9 @@
               "version": 1
             },
             "execution_policy": "serial",
-            "notes": []
+            "notes": [
+              "carry pull-to-par unavailable: flat-yield repricing could not be resolved; roll_down contains the unpartitioned price-carry residual"
+            ]
           },
           "result_invalid": false
         }

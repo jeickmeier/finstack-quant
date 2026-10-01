@@ -106,6 +106,35 @@ impl IntoJsError for finstack_quant_scenarios::Error {
     }
 }
 
+/// A strict persisted-contract load failure: malformed, unversioned, oversized
+/// or semantically invalid input is validation; a wrapped core error keeps its
+/// own Rust kind. `code` names the contract failure mode, as the portfolio
+/// materialization errors do.
+impl IntoJsError for finstack_quant_core::contract::ContractError {
+    fn js_kind(&self) -> &'static str {
+        match self {
+            Self::Core(error) => error.js_kind(),
+            _ => "validation",
+        }
+    }
+    fn js_message(&self) -> String {
+        match self {
+            Self::Core(error) => error.js_message(),
+            other => other.to_string(),
+        }
+    }
+    fn js_code(&self) -> Option<&'static str> {
+        match self {
+            Self::UnsupportedVersion { .. } => Some("unsupported_version"),
+            Self::MissingVersion { .. } => Some("missing_version"),
+            Self::MalformedSchema { .. } => Some("malformed_schema"),
+            Self::LimitExceeded { .. } => Some("limit_exceeded"),
+            Self::Report(_) => Some("report"),
+            _ => None,
+        }
+    }
+}
+
 /// Plain messages and parse/decode failures are input validation.
 macro_rules! validation_js_error {
     ($($ty:ty),* $(,)?) => {$(
@@ -347,6 +376,30 @@ pub fn materialization_to_js_error(error: finstack_quant_portfolio::Error) -> Js
     #[cfg(target_arch = "wasm32")]
     if let Some(code) = error.js_code() {
         let _ = js_sys::Reflect::set(&js, &JsValue::from("code"), &JsValue::from(code));
+    }
+    js
+}
+
+/// Convert a strict persisted-contract load failure.
+///
+/// Contract failures are `ContractValidationError`s with `kind: "validation"`
+/// and the failure-mode `code`; a validation report is also attached as
+/// `error.report`. A wrapped core error is an ordinary [`to_js_err`] error.
+///
+/// # Arguments
+///
+/// * `error` - Typed contract error returned by a strict `from_*_slice` loader.
+pub fn contract_to_js_err(error: finstack_quant_core::contract::ContractError) -> JsValue {
+    use finstack_quant_core::contract::ContractError;
+    if matches!(error, ContractError::Core(_)) {
+        return to_js_err(error);
+    }
+    let js = named_js_error("ContractValidationError", &error);
+    #[cfg(target_arch = "wasm32")]
+    if let ContractError::Report(report) = &error {
+        if let Ok(value) = to_js_value(report.as_ref()) {
+            let _ = js_sys::Reflect::set(&js, &JsValue::from("report"), &value);
+        }
     }
     js
 }

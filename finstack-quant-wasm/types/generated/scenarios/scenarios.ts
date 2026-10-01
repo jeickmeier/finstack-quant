@@ -283,13 +283,16 @@ export type Currency =
  * The actual-day conventions:
  *
  * - **`Act365L`** (ICMA Rule 251.1(i)(c)): the denominator depends on the
- *   coupon frequency supplied via [`DayCountContext`]. Annual, or no frequency
- *   supplied: 366 if February 29 falls in `(start, end]` (exclusive of start,
- *   inclusive of end), else 365. Non-annual: 366 if the period end date falls
- *   in a leap year, else 365. This is **not** ACT/ACT AFB, which uses a
- *   sub-period splitting algorithm; use [`DayCount::ActActAfb`] for AFB /
- *   Actual/Actual Euro.
- * - **`Nl365`**: counts the actual calendar days in `[start, end)` and removes
+ *   coupon frequency and the enclosing `coupon_period` supplied via
+ *   [`DayCountContext`]; both are required. Annual: 366 if February 29 falls
+ *   in `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),
+ *   else 365. Non-annual: 366 if the next coupon date falls in a leap year,
+ *   else 365. Partial accrual keeps the enclosing coupon's denominator.
+ *   Accrual dates outside that coupon are rejected; sum separate coupon
+ *   slices for calculations spanning multiple coupon periods. This is **not**
+ *   ACT/ACT AFB, which uses a sub-period splitting algorithm; use
+ *   [`DayCount::ActActAfb`] for AFB / Actual/Actual Euro.
+ * - **`Nl365`**: counts the actual calendar days in `(start, end]` and removes
  *   every February 29 that falls in the period, so a full leap year still
  *   yields exactly 1.0.
  * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
@@ -633,8 +636,10 @@ export type OasPriceBasis = "settlement_dirty" | "forward_accrued_clean";
  *
  * # Ordering of Rates
  *
- * For positive rates and t > 0: `r_simple > r_annual > r_continuous`
- * (less frequent compounding requires a higher quoted rate for the same DF).
+ * For a common discount factor below one, annual and simple rates both exceed
+ * the continuous rate. Their ordering depends on the maturity `t` in years:
+ * `r_annual > r_simple` for `0 < t < 1`, they agree at `t = 1`, and
+ * `r_simple > r_annual` for `t > 1`.
  */
 export type Compounding =
   | "continuous"
@@ -868,12 +873,14 @@ export type AmortizationSpec =
   | {
       linear_between: {
         /**
-         * Amortization end (full repayment), on or before maturity.
+         * Economic end of amortization (full repayment), which must be an
+         * actual coupon accrual boundary on or before the effective terminal
+         * accrual date. Cash settlement may follow this date due to payment lag.
          */
         end: DateWire;
         /**
-         * Amortization start; installments fall on payment dates strictly
-         * after it.
+         * Economic amortization start, on or after issue; installments fall
+         * on coupon accrual boundaries strictly after it.
          */
         start: DateWire;
       };
@@ -1373,11 +1380,19 @@ export type CouponType =
  *
  * - **`None`**: plain tenor stepping from the schedule boundaries (default).
  * - **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates
- *   for rate, currency, and equity index futures).
+ *   for rate, currency, and equity index futures). Cashflow schedules retain
+ *   the contractual maturity as a short final stub when it is off-grid.
  * - **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll
  *   dates). When the start date is not itself a roll date, the first period
  *   accrues from the roll date immediately **preceding** the start (standard
  *   front accrual per the ISDA Big Bang Protocol, April 2009).
+ *   Interior coupon or payment-program windows start at their declared
+ *   boundary; front accrual is applied only once at the instrument start.
+ *
+ * Explicit roll grids cannot be combined with `end_of_month`. ACT/ACT ICMA
+ * supports the CDS twentieth grid; third-Wednesday IMM with ACT/ACT ICMA is
+ * rejected because the available ICMA reference calculation requires nominal
+ * month-grid coupons.
  *
  * # References
  *
@@ -1705,11 +1720,12 @@ export type DeflationProtection = "none" | "maturity_only" | "all_payments";
  */
 export type IndexationMethod = "canadian" | "tips" | "uk" | "french" | "japanese";
 /**
- * Publication lag for inflation index reference dates.
+ * Contractual observation lag for inflation index reference dates.
  *
  * Inflation indices are published with a delay (typically 2-4 weeks). Securities
- * using these indices incorporate a lag to ensure the reference index is published
- * by the settlement date.
+ * using these indices incorporate an observation lag to ensure the reference
+ * index is published by settlement. This lag does not specify the actual
+ * publication date; use [`InflationIndex::with_publication_dates`] for that.
  *
  * # Standard Lags by Market
  *
@@ -2054,6 +2070,10 @@ export type InflationInterpolation = "step" | "linear";
  */
 export type RateOptionType = "cap" | "floor" | "caplet" | "floorlet";
 /**
+ * Expiry convention of the annualized inflation-option volatility surface.
+ */
+export type InflationVolatilityExpiry = "reference_date" | "publication_date";
+/**
  * Cash settlement annuity method for cash-settled swaptions.
  *
  * The trade confirmation or ISDA settlement matrix determines the method.
@@ -2141,7 +2161,8 @@ export type FutureOptionPremiumStyle = "premium_paid" | "futures_style";
 export type FutureOptionSettlement =
   | {
       /**
-       * Date on which the fixed exercise payoff is paid.
+       * Date on which the fixed exercise payoff is paid, including after
+       * early exercise; this date is not relative to the exercise date.
        */
       payment_date: DateWire;
       type: "cash";
@@ -2205,17 +2226,13 @@ export type CapFloorVolType = "lognormal" | "shifted_lognormal" | "normal" | "au
 export type FundingLeg =
   | {
       /**
-       * Accrual fractions for each period.
-       */
-      accrual_fractions: number[];
-      /**
-       * Day count convention.
+       * Day count convention used to calculate period year fractions.
        */
       day_count: DayCount;
       /**
-       * Payment dates for each period.
+       * Funding accrual and payment schedule, in chronological order.
        */
-      payment_dates: DateWire[];
+      periods: FundingPeriod[];
       /**
        * Fixed coupon rate as a decimal annual rate (0.03 = 3%).
        */
@@ -2224,11 +2241,7 @@ export type FundingLeg =
     }
   | {
       /**
-       * Accrual fractions for each period.
-       */
-      accrual_fractions: number[];
-      /**
-       * Day count convention.
+       * Day count convention used to calculate period year fractions.
        */
       day_count: DayCount;
       /**
@@ -2236,10 +2249,9 @@ export type FundingLeg =
        */
       forward_curve_id: Id;
       /**
-       * Payment dates for each period. Each is also treated as the period's
-       * accrual-end date (no payment lag — see the variant docs).
+       * Funding accrual, reset and payment schedule, in chronological order.
        */
-      payment_dates: DateWire[];
+      periods: FundingPeriod[];
       /**
        * Additive spread over the floating index in basis points (10 = 10bp).
        */
@@ -2605,7 +2617,7 @@ export type PeFundWaterfallTranche =
       preferred_irr: {
         /**
          * LP preferred-return hurdle as an annual decimal IRR (`0.08` = 8%),
-         * compounded on the spec's `day_count`.
+         * compounded on the spec's `day_count`; must be finite and greater than -1.
          */
         hurdle_irr: number;
       };
@@ -2631,7 +2643,7 @@ export type PeFundWaterfallTranche =
         gp_share: number;
         /**
          * Annual decimal IRR hurdle (`0.12` = 12%) the LP must reach (at
-         * 100% payout) before this tier's split activates.
+         * 100% payout) before this tier's split activates; must be finite and greater than -1.
          */
         hurdle_irr: number;
         /**
@@ -4667,7 +4679,8 @@ export type OperationSpec =
        */
       node_id: NodeId;
       /**
-       * Absolute value to assign.
+       * Finite absolute value in the node's units; monetary nodes retain
+       * their currency and interpret this as major currency units.
        */
       value: number;
     }
@@ -5628,6 +5641,7 @@ export interface MertonMcCalibrationSpec {
  * Models the relationship between the accreted notional and the recovery
  * rate in default. As PIK accrual increases the notional relative to the
  * original base, recovery declines according to the chosen [`RecoveryModel`].
+ * Deserialization enforces the same parameter invariants as the constructors.
  */
 export interface DynamicRecoverySpec {
   /**
@@ -5649,6 +5663,8 @@ export interface DynamicRecoverySpec {
  * Models the relationship between a firm's leverage and its instantaneous
  * hazard rate, enabling a feedback loop where PIK accrual increases the
  * notional (and hence leverage), which drives the hazard rate higher.
+ * Deserialization validates the parameters and rejects incomplete or
+ * inconsistent tabular calibrations before they can be evaluated.
  */
 export interface EndogenousHazardSpec {
   /**
@@ -6506,6 +6522,11 @@ export interface FixedCouponSpec {
   /**
    * Whether end-of-month rolling should be preserved when generating the
    * schedule.
+   *
+   * Incompatible with explicit IMM roll rules. With ACT/ACT ICMA, the
+   * regular grid anchor must be month-end: maturity for front stubs, or
+   * start for back stubs and schedules without stubs. An irregular opposite
+   * endpoint remains supported.
    */
   end_of_month?: boolean;
   /**
@@ -6588,6 +6609,11 @@ export interface FloatingCouponSpec {
   /**
    * Whether end-of-month rolling should be preserved when generating the
    * schedule.
+   *
+   * Incompatible with explicit IMM roll rules. With ACT/ACT ICMA, the
+   * regular grid anchor must be month-end: maturity for front stubs, or
+   * start for back stubs and schedules without stubs. An irregular opposite
+   * endpoint remains supported.
    */
   end_of_month?: boolean;
   /**
@@ -6656,11 +6682,11 @@ export interface FloatingCouponSpec {
  * observations. Observation dates strictly before the forward curve base
  * date then resolve from that series instead of the curve:
  *
- * - **Overnight observations** (compounded/averaged paths) use LOCF lookup
- *   (last observation carried forward), matching RFR publication
- *   conventions where a fixing carries over non-publication days
- *   (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 §7.1(g)). A partially
- *   seasoned compounding window seamlessly mixes realized fixings and
+ * - **Overnight observations** (compounded/averaged paths) use exact-date
+ *   lookup on the index's fixing business days. Weekend and holiday carry
+ *   comes from each observation's accrual-day weight, so a missing required
+ *   business-day fixing is an error rather than reuse of an older fixing.
+ *   A partially seasoned compounding window mixes realized fixings and
  *   curve-projected forwards with identical `(rate, days)` weighting.
  * - **Term-rate resets** use exact-date lookup on the (business-day
  *   adjusted) reset date — a term rate fixes on a specific published date.
@@ -6745,13 +6771,13 @@ export interface FloatingRateSpec {
    */
   index_floor_bp?: DecimalWire | null;
   /**
-   * Diagnostic tenor for term-index projection error context.
+   * Explicit term-index tenor when no forward curve resolves.
    *
    * The named forward curve is already the term index (for example a 3M
    * EURIBOR curve). Projection is `fwd.rate(reset_date)`, not a FRA-style
    * average over `[reset, reset + tenor]`. This field (or
-   * [`Self::reset_frequency`] when `None`) is used only to compute
-   * `index_maturity` for error messages. Ignored for overnight-compounded
+   * [`Self::reset_frequency`] when `None`) supplies the compiled term tenor
+   * when no forward curve resolves. Ignored for overnight-compounded
    * legs. When set, the builder warns at build time if it disagrees with
    * the resolved curve's tenor by more than 10% — the curve remains
    * authoritative.
@@ -6773,14 +6799,21 @@ export interface FloatingRateSpec {
   overnight_basis?: DayCount | null;
   /**
    * Index floor/cap application policy for overnight-compounded coupons.
+   *
+   * With changing principal, the builder retains daily compounded-rate
+   * increments. Any bound applied to the final period index or all-in
+   * rate contributes a uniform annual-rate adjustment over the coupon's
+   * contractual accrual time; interim cumulative prefixes are not bounded.
    */
   overnight_index_constraints?: OvernightIndexConstraintApplication;
   /**
-   * Reset frequency for rate fixings.
+   * Fallback term-index tenor when [`Self::index_tenor`] is absent.
    *
-   * This is the cadence at which the rate refixes. When
-   * [`Self::index_tenor`] is `None`, it is also the tenor used only to
-   * build the diagnostic index-maturity date in projection error context.
+   * The bare cashflow builder observes one term fixing at each coupon
+   * period's accrual start, with the configured reset lag. This field does
+   * not create additional resets inside a payment period. The resolved
+   * forward curve owns the quoted index tenor; overnight methods observe
+   * their compiled daily fixing schedule independently of this field.
    */
   reset_frequency: Tenor;
   /**
@@ -6847,6 +6880,11 @@ export interface StepUpCouponSpec {
   /**
    * Whether end-of-month rolling should be preserved when generating the
    * schedule.
+   *
+   * Incompatible with explicit IMM roll rules. With ACT/ACT ICMA, the
+   * regular grid anchor must be month-end: maturity for front stubs, or
+   * start for back stubs and schedules without stubs. An irregular opposite
+   * endpoint remains supported.
    */
   end_of_month?: boolean;
   /**
@@ -6962,6 +7000,7 @@ export interface CashFlow {
    * This is stored at cashflow creation time when available.
    * For instruments with intra-period events (e.g., revolving credit with draws/repays),
    * this may represent a time-weighted average rate across sub-periods.
+   * Serialization rejects non-finite rates instead of encoding them as absent.
    */
   rate?: number | null;
   /**
@@ -6979,8 +7018,11 @@ export interface CashFlowAccrual {
    */
   calendar_id?: string | null;
   /**
-   * Regular reference coupon period for ACT/ACT ICMA, including stub accrual.
-   * `None` leaves reference-period selection to the schedule accrual caller.
+   * Unadjusted regular reference coupon period for ACT/ACT ICMA, or the
+   * actual full contractual coupon period for ACT/365L, including when
+   * this flow represents only a rate or balance subinterval.
+   * ACT/365L metadata must retain these boundaries to select the original
+   * coupon's denominator; other conventions may leave this field `None`.
    *
    * @minItems 2
    * @maxItems 2
@@ -7001,6 +7043,7 @@ export interface CashFlowAccrual {
   end_is_termination_date?: boolean;
   /**
    * Projected index rate before spread, gearing, caps, or floors.
+   * Serialization rejects non-finite rates instead of encoding them as absent.
    */
   projected_index_rate?: number | null;
   /**
@@ -9454,7 +9497,7 @@ export interface InflationCapFloor {
    */
   calendar_id?: Id | null;
   /**
-   * Day count convention for accrual and option time.
+   * Day count convention for accrual. Option quote time always uses ACT/365F.
    */
   day_count: DayCount;
   /**
@@ -9473,13 +9516,6 @@ export interface InflationCapFloor {
    * Inflation index/curve identifier (e.g., US-CPI-U).
    */
   inflation_index_id: Id;
-  /**
-   * Correlation between the inflation index and the nominal short rate,
-   * used in the YoY convexity/timing adjustment. `None` ⇒ treated as 0
-   * (the timing term vanishes; the pure inflation-vol Jensen convexity
-   * `σ_I²·τ` is still applied).
-   */
-  inflation_nominal_correlation?: number | null;
   /**
    * Instrument-owned pricing inputs.
    */
@@ -9502,11 +9538,6 @@ export interface InflationCapFloor {
    * Metric-time pricing configuration.
    */
   metric_pricing_overrides?: MetricPricingOverrides;
-  /**
-   * Nominal short-rate volatility `σ_n` (annualized, absolute), used in the
-   * YoY timing term. `None` ⇒ the `ρ·σ_n` timing term is dropped.
-   */
-  nominal_rate_volatility?: number | null;
   /**
    * Notional amount in quote currency.
    */
@@ -9536,6 +9567,12 @@ export interface InflationCapFloor {
    * Volatility surface identifier.
    */
   vol_surface_id: Id;
+  /**
+   * Clock used by the volatility surface's annualized quotes. This is
+   * independent of CPI publication policy; changing it requires matching
+   * quotes, not merely relabelling the old surface.
+   */
+  volatility_expiry?: InflationVolatilityExpiry;
 }
 /**
  * Forward Rate Agreement instrument.
@@ -10392,6 +10429,7 @@ export interface CmsSwap {
   id: Id;
   /**
    * Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`).
+   * Required for USD CMS; legacy contracts must name their legacy index explicitly.
    */
   index_id?: Id | null;
   /**
@@ -10440,11 +10478,36 @@ export interface CmsSwap {
   vol_surface_id: Id;
 }
 /**
+ * Contractual dates and accrual fraction of one CMS funding coupon.
+ */
+export interface FundingPeriod {
+  /**
+   * Exclusive accrual end, independent of payment-date adjustment.
+   */
+  accrual_end: DateWire;
+  /**
+   * Inclusive accrual start, independent of the CMS observation date.
+   */
+  accrual_start: DateWire;
+  /**
+   * Positive year fraction measured using the funding leg day count.
+   */
+  accrual_year_fraction: number;
+  /**
+   * Contractual payment date after business-day adjustment.
+   */
+  payment_date: DateWire;
+  /**
+   * Floating index observation date; ignored for fixed funding.
+   */
+  reset_date: DateWire;
+}
+/**
  * CMS option instrument (cap/floor on CMS rates).
  */
 export interface CmsOption {
   /**
-   * Accrual fractions for each period
+   * Finite nonnegative accrual fractions for each period; zero gives a zero coupon.
    */
   accrual_fractions: number[];
   /**
@@ -10480,7 +10543,7 @@ export interface CmsOption {
    *
    * When set, provides default values for `swap_fixed_frequency`, `swap_float_frequency`,
    * `swap_fixed_day_count`, and `swap_float_day_count`. Individual fields still
-   * override the convention when explicitly set.
+   * override the convention when explicitly set. Required for USD CMS.
    */
   index_id?: Id | null;
   /**
@@ -12377,7 +12440,8 @@ export interface FxSwap {
    */
   far_date: DateWire;
   /**
-   * Optional far leg FX rate (quote per base). If None, source from forwards.
+   * Optional far leg FX rate (quote per base). If absent, use the market
+   * outright forward from the valuation date to far settlement.
    */
   far_rate?: number | null;
   /**
@@ -12401,7 +12465,8 @@ export interface FxSwap {
    */
   near_date: DateWire;
   /**
-   * Optional near leg FX rate (quote per base). If None, source from market.
+   * Optional near leg FX rate (quote per base). If absent, use the market
+   * outright forward from the valuation date to near settlement.
    */
   near_rate?: number | null;
   /**
@@ -13003,9 +13068,15 @@ export interface FxBarrierOption {
    */
   notional: Money;
   /**
-   * Observed barrier state for expired options.
+   * Processed barrier-monitoring state through the valuation date.
    *
-   * Historical monitoring must be supplied explicitly for expired contracts.
+   * `Some(true)` records a breach whose at-hit rebate has already settled,
+   * including a hit processed on the valuation date. That rebate is not a
+   * remaining claim at expiry. An at-expiry rebate remains due on expiry.
+   * `Some(false)` records no breach in the processed monitoring history.
+   * Historical monitoring must be supplied explicitly for seasoned and
+   * expired contracts. Same-day unpaid at-hit claims require a separate
+   * cash receivable; this boolean does not represent pending settlement.
    */
   observed_barrier_breached?: boolean | null;
   /**
@@ -13050,7 +13121,18 @@ export interface FxBarrierOption {
 /**
  * FX variance swap instrument.
  *
- * Payoff: Notional * (Realized Variance - Strike Variance)
+ * Payoff: Notional * (Realized Variance - Strike Variance).
+ *
+ * Before the final observation, close-to-close pricing projects Gaussian
+ * independent log-return increments using deterministic domestic/foreign
+ * rates and smile-replicated cumulative quadratic variation. It includes
+ * each return's conditional-mean square and applies the contractual
+ * annualization factor divided by the full scheduled return count. This
+ * projection is exact for deterministic instantaneous variance in the
+ * limit of exact smile integration; it does not model general stochastic
+ * volatility/rate joint dynamics. OHLC estimators support fully observed
+ * settlement only, because their future path statistics need a separate
+ * estimator-specific forecast model.
  */
 export interface FxVarianceSwap {
   /**
@@ -13286,6 +13368,11 @@ export interface QuantoOption {
  * - **European options**: Black-76 model using the forward price from the `PriceCurve`
  * - **American options**: Binomial tree (Leisen-Reimer) with cost-of-carry derived from
  *   the forward/spot relationship
+ *
+ * Analytical delta measures currency per unit change in the resolved forward,
+ * holding discount factors and volatility fixed. At zero volatility or expiry,
+ * the intrinsic-payoff derivative is used; delta is defined as zero exactly at
+ * the strike, where the mathematical derivative does not exist.
  *
  * # American Option Assumptions
  *
@@ -13816,6 +13903,11 @@ export interface CommoditySwap {
  * - Forward swap rate is the weighted average of forward commodity prices
  *   over the swap period
  * - Annuity factor captures the present value of a unit payment stream
+ *
+ * Analytical delta measures currency per unit change in the annuity-weighted
+ * forward price, holding rates and volatility fixed. At zero volatility or
+ * expiry, delta uses the intrinsic-payoff derivative and is defined as zero
+ * exactly at the strike, where that derivative does not exist.
  */
 export interface CommoditySwaption {
   /**
@@ -14976,9 +15068,14 @@ export interface BermudanCallProvision {
  *
  * # Pricing Approach
  *
- * 1. Each CMS rate has SABR marginal distribution (reuses CMS option SABR calibration)
- * 2. Joint distribution via Gaussian copula with rank correlation
- * 3. CMS convexity adjustment applied to each leg via static replication
+ * 1. Each CMS rate has a lognormal payment-measure marginal from a flat-strike
+ *    Black volatility surface (or a tenor-axis ATM surface).
+ * 2. A Gaussian copula couples the two rates.
+ * 3. The shared first-order CMS convexity approximation sets each marginal mean.
+ *
+ * Nonflat smiles and SABR cubes are unsupported and return a validation error.
+ * The registered `StaticReplication` model key selects this approximation;
+ * it does not implement SABR smile replication.
  *
  * # References
  *
@@ -15017,8 +15114,9 @@ export interface CmsSpreadOption {
   /**
    * Rate-index convention-registry key of the underlying CMS swaps (e.g. `EUR-ESTR-OIS`).
    *
-   * When set, provides default values for the fixed/float frequency and
-   * day count. Individual fields still override the convention when set.
+   * Required for USD CMS; other supported currencies use their registered
+   * overnight-index default when omitted. Supplies calendar, settlement lag
+   * and default leg conventions. Individual leg fields override the index.
    */
   index_id?: Id | null;
   /**
@@ -15030,7 +15128,8 @@ export interface CmsSpreadOption {
    */
   long_cms_tenor: Tenor;
   /**
-   * Swaption volatility surface for long tenor.
+   * Black swaption volatility surface for the long tenor. The selected
+   * expiry slice must be flat across strikes; tenor-axis ATM surfaces are valid.
    */
   long_vol_surface_id: Id;
   /**
@@ -15059,7 +15158,8 @@ export interface CmsSpreadOption {
    */
   short_cms_tenor: Tenor;
   /**
-   * Swaption volatility surface for short tenor.
+   * Black swaption volatility surface for the short tenor, subject to the
+   * same flat-strike restriction as the long-tenor surface.
    */
   short_vol_surface_id: Id;
   /**
@@ -15286,6 +15386,11 @@ export interface ScheduleParams {
   /**
    * Whether end-of-month rolling should be preserved when generating the
    * schedule.
+   *
+   * Incompatible with explicit IMM roll rules. With ACT/ACT ICMA, the
+   * regular grid anchor must be month-end: maturity for front stubs, or
+   * start for back stubs and schedules without stubs. An irregular opposite
+   * endpoint remains supported.
    */
   end_of_month?: boolean;
   /**
@@ -18273,10 +18378,11 @@ export interface LeveredRealEstateEquity {
   scenario_pricing_overrides?: ScenarioPricingOverrides;
 }
 /**
- * Priceable composite instrument containing an unresolved policy and immutable state.
+ * Priceable composite instrument containing an unresolved policy and resolved state.
  *
- * Valuation and risk use `state` exactly as stored. Call [`Self::rebalance`]
- * to obtain a distinct instrument; this type does not mutate in place.
+ * Valuation and risk use the current `spec` and `state` exactly as stored.
+ * Call [`Self::rebalance`] to obtain a distinct instrument with newly resolved
+ * quantities. Direct field edits must preserve the specification/state invariants.
  */
 export interface CompositeInstrument {
   /**
@@ -18456,7 +18562,7 @@ export interface ResultsMeta {
  */
 export interface RoundingContext {
   /**
-   * Ingest scale map snapshot by currency code.
+   * Validated ingest scale snapshot by currency code, with values in `0..=28`.
    */
   ingest_scale_by_currency: {
     [k: string]: number;
@@ -18466,7 +18572,7 @@ export interface RoundingContext {
    */
   mode: RoundingMode;
   /**
-   * Output scale map snapshot by currency code.
+   * Validated output scale snapshot by currency code, with values in `0..=28`.
    */
   output_scale_by_currency: {
     [k: string]: number;
@@ -18617,7 +18723,9 @@ export interface AttributionMeta {
    */
   notes: string[];
   /**
-   * Number of repricings performed.
+   * Number of top-level valuation calls, including attempted carry-helper
+   * metric, flat-yield and funding valuations. Internal risk-metric bump
+   * valuations are not counted separately.
    */
   num_repricings: number;
   /**
@@ -18861,7 +18969,7 @@ export interface LevelCarry {
  * # Attribution method coverage
  *
  * All four methods populate `carry_detail`: Parallel, Waterfall and Taylor
- * via `apply_total_return_carry` (theta + coupon_income, with financing
+ * via `apply_total_return_carry` (theta + period economic cash, with financing
  * identified separately when configured), MetricsBased from the carry
  * decomposition metrics. `credit_carry_decomposition` is therefore emitted
  * on any path whose `carry_detail.coupon_income` is populated when a
@@ -19196,7 +19304,7 @@ export interface PnlAttribution {
    *
    * Separates the raw user-input price change from
    * the total-return view stamped on `total_pnl`. When the attribution path
-   * added coupon_income to `total_pnl` (the standard total-return convention
+   * added period economic cash to `total_pnl` (the standard total-return convention
    * in parallel / waterfall / taylor attribution), this field still reports
    * the raw `val_t1 − val_t0` so a downstream consumer that computed their
    * own total from the underlying valuations can reconcile cleanly.
@@ -19249,16 +19357,16 @@ export interface PnlAttribution {
    *
    * In the standard total-return convention (the default carry path uses
    * the internal total-return carry helper), this is
-   * `(val_t1 − val_t0) + coupon_income_between(T0, T1)`. Cashflows received
+   * `(val_t1 − val_t0) + economic_cash_between(T0, T1)`. Cashflows received
    * during the period are added back so that
    * `total_pnl == carry + factor_sum + residual` holds: the `carry` field
-   * includes the coupon income, and reconciliation against the user's
-   * observed val_t1 − val_t0 must subtract the coupon_income out of
+   * includes income and principal receipts, and reconciliation against the user's
+   * observed val_t1 − val_t0 must subtract the economic cash out of
    * `total_pnl` to recover the pure mark-to-market move.
    *
    * **For a raw mark-to-market view that excludes intra-period cashflows,
    * read [`Self::mark_to_market_pnl`].** That field, when present, is the
-   * untouched `val_t1 − val_t0` and never absorbs coupon income.
+   * untouched `val_t1 − val_t0` and never absorbs cash receipts.
    */
   total_pnl: Money;
   /**
@@ -19435,7 +19543,8 @@ export interface HorizonSummary {
  * The extracted rate is written into the statement model as a decimal scalar
  * (for example `0.0525` for 5.25%). `compounding` controls the output quote
  * convention, while `day_count` optionally overrides the curve's native day
- * count when converting `tenor` into a year fraction.
+ * count when converting `tenor` into a year fraction. Monetary target nodes
+ * are rejected during application because a rate is dimensionless.
  *
  * Persisted `day_count` override values are the canonical snake_case
  * [`DayCount`] labels: `act_360`, `act_365f`, `act_365l`, `nl_365`, `30_360`,

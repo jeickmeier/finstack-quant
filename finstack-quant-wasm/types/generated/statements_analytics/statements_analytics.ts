@@ -715,6 +715,10 @@ export interface Attributes {
 }
 /**
  * Verifies that Assets = Liabilities + Equity for every period.
+ *
+ * All configured operands must have compatible scalar/monetary units and one
+ * currency. Execution rejects incompatible units or invalid numeric tolerances;
+ * it performs no FX conversion.
  */
 export interface BalanceSheetArticulation {
   /**
@@ -799,6 +803,10 @@ export interface BridgeStep {
  * Checks that retained earnings flow correctly across periods:
  * RE(t) = RE(t−1) + NI(t) − Dividends(t) ± Adjustments(t).
  *
+ * Every configured balance, flow, and adjustment must use the same
+ * scalar/monetary units and currency. Execution rejects incompatible units or
+ * invalid numeric tolerances; it performs no FX conversion.
+ *
  * # Sign convention
  *
  * * `net_income_node` carries the [`SignConventionPolicy::InflowPositive`]
@@ -845,6 +853,10 @@ export interface RetainedEarningsReconciliation {
 /**
  * Checks Cash(t) = Cash(t−1) + TotalCF(t) and optionally
  * TotalCF = CFO + CFI + CFF.
+ *
+ * Every configured operand must have the same scalar/monetary units and
+ * currency. Execution rejects incompatible units or non-finite/negative
+ * tolerances; it performs no FX conversion.
  */
 export interface CashReconciliation {
   /**
@@ -877,9 +889,8 @@ export interface CashReconciliation {
 /**
  * Flags required nodes that lack values in applicable periods.
  *
- * **Advisory-only**: findings are `Severity::Warning`, so
- * `CheckResult::passed` is always `true`; the check surfaces gaps without
- * failing a pipeline gate.
+ * Missing actual observations produce `Severity::Error` and fail the check.
+ * Missing forecast observations produce advisory `Severity::Warning` findings.
  */
 export interface MissingValueCheck {
   /**
@@ -1004,33 +1015,10 @@ export interface CeclConfig {
    */
   reversion_method: ReversionMethod;
   /**
-   * Macro scenario specifications (same structure as IFRS 9).
-   */
-  scenarios: MacroScenario[];
-  /**
    * Average annual net charge-off rate (decimal) for the WARM method.
    * Required when `methodology == CeclMethodology::Warm`; rejected otherwise.
    */
   warm_annual_loss_rate?: number | null;
-}
-/**
- * A forward-looking macro scenario with a probability weight.
- *
- * Used for probability-weighted ECL calculation per IFRS 9 B5.5.42.
- */
-export interface MacroScenario {
-  /**
-   * Scenario identifier (e.g., "base", "upside", "downside").
-   */
-  id: string;
-  /**
-   * Optional LGD override for this scenario (downturn LGD).
-   */
-  lgd_override?: number | null;
-  /**
-   * Probability weight in \[0, 1\]. All scenario weights must sum to 1.0.
-   */
-  weight: number;
 }
 /**
  * CECL result for a single exposure.
@@ -1283,7 +1271,10 @@ export interface FormulaCheckSpec {
    */
   severity: CheckSeverity;
   /**
-   * Numeric tolerance for floating-point comparisons.
+   * Finite, nonnegative absolute residual bound in the formula's result units.
+   * When present, the formula passes when its absolute result is at most
+   * this bound. When absent, the formula is a predicate and any finite
+   * nonzero result passes.
    */
   tolerance?: number | null;
 }
@@ -1698,7 +1689,8 @@ export interface CreditAssessment {
 }
 /**
  * One period's structured credit metrics. Each metric is `None` when it
- * cannot be computed for that period (e.g. an incomplete TTM window).
+ * cannot be computed for that period (e.g. an incomplete TTM window, mixed
+ * scalar/monetary representations, or different input currencies).
  */
 export interface CreditAssessmentPoint {
   /**
@@ -1961,7 +1953,8 @@ export interface TornadoEntry {
    */
   downside: number;
   /**
-   * Parameter node identifier.
+   * Parameter identifier: `node@period` for statement sensitivities, or
+   * the shocked assumption name for DCF sensitivities.
    */
   parameter_id: string;
   /**
@@ -2148,16 +2141,6 @@ export interface EclConfig {
    */
   lgd_type: LgdType;
   /**
-   * Macro scenario specifications with probability weights.
-   * Weights must sum to 1.0 and each weight must lie in \[0, 1\].
-   *
-   * When non-empty, [`compute_ecl_weighted`] and [`EclEngine`] require
-   * the same ids and weights (tolerance 1e-6, same order) as the
-   * `pd_sources` argument. The `pd_sources` weights remain the priced
-   * weights and are still validated independently.
-   */
-  scenarios: MacroScenario[];
-  /**
    * Assumed time (in years) from the reporting date to recovery
    * realisation for Stage 3 (credit-impaired) exposures. Used to
    * discount expected recoveries `(1 - LGD) x EAD` at the EIR.
@@ -2217,9 +2200,13 @@ export interface StagingConfig {
   pd_delta_absolute: number;
   /**
    * Relative PD increase threshold for SICR (e.g., 2.0 = PD doubled).
-   * Applied as: current_pd / origination_pd > threshold.
+   * `Some(threshold)` applies current_pd / origination_pd > threshold;
+   * the threshold must be finite and non-negative. `None` disables this
+   * trigger. Positive current PD against zero origination PD is undefined
+   * and errors when this trigger is enabled; both PDs zero mean no increase.
+   * Default: `Some(2.0)`.
    */
-  pd_delta_relative: number;
+  pd_delta_relative?: number | null;
   /**
    * Whether any qualitative SICR flag triggers Stage 2.
    */
@@ -2381,7 +2368,7 @@ export interface ResultsMeta {
  */
 export interface RoundingContext {
   /**
-   * Ingest scale map snapshot by currency code.
+   * Validated ingest scale snapshot by currency code, with values in `0..=28`.
    */
   ingest_scale_by_currency: {
     [k: string]: number;
@@ -2391,7 +2378,7 @@ export interface RoundingContext {
    */
   mode: RoundingMode;
   /**
-   * Output scale map snapshot by currency code.
+   * Validated output scale snapshot by currency code, with values in `0..=28`.
    */
   output_scale_by_currency: {
     [k: string]: number;
@@ -2432,7 +2419,8 @@ export interface ToleranceConfig {
  */
 export interface EclStageRequest {
   /**
-   * Current lifetime probability of default as a decimal probability.
+   * Current remaining-lifetime probability of default as a decimal in
+   * `[0, 1]`, measured from the reporting date.
    */
   current_pd: number;
   /**
@@ -2455,8 +2443,11 @@ export interface EclStageRequest {
    */
   exposure_id: string;
   /**
-   * Lifetime probability of default at initial recognition as a decimal
-   * probability.
+   * Initial-recognition expected PD for the same remaining window as
+   * `current_pd`, conditional on survival to the reporting date, as a
+   * decimal in `[0, 1]`. The caller aligns the original risk estimate to
+   * this window; the full original contractual-lifetime PD is not suitable
+   * for an aged exposure.
    */
   origination_pd: number;
   /**
@@ -2786,11 +2777,11 @@ export interface ForecastMetrics {
    * [`ForecastMetrics::mape_effective_n`] records how many samples were
    * used so callers can tell a low MAPE from a MAPE that was computed on
    * very few points. Very small non-zero actuals can still dominate the
-   * metric. If `mape_effective_n == 0`, `mape` is `NaN`; prefer
+   * metric. If `mape_effective_n == 0`, `mape` is `None`; prefer
    * [`ForecastMetrics::smape`] in that case.
    * Lower is better.
    */
-  mape: NonFiniteF64Wire;
+  mape?: number | null;
   /**
    * Number of samples that actually contributed to MAPE (i.e. had
    * `|actual| >= ZERO_TOLERANCE`). Always `<= n`.
@@ -2812,12 +2803,12 @@ export interface ForecastMetrics {
    * Symmetric Mean Absolute Percentage Error:
    * `mean( |a - f| / ((|a| + |f|) / 2) ) × 100`.
    *
-   * Always well-defined when at least one of `|a|` or `|f|` is positive,
-   * and always bounded in `[0, 200]`. Preferred over MAPE when the actual
-   * series contains zeros or near-zeros. Terms where both `a` and `f`
-   * are within `ZERO_TOLERANCE` of zero are skipped.
+   * Bounded in `[0, 200]` for available observations. Preferred over MAPE
+   * when the actual series contains zeros or near-zeros. Terms whose
+   * denominator is below `ZERO_TOLERANCE` are skipped. Returns `None` when
+   * every denominator is below that threshold.
    */
-  smape: NonFiniteF64Wire;
+  smape?: number | null;
   [k: string]: unknown;
 }
 /**
@@ -3334,7 +3325,8 @@ export interface ParameterSpec {
    */
   period_id: PeriodId;
   /**
-   * Perturbations to apply (e.g., [-10%, 0%, +10%])
+   * Absolute values to substitute for this node/period; use
+   * [`Self::with_percentages`] to construct shocks from percentage inputs.
    */
   perturbations: number[];
   [k: string]: unknown;
@@ -3953,7 +3945,7 @@ export interface ScoringDimension {
    */
   label: string;
   /**
-   * Weight of this dimension in the composite score (0.0 to 1.0).
+   * Finite, non-negative relative weight in the composite score; zero disables it.
    */
   weight: number;
   /**
@@ -3988,8 +3980,8 @@ export interface SensitivityConfig {
  */
 export interface SensitivityResult {
   /**
-   * Unperturbed baseline evaluation of the model (populated by tornado
-   * runs). Used by tornado chart generation as the reference metric
+   * Unperturbed baseline evaluation of the model (populated by every run).
+   * Used by tornado chart generation as the reference metric
    * when a parameter's base value is not part of the perturbation grid.
    */
   baseline?: statements.StatementResult | null;

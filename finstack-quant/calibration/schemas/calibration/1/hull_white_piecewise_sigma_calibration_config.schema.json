@@ -36,7 +36,7 @@
   ],
   "properties": {
     "fit_tolerance": {
-      "description": "Required positive maximum implied-quote error in quoted volatility units.\nNormal quotes use decimal rate volatility; Black quotes use relative volatility.\nThis acceptance budget is independent of the numerical solver tolerance.",
+      "description": "Required positive maximum implied-normal-volatility error in decimal rate units.\nCap/floor quotes use the normal (Bachelier) convention only.\nThis acceptance budget is independent of the numerical solver tolerance.",
       "format": "double",
       "type": "number"
     },
@@ -48,7 +48,7 @@
     "frequency": {
       "$ref": "#/$defs/SwapFrequency",
       "default": "semi_annual",
-      "description": "Coupon frequency used to decompose each market cap/floor quote."
+      "description": "Synthetic coupon frequency used only when contractual schedules are absent."
     },
     "sigma_max": {
       "description": "Inclusive upper short-rate volatility search bound.",

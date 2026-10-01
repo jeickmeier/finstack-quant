@@ -264,7 +264,9 @@ test('computeMultiple treats a null metric as missing', () => {
 
 test('non-finite forecast and explanation values are JavaScript numbers', () => {
   const metrics = sa.backtestForecast([0.0, 0.0], [1.0, 2.0]);
-  assert.ok(Number.isNaN(metrics.mape));
+  assert.equal(metrics.mape, null);
+  assert.equal(metrics.smape, 200);
+  assert.equal(metrics.mape_effective_n, 0);
   assert.equal(metrics.mae, 1.5);
 
   const model = {

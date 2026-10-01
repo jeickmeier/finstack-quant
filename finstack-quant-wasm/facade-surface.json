@@ -870,6 +870,7 @@
       "kahanSum",
       "ledoitWolfShrinkage",
       "lnGamma",
+      "logNormCdf",
       "logReturns",
       "longestPositiveRun",
       "mean",
@@ -879,11 +880,11 @@
       "monthsUntil",
       "neumaierSum",
       "nextCdsDate",
-      "nextEquityOptionExpiry",
       "nextImm",
       "nextImmOptionExpiry",
       "nextSemiannualCdsMaturity",
       "nextSifmaSettlement",
+      "nextThirdFriday",
       "normCdf",
       "normCdfWithParams",
       "normPdf",
@@ -1470,7 +1471,7 @@
   "core.nextImmOptionExpiry": {
     "kind": "function"
   },
-  "core.nextEquityOptionExpiry": {
+  "core.nextThirdFriday": {
     "kind": "function"
   },
   "core.SifmaSettlementClass": {
@@ -1795,6 +1796,9 @@
     "kind": "function"
   },
   "core.normCdf": {
+    "kind": "function"
+  },
+  "core.logNormCdf": {
     "kind": "function"
   },
   "core.normPdf": {

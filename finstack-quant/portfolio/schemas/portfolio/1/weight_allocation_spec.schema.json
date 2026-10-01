@@ -118,7 +118,7 @@
     },
     "money_decimal_places": {
       "default": 10,
-      "description": "Number of decimal places for capital rounding.",
+      "description": "Number of decimal places for capital rounding, default 10 and at most 12.\nRounded minor units must remain finite and representable by the\nfloating-point output.",
       "format": "uint32",
       "minimum": 0,
       "type": "integer"
@@ -135,7 +135,7 @@
       "type": "array"
     },
     "total_capital": {
-      "description": "Total capital to allocate across strategies.",
+      "description": "Finite signed capital to allocate across strategies. Rounded allocations\nretain this sign and sum to the total rounded at `money_decimal_places`.",
       "format": "double",
       "type": "number"
     }

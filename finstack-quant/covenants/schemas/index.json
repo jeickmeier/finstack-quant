@@ -38,7 +38,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/covenants/1/covenant_report.schema.json",
-      "bytes": 8136,
+      "bytes": 8188,
       "kind": "output",
       "path": "schemas/covenants/1/covenant_report.schema.json",
       "summary": "Covenant check result.",
@@ -47,7 +47,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/covenants/1/dated_covenant_reports.schema.json",
-      "bytes": 9183,
+      "bytes": 9235,
       "kind": "output",
       "path": "schemas/covenants/1/dated_covenant_reports.schema.json",
       "summary": "Covenant reports produced for one test date of a series evaluation.",

@@ -33,7 +33,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Explicit schedule of remaining principal amounts after given dates.\nEach pair stores `(date, remaining_principal_after_date)`.",
+          "description": "Explicit schedule of remaining principal amounts after given economic dates.\nTargets include PIK capitalized and principal events effective on that date.\nA target may exceed initial or earlier remaining principal when funded by\nintervening draws or PIK, but must not exceed the live balance on its date.\nEach pair stores `(date, remaining_principal_after_date)`.",
           "properties": {
             "step_remaining": {
               "additionalProperties": false,
@@ -117,18 +117,18 @@
         },
         {
           "additionalProperties": false,
-          "description": "Equal principal installments on every payment date in `(start, end]`,\nrepaying the outstanding principal in full by `end`.",
+          "description": "Equal principal installments on coupon accrual boundaries in `(start, end]`.\nThe installment is fixed from outstanding after all start-date movements,\nincluding PIK and explicit principal events. The final installment pays\nthe live remaining balance, including subsequent PIK or principal changes.\nPrincipal changes economically on each accrual boundary; cash settles on\nthat coupon's adjusted, lagged payment date.",
           "properties": {
             "linear_between": {
               "additionalProperties": false,
               "properties": {
                 "end": {
                   "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-                  "description": "Amortization end (full repayment), on or before maturity."
+                  "description": "Economic end of amortization (full repayment), which must be an\nactual coupon accrual boundary on or before the effective terminal\naccrual date. Cash settlement may follow this date due to payment lag."
                 },
                 "start": {
                   "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-                  "description": "Amortization start; installments fall on payment dates strictly\nafter it."
+                  "description": "Economic amortization start, on or after issue; installments fall\non coupon accrual boundaries strictly after it."
                 }
               },
               "required": [
@@ -145,7 +145,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Custom principal exchanges on specific dates (absolute cash amounts).\nPositive amounts reduce outstanding (i.e., principal paid by issuer).",
+          "description": "Custom principal exchanges on specific dates (absolute cash amounts).\nPositive amounts reduce outstanding (i.e., principal paid by issuer).\nEach payment must be covered by the live balance, including prior draws\nand PIK. Lifetime repayments may therefore exceed initial principal.",
           "properties": {
             "custom_principal": {
               "additionalProperties": false,
@@ -371,7 +371,7 @@
           "description": "Explicit change in outstanding principal, in the cashflow currency.\nPositive increases outstanding. When absent, the flow kind and amount\ndetermine the balance movement. Initial funding remains represented by\nthe schedule's initial notional rather than being counted twice."
         },
         "rate": {
-          "description": "Effective rate used to calculate this cashflow (None if not rate-based or unknown).\n\nFor interest/fees: the annual rate used in the calculation\nFor notional/amortization/PIK: typically None\n\nThis is stored at cashflow creation time when available.\nFor instruments with intra-period events (e.g., revolving credit with draws/repays),\nthis may represent a time-weighted average rate across sub-periods.",
+          "description": "Effective rate used to calculate this cashflow (None if not rate-based or unknown).\n\nFor interest/fees: the annual rate used in the calculation\nFor notional/amortization/PIK: typically None\n\nThis is stored at cashflow creation time when available.\nFor instruments with intra-period events (e.g., revolving credit with draws/repays),\nthis may represent a time-weighted average rate across sub-periods.\nSerialization rejects non-finite rates instead of encoding them as absent.",
           "format": "double",
           "type": [
             "number",
@@ -411,7 +411,7 @@
           ]
         },
         "coupon_period": {
-          "description": "Regular reference coupon period for ACT/ACT ICMA, including stub accrual.\n`None` leaves reference-period selection to the schedule accrual caller.",
+          "description": "Unadjusted regular reference coupon period for ACT/ACT ICMA, or the\nactual full contractual coupon period for ACT/365L, including when\nthis flow represents only a rate or balance subinterval.\nACT/365L metadata must retain these boundaries to select the original\ncoupon's denominator; other conventions may leave this field `None`.",
           "maxItems": 2,
           "minItems": 2,
           "prefixItems": [
@@ -441,7 +441,7 @@
           "type": "boolean"
         },
         "projected_index_rate": {
-          "description": "Projected index rate before spread, gearing, caps, or floors.",
+          "description": "Projected index rate before spread, gearing, caps, or floors.\nSerialization rejects non-finite rates instead of encoding them as absent.",
           "format": "double",
           "type": [
             "number",

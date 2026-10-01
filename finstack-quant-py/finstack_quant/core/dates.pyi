@@ -581,7 +581,7 @@ class DayCountContext:
     frequency : Tenor | str | None
         Coupon frequency for ISMA and ACT/365L (``Tenor`` or ``"6M"``).
     bus_basis : int | None
-        Custom business-day divisor (defaults to 252 when omitted).
+        Custom positive business-day divisor (defaults to 252 when omitted).
     coupon_period : tuple[datetime.date | str, datetime.date | str] | None
         Unadjusted regular ICMA reference period or ACT/365L enclosing
         contractual coupon ``(start, end)``; ``start`` must precede ``end``.
@@ -617,7 +617,7 @@ class DayCountContext:
         frequency : Tenor | str | None
             Coupon frequency (``Tenor`` or tenor string such as ``"6M"``).
         bus_basis : int | None
-            Custom business-day divisor for Bus/252.
+            Custom positive business-day divisor for Bus/252.
         coupon_period : tuple[datetime.date | str, datetime.date | str] | None
             Unadjusted regular ICMA reference period or ACT/365L enclosing
             contractual coupon ``(start, end)``. ICMA validates that both
@@ -629,7 +629,8 @@ class DayCountContext:
         ------
         ValueError
             If *coupon_period* is supplied and its start is not before its
-            end (validated in Rust), or *frequency* does not parse.
+            end (validated in Rust), *frequency* does not parse, or
+            *bus_basis* is zero.
 
         """
         ...

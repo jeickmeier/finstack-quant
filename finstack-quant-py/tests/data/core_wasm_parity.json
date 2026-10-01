@@ -162,12 +162,12 @@
     "rate_calibration": null
   },
   "discount_curve_queries": [
-    0.043825578623513994,
-    0.0433556505156063,
-    0.04312319922666319,
-    0.9177917091683159,
-    0.9567437070971284,
-    0.04409015516265047,
+    0.04383487714260226,
+    0.04336475171967491,
+    0.043132203348958065,
+    0.9177753577972274,
+    0.9567266617574995,
+    0.0440957840826286,
     "act_365f",
     "monotone_convex",
     "flat_forward",
@@ -232,7 +232,7 @@
   ],
   "holiday_calendar": {
     "code": "gblo+nyse",
-    "count_business_days": 21,
+    "count_business_days": 20,
     "is_business_day": true,
     "is_holiday": true,
     "metadata_id": "nyse"
@@ -457,6 +457,7 @@
         "pivot_currency": "USD"
       },
       "pinned_quotes": [],
+      "provider_pinned_quotes": [],
       "provider_quotes": [],
       "quotes": [
         [

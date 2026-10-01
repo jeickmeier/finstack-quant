@@ -326,7 +326,7 @@ export default [
   {
     "path": "#/$defs/d_16451e0bf3b6b78178d8",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/DynamicRecoverySpec",
-    "description": "Specification for dynamic (notional-dependent) recovery rate.\n\nModels the relationship between the accreted notional and the recovery\nrate in default. As PIK accrual increases the notional relative to the\noriginal base, recovery declines according to the chosen [`RecoveryModel`]."
+    "description": "Specification for dynamic (notional-dependent) recovery rate.\n\nModels the relationship between the accreted notional and the recovery\nrate in default. As PIK accrual increases the notional relative to the\noriginal base, recovery declines according to the chosen [`RecoveryModel`].\nDeserialization enforces the same parameter invariants as the constructors."
   },
   {
     "path": "#/$defs/d_16451e0bf3b6b78178d8/properties/base_notional",
@@ -988,7 +988,7 @@ export default [
   {
     "path": "#/$defs/d_5c13df5a55f1da604df2",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding",
-    "description": "Compounding convention for interest rates.\n\nUsed to specify how interest rates should be quoted or converted.\nAll variants produce mathematically equivalent discount factors when\napplied consistently.\n\n# Relationship Between Conventions\n\nFor a given discount factor DF at time t, the rates under different\nconventions are related by:\n\n```text\nDF = e^(-r_cc × t)                    [Continuous]\n   = (1 + r_ann)^(-t)                 [Annual]\n   = (1 + r_per/n)^(-n×t)             [Periodic(n)]\n   = 1 / (1 + r_simple × t)           [Simple]\n```\n\n# Ordering of Rates\n\nFor positive rates and t > 0: `r_simple > r_annual > r_continuous`\n(less frequent compounding requires a higher quoted rate for the same DF)."
+    "description": "Compounding convention for interest rates.\n\nUsed to specify how interest rates should be quoted or converted.\nAll variants produce mathematically equivalent discount factors when\napplied consistently.\n\n# Relationship Between Conventions\n\nFor a given discount factor DF at time t, the rates under different\nconventions are related by:\n\n```text\nDF = e^(-r_cc × t)                    [Continuous]\n   = (1 + r_ann)^(-t)                 [Annual]\n   = (1 + r_per/n)^(-n×t)             [Periodic(n)]\n   = 1 / (1 + r_simple × t)           [Simple]\n```\n\n# Ordering of Rates\n\nFor a common discount factor below one, annual and simple rates both exceed\nthe continuous rate. Their ordering depends on the maturity `t` in years:\n`r_annual > r_simple` for `0 < t < 1`, they agree at `t = 1`, and\n`r_simple > r_annual` for `t > 1`."
   },
   {
     "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/0",
@@ -3469,7 +3469,7 @@ export default [
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/10",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/10",
     "const": "act_act_isma",
-    "description": "Actual/Actual (ICMA) day count convention.\n\nActual days over (actual days in the coupon period × coupons per year).\nRequires a coupon frequency.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251 - \"Actual/Actual (ICMA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ICMA\" (A007)\n- **Also known as**: Act/Act (ICMA), Act/Act (ISMA), ISMA-99"
+    "description": "Actual/Actual (ICMA) day count convention.\n\nActual days over (actual days in the coupon period × coupons per year).\nRequires a coupon frequency. Explicit reference coupon boundaries must\nbe unadjusted regular dates from the contractual nominal month grid,\nnot payment dates.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251 - \"Actual/Actual (ICMA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ICMA\" (A007)\n- **Also known as**: Act/Act (ICMA), Act/Act (ISMA), ISMA-99"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/11",
@@ -3493,7 +3493,7 @@ export default [
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/3",
     "const": "act_365l",
-    "description": "Actual/365 Leap day count convention (Actual/365L).\n\nYear fraction = (actual days) / (365 or 366). Annual or unspecified\nfrequency: 366 if February 29 falls in (start, end]. Other frequencies:\n366 if the end date falls in a leap year. Not Actual/Actual AFB.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251.1(i)(c)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365L\" (A008)\n- **Also known as**: Act/365L, ISMA-Year"
+    "description": "Actual/365 Leap day count convention (Actual/365L).\n\nYear fraction = (actual days) / (365 or 366). Requires the coupon\nfrequency and the enclosing coupon period. Annual: 366 if February 29\nfalls in (coupon_start, coupon_end]. Other frequencies: 366 if the next\ncoupon date falls in a leap year. Not Actual/Actual AFB.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251.1(i)(c)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365L\" (A008)\n- **Also known as**: Act/365L, ISMA-Year"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/4",
@@ -3557,7 +3557,7 @@ export default [
   {
     "path": "#/$defs/d_cc8ed166abbb10ad4451",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/EndogenousHazardSpec",
-    "description": "Specification for endogenous (leverage-dependent) hazard rate.\n\nModels the relationship between a firm's leverage and its instantaneous\nhazard rate, enabling a feedback loop where PIK accrual increases the\nnotional (and hence leverage), which drives the hazard rate higher."
+    "description": "Specification for endogenous (leverage-dependent) hazard rate.\n\nModels the relationship between a firm's leverage and its instantaneous\nhazard rate, enabling a feedback loop where PIK accrual increases the\nnotional (and hence leverage), which drives the hazard rate higher.\nDeserialization validates the parameters and rejects incomplete or\ninconsistent tabular calibrations before they can be evaluated."
   },
   {
     "path": "#/$defs/d_cc8ed166abbb10ad4451/properties/base_hazard_rate",
@@ -3943,7 +3943,7 @@ export default [
     "path": "#/$defs/d_f80f2b90e7af690c5898/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/VarMethod/oneOf/1",
     "const": "taylor_approximation",
-    "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options)."
+    "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options).\nEquity Greeks are associated with their actual market-scalar identifier.\nInstruments with multiple underlying spots or ambiguous scalar ownership\nrequire full revaluation; aggregate gamma is not a multi-asset Hessian."
   },
   {
     "path": "#/$defs/d_fd618cd5743ec18a168f",
@@ -3965,7 +3965,7 @@ export default [
   {
     "path": "#/$defs/d_ff58eb1d8c0cb6416b15",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_spread_option.schema.json#/$defs/CmsSpreadOption",
-    "description": "CMS Spread Option.\n\nOption on the spread between two CMS rates of different tenors.\n\n```text\nPayoff = max(CMS_long - CMS_short - strike, 0) * notional    [for a call]\nPayoff = max(strike - (CMS_long - CMS_short), 0) * notional   [for a put]\n```\n\nTypically: long tenor = 10Y or 30Y CMS, short tenor = 2Y CMS.\n\n# Pricing Approach\n\n1. Each CMS rate has SABR marginal distribution (reuses CMS option SABR calibration)\n2. Joint distribution via Gaussian copula with rank correlation\n3. CMS convexity adjustment applied to each leg via static replication\n\n# References\n\n- Hagan, P. S. (2003). \"Convexity Conundrums.\" *Wilmott Magazine*. `docs/REFERENCES.md#hagan-2003-cms-convexity`\n- Antonov, A., Konikov, M., & Spector, M. (2013). \"SABR Spreads.\" *Risk*. `docs/REFERENCES.md#hagan-2002-sabr`"
+    "description": "CMS Spread Option.\n\nOption on the spread between two CMS rates of different tenors.\n\n```text\nPayoff = max(CMS_long - CMS_short - strike, 0) * notional    [for a call]\nPayoff = max(strike - (CMS_long - CMS_short), 0) * notional   [for a put]\n```\n\nTypically: long tenor = 10Y or 30Y CMS, short tenor = 2Y CMS.\n\n# Pricing Approach\n\n1. Each CMS rate has a lognormal payment-measure marginal from a flat-strike\n   Black volatility surface (or a tenor-axis ATM surface).\n2. A Gaussian copula couples the two rates.\n3. The shared first-order CMS convexity approximation sets each marginal mean.\n\nNonflat smiles and SABR cubes are unsupported and return a validation error.\nThe registered `StaticReplication` model key selects this approximation;\nit does not implement SABR smile replication.\n\n# References\n\n- Hagan, P. S. (2003). \"Convexity Conundrums.\" *Wilmott Magazine*. `docs/REFERENCES.md#hagan-2003-cms-convexity`\n- Antonov, A., Konikov, M., & Spector, M. (2013). \"SABR Spreads.\" *Risk*. `docs/REFERENCES.md#hagan-2002-sabr`"
   },
   {
     "path": "#/$defs/d_ff58eb1d8c0cb6416b15/properties/attributes",
@@ -4019,7 +4019,7 @@ export default [
   {
     "path": "#/$defs/d_ff58eb1d8c0cb6416b15/properties/index_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_spread_option.schema.json#/$defs/CmsSpreadOption/properties/index_id",
-    "description": "Rate-index convention-registry key of the underlying CMS swaps (e.g. `EUR-ESTR-OIS`).\n\nWhen set, provides default values for the fixed/float frequency and\nday count. Individual fields still override the convention when set."
+    "description": "Rate-index convention-registry key of the underlying CMS swaps (e.g. `EUR-ESTR-OIS`).\n\nRequired for USD CMS; other supported currencies use their registered\novernight-index default when omitted. Supplies calendar, settlement lag\nand default leg conventions. Individual leg fields override the index."
   },
   {
     "path": "#/$defs/d_ff58eb1d8c0cb6416b15/properties/index_id/anyOf/0",
@@ -4048,7 +4048,7 @@ export default [
   {
     "path": "#/$defs/d_ff58eb1d8c0cb6416b15/properties/long_vol_surface_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_spread_option.schema.json#/$defs/CmsSpreadOption/properties/long_vol_surface_id",
-    "description": "Swaption volatility surface for long tenor.",
+    "description": "Black swaption volatility surface for the long tenor. The selected\nexpiry slice must be flat across strikes; tenor-axis ATM surfaces are valid.",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
@@ -4097,7 +4097,7 @@ export default [
   {
     "path": "#/$defs/d_ff58eb1d8c0cb6416b15/properties/short_vol_surface_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_spread_option.schema.json#/$defs/CmsSpreadOption/properties/short_vol_surface_id",
-    "description": "Swaption volatility surface for short tenor.",
+    "description": "Black swaption volatility surface for the short tenor, subject to the\nsame flat-strike restriction as the long-tenor surface.",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },

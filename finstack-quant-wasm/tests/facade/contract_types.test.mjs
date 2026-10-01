@@ -489,7 +489,9 @@ test('namespace results match their published result types', () => {
 
   // statements_analytics: flat results restore non-finite values as numbers.
   const metrics = statements_analytics.backtestForecast([0.0, 0.0], [1.0, 2.0]);
-  assert.ok(Number.isNaN(metrics.mape));
+  assert.equal(metrics.mape, null);
+  assert.equal(metrics.smape, 200);
+  assert.equal(metrics.mape_effective_n, 0);
   declarations.push(['forecast_metrics', 'fq.ForecastMetrics', metrics]);
   const explanation = statements_analytics.explainFormula(
     LAG_MODEL,

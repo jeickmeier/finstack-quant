@@ -245,7 +245,7 @@
     },
     {
       "additionalProperties": false,
-      "description": "Regime-switching prepayment model.\n\nTwo-state Markov model for prepayment regimes (high/low).",
+      "description": "Regime-switching prepayment model.\n\nTwo-state Markov model, initially in the low regime at origination.\nEvery simulated month transitions before computing its monthly rate.\nLatent transition draws are independent of the systematic CPR shock.",
       "properties": {
         "cpr_volatility": {
           "default": 0.2,

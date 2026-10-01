@@ -1,10 +1,40 @@
 {
   "$defs": {
+    "ForwardVarianceCurve": {
+      "description": "Forward variance curve ξ₀(t) for rough volatility models.\n\nRepresents `ξ₀(t) = E^Q[V_t | F₀]`, expected instantaneous variance under\nthe consuming model's pricing measure. Values are supplied or calibrated by\nthe caller. The integral sets the model's expected accumulated variance.\n\nDifferencing ATM implied total variance is an optional proxy, not an exact\nvariance-swap bootstrap. This type interpolates the supplied curve; it does\nnot perform market calibration.",
+      "properties": {
+        "interpolation": {
+          "$ref": "#/$defs/Interpolation",
+          "description": "Interpolation contract used by the constructor."
+        },
+        "times": {
+          "description": "Point times or interval ends (strictly increasing year fractions).",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "values": {
+          "description": "Point samples or constant interval variances (all > 0).",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "interpolation",
+        "times",
+        "values"
+      ],
+      "type": "object"
+    },
     "HurstExponent": {
       "description": "Validated Hurst exponent H ∈ (0, 1).\n\nThe Hurst exponent determines the roughness of fractional Brownian motion:\n\n- H < 0.5 — rough (anti-persistent increments)\n- H = 0.5 — standard Brownian motion\n- H > 0.5 — smooth (persistent increments)",
       "properties": {
         "h": {
-          "description": "The Hurst parameter value.",
           "format": "double",
           "type": "number"
         }
@@ -13,6 +43,13 @@
         "h"
       ],
       "type": "object"
+    },
+    "Interpolation": {
+      "enum": [
+        "linear",
+        "constant_intervals"
+      ],
+      "type": "string"
     }
   },
   "$id": "https://finstack_quant.dev/schemas/models/1/cheyette_rough_vol_params.schema.json",
@@ -33,17 +70,40 @@
       "format": "double",
       "type": "number"
     },
+    "phi_times": {
+      "description": "Time knots for the initial forward rate curve φ(t) = f(0, t).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "phi_values": {
+      "description": "Value knots for the initial forward rate curve φ(t) = f(0, t).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
     "rho": {
       "description": "Correlation between rate and vol innovations ρ ∈ [-1, 1].",
       "format": "double",
       "type": "number"
+    },
+    "sigma_base": {
+      "$ref": "#/$defs/ForwardVarianceCurve",
+      "description": "Base volatility term structure σ₀(t) for the rate process."
     }
   },
   "required": [
     "kappa",
+    "sigma_base",
     "hurst",
     "eta",
-    "rho"
+    "rho",
+    "phi_times",
+    "phi_values"
   ],
   "title": "CheyetteRoughVolParams",
   "type": "object"

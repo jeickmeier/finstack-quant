@@ -92,12 +92,26 @@ def test_format_with_rounding_parses_serde_names_with_rust_default() -> None:
 
 def test_year_fractions_with_and_without_context_match_wasm() -> None:
     start, end = dt.date(2024, 3, 1), dt.date(2024, 9, 1)
-    assert DayCount.ACT_365L.year_fraction(start, end) == 0.5041095890410959
-    assert DayCount.ACT_365L.year_fraction(start, end, frequency="6M") == 0.5027322404371585
-    assert DayCount.ACT_365L.signed_year_fraction(end, start, frequency="6M") == -0.5027322404371585
-    assert DayCount.ACT_365L.signed_year_fraction(end, start) == -0.5041095890410959
+    # Act/365L is defined per coupon period: it needs the coupon frequency and
+    # the enclosing coupon period, and the frequency selects the denominator.
+    annual = DayCountContext(frequency="1Y", coupon_period=(start, dt.date(2025, 3, 1)))
+    semi_annual = DayCountContext(frequency="6M", coupon_period=(start, end))
+    assert DayCount.ACT_365L.year_fraction(start, end, annual) == 0.5041095890410959
+    assert DayCount.ACT_365L.year_fraction(start, end, semi_annual) == 0.5027322404371585
+    assert DayCount.ACT_365L.signed_year_fraction(end, start, semi_annual) == -0.5027322404371585
+    assert DayCount.ACT_365L.signed_year_fraction(end, start, annual) == -0.5041095890410959
+    with _raises_exactly("Validation error: ACT/365L requires coupon frequency in DayCountContext"):
+        DayCount.ACT_365L.year_fraction(start, end)
+    with _raises_exactly("Validation error: ACT/365L requires coupon frequency in DayCountContext"):
+        DayCount.ACT_365L.signed_year_fraction(end, start)
     assert DayCount.BUS_252.year_fraction(start, end, calendar="nyse") == 0.503968253968254
     assert DayCount.BUS_252.signed_year_fraction(end, start, calendar="nyse") == -0.503968253968254
+
+
+def test_day_count_context_rejects_a_zero_bus_basis_in_rust() -> None:
+    with _raises_exactly("Invalid Bus/252 basis: expected positive, got 0"):
+        DayCountContext(bus_basis=0)
+    assert DayCountContext(bus_basis=252).bus_basis == 252
 
 
 def test_day_count_context_coupon_period_is_validated_in_rust() -> None:

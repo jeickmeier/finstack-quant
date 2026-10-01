@@ -20,7 +20,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/factor_model/1/credit_factor_model.schema.json",
-      "bytes": 92116,
+      "bytes": 90957,
       "kind": "input",
       "path": "schemas/factor_model/1/credit_factor_model.schema.json",
       "summary": "Calibrated credit factor hierarchy, loadable as pricing input.",
@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/factor_model/1/factor_model_config.schema.json",
-      "bytes": 60414,
+      "bytes": 60274,
       "kind": "input",
       "path": "schemas/factor_model/1/factor_model_config.schema.json",
       "summary": "Factor definitions, matchers and covariance settings.",
@@ -146,7 +146,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/cheyette_rough_vol_params.schema.json",
-      "bytes": 1494,
+      "bytes": 3527,
       "kind": "input",
       "path": "schemas/models/1/cheyette_rough_vol_params.schema.json",
       "summary": "Cheyette + rough stochastic volatility model parameters.",
@@ -596,7 +596,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/position_risk_decomposition.schema.json",
-      "bytes": 6771,
+      "bytes": 6832,
       "kind": "output",
       "path": "schemas/models/1/position_risk_decomposition.schema.json",
       "summary": "Complete position-level risk decomposition of a portfolio.",
@@ -659,7 +659,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/risk_decomposition.schema.json",
-      "bytes": 9154,
+      "bytes": 9269,
       "kind": "output",
       "path": "schemas/models/1/risk_decomposition.schema.json",
       "summary": "Portfolio-level decomposition of total risk across common factors and residuals.",
@@ -668,7 +668,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/rough_bergomi_params.schema.json",
-      "bytes": 1597,
+      "bytes": 1542,
       "kind": "input",
       "path": "schemas/models/1/rough_bergomi_params.schema.json",
       "summary": "rBergomi model parameters.",
@@ -686,7 +686,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/rough_heston_params.schema.json",
-      "bytes": 2055,
+      "bytes": 2000,
       "kind": "input",
       "path": "schemas/models/1/rough_heston_params.schema.json",
       "summary": "Rough Heston model parameters.",
@@ -758,7 +758,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/stochastic_default_spec.schema.json",
-      "bytes": 11735,
+      "bytes": 11823,
       "kind": "input",
       "path": "schemas/models/1/stochastic_default_spec.schema.json",
       "summary": "Stochastic default model specification.",
@@ -767,7 +767,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/stochastic_prepay_spec.schema.json",
-      "bytes": 9417,
+      "bytes": 9567,
       "kind": "input",
       "path": "schemas/models/1/stochastic_prepay_spec.schema.json",
       "summary": "Stochastic prepayment model specification.",
@@ -803,7 +803,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/trade_params.schema.json",
-      "bytes": 5788,
+      "bytes": 5814,
       "kind": "input",
       "path": "schemas/models/1/trade_params.schema.json",
       "summary": "Input parameters for a market impact calculation.",
@@ -884,7 +884,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/yield_pca.schema.json",
-      "bytes": 2804,
+      "bytes": 2835,
       "kind": "component",
       "path": "schemas/models/1/yield_pca.schema.json",
       "summary": "PCA decomposition of yield curve changes.",

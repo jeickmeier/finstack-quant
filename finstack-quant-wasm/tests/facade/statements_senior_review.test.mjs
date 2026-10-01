@@ -7,6 +7,26 @@ await init({
   module_or_path: readFileSync(new URL('../../pkg/finstack_quant_wasm_bg.wasm', import.meta.url)),
 });
 
+/** One-shot `Evaluator.evaluate`, the branch twin of the retired `evaluateModel`. */
+function evaluateModel(input) {
+  const evaluator = new statements.Evaluator();
+  try {
+    return evaluator.evaluate(input);
+  } finally {
+    evaluator.free();
+  }
+}
+
+/** One-shot `Evaluator.evaluateWithMarket`, the twin of the retired `evaluateModelWithMarket`. */
+function evaluateModelWithMarket(input, market, asOf) {
+  const evaluator = new statements.Evaluator();
+  try {
+    return evaluator.evaluateWithMarket(input, market, asOf);
+  } finally {
+    evaluator.free();
+  }
+}
+
 function model(nodes) {
   return {
     id: 'senior-review',
@@ -42,7 +62,7 @@ test('monetary quantile preserves USD through the published facade', () => {
     lower: formula('lower', 'quantile(cash, 0.25)'),
     combined: formula('combined', 'lower + cash'),
   });
-  const result = statements.evaluateModel(JSON.stringify(input));
+  const result = evaluateModel(JSON.stringify(input));
   assert.equal(result.nodes.lower['2025Q3'], 150);
   assert.equal(result.nodes.combined['2025Q3'], 350);
   assert.equal(result.node_value_types.lower.currency, 'USD');
@@ -55,12 +75,12 @@ test('coalesce skips infinite values and ranks honor direction', () => {
     ascending: formula('ascending', 'rank(observation, 1)'),
     descending: formula('descending', 'rank(observation, 0)'),
   });
-  const result = statements.evaluateModel(JSON.stringify(input));
+  const result = evaluateModel(JSON.stringify(input));
   assert.equal(result.nodes.fallback['2025Q3'], 7);
   assert.equal(result.nodes.ascending['2025Q3'], 1);
   assert.equal(result.nodes.descending['2025Q3'], 3);
   input.nodes.ascending.formula_text = 'rank(observation, 1, 2)';
-  assert.throws(() => statements.evaluateModel(JSON.stringify(input)), /1 or 2 arguments/);
+  assert.throws(() => evaluateModel(JSON.stringify(input)), /1 or 2 arguments/);
 });
 
 test('accounting identities reject numerically balanced incompatible currencies', () => {
@@ -85,7 +105,7 @@ test('accounting identities reject numerically balanced incompatible currencies'
     () => statements_analytics.runChecks(JSON.stringify(input), JSON.stringify(suite)),
     /incompatible|currency|USD.*EUR/i
   );
-  const stale = statements.evaluateModel(JSON.stringify(input));
+  const stale = evaluateModel(JSON.stringify(input));
   for (const node of ['assets', 'liabilities', 'equity']) {
     stale.node_value_types[node] = { type: 'scalar' };
   }
@@ -148,7 +168,7 @@ for (const [name, side, fixedRate, forwardRate] of [
     swap.fixed_leg.rate = fixedRate;
     const forward = fixture.market.curves.find((curve) => curve.type === 'forward');
     forward.knot_points = forward.knot_points.map(([time]) => [time, forwardRate]);
-    const result = statements.evaluateModelWithMarket(
+    const result = evaluateModelWithMarket(
       JSON.stringify(fixture.model),
       JSON.stringify(fixture.market),
       '2025-01-01'

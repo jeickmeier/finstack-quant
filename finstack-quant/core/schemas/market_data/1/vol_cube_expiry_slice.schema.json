@@ -25,6 +25,30 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Tenor-by-strike volatility quotes at a fixed option expiry, preserving quote convention and displacement.",
+  "examples": [
+    {
+      "expiry": 1.0,
+      "id": "USD-SWAPTION-1Y",
+      "quote_type": "normal",
+      "strikes": [
+        0.02,
+        0.03,
+        0.04
+      ],
+      "tenors": [
+        2.0,
+        5.0
+      ],
+      "vols_row_major": [
+        0.0085,
+        0.008,
+        0.0082,
+        0.009,
+        0.0086,
+        0.0088
+      ]
+    }
+  ],
   "properties": {
     "displacements": {
       "items": {

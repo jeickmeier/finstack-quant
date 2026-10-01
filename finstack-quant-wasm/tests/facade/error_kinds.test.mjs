@@ -158,7 +158,15 @@ test('COS separates invalid inputs from a degenerate range', () => {
     kind('validation', /num_terms/)
   );
   assert.throws(() => models.bsCosPrice(100, 100, 0.05, 0, -0.2, 1, true), kind('validation'));
-  assert.throws(() => models.bsCosPrice(100, 100, 0.05, 0, 0.2, 0, true), kind('computation'));
+  assert.throws(
+    () => models.bsCosPrice(100, 100, 0.05, 0, 0.2, 0, true),
+    kind('validation', /expiry must be finite and positive/)
+  );
+  // A valid but vanishing expiry leaves no spread to truncate: a numerical failure.
+  assert.throws(
+    () => models.bsCosPrice(100, 100, 0.05, 0, 0.2, 1e-320, true),
+    kind('computation', /degenerate cumulant set/)
+  );
 });
 
 test('inverting a zero FX rate is a validation failure', () => {

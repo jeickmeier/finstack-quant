@@ -13,7 +13,8 @@ use crate::api::core::market_scalars::{JsInflationIndex, JsScalarTimeSeries};
 use crate::api::core::money::JsMoney;
 use crate::api::core::surfaces::{JsFxDeltaVolSurface, JsVolCube, JsVolSurface};
 use crate::utils::input::{js_f64, js_int, js_opt_string, js_string, json_text};
-use crate::utils::{parse_iso_date, to_js_err, to_js_value};
+use crate::utils::{contract_to_js_err, parse_iso_date, to_js_err, to_js_value};
+use finstack_quant_core::contract::LoadLimits;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
@@ -71,19 +72,25 @@ impl JsMarketContext {
         Self::default()
     }
 
-    /// Parse a market context from its canonical JSON representation.
+    /// Strictly load a persisted market context from its canonical state JSON.
+    ///
+    /// Uses the Rust `MarketContext::from_state_slice` contract loader with
+    /// the default `LoadLimits`: the input is bounded to 64 MiB and 96 nested
+    /// JSON containers and must carry `schema_version: 1`.
     ///
     /// # Arguments
     ///
     /// * `json` - Canonical MarketContext JSON (string or plain object), the
-    ///   same payload accepted by pricing `marketJson` arguments. Unknown fields
-    ///   are rejected.
+    ///   same payload accepted by pricing `marketJson` arguments, with the
+    ///   required `schema_version: 1`. Unknown fields are rejected.
     /// @returns A `MarketContext` handle that can be reused across pricing calls; release it with free().
-    /// @throws Error - Throws with kind `validation` when the JSON is malformed or does not match the MarketContext schema, and a `TypeError` when `json` is neither a string nor a plain object.
+    /// @throws Error - Throws a `ContractValidationError` with kind `validation` when the JSON is malformed, exceeds the canonical byte or depth limits (`code` `limit_exceeded`), has a missing or unsupported schema version, or has invalid market objects, duplicate ids or unresolved curve references (`code` `report`, with the diagnostics on `error.report`), and a `TypeError` when `json` is neither a string nor a plain object.
     #[wasm_bindgen(js_name = fromJson)]
     pub fn from_json(json: JsValue) -> Result<JsMarketContext, JsValue> {
         let json: &str = &json_text(&json, "json")?;
-        let inner: MarketContext = serde_json::from_str(json).map_err(to_js_err)?;
+        let (inner, _report) =
+            MarketContext::from_state_slice(json.as_bytes(), &LoadLimits::default())
+                .map_err(contract_to_js_err)?;
         Ok(JsMarketContext {
             inner: Arc::new(inner),
         })

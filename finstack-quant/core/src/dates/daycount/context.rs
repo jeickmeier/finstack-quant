@@ -124,8 +124,8 @@ impl DayCountContextState {
     /// * `calendar_id` - Optional registered holiday-calendar id (for example
     ///   `"usny"`), required by `Bus/252`.
     /// * `frequency` - Coupon frequency required by ACT/ACT ICMA and ACT/365L.
-    /// * `bus_basis` - Optional business-day divisor for `Bus/252`; `None`
-    ///   selects 252.
+    /// * `bus_basis` - Optional business-day divisor for `Bus/252`, a positive
+    ///   count of business days per year; `None` selects 252.
     /// * `coupon_period` - Optional `(start, end)` unadjusted regular ACT/ACT ICMA
     ///   reference period or ACT/365L enclosing coupon; `start` must precede
     ///   `end`. ICMA validates the nominal month grid at calculation time.
@@ -135,7 +135,7 @@ impl DayCountContextState {
     /// # Errors
     ///
     /// Returns `Error::Validation` when `coupon_period` is not strictly
-    /// increasing.
+    /// increasing, and `InputError::InvalidBusBasis` when `bus_basis` is zero.
     pub fn try_new(
         calendar_id: Option<String>,
         frequency: Option<Tenor>,
@@ -145,6 +145,9 @@ impl DayCountContextState {
     ) -> crate::Result<Self> {
         if let Some((start, end)) = coupon_period {
             validate_coupon_period(start, end)?;
+        }
+        if bus_basis == Some(0) {
+            return Err(crate::error::InputError::InvalidBusBasis { basis: 0 }.into());
         }
         Ok(Self {
             calendar_id,
@@ -230,6 +233,14 @@ mod tests {
             false,
         )
         .is_ok());
+    }
+
+    #[test]
+    fn try_new_rejects_a_zero_bus_basis() {
+        let err = DayCountContextState::try_new(None, None, Some(0), None, false)
+            .expect_err("a zero Bus/252 divisor must be rejected at construction");
+        assert!(err.to_string().contains("Invalid Bus/252 basis"), "{err}");
+        assert!(DayCountContextState::try_new(None, None, Some(252), None, false).is_ok());
     }
 
     #[test]

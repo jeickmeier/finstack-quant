@@ -123,7 +123,9 @@ test('rolling returns preserve tiny windows after a positive outlier leaves', ()
   for (const window of [1, 3]) {
     const rolling = panel(values).rollingReturns(0, window);
     assert.deepEqual(rolling.dates, dates(values.length).slice(window - 1));
-    Array.from(rolling.return).forEach((actual, start) => {
+    assert.equal(rolling.value_column, 'return');
+    assert.equal(rolling.values.length, values.length - window + 1);
+    Array.from(rolling.values).forEach((actual, start) => {
       const expected = panel(values.slice(start, start + window)).cumulativeReturns()[0][
         window - 1
       ];
@@ -164,7 +166,9 @@ test('rolling Sortino preserves small returns after a positive outlier leaves', 
     ]) {
       const rolling = panel(values).rollingSortino(0, 3);
       assert.deepEqual(rolling.dates, dates(values.length).slice(2));
-      Array.from(rolling.sortino).forEach((actual, start) => {
+      assert.equal(rolling.value_column, 'sortino');
+      assert.equal(rolling.values.length, values.length - 2);
+      Array.from(rolling.values).forEach((actual, start) => {
         const expected = analytics.sortino(values.slice(start, start + 3));
         if (!Number.isFinite(expected)) assert.equal(actual, expected);
         else assert.ok(Math.abs(actual - expected) <= 1e-12 * Math.max(1, Math.abs(expected)));

@@ -83,12 +83,14 @@ export type AmortizationSpec =
   | {
       linear_between: {
         /**
-         * Amortization end (full repayment), on or before maturity.
+         * Economic end of amortization (full repayment), which must be an
+         * actual coupon accrual boundary on or before the effective terminal
+         * accrual date. Cash settlement may follow this date due to payment lag.
          */
         end: DateWire;
         /**
-         * Amortization start; installments fall on payment dates strictly
-         * after it.
+         * Economic amortization start, on or after issue; installments fall
+         * on coupon accrual boundaries strictly after it.
          */
         start: DateWire;
       };
@@ -519,13 +521,16 @@ export type CouponType =
  * The actual-day conventions:
  *
  * - **`Act365L`** (ICMA Rule 251.1(i)(c)): the denominator depends on the
- *   coupon frequency supplied via [`DayCountContext`]. Annual, or no frequency
- *   supplied: 366 if February 29 falls in `(start, end]` (exclusive of start,
- *   inclusive of end), else 365. Non-annual: 366 if the period end date falls
- *   in a leap year, else 365. This is **not** ACT/ACT AFB, which uses a
- *   sub-period splitting algorithm; use [`DayCount::ActActAfb`] for AFB /
- *   Actual/Actual Euro.
- * - **`Nl365`**: counts the actual calendar days in `[start, end)` and removes
+ *   coupon frequency and the enclosing `coupon_period` supplied via
+ *   [`DayCountContext`]; both are required. Annual: 366 if February 29 falls
+ *   in `(coupon_start, coupon_end]` (exclusive of start, inclusive of end),
+ *   else 365. Non-annual: 366 if the next coupon date falls in a leap year,
+ *   else 365. Partial accrual keeps the enclosing coupon's denominator.
+ *   Accrual dates outside that coupon are rejected; sum separate coupon
+ *   slices for calculations spanning multiple coupon periods. This is **not**
+ *   ACT/ACT AFB, which uses a sub-period splitting algorithm; use
+ *   [`DayCount::ActActAfb`] for AFB / Actual/Actual Euro.
+ * - **`Nl365`**: counts the actual calendar days in `(start, end]` and removes
  *   every February 29 that falls in the period, so a full leap year still
  *   yields exactly 1.0.
  * - **`ActAct`** (ISDA): split the period at calendar-year boundaries, take
@@ -593,11 +598,19 @@ export type TenorUnit = "days" | "weeks" | "months" | "years";
  *
  * - **`None`**: plain tenor stepping from the schedule boundaries (default).
  * - **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates
- *   for rate, currency, and equity index futures).
+ *   for rate, currency, and equity index futures). Cashflow schedules retain
+ *   the contractual maturity as a short final stub when it is off-grid.
  * - **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll
  *   dates). When the start date is not itself a roll date, the first period
  *   accrues from the roll date immediately **preceding** the start (standard
  *   front accrual per the ISDA Big Bang Protocol, April 2009).
+ *   Interior coupon or payment-program windows start at their declared
+ *   boundary; front accrual is applied only once at the instrument start.
+ *
+ * Explicit roll grids cannot be combined with `end_of_month`. ACT/ACT ICMA
+ * supports the CDS twentieth grid; third-Wednesday IMM with ACT/ACT ICMA is
+ * rejected because the available ICMA reference calculation requires nominal
+ * month-grid coupons.
  *
  * # References
  *
@@ -1001,8 +1014,10 @@ export type OasPriceBasis = "settlement_dirty" | "forward_accrued_clean";
  *
  * # Ordering of Rates
  *
- * For positive rates and t > 0: `r_simple > r_annual > r_continuous`
- * (less frequent compounding requires a higher quoted rate for the same DF).
+ * For a common discount factor below one, annual and simple rates both exceed
+ * the continuous rate. Their ordering depends on the maturity `t` in years:
+ * `r_annual > r_simple` for `0 < t < 1`, they agree at `t = 1`, and
+ * `r_simple > r_annual` for `t > 1`.
  */
 export type Compounding =
   | "continuous"
@@ -2115,6 +2130,10 @@ export interface Attributes {
 }
 /**
  * Verifies that Assets = Liabilities + Equity for every period.
+ *
+ * All configured operands must have compatible scalar/monetary units and one
+ * currency. Execution rejects incompatible units or invalid numeric tolerances;
+ * it performs no FX conversion.
  */
 export interface BalanceSheetArticulation {
   /**
@@ -2375,6 +2394,11 @@ export interface FixedCouponSpec {
   /**
    * Whether end-of-month rolling should be preserved when generating the
    * schedule.
+   *
+   * Incompatible with explicit IMM roll rules. With ACT/ACT ICMA, the
+   * regular grid anchor must be month-end: maturity for front stubs, or
+   * start for back stubs and schedules without stubs. An irregular opposite
+   * endpoint remains supported.
    */
   end_of_month?: boolean;
   /**
@@ -2475,6 +2499,11 @@ export interface FloatingCouponSpec {
   /**
    * Whether end-of-month rolling should be preserved when generating the
    * schedule.
+   *
+   * Incompatible with explicit IMM roll rules. With ACT/ACT ICMA, the
+   * regular grid anchor must be month-end: maturity for front stubs, or
+   * start for back stubs and schedules without stubs. An irregular opposite
+   * endpoint remains supported.
    */
   end_of_month?: boolean;
   /**
@@ -2543,11 +2572,11 @@ export interface FloatingCouponSpec {
  * observations. Observation dates strictly before the forward curve base
  * date then resolve from that series instead of the curve:
  *
- * - **Overnight observations** (compounded/averaged paths) use LOCF lookup
- *   (last observation carried forward), matching RFR publication
- *   conventions where a fixing carries over non-publication days
- *   (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 §7.1(g)). A partially
- *   seasoned compounding window seamlessly mixes realized fixings and
+ * - **Overnight observations** (compounded/averaged paths) use exact-date
+ *   lookup on the index's fixing business days. Weekend and holiday carry
+ *   comes from each observation's accrual-day weight, so a missing required
+ *   business-day fixing is an error rather than reuse of an older fixing.
+ *   A partially seasoned compounding window mixes realized fixings and
  *   curve-projected forwards with identical `(rate, days)` weighting.
  * - **Term-rate resets** use exact-date lookup on the (business-day
  *   adjusted) reset date — a term rate fixes on a specific published date.
@@ -2632,13 +2661,13 @@ export interface FloatingRateSpec {
    */
   index_floor_bp?: DecimalWire | null;
   /**
-   * Diagnostic tenor for term-index projection error context.
+   * Explicit term-index tenor when no forward curve resolves.
    *
    * The named forward curve is already the term index (for example a 3M
    * EURIBOR curve). Projection is `fwd.rate(reset_date)`, not a FRA-style
    * average over `[reset, reset + tenor]`. This field (or
-   * [`Self::reset_frequency`] when `None`) is used only to compute
-   * `index_maturity` for error messages. Ignored for overnight-compounded
+   * [`Self::reset_frequency`] when `None`) supplies the compiled term tenor
+   * when no forward curve resolves. Ignored for overnight-compounded
    * legs. When set, the builder warns at build time if it disagrees with
    * the resolved curve's tenor by more than 10% — the curve remains
    * authoritative.
@@ -2660,14 +2689,21 @@ export interface FloatingRateSpec {
   overnight_basis?: DayCount | null;
   /**
    * Index floor/cap application policy for overnight-compounded coupons.
+   *
+   * With changing principal, the builder retains daily compounded-rate
+   * increments. Any bound applied to the final period index or all-in
+   * rate contributes a uniform annual-rate adjustment over the coupon's
+   * contractual accrual time; interim cumulative prefixes are not bounded.
    */
   overnight_index_constraints?: OvernightIndexConstraintApplication;
   /**
-   * Reset frequency for rate fixings.
+   * Fallback term-index tenor when [`Self::index_tenor`] is absent.
    *
-   * This is the cadence at which the rate refixes. When
-   * [`Self::index_tenor`] is `None`, it is also the tenor used only to
-   * build the diagnostic index-maturity date in projection error context.
+   * The bare cashflow builder observes one term fixing at each coupon
+   * period's accrual start, with the configured reset lag. This field does
+   * not create additional resets inside a payment period. The resolved
+   * forward curve owns the quoted index tenor; overnight methods observe
+   * their compiled daily fixing schedule independently of this field.
    */
   reset_frequency: Tenor;
   /**
@@ -2734,6 +2770,11 @@ export interface StepUpCouponSpec {
   /**
    * Whether end-of-month rolling should be preserved when generating the
    * schedule.
+   *
+   * Incompatible with explicit IMM roll rules. With ACT/ACT ICMA, the
+   * regular grid anchor must be month-end: maturity for front stubs, or
+   * start for back stubs and schedules without stubs. An irregular opposite
+   * endpoint remains supported.
    */
   end_of_month?: boolean;
   /**
@@ -2849,6 +2890,7 @@ export interface CashFlow {
    * This is stored at cashflow creation time when available.
    * For instruments with intra-period events (e.g., revolving credit with draws/repays),
    * this may represent a time-weighted average rate across sub-periods.
+   * Serialization rejects non-finite rates instead of encoding them as absent.
    */
   rate?: number | null;
   /**
@@ -2866,8 +2908,11 @@ export interface CashFlowAccrual {
    */
   calendar_id?: string | null;
   /**
-   * Regular reference coupon period for ACT/ACT ICMA, including stub accrual.
-   * `None` leaves reference-period selection to the schedule accrual caller.
+   * Unadjusted regular reference coupon period for ACT/ACT ICMA, or the
+   * actual full contractual coupon period for ACT/365L, including when
+   * this flow represents only a rate or balance subinterval.
+   * ACT/365L metadata must retain these boundaries to select the original
+   * coupon's denominator; other conventions may leave this field `None`.
    *
    * @minItems 2
    * @maxItems 2
@@ -2888,6 +2933,7 @@ export interface CashFlowAccrual {
   end_is_termination_date?: boolean;
   /**
    * Projected index rate before spread, gearing, caps, or floors.
+   * Serialization rejects non-finite rates instead of encoding them as absent.
    */
   projected_index_rate?: number | null;
   /**
@@ -3430,6 +3476,7 @@ export interface MertonMcCalibrationSpec {
  * Models the relationship between the accreted notional and the recovery
  * rate in default. As PIK accrual increases the notional relative to the
  * original base, recovery declines according to the chosen [`RecoveryModel`].
+ * Deserialization enforces the same parameter invariants as the constructors.
  */
 export interface DynamicRecoverySpec {
   /**
@@ -3451,6 +3498,8 @@ export interface DynamicRecoverySpec {
  * Models the relationship between a firm's leverage and its instantaneous
  * hazard rate, enabling a feedback loop where PIK accrual increases the
  * notional (and hence leverage), which drives the hazard rate higher.
+ * Deserialization validates the parameters and rejects incomplete or
+ * inconsistent tabular calibrations before they can be evaluated.
  */
 export interface EndogenousHazardSpec {
   /**
@@ -3867,6 +3916,10 @@ export interface ScenarioPricingOverrides {
  * Checks that retained earnings flow correctly across periods:
  * RE(t) = RE(t−1) + NI(t) − Dividends(t) ± Adjustments(t).
  *
+ * Every configured balance, flow, and adjustment must use the same
+ * scalar/monetary units and currency. Execution rejects incompatible units or
+ * invalid numeric tolerances; it performs no FX conversion.
+ *
  * # Sign convention
  *
  * * `net_income_node` carries the [`SignConventionPolicy::InflowPositive`]
@@ -3913,6 +3966,10 @@ export interface RetainedEarningsReconciliation {
 /**
  * Checks Cash(t) = Cash(t−1) + TotalCF(t) and optionally
  * TotalCF = CFO + CFI + CFF.
+ *
+ * Every configured operand must have the same scalar/monetary units and
+ * currency. Execution rejects incompatible units or non-finite/negative
+ * tolerances; it performs no FX conversion.
  */
 export interface CashReconciliation {
   /**
@@ -3945,9 +4002,8 @@ export interface CashReconciliation {
 /**
  * Flags required nodes that lack values in applicable periods.
  *
- * **Advisory-only**: findings are `Severity::Warning`, so
- * `CheckResult::passed` is always `true`; the check surfaces gaps without
- * failing a pipeline gate.
+ * Missing actual observations produce `Severity::Error` and fail the check.
+ * Missing forecast observations produce advisory `Severity::Warning` findings.
  */
 export interface MissingValueCheck {
   /**
@@ -4241,7 +4297,8 @@ export interface CapitalStructureCashflows {
  */
 export interface CashflowBreakdown {
   /**
-   * Accrued interest not yet paid (liability)
+   * Debt coupon interest accrued but not yet paid (liability).
+   * Hedge-leg accrual valuation is outside the debt-service contract and is zero.
    */
   accrued_interest: Money;
   /**
@@ -4263,8 +4320,8 @@ export interface CashflowBreakdown {
   /**
    * Net cash interest **received** during the period.
    *
-   * Non-zero only for two-leg instruments whose legs net to a receipt (e.g.
-   * an in-the-money pay-fixed swap). Stored as a positive amount, like the
+   * Includes net hedge receipts and receipts from negative-rate debt coupons.
+   * Stored as a positive amount, like the
    * outflow-oriented fields, and reported through the `cs.interest_income`
    * namespace.
    *
@@ -6172,13 +6229,15 @@ export interface WaterfallSpec {
    */
   available_cash_node: string;
   /**
-   * Excess Cash Flow (ECF) sweep specification
+   * Excess Cash Flow (ECF) sweep specification.
+   * A positive sweep percentage requires the `Sweep` payment priority.
    */
   ecf_sweep?: EcfSweepSpec | null;
   /**
    * Formula or node for the `MandatoryPrepayment` rung.
    *
    * Required when `MandatoryPrepayment` appears in `priority_of_payments`.
+   * When configured, that priority must be present so payment consumes cash.
    * Sized independently of the ECF sweep and voluntary prepay buckets.
    */
   mandatory_prepay_node?: string | null;
@@ -6202,6 +6261,7 @@ export interface WaterfallSpec {
    * Formula or node for the `VoluntaryPrepayment` rung.
    *
    * Required when `VoluntaryPrepayment` appears in `priority_of_payments`.
+   * When configured, that priority must be present so payment consumes cash.
    * Sized independently of the ECF sweep and mandatory prepay buckets.
    */
   voluntary_prepay_node?: string | null;
@@ -6213,9 +6273,9 @@ export interface WaterfallSpec {
  *
  * # ECF Calculation
  *
- * The standard ECF formula deducts cash interest from EBITDA. Fees and
- * scheduled principal are also deducted when those payment categories rank
- * ahead of the prepayment priority:
+ * The ECF formula deducts cash interest, fees and scheduled principal paid
+ * by payment categories ahead of the `Sweep` priority, including carried
+ * arrears. Unpaid claims, PIK and later payment priorities are not deducted:
  *
  * ```text
  * ECF = EBITDA - Taxes - CapEx - ΔWC - Cash Interest Paid
@@ -6224,8 +6284,7 @@ export interface WaterfallSpec {
  *   ```
  *
  * Set `cash_interest_node` to override the cash-interest input. If omitted,
- * contractual cash interest is deducted automatically using the period's
- * debt-service magnitude.
+ * the interest actually paid ahead of `Sweep` is deducted automatically.
  *
  * # References
  *
@@ -6239,8 +6298,10 @@ export interface EcfSweepSpec {
   /**
    * Formula or node reference for cash interest paid (e.g., "cs.interest_expense_cash.total").
    *
-   * Per S&P LCD / standard LPA definitions, ECF should deduct cash interest paid.
-   * If omitted, contractual cash interest is deducted automatically.
+   * If omitted, deducts cash interest actually paid by the `Interest` priority
+   * ahead of `Sweep`, including carried coupon arrears. If `Interest` follows
+   * `Sweep`, this automatic deduction is zero. An explicit node overrides
+   * that amount in the model's cash currency units.
    */
   cash_interest_node?: string | null;
   /**
@@ -6307,11 +6368,12 @@ export interface PikToggleSpec {
    */
   min_periods_in_pik?: number;
   /**
-   * Instruments that switch to PIK when the toggle triggers.
+   * Borrowing debt IDs whose cash coupons capitalize when the toggle triggers.
    *
    * Must be a non-empty list: instrument-level PIK capability is not
    * modeled, so `None` or an empty list is rejected by
    * [`PikToggleSpec::validate`] rather than meaning "every instrument".
+   * Swaps and options cannot be PIK targets.
    */
   target_instrument_ids?: string[] | null;
   /**
@@ -6545,7 +6607,10 @@ export interface FormulaCheckSpec {
    */
   severity: CheckSeverity;
   /**
-   * Numeric tolerance for floating-point comparisons.
+   * Finite, nonnegative absolute residual bound in the formula's result units.
+   * When present, the formula passes when its absolute result is at most
+   * this bound. When absent, the formula is a predicate and any finite
+   * nonzero result passes.
    */
   tolerance?: number | null;
 }

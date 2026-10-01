@@ -106,8 +106,16 @@ test('core date inputs reject truncation, wrapping and non-finite epoch days', (
       );
     }
     for (const value of [-1, 252.5, 65536, 65788, Number.NaN, Infinity]) {
-      assert.throws(() => new core.DayCountContext(undefined, undefined, value));
+      assert.throws(
+        () => new core.DayCountContext(undefined, undefined, value),
+        (error) => error instanceof TypeError && error.kind === 'invalid_type'
+      );
     }
+    // A zero Bus/252 divisor is a whole number the Rust constructor rejects.
+    assert.throws(
+      () => new core.DayCountContext(undefined, undefined, 0),
+      (error) => error.kind === 'validation' && /Invalid Bus\/252 basis/.test(error.message)
+    );
     const validBasis = new core.DayCountContext(undefined, undefined, 252);
     assert.equal(validBasis.busBasis, 252);
     validBasis.free();

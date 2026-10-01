@@ -113,12 +113,14 @@ test('horizon facade includes Rust-computed returns and factor contributions', (
   const totalPnl = Number(result.attribution.total_pnl.amount);
   assert.equal(result.initial_value.currency, 'USD');
   assert.equal(result.horizon_days, 31);
-  assert.equal(typeof result.total_return, 'number');
-  assert.ok(Math.abs(result.total_return - totalPnl / initial) < 1e-12);
+  assert.equal(typeof result.summary.total_return, 'number');
+  assert.ok(Math.abs(result.summary.total_return - totalPnl / initial) < 1e-12);
   assert.ok(
-    Math.abs(result.annualized_return - ((1 + result.total_return) ** (365 / 31) - 1)) < 1e-12
+    Math.abs(
+      result.summary.annualized_return - ((1 + result.summary.total_return) ** (365 / 31) - 1)
+    ) < 1e-12
   );
-  assert.deepEqual(Object.keys(result.factor_contributions).sort(), [
+  assert.deepEqual(Object.keys(result.summary.factor_contributions).sort(), [
     'carry',
     'correlations',
     'credit_curves',
@@ -131,7 +133,7 @@ test('horizon facade includes Rust-computed returns and factor contributions', (
   ]);
   assert.ok(
     Math.abs(
-      result.factor_contributions.carry - Number(result.attribution.carry.amount) / initial
+      result.summary.factor_contributions.carry - Number(result.attribution.carry.amount) / initial
     ) < 1e-12
   );
   assert.equal(result.scenario_report.user_operations, 1);
@@ -142,13 +144,13 @@ test('horizon facade uses null for undefined returns', () => {
   const spec = JSON.stringify(scenarios.buildScenarioSpec('no-roll', []));
   const live = scenarios.computeHorizonReturn(instrument, market, '2025-01-15', spec);
   assert.equal(live.horizon_days, null);
-  assert.equal(live.total_return, 0);
-  assert.equal(live.annualized_return, null);
+  assert.equal(live.summary.total_return, 0);
+  assert.equal(live.summary.annualized_return, null);
   const matured = scenarios.computeHorizonReturn(instrument, market, '2025-08-15', spec);
   assert.equal(Number(matured.initial_value.amount), 0);
-  assert.equal(matured.total_return, null);
-  assert.equal(matured.annualized_return, null);
-  assert.ok(Object.values(matured.factor_contributions).every((value) => value === null));
+  assert.equal(matured.summary.total_return, null);
+  assert.equal(matured.summary.annualized_return, null);
+  assert.ok(Object.values(matured.summary.factor_contributions).every((value) => value === null));
 });
 
 for (const method of ['parallel', 'waterfall', 'metrics_based', 'taylor']) {
@@ -173,9 +175,9 @@ for (const method of ['parallel', 'waterfall', 'metrics_based', 'taylor']) {
       assert.ok(Number(result.initial_value.amount) > 0);
       assert.ok(Number(result.terminal_value.amount) > 0);
       assert.equal(result.initial_value.currency, 'USD');
-      assert.ok(Number.isFinite(result.total_return));
-      assert.equal(result.annualized_return, null);
-      assert.ok(Object.values(result.factor_contributions).every(Number.isFinite));
+      assert.ok(Number.isFinite(result.summary.total_return));
+      assert.equal(result.summary.annualized_return, null);
+      assert.ok(Object.values(result.summary.factor_contributions).every(Number.isFinite));
     }
   });
 }
@@ -256,7 +258,7 @@ test('floating horizons preserve opening-day and crossed fixings for every metho
       assert.deepEqual(result.initial_value, opening, `${issueDate} ${method} opening`);
       assert.deepEqual(result.terminal_value, closing, `${issueDate} ${method} closing`);
       assert.equal(result.horizon_days, 4);
-      assert.ok(Number.isFinite(result.total_return));
+      assert.ok(Number.isFinite(result.summary.total_return));
       assert.deepEqual(result.scenario_report.warnings, []);
     }
     assert.equal(bond.toJson(), original);
@@ -506,9 +508,9 @@ test('computeHorizonReturn returns the Rust summary and matches Python', () => {
   assert.equal(result.summary.currency, 'USD');
   // Python: compute_horizon_return(...).total_return / annualized_return /
   // factor_contribution("carry") on the same inputs.
-  assert.ok(Math.abs(result.summary.total_return - 0.0023777484103168997) < 1e-12);
-  assert.ok(Math.abs(result.summary.annualized_return - 0.02835746876872225) < 1e-12);
-  assert.ok(Math.abs(result.summary.factor_contributions.carry - 0.003408116341277966) < 1e-12);
+  assert.ok(Math.abs(result.summary.total_return - 0.0023899669679482228) < 1e-12);
+  assert.ok(Math.abs(result.summary.annualized_return - 0.028505070795274978) < 1e-12);
+  assert.ok(Math.abs(result.summary.factor_contributions.carry - 0.0034203488888837974) < 1e-12);
   assert.equal(Object.keys(result.summary.factor_contributions).length, 9);
   const ratio = Number(result.attribution.total_pnl.amount) / Number(result.initial_value.amount);
   assert.ok(Math.abs(result.summary.total_return - ratio) < 1e-12);

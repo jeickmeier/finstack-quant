@@ -5,7 +5,7 @@
       "description": "Calibration diagnostics providing condition number, residual analysis, and fit quality.\n\nThese diagnostics are only populated when `CalibrationConfig::compute_diagnostics`\nis set to `true`. They are relatively expensive to compute (requiring Jacobian\nanalysis) and are intended for calibration debugging, auditing, and quality\nmonitoring rather than production hot paths.",
       "properties": {
         "condition_number": {
-          "description": "Condition number of the Jacobian's normal equations (J^T * J).\n\nA high condition number (e.g., > 1e10) indicates an ill-conditioned\ncalibration problem where small changes in market data can produce\nlarge changes in calibrated parameters.",
+          "description": "Condition number of the weighted Jacobian's normal equations (J^T * W * J).\n`W` contains the configured residual weights; unweighted fits use identity.\n\nA high condition number (e.g., > 1e10) indicates an ill-conditioned\ncalibration problem where small changes in market data can produce\nlarge changes in calibrated parameters.",
           "format": "double",
           "type": [
             "number",
@@ -331,6 +331,32 @@
       ],
       "type": "object"
     },
+    "CurveAdjustmentSegment": {
+      "additionalProperties": false,
+      "properties": {
+        "slope": {
+          "description": "Function slope on this segment.",
+          "format": "double",
+          "type": "number"
+        },
+        "start": {
+          "description": "Segment origin in the source curve's time coordinates.",
+          "format": "double",
+          "type": "number"
+        },
+        "value": {
+          "description": "Right-hand function value at the segment origin.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "start",
+        "value",
+        "slope"
+      ],
+      "type": "object"
+    },
     "CurveState": {
       "description": "Serializable state representation for any curve type.\n\nProduced when persisting market data snapshots through serde.",
       "oneOf": [
@@ -419,6 +445,17 @@
                 }
               ],
               "description": "Exact typed calibration replay recipe."
+            },
+            "transform": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/DiscountCurveTransform"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Canonical source interpolation and accumulated continuous transformations."
             },
             "type": {
               "const": "discount",
@@ -519,6 +556,17 @@
               "description": "Index tenor in years",
               "format": "double",
               "type": "number"
+            },
+            "transform": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ForwardCurveTransform"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Canonical source interpolation and cumulative continuous transformations."
             },
             "type": {
               "const": "forward",
@@ -1023,6 +1071,46 @@
         }
       ]
     },
+    "DiscountCurveTransform": {
+      "additionalProperties": false,
+      "description": "Source interpolation and a single accumulated transformation, never a chain\nof nested curves. The adjustment is stored as its piecewise-linear derivative\nso evaluating beyond a completed triangular shock does not subtract large\nquadratic polynomials.",
+      "properties": {
+        "adjustment": {
+          "$ref": "#/$defs/PiecewiseLinearAdjustment",
+          "description": "Cumulative derivative of the additive log-discount adjustment."
+        },
+        "offset": {
+          "description": "Current origin in the source interpolation's year-fraction coordinates.",
+          "format": "double",
+          "type": "number"
+        },
+        "source_points": {
+          "description": "Original, untransformed interpolation pillars.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "format": "double",
+                "type": "number"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "source_points",
+        "offset",
+        "adjustment"
+      ],
+      "type": "object"
+    },
     "DividendEvent": {
       "description": "A dated dividend event.",
       "properties": {
@@ -1184,6 +1272,51 @@
         }
       ]
     },
+    "ForwardCurveTransform": {
+      "additionalProperties": false,
+      "properties": {
+        "adjustment": {
+          "$ref": "#/$defs/PiecewiseLinearAdjustment",
+          "description": "Cumulative additive rate adjustment in source time coordinates."
+        },
+        "offset": {
+          "description": "Current curve origin in the source curve's year-fraction coordinates.",
+          "format": "double",
+          "type": "number"
+        },
+        "scale": {
+          "description": "Accumulated parallel multiplicative factor on the source interpolation.",
+          "format": "double",
+          "type": "number"
+        },
+        "source_points": {
+          "description": "Original interpolation pillars, independent of current curve samples.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "format": "double",
+                "type": "number"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "source_points",
+        "offset",
+        "scale",
+        "adjustment"
+      ],
+      "type": "object"
+    },
     "FxConfig": {
       "additionalProperties": false,
       "description": "Configuration for [`FxMatrix`](crate::money::fx::FxMatrix) behaviour.\n\nControls triangulation and caching.",
@@ -1302,7 +1435,7 @@
     },
     "FxMatrixState": {
       "additionalProperties": false,
-      "description": "Serializable state of an FxMatrix.\nContains the configuration and cached quotes that can be persisted and restored.",
+      "description": "Serializable state of an FxMatrix.\nContains the configuration and cached quotes that can be persisted and restored.\nSerialization fails with an ordinary serializer error if any captured\nexplicit or provider rate is non-finite or non-positive, including rates\nthat overflow after a mutable underlying provider changes under a shock.",
       "properties": {
         "config": {
           "$ref": "#/$defs/FxConfig",
@@ -1310,6 +1443,33 @@
         },
         "pinned_quotes": {
           "description": "Pinned, date/policy-scoped quotes as `(from, to, on, policy, rate)`.\n\nRequired: a snapshot that omits it would silently re-derive those\ndates from the provider instead of restoring the pinned fixings.",
+          "items": {
+            "maxItems": 5,
+            "minItems": 5,
+            "prefixItems": [
+              {
+                "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json"
+              },
+              {
+                "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/FxConversionPolicy"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "provider_pinned_quotes": {
+          "description": "Captured date/policy-scoped provider quotes. These override captured\npair-global provider quotes for their scope while remaining below\nexplicit matrix quotes in either direction. Required even when empty.",
           "items": {
             "maxItems": 5,
             "minItems": 5,
@@ -1382,6 +1542,7 @@
         "config",
         "quotes",
         "provider_quotes",
+        "provider_pinned_quotes",
         "pinned_quotes"
       ],
       "type": "object"
@@ -1472,7 +1633,7 @@
     },
     "InflationIndex": {
       "additionalProperties": false,
-      "description": "Inflation index time series with lagging and seasonality.\n\nWraps historical CPI/RPI observations with market-standard conventions for\nlag application and interpolation. Used for pricing TIPS, linkers, and\ninflation derivatives.\n\n# Components\n\n- **Observations**: Historical index levels by publication date\n- **Interpolation**: Daily interpolation between monthly observations\n- **Lag**: Publication lag (typically 3 months for TIPS)\n- **Seasonality**: Optional monthly adjustment factors\n\n# Interpolation Methods\n\n- **Step**: Last observation carried forward (conservative)\n- **Linear**: Daily interpolation between months (TIPS standard)\n\n# Lag Application\n\nReference index calculation applies lag before interpolation:\n```text\nFor settlement date T with 3-month lag:\n1. Reference date = T - 3 months\n2. Find bracketing CPI observations\n3. Interpolate linearly between them\n```\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::{\n    InflationIndex, InflationInterpolation, InflationLag,\n};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\n// US CPI-U observations\nlet observations = vec![\n    (Date::from_calendar_date(2023, Month::September, 30).expect(\"Valid date\"), 296.8),\n    (Date::from_calendar_date(2023, Month::October, 31).expect(\"Valid date\"), 297.4),\n    (Date::from_calendar_date(2023, Month::November, 30).expect(\"Valid date\"), 298.1),\n    (Date::from_calendar_date(2023, Month::December, 31).expect(\"Valid date\"), 299.0),\n    (Date::from_calendar_date(2024, Month::January, 31).expect(\"Valid date\"), 300.5),\n    (Date::from_calendar_date(2024, Month::February, 29).expect(\"Valid date\"), 302.1),\n    (Date::from_calendar_date(2024, Month::March, 31).expect(\"Valid date\"), 303.8),\n    (Date::from_calendar_date(2024, Month::April, 30).expect(\"Valid date\"), 304.1),\n];\n\nlet index = InflationIndex::new(\"US-CPI-U\", observations, Currency::USD)\n    .expect(\"Index creation should succeed\")\n    .with_interpolation(InflationInterpolation::Linear)\n    .with_lag(InflationLag::Months(3)); // TIPS standard\n\n// Calculate inflation ratio for TIPS coupon indexation\nlet base_date = Date::from_calendar_date(2024, Month::January, 15).expect(\"Valid date\");\nlet settle_date = Date::from_calendar_date(2024, Month::June, 15).expect(\"Valid date\");\nlet ratio = index.ratio(base_date, settle_date).expect(\"Ratio calculation should succeed\");\nassert!(ratio >= 1.0); // Inflation adjustment factor\n```\n\n# Thread Safety\n\nImmutable after construction; safe to share via `Arc<InflationIndex>`.\n\n# References\n\n- **TIPS Mechanics**:\n  - US Treasury (2024). \"TIPS In Depth.\" treasurydirect.gov. `docs/REFERENCES.md#deacon-derry-mirfendereski-2004`\n  - Deacon, M., Derry, A., & Mirfendereski, D. (2004). *Inflation-Indexed Securities*\n    (2nd ed.). Wiley Finance. Chapter 2 (Index-linked bond mechanics). `docs/REFERENCES.md#deacon-derry-mirfendereski-2004`\n\n- **Index Lagging**:\n  - Kerkhof, J. (2005). \"Inflation Derivatives Explained.\" *Journal of Derivatives\n    Accounting*, 2(1), 1-19. `docs/REFERENCES.md#kerkhof-2005`\n  - Hurd, M., & Relleen, J. (2006). \"Estimating the Inflation Risk Premium.\"\n    Bank of England Quarterly Bulletin, Q2 2006. `docs/REFERENCES.md#kerkhof-2005`",
+      "description": "Inflation index time series with lagging and seasonality.\n\nWraps historical CPI/RPI observations with market-standard conventions for\nlag application and interpolation. Used for pricing TIPS, linkers, and\ninflation derivatives.\n\n# Components\n\n- **Observations**: Index levels labelled by reference date/month\n- **Interpolation**: Daily interpolation between monthly observations\n- **Lag**: Contractual observation lag (typically 3 months for TIPS)\n- **Publication dates**: Optional explicit availability dates by reference month\n- **Seasonality**: Optional monthly adjustment factors\n\n# Interpolation Methods\n\n- **Step**: Last observation carried forward (conservative)\n- **Linear**: Daily interpolation between months (TIPS standard)\n\n# Lag Application\n\nReference index calculation applies lag before interpolation:\n```text\nFor settlement date T with 3-month lag:\n1. Reference date = T - 3 months\n2. Find bracketing CPI observations\n3. Interpolate linearly between them\n```\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::{\n    InflationIndex, InflationInterpolation, InflationLag,\n};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\n// US CPI-U observations\nlet observations = vec![\n    (Date::from_calendar_date(2023, Month::September, 30).expect(\"Valid date\"), 296.8),\n    (Date::from_calendar_date(2023, Month::October, 31).expect(\"Valid date\"), 297.4),\n    (Date::from_calendar_date(2023, Month::November, 30).expect(\"Valid date\"), 298.1),\n    (Date::from_calendar_date(2023, Month::December, 31).expect(\"Valid date\"), 299.0),\n    (Date::from_calendar_date(2024, Month::January, 31).expect(\"Valid date\"), 300.5),\n    (Date::from_calendar_date(2024, Month::February, 29).expect(\"Valid date\"), 302.1),\n    (Date::from_calendar_date(2024, Month::March, 31).expect(\"Valid date\"), 303.8),\n    (Date::from_calendar_date(2024, Month::April, 30).expect(\"Valid date\"), 304.1),\n];\n\nlet index = InflationIndex::new(\"US-CPI-U\", observations, Currency::USD)\n    .expect(\"Index creation should succeed\")\n    .with_interpolation(InflationInterpolation::Linear)\n    .with_lag(InflationLag::Months(3)); // TIPS standard\n\n// Calculate inflation ratio for TIPS coupon indexation\nlet base_date = Date::from_calendar_date(2024, Month::January, 15).expect(\"Valid date\");\nlet settle_date = Date::from_calendar_date(2024, Month::June, 15).expect(\"Valid date\");\nlet ratio = index.ratio(base_date, settle_date).expect(\"Ratio calculation should succeed\");\nassert!(ratio >= 1.0); // Inflation adjustment factor\n```\n\n# Thread Safety\n\nImmutable after construction; safe to share via `Arc<InflationIndex>`.\n\n# References\n\n- **TIPS Mechanics**:\n  - US Treasury (2024). \"TIPS In Depth.\" treasurydirect.gov. `docs/REFERENCES.md#deacon-derry-mirfendereski-2004`\n  - Deacon, M., Derry, A., & Mirfendereski, D. (2004). *Inflation-Indexed Securities*\n    (2nd ed.). Wiley Finance. Chapter 2 (Index-linked bond mechanics). `docs/REFERENCES.md#deacon-derry-mirfendereski-2004`\n\n- **Index Lagging**:\n  - Kerkhof, J. (2005). \"Inflation Derivatives Explained.\" *Journal of Derivatives\n    Accounting*, 2(1), 1-19. `docs/REFERENCES.md#kerkhof-2005`\n  - Hurd, M., & Relleen, J. (2006). \"Estimating the Inflation Risk Premium.\"\n    Bank of England Quarterly Bulletin, Q2 2006. `docs/REFERENCES.md#kerkhof-2005`",
       "properties": {
         "currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
@@ -1505,6 +1666,13 @@
               }
             ],
             "type": "array"
+          },
+          "type": "array"
+        },
+        "publication_dates": {
+          "description": "Explicit monthly observation availability; no release dates are inferred.",
+          "items": {
+            "$ref": "#/$defs/InflationPublicationWire"
           },
           "type": "array"
         },
@@ -1547,7 +1715,7 @@
       ]
     },
     "InflationLag": {
-      "description": "Publication lag for inflation index reference dates.\n\nInflation indices are published with a delay (typically 2-4 weeks). Securities\nusing these indices incorporate a lag to ensure the reference index is published\nby the settlement date.\n\n# Standard Lags by Market\n\n- **US TIPS**: 3-month lag (reference index from 3 months prior)\n- **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)\n- **French OATi**: 3-month lag\n- **German index-linked**: 3-month lag\n\n# Rationale\n\nThe lag ensures:\n1. Reference index is published before settlement\n2. Index value is known at coupon payment date\n3. No estimation or forecasting required for payment calculation\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationLag;\n\nlet tips_lag = InflationLag::Months(3);  // US TIPS standard\nlet gilt_lag = InflationLag::Months(3);  // UK modern gilts\nlet no_lag = InflationLag::None;         // Inflation swaps (forecast-based)\n```",
+      "description": "Contractual observation lag for inflation index reference dates.\n\nInflation indices are published with a delay (typically 2-4 weeks). Securities\nusing these indices incorporate an observation lag to ensure the reference\nindex is published by settlement. This lag does not specify the actual\npublication date; use [`InflationIndex::with_publication_dates`] for that.\n\n# Standard Lags by Market\n\n- **US TIPS**: 3-month lag (reference index from 3 months prior)\n- **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)\n- **French OATi**: 3-month lag\n- **German index-linked**: 3-month lag\n\n# Rationale\n\nThe lag ensures:\n1. Reference index is published before settlement\n2. Index value is known at coupon payment date\n3. No estimation or forecasting required for payment calculation\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationLag;\n\nlet tips_lag = InflationLag::Months(3);  // US TIPS standard\nlet gilt_lag = InflationLag::Months(3);  // UK modern gilts\nlet no_lag = InflationLag::None;         // Inflation swaps (forecast-based)\n```",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -1587,6 +1755,24 @@
           "type": "string"
         }
       ]
+    },
+    "InflationPublicationWire": {
+      "additionalProperties": false,
+      "properties": {
+        "publication_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Inclusive date on which the observation must be available."
+        },
+        "reference_month": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "First calendar day of the reference month."
+        }
+      },
+      "required": [
+        "reference_month",
+        "publication_date"
+      ],
+      "type": "object"
     },
     "InterpStyle": {
       "description": "Enum of supported interpolation styles. The default is `Linear`.",
@@ -1886,6 +2072,29 @@
           "type": "string"
         }
       ]
+    },
+    "PiecewiseLinearAdjustment": {
+      "additionalProperties": false,
+      "description": "A flat function representation: repeated shocks merge on a breakpoint union\nrather than forming a recursively nested transformation history.",
+      "properties": {
+        "initial_value": {
+          "description": "Constant value before the first breakpoint.",
+          "format": "double",
+          "type": "number"
+        },
+        "segments": {
+          "description": "Sorted, merged linear segments.",
+          "items": {
+            "$ref": "#/$defs/CurveAdjustmentSegment"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "initial_value",
+        "segments"
+      ],
+      "type": "object"
     },
     "PositiveF64Wire": {
       "description": "Finite JSON number that is strictly greater than zero.\n\nThis type is used by serde field adapters so runtime deserialization and\ngenerated schemas enforce the same positive-number contract.",
@@ -2422,11 +2631,11 @@
       "properties": {
         "ingest_scale_by_currency": {
           "additionalProperties": {
-            "format": "uint32",
+            "maximum": 28,
             "minimum": 0,
             "type": "integer"
           },
-          "description": "Ingest scale map snapshot by currency code.",
+          "description": "Validated ingest scale snapshot by currency code, with values in `0..=28`.",
           "type": "object"
         },
         "mode": {
@@ -2435,11 +2644,11 @@
         },
         "output_scale_by_currency": {
           "additionalProperties": {
-            "format": "uint32",
+            "maximum": 28,
             "minimum": 0,
             "type": "integer"
           },
-          "description": "Output scale map snapshot by currency code.",
+          "description": "Validated output scale snapshot by currency code, with values in `0..=28`.",
           "type": "object"
         },
         "tolerances": {
@@ -2634,14 +2843,15 @@
       "properties": {
         "max_iterations": {
           "default": 100,
-          "description": "Maximum iterations available to each solver invocation.",
+          "description": "Positive maximum number of iterations available to each solver invocation.",
           "format": "uint",
-          "minimum": 0,
+          "minimum": 1,
           "type": "integer"
         },
         "tolerance": {
           "default": 1e-12,
-          "description": "Numerical convergence tolerance; distinct from economic fit acceptance.",
+          "description": "Positive finite numerical convergence tolerance, distinct from economic fit acceptance.",
+          "exclusiveMinimum": 0.0,
           "format": "double",
           "type": "number"
         }
@@ -2930,6 +3140,11 @@
           "type": "string"
         },
         {
+          "const": "shifted_black_lognormal",
+          "description": "Displaced Black volatility; per-expiry displacements accompany the grid.",
+          "type": "string"
+        },
+        {
           "const": "normal",
           "description": "Normal (Bachelier) implied volatility, absolute rate units.",
           "type": "string"
@@ -2940,6 +3155,17 @@
       "additionalProperties": false,
       "description": "Volatility surface defined on expiry × strike grid.\n\nInternally stores volatilities in row-major order as a boxed slice.",
       "properties": {
+        "displacements": {
+          "description": "Additive displacements in forward/strike units, one per expiry for shifted Black quotes.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
         "expiries": {
           "description": "Expiry times in years",
           "items": {

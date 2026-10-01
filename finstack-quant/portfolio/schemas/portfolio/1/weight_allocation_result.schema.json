@@ -51,7 +51,7 @@
       "description": "Per-strategy allocation output row.",
       "properties": {
         "capital": {
-          "description": "Rounded capital allocation.",
+          "description": "Rounded capital allocation with the sign of total capital. Fractional\nminor units are assigned by largest remainder, breaking ties by input order.",
           "format": "double",
           "type": "number"
         },

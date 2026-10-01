@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
-      "bytes": 208638,
+      "bytes": 215152,
       "kind": "input",
       "path": "schemas/calibration/1/calibration.schema.json",
       "summary": "Build a market from quotes: a calibration plan, flat market data, and any pre-built curves or surfaces.",
@@ -11,7 +11,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration_result.schema.json",
-      "bytes": 116464,
+      "bytes": 124342,
       "kind": "output",
       "path": "schemas/calibration/1/calibration_result.schema.json",
       "summary": "The calibrated market snapshot with the plan-level and per-step fit reports.",
@@ -20,7 +20,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration_validation_report.schema.json",
-      "bytes": 15826,
+      "bytes": 15924,
       "kind": "output",
       "path": "schemas/calibration/1/calibration_validation_report.schema.json",
       "summary": "Dry-run findings for a calibration envelope; nothing is solved.",
@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/calibration/1/hull_white_cap_floor_calibration_config.schema.json",
-      "bytes": 2956,
+      "bytes": 2952,
       "kind": "component",
       "path": "schemas/calibration/1/hull_white_cap_floor_calibration_config.schema.json",
       "summary": "Settings of the scalar Hull-White fit to cap/floor quotes.",
@@ -47,7 +47,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/calibration/1/hull_white_piecewise_sigma_calibration_config.schema.json",
-      "bytes": 2333,
+      "bytes": 2332,
       "kind": "component",
       "path": "schemas/calibration/1/hull_white_piecewise_sigma_calibration_config.schema.json",
       "summary": "Settings of the piecewise-constant Hull-White sigma bootstrap to cap/floor quotes.",
@@ -65,7 +65,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/calibration/1/step_params.schema.json",
-      "bytes": 62840,
+      "bytes": 62357,
       "kind": "component",
       "path": "schemas/calibration/1/step_params.schema.json",
       "summary": "Kind-tagged parameters of one calibration step, flattened into `CalibrationStep`.",
@@ -101,7 +101,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/market/1/market_quote.schema.json",
-      "bytes": 29936,
+      "bytes": 30462,
       "kind": "component",
       "path": "schemas/market/1/market_quote.schema.json",
       "summary": "One market observation, tagged by asset class.",
@@ -119,7 +119,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/market/1/vol_quote.schema.json",
-      "bytes": 7934,
+      "bytes": 8460,
       "kind": "component",
       "path": "schemas/market/1/vol_quote.schema.json",
       "summary": "Option, swaption or cap/floor volatility quote.",

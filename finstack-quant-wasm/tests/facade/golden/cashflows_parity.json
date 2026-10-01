@@ -739,12 +739,12 @@
         },
         "kind": "float_reset",
         "accrual_factor": 0.25,
-        "rate": 0.05519444444444444,
+        "rate": 0.055194444444444435,
         "accrual": {
           "start": "2025-01-15",
           "end": "2025-04-15",
           "day_count": "act_360",
-          "projected_index_rate": 0.04019444444444444,
+          "projected_index_rate": 0.040194444444444435,
           "calendar_id": "weekends_only",
           "coupon_period": ["2025-01-15", "2025-04-15"],
           "end_is_termination_date": false
@@ -774,17 +774,17 @@
         "date": "2025-10-15",
         "reset_date": "2025-07-15",
         "amount": {
-          "amount": "14747.68518518518",
+          "amount": "14747.68518518519",
           "currency": "USD"
         },
         "kind": "float_reset",
         "accrual_factor": 0.25555555555555554,
-        "rate": 0.057708333333333334,
+        "rate": 0.057708333333333355,
         "accrual": {
           "start": "2025-07-15",
           "end": "2025-10-15",
           "day_count": "act_360",
-          "projected_index_rate": 0.042708333333333334,
+          "projected_index_rate": 0.042708333333333355,
           "calendar_id": "weekends_only",
           "coupon_period": ["2025-07-15", "2025-10-15"],
           "end_is_termination_date": false
@@ -874,17 +874,17 @@
         "date": "2027-01-15",
         "reset_date": "2026-10-15",
         "amount": {
-          "amount": "15851.54320987654",
+          "amount": "15851.54320987655",
           "currency": "USD"
         },
         "kind": "float_reset",
         "accrual_factor": 0.25555555555555554,
-        "rate": 0.06202777777777778,
+        "rate": 0.06202777777777782,
         "accrual": {
           "start": "2026-10-15",
           "end": "2027-01-15",
           "day_count": "act_360",
-          "projected_index_rate": 0.04702777777777778,
+          "projected_index_rate": 0.04702777777777782,
           "calendar_id": "weekends_only",
           "coupon_period": ["2026-10-15", "2027-01-15"],
           "end_is_termination_date": true
@@ -915,7 +915,7 @@
         {
           "series_id": "FIXING:USD-SOFR-3M",
           "date": "2025-01-15",
-          "value": 0.04019444444444444
+          "value": 0.040194444444444435
         },
         {
           "series_id": "FIXING:USD-SOFR-3M",
@@ -925,7 +925,7 @@
         {
           "series_id": "FIXING:USD-SOFR-3M",
           "date": "2025-07-15",
-          "value": 0.042708333333333334
+          "value": 0.042708333333333355
         },
         {
           "series_id": "FIXING:USD-SOFR-3M",
@@ -950,7 +950,7 @@
         {
           "series_id": "FIXING:USD-SOFR-3M",
           "date": "2026-10-15",
-          "value": 0.04702777777777778
+          "value": 0.04702777777777782
         }
       ],
       "representation": "contractual",
@@ -1112,17 +1112,17 @@
         "date": "2027-01-15",
         "reset_date": "2026-10-15",
         "amount": {
-          "amount": "15851.54320987654",
+          "amount": "15851.54320987655",
           "currency": "USD"
         },
         "kind": "float_reset",
         "accrual_factor": 0.25555555555555554,
-        "rate": 0.06202777777777778,
+        "rate": 0.06202777777777782,
         "accrual": {
           "start": "2026-10-15",
           "end": "2027-01-15",
           "day_count": "act_360",
-          "projected_index_rate": 0.04702777777777778,
+          "projected_index_rate": 0.04702777777777782,
           "calendar_id": "weekends_only",
           "coupon_period": ["2026-10-15", "2027-01-15"],
           "end_is_termination_date": true
@@ -1168,7 +1168,7 @@
         {
           "series_id": "FIXING:USD-SOFR-3M",
           "date": "2026-10-15",
-          "value": 0.04702777777777778
+          "value": 0.04702777777777782
         }
       ],
       "representation": "contractual",
@@ -1200,12 +1200,12 @@
           },
           "kind": "float_reset",
           "accrual_factor": 0.25,
-          "rate": 0.05519444444444444,
+          "rate": 0.055194444444444435,
           "accrual": {
             "start": "2025-01-15",
             "end": "2025-04-15",
             "day_count": "act_360",
-            "projected_index_rate": 0.04019444444444444,
+            "projected_index_rate": 0.040194444444444435,
             "calendar_id": "weekends_only",
             "coupon_period": ["2025-01-15", "2025-04-15"],
             "end_is_termination_date": false
@@ -1235,17 +1235,17 @@
           "date": "2025-10-15",
           "reset_date": "2025-07-15",
           "amount": {
-            "amount": "14747.68518518518",
+            "amount": "14747.68518518519",
             "currency": "USD"
           },
           "kind": "float_reset",
           "accrual_factor": 0.25555555555555554,
-          "rate": 0.057708333333333334,
+          "rate": 0.057708333333333355,
           "accrual": {
             "start": "2025-07-15",
             "end": "2025-10-15",
             "day_count": "act_360",
-            "projected_index_rate": 0.042708333333333334,
+            "projected_index_rate": 0.042708333333333355,
             "calendar_id": "weekends_only",
             "coupon_period": ["2025-07-15", "2025-10-15"],
             "end_is_termination_date": false
@@ -1335,17 +1335,17 @@
           "date": "2027-01-15",
           "reset_date": "2026-10-15",
           "amount": {
-            "amount": "18407.0987654321",
+            "amount": "18407.09876543211",
             "currency": "USD"
           },
           "kind": "float_reset",
           "accrual_factor": 0.25555555555555554,
-          "rate": 0.07202777777777777,
+          "rate": 0.07202777777777783,
           "accrual": {
             "start": "2026-10-15",
             "end": "2027-01-15",
             "day_count": "act_360",
-            "projected_index_rate": 0.04702777777777778,
+            "projected_index_rate": 0.04702777777777782,
             "calendar_id": "weekends_only",
             "coupon_period": ["2026-10-15", "2027-01-15"],
             "end_is_termination_date": true
@@ -1376,7 +1376,7 @@
           {
             "series_id": "FIXING:USD-SOFR-3M",
             "date": "2025-01-15",
-            "value": 0.04019444444444444
+            "value": 0.040194444444444435
           },
           {
             "series_id": "FIXING:USD-SOFR-3M",
@@ -1386,7 +1386,7 @@
           {
             "series_id": "FIXING:USD-SOFR-3M",
             "date": "2025-07-15",
-            "value": 0.042708333333333334
+            "value": 0.042708333333333355
           },
           {
             "series_id": "FIXING:USD-SOFR-3M",
@@ -1411,7 +1411,7 @@
           {
             "series_id": "FIXING:USD-SOFR-3M",
             "date": "2026-10-15",
-            "value": 0.04702777777777778
+            "value": 0.04702777777777782
           }
         ],
         "representation": "contractual",
@@ -1442,12 +1442,12 @@
           },
           "kind": "float_reset",
           "accrual_factor": 0.25,
-          "rate": 0.05519444444444444,
+          "rate": 0.055194444444444435,
           "accrual": {
             "start": "2025-01-15",
             "end": "2025-04-15",
             "day_count": "act_360",
-            "projected_index_rate": 0.04019444444444444,
+            "projected_index_rate": 0.040194444444444435,
             "calendar_id": "weekends_only",
             "coupon_period": ["2025-01-15", "2025-04-15"],
             "end_is_termination_date": false
@@ -1477,17 +1477,17 @@
           "date": "2025-10-15",
           "reset_date": "2025-07-15",
           "amount": {
-            "amount": "14747.68518518518",
+            "amount": "14747.68518518519",
             "currency": "USD"
           },
           "kind": "float_reset",
           "accrual_factor": 0.25555555555555554,
-          "rate": 0.057708333333333334,
+          "rate": 0.057708333333333355,
           "accrual": {
             "start": "2025-07-15",
             "end": "2025-10-15",
             "day_count": "act_360",
-            "projected_index_rate": 0.042708333333333334,
+            "projected_index_rate": 0.042708333333333355,
             "calendar_id": "weekends_only",
             "coupon_period": ["2025-07-15", "2025-10-15"],
             "end_is_termination_date": false
@@ -1577,17 +1577,17 @@
           "date": "2027-01-15",
           "reset_date": "2026-10-15",
           "amount": {
-            "amount": "15851.54320987654",
+            "amount": "15851.54320987655",
             "currency": "USD"
           },
           "kind": "float_reset",
           "accrual_factor": 0.25555555555555554,
-          "rate": 0.06202777777777778,
+          "rate": 0.06202777777777782,
           "accrual": {
             "start": "2026-10-15",
             "end": "2027-01-15",
             "day_count": "act_360",
-            "projected_index_rate": 0.04702777777777778,
+            "projected_index_rate": 0.04702777777777782,
             "calendar_id": "weekends_only",
             "coupon_period": ["2026-10-15", "2027-01-15"],
             "end_is_termination_date": true
@@ -1618,7 +1618,7 @@
           {
             "series_id": "FIXING:USD-SOFR-3M",
             "date": "2025-01-15",
-            "value": 0.04019444444444444
+            "value": 0.040194444444444435
           },
           {
             "series_id": "FIXING:USD-SOFR-3M",
@@ -1628,7 +1628,7 @@
           {
             "series_id": "FIXING:USD-SOFR-3M",
             "date": "2025-07-15",
-            "value": 0.042708333333333334
+            "value": 0.042708333333333355
           },
           {
             "series_id": "FIXING:USD-SOFR-3M",
@@ -1653,7 +1653,7 @@
           {
             "series_id": "FIXING:USD-SOFR-3M",
             "date": "2026-10-15",
-            "value": 0.04702777777777778
+            "value": 0.04702777777777782
           }
         ],
         "representation": "contractual",
@@ -2525,12 +2525,12 @@
         },
         "kind": "float_reset",
         "accrual_factor": 0.25,
-        "rate": 0.05519444444444444,
+        "rate": 0.055194444444444435,
         "accrual": {
           "start": "2025-01-15",
           "end": "2025-04-15",
           "day_count": "act_360",
-          "projected_index_rate": 0.04019444444444444,
+          "projected_index_rate": 0.040194444444444435,
           "calendar_id": "weekends_only",
           "coupon_period": ["2025-01-15", "2025-04-15"],
           "end_is_termination_date": false
@@ -2560,17 +2560,17 @@
         "date": "2025-10-15",
         "reset_date": "2025-07-15",
         "amount": {
-          "amount": "14747.68518518518",
+          "amount": "14747.68518518519",
           "currency": "USD"
         },
         "kind": "float_reset",
         "accrual_factor": 0.25555555555555554,
-        "rate": 0.057708333333333334,
+        "rate": 0.057708333333333355,
         "accrual": {
           "start": "2025-07-15",
           "end": "2025-10-15",
           "day_count": "act_360",
-          "projected_index_rate": 0.042708333333333334,
+          "projected_index_rate": 0.042708333333333355,
           "calendar_id": "weekends_only",
           "coupon_period": ["2025-07-15", "2025-10-15"],
           "end_is_termination_date": false
@@ -2660,17 +2660,17 @@
         "date": "2027-01-15",
         "reset_date": "2026-10-15",
         "amount": {
-          "amount": "15851.54320987654",
+          "amount": "15851.54320987655",
           "currency": "USD"
         },
         "kind": "float_reset",
         "accrual_factor": 0.25555555555555554,
-        "rate": 0.06202777777777778,
+        "rate": 0.06202777777777782,
         "accrual": {
           "start": "2026-10-15",
           "end": "2027-01-15",
           "day_count": "act_360",
-          "projected_index_rate": 0.04702777777777778,
+          "projected_index_rate": 0.04702777777777782,
           "calendar_id": "weekends_only",
           "coupon_period": ["2026-10-15", "2027-01-15"],
           "end_is_termination_date": true
@@ -2701,7 +2701,7 @@
         {
           "series_id": "FIXING:USD-SOFR-3M",
           "date": "2025-01-15",
-          "value": 0.04019444444444444
+          "value": 0.040194444444444435
         },
         {
           "series_id": "FIXING:USD-SOFR-3M",
@@ -2711,7 +2711,7 @@
         {
           "series_id": "FIXING:USD-SOFR-3M",
           "date": "2025-07-15",
-          "value": 0.042708333333333334
+          "value": 0.042708333333333355
         },
         {
           "series_id": "FIXING:USD-SOFR-3M",
@@ -2736,7 +2736,7 @@
         {
           "series_id": "FIXING:USD-SOFR-3M",
           "date": "2026-10-15",
-          "value": 0.04702777777777778
+          "value": 0.04702777777777782
         }
       ],
       "representation": "contractual",
@@ -3322,7 +3322,7 @@
         "unit": "months"
       },
       "reset_lag_days": 0,
-      "fixing_calendar_id": "usny",
+      "fixing_calendar_id": "sofr",
       "compounding": {
         "compounded_in_arrears": {
           "lookback_days": 0

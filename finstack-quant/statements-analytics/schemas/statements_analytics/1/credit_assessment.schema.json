@@ -1,7 +1,7 @@
 {
   "$defs": {
     "CreditAssessmentPoint": {
-      "description": "One period's structured credit metrics. Each metric is `None` when it\ncannot be computed for that period (e.g. an incomplete TTM window).",
+      "description": "One period's structured credit metrics. Each metric is `None` when it\ncannot be computed for that period (e.g. an incomplete TTM window, mixed\nscalar/monetary representations, or different input currencies).",
       "properties": {
         "free_cash_flow": {
           "description": "Free cash flow at this period.",

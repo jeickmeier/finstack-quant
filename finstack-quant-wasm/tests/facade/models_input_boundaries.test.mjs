@@ -8,6 +8,17 @@ await facade.default({
 });
 const { models } = facade;
 
+/** The Rust `js_uint` boundary rejection for a count that is not a whole number in range. */
+const invalidCount = (name) => (error) => {
+  assert.ok(error instanceof TypeError, `expected a TypeError, got ${error}`);
+  assert.equal(error.kind, 'invalid_type');
+  assert.match(
+    error.message,
+    new RegExp(`^${name}: (expected a non-negative whole number, got |\\d+ is out of range)`)
+  );
+  return true;
+};
+
 test('forward option APIs validate input domains before intrinsic branches', () => {
   for (const invalid of [NaN, Infinity, -Infinity]) {
     for (const expiry of [0, 1]) {
@@ -49,43 +60,43 @@ test('models reject fractional, non-finite and wrapped counts before the WASM AB
     4294967297,
     9007199254740992,
   ];
-  const model = models.credit.mertonModelJson(100, 0.2, 80, 0.05);
+  const model = new models.credit.MertonModel(100, 0.2, 80, 0.05);
   const calibrator = new models.volatility.SabrCalibrator();
   try {
     for (const count of invalidCounts) {
-      assert.throws(() => models.asianOptionPrice(100, 100, 0.05, 0, 0.2, 1, count), /integer/);
-      assert.throws(() => models.bsCosPrice(100, 100, 0.05, 0, 0.2, 1, true, count), /integer/);
+      assert.throws(
+        () => models.asianOptionPrice(100, 100, 0.05, 0, 0.2, 1, count),
+        invalidCount('numFixings')
+      );
+      assert.throws(
+        () => models.bsCosPrice(100, 100, 0.05, 0, 0.2, 1, true, count),
+        invalidCount('nTerms')
+      );
       assert.throws(
         () => models.vgCosPrice(100, 100, 0.05, 0, 0.2, -0.1, 0.2, 1, true, count),
-        /integer/
+        invalidCount('nTerms')
       );
       assert.throws(
         () => models.mertonJumpCosPrice(100, 100, 0.05, 0, 0.2, -0.1, 0.1, 0.1, 1, true, count),
-        /integer/
+        invalidCount('nTerms')
       );
       for (const price of [models.monteCarlo.priceHestonCall, models.monteCarlo.priceHestonPut]) {
         assert.throws(
           () => price(100, 100, 0.05, 0, 2, 0.04, 0.3, -0.7, 0.04, 1, count, 42n, 1),
-          /integer/
+          invalidCount('numPaths')
         );
         assert.throws(
           () => price(100, 100, 0.05, 0, 2, 0.04, 0.3, -0.7, 0.04, 1, 2, 42n, count),
-          /integer/
+          invalidCount('numSteps')
         );
       }
+      assert.throws(() => model.simulatePaths(count, 1, 1, 42n, false), invalidCount('numPaths'));
+      assert.throws(() => model.simulatePaths(2, count, 1, 42n, false), invalidCount('numSteps'));
       assert.throws(
-        () => models.credit.mertonSimulatePathsJson(model, count, 1, 1, 42n, false),
-        /integer/
+        () => models.credit.ToggleExerciseModel.optimal(count, 0.1, 0.25, 0.04, 5),
+        invalidCount('nestedPaths')
       );
-      assert.throws(
-        () => models.credit.mertonSimulatePathsJson(model, 2, count, 1, 42n, false),
-        /integer/
-      );
-      assert.throws(
-        () => models.credit.toggleExerciseOptimalJson(count, 0.1, 0.25, 0.04, 5),
-        /integer/
-      );
-      assert.throws(() => calibrator.withMaxIterations(count), /integer/);
+      assert.throws(() => calibrator.withMaxIterations(count), invalidCount('maxIterations'));
     }
     const estimate = models.monteCarlo.priceHestonCall(
       100,
@@ -103,9 +114,11 @@ test('models reject fractional, non-finite and wrapped counts before the WASM AB
       1
     );
     assert.equal(estimate.num_paths, 2);
-    assert.ok(Number.isFinite(estimate.mean));
+    assert.ok(Number.isFinite(Number(estimate.mean.amount)));
+    assert.equal(estimate.mean.currency, 'USD');
   } finally {
     calibrator.free();
+    model.free();
   }
 });
 
@@ -132,9 +145,12 @@ test('stored expiry and hierarchy indices cannot silently select another grid ro
     assert.deepEqual(levels.levelValues(0), { IG: 10 });
     assert.deepEqual(deltas.levelDeltas(0), { IG: 2 });
     for (const index of [0.5, NaN, Infinity, -1, 4294967296]) {
-      assert.throws(() => models.volatility.getFxDeltaPillarVols(surface, index), /integer/);
-      assert.throws(() => levels.levelValues(index), /integer/);
-      assert.throws(() => deltas.levelDeltas(index), /integer/);
+      assert.throws(
+        () => models.volatility.getFxDeltaPillarVols(surface, index),
+        invalidCount('expiryIndex')
+      );
+      assert.throws(() => levels.levelValues(index), invalidCount('levelIndex'));
+      assert.throws(() => deltas.levelDeltas(index), invalidCount('levelIndex'));
     }
   } finally {
     surface.free();
@@ -158,18 +174,30 @@ test('RFL tail dependence reports the calibrated unit-loading mass', () => {
 });
 
 test('credit model JSON cannot bypass recovery and hazard validation', () => {
-  const recovery = JSON.parse(models.credit.dynamicRecoveryConstantJson(0.4));
-  for (const invalid of [-0.1, 1.5]) {
-    assert.throws(() =>
-      models.credit.dynamicRecoveryAtNotional(
-        JSON.stringify({ ...recovery, base_recovery: invalid }),
-        100
-      )
-    );
+  const validation = (error) => {
+    assert.equal(error.kind, 'validation');
+    return true;
+  };
+  const { DynamicRecoverySpec, EndogenousHazardSpec } = models.credit;
+  const constant = DynamicRecoverySpec.constant(0.4);
+  const powerLaw = EndogenousHazardSpec.powerLaw(0.1, 1.5, 2);
+  try {
+    const recovery = JSON.parse(constant.toJson());
+    assert.equal(DynamicRecoverySpec.fromJson(recovery).recoveryAtNotional(100), 0.4);
+    for (const invalid of [-0.1, 1.5]) {
+      assert.throws(
+        () => DynamicRecoverySpec.fromJson({ ...recovery, base_recovery: invalid }),
+        validation
+      );
+    }
+    const hazard = JSON.parse(powerLaw.toJson());
+    assert.ok(EndogenousHazardSpec.fromJson(hazard).hazardAtLeverage(2) > 0);
+    hazard.leverage_hazard_map = { tabular: { leverage_points: [], hazard_points: [] } };
+    assert.throws(() => EndogenousHazardSpec.fromJson(hazard), validation);
+  } finally {
+    powerLaw.free();
+    constant.free();
   }
-  const hazard = JSON.parse(models.credit.endogenousHazardPowerLawJson(0.1, 1.5, 2));
-  hazard.leverage_hazard_map = { tabular: { leverage_points: [], hazard_points: [] } };
-  assert.throws(() => models.credit.endogenousHazardAtLeverage(JSON.stringify(hazard), 2));
 });
 
 test('risk budget rejects invalid finite-share and threshold inputs', () => {

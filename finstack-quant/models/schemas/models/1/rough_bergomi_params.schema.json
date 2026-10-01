@@ -4,7 +4,6 @@
       "description": "Validated Hurst exponent H ∈ (0, 1).\n\nThe Hurst exponent determines the roughness of fractional Brownian motion:\n\n- H < 0.5 — rough (anti-persistent increments)\n- H = 0.5 — standard Brownian motion\n- H > 0.5 — smooth (persistent increments)",
       "properties": {
         "h": {
-          "description": "The Hurst parameter value.",
           "format": "double",
           "type": "number"
         }

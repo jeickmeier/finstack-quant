@@ -20,7 +20,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/cecl_config.schema.json",
-      "bytes": 6601,
+      "bytes": 5497,
       "kind": "input",
       "path": "schemas/statements_analytics/1/cecl_config.schema.json",
       "summary": "Configuration for CECL (US GAAP ASC 326) calculation.",
@@ -65,7 +65,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/corporate_analysis_options.schema.json",
-      "bytes": 25298,
+      "bytes": 26061,
       "kind": "input",
       "path": "schemas/statements_analytics/1/corporate_analysis_options.schema.json",
       "summary": "Optional DCF, coverage, check-suite, valuation-date and LTV settings of the corporate analysis pipeline.",
@@ -83,7 +83,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/credit_assessment.schema.json",
-      "bytes": 2334,
+      "bytes": 2405,
       "kind": "component",
       "path": "schemas/statements_analytics/1/credit_assessment.schema.json",
       "summary": "Structured credit assessment: leverage, interest coverage, and free cash flow at a `period` plus a per-period series for trend display.",
@@ -101,7 +101,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/dcf_sensitivity_result.schema.json",
-      "bytes": 23439,
+      "bytes": 23532,
       "kind": "output",
       "path": "schemas/statements_analytics/1/dcf_sensitivity_result.schema.json",
       "summary": "Enterprise-value tornado for the headline DCF assumptions.",
@@ -137,7 +137,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/ecl_config.schema.json",
-      "bytes": 14106,
+      "bytes": 12960,
       "kind": "input",
       "path": "schemas/statements_analytics/1/ecl_config.schema.json",
       "summary": "Configuration for ECL calculation.",
@@ -155,7 +155,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/ecl_stage_request.schema.json",
-      "bytes": 2213,
+      "bytes": 2473,
       "kind": "input",
       "path": "schemas/statements_analytics/1/ecl_stage_request.schema.json",
       "summary": "Inputs for the simplified IFRS 9 stage-classification workflow.",
@@ -200,7 +200,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/forecast_metrics.schema.json",
-      "bytes": 3865,
+      "bytes": 3920,
       "kind": "component",
       "path": "schemas/statements_analytics/1/forecast_metrics.schema.json",
       "summary": "Forecast accuracy metrics.",
@@ -317,7 +317,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/portfolio_ecl_result.schema.json",
-      "bytes": 23861,
+      "bytes": 23913,
       "kind": "output",
       "path": "schemas/statements_analytics/1/portfolio_ecl_result.schema.json",
       "summary": "Portfolio-level ECL result with stage migration and segment breakdown.",
@@ -416,7 +416,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/scoring_dimension.schema.json",
-      "bytes": 5389,
+      "bytes": 5406,
       "kind": "component",
       "path": "schemas/statements_analytics/1/scoring_dimension.schema.json",
       "summary": "Configuration for a single rich/cheap scoring dimension.",
@@ -425,7 +425,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/sensitivity_result.schema.json",
-      "bytes": 4025,
+      "bytes": 4102,
       "kind": "output",
       "path": "schemas/statements_analytics/1/sensitivity_result.schema.json",
       "summary": "Results of sensitivity analysis.",

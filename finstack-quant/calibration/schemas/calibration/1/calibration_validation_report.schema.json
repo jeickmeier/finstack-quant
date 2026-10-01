@@ -4,7 +4,7 @@
       "description": "Static dependency graph derived from a [`CalibrationEnvelope`].",
       "properties": {
         "initial_ids": {
-          "description": "Curve / surface IDs available at the start of execution, contributed\nby `market_data` and `prior_market`.",
+          "description": "Market-object IDs available at the start of execution, contributed\nby `market_data` and `prior_market`.",
           "items": {
             "type": "string"
           },
@@ -32,7 +32,7 @@
           "type": "string"
         },
         "reads": {
-          "description": "Curve / surface IDs the step depends on. Each must be either in\n`initial_ids` or produced by an earlier step.",
+          "description": "Market-object IDs the step depends on, including quote-derived curve\nroles and selected spot/carry inputs. Each must be either in\n`initial_ids` or produced by an earlier step.",
           "items": {
             "type": "string"
           },
@@ -49,7 +49,7 @@
           "type": "integer"
         },
         "writes": {
-          "description": "Curve / surface ID(s) the step produces.",
+          "description": "Market-object IDs the step produces, including scalar and series outputs.",
           "items": {
             "type": "string"
           },

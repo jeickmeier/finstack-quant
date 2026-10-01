@@ -42,7 +42,7 @@
         },
         {
           "const": "bloomberg_cdsw_clean",
-          "description": "Bloomberg CDSW clean principal presentation and premium-leg policy.\n\nThis is the industry-standard convention used by Bloomberg CDSW and\nthe ISDA Standard Upfront Model. It is the default for new\n`CreditDefaultSwap` instances:\n\n- Premium cashflows accrue between business-day-adjusted dates that\n  match the Bloomberg CDSW cashflow schedule.\n- The final coupon period is inclusive of the maturity date (extra\n  day) per CDSW convention.\n- The reported NPV is the clean principal value (Bloomberg\n  \"Principal\" line). Cash settlement is `Principal + Accrued`.\n- Par spread uses the risky annuity denominator (matches the CDSW\n  screen for investment-grade credits).\n- Hazard rebootstrap inside risk metrics (CS01, recovery01, etc.)\n  inherits the same CDSW pricer convention so sensitivities are\n  self-consistent with the base PV.",
+          "description": "Bloomberg CDSW clean principal presentation and premium-leg policy.\n\nThis is the industry-standard convention used by Bloomberg CDSW and\nthe ISDA Standard Upfront Model. It is the default for new\n`CreditDefaultSwap` instances:\n\n- Intermediate premium cashflows accrue between business-day-adjusted\n  dates. Final accrual ends on unadjusted maturity; the final payment\n  follows the business-day convention independently.\n- The final coupon period is inclusive of the maturity date (extra\n  day) per CDSW convention.\n- The reported NPV is the clean principal value (Bloomberg\n  \"Principal\" line). Cash settlement is `Principal + Accrued`.\n- Par spread uses the risky annuity denominator (matches the CDSW\n  screen for investment-grade credits).\n- Hazard rebootstrap inside risk metrics (CS01, recovery01, etc.)\n  inherits the same CDSW pricer convention so sensitivities are\n  self-consistent with the base PV.",
           "type": "string"
         },
         {
@@ -368,7 +368,7 @@
       "type": "object"
     },
     "RollRule": {
-      "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode. The IMM modes\nforce a quarterly grid: the schedule frequency and stub rule configured on\n[`ScheduleParams`] are overridden with quarterly / short-back, matching\n`ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates\n  for rate, currency, and equity index futures).\n- **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll\n  dates). When the start date is not itself a roll date, the first period\n  accrues from the roll date immediately **preceding** the start (standard\n  front accrual per the ISDA Big Bang Protocol, April 2009).\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::specs::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)",
+      "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode. The IMM modes\nforce a quarterly grid: the schedule frequency and stub rule configured on\n[`ScheduleParams`] are overridden with quarterly / short-back, matching\n`ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates\n  for rate, currency, and equity index futures). Cashflow schedules retain\n  the contractual maturity as a short final stub when it is off-grid.\n- **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll\n  dates). When the start date is not itself a roll date, the first period\n  accrues from the roll date immediately **preceding** the start (standard\n  front accrual per the ISDA Big Bang Protocol, April 2009).\n  Interior coupon or payment-program windows start at their declared\n  boundary; front accrual is applied only once at the instrument start.\n\nExplicit roll grids cannot be combined with `end_of_month`. ACT/ACT ICMA\nsupports the CDS twentieth grid; third-Wednesday IMM with ACT/ACT ICMA is\nrejected because the available ICMA reference calculation requires nominal\nmonth-grid coupons.\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::specs::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)",
       "oneOf": [
         {
           "const": "none",
@@ -391,26 +391,6 @@
       "const": "bilinear",
       "description": "Interpolation method for SABR parameters across the expiry–tenor grid.",
       "type": "string"
-    },
-    "SeasonalFactors": {
-      "additionalProperties": false,
-      "description": "Monthly seasonal adjustment factors for inflation curves.\n\nUsed to deseasonalize CPI observations before fitting a smooth\nzero-coupon inflation curve, then reseasonalize the output.\nMonthly adjustments should approximately sum to zero.",
-      "properties": {
-        "monthly_adjustments": {
-          "description": "Monthly adjustment factors (Jan=index 0 through Dec=index 11).\nThese are additive adjustments to the log CPI level.",
-          "items": {
-            "format": "double",
-            "type": "number"
-          },
-          "maxItems": 12,
-          "minItems": 12,
-          "type": "array"
-        }
-      },
-      "required": [
-        "monthly_adjustments"
-      ],
-      "type": "object"
     },
     "Seniority": {
       "description": "Seniority level for credit exposures.\n\nUsed to tag a hazard curve with the seniority of the issuer's debt\nobserved by the curve. Drives the recovery-rate prior in default\nmodelling and selects the right LGD prior in\n`finstack_quant_models::credit::lgd::seniority`.\n\nOrder is **not** total — `SeniorSecured` is strictly senior to `Senior`,\n`Subordinated`, and `Junior`, but the relative ordering of `Subordinated`\nvs. `Junior` is jurisdiction-dependent. Do not rely on `Ord` semantics.",
@@ -452,26 +432,6 @@
         }
       ]
     },
-    "SwapFrequency": {
-      "description": "Number of coupon payments per year for the underlying swap in HW1F calibration.\n\nUSD swaps are semi-annual (2), EUR swaps are annual (1).",
-      "oneOf": [
-        {
-          "const": "annual",
-          "description": "1 payment per year (EUR, GBP standard).",
-          "type": "string"
-        },
-        {
-          "const": "semi_annual",
-          "description": "2 payments per year (USD standard).",
-          "type": "string"
-        },
-        {
-          "const": "quarterly",
-          "description": "4 payments per year.",
-          "type": "string"
-        }
-      ]
-    },
     "SwaptionVolConvention": {
       "description": "Volatility quoting convention for swaptions.",
       "oneOf": [
@@ -482,17 +442,17 @@
         },
         {
           "const": "lognormal",
-          "description": "Lognormal (Black) volatility in decimal units.\n\nExample: `0.20` means 20% Black volatility.",
+          "description": "Lognormal (Black) volatility in decimal units.\n\nExample: `0.20` means 20% Black volatility.\nRequires `black_lognormal` quotes and positive forwards/strikes;\ncalibration does not introduce a displacement automatically.",
           "type": "string"
         },
         {
           "additionalProperties": false,
-          "description": "Shifted lognormal (Black) volatility in decimal units, with an explicit shift.\n\nExample: `0.20` means 20% Black volatility.",
+          "description": "Shifted lognormal (Black) volatility in decimal units, with an explicit shift.\n\nExample: `0.20` means 20% Black volatility on displaced forward/strike\ncoordinates. Requires `shifted_black_lognormal` quotes.",
           "properties": {
             "shifted_lognormal": {
               "properties": {
                 "shift": {
-                  "description": "Shift amount for negative rate handling",
+                  "description": "Finite positive additive shift in decimal rate units, applied to\nboth forwards and strikes and retained in calibrated artifacts.",
                   "format": "double",
                   "type": "number"
                 }
@@ -810,19 +770,8 @@
           "type": "number"
         },
         "observation_lag": {
-          "description": "Observation lag (e.g. \"3M\").\n\nOverrides the quote convention's lag and must match any supplied index\nlag. The same lag determines the output curve's reference-date origin and the dates\nof the CPI observations consumed by calibration instruments.",
+          "description": "Month observation lag (e.g. \"3M\"); \"none\" means zero months.\nDay-based lags are unsupported because output curves carry month lags.\n\nOverrides the quote convention's lag and must match any supplied index\nlag. The same lag determines the output curve's reference-date origin and the dates\nof the CPI observations consumed by calibration instruments.",
           "type": "string"
-        },
-        "seasonal_factors": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/SeasonalFactors"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Optional seasonal adjustment factors for deseasonalizing CPI observations.\n\nWhen provided, the calibrator will:\n1. Deseasonalize input CPI levels using the monthly factors\n2. Fit the smooth zero-coupon curve to deseasonalized levels\n3. Reseasonalize the output CPI path\n\nMonthly adjustments are additive to log CPI level. They should approximately\nsum to zero over 12 months."
         }
       },
       "required": [
@@ -969,7 +918,7 @@
             }
           ],
           "default": null,
-          "description": "Optional day count convention for fixed leg calculations."
+          "description": "Optional day count convention for fixed-leg coupon accrual only.\nOption expiry and variance always use ACT/365F."
         },
         "forward_id": {
           "default": null,
@@ -1013,7 +962,7 @@
         },
         "target_expiries": {
           "default": [],
-          "description": "Target expiry times (in years) for the surface grid.",
+          "description": "Target option expiry times in ACT/365F years from `base_date`, independent\nof the fixed-leg coupon day-count convention.",
           "items": {
             "format": "double",
             "type": "number"
@@ -1135,7 +1084,7 @@
           "type": "string"
         },
         "maturity_years": {
-          "description": "Maturity of the tranches in years.",
+          "description": "Finite positive CDS tenor in years, representable as a whole number of months.\nQuotes must resolve to the same CDS convention maturity as this tenor.",
           "format": "double",
           "type": "number"
         },
@@ -1324,6 +1273,10 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Forward/projection curve ID. If equal to `discount_curve_id`, the\ndiscount curve is used as the single-curve projection proxy."
         },
+        "index_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Term-rate index defining settlement, reset tenor, accrual day count,\ncalendar, business-day adjustments, and payment lag for caplets.\nIts currency must match `currency`; overnight indices are unsupported."
+        },
         "initial_kappa": {
           "default": null,
           "description": "Optional initial guess for mean reversion κ when solving both κ and σ.",
@@ -1346,11 +1299,6 @@
           "const": "cap_floor_hull_white",
           "type": "string"
         },
-        "payment_frequency": {
-          "$ref": "#/$defs/SwapFrequency",
-          "default": "semi_annual",
-          "description": "Payment frequency used to decompose quoted caps/floors into caplets."
-        },
         "volatility_mode": {
           "$ref": "#/$defs/HullWhiteVolatilityMode",
           "default": "scalar",
@@ -1363,7 +1311,8 @@
         "discount_curve_id",
         "forward_curve_id",
         "currency",
-        "base_date"
+        "base_date",
+        "index_id"
       ],
       "type": "object"
     },
@@ -1389,7 +1338,7 @@
         },
         "dividend_yield_override": {
           "default": null,
-          "description": "Optional continuous dividend yield; defaults to the market scalar\n`\"<underlying_ticker>-DIVYIELD\"` or zero.",
+          "description": "Optional continuous dividend yield in decimal units. Without an override,\nuses the unitless market scalar `\"<underlying_ticker>-DIVYIELD\"`. When a\ndiscount curve is supplied, a matching cash-dividend schedule may supply\ncarry instead; otherwise an explicit yield is required.",
           "format": "double",
           "type": [
             "number",
@@ -1506,7 +1455,7 @@
         "method": {
           "$ref": "#/$defs/CalibrationMethod",
           "default": "bootstrap",
-          "description": "Calibration method to use."
+          "description": "Sequential bootstrap method. `GlobalSolve` is unsupported and rejected."
         }
       },
       "required": [

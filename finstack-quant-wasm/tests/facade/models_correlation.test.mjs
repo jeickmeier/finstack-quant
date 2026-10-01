@@ -9,19 +9,27 @@ await init({
 
 const correlation = models.correlation;
 
+/** The Rust `js_uint` boundary rejection for a count that is not a whole u32. */
+const invalidCount = (name) => (error) => {
+  assert.ok(error instanceof TypeError, `expected a TypeError, got ${error}`);
+  assert.equal(error.kind, 'invalid_type');
+  assert.match(
+    error.message,
+    new RegExp(`^${name}: (expected a non-negative whole number, got |\\d+ is out of range)`)
+  );
+  return true;
+};
+
 test('matrix dimensions reject fractional, non-finite and wrapped JavaScript numbers', () => {
   for (const n of [0.9, 1.9, -1, NaN, Infinity, -Infinity, 4294967296, 4294967297]) {
-    assert.throws(() => correlation.validateCorrelationMatrix([1], n), /n must be.*integer/);
-    assert.throws(() => correlation.nearestCorrelation([1], n), /n must be.*integer/);
+    assert.throws(() => correlation.validateCorrelationMatrix([1], n), invalidCount('n'));
+    assert.throws(() => correlation.nearestCorrelation([1], n), invalidCount('n'));
   }
 });
 
 test('nearest correlation validates iteration counts before the WASM ABI converts them', () => {
   for (const maxIter of [0.9, -1, NaN, Infinity, -Infinity, 4294967296, 4294967297]) {
-    assert.throws(
-      () => correlation.nearestCorrelation([1], 1, maxIter),
-      /maxIter must be.*integer/
-    );
+    assert.throws(() => correlation.nearestCorrelation([1], 1, maxIter), invalidCount('maxIter'));
   }
 });
 

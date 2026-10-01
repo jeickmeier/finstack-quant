@@ -138,29 +138,6 @@ export default [
     "description": "Adjust to the closer business day. A tie (equal calendar-day distance)\nrolls Following, matching FpML `NEAREST` and QuantLib `Nearest`.\n\n**FpML**: \"NEAREST\""
   },
   {
-    "path": "#/$defs/d_022e5f44e59eaa6c084b",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SwapFrequency",
-    "description": "Number of coupon payments per year for the underlying swap in HW1F calibration.\n\nUSD swaps are semi-annual (2), EUR swaps are annual (1)."
-  },
-  {
-    "path": "#/$defs/d_022e5f44e59eaa6c084b/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SwapFrequency/oneOf/0",
-    "const": "annual",
-    "description": "1 payment per year (EUR, GBP standard)."
-  },
-  {
-    "path": "#/$defs/d_022e5f44e59eaa6c084b/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SwapFrequency/oneOf/1",
-    "const": "semi_annual",
-    "description": "2 payments per year (USD standard)."
-  },
-  {
-    "path": "#/$defs/d_022e5f44e59eaa6c084b/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SwapFrequency/oneOf/2",
-    "const": "quarterly",
-    "description": "4 payments per year."
-  },
-  {
     "path": "#/$defs/d_08aea844abd10cb00e40",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep",
     "description": "A single step in the calibration process.\n\nEach step targets the construction or update of a specific market object\n(e.g., a yield curve) using a specified set of quotes."
@@ -366,7 +343,7 @@ export default [
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/10/properties/dividend_yield_override",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/10/properties/dividend_yield_override",
     "default": null,
-    "description": "Optional continuous dividend yield; defaults to the market scalar\n`\"<underlying_ticker>-DIVYIELD\"` or zero.",
+    "description": "Optional continuous dividend yield in decimal units. Without an override,\nuses the unitless market scalar `\"<underlying_ticker>-DIVYIELD\"`. When a\ndiscount curve is supplied, a matching cash-dividend schedule may supply\ncarry instead; otherwise an explicit yield is required.",
     "format": "double"
   },
   {
@@ -504,7 +481,7 @@ export default [
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/11/properties/method",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/11/properties/method",
     "default": "bootstrap",
-    "description": "Calibration method to use.",
+    "description": "Sequential bootstrap method. `GlobalSolve` is unsupported and rejected.",
     "ref": "#/$defs/CalibrationMethod",
     "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationMethod"
   },
@@ -737,22 +714,7 @@ export default [
   {
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/3/properties/observation_lag",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/3/properties/observation_lag",
-    "description": "Observation lag (e.g. \"3M\").\n\nOverrides the quote convention's lag and must match any supplied index\nlag. The same lag determines the output curve's reference-date origin and the dates\nof the CPI observations consumed by calibration instruments."
-  },
-  {
-    "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/3/properties/seasonal_factors",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/3/properties/seasonal_factors",
-    "description": "Optional seasonal adjustment factors for deseasonalizing CPI observations.\n\nWhen provided, the calibrator will:\n1. Deseasonalize input CPI levels using the monthly factors\n2. Fit the smooth zero-coupon curve to deseasonalized levels\n3. Reseasonalize the output CPI path\n\nMonthly adjustments are additive to log CPI level. They should approximately\nsum to zero over 12 months."
-  },
-  {
-    "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/3/properties/seasonal_factors/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/3/properties/seasonal_factors/anyOf/0",
-    "ref": "#/$defs/SeasonalFactors",
-    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SeasonalFactors"
-  },
-  {
-    "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/3/properties/seasonal_factors/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/3/properties/seasonal_factors/anyOf/1"
+    "description": "Month observation lag (e.g. \"3M\"); \"none\" means zero months.\nDay-based lags are unsupported because output curves carry month lags.\n\nOverrides the quote convention's lag and must match any supplied index\nlag. The same lag determines the output curve's reference-date origin and the dates\nof the CPI observations consumed by calibration instruments."
   },
   {
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/4",
@@ -897,7 +859,7 @@ export default [
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/5/properties/fixed_day_count",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/5/properties/fixed_day_count",
     "default": null,
-    "description": "Optional day count convention for fixed leg calculations."
+    "description": "Optional day count convention for fixed-leg coupon accrual only.\nOption expiry and variance always use ACT/365F."
   },
   {
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/5/properties/fixed_day_count/anyOf/0",
@@ -963,7 +925,7 @@ export default [
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/5/properties/target_expiries",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/5/properties/target_expiries",
     "default": [],
-    "description": "Target expiry times (in years) for the surface grid."
+    "description": "Target option expiry times in ACT/365F years from `base_date`, independent\nof the fixed-leg coupon day-count convention."
   },
   {
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/5/properties/target_expiries/items",
@@ -1105,7 +1067,7 @@ export default [
   {
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/6/properties/maturity_years",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/6/properties/maturity_years",
-    "description": "Maturity of the tranches in years.",
+    "description": "Finite positive CDS tenor in years, representable as a whole number of months.\nQuotes must resolve to the same CDS convention maturity as this tenor.",
     "format": "double"
   },
   {
@@ -1298,6 +1260,13 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
+    "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/9/properties/index_id",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/9/properties/index_id",
+    "description": "Term-rate index defining settlement, reset tenor, accrual day count,\ncalendar, business-day adjustments, and payment lag for caplets.\nIts currency must match `currency`; overnight indices are unsupported.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/9/properties/initial_kappa",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/9/properties/initial_kappa",
     "default": null,
@@ -1315,14 +1284,6 @@ export default [
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/9/properties/kind",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/9/properties/kind",
     "const": "cap_floor_hull_white"
-  },
-  {
-    "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/9/properties/payment_frequency",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/9/properties/payment_frequency",
-    "default": "semi_annual",
-    "description": "Payment frequency used to decompose quoted caps/floors into caplets.",
-    "ref": "#/$defs/SwapFrequency",
-    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SwapFrequency"
   },
   {
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/9/properties/volatility_mode",
@@ -1460,6 +1421,28 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_1a0c0b834c9e63a93be3",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CurveAdjustmentSegment"
+  },
+  {
+    "path": "#/$defs/d_1a0c0b834c9e63a93be3/properties/slope",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CurveAdjustmentSegment/properties/slope",
+    "description": "Function slope on this segment.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_1a0c0b834c9e63a93be3/properties/start",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CurveAdjustmentSegment/properties/start",
+    "description": "Segment origin in the source curve's time coordinates.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_1a0c0b834c9e63a93be3/properties/value",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CurveAdjustmentSegment/properties/value",
+    "description": "Right-hand function value at the segment origin.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_1b2ccb88c9229e7463e8",
     "source": "https://finstack_quant.dev/schemas/common/1/date.schema.json#",
     "description": "ISO 8601 calendar date string.",
@@ -1590,15 +1573,16 @@ export default [
     "path": "#/$defs/d_354032bddbd823c2e3f2/properties/max_iterations",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SolverConfig/properties/max_iterations",
     "default": 100,
-    "description": "Maximum iterations available to each solver invocation.",
+    "description": "Positive maximum number of iterations available to each solver invocation.",
     "format": "uint",
-    "minimum": 0
+    "minimum": 1
   },
   {
     "path": "#/$defs/d_354032bddbd823c2e3f2/properties/tolerance",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SolverConfig/properties/tolerance",
     "default": 1e-12,
-    "description": "Numerical convergence tolerance; distinct from economic fit acceptance.",
+    "description": "Positive finite numerical convergence tolerance, distinct from economic fit acceptance.",
+    "exclusiveMinimum": 0,
     "format": "double"
   },
   {
@@ -1844,7 +1828,7 @@ export default [
     "path": "#/$defs/d_3d7928f8797773779aed/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CdsValuationConvention/oneOf/1",
     "const": "bloomberg_cdsw_clean",
-    "description": "Bloomberg CDSW clean principal presentation and premium-leg policy.\n\nThis is the industry-standard convention used by Bloomberg CDSW and\nthe ISDA Standard Upfront Model. It is the default for new\n`CreditDefaultSwap` instances:\n\n- Premium cashflows accrue between business-day-adjusted dates that\n  match the Bloomberg CDSW cashflow schedule.\n- The final coupon period is inclusive of the maturity date (extra\n  day) per CDSW convention.\n- The reported NPV is the clean principal value (Bloomberg\n  \"Principal\" line). Cash settlement is `Principal + Accrued`.\n- Par spread uses the risky annuity denominator (matches the CDSW\n  screen for investment-grade credits).\n- Hazard rebootstrap inside risk metrics (CS01, recovery01, etc.)\n  inherits the same CDSW pricer convention so sensitivities are\n  self-consistent with the base PV."
+    "description": "Bloomberg CDSW clean principal presentation and premium-leg policy.\n\nThis is the industry-standard convention used by Bloomberg CDSW and\nthe ISDA Standard Upfront Model. It is the default for new\n`CreditDefaultSwap` instances:\n\n- Intermediate premium cashflows accrue between business-day-adjusted\n  dates. Final accrual ends on unadjusted maturity; the final payment\n  follows the business-day convention independently.\n- The final coupon period is inclusive of the maturity date (extra\n  day) per CDSW convention.\n- The reported NPV is the clean principal value (Bloomberg\n  \"Principal\" line). Cash settlement is `Principal + Accrued`.\n- Par spread uses the risky annuity denominator (matches the CDSW\n  screen for investment-grade credits).\n- Hazard rebootstrap inside risk metrics (CS01, recovery01, etc.)\n  inherits the same CDSW pricer convention so sensitivities are\n  self-consistent with the base PV."
   },
   {
     "path": "#/$defs/d_3d7928f8797773779aed/oneOf/2",
@@ -1868,6 +1852,43 @@ export default [
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/VolSurfaceSolveConfig/properties/validation_tolerance",
     "default": 0.001,
     "description": "Tolerance for determining calibration *success* (applied to vol residuals).\n\nAfter each expiry slice is calibrated, the final `|σ_model − σ_mkt|`\nresiduals are compared against this tolerance. If `max_residual >\nvalidation_tolerance`, the calibration report will have `success = false`\neven if the slice solver converged.\n\nThis is distinct from `solver.tolerance()` which controls when the\nnumerical solver terminates. See [`CalibrationConfig`] for a full\nexplanation.\n\nDefault: `1e-3` (0.10 vol points in decimal vol).",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_44550d6839f96bb19179",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveTransform",
+    "description": "Source interpolation and a single accumulated transformation, never a chain\nof nested curves. The adjustment is stored as its piecewise-linear derivative\nso evaluating beyond a completed triangular shock does not subtract large\nquadratic polynomials."
+  },
+  {
+    "path": "#/$defs/d_44550d6839f96bb19179/properties/adjustment",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveTransform/properties/adjustment",
+    "description": "Cumulative derivative of the additive log-discount adjustment.",
+    "ref": "#/$defs/PiecewiseLinearAdjustment",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PiecewiseLinearAdjustment"
+  },
+  {
+    "path": "#/$defs/d_44550d6839f96bb19179/properties/offset",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveTransform/properties/offset",
+    "description": "Current origin in the source interpolation's year-fraction coordinates.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_44550d6839f96bb19179/properties/source_points",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveTransform/properties/source_points",
+    "description": "Original, untransformed interpolation pillars."
+  },
+  {
+    "path": "#/$defs/d_44550d6839f96bb19179/properties/source_points/items",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveTransform/properties/source_points/items"
+  },
+  {
+    "path": "#/$defs/d_44550d6839f96bb19179/properties/source_points/items/prefixItems/0",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveTransform/properties/source_points/items/prefixItems/0",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_44550d6839f96bb19179/properties/source_points/items/prefixItems/1",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveTransform/properties/source_points/items/prefixItems/1",
     "format": "double"
   },
   {
@@ -1903,7 +1924,7 @@ export default [
   {
     "path": "#/$defs/d_482bae9be5d021df13ce",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationLag",
-    "description": "Publication lag for inflation index reference dates.\n\nInflation indices are published with a delay (typically 2-4 weeks). Securities\nusing these indices incorporate a lag to ensure the reference index is published\nby the settlement date.\n\n# Standard Lags by Market\n\n- **US TIPS**: 3-month lag (reference index from 3 months prior)\n- **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)\n- **French OATi**: 3-month lag\n- **German index-linked**: 3-month lag\n\n# Rationale\n\nThe lag ensures:\n1. Reference index is published before settlement\n2. Index value is known at coupon payment date\n3. No estimation or forecasting required for payment calculation\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationLag;\n\nlet tips_lag = InflationLag::Months(3);  // US TIPS standard\nlet gilt_lag = InflationLag::Months(3);  // UK modern gilts\nlet no_lag = InflationLag::None;         // Inflation swaps (forecast-based)\n```"
+    "description": "Contractual observation lag for inflation index reference dates.\n\nInflation indices are published with a delay (typically 2-4 weeks). Securities\nusing these indices incorporate an observation lag to ensure the reference\nindex is published by settlement. This lag does not specify the actual\npublication date; use [`InflationIndex::with_publication_dates`] for that.\n\n# Standard Lags by Market\n\n- **US TIPS**: 3-month lag (reference index from 3 months prior)\n- **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)\n- **French OATi**: 3-month lag\n- **German index-linked**: 3-month lag\n\n# Rationale\n\nThe lag ensures:\n1. Reference index is published before settlement\n2. Index value is known at coupon payment date\n3. No estimation or forecasting required for payment calculation\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationLag;\n\nlet tips_lag = InflationLag::Months(3);  // US TIPS standard\nlet gilt_lag = InflationLag::Months(3);  // UK modern gilts\nlet no_lag = InflationLag::None;         // Inflation swaps (forecast-based)\n```"
   },
   {
     "path": "#/$defs/d_482bae9be5d021df13ce/oneOf/0",
@@ -2296,7 +2317,7 @@ export default [
   {
     "path": "#/$defs/d_65447e12defc07e99879",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveSolveConfig",
-    "description": "Discount-curve specific numerical solver configuration.\n\nControls the search space and numerical stability of the discount curve\nbootstrapping or global solve process.\n\n# Invariants\n- `df_hard_min` > 0\n- `scan_grid_points` > 0\n\n# Examples\n```\nuse finstack_quant_calibration::DiscountCurveSolveConfig;\n\nlet config = DiscountCurveSolveConfig {\n    scan_grid_points: 64,\n    df_hard_min: 1e-10,\n    ..Default::default()\n};\n```"
+    "description": "Discount-curve specific numerical solver configuration.\n\nControls the search space and numerical stability of the discount curve\nbootstrapping or global solve process.\n\n# Invariants\n- `0 < df_hard_min < df_hard_max`, with finite bounds\n- `scan_grid_points` > 0\n- Scan and finite-difference step sizes are finite and strictly positive\n\n# Examples\n```\nuse finstack_quant_calibration::DiscountCurveSolveConfig;\n\nlet config = DiscountCurveSolveConfig {\n    scan_grid_points: 64,\n    df_hard_min: 1e-10,\n    ..Default::default()\n};\n```"
   },
   {
     "path": "#/$defs/d_65447e12defc07e99879/properties/allow_non_monotonic_final",
@@ -2314,21 +2335,21 @@ export default [
     "path": "#/$defs/d_65447e12defc07e99879/properties/df_hard_max",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveSolveConfig/properties/df_hard_max",
     "default": 1000000,
-    "description": "Absolute maximum allowed discount factor (prevents divergence).",
+    "description": "Finite upper discount-factor bound, strictly above `df_hard_min`.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_65447e12defc07e99879/properties/df_hard_min",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveSolveConfig/properties/df_hard_min",
     "default": 1e-12,
-    "description": "Absolute minimum allowed discount factor (prevents singularity).",
+    "description": "Finite, strictly positive lower discount-factor bound, below `df_hard_max`.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_65447e12defc07e99879/properties/jacobian_step_size",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveSolveConfig/properties/jacobian_step_size",
-    "default": 0,
-    "description": "Step size (h) for finite-difference Jacobian calculation.",
+    "default": 0.000001,
+    "description": "Finite, strictly positive relative step for finite-difference Jacobians.\nThe parameter bump is `max(h, abs(parameter) * h)`.",
     "format": "double"
   },
   {
@@ -2358,7 +2379,7 @@ export default [
     "path": "#/$defs/d_65447e12defc07e99879/properties/scan_grid_step",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveSolveConfig/properties/scan_grid_step",
     "default": 0.0001,
-    "description": "Initial step size for geometric scan grid.",
+    "description": "Finite, strictly positive initial step size for the geometric scan grid.",
     "format": "double"
   },
   {
@@ -2592,6 +2613,24 @@ export default [
     "path": "#/$defs/d_769f53b41c63a40f226a/oneOf/1/properties/variant",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/NelsonSiegelModel/oneOf/1/properties/variant",
     "const": "nss"
+  },
+  {
+    "path": "#/$defs/d_7badbe6d060a37bc56dc",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationPublicationWire"
+  },
+  {
+    "path": "#/$defs/d_7badbe6d060a37bc56dc/properties/publication_date",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationPublicationWire/properties/publication_date",
+    "description": "Inclusive date on which the observation must be available.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_7badbe6d060a37bc56dc/properties/reference_month",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationPublicationWire/properties/reference_month",
+    "description": "First calendar day of the reference month.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
     "path": "#/$defs/d_7d8265a72b3debd33f3e",
@@ -2986,6 +3025,17 @@ export default [
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/10/properties/observations/items/prefixItems/1",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/10/properties/observations/items/prefixItems/1",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/10/properties/publication_dates",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/10/properties/publication_dates",
+    "description": "Explicit monthly observation availability; no release dates are inferred."
+  },
+  {
+    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/10/properties/publication_dates/items",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/10/properties/publication_dates/items",
+    "ref": "#/$defs/InflationPublicationWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationPublicationWire"
   },
   {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/10/properties/seasonality",
@@ -3490,7 +3540,7 @@ export default [
   {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/4/oneOf/1/properties/swaption_vol/properties/quote_type",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/4/oneOf/1/properties/swaption_vol/properties/quote_type",
-    "description": "Volatility quoting convention.",
+    "description": "Volatility quoting convention. Shifted Black quotes require a\n`ShiftedLognormal` calibration plan supplying their displacement;\nHull-White calibration rejects them because its quote contract\ncarries no displacement.",
     "ref": "#/$defs/VolQuoteType",
     "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/VolQuoteType"
   },
@@ -3537,7 +3587,7 @@ export default [
   {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/4/oneOf/2/properties/cap_floor_vol/properties/quote_type",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/4/oneOf/2/properties/cap_floor_vol/properties/quote_type",
-    "description": "Volatility quoting convention.",
+    "description": "Volatility quoting convention. Hull-White calibration accepts\nnormal and unshifted Black quotes; it rejects shifted Black\nbecause this quote does not carry a displacement.",
     "ref": "#/$defs/VolQuoteType",
     "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/VolQuoteType"
   },
@@ -3810,12 +3860,12 @@ export default [
     "path": "#/$defs/d_90f31cdba2ca2a488317/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SwaptionVolConvention/oneOf/1",
     "const": "lognormal",
-    "description": "Lognormal (Black) volatility in decimal units.\n\nExample: `0.20` means 20% Black volatility."
+    "description": "Lognormal (Black) volatility in decimal units.\n\nExample: `0.20` means 20% Black volatility.\nRequires `black_lognormal` quotes and positive forwards/strikes;\ncalibration does not introduce a displacement automatically."
   },
   {
     "path": "#/$defs/d_90f31cdba2ca2a488317/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SwaptionVolConvention/oneOf/2",
-    "description": "Shifted lognormal (Black) volatility in decimal units, with an explicit shift.\n\nExample: `0.20` means 20% Black volatility."
+    "description": "Shifted lognormal (Black) volatility in decimal units, with an explicit shift.\n\nExample: `0.20` means 20% Black volatility on displaced forward/strike\ncoordinates. Requires `shifted_black_lognormal` quotes."
   },
   {
     "path": "#/$defs/d_90f31cdba2ca2a488317/oneOf/2/properties/shifted_lognormal",
@@ -3824,7 +3874,7 @@ export default [
   {
     "path": "#/$defs/d_90f31cdba2ca2a488317/oneOf/2/properties/shifted_lognormal/properties/shift",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SwaptionVolConvention/oneOf/2/properties/shifted_lognormal/properties/shift",
-    "description": "Shift amount for negative rate handling",
+    "description": "Finite positive additive shift in decimal rate units, applied to\nboth forwards and strikes and retained in calibrated artifacts.",
     "format": "double"
   },
   {
@@ -6115,7 +6165,7 @@ export default [
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/10",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/10",
     "const": "act_act_isma",
-    "description": "Actual/Actual (ICMA) day count convention.\n\nActual days over (actual days in the coupon period × coupons per year).\nRequires a coupon frequency.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251 - \"Actual/Actual (ICMA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ICMA\" (A007)\n- **Also known as**: Act/Act (ICMA), Act/Act (ISMA), ISMA-99"
+    "description": "Actual/Actual (ICMA) day count convention.\n\nActual days over (actual days in the coupon period × coupons per year).\nRequires a coupon frequency. Explicit reference coupon boundaries must\nbe unadjusted regular dates from the contractual nominal month grid,\nnot payment dates.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251 - \"Actual/Actual (ICMA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ICMA\" (A007)\n- **Also known as**: Act/Act (ICMA), Act/Act (ISMA), ISMA-99"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/11",
@@ -6139,7 +6189,7 @@ export default [
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/3",
     "const": "act_365l",
-    "description": "Actual/365 Leap day count convention (Actual/365L).\n\nYear fraction = (actual days) / (365 or 366). Annual or unspecified\nfrequency: 366 if February 29 falls in (start, end]. Other frequencies:\n366 if the end date falls in a leap year. Not Actual/Actual AFB.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251.1(i)(c)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365L\" (A008)\n- **Also known as**: Act/365L, ISMA-Year"
+    "description": "Actual/365 Leap day count convention (Actual/365L).\n\nYear fraction = (actual days) / (365 or 366). Requires the coupon\nfrequency and the enclosing coupon period. Annual: 366 if February 29\nfalls in (coupon_start, coupon_end]. Other frequencies: 366 if the next\ncoupon date falls in a leap year. Not Actual/Actual AFB.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251.1(i)(c)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365L\" (A008)\n- **Also known as**: Act/365L, ISMA-Year"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/4",
@@ -6775,6 +6825,21 @@ export default [
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/0/properties/rate_calibration/anyOf/1"
   },
   {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/0/properties/transform",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/0/properties/transform",
+    "description": "Canonical source interpolation and accumulated continuous transformations."
+  },
+  {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/0/properties/transform/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/0/properties/transform/anyOf/0",
+    "ref": "#/$defs/DiscountCurveTransform",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveTransform"
+  },
+  {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/0/properties/transform/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/0/properties/transform/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/1",
     "description": "Pre-built forward-rate curve."
@@ -6877,6 +6942,21 @@ export default [
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/1/properties/tenor",
     "description": "Index tenor in years",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/1/properties/transform",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/1/properties/transform",
+    "description": "Canonical source interpolation and cumulative continuous transformations."
+  },
+  {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/1/properties/transform/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/1/properties/transform/anyOf/0",
+    "ref": "#/$defs/ForwardCurveTransform",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ForwardCurveTransform"
+  },
+  {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/1/properties/transform/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/1/properties/transform/anyOf/1"
   },
   {
     "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/2",
@@ -7387,6 +7467,16 @@ export default [
     "description": "Pre-built volatility surface (expiry x strike)."
   },
   {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/9/properties/displacements",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/9/properties/displacements",
+    "description": "Additive displacements in forward/strike units, one per expiry for shifted Black quotes."
+  },
+  {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/9/properties/displacements/items",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/9/properties/displacements/items",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/9/properties/expiries",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/9/properties/expiries",
     "description": "Expiry times in years"
@@ -7481,24 +7571,31 @@ export default [
     "description": "Bootstrap a piecewise-constant short-rate volatility schedule at quote expiries."
   },
   {
+    "path": "#/$defs/d_f1a590578006650bb43d",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PiecewiseLinearAdjustment",
+    "description": "A flat function representation: repeated shocks merge on a breakpoint union\nrather than forming a recursively nested transformation history."
+  },
+  {
+    "path": "#/$defs/d_f1a590578006650bb43d/properties/initial_value",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PiecewiseLinearAdjustment/properties/initial_value",
+    "description": "Constant value before the first breakpoint.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_f1a590578006650bb43d/properties/segments",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PiecewiseLinearAdjustment/properties/segments",
+    "description": "Sorted, merged linear segments."
+  },
+  {
+    "path": "#/$defs/d_f1a590578006650bb43d/properties/segments/items",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PiecewiseLinearAdjustment/properties/segments/items",
+    "ref": "#/$defs/CurveAdjustmentSegment",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CurveAdjustmentSegment"
+  },
+  {
     "path": "#/$defs/d_f2494b65293b81ee2ea2",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/IrFutureContractId",
     "description": "Stable identifier for an Interest Rate Future contract (e.g., \"CME:SR3\").\n\nUsed to look up [`IrFutureConventions`](crate::market::conventions::defs::IrFutureConventions)\nfrom the convention registry."
-  },
-  {
-    "path": "#/$defs/d_f4c196ca4f3c0a638b09",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SeasonalFactors",
-    "description": "Monthly seasonal adjustment factors for inflation curves.\n\nUsed to deseasonalize CPI observations before fitting a smooth\nzero-coupon inflation curve, then reseasonalize the output.\nMonthly adjustments should approximately sum to zero."
-  },
-  {
-    "path": "#/$defs/d_f4c196ca4f3c0a638b09/properties/monthly_adjustments",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SeasonalFactors/properties/monthly_adjustments",
-    "description": "Monthly adjustment factors (Jan=index 0 through Dec=index 11).\nThese are additive adjustments to the log CPI level."
-  },
-  {
-    "path": "#/$defs/d_f4c196ca4f3c0a638b09/properties/monthly_adjustments/items",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SeasonalFactors/properties/monthly_adjustments/items",
-    "format": "double"
   },
   {
     "path": "#/$defs/d_f6b6b6746b36a7a4a06d",
@@ -7514,13 +7611,19 @@ export default [
   {
     "path": "#/$defs/d_f6b6b6746b36a7a4a06d/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/VolQuoteType/oneOf/1",
+    "const": "shifted_black_lognormal",
+    "description": "Displaced Black volatility; per-expiry displacements accompany the grid."
+  },
+  {
+    "path": "#/$defs/d_f6b6b6746b36a7a4a06d/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/VolQuoteType/oneOf/2",
     "const": "normal",
     "description": "Normal (Bachelier) implied volatility, absolute rate units."
   },
   {
     "path": "#/$defs/d_fa1f99a63e484452eafa",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RollRule",
-    "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode. The IMM modes\nforce a quarterly grid: the schedule frequency and stub rule configured on\n[`ScheduleParams`] are overridden with quarterly / short-back, matching\n`ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates\n  for rate, currency, and equity index futures).\n- **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll\n  dates). When the start date is not itself a roll date, the first period\n  accrues from the roll date immediately **preceding** the start (standard\n  front accrual per the ISDA Big Bang Protocol, April 2009).\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::specs::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)"
+    "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode. The IMM modes\nforce a quarterly grid: the schedule frequency and stub rule configured on\n[`ScheduleParams`] are overridden with quarterly / short-back, matching\n`ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates\n  for rate, currency, and equity index futures). Cashflow schedules retain\n  the contractual maturity as a short final stub when it is off-grid.\n- **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll\n  dates). When the start date is not itself a roll date, the first period\n  accrues from the roll date immediately **preceding** the start (standard\n  front accrual per the ISDA Big Bang Protocol, April 2009).\n  Interior coupon or payment-program windows start at their declared\n  boundary; front accrual is applied only once at the instrument start.\n\nExplicit roll grids cannot be combined with `end_of_month`. ACT/ACT ICMA\nsupports the CDS twentieth grid; third-Wednesday IMM with ACT/ACT ICMA is\nrejected because the available ICMA reference calculation requires nominal\nmonth-grid coupons.\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::specs::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)"
   },
   {
     "path": "#/$defs/d_fa1f99a63e484452eafa/oneOf/0",
@@ -7539,6 +7642,48 @@ export default [
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RollRule/oneOf/2",
     "const": "cds_imm",
     "description": "CDS IMM dates: 20th of Mar/Jun/Sep/Dec with post-Big-Bang front accrual."
+  },
+  {
+    "path": "#/$defs/d_fb5d44c23c59cc156917",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ForwardCurveTransform"
+  },
+  {
+    "path": "#/$defs/d_fb5d44c23c59cc156917/properties/adjustment",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ForwardCurveTransform/properties/adjustment",
+    "description": "Cumulative additive rate adjustment in source time coordinates.",
+    "ref": "#/$defs/PiecewiseLinearAdjustment",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PiecewiseLinearAdjustment"
+  },
+  {
+    "path": "#/$defs/d_fb5d44c23c59cc156917/properties/offset",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ForwardCurveTransform/properties/offset",
+    "description": "Current curve origin in the source curve's year-fraction coordinates.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_fb5d44c23c59cc156917/properties/scale",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ForwardCurveTransform/properties/scale",
+    "description": "Accumulated parallel multiplicative factor on the source interpolation.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_fb5d44c23c59cc156917/properties/source_points",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ForwardCurveTransform/properties/source_points",
+    "description": "Original interpolation pillars, independent of current curve samples."
+  },
+  {
+    "path": "#/$defs/d_fb5d44c23c59cc156917/properties/source_points/items",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ForwardCurveTransform/properties/source_points/items"
+  },
+  {
+    "path": "#/$defs/d_fb5d44c23c59cc156917/properties/source_points/items/prefixItems/0",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ForwardCurveTransform/properties/source_points/items/prefixItems/0",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_fb5d44c23c59cc156917/properties/source_points/items/prefixItems/1",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ForwardCurveTransform/properties/source_points/items/prefixItems/1",
+    "format": "double"
   },
   {
     "path": "#/$defs/d_fc123a39e4a8423ed13b",
