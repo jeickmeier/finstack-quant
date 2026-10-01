@@ -248,6 +248,32 @@ pub struct CalibrationResult {
     pub results_meta: ResultsMeta,
 }
 
+impl CalibrationResult {
+    /// Report of one calibration step.
+    ///
+    /// # Arguments
+    ///
+    /// * `step_id` - Identifier of the step, as given in the plan
+    ///   (`CalibrationStep::id`); matched exactly against the keys of
+    ///   [`Self::step_reports`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a not-found input error naming the available step ids when no
+    /// step with `step_id` was executed.
+    pub fn step_report(&self, step_id: &str) -> finstack_quant_core::Result<&CalibrationReport> {
+        self.step_reports.get(step_id).ok_or_else(|| {
+            finstack_quant_core::InputError::NotFound {
+                id: format!(
+                    "calibration step '{step_id}'; available steps: {:?}",
+                    self.step_reports.keys().collect::<Vec<_>>()
+                ),
+            }
+            .into()
+        })
+    }
+}
+
 /// Top-level envelope for calibration results.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -1543,5 +1569,34 @@ mod interpolation_default_tests {
         }))
         .expect("xccy params");
         assert_eq!(xccy.interpolation, InterpStyle::LogLinear);
+    }
+}
+
+#[cfg(test)]
+mod step_report_tests {
+    use super::{CalibrationEnvelope, CalibrationPlan};
+
+    #[test]
+    fn step_report_names_the_available_steps_when_missing() {
+        let plan = CalibrationPlan {
+            id: "empty".to_string(),
+            description: None,
+            quote_sets: Default::default(),
+            steps: Vec::new(),
+            settings: Default::default(),
+        };
+        let envelope = CalibrationEnvelope::new(plan, Vec::new(), Vec::new());
+        let result = crate::api::engine::calibrate(&envelope).expect("empty plan calibrates");
+        let error = result
+            .result
+            .step_report("USD-OIS")
+            .expect_err("no such step");
+        assert_eq!(
+            error.kind(),
+            finstack_quant_core::error::ErrorKind::NotFound
+        );
+        assert!(error
+            .to_string()
+            .contains("calibration step 'USD-OIS'; available steps: []"));
     }
 }

@@ -1,0 +1,48 @@
+{
+  "$defs": {
+    "PanelTransformColumn": {
+      "additionalProperties": false,
+      "description": "A named output column from a panel transform pipeline.",
+      "properties": {
+        "name": {
+          "description": "Output column name.",
+          "type": "string"
+        },
+        "values": {
+          "description": "Output values aligned to the input `values` column.",
+          "items": {
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "values"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/features/1/panel_transform_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Ordered result columns from a panel transform pipeline.",
+  "properties": {
+    "columns": {
+      "description": "Output columns in the same order as requested operations.",
+      "items": {
+        "$ref": "#/$defs/PanelTransformColumn"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "columns"
+  ],
+  "title": "PanelTransformResult",
+  "type": "object"
+}

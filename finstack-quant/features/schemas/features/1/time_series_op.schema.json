@@ -1,0 +1,123 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/features/1/time_series_op.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Supported time-series transform operation.",
+  "oneOf": [
+    {
+      "const": "returns",
+      "description": "Simple return `v_t / v_{t-periods} - 1`; `None` for zero prior values.",
+      "type": "string"
+    },
+    {
+      "const": "log_returns",
+      "description": "Log return `ln(v_t / v_{t-periods})`; `None` when the ratio is not positive.",
+      "type": "string"
+    },
+    {
+      "const": "diff",
+      "description": "Difference `v_t - v_{t-periods}`.",
+      "type": "string"
+    },
+    {
+      "const": "lag",
+      "description": "Value shifted forward by `periods`.",
+      "type": "string"
+    },
+    {
+      "const": "rolling_mean",
+      "description": "Mean over the trailing window of finite observations.",
+      "type": "string"
+    },
+    {
+      "const": "rolling_sum",
+      "description": "Sum over the trailing window of finite observations.",
+      "type": "string"
+    },
+    {
+      "const": "rolling_std",
+      "description": "Sample (Bessel-corrected) standard deviation; needs ≥ 2 finite points.",
+      "type": "string"
+    },
+    {
+      "const": "rolling_min",
+      "description": "Minimum over the trailing window.",
+      "type": "string"
+    },
+    {
+      "const": "rolling_max",
+      "description": "Maximum over the trailing window.",
+      "type": "string"
+    },
+    {
+      "const": "rolling_zscore",
+      "description": "Z-score of the current value against the trailing sample mean/std.",
+      "type": "string"
+    },
+    {
+      "const": "rolling_rank",
+      "description": "Percentile rank of the current value against the trailing window.",
+      "type": "string"
+    },
+    {
+      "const": "rolling_quantile",
+      "description": "Quantile over the trailing window (`quantile`, default `0.5`).",
+      "type": "string"
+    },
+    {
+      "const": "rolling_skew",
+      "description": "Fisher G1 skewness over the trailing window; needs ≥ 3 finite points.",
+      "type": "string"
+    },
+    {
+      "const": "rolling_kurtosis",
+      "description": "Fisher G2 excess kurtosis over the trailing window; needs ≥ 4 finite points.",
+      "type": "string"
+    },
+    {
+      "const": "rolling_slope",
+      "description": "Linear trend slope over the trailing window; needs ≥ 2 finite points.",
+      "type": "string"
+    },
+    {
+      "const": "rolling_sharpe",
+      "description": "Period Sharpe `(mean - risk_free) / sample_std` over the trailing window.\n\nThis is a research period feature, not the annualized `analytics` Sharpe.\nOptional JSON `risk_free` defaults to `0.0` in the same units as the\nreturn series. No annualization.",
+      "type": "string"
+    },
+    {
+      "const": "rolling_winsorize",
+      "description": "Clamp the current value to trailing quantile bounds.",
+      "type": "string"
+    },
+    {
+      "const": "drawdown",
+      "description": "Drawdown `value / running_peak - 1` for a positive level series.",
+      "type": "string"
+    },
+    {
+      "const": "hampel_filter",
+      "description": "Replace outliers with the trailing median (Hampel filter).",
+      "type": "string"
+    },
+    {
+      "const": "exponential_decay_weights",
+      "description": "Current row's normalized exponential-decay weight (`half_life` required).",
+      "type": "string"
+    },
+    {
+      "const": "ewma_mean",
+      "description": "Exponentially weighted mean of a return series (`span` is pandas, not RiskMetrics `lambda`).",
+      "type": "string"
+    },
+    {
+      "const": "ewma_vol",
+      "description": "Exponentially weighted volatility of a return series (`span` required).",
+      "type": "string"
+    },
+    {
+      "const": "ewma_zscore",
+      "description": "Return z-score against shared EWMA mean/variance (`span` required).",
+      "type": "string"
+    }
+  ],
+  "title": "TimeSeriesOp"
+}

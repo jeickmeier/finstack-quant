@@ -11,4 +11,12 @@ export const features = {
   transformCrossSectional: wasm.transformCrossSectional,
   transformCrossSectionalGrouped: wasm.transformCrossSectionalGrouped,
   transformPanelJson: wasm.transformPanelJson,
+  transformPanel: wasm.transformPanel,
+  panelTransformResultGetColumn: wasm.panelTransformResultGetColumn,
+  timeSeriesOpValues: wasm.timeSeriesOpValues,
+  timeSeriesOpParamKeys: wasm.timeSeriesOpParamKeys,
+  crossSectionalOpValues: wasm.crossSectionalOpValues,
+  crossSectionalOpParamKeys: wasm.crossSectionalOpParamKeys,
+  pairwiseOpValues: wasm.pairwiseOpValues,
+  pairwiseOpParamKeys: wasm.pairwiseOpParamKeys,
 };

@@ -1,0 +1,88 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/features/1/cross_sectional_op.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Supported cross-sectional transform operation.",
+  "oneOf": [
+    {
+      "const": "zscore",
+      "description": "Population z-score within each partition; `0.0` for constant values.",
+      "type": "string"
+    },
+    {
+      "const": "rank",
+      "description": "Closed-interval percentile rank in `[0, 1]`; ties share the lowest rank.",
+      "type": "string"
+    },
+    {
+      "const": "percentile_rank",
+      "description": "Open-interval percentile rank using average tied positions.",
+      "type": "string"
+    },
+    {
+      "const": "quantile_bucket",
+      "description": "Integer quantile bucket labels from `0` to `buckets - 1`.",
+      "type": "string"
+    },
+    {
+      "const": "demean",
+      "description": "Difference from partition mean.",
+      "type": "string"
+    },
+    {
+      "const": "robust_zscore",
+      "description": "Robust z-score using median and MAD with normal-consistency scaling.",
+      "type": "string"
+    },
+    {
+      "const": "minmax_scale",
+      "description": "Scale finite values to the `[0, 1]` range within each partition.",
+      "type": "string"
+    },
+    {
+      "const": "clip",
+      "description": "Clamp values to explicit lower and upper bounds.",
+      "type": "string"
+    },
+    {
+      "const": "clip_by_sigma",
+      "description": "Clamp values to `mean ± sigma * population_std`.",
+      "type": "string"
+    },
+    {
+      "const": "normal_score_transform",
+      "description": "Map open-interval percentile ranks to standard-normal scores.",
+      "type": "string"
+    },
+    {
+      "const": "long_short_weights",
+      "description": "Demean signal values and normalize by gross absolute exposure.",
+      "type": "string"
+    },
+    {
+      "const": "cap_weights",
+      "description": "Dollar-neutral, unit-gross weights with a final absolute position cap.",
+      "type": "string"
+    },
+    {
+      "const": "fill_missing",
+      "description": "Fill missing and non-finite values with a constant.",
+      "type": "string"
+    },
+    {
+      "const": "is_finite",
+      "description": "Emit 1.0 for finite inputs and 0.0 otherwise.",
+      "type": "string"
+    },
+    {
+      "const": "nan_mask",
+      "description": "Emit 1.0 for missing or non-finite inputs and 0.0 otherwise.",
+      "type": "string"
+    },
+    {
+      "const": "winsorize",
+      "description": "Clamp values to partition quantile bounds.",
+      "type": "string"
+    }
+  ],
+  "title": "CrossSectionalOp"
+}

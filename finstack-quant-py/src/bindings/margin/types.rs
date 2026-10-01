@@ -6,7 +6,6 @@ use crate::errors::{core_to_py, display_to_py};
 use finstack_quant_core::money::Money;
 use finstack_quant_margin as fm;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
 
 /// Gross IM, collateral target and signed transfer for one CSA IM account.
 #[pyclass(
@@ -1235,45 +1234,11 @@ pub fn register(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyImCollateralResult>()?;
     m.add_class::<PyEligibleCollateralSchedule>()?;
 
-    // `CONSTANTS` mirrors `finstack_quant_margin::constants` plus the
-    // registry/calculator constants hosts need to interpret results.
-    let constants = PyDict::new(py);
-    constants.set_item(
-        "CALENDAR_DAYS_PER_YEAR",
-        fm::constants::CALENDAR_DAYS_PER_YEAR,
-    )?;
-    constants.set_item(
-        "DURATION_APPROXIMATION_FACTOR",
-        fm::constants::DURATION_APPROXIMATION_FACTOR,
-    )?;
-    constants.set_item("ONE_BP", fm::constants::ONE_BP)?;
-    constants.set_item(
-        "STANDARD_CDS_MATURITY_YEARS",
-        fm::constants::STANDARD_CDS_MATURITY_YEARS,
-    )?;
-    let tenor_buckets = PyDict::new(py);
-    use fm::constants::tenor_buckets as tb;
-    for (name, years) in [
-        ("BUCKET_3M", tb::BUCKET_3M),
-        ("BUCKET_6M", tb::BUCKET_6M),
-        ("BUCKET_1Y", tb::BUCKET_1Y),
-        ("BUCKET_2Y", tb::BUCKET_2Y),
-        ("BUCKET_3Y", tb::BUCKET_3Y),
-        ("BUCKET_5Y", tb::BUCKET_5Y),
-        ("BUCKET_10Y", tb::BUCKET_10Y),
-        ("BUCKET_15Y", tb::BUCKET_15Y),
-        ("BUCKET_20Y", tb::BUCKET_20Y),
-    ] {
-        tenor_buckets.set_item(name, years)?;
-    }
-    constants.set_item("tenor_buckets", tenor_buckets)?;
-    constants.set_item("BCBS_IOSCO_SCHEDULE_ID", fm::BCBS_IOSCO_SCHEDULE_ID)?;
-    constants.set_item("HAIRCUT_MPOR_DAYS", fm::calculators::im::HAIRCUT_MPOR_DAYS)?;
-    constants.set_item("SIMM_TENORS", fm::SIMM_TENORS.to_vec())?;
-    constants.set_item(
-        "SIMM_COMMODITY_BUCKET_COUNT",
-        fm::types::SIMM_COMMODITY_BUCKET_COUNT,
-    )?;
+    // `CONSTANTS` is the Rust `MarginConstants::current()` value: the crate
+    // constants plus the registry/calculator constants hosts need to
+    // interpret results.
+    let constants =
+        crate::bindings::pandas_utils::serde_to_py(py, &fm::constants::MarginConstants::current())?;
     m.add("CONSTANTS", constants)?;
 
     Ok(())

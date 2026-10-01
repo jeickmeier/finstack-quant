@@ -28,6 +28,42 @@
       "type_name": "CalibrationValidationReport"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/calibration/1/hull_white_cap_floor_calibration_config.schema.json",
+      "bytes": 2807,
+      "kind": "component",
+      "path": "schemas/calibration/1/hull_white_cap_floor_calibration_config.schema.json",
+      "summary": "Settings of the scalar Hull-White fit to cap/floor quotes.",
+      "title": "Hull-White Cap/Floor Calibration Config",
+      "type_name": "CapFloorCalibrationConfig"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/calibration/1/hull_white_cap_floor_quote.schema.json",
+      "bytes": 1286,
+      "kind": "component",
+      "path": "schemas/calibration/1/hull_white_cap_floor_quote.schema.json",
+      "summary": "Cap or floor volatility quote in year fractions for the direct Hull-White calibrators.",
+      "title": "Hull-White Cap/Floor Quote",
+      "type_name": "CapFloorQuote"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/calibration/1/hull_white_piecewise_sigma_calibration_config.schema.json",
+      "bytes": 2161,
+      "kind": "component",
+      "path": "schemas/calibration/1/hull_white_piecewise_sigma_calibration_config.schema.json",
+      "summary": "Settings of the piecewise-constant Hull-White sigma bootstrap to cap/floor quotes.",
+      "title": "Hull-White Piecewise Sigma Calibration Config",
+      "type_name": "PiecewiseSigmaCalibrationConfig"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/calibration/1/hull_white_swaption_quote.schema.json",
+      "bytes": 1188,
+      "kind": "component",
+      "path": "schemas/calibration/1/hull_white_swaption_quote.schema.json",
+      "summary": "ATM swaption volatility quote in year fractions for the direct Hull-White calibrator.",
+      "title": "Hull-White Swaption Quote",
+      "type_name": "SwaptionQuote"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/calibration/1/step_params.schema.json",
       "bytes": 62424,
       "kind": "component",

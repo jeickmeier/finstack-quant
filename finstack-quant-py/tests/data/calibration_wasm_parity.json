@@ -1,0 +1,554 @@
+{
+  "_doc": "Python outputs for the calibration members that WASM binds as free functions; asserted by tests/test_calibration_wasm_parity.py and finstack-quant-wasm/tests/facade/calibration_parity.test.mjs.",
+  "quotes": {
+    "deposit": {
+      "type": "deposit",
+      "id": "D3M",
+      "index": "USD-SOFR-OIS",
+      "pillar": {
+        "tenor": {
+          "count": 3,
+          "unit": "months"
+        }
+      },
+      "rate": 0.052
+    },
+    "fra": {
+      "type": "fra",
+      "id": "F",
+      "index": "USD-SOFR-OIS",
+      "start": {
+        "tenor": {
+          "count": 3,
+          "unit": "months"
+        }
+      },
+      "end": {
+        "tenor": {
+          "count": 6,
+          "unit": "months"
+        }
+      },
+      "rate": 0.05
+    },
+    "futures": {
+      "type": "futures",
+      "id": "FUT",
+      "contract": "CME:SR3",
+      "expiry": "2026-09-15",
+      "price": 96.5,
+      "convexity_adjustment": 0.0
+    },
+    "swap": {
+      "type": "swap",
+      "id": "S5",
+      "index": "USD-SOFR-OIS",
+      "pillar": {
+        "tenor": {
+          "count": 5,
+          "unit": "years"
+        }
+      },
+      "rate": 0.045,
+      "spread_decimal": null
+    },
+    "swap_dated": {
+      "type": "swap",
+      "id": "S5d",
+      "index": "USD-SOFR-OIS",
+      "pillar": {
+        "date": "2031-05-08"
+      },
+      "rate": 0.045,
+      "spread_decimal": 0.001
+    },
+    "par_spread": {
+      "type": "cds_par_spread",
+      "id": "ACME-5Y",
+      "entity": "ACME",
+      "convention": {
+        "currency": "USD",
+        "doc_clause": "isda_na"
+      },
+      "pillar": {
+        "tenor": {
+          "count": 5,
+          "unit": "years"
+        }
+      },
+      "spread_bp": 80.0,
+      "recovery_rate": 0.4
+    },
+    "upfront": {
+      "type": "cds_upfront",
+      "id": "ACME-5Y-U",
+      "entity": "ACME",
+      "convention": {
+        "currency": "USD",
+        "doc_clause": "isda_na"
+      },
+      "pillar": {
+        "tenor": {
+          "count": 5,
+          "unit": "years"
+        }
+      },
+      "coupon_bp": 100.0,
+      "upfront_pct": 0.01,
+      "recovery_rate": 0.4
+    },
+    "option_vol": {
+      "option_vol": {
+        "id": "O",
+        "underlying": "AAPL",
+        "expiry": "2027-05-08",
+        "strike": 155.0,
+        "vol": 0.28,
+        "option_type": "call"
+      }
+    },
+    "swaption_vol": {
+      "swaption_vol": {
+        "id": "SV",
+        "expiry": "2027-05-08",
+        "maturity": "2032-05-08",
+        "strike": 0.04,
+        "vol": 0.0072,
+        "quote_type": "normal",
+        "convention": "USD"
+      }
+    },
+    "cap_floor_vol": {
+      "cap_floor_vol": {
+        "id": "CF",
+        "expiry": "2027-05-08",
+        "strike": 0.04,
+        "vol": 0.0072,
+        "quote_type": "normal",
+        "is_cap": false
+      }
+    }
+  },
+  "rate_bounds": {
+    "USD": {
+      "min_rate": -0.02,
+      "max_rate": 0.5
+    },
+    "JPY": {
+      "min_rate": -0.05,
+      "max_rate": 0.3
+    },
+    "emerging_markets": {
+      "min_rate": -0.05,
+      "max_rate": 2.0
+    }
+  },
+  "steps": {
+    "discount": {
+      "id": "USD-OIS",
+      "quote_set": "USD-OIS",
+      "kind": "discount",
+      "curve_id": "USD-OIS",
+      "currency": "USD",
+      "base_date": "2026-05-08",
+      "method": "bootstrap",
+      "interpolation": "log_linear",
+      "extrapolation": "flat_forward",
+      "pricing_discount_id": null,
+      "pricing_forward_id": null,
+      "conventions": {
+        "curve_day_count": null,
+        "ois_compounding": null
+      }
+    },
+    "discount_named": {
+      "id": "d2",
+      "quote_set": "qs",
+      "kind": "discount",
+      "curve_id": "USD-OIS",
+      "currency": "USD",
+      "base_date": "2026-05-08",
+      "method": "bootstrap",
+      "interpolation": "linear",
+      "extrapolation": "flat_forward",
+      "pricing_discount_id": null,
+      "pricing_forward_id": null,
+      "conventions": {
+        "curve_day_count": null,
+        "ois_compounding": null
+      }
+    },
+    "forward": {
+      "id": "USD-SOFR-3M",
+      "quote_set": "USD-SOFR-3M",
+      "kind": "forward",
+      "curve_id": "USD-SOFR-3M",
+      "currency": "USD",
+      "base_date": "2026-05-08",
+      "tenor_years": 0.25,
+      "discount_curve_id": "USD-OIS",
+      "method": "bootstrap",
+      "interpolation": "monotone_convex",
+      "conventions": {
+        "curve_day_count": null,
+        "ois_compounding": null
+      }
+    },
+    "hazard": {
+      "id": "ACME",
+      "quote_set": "ACME",
+      "kind": "hazard",
+      "curve_id": "ACME",
+      "entity": "ACME",
+      "seniority": "senior",
+      "currency": "USD",
+      "base_date": "2026-05-08",
+      "discount_curve_id": "USD-OIS",
+      "recovery_rate": 0.4,
+      "notional": 1.0,
+      "method": "bootstrap",
+      "interpolation": "log_linear",
+      "par_interp": "linear"
+    },
+    "inflation": {
+      "id": "USA-CPI",
+      "quote_set": "USA-CPI",
+      "kind": "inflation",
+      "curve_id": "USA-CPI",
+      "currency": "USD",
+      "base_date": "2026-05-08",
+      "discount_curve_id": "USD-OIS",
+      "index": "USA-CPI-U",
+      "observation_lag": "3M",
+      "base_cpi": 310.0,
+      "notional": 1.0,
+      "method": "bootstrap",
+      "interpolation": "linear"
+    },
+    "vol_surface": {
+      "id": "AAPL-VOL",
+      "quote_set": "AAPL-VOL",
+      "kind": "vol_surface",
+      "vol_surface_id": "AAPL-VOL",
+      "base_date": "2026-05-08",
+      "underlying_ticker": "AAPL",
+      "model": "sabr",
+      "discount_curve_id": null,
+      "beta": 0.5,
+      "target_expiries": [],
+      "target_strikes": [],
+      "spot_override": null,
+      "dividend_yield_override": null,
+      "expiry_extrapolation": "error"
+    },
+    "swaption_vol": {
+      "id": "USD-SWPT",
+      "quote_set": "USD-SWPT",
+      "kind": "swaption_vol",
+      "vol_surface_id": "USD-SWPT",
+      "base_date": "2026-05-08",
+      "discount_curve_id": "USD-OIS",
+      "forward_id": null,
+      "currency": "USD",
+      "vol_convention": "lognormal",
+      "sabr_beta": 0.5,
+      "target_expiries": [],
+      "target_tenors": [],
+      "sabr_interpolation": "bilinear",
+      "calendar_id": null,
+      "fixed_day_count": null,
+      "swap_index": null,
+      "vol_tolerance": null,
+      "sabr_extrapolation": "error",
+      "allow_sabr_missing_bucket_fallback": false
+    },
+    "base_correlation": {
+      "id": "CDX-CORR",
+      "quote_set": "CDX-CORR",
+      "kind": "base_correlation",
+      "index_id": "CDX.NA.IG",
+      "series": 42,
+      "maturity_years": 5.0,
+      "base_date": "2026-05-08",
+      "discount_curve_id": "USD-OIS",
+      "currency": "USD",
+      "notional": 1.0,
+      "frequency": null,
+      "day_count": null,
+      "business_day_convention": null,
+      "calendar_id": null,
+      "detachment_points": [],
+      "roll_rule": "none"
+    },
+    "student_t": {
+      "id": "T",
+      "quote_set": "T",
+      "kind": "student_t",
+      "tranche_instrument_id": "TRANCHE-1",
+      "base_correlation_curve_id": "CDX.NA.IG_CORR",
+      "discount_curve_id": null,
+      "initial_df": 5.0,
+      "df_bounds": [
+        2.1,
+        50.0
+      ],
+      "correlation": 0.3
+    },
+    "hull_white": {
+      "id": "HW",
+      "quote_set": "HW",
+      "kind": "hull_white",
+      "fit_tolerance": 0.0001,
+      "curve_id": "USD-OIS",
+      "currency": "USD",
+      "base_date": "2026-05-08",
+      "initial_kappa": null,
+      "initial_sigma": null
+    },
+    "cap_floor_hull_white": {
+      "id": "HWCF",
+      "quote_set": "HWCF",
+      "kind": "cap_floor_hull_white",
+      "fit_tolerance": 0.0001,
+      "discount_curve_id": "USD-OIS",
+      "forward_curve_id": "USD-SOFR-3M",
+      "currency": "USD",
+      "base_date": "2026-05-08",
+      "fixed_kappa": null,
+      "initial_kappa": null,
+      "initial_sigma": null,
+      "payment_frequency": "semi_annual",
+      "volatility_mode": "scalar"
+    },
+    "svi_surface": {
+      "id": "AAPL-SVI",
+      "quote_set": "AAPL-SVI",
+      "kind": "svi_surface",
+      "vol_surface_id": "AAPL-SVI",
+      "base_date": "2026-05-08",
+      "underlying_ticker": "AAPL",
+      "discount_curve_id": null,
+      "target_expiries": [],
+      "target_strikes": [],
+      "spot_override": null,
+      "dividend_yield_override": null
+    },
+    "xccy_basis": {
+      "id": "EUR-XCCY",
+      "quote_set": "EUR-XCCY",
+      "kind": "xccy_basis",
+      "curve_id": "EUR-XCCY",
+      "currency": "EUR",
+      "base_date": "2026-05-08",
+      "fx_spot": 1.1,
+      "domestic_discount_id": "USD-OIS",
+      "method": "bootstrap",
+      "interpolation": "log_linear",
+      "extrapolation": "flat_forward",
+      "conventions": {
+        "curve_day_count": null,
+        "ois_compounding": null
+      },
+      "basis_spread_curve_id": null
+    },
+    "parametric": {
+      "id": "USD-NS",
+      "quote_set": "USD-NS",
+      "kind": "parametric",
+      "curve_id": "USD-NS",
+      "base_date": "2026-05-08",
+      "model": "ns",
+      "initial_params": null
+    }
+  },
+  "envelope": {
+    "schema": "finstack_quant.calibration/1",
+    "plan": {
+      "id": "parity",
+      "quote_sets": {
+        "USD-OIS": [
+          "USD-DEP-3M",
+          "USD-SWAP-2Y"
+        ]
+      },
+      "steps": [
+        {
+          "id": "USD-OIS",
+          "quote_set": "USD-OIS",
+          "kind": "discount",
+          "curve_id": "USD-OIS",
+          "currency": "USD",
+          "base_date": "2026-05-08"
+        }
+      ]
+    },
+    "market_data": [
+      {
+        "kind": "rate_quote",
+        "type": "deposit",
+        "id": "USD-DEP-3M",
+        "index": "USD-SOFR-OIS",
+        "pillar": {
+          "tenor": {
+            "count": 3,
+            "unit": "months"
+          }
+        },
+        "rate": 0.052
+      },
+      {
+        "kind": "rate_quote",
+        "type": "swap",
+        "id": "USD-SWAP-2Y",
+        "index": "USD-SOFR-OIS",
+        "pillar": {
+          "tenor": {
+            "count": 2,
+            "unit": "years"
+          }
+        },
+        "rate": 0.049,
+        "spread_decimal": null
+      }
+    ]
+  },
+  "step_report": {
+    "success": true,
+    "iterations": 64,
+    "residual_ids": [
+      "USD-DEP-3M",
+      "USD-SWAP-2Y"
+    ]
+  },
+  "hull_white": {
+    "curve": {
+      "id": "USD-OIS",
+      "base_date": "2026-01-02",
+      "day_count": "act_365f",
+      "knots": [
+        0.0,
+        1.0,
+        0.5,
+        0.9851119396030626,
+        1.0,
+        0.9704455335485082,
+        2.0,
+        0.9417645335842487,
+        5.0,
+        0.8607079764250578,
+        10.0,
+        0.7408182206817179,
+        20.0,
+        0.5488116360940264,
+        30.0,
+        0.40656965974059917
+      ]
+    },
+    "cap_floor_quotes": [
+      {
+        "maturity": 1.0,
+        "strike": 0.03,
+        "volatility": 0.007,
+        "is_cap": true,
+        "is_normal_vol": true
+      },
+      {
+        "maturity": 2.0,
+        "strike": 0.03,
+        "volatility": 0.0075,
+        "is_cap": true,
+        "is_normal_vol": true
+      },
+      {
+        "maturity": 5.0,
+        "strike": 0.03,
+        "volatility": 0.008,
+        "is_cap": true,
+        "is_normal_vol": true
+      }
+    ],
+    "piecewise_config": {
+      "fixed_kappa": 0.03,
+      "sigma_min": 1e-05,
+      "sigma_max": 0.1,
+      "fit_tolerance": 1e-06
+    },
+    "piecewise": {
+      "params": {
+        "kappa": 0.03,
+        "volatility": {
+          "times": [
+            0.0,
+            1.0,
+            2.0
+          ],
+          "values": [
+            0.007000194715318602,
+            0.010522537939609241,
+            0.007613537967140784
+          ]
+        }
+      },
+      "success": true,
+      "sigma_at_1_5": 0.010522537939609241,
+      "sigma_at_0_5": 0.007000194715318602
+    },
+    "scalar_config": {
+      "fit_tolerance": 1e-06,
+      "fixed_kappa": 0.03
+    },
+    "scalar": {
+      "params": {
+        "kappa": 0.03,
+        "sigma": 0.007565416987396328
+      },
+      "success": true
+    },
+    "swaption_quotes": [
+      {
+        "expiry": 1.0,
+        "tenor": 1.0,
+        "volatility": 0.008,
+        "is_normal_vol": true
+      },
+      {
+        "expiry": 1.0,
+        "tenor": 5.0,
+        "volatility": 0.007,
+        "is_normal_vol": true
+      },
+      {
+        "expiry": 1.0,
+        "tenor": 10.0,
+        "volatility": 0.006,
+        "is_normal_vol": true
+      },
+      {
+        "expiry": 5.0,
+        "tenor": 1.0,
+        "volatility": 0.0075,
+        "is_normal_vol": true
+      },
+      {
+        "expiry": 5.0,
+        "tenor": 5.0,
+        "volatility": 0.0065,
+        "is_normal_vol": true
+      },
+      {
+        "expiry": 5.0,
+        "tenor": 10.0,
+        "volatility": 0.0056,
+        "is_normal_vol": true
+      }
+    ],
+    "swaption_fit_tolerance": 0.002,
+    "swaptions": {
+      "params": {
+        "kappa": 0.06338794229629371,
+        "sigma": 0.008468025449495533
+      },
+      "success": true
+    }
+  }
+}

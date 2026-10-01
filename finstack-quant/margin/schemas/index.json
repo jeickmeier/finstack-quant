@@ -10,6 +10,15 @@
       "type_name": "CcpMethodology"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/margin/1/concentration_breach.schema.json",
+      "bytes": 2618,
+      "kind": "output",
+      "path": "schemas/margin/1/concentration_breach.schema.json",
+      "summary": "A breach of a collateral concentration limit.",
+      "title": "ConcentrationBreach",
+      "type_name": "ConcentrationBreach"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/margin/1/ead_result.schema.json",
       "bytes": 8515,
       "kind": "output",
@@ -116,6 +125,15 @@
       "summary": "One of three closed root shapes: an OTC margin spec, a CSA spec, or a margin call.",
       "title": "Finstack Quant Margin Specification",
       "type_name": "MarginEnvelope"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/margin/1/margin_constants.schema.json",
+      "bytes": 4005,
+      "kind": "output",
+      "path": "schemas/margin/1/margin_constants.schema.json",
+      "summary": "Margin constants a host needs to interpret inputs and results.",
+      "title": "MarginConstants",
+      "type_name": "MarginConstants"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/margin/1/margin_funding_cost.schema.json",

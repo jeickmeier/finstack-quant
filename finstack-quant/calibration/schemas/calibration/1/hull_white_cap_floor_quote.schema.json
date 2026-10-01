@@ -1,0 +1,40 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/calibration/1/hull_white_cap_floor_quote.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Cap or floor volatility quote in year fractions for the direct Hull-White calibrators.",
+  "properties": {
+    "is_cap": {
+      "description": "`true` for a cap, `false` for a floor.",
+      "type": "boolean"
+    },
+    "is_normal_vol": {
+      "description": "`true` for normal (Bachelier) vol. Lognormal cap/floor quotes are rejected.",
+      "type": "boolean"
+    },
+    "maturity": {
+      "description": "Cap/floor maturity in years from the curve base date; finite and positive.",
+      "format": "double",
+      "type": "number"
+    },
+    "strike": {
+      "description": "Strike rate as a decimal (for example `0.03` for 3%).",
+      "format": "double",
+      "type": "number"
+    },
+    "volatility": {
+      "description": "Market-quoted flat volatility; normal vols use decimal rate units\n(`0.0088` is 88 bp). Finite and positive.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "maturity",
+    "strike",
+    "volatility",
+    "is_cap",
+    "is_normal_vol"
+  ],
+  "title": "Hull-White Cap/Floor Quote",
+  "type": "object"
+}

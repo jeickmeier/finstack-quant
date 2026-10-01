@@ -56,6 +56,7 @@ use crate::solver::traits::GlobalSolveTarget;
 use crate::CalibrationReport;
 
 mod cap_floor;
+mod curves;
 mod pricing;
 mod quotes;
 mod swaption;
@@ -64,6 +65,10 @@ mod targets;
 pub use cap_floor::{
     bootstrap_hull_white_sigma_schedule_to_cap_floors, calibrate_hull_white_to_cap_floors,
     PiecewiseSigmaCalibrationConfig,
+};
+pub use curves::{
+    bootstrap_hull_white_sigma_schedule_to_cap_floors_from_curves,
+    calibrate_hull_white_to_cap_floors_from_curves, calibrate_hull_white_to_swaptions_from_curve,
 };
 pub use finstack_quant_models::rates::hull_white::{
     capfloor_hw1f_scalar_keys, capfloor_hw1f_sigma_schedule_key, hw1f_scalar_keys,

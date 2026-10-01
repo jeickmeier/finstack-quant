@@ -92,6 +92,9 @@ mod index;
 mod keys;
 mod multi;
 mod panel;
+/// Schema registry: every root serde contract this crate publishes.
+#[cfg(feature = "json-schema")]
+pub mod schema;
 mod timeseries;
 mod types;
 

@@ -1,0 +1,1103 @@
+{
+ "constructors": [
+  {
+   "py": "market_fx_pct",
+   "args": [
+    "EUR",
+    "USD",
+    5.0
+   ],
+   "expected": {
+    "kind": "market_fx_pct",
+    "base": "EUR",
+    "quote": "USD",
+    "pct": 5.0
+   },
+   "requires_instruments": false,
+   "mutates_instruments": false
+  },
+  {
+   "py": "equity_price_pct",
+   "args": [
+    [
+     "SPX",
+     "NDX"
+    ],
+    -10.0
+   ],
+   "expected": {
+    "kind": "equity_price_pct",
+    "ids": [
+     "SPX",
+     "NDX"
+    ],
+    "pct": -10.0
+   },
+   "requires_instruments": false,
+   "mutates_instruments": false
+  },
+  {
+   "py": "instrument_price_pct_by_attr",
+   "args": [
+    {
+     "sector": "energy",
+     "rating": "BB"
+    },
+    -5.0
+   ],
+   "expected": {
+    "kind": "instrument_price_pct_by_attr",
+    "attrs": {
+     "sector": "energy",
+     "rating": "BB"
+    },
+    "pct": -5.0
+   },
+   "requires_instruments": true,
+   "mutates_instruments": true
+  },
+  {
+   "py": "instrument_price_pct_by_attr",
+   "args": [
+    [
+     [
+      "sector",
+      "energy"
+     ],
+     [
+      "rating",
+      "BB"
+     ]
+    ],
+    -5.0
+   ],
+   "expected": {
+    "kind": "instrument_price_pct_by_attr",
+    "attrs": {
+     "sector": "energy",
+     "rating": "BB"
+    },
+    "pct": -5.0
+   },
+   "requires_instruments": true,
+   "mutates_instruments": true
+  },
+  {
+   "py": "curve_parallel_bp",
+   "args": [
+    "discount",
+    "USD-OIS",
+    25.0
+   ],
+   "expected": {
+    "kind": "curve_parallel_bp",
+    "curve_kind": "discount",
+    "curve_id": "USD-OIS",
+    "bp": 25.0
+   },
+   "requires_instruments": false,
+   "mutates_instruments": false
+  },
+  {
+   "py": "curve_parallel_bp",
+   "args": [
+    "par_cds",
+    "ACME",
+    50.0,
+    "USD-OIS"
+   ],
+   "expected": {
+    "kind": "curve_parallel_bp",
+    "curve_kind": "par_cds",
+    "curve_id": "ACME",
+    "discount_curve_id": "USD-OIS",
+    "bp": 50.0
+   },
+   "requires_instruments": false,
+   "mutates_instruments": false
+  },
+  {
+   "py": "curve_parallel_bp",
+   "args": [
+    "discount",
+    [
+     "USD-OIS",
+     "EUR-OIS"
+    ],
+    10.0
+   ],
+   "expected": [
+    {
+     "kind": "curve_parallel_bp",
+     "curve_kind": "discount",
+     "curve_id": "USD-OIS",
+     "bp": 10.0
+    },
+    {
+     "kind": "curve_parallel_bp",
+     "curve_kind": "discount",
+     "curve_id": "EUR-OIS",
+     "bp": 10.0
+    }
+   ],
+   "requires_instruments": null,
+   "mutates_instruments": null
+  },
+  {
+   "py": "curve_node_bp",
+   "args": [
+    "forward",
+    "USD-SOFR",
+    [
+     [
+      "2Y",
+      10.0
+     ],
+     [
+      "10Y",
+      -5.0
+     ]
+    ]
+   ],
+   "expected": {
+    "kind": "curve_node_bp",
+    "curve_kind": "forward",
+    "curve_id": "USD-SOFR",
+    "nodes": [
+     [
+      "2Y",
+      10.0
+     ],
+     [
+      "10Y",
+      -5.0
+     ]
+    ],
+    "match_mode": "interpolate"
+   },
+   "requires_instruments": false,
+   "mutates_instruments": false
+  },
+  {
+   "py": "curve_node_bp",
+   "args": [
+    "forward",
+    "USD-SOFR",
+    [
+     [
+      "2Y",
+      10.0
+     ]
+    ],
+    "exact",
+    "USD-OIS"
+   ],
+   "expected": {
+    "kind": "curve_node_bp",
+    "curve_kind": "forward",
+    "curve_id": "USD-SOFR",
+    "discount_curve_id": "USD-OIS",
+    "nodes": [
+     [
+      "2Y",
+      10.0
+     ]
+    ],
+    "match_mode": "exact"
+   },
+   "requires_instruments": false,
+   "mutates_instruments": false
+  },
+  {
+   "py": "vol_index_parallel_pts",
+   "args": [
+    "VIX",
+    2.5
+   ],
+   "expected": {
+    "kind": "vol_index_parallel_pts",
+    "curve_id": "VIX",
+    "points": 2.5
+   },
+   "requires_instruments": false,
+   "mutates_instruments": false
+  },
+  {
+   "py": "vol_index_node_pts",
+   "args": [
+    "VIX",
+    [
+     [
+      "1M",
+      3.0
+     ]
+    ]
+   ],
+   "expected": {
+    "kind": "vol_index_node_pts",
+    "curve_id": "VIX",
+    "nodes": [
+     [
+      "1M",
+      3.0
+     ]
+    ],
+    "match_mode": "interpolate"
+   },
+   "requires_instruments": false,
+   "mutates_instruments": false
+  },
+  {
+   "py": "vol_index_node_pts",
+   "args": [
+    "VIX",
+    [
+     [
+      "1M",
+      3.0
+     ]
+    ],
+    "exact"
+   ],
+   "expected": {
+    "kind": "vol_index_node_pts",
+    "curve_id": "VIX",
+    "nodes": [
+     [
+      "1M",
+      3.0
+     ]
+    ],
+    "match_mode": "exact"
+   },
+   "requires_instruments": false,
+   "mutates_instruments": false
+  },
+  {
+   "py": "base_corr_parallel_pts",
+   "args": [
+    "CDX-IG",
+    0.02
+   ],
+   "expected": {
+    "kind": "base_corr_parallel_pts",
+    "surface_id": "CDX-IG",
+    "points": 0.02
+   },
+   "requires_instruments": false,
+   "mutates_instruments": false
+  },
+  {
+   "py": "base_corr_bucket_pts",
+   "args": [
+    "CDX-IG",
+    0.03,
+    [
+     300,
+     700
+    ]
+   ],
+   "expected": {
+    "kind": "base_corr_bucket_pts",
+    "surface_id": "CDX-IG",
+    "detachment_bp": [
+     300,
+     700
+    ],
+    "points": 0.03
+   },
+   "requires_instruments": false,
+   "mutates_instruments": false
+  },
+  {
+   "py": "base_corr_bucket_pts",
+   "args": [
+    "CDX-IG",
+    0.03
+   ],
+   "expected": {
+    "kind": "base_corr_bucket_pts",
+    "surface_id": "CDX-IG",
+    "detachment_bp": null,
+    "points": 0.03
+   },
+   "requires_instruments": false,
+   "mutates_instruments": false
+  },
+  {
+   "py": "vol_surface_parallel_pct",
+   "args": [
+    "SPX-VOL",
+    10.0
+   ],
+   "expected": {
+    "kind": "vol_surface_parallel_pct",
+    "vol_surface_id": "SPX-VOL",
+    "pct": 10.0
+   },
+   "requires_instruments": false,
+   "mutates_instruments": false
+  },
+  {
+   "py": "vol_surface_bucket_pct",
+   "args": [
+    "SPX-VOL",
+    15.0,
+    [
+     "1M",
+     "3M"
+    ],
+    [
+     90.0,
+     100.0
+    ]
+   ],
+   "expected": {
+    "kind": "vol_surface_bucket_pct",
+    "vol_surface_id": "SPX-VOL",
+    "tenors": [
+     "1M",
+     "3M"
+    ],
+    "strikes": [
+     90.0,
+     100.0
+    ],
+    "pct": 15.0
+   },
+   "requires_instruments": false,
+   "mutates_instruments": false
+  },
+  {
+   "py": "vol_surface_bucket_pct",
+   "args": [
+    "SPX-VOL",
+    15.0,
+    null,
+    [
+     90.0
+    ]
+   ],
+   "expected": {
+    "kind": "vol_surface_bucket_pct",
+    "vol_surface_id": "SPX-VOL",
+    "tenors": null,
+    "strikes": [
+     90.0
+    ],
+    "pct": 15.0
+   },
+   "requires_instruments": false,
+   "mutates_instruments": false
+  },
+  {
+   "py": "stmt_forecast_percent",
+   "args": [
+    "revenue",
+    -5.0
+   ],
+   "expected": {
+    "kind": "stmt_forecast_percent",
+    "node_id": "revenue",
+    "pct": -5.0
+   },
+   "requires_instruments": false,
+   "mutates_instruments": false
+  },
+  {
+   "py": "stmt_forecast_assign",
+   "args": [
+    "capex",
+    1250000.0
+   ],
+   "expected": {
+    "kind": "stmt_forecast_assign",
+    "node_id": "capex",
+    "value": 1250000.0
+   },
+   "requires_instruments": false,
+   "mutates_instruments": false
+  },
+  {
+   "py": "rate_binding",
+   "args": [
+    {
+     "node_id": "interest_rate",
+     "curve_id": "USD-OIS",
+     "tenor": "1Y",
+     "compounding": {
+      "periodic": 2
+     }
+    }
+   ],
+   "expected": {
+    "kind": "rate_binding",
+    "binding": {
+     "node_id": "interest_rate",
+     "curve_id": "USD-OIS",
+     "tenor": "1Y",
+     "compounding": {
+      "periodic": 2
+     },
+     "day_count": null
+    }
+   },
+   "requires_instruments": false,
+   "mutates_instruments": false
+  },
+  {
+   "py": "instrument_spread_bp_by_attr",
+   "args": [
+    {
+     "sector": "energy"
+    },
+    75.0
+   ],
+   "expected": {
+    "kind": "instrument_spread_bp_by_attr",
+    "attrs": {
+     "sector": "energy"
+    },
+    "bp": 75.0
+   },
+   "requires_instruments": true,
+   "mutates_instruments": true
+  },
+  {
+   "py": "instrument_price_pct_by_type",
+   "args": [
+    [
+     "bond",
+     "cds_index"
+    ],
+    -3.0
+   ],
+   "expected": {
+    "kind": "instrument_price_pct_by_type",
+    "instrument_types": [
+     "bond",
+     "cds_index"
+    ],
+    "pct": -3.0
+   },
+   "requires_instruments": true,
+   "mutates_instruments": true
+  },
+  {
+   "py": "instrument_spread_bp_by_type",
+   "args": [
+    [
+     "bond"
+    ],
+    40.0
+   ],
+   "expected": {
+    "kind": "instrument_spread_bp_by_type",
+    "instrument_types": [
+     "bond"
+    ],
+    "bp": 40.0
+   },
+   "requires_instruments": true,
+   "mutates_instruments": true
+  },
+  {
+   "py": "asset_correlation_pts",
+   "args": [
+    0.05
+   ],
+   "expected": {
+    "kind": "asset_correlation_pts",
+    "delta_pts": 0.05
+   },
+   "requires_instruments": true,
+   "mutates_instruments": true
+  },
+  {
+   "py": "prepay_default_correlation_pts",
+   "args": [
+    -0.1
+   ],
+   "expected": {
+    "kind": "prepay_default_correlation_pts",
+    "delta_pts": -0.1
+   },
+   "requires_instruments": true,
+   "mutates_instruments": true
+  },
+  {
+   "py": "hierarchy_curve_parallel_bp",
+   "args": [
+    "discount",
+    {
+     "path": [
+      "Credit",
+      "US"
+     ],
+     "tag_filter": {
+      "predicates": [
+       {
+        "equals": {
+         "key": "sector",
+         "value": "financials"
+        }
+       }
+      ]
+     }
+    },
+    25.0
+   ],
+   "expected": {
+    "kind": "hierarchy_curve_parallel_bp",
+    "curve_kind": "discount",
+    "target": {
+     "path": [
+      "Credit",
+      "US"
+     ],
+     "tag_filter": {
+      "predicates": [
+       {
+        "equals": {
+         "key": "sector",
+         "value": "financials"
+        }
+       }
+      ]
+     }
+    },
+    "bp": 25.0
+   },
+   "requires_instruments": false,
+   "mutates_instruments": false
+  },
+  {
+   "py": "hierarchy_curve_parallel_bp",
+   "args": [
+    "par_cds",
+    {
+     "path": [
+      "Credit",
+      "US"
+     ],
+     "tag_filter": {
+      "predicates": [
+       {
+        "equals": {
+         "key": "sector",
+         "value": "financials"
+        }
+       }
+      ]
+     }
+    },
+    25.0,
+    "USD-OIS"
+   ],
+   "expected": {
+    "kind": "hierarchy_curve_parallel_bp",
+    "curve_kind": "par_cds",
+    "target": {
+     "path": [
+      "Credit",
+      "US"
+     ],
+     "tag_filter": {
+      "predicates": [
+       {
+        "equals": {
+         "key": "sector",
+         "value": "financials"
+        }
+       }
+      ]
+     }
+    },
+    "bp": 25.0,
+    "discount_curve_id": "USD-OIS"
+   },
+   "requires_instruments": false,
+   "mutates_instruments": false
+  },
+  {
+   "py": "hierarchy_vol_surface_parallel_pct",
+   "args": [
+    {
+     "path": [
+      "Credit",
+      "US"
+     ],
+     "tag_filter": {
+      "predicates": [
+       {
+        "equals": {
+         "key": "sector",
+         "value": "financials"
+        }
+       }
+      ]
+     }
+    },
+    10.0
+   ],
+   "expected": {
+    "kind": "hierarchy_vol_surface_parallel_pct",
+    "target": {
+     "path": [
+      "Credit",
+      "US"
+     ],
+     "tag_filter": {
+      "predicates": [
+       {
+        "equals": {
+         "key": "sector",
+         "value": "financials"
+        }
+       }
+      ]
+     }
+    },
+    "pct": 10.0
+   },
+   "requires_instruments": false,
+   "mutates_instruments": false
+  },
+  {
+   "py": "hierarchy_equity_price_pct",
+   "args": [
+    {
+     "path": [
+      "Credit",
+      "US"
+     ],
+     "tag_filter": {
+      "predicates": [
+       {
+        "equals": {
+         "key": "sector",
+         "value": "financials"
+        }
+       }
+      ]
+     }
+    },
+    -20.0
+   ],
+   "expected": {
+    "kind": "hierarchy_equity_price_pct",
+    "target": {
+     "path": [
+      "Credit",
+      "US"
+     ],
+     "tag_filter": {
+      "predicates": [
+       {
+        "equals": {
+         "key": "sector",
+         "value": "financials"
+        }
+       }
+      ]
+     }
+    },
+    "pct": -20.0
+   },
+   "requires_instruments": false,
+   "mutates_instruments": false
+  },
+  {
+   "py": "hierarchy_base_corr_parallel_pts",
+   "args": [
+    {
+     "path": [
+      "Credit",
+      "US"
+     ],
+     "tag_filter": {
+      "predicates": [
+       {
+        "equals": {
+         "key": "sector",
+         "value": "financials"
+        }
+       }
+      ]
+     }
+    },
+    0.02
+   ],
+   "expected": {
+    "kind": "hierarchy_base_corr_parallel_pts",
+    "target": {
+     "path": [
+      "Credit",
+      "US"
+     ],
+     "tag_filter": {
+      "predicates": [
+       {
+        "equals": {
+         "key": "sector",
+         "value": "financials"
+        }
+       }
+      ]
+     }
+    },
+    "points": 0.02
+   },
+   "requires_instruments": false,
+   "mutates_instruments": false
+  },
+  {
+   "py": "time_roll_forward",
+   "args": [
+    "3M"
+   ],
+   "expected": {
+    "kind": "time_roll_forward",
+    "period": "3M",
+    "apply_shocks": true,
+    "roll_mode": "business_days"
+   },
+   "requires_instruments": true,
+   "mutates_instruments": false
+  },
+  {
+   "py": "time_roll_forward",
+   "args": [
+    "1M",
+    false,
+    "calendar_days"
+   ],
+   "expected": {
+    "kind": "time_roll_forward",
+    "period": "1M",
+    "apply_shocks": false,
+    "roll_mode": "calendar_days"
+   },
+   "requires_instruments": true,
+   "mutates_instruments": false
+  },
+  {
+   "py": "time_roll_forward",
+   "args": [
+    "1M",
+    true,
+    "approximate"
+   ],
+   "expected": {
+    "kind": "time_roll_forward",
+    "period": "1M",
+    "apply_shocks": true,
+    "roll_mode": "approximate"
+   },
+   "requires_instruments": true,
+   "mutates_instruments": false
+  }
+ ],
+ "invalid_operations": [
+  {
+   "operation": {
+    "kind": "market_fx_pct",
+    "base": "USD",
+    "quote": "USD",
+    "pct": 1.0
+   },
+   "error": {
+    "exception": "ValueError",
+    "message": "Validation error: Base and quote currencies must be different"
+   }
+  },
+  {
+   "operation": {
+    "kind": "time_roll_forward",
+    "period": "bogus"
+   },
+   "error": {
+    "exception": "ValueError",
+    "message": "Invalid time period: Time roll period \"bogus\" is not a valid tenor: Invalid tenor 'bogus': no count found; expected format like '3M' or '1Y'"
+   }
+  },
+  {
+   "operation": {
+    "kind": "market_fx_pct",
+    "base": "EUR",
+    "quote": "USD",
+    "pct": -100.0
+   },
+   "error": {
+    "exception": "ValueError",
+    "message": "Validation error: Percentage 'pct' must be greater than -100% (got -100.0%)"
+   }
+  },
+  {
+   "operation": {
+    "kind": "equity_price_pct",
+    "ids": [],
+    "pct": 1.0
+   },
+   "error": {
+    "exception": "ValueError",
+    "message": "Validation error: Equity IDs cannot be empty"
+   }
+  }
+ ],
+ "invalid_bindings": [
+  {
+   "binding": {
+    "node_id": "",
+    "curve_id": "USD-OIS",
+    "tenor": "1Y"
+   },
+   "error": {
+    "exception": "ValueError",
+    "message": "Validation error: Identifier 'node_id' cannot be empty"
+   }
+  },
+  {
+   "binding": {
+    "node_id": "n",
+    "curve_id": "USD-OIS",
+    "tenor": "zz"
+   },
+   "error": {
+    "exception": "ValueError",
+    "message": "Invalid tenor string: Invalid tenor 'zz': no count found; expected format like '3M' or '1Y'"
+   }
+  }
+ ],
+ "enums": {
+  "CurveKind": {
+   "discount": "discount",
+   "forward": "forward",
+   "par_cds": "par_cds",
+   "inflation": "inflation",
+   "commodity": "commodity"
+  },
+  "TenorMatchMode": {
+   "exact": "exact",
+   "interpolate": "interpolate"
+  },
+  "TimeRollMode": {
+   "business_days": "business_days",
+   "calendar_days": "calendar_days",
+   "approximate": "approximate"
+  },
+  "Compounding": {
+   "simple": "simple",
+   "continuous": "continuous",
+   "annual": "annual",
+   "semi_annual": {
+    "periodic": 2
+   },
+   "quarterly": {
+    "periodic": 4
+   },
+   "monthly": {
+    "periodic": 12
+   }
+  }
+ },
+ "horizon": {
+  "as_of": "2025-01-15",
+  "market": {
+   "schema_version": 1,
+   "curves": [
+    {
+     "type": "discount",
+     "id": "USD-OIS",
+     "base": "2025-01-15",
+     "day_count": "act_365f",
+     "knot_points": [
+      [
+       0.0,
+       1.0
+      ],
+      [
+       0.5,
+       0.98
+      ],
+      [
+       1.0,
+       0.96
+      ],
+      [
+       2.0,
+       0.92
+      ]
+     ],
+     "interp_style": "monotone_convex",
+     "extrapolation": "flat_forward",
+     "min_forward_rate": -0.005,
+     "allow_non_monotonic": false,
+     "min_forward_tenor": 1e-06,
+     "rate_calibration": null,
+     "calibration_ois_cutoff_days": null,
+     "fx_policy": null
+    }
+   ],
+   "fx": null,
+   "surfaces": [],
+   "prices": {},
+   "series": [],
+   "inflation_indices": [],
+   "dividends": [],
+   "credit_indices": [],
+   "fx_delta_vol_surfaces": [],
+   "vol_cubes": [],
+   "collateral": {},
+   "hierarchy": null
+  },
+  "instrument": {
+   "schema": "finstack_quant.instrument/1",
+   "instrument": {
+    "type": "deposit",
+    "spec": {
+     "id": "DEP-0",
+     "notional": {
+      "amount": "1000000",
+      "currency": "USD"
+     },
+     "start_date": "2025-01-15",
+     "maturity": "2025-07-15",
+     "day_count": "act_360",
+     "fixed_rate": "0.04",
+     "discount_curve_id": "USD-OIS",
+     "attributes": {}
+    }
+   }
+  },
+  "scenario": {
+   "id": "hold_1m_up25",
+   "operations": [
+    {
+     "kind": "time_roll_forward",
+     "period": "1M",
+     "apply_shocks": true,
+     "roll_mode": "calendar_days"
+    },
+    {
+     "kind": "curve_parallel_bp",
+     "curve_kind": "discount",
+     "curve_id": "USD-OIS",
+     "bp": 25.0
+    }
+   ]
+  },
+  "explain": "Horizon Total Return: 0.2378%\nAnnualized: 2.8357%\nHorizon: 31 days\nInitial Value: USD 999876.60\nTerminal Value: USD 1002254.06\nTotal P&L: USD 2377.46\n  Carry: USD 3407.70\n  Rates: USD -1030.24\n  Credit: USD 0.00\n  Residual: USD 0.00\n",
+  "factor_contribution": {
+   "carry": 0.003408116341277966,
+   "rates_curves": -0.0010303679309610666,
+   "credit_curves": 0.0,
+   "inflation_curves": 0.0,
+   "correlations": 0.0,
+   "fx": 0.0,
+   "volatility": 0.0,
+   "market_scalars": 0.0,
+   "model_parameters": 0.0
+  },
+  "bad_factor_error": {
+   "exception": "ValueError",
+   "message": "Unknown factor 'nope'. Expected one of: carry, rates_curves, credit_curves, inflation_curves, correlations, fx, volatility, market_scalars, model_parameters"
+  }
+ },
+ "scenario_spec": {
+  "cases": [
+   {
+    "spec": {
+     "id": "hold_1m_up25",
+     "name": null,
+     "description": null,
+     "operations": [
+      {
+       "kind": "time_roll_forward",
+       "period": "1M",
+       "apply_shocks": true,
+       "roll_mode": "calendar_days"
+      },
+      {
+       "kind": "curve_parallel_bp",
+       "curve_kind": "discount",
+       "curve_id": "USD-OIS",
+       "bp": 25.0
+      }
+     ],
+     "priority": 0,
+     "resolution_mode": "most_specific_wins"
+    },
+    "requires_instruments": true,
+    "mutates_instruments": false
+   },
+   {
+    "spec": {
+     "id": "px",
+     "name": null,
+     "description": null,
+     "operations": [
+      {
+       "kind": "instrument_price_pct_by_type",
+       "instrument_types": [
+        "bond"
+       ],
+       "pct": -5.0
+      }
+     ],
+     "priority": 0,
+     "resolution_mode": "most_specific_wins"
+    },
+    "requires_instruments": true,
+    "mutates_instruments": true
+   },
+   {
+    "spec": {
+     "id": "mkt",
+     "name": null,
+     "description": null,
+     "operations": [
+      {
+       "kind": "vol_index_parallel_pts",
+       "curve_id": "VIX",
+       "points": 1.0
+      }
+     ],
+     "priority": 0,
+     "resolution_mode": "most_specific_wins"
+    },
+    "requires_instruments": false,
+    "mutates_instruments": false
+   }
+  ],
+  "with_hazard_bump_mode": {
+   "mode": "first_order_shift",
+   "expected": {
+    "id": "hold_1m_up25",
+    "name": null,
+    "description": null,
+    "operations": [
+     {
+      "kind": "time_roll_forward",
+      "period": "1M",
+      "apply_shocks": true,
+      "roll_mode": "calendar_days"
+     },
+     {
+      "kind": "curve_parallel_bp",
+      "curve_kind": "discount",
+      "curve_id": "USD-OIS",
+      "bp": 25.0
+     }
+    ],
+    "priority": 0,
+    "resolution_mode": "most_specific_wins",
+    "hazard_bump_mode": "first_order_shift"
+   }
+  },
+  "bad_mode_error": {
+   "exception": "ValueError",
+   "message": "Validation error: invalid value \"nope\": unknown variant `nope`, expected `solve_to_par` or `first_order_shift`"
+  }
+ }
+}

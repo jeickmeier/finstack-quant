@@ -747,6 +747,18 @@ fn scenarios_dts_matches_structured_surface() {
         &dts,
         "buildScenarioSpec(id: string, operations: OperationSpec[], name?: string, description?: string, priority?: number, resolutionMode?: 'most_specific_wins' | 'cumulative', hazardBumpMode?: 'solve_to_par' | 'first_order_shift'): ScenarioSpec;",
     ));
+    // Free-function twins of the Python OperationSpec / HorizonResult members:
+    // the omitted trailing arguments resolve to the Rust defaults.
+    for signature in [
+        "operationSpecCurveParallelBp(curveKind: CurveKind, curveId: string | string[], bp: number, discountCurveId?: string): OperationSpec | OperationSpec[];",
+        "operationSpecTimeRollForward(period: string, applyShocks?: boolean, rollMode?: TimeRollMode): OperationSpec;",
+        "scenarioSpecWithHazardBumpMode(spec: ScenarioSpec | string, mode: HazardBumpMode): ScenarioSpec;",
+        "horizonResultExplainText(result: HorizonReport | HorizonResult | string): string;",
+        "horizonResultFactorContribution(result: HorizonReport | HorizonResult | string, factor: AttributionFactor): number;",
+        "compoundingSemiAnnual(): Compounding;",
+    ] {
+        assert!(contains_ignoring_ws(&dts, signature), "{signature}");
+    }
     assert!(dts.contains("export declare const scenarios: ScenariosNamespace;"));
 }
 
@@ -1259,6 +1271,18 @@ fn features_dts_matches_transform_surface() {
     assert!(contains_signature(
         features,
         "transformPanelJson(specJson: JsonInput): string;"
+    ));
+    assert!(contains_signature(
+        features,
+        "transformPanel(spec: PanelTransformSpec | string): PanelTransformResult;"
+    ));
+    assert!(contains_signature(
+        features,
+        "panelTransformResultGetColumn(result: PanelTransformResult | string, name: string): FeatureValue[];"
+    ));
+    assert!(contains_signature(
+        features,
+        "timeSeriesOpParamKeys(op: TimeSeriesOp): string[];"
     ));
     assert!(dts.contains("export declare const features: FeaturesNamespace;"));
 }

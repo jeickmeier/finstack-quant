@@ -102,11 +102,10 @@ impl PyRateQuote {
         Self { inner }
     }
 
-    fn build(mut fields: Map<String, Value>, kind: &str) -> PyResult<Self> {
-        fields.insert("type".to_string(), Value::String(kind.to_string()));
-        let inner: RateQuote = from_value(Value::Object(fields), "RateQuote")?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self::from_inner(inner))
+    fn build(fields: Map<String, Value>, kind: &str) -> PyResult<Self> {
+        RateQuote::from_wire_fields(kind, fields)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
     }
 }
 
@@ -371,7 +370,6 @@ impl PyCdsQuote {
         extra: Vec<(&str, f64)>,
     ) -> PyResult<Self> {
         let mut fields = Map::new();
-        fields.insert("type".into(), Value::String(kind.into()));
         fields.insert("id".into(), Value::String(id.into()));
         fields.insert("entity".into(), Value::String(entity.into()));
         let mut convention = Map::new();
@@ -382,9 +380,9 @@ impl PyCdsQuote {
         for (key, value) in extra {
             fields.insert(key.into(), Value::from(value));
         }
-        let inner: CdsQuote = from_value(Value::Object(fields), "CdsQuote")?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self::from_inner(inner))
+        CdsQuote::from_wire_fields(kind, fields)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
     }
 }
 
@@ -584,11 +582,9 @@ impl PyVolQuote {
     }
 
     fn build(variant: &str, fields: Map<String, Value>) -> PyResult<Self> {
-        let mut outer = Map::new();
-        outer.insert(variant.to_string(), Value::Object(fields));
-        let inner: VolQuote = from_value(Value::Object(outer), "VolQuote")?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self::from_inner(inner))
+        VolQuote::from_wire_fields(variant, fields)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
     }
 }
 
@@ -878,6 +874,9 @@ impl PyCalibrationStep {
     }
 
     /// Shared constructor: `kind` + `id` + explicit fields + `**params`.
+    ///
+    /// Rust `CalibrationStep::from_wire_fields` owns the omitted-argument
+    /// defaults (quote set and produced-object identifiers fall back to `id`).
     fn build(
         py: Python<'_>,
         kind: &str,
@@ -888,13 +887,8 @@ impl PyCalibrationStep {
         params: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
         merge_kwargs(py, &mut fields, params, kind)?;
-        fields.insert("kind".into(), Value::String(kind.into()));
-        fields.insert("id".into(), Value::String(id.into()));
-        fields.insert(
-            "quote_set".into(),
-            Value::String(quote_set.unwrap_or_else(|| id.to_string())),
-        );
-        let inner: CalibrationStep = from_value(Value::Object(fields), &format!("{kind} step"))?;
+        let inner = CalibrationStep::from_wire_fields(kind, id, quote_set.as_deref(), fields)
+            .map_err(core_to_py)?;
         Ok(Self {
             inner,
             quotes: extract_market_data(py, quotes)?,
@@ -953,10 +947,7 @@ impl PyCalibrationStep {
         params: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
         let f = fields(vec![
-            (
-                "curve_id",
-                Value::String(curve_id.unwrap_or_else(|| id.into())),
-            ),
+            ("curve_id", curve_id.map_or(Value::Null, Value::String)),
             ("currency", Value::String(currency_code(currency)?)),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
         ]);
@@ -1006,10 +997,7 @@ impl PyCalibrationStep {
         params: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
         let f = fields(vec![
-            (
-                "curve_id",
-                Value::String(curve_id.unwrap_or_else(|| id.into())),
-            ),
+            ("curve_id", curve_id.map_or(Value::Null, Value::String)),
             ("currency", Value::String(currency_code(currency)?)),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
             ("tenor_years", Value::from(tenor_years)),
@@ -1067,10 +1055,7 @@ impl PyCalibrationStep {
         params: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
         let f = fields(vec![
-            (
-                "curve_id",
-                Value::String(curve_id.unwrap_or_else(|| id.into())),
-            ),
+            ("curve_id", curve_id.map_or(Value::Null, Value::String)),
             ("entity", Value::String(entity.into())),
             ("seniority", Value::String(seniority.into())),
             ("currency", Value::String(currency_code(currency)?)),
@@ -1130,10 +1115,7 @@ impl PyCalibrationStep {
         params: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
         let f = fields(vec![
-            (
-                "curve_id",
-                Value::String(curve_id.unwrap_or_else(|| id.into())),
-            ),
+            ("curve_id", curve_id.map_or(Value::Null, Value::String)),
             ("currency", Value::String(currency_code(currency)?)),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
             ("discount_curve_id", Value::String(discount_curve_id.into())),
@@ -1189,7 +1171,7 @@ impl PyCalibrationStep {
         let f = fields(vec![
             (
                 "vol_surface_id",
-                Value::String(vol_surface_id.unwrap_or_else(|| id.into())),
+                vol_surface_id.map_or(Value::Null, Value::String),
             ),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
             ("underlying_ticker", Value::String(underlying_ticker.into())),
@@ -1243,7 +1225,7 @@ impl PyCalibrationStep {
         let f = fields(vec![
             (
                 "vol_surface_id",
-                Value::String(vol_surface_id.unwrap_or_else(|| id.into())),
+                vol_surface_id.map_or(Value::Null, Value::String),
             ),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
             ("discount_curve_id", Value::String(discount_curve_id.into())),
@@ -1494,7 +1476,7 @@ impl PyCalibrationStep {
         let f = fields(vec![
             (
                 "vol_surface_id",
-                Value::String(vol_surface_id.unwrap_or_else(|| id.into())),
+                vol_surface_id.map_or(Value::Null, Value::String),
             ),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
             ("underlying_ticker", Value::String(underlying_ticker.into())),
@@ -1545,10 +1527,7 @@ impl PyCalibrationStep {
         params: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
         let f = fields(vec![
-            (
-                "curve_id",
-                Value::String(curve_id.unwrap_or_else(|| id.into())),
-            ),
+            ("curve_id", curve_id.map_or(Value::Null, Value::String)),
             ("currency", Value::String(currency_code(currency)?)),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
             ("fx_spot", Value::from(fx_spot)),
@@ -1598,10 +1577,7 @@ impl PyCalibrationStep {
         params: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
         let f = fields(vec![
-            (
-                "curve_id",
-                Value::String(curve_id.unwrap_or_else(|| id.into())),
-            ),
+            ("curve_id", curve_id.map_or(Value::Null, Value::String)),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
             ("model", Value::String(model.into())),
         ]);

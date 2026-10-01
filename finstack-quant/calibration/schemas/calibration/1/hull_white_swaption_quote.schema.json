@@ -1,0 +1,35 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/calibration/1/hull_white_swaption_quote.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "ATM swaption volatility quote in year fractions for the direct Hull-White calibrator.",
+  "properties": {
+    "expiry": {
+      "description": "Swaption expiry in years (T₀); finite and positive.",
+      "format": "double",
+      "type": "number"
+    },
+    "is_normal_vol": {
+      "description": "`true` for normal (Bachelier) vol, `false` for lognormal (Black-76) vol.",
+      "type": "boolean"
+    },
+    "tenor": {
+      "description": "Underlying swap tenor in years (e.g. 5.0 for a 5Y swap); finite and positive.",
+      "format": "double",
+      "type": "number"
+    },
+    "volatility": {
+      "description": "Market-quoted volatility as a decimal: absolute rate volatility for\nnormal quotes, Black volatility for lognormal quotes; finite and positive.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "expiry",
+    "tenor",
+    "volatility",
+    "is_normal_vol"
+  ],
+  "title": "Hull-White Swaption Quote",
+  "type": "object"
+}

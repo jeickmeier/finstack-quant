@@ -1,0 +1,82 @@
+{
+  "$defs": {
+    "CollateralAssetClass": {
+      "description": "Collateral asset classes per BCBS-IOSCO standards.\n\nAsset classes determine baseline haircuts and eligibility criteria.\nThe BCBS-IOSCO framework specifies minimum haircuts by asset class.\n\n# Reference\n\nBCBS-IOSCO \"Margin requirements for non-centrally cleared derivatives\" (2020)\nAnnex A: Standardized haircut schedule `docs/REFERENCES.md#bcbs-iosco-uncleared-margin`",
+      "oneOf": [
+        {
+          "const": "cash",
+          "description": "Cash in eligible currency",
+          "type": "string"
+        },
+        {
+          "const": "government_bonds",
+          "description": "Sovereign government bonds accepted as collateral.",
+          "type": "string"
+        },
+        {
+          "const": "agency_bonds",
+          "description": "Debt issued or guaranteed by eligible agencies.",
+          "type": "string"
+        },
+        {
+          "const": "covered_bonds",
+          "description": "Covered bonds meeting the applicable eligibility criteria.",
+          "type": "string"
+        },
+        {
+          "const": "corporate_bonds",
+          "description": "Investment-grade corporate bonds accepted under the CSA.",
+          "type": "string"
+        },
+        {
+          "const": "equity",
+          "description": "Eligible listed equity collateral.",
+          "type": "string"
+        },
+        {
+          "const": "gold",
+          "description": "Eligible gold collateral.",
+          "type": "string"
+        },
+        {
+          "const": "mutual_funds",
+          "description": "Eligible mutual funds or exchange-traded funds.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/margin/1/concentration_breach.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "A breach of a collateral concentration limit.",
+  "properties": {
+    "asset_class": {
+      "$ref": "#/$defs/CollateralAssetClass",
+      "description": "Asset class that breached"
+    },
+    "excess": {
+      "description": "Excess fraction above limit",
+      "format": "double",
+      "type": "number"
+    },
+    "fraction": {
+      "description": "Actual fraction of total collateral",
+      "format": "double",
+      "type": "number"
+    },
+    "limit": {
+      "description": "Allowed concentration limit",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "asset_class",
+    "fraction",
+    "limit",
+    "excess"
+  ],
+  "title": "ConcentrationBreach",
+  "type": "object"
+}

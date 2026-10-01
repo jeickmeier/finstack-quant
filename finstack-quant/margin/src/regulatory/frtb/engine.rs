@@ -71,6 +71,28 @@ impl FrtbSbaEngine {
         })
     }
 
+    /// Create an engine from optional selections, defaulting each to the full set.
+    ///
+    /// # Arguments
+    ///
+    /// * `scenarios` - Correlation scenarios to evaluate, or `None` for
+    ///   [`CorrelationScenario::ALL`] (the regulatory three).
+    /// * `risk_classes` - Risk classes to include, or `None` for
+    ///   [`FrtbRiskClass::ALL`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if a supplied list is empty.
+    pub fn with_selection(
+        scenarios: Option<Vec<CorrelationScenario>>,
+        risk_classes: Option<Vec<FrtbRiskClass>>,
+    ) -> Result<Self> {
+        Self::new(
+            scenarios.unwrap_or_else(|| CorrelationScenario::ALL.to_vec()),
+            risk_classes.unwrap_or_else(|| FrtbRiskClass::ALL.to_vec()),
+        )
+    }
+
     /// Correlation scenarios evaluated by this engine, in configured order.
     #[must_use]
     pub fn scenarios(&self) -> &[CorrelationScenario] {
@@ -152,6 +174,30 @@ impl FrtbSbaEngine {
             ),
         })
     }
+}
+
+/// FRTB SBA capital charge for one sensitivity set.
+///
+/// Runs the full engine (every risk class), under one correlation scenario
+/// when `correlation_scenario` is given and under all three otherwise.
+///
+/// # Arguments
+///
+/// * `sensitivities` - Delta, vega, curvature, DRC and RRAO inputs in one
+///   reporting currency.
+/// * `correlation_scenario` - Single scenario to evaluate, or `None` for the
+///   regulatory maximum over low, medium and high correlations.
+///
+/// # Errors
+///
+/// Returns a validation error if `sensitivities` fail
+/// [`FrtbSensitivities::validate`].
+pub fn frtb_sba_charge(
+    sensitivities: &FrtbSensitivities,
+    correlation_scenario: Option<CorrelationScenario>,
+) -> Result<FrtbSbaResult> {
+    FrtbSbaEngine::with_selection(correlation_scenario.map(|scenario| vec![scenario]), None)?
+        .calculate(sensitivities)
 }
 
 #[cfg(test)]
@@ -643,5 +689,37 @@ mod tests {
             (rho - 0.40).abs() < 1e-4,
             "0.25Y vs 30Y: expected 0.40 (floor), got {rho}"
         );
+    }
+
+    #[test]
+    fn with_selection_defaults_each_omitted_list_to_the_full_set() {
+        let engine = FrtbSbaEngine::with_selection(None, None).expect("defaults");
+        assert_eq!(engine.scenarios(), CorrelationScenario::ALL);
+        assert_eq!(engine.risk_classes(), FrtbRiskClass::ALL);
+
+        let engine = FrtbSbaEngine::with_selection(Some(vec![CorrelationScenario::High]), None)
+            .expect("one scenario");
+        assert_eq!(engine.scenarios(), [CorrelationScenario::High]);
+        assert_eq!(engine.risk_classes(), FrtbRiskClass::ALL);
+
+        assert!(FrtbSbaEngine::with_selection(Some(Vec::new()), None).is_err());
+    }
+
+    #[test]
+    fn frtb_sba_charge_matches_the_engine_for_one_and_all_scenarios() {
+        let mut sens = FrtbSensitivities::new(Currency::USD);
+        sens.add_girr_delta(Currency::USD, "5Y", 1_000_000.0);
+        sens.add_equity_delta("AAPL", 1, 250_000.0);
+
+        let all = frtb_sba_charge(&sens, None).expect("all scenarios");
+        let engine = FrtbSbaEngine::default().calculate(&sens).expect("engine");
+        assert_eq!(all.total, engine.total);
+        assert_eq!(all.scenario_charges.len(), 3);
+
+        let high = frtb_sba_charge(&sens, Some(CorrelationScenario::High)).expect("high");
+        assert_eq!(high.scenario_charges.len(), 1);
+        assert_eq!(high.binding_scenario, CorrelationScenario::High);
+        let expected = all.scenario_charges[&CorrelationScenario::High] + all.drc + all.rrao;
+        assert!((high.total - expected).abs() <= 1e-9 * expected.abs().max(1.0));
     }
 }

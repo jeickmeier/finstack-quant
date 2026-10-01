@@ -11,6 +11,7 @@ use super::*;
 /// Deserialization rejects unknown fields and applies the same validation as
 /// [`SwaptionQuote::try_new`].
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "SwaptionQuoteRaw")]
 pub struct SwaptionQuote {
     /// Swaption expiry in years (T₀).
@@ -46,11 +47,17 @@ pub struct SwaptionSchedule {
 /// Wire shape for [`SwaptionQuote`]: rejects unknown fields, then routes
 /// through [`SwaptionQuote::try_new`] for value validation.
 #[derive(serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 struct SwaptionQuoteRaw {
+    /// Swaption expiry in years (T₀); finite and positive.
     expiry: f64,
+    /// Underlying swap tenor in years (e.g. 5.0 for a 5Y swap); finite and positive.
     tenor: f64,
+    /// Market-quoted volatility as a decimal: absolute rate volatility for
+    /// normal quotes, Black volatility for lognormal quotes; finite and positive.
     volatility: f64,
+    /// `true` for normal (Bachelier) vol, `false` for lognormal (Black-76) vol.
     is_normal_vol: bool,
 }
 
@@ -78,6 +85,7 @@ impl TryFrom<SwaptionQuoteRaw> for SwaptionQuote {
 /// Deserialization rejects unknown fields and applies the same validation as
 /// [`CapFloorQuote::try_new`].
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "CapFloorQuoteRaw")]
 pub struct CapFloorQuote {
     /// Cap/floor maturity in years.
@@ -96,12 +104,19 @@ pub struct CapFloorQuote {
 /// Wire shape for [`CapFloorQuote`]: rejects unknown fields, then routes
 /// through [`CapFloorQuote::try_new`] for value validation.
 #[derive(serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 struct CapFloorQuoteRaw {
+    /// Cap/floor maturity in years from the curve base date; finite and positive.
     maturity: f64,
+    /// Strike rate as a decimal (for example `0.03` for 3%).
     strike: f64,
+    /// Market-quoted flat volatility; normal vols use decimal rate units
+    /// (`0.0088` is 88 bp). Finite and positive.
     volatility: f64,
+    /// `true` for a cap, `false` for a floor.
     is_cap: bool,
+    /// `true` for normal (Bachelier) vol. Lognormal cap/floor quotes are rejected.
     is_normal_vol: bool,
 }
 
@@ -150,18 +165,27 @@ impl CapFloorQuote {
 }
 
 /// Configuration for cap/floor HW1F calibration.
-#[derive(Debug, Clone, Copy)]
+///
+/// On the wire only `fit_tolerance` is required: an omitted `frequency` is
+/// [`SwapFrequency::default`] (semi-annual) and the two optional parameters
+/// default to `null`. Unknown fields are rejected.
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct CapFloorCalibrationConfig {
     /// Required positive maximum implied-quote error in quoted volatility units.
     /// Normal quotes use decimal rate volatility; Black quotes use relative volatility.
     /// This acceptance budget is independent of the numerical solver tolerance.
     pub fit_tolerance: f64,
     /// Payment frequency used to decompose full caps/floors into caplets.
+    #[serde(default)]
     pub frequency: SwapFrequency,
     /// Optional source mean reversion. Required when calibrating from a
     /// single cap/floor quote because one quote cannot identify both κ and σ.
+    #[serde(default)]
     pub fixed_kappa: Option<f64>,
     /// Optional initial guess when solving both κ and σ.
+    #[serde(default)]
     pub initial_guess: Option<HullWhiteCalibrationParams>,
 }
 
@@ -234,6 +258,22 @@ impl SwapFrequency {
             Self::Annual => "annual",
             Self::SemiAnnual => "semi_annual",
             Self::Quarterly => "quarterly",
+        }
+    }
+}
+
+impl std::str::FromStr for SwapFrequency {
+    type Err = finstack_quant_core::Error;
+
+    /// Parse the snake_case wire label: `annual`, `semi_annual` or `quarterly`.
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "annual" => Ok(Self::Annual),
+            "semi_annual" => Ok(Self::SemiAnnual),
+            "quarterly" => Ok(Self::Quarterly),
+            _ => Err(finstack_quant_core::Error::Validation(format!(
+                "invalid swap frequency '{value}': expected 'annual', 'semi_annual' or 'quarterly'"
+            ))),
         }
     }
 }

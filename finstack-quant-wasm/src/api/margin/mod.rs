@@ -1,13 +1,45 @@
 //! WASM bindings for the `finstack-quant-margin` crate.
 //!
-//! Exposes CSA specification loading, variation margin calculation, and
-//! bilateral XVA via JSON-based interfaces for JavaScript/TypeScript
-//! consumers.
+//! Data types (CSA specifications, schedules, profiles, results) cross the
+//! boundary as plain JSON values typed by the generated TypeScript; engines,
+//! calculators and the sensitivity builders are classes. The submodules hold
+//! one family each.
+
+mod calculators;
+mod frtb;
+mod im;
+mod metrics;
+mod sa_ccr;
+mod types;
+mod xva;
 
 use crate::api::core::market_data::{JsDiscountCurve, JsHazardCurve};
 use crate::utils::input::{js_f64, js_string, json_text, opt_json_text};
 use crate::utils::{parse_iso_date, to_js_err, to_js_value};
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::Date;
+use finstack_quant_core::money::Money;
 use wasm_bindgen::prelude::*;
+
+/// An ISO-4217 currency argument.
+fn js_currency(value: &JsValue, label: &str) -> Result<Currency, JsValue> {
+    js_string(value, label)?.parse().map_err(to_js_err)
+}
+
+/// A numeric amount argument in major units of `currency`.
+fn js_money(value: &JsValue, label: &str, currency: Currency) -> Result<Money, JsValue> {
+    Money::new(js_f64(value, label)?, currency).map_err(to_js_err)
+}
+
+/// An amount in major units of a CSA's base currency.
+fn base_money(csa: &finstack_quant_margin::CsaSpec, amount: f64) -> Result<Money, JsValue> {
+    Money::new(amount, csa.base_currency).map_err(to_js_err)
+}
+
+/// An ISO-8601 date argument.
+fn js_date(value: &JsValue, label: &str) -> Result<Date, JsValue> {
+    parse_iso_date(&js_string(value, label)?)
+}
 
 fn serialize_csa(csa: &finstack_quant_margin::CsaSpec) -> Result<String, JsValue> {
     serde_json::to_string(csa).map_err(to_js_err)

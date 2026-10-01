@@ -92,6 +92,41 @@ pub enum ImDecayProfile {
 }
 
 impl ImDecayProfile {
+    /// Linear decay to zero at `maturity_years`: `factor(t) = max(1 − t/T, 0)`.
+    ///
+    /// # Arguments
+    ///
+    /// * `maturity_years` - Portfolio maturity `T` in years; must be positive
+    ///   and finite.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if `maturity_years` is non-positive or
+    /// non-finite.
+    pub fn linear_to_maturity(maturity_years: f64) -> finstack_quant_core::Result<Self> {
+        let profile = Self::LinearToMaturity { maturity_years };
+        profile.validate()?;
+        Ok(profile)
+    }
+
+    /// Square-root decay to zero at `maturity_years`:
+    /// `factor(t) = sqrt(max(1 − t/T, 0))`.
+    ///
+    /// # Arguments
+    ///
+    /// * `maturity_years` - Portfolio maturity `T` in years; must be positive
+    ///   and finite.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if `maturity_years` is non-positive or
+    /// non-finite.
+    pub fn sqrt_time(maturity_years: f64) -> finstack_quant_core::Result<Self> {
+        let profile = Self::SqrtTime { maturity_years };
+        profile.validate()?;
+        Ok(profile)
+    }
+
     /// Decay factor at time `t` (years). Always in `[0, 1]` for `t ≥ 0`.
     ///
     /// # References
@@ -679,5 +714,25 @@ mod tests {
             r#"{"linear_to_maturity":{"maturity_years":2.0,"surprise":1}}"#
         )
         .is_err());
+    }
+
+    #[test]
+    fn decay_profile_constructors_validate_the_maturity() {
+        assert_eq!(
+            ImDecayProfile::linear_to_maturity(5.0).expect("positive maturity"),
+            ImDecayProfile::LinearToMaturity {
+                maturity_years: 5.0
+            }
+        );
+        assert_eq!(
+            ImDecayProfile::sqrt_time(4.0)
+                .expect("positive maturity")
+                .factor(3.0),
+            0.5
+        );
+        for bad in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            assert!(ImDecayProfile::linear_to_maturity(bad).is_err());
+            assert!(ImDecayProfile::sqrt_time(bad).is_err());
+        }
     }
 }

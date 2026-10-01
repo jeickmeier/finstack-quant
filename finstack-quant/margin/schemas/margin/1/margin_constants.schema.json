@@ -1,0 +1,134 @@
+{
+  "$defs": {
+    "TenorBucketYears": {
+      "additionalProperties": false,
+      "description": "SIMM tenor bucket boundaries in years (the [`tenor_buckets`] constants).",
+      "properties": {
+        "BUCKET_10Y": {
+          "description": "10 year bucket threshold.",
+          "format": "double",
+          "type": "number"
+        },
+        "BUCKET_15Y": {
+          "description": "15 year bucket threshold.",
+          "format": "double",
+          "type": "number"
+        },
+        "BUCKET_1Y": {
+          "description": "1 year bucket threshold.",
+          "format": "double",
+          "type": "number"
+        },
+        "BUCKET_20Y": {
+          "description": "20 year bucket threshold.",
+          "format": "double",
+          "type": "number"
+        },
+        "BUCKET_2Y": {
+          "description": "2 year bucket threshold.",
+          "format": "double",
+          "type": "number"
+        },
+        "BUCKET_3M": {
+          "description": "3 month bucket threshold.",
+          "format": "double",
+          "type": "number"
+        },
+        "BUCKET_3Y": {
+          "description": "3 year bucket threshold.",
+          "format": "double",
+          "type": "number"
+        },
+        "BUCKET_5Y": {
+          "description": "5 year bucket threshold.",
+          "format": "double",
+          "type": "number"
+        },
+        "BUCKET_6M": {
+          "description": "6 month bucket threshold.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "BUCKET_3M",
+        "BUCKET_6M",
+        "BUCKET_1Y",
+        "BUCKET_2Y",
+        "BUCKET_3Y",
+        "BUCKET_5Y",
+        "BUCKET_10Y",
+        "BUCKET_15Y",
+        "BUCKET_20Y"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/margin/1/margin_constants.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Margin constants a host needs to interpret inputs and results.",
+  "properties": {
+    "BCBS_IOSCO_SCHEDULE_ID": {
+      "description": "Registry id of the BCBS-IOSCO regulatory IM schedule.",
+      "type": "string"
+    },
+    "CALENDAR_DAYS_PER_YEAR": {
+      "description": "[`CALENDAR_DAYS_PER_YEAR`]: days per year for ACT/365 Fixed year fractions.",
+      "format": "double",
+      "type": "number"
+    },
+    "DURATION_APPROXIMATION_FACTOR": {
+      "description": "[`DURATION_APPROXIMATION_FACTOR`]: modified duration per year to maturity.",
+      "format": "double",
+      "type": "number"
+    },
+    "HAIRCUT_MPOR_DAYS": {
+      "description": "Margin period of risk, in business days, stamped on haircut-based IM results.",
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "ONE_BP": {
+      "description": "[`ONE_BP`]: one basis point as a decimal.",
+      "format": "double",
+      "type": "number"
+    },
+    "SIMM_COMMODITY_BUCKET_COUNT": {
+      "description": "Number of SIMM commodity buckets.",
+      "format": "uint8",
+      "maximum": 255,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "SIMM_TENORS": {
+      "description": "SIMM tenor bucket labels accepted by the sensitivity containers, shortest first.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "STANDARD_CDS_MATURITY_YEARS": {
+      "description": "[`STANDARD_CDS_MATURITY_YEARS`]: CDS tenor used for SIMM bucketing, in years.",
+      "format": "double",
+      "type": "number"
+    },
+    "tenor_buckets": {
+      "$ref": "#/$defs/TenorBucketYears",
+      "description": "SIMM tenor bucket boundaries in years, keyed by the [`tenor_buckets`] constant names."
+    }
+  },
+  "required": [
+    "CALENDAR_DAYS_PER_YEAR",
+    "DURATION_APPROXIMATION_FACTOR",
+    "ONE_BP",
+    "STANDARD_CDS_MATURITY_YEARS",
+    "tenor_buckets",
+    "BCBS_IOSCO_SCHEDULE_ID",
+    "HAIRCUT_MPOR_DAYS",
+    "SIMM_TENORS",
+    "SIMM_COMMODITY_BUCKET_COUNT"
+  ],
+  "title": "MarginConstants",
+  "type": "object"
+}

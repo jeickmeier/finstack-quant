@@ -12,7 +12,7 @@
   },
   "analytics.Performance": {
     "kind": "class",
-    "statics": ["fromReturns"],
+    "statics": ["fromArrays", "fromJson", "fromReturns", "fromReturnsArrays"],
     "methods": [
       "activeDates",
       "activeDatesForTicker",
@@ -77,6 +77,7 @@
       "summary",
       "tailRatio",
       "tickerNames",
+      "toJson",
       "trackingError",
       "treynor",
       "ulcerIndex",
@@ -184,16 +185,51 @@
   "calibration": {
     "kind": "namespace",
     "keys": [
+      "bootstrapHullWhiteSigmaScheduleToCapFloors",
       "calibrate",
       "calibrateBermudanLmmBaseVol",
+      "calibrateHullWhiteToCapFloors",
+      "calibrateHullWhiteToSwaptions",
       "calibrationEnvelopeContentHash",
       "calibrationResultContentHash",
+      "calibrationResultResiduals",
+      "calibrationResultStepReport",
+      "calibrationResultStepReportJson",
+      "calibrationStepBaseCorrelation",
+      "calibrationStepCapFloorHullWhite",
+      "calibrationStepDiscount",
+      "calibrationStepForward",
+      "calibrationStepHazard",
+      "calibrationStepHullWhite",
+      "calibrationStepInflation",
+      "calibrationStepParametric",
+      "calibrationStepStudentT",
+      "calibrationStepSviSurface",
+      "calibrationStepSwaptionVol",
+      "calibrationStepVolSurface",
+      "calibrationStepXccyBasis",
+      "cdsQuoteParSpread",
+      "cdsQuoteUpfront",
       "dryRun",
       "dryRunJson",
-      "validateCalibrationJson"
+      "hullWhiteParamsSigmaAt",
+      "rateBoundsEmergingMarkets",
+      "rateBoundsForCurrency",
+      "rateQuoteDeposit",
+      "rateQuoteFra",
+      "rateQuoteFutures",
+      "rateQuoteSwap",
+      "validateCalibration",
+      "validateCalibrationJson",
+      "volQuoteCapFloorVol",
+      "volQuoteOptionVol",
+      "volQuoteSwaptionVol"
     ]
   },
   "calibration.calibrate": {
+    "kind": "function"
+  },
+  "calibration.validateCalibration": {
     "kind": "function"
   },
   "calibration.validateCalibrationJson": {
@@ -212,6 +248,99 @@
     "kind": "function"
   },
   "calibration.calibrationResultContentHash": {
+    "kind": "function"
+  },
+  "calibration.calibrationResultStepReport": {
+    "kind": "function"
+  },
+  "calibration.calibrationResultStepReportJson": {
+    "kind": "function"
+  },
+  "calibration.calibrationResultResiduals": {
+    "kind": "function"
+  },
+  "calibration.rateQuoteDeposit": {
+    "kind": "function"
+  },
+  "calibration.rateQuoteFra": {
+    "kind": "function"
+  },
+  "calibration.rateQuoteFutures": {
+    "kind": "function"
+  },
+  "calibration.rateQuoteSwap": {
+    "kind": "function"
+  },
+  "calibration.cdsQuoteParSpread": {
+    "kind": "function"
+  },
+  "calibration.cdsQuoteUpfront": {
+    "kind": "function"
+  },
+  "calibration.volQuoteOptionVol": {
+    "kind": "function"
+  },
+  "calibration.volQuoteSwaptionVol": {
+    "kind": "function"
+  },
+  "calibration.volQuoteCapFloorVol": {
+    "kind": "function"
+  },
+  "calibration.rateBoundsForCurrency": {
+    "kind": "function"
+  },
+  "calibration.rateBoundsEmergingMarkets": {
+    "kind": "function"
+  },
+  "calibration.calibrationStepDiscount": {
+    "kind": "function"
+  },
+  "calibration.calibrationStepForward": {
+    "kind": "function"
+  },
+  "calibration.calibrationStepHazard": {
+    "kind": "function"
+  },
+  "calibration.calibrationStepInflation": {
+    "kind": "function"
+  },
+  "calibration.calibrationStepVolSurface": {
+    "kind": "function"
+  },
+  "calibration.calibrationStepSwaptionVol": {
+    "kind": "function"
+  },
+  "calibration.calibrationStepBaseCorrelation": {
+    "kind": "function"
+  },
+  "calibration.calibrationStepStudentT": {
+    "kind": "function"
+  },
+  "calibration.calibrationStepHullWhite": {
+    "kind": "function"
+  },
+  "calibration.calibrationStepCapFloorHullWhite": {
+    "kind": "function"
+  },
+  "calibration.calibrationStepSviSurface": {
+    "kind": "function"
+  },
+  "calibration.calibrationStepXccyBasis": {
+    "kind": "function"
+  },
+  "calibration.calibrationStepParametric": {
+    "kind": "function"
+  },
+  "calibration.calibrateHullWhiteToSwaptions": {
+    "kind": "function"
+  },
+  "calibration.calibrateHullWhiteToCapFloors": {
+    "kind": "function"
+  },
+  "calibration.bootstrapHullWhiteSigmaScheduleToCapFloors": {
+    "kind": "function"
+  },
+  "calibration.hullWhiteParamsSigmaAt": {
     "kind": "function"
   },
   "cashflows": {
@@ -1137,13 +1266,21 @@
   "features": {
     "kind": "namespace",
     "keys": [
+      "crossSectionalOpParamKeys",
+      "crossSectionalOpValues",
       "neutralize",
       "neutralizeAndZscore",
+      "pairwiseOpParamKeys",
+      "pairwiseOpValues",
+      "panelTransformResultGetColumn",
       "rankToWeights",
       "riskScaledWeights",
       "rollingRegressionResidual",
+      "timeSeriesOpParamKeys",
+      "timeSeriesOpValues",
       "transformCrossSectional",
       "transformCrossSectionalGrouped",
+      "transformPanel",
       "transformPanelJson",
       "transformTimeseries",
       "transformTimeseriesPairwise"
@@ -1179,14 +1316,125 @@
   "features.transformPanelJson": {
     "kind": "function"
   },
+  "features.transformPanel": {
+    "kind": "function"
+  },
+  "features.panelTransformResultGetColumn": {
+    "kind": "function"
+  },
+  "features.timeSeriesOpValues": {
+    "kind": "function"
+  },
+  "features.timeSeriesOpParamKeys": {
+    "kind": "function"
+  },
+  "features.crossSectionalOpValues": {
+    "kind": "function"
+  },
+  "features.crossSectionalOpParamKeys": {
+    "kind": "function"
+  },
+  "features.pairwiseOpValues": {
+    "kind": "function"
+  },
+  "features.pairwiseOpParamKeys": {
+    "kind": "function"
+  },
   "margin": {
     "kind": "namespace",
     "keys": [
+      "FrtbSbaEngine",
+      "FrtbSensitivities",
+      "HaircutImCalculator",
+      "SaCcrEngine",
+      "ScheduleImCalculator",
+      "SimmCalculator",
+      "SimmSensitivities",
+      "VmCalculator",
       "calculateVm",
+      "clearingStatusBilateral",
+      "clearingStatusCleared",
+      "collateralAssetClassAgencyBonds",
+      "collateralAssetClassCash",
+      "collateralAssetClassCorporateBonds",
+      "collateralAssetClassCoveredBonds",
+      "collateralAssetClassEquity",
+      "collateralAssetClassFromStr",
+      "collateralAssetClassFxAddon",
+      "collateralAssetClassGold",
+      "collateralAssetClassGovernmentBonds",
+      "collateralAssetClassMutualFunds",
+      "collateralAssetClassStandardHaircut",
       "computeBilateralXva",
+      "computeMva",
+      "constants",
       "csaEurRegulatoryJson",
+      "csaSpecApplyImTerms",
+      "csaSpecEurRegulatory",
+      "csaSpecRegulatory",
+      "csaSpecUsdRegulatory",
+      "csaSpecValidate",
+      "csaSpecWithIm",
+      "csaSpecWithVmThreshold",
       "csaUsdRegulatoryJson",
-      "validateCsaJson"
+      "eligibleCollateralScheduleBcbsStandard",
+      "eligibleCollateralScheduleCashOnly",
+      "eligibleCollateralScheduleCheckConcentrationLimits",
+      "eligibleCollateralScheduleHaircutFor",
+      "eligibleCollateralScheduleHaircutForMaturity",
+      "eligibleCollateralScheduleIsEligible",
+      "eligibleCollateralScheduleUsTreasuries",
+      "excessCollateral",
+      "excessCollateralExcessPercentage",
+      "excessCollateralHasExcess",
+      "excessCollateralHasShortfall",
+      "exposureProfileValidate",
+      "frtbSbaCharge",
+      "fundingConfigEffectiveBenefitBp",
+      "fundingConfigEffectiveMarginSpreadBp",
+      "haircut01",
+      "haircut01HaircutBp",
+      "imDecayProfileConstant",
+      "imDecayProfileFactor",
+      "imDecayProfileLinearToMaturity",
+      "imDecayProfileSqrtTime",
+      "imMethodologyClearingHouse",
+      "imMethodologyFromStr",
+      "imMethodologyHaircut",
+      "imMethodologyInternalModel",
+      "imMethodologySchedule",
+      "imMethodologySimm",
+      "imProfileFromSimm",
+      "imProfileValidate",
+      "imResultBreakdownAmount",
+      "imResultBreakdownKeys",
+      "marginCallTypeFromStr",
+      "marginCallTypeInitialMargin",
+      "marginCallTypeSubstitution",
+      "marginCallTypeTopUp",
+      "marginCallTypeVariationMarginCollect",
+      "marginCallTypeVariationMarginPost",
+      "marginFundingCost",
+      "marginFundingCostCostForPeriod",
+      "marginFundingCostSpread",
+      "marginTenorDaily",
+      "marginTenorFromStr",
+      "marginTenorMonthly",
+      "marginTenorOnDemand",
+      "marginTenorWeekly",
+      "marginUtilization",
+      "marginUtilizationIsAdequate",
+      "marginUtilizationRatio",
+      "marginUtilizationShortfall",
+      "nettingSetIdBilateral",
+      "nettingSetIdCleared",
+      "saCcrNettingSetConfigMargined",
+      "saCcrNettingSetConfigUnmargined",
+      "saCcrNettingSetConfigValidate",
+      "saccrEad",
+      "validateCsaJson",
+      "vmResultNetMargin",
+      "vmResultRequiresCall"
     ]
   },
   "margin.csaUsdRegulatoryJson": {
@@ -1202,6 +1450,358 @@
     "kind": "function"
   },
   "margin.computeBilateralXva": {
+    "kind": "function"
+  },
+  "margin.FrtbSbaEngine": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["calculate", "free"],
+    "getters": ["riskClasses", "scenarios"]
+  },
+  "margin.FrtbSensitivities": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": [
+      "addCommodityCurvature",
+      "addCommodityDelta",
+      "addCommodityVega",
+      "addCsrNonsecCurvature",
+      "addCsrNonsecDelta",
+      "addCsrNonsecVega",
+      "addCsrSecCtpCurvature",
+      "addCsrSecCtpDelta",
+      "addCsrSecCtpVega",
+      "addCsrSecNonctpCurvature",
+      "addCsrSecNonctpDelta",
+      "addCsrSecNonctpVega",
+      "addDrcPosition",
+      "addEquityCurvature",
+      "addEquityDelta",
+      "addEquityRepoDelta",
+      "addEquityVega",
+      "addFxCurvature",
+      "addFxDelta",
+      "addFxVega",
+      "addGirrCurvature",
+      "addGirrDelta",
+      "addGirrInflationDelta",
+      "addGirrVega",
+      "addGirrXccyBasisDelta",
+      "addRraoPosition",
+      "free",
+      "toJson",
+      "validate"
+    ],
+    "getters": ["baseCurrency"]
+  },
+  "margin.HaircutImCalculator": {
+    "kind": "class",
+    "statics": ["bcbsStandard", "fromSchedule", "usTreasuries"],
+    "methods": [
+      "calculateForCollateral",
+      "free",
+      "haircutFor",
+      "withCollateralTerms",
+      "withDefaultAssetClass",
+      "withPostedCollateralCurrency"
+    ],
+    "getters": ["defaultAssetClass", "eligibleCollateral", "mporDays", "postedCollateralCurrency"]
+  },
+  "margin.SaCcrEngine": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["calculateEad", "free"],
+    "getters": ["alpha"]
+  },
+  "margin.ScheduleImCalculator": {
+    "kind": "class",
+    "statics": ["bcbsStandard", "fromRegistryId"],
+    "methods": [
+      "calculateForNotional",
+      "calculateNettingSetWithNgr",
+      "free",
+      "rate",
+      "withAssetClass",
+      "withMaturity"
+    ],
+    "getters": ["defaultAssetClass", "defaultMaturityYears", "mporDays"]
+  },
+  "margin.SimmCalculator": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["calculateFromSensitivities", "free"],
+    "getters": ["mporDays", "version"]
+  },
+  "margin.SimmSensitivities": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": [
+      "addCommodityDelta",
+      "addCommodityVega",
+      "addCreditNonQualifyingDelta",
+      "addCreditNonQualifyingVega",
+      "addCreditQualifyingDelta",
+      "addCreditQualifyingVega",
+      "addCurvature",
+      "addEquityDelta",
+      "addEquityVega",
+      "addFxDelta",
+      "addFxVega",
+      "addIrDelta",
+      "addIrVega",
+      "free",
+      "isEmpty",
+      "merge",
+      "scaled",
+      "scaledToCurrency",
+      "toJson",
+      "totalEquityDelta",
+      "totalIrDelta",
+      "validate"
+    ],
+    "getters": ["baseCurrency"]
+  },
+  "margin.VmCalculator": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["calculate", "free", "generateMarginCalls", "marginCallDates"],
+    "getters": ["csa"]
+  },
+  "margin.constants": {
+    "kind": "function"
+  },
+  "margin.computeMva": {
+    "kind": "function"
+  },
+  "margin.clearingStatusBilateral": {
+    "kind": "function"
+  },
+  "margin.clearingStatusCleared": {
+    "kind": "function"
+  },
+  "margin.collateralAssetClassAgencyBonds": {
+    "kind": "function"
+  },
+  "margin.collateralAssetClassCash": {
+    "kind": "function"
+  },
+  "margin.collateralAssetClassCorporateBonds": {
+    "kind": "function"
+  },
+  "margin.collateralAssetClassCoveredBonds": {
+    "kind": "function"
+  },
+  "margin.collateralAssetClassEquity": {
+    "kind": "function"
+  },
+  "margin.collateralAssetClassFromStr": {
+    "kind": "function"
+  },
+  "margin.collateralAssetClassFxAddon": {
+    "kind": "function"
+  },
+  "margin.collateralAssetClassGold": {
+    "kind": "function"
+  },
+  "margin.collateralAssetClassGovernmentBonds": {
+    "kind": "function"
+  },
+  "margin.collateralAssetClassMutualFunds": {
+    "kind": "function"
+  },
+  "margin.collateralAssetClassStandardHaircut": {
+    "kind": "function"
+  },
+  "margin.csaSpecApplyImTerms": {
+    "kind": "function"
+  },
+  "margin.csaSpecEurRegulatory": {
+    "kind": "function"
+  },
+  "margin.csaSpecRegulatory": {
+    "kind": "function"
+  },
+  "margin.csaSpecUsdRegulatory": {
+    "kind": "function"
+  },
+  "margin.csaSpecValidate": {
+    "kind": "function"
+  },
+  "margin.csaSpecWithIm": {
+    "kind": "function"
+  },
+  "margin.csaSpecWithVmThreshold": {
+    "kind": "function"
+  },
+  "margin.eligibleCollateralScheduleBcbsStandard": {
+    "kind": "function"
+  },
+  "margin.eligibleCollateralScheduleCashOnly": {
+    "kind": "function"
+  },
+  "margin.eligibleCollateralScheduleCheckConcentrationLimits": {
+    "kind": "function"
+  },
+  "margin.eligibleCollateralScheduleHaircutFor": {
+    "kind": "function"
+  },
+  "margin.eligibleCollateralScheduleHaircutForMaturity": {
+    "kind": "function"
+  },
+  "margin.eligibleCollateralScheduleIsEligible": {
+    "kind": "function"
+  },
+  "margin.eligibleCollateralScheduleUsTreasuries": {
+    "kind": "function"
+  },
+  "margin.excessCollateral": {
+    "kind": "function"
+  },
+  "margin.excessCollateralExcessPercentage": {
+    "kind": "function"
+  },
+  "margin.excessCollateralHasExcess": {
+    "kind": "function"
+  },
+  "margin.excessCollateralHasShortfall": {
+    "kind": "function"
+  },
+  "margin.exposureProfileValidate": {
+    "kind": "function"
+  },
+  "margin.frtbSbaCharge": {
+    "kind": "function"
+  },
+  "margin.fundingConfigEffectiveBenefitBp": {
+    "kind": "function"
+  },
+  "margin.fundingConfigEffectiveMarginSpreadBp": {
+    "kind": "function"
+  },
+  "margin.haircut01": {
+    "kind": "function"
+  },
+  "margin.haircut01HaircutBp": {
+    "kind": "function"
+  },
+  "margin.imDecayProfileConstant": {
+    "kind": "function"
+  },
+  "margin.imDecayProfileFactor": {
+    "kind": "function"
+  },
+  "margin.imDecayProfileLinearToMaturity": {
+    "kind": "function"
+  },
+  "margin.imDecayProfileSqrtTime": {
+    "kind": "function"
+  },
+  "margin.imMethodologyClearingHouse": {
+    "kind": "function"
+  },
+  "margin.imMethodologyFromStr": {
+    "kind": "function"
+  },
+  "margin.imMethodologyHaircut": {
+    "kind": "function"
+  },
+  "margin.imMethodologyInternalModel": {
+    "kind": "function"
+  },
+  "margin.imMethodologySchedule": {
+    "kind": "function"
+  },
+  "margin.imMethodologySimm": {
+    "kind": "function"
+  },
+  "margin.imProfileFromSimm": {
+    "kind": "function"
+  },
+  "margin.imProfileValidate": {
+    "kind": "function"
+  },
+  "margin.imResultBreakdownAmount": {
+    "kind": "function"
+  },
+  "margin.imResultBreakdownKeys": {
+    "kind": "function"
+  },
+  "margin.marginCallTypeFromStr": {
+    "kind": "function"
+  },
+  "margin.marginCallTypeInitialMargin": {
+    "kind": "function"
+  },
+  "margin.marginCallTypeSubstitution": {
+    "kind": "function"
+  },
+  "margin.marginCallTypeTopUp": {
+    "kind": "function"
+  },
+  "margin.marginCallTypeVariationMarginCollect": {
+    "kind": "function"
+  },
+  "margin.marginCallTypeVariationMarginPost": {
+    "kind": "function"
+  },
+  "margin.marginFundingCost": {
+    "kind": "function"
+  },
+  "margin.marginFundingCostCostForPeriod": {
+    "kind": "function"
+  },
+  "margin.marginFundingCostSpread": {
+    "kind": "function"
+  },
+  "margin.marginTenorDaily": {
+    "kind": "function"
+  },
+  "margin.marginTenorFromStr": {
+    "kind": "function"
+  },
+  "margin.marginTenorMonthly": {
+    "kind": "function"
+  },
+  "margin.marginTenorOnDemand": {
+    "kind": "function"
+  },
+  "margin.marginTenorWeekly": {
+    "kind": "function"
+  },
+  "margin.marginUtilization": {
+    "kind": "function"
+  },
+  "margin.marginUtilizationIsAdequate": {
+    "kind": "function"
+  },
+  "margin.marginUtilizationRatio": {
+    "kind": "function"
+  },
+  "margin.marginUtilizationShortfall": {
+    "kind": "function"
+  },
+  "margin.nettingSetIdBilateral": {
+    "kind": "function"
+  },
+  "margin.nettingSetIdCleared": {
+    "kind": "function"
+  },
+  "margin.saCcrNettingSetConfigMargined": {
+    "kind": "function"
+  },
+  "margin.saCcrNettingSetConfigUnmargined": {
+    "kind": "function"
+  },
+  "margin.saCcrNettingSetConfigValidate": {
+    "kind": "function"
+  },
+  "margin.saccrEad": {
+    "kind": "function"
+  },
+  "margin.vmResultNetMargin": {
+    "kind": "function"
+  },
+  "margin.vmResultRequiresCall": {
     "kind": "function"
   },
   "models": {
@@ -2503,11 +3103,60 @@
       "buildScenarioSpec",
       "buildTemplateComponent",
       "composeScenarios",
+      "compoundingAnnual",
+      "compoundingContinuous",
+      "compoundingMonthly",
+      "compoundingQuarterly",
+      "compoundingSemiAnnual",
+      "compoundingSimple",
       "computeHorizonReturn",
+      "curveKindCommodity",
+      "curveKindDiscount",
+      "curveKindForward",
+      "curveKindInflation",
+      "curveKindParCds",
+      "horizonResultExplainText",
+      "horizonResultFactorContribution",
       "listBuiltinTemplateMetadata",
       "listBuiltinTemplates",
       "listTemplateComponents",
+      "operationSpecAssetCorrelationPts",
+      "operationSpecBaseCorrBucketPts",
+      "operationSpecBaseCorrParallelPts",
+      "operationSpecCurveNodeBp",
+      "operationSpecCurveParallelBp",
+      "operationSpecEquityPricePct",
+      "operationSpecHierarchyBaseCorrParallelPts",
+      "operationSpecHierarchyCurveParallelBp",
+      "operationSpecHierarchyEquityPricePct",
+      "operationSpecHierarchyVolSurfaceParallelPct",
+      "operationSpecInstrumentPricePctByAttr",
+      "operationSpecInstrumentPricePctByType",
+      "operationSpecInstrumentSpreadBpByAttr",
+      "operationSpecInstrumentSpreadBpByType",
+      "operationSpecMarketFxPct",
+      "operationSpecMutatesInstruments",
+      "operationSpecPrepayDefaultCorrelationPts",
+      "operationSpecRateBinding",
+      "operationSpecRequiresInstruments",
+      "operationSpecStmtForecastAssign",
+      "operationSpecStmtForecastPercent",
+      "operationSpecTimeRollForward",
+      "operationSpecValidate",
+      "operationSpecVolIndexNodePts",
+      "operationSpecVolIndexParallelPts",
+      "operationSpecVolSurfaceBucketPct",
+      "operationSpecVolSurfaceParallelPct",
       "parseScenarioSpec",
+      "rateBindingSpecValidate",
+      "scenarioSpecMutatesInstruments",
+      "scenarioSpecRequiresInstruments",
+      "scenarioSpecWithHazardBumpMode",
+      "tenorMatchModeExact",
+      "tenorMatchModeInterpolate",
+      "timeRollModeApproximate",
+      "timeRollModeBusinessDays",
+      "timeRollModeCalendarDays",
       "validateScenarioSpec"
     ]
   },
@@ -2545,6 +3194,153 @@
     "kind": "function"
   },
   "scenarios.computeHorizonReturn": {
+    "kind": "function"
+  },
+  "scenarios.operationSpecMarketFxPct": {
+    "kind": "function"
+  },
+  "scenarios.operationSpecEquityPricePct": {
+    "kind": "function"
+  },
+  "scenarios.operationSpecInstrumentPricePctByAttr": {
+    "kind": "function"
+  },
+  "scenarios.operationSpecCurveParallelBp": {
+    "kind": "function"
+  },
+  "scenarios.operationSpecCurveNodeBp": {
+    "kind": "function"
+  },
+  "scenarios.operationSpecVolIndexParallelPts": {
+    "kind": "function"
+  },
+  "scenarios.operationSpecVolIndexNodePts": {
+    "kind": "function"
+  },
+  "scenarios.operationSpecBaseCorrParallelPts": {
+    "kind": "function"
+  },
+  "scenarios.operationSpecBaseCorrBucketPts": {
+    "kind": "function"
+  },
+  "scenarios.operationSpecVolSurfaceParallelPct": {
+    "kind": "function"
+  },
+  "scenarios.operationSpecVolSurfaceBucketPct": {
+    "kind": "function"
+  },
+  "scenarios.operationSpecStmtForecastPercent": {
+    "kind": "function"
+  },
+  "scenarios.operationSpecStmtForecastAssign": {
+    "kind": "function"
+  },
+  "scenarios.operationSpecRateBinding": {
+    "kind": "function"
+  },
+  "scenarios.operationSpecInstrumentSpreadBpByAttr": {
+    "kind": "function"
+  },
+  "scenarios.operationSpecInstrumentPricePctByType": {
+    "kind": "function"
+  },
+  "scenarios.operationSpecInstrumentSpreadBpByType": {
+    "kind": "function"
+  },
+  "scenarios.operationSpecAssetCorrelationPts": {
+    "kind": "function"
+  },
+  "scenarios.operationSpecPrepayDefaultCorrelationPts": {
+    "kind": "function"
+  },
+  "scenarios.operationSpecHierarchyCurveParallelBp": {
+    "kind": "function"
+  },
+  "scenarios.operationSpecHierarchyVolSurfaceParallelPct": {
+    "kind": "function"
+  },
+  "scenarios.operationSpecHierarchyEquityPricePct": {
+    "kind": "function"
+  },
+  "scenarios.operationSpecHierarchyBaseCorrParallelPts": {
+    "kind": "function"
+  },
+  "scenarios.operationSpecTimeRollForward": {
+    "kind": "function"
+  },
+  "scenarios.operationSpecValidate": {
+    "kind": "function"
+  },
+  "scenarios.operationSpecRequiresInstruments": {
+    "kind": "function"
+  },
+  "scenarios.operationSpecMutatesInstruments": {
+    "kind": "function"
+  },
+  "scenarios.curveKindDiscount": {
+    "kind": "function"
+  },
+  "scenarios.curveKindForward": {
+    "kind": "function"
+  },
+  "scenarios.curveKindParCds": {
+    "kind": "function"
+  },
+  "scenarios.curveKindInflation": {
+    "kind": "function"
+  },
+  "scenarios.curveKindCommodity": {
+    "kind": "function"
+  },
+  "scenarios.tenorMatchModeExact": {
+    "kind": "function"
+  },
+  "scenarios.tenorMatchModeInterpolate": {
+    "kind": "function"
+  },
+  "scenarios.timeRollModeBusinessDays": {
+    "kind": "function"
+  },
+  "scenarios.timeRollModeCalendarDays": {
+    "kind": "function"
+  },
+  "scenarios.timeRollModeApproximate": {
+    "kind": "function"
+  },
+  "scenarios.compoundingSimple": {
+    "kind": "function"
+  },
+  "scenarios.compoundingContinuous": {
+    "kind": "function"
+  },
+  "scenarios.compoundingAnnual": {
+    "kind": "function"
+  },
+  "scenarios.compoundingSemiAnnual": {
+    "kind": "function"
+  },
+  "scenarios.compoundingQuarterly": {
+    "kind": "function"
+  },
+  "scenarios.compoundingMonthly": {
+    "kind": "function"
+  },
+  "scenarios.rateBindingSpecValidate": {
+    "kind": "function"
+  },
+  "scenarios.scenarioSpecRequiresInstruments": {
+    "kind": "function"
+  },
+  "scenarios.scenarioSpecMutatesInstruments": {
+    "kind": "function"
+  },
+  "scenarios.scenarioSpecWithHazardBumpMode": {
+    "kind": "function"
+  },
+  "scenarios.horizonResultExplainText": {
+    "kind": "function"
+  },
+  "scenarios.horizonResultFactorContribution": {
     "kind": "function"
   },
   "statements": {

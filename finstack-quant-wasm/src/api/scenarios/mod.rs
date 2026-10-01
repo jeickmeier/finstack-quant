@@ -9,6 +9,10 @@ use crate::utils::input::{
 use crate::utils::{parse_iso_date, to_js_err};
 use wasm_bindgen::prelude::*;
 
+pub mod kinds;
+pub mod operation_spec;
+pub mod results;
+
 /// Process-wide builtin template registry, parsed once by the scenarios crate.
 fn builtin_registry() -> Result<&'static finstack_quant_scenarios::TemplateRegistry, JsValue> {
     finstack_quant_scenarios::TemplateRegistry::embedded_builtins().map_err(to_js_err)

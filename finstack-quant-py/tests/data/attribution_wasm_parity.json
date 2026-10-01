@@ -1,0 +1,47 @@
+{
+  "_doc": "Python output of attribute_return_contribution and the ReturnContributionResult property names; asserted by tests/test_attribution_wasm_parity.py and finstack-quant-wasm/tests/facade/attribution_parity.test.mjs.",
+  "spec": {
+    "as_of": "2026-01-02",
+    "positions": [
+      {
+        "id": "A",
+        "market_value": 100.0,
+        "return": 0.02
+      },
+      {
+        "id": "B",
+        "market_value": 300.0,
+        "return": -0.01
+      }
+    ]
+  },
+  "result": {
+    "portfolio_return": -0.0024999999999999996,
+    "instrument_contribution": [
+      {
+        "id": "A",
+        "weight": 0.25,
+        "return": 0.02,
+        "contribution": 0.005
+      },
+      {
+        "id": "B",
+        "weight": 0.75,
+        "return": -0.01,
+        "contribution": -0.0075
+      }
+    ],
+    "group_contribution": {},
+    "factor_contribution": [],
+    "benchmark_relative": null
+  },
+  "properties": [
+    "benchmark_relative",
+    "factor_contribution",
+    "group_contribution",
+    "instrument_contribution",
+    "portfolio_return",
+    "specific_return",
+    "warnings"
+  ]
+}

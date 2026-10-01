@@ -1,0 +1,1824 @@
+{
+  "collateral_asset_class": {
+    "fx_addon": {
+      "agency_bonds": 0.08,
+      "cash": 0.08,
+      "corporate_bonds": 0.08,
+      "covered_bonds": 0.08,
+      "equity": 0.08,
+      "gold": 0.08,
+      "government_bonds": 0.08,
+      "mutual_funds": 0.08
+    },
+    "standard_haircut": {
+      "agency_bonds": 0.03,
+      "cash": 0.0,
+      "corporate_bonds": 0.05,
+      "covered_bonds": 0.04,
+      "equity": 0.15,
+      "gold": 0.15,
+      "government_bonds": 0.02,
+      "mutual_funds": 0.15
+    }
+  },
+  "constants": {
+    "BCBS_IOSCO_SCHEDULE_ID": "bcbs_iosco",
+    "CALENDAR_DAYS_PER_YEAR": 365.0,
+    "DURATION_APPROXIMATION_FACTOR": 0.9,
+    "HAIRCUT_MPOR_DAYS": 2,
+    "ONE_BP": 0.0001,
+    "SIMM_COMMODITY_BUCKET_COUNT": 17,
+    "SIMM_TENORS": [
+      "2W",
+      "1M",
+      "3M",
+      "6M",
+      "1Y",
+      "2Y",
+      "3Y",
+      "5Y",
+      "10Y",
+      "15Y",
+      "20Y",
+      "30Y"
+    ],
+    "STANDARD_CDS_MATURITY_YEARS": 5.0,
+    "tenor_buckets": {
+      "BUCKET_10Y": 10.0,
+      "BUCKET_15Y": 15.0,
+      "BUCKET_1Y": 1.0,
+      "BUCKET_20Y": 20.0,
+      "BUCKET_2Y": 2.0,
+      "BUCKET_3M": 0.25,
+      "BUCKET_3Y": 3.0,
+      "BUCKET_5Y": 5.0,
+      "BUCKET_6M": 0.5
+    }
+  },
+  "csa": {
+    "apply_im_terms": {
+      "currency": "USD",
+      "current_collateral": 5000000.0,
+      "gross_initial_margin": 60000000.0,
+      "required_collateral": 10000000.0,
+      "segregated": true,
+      "transfer": 5000000.0
+    },
+    "eur": {
+      "base_currency": "EUR",
+      "calendar_id": "target2",
+      "call_timing": {
+        "delivery_grace_days": 0,
+        "dispute_resolution_days": 1,
+        "notification_deadline_hours": 13,
+        "response_deadline_hours": 2
+      },
+      "collateral_curve_id": "EUR-ESTR",
+      "eligible_collateral": {
+        "eligible": [
+          {
+            "asset_class": "cash",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.0
+          },
+          {
+            "asset_class": "government_bonds",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.005,
+            "maturity_constraints": {
+              "max_remaining_years": 1.0,
+              "min_remaining_years": null
+            },
+            "min_rating": "AA-"
+          },
+          {
+            "asset_class": "government_bonds",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.02,
+            "maturity_constraints": {
+              "max_remaining_years": 5.0,
+              "min_remaining_years": 1.0
+            },
+            "min_rating": "AA-"
+          },
+          {
+            "asset_class": "government_bonds",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.04,
+            "maturity_constraints": {
+              "max_remaining_years": null,
+              "min_remaining_years": 5.0
+            },
+            "min_rating": "AA-"
+          }
+        ],
+        "rehypothecation_allowed": false
+      },
+      "id": "EUR-REGULATORY-CSA",
+      "im_params": {
+        "methodology": "simm",
+        "mpor_days": 10,
+        "mta": {
+          "amount": "0",
+          "currency": "EUR"
+        },
+        "segregated": true,
+        "threshold": {
+          "amount": "50000000",
+          "currency": "EUR"
+        }
+      },
+      "vm_params": {
+        "frequency": "daily",
+        "independent_amount": {
+          "amount": "0",
+          "currency": "EUR"
+        },
+        "mta": {
+          "amount": "500000",
+          "currency": "EUR"
+        },
+        "rounding": {
+          "amount": "10000",
+          "currency": "EUR"
+        },
+        "settlement_lag": 1,
+        "threshold": {
+          "amount": "0",
+          "currency": "EUR"
+        }
+      }
+    },
+    "regulatory_gbp": {
+      "base_currency": "GBP",
+      "calendar_id": "gblo",
+      "call_timing": {
+        "delivery_grace_days": 0,
+        "dispute_resolution_days": 1,
+        "notification_deadline_hours": 13,
+        "response_deadline_hours": 2
+      },
+      "collateral_curve_id": "GBP-SONIA",
+      "eligible_collateral": {
+        "eligible": [
+          {
+            "asset_class": "cash",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.0
+          },
+          {
+            "asset_class": "government_bonds",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.005,
+            "maturity_constraints": {
+              "max_remaining_years": 1.0,
+              "min_remaining_years": null
+            },
+            "min_rating": "AA-"
+          },
+          {
+            "asset_class": "government_bonds",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.02,
+            "maturity_constraints": {
+              "max_remaining_years": 5.0,
+              "min_remaining_years": 1.0
+            },
+            "min_rating": "AA-"
+          },
+          {
+            "asset_class": "government_bonds",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.04,
+            "maturity_constraints": {
+              "max_remaining_years": null,
+              "min_remaining_years": 5.0
+            },
+            "min_rating": "AA-"
+          }
+        ],
+        "rehypothecation_allowed": false
+      },
+      "id": "GBP-CSA",
+      "im_params": {
+        "methodology": "simm",
+        "mpor_days": 10,
+        "mta": {
+          "amount": "0",
+          "currency": "GBP"
+        },
+        "segregated": true,
+        "threshold": {
+          "amount": "50000000",
+          "currency": "GBP"
+        }
+      },
+      "vm_params": {
+        "frequency": "daily",
+        "independent_amount": {
+          "amount": "0",
+          "currency": "GBP"
+        },
+        "mta": {
+          "amount": "500000",
+          "currency": "GBP"
+        },
+        "rounding": {
+          "amount": "10000",
+          "currency": "GBP"
+        },
+        "settlement_lag": 1,
+        "threshold": {
+          "amount": "0",
+          "currency": "GBP"
+        }
+      }
+    },
+    "usd": {
+      "base_currency": "USD",
+      "calendar_id": "usny",
+      "call_timing": {
+        "delivery_grace_days": 0,
+        "dispute_resolution_days": 1,
+        "notification_deadline_hours": 13,
+        "response_deadline_hours": 2
+      },
+      "collateral_curve_id": "USD-OIS",
+      "eligible_collateral": {
+        "eligible": [
+          {
+            "asset_class": "cash",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.0
+          },
+          {
+            "asset_class": "government_bonds",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.005,
+            "maturity_constraints": {
+              "max_remaining_years": 1.0,
+              "min_remaining_years": null
+            },
+            "min_rating": "AA-"
+          },
+          {
+            "asset_class": "government_bonds",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.02,
+            "maturity_constraints": {
+              "max_remaining_years": 5.0,
+              "min_remaining_years": 1.0
+            },
+            "min_rating": "AA-"
+          },
+          {
+            "asset_class": "government_bonds",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.04,
+            "maturity_constraints": {
+              "max_remaining_years": null,
+              "min_remaining_years": 5.0
+            },
+            "min_rating": "AA-"
+          }
+        ],
+        "rehypothecation_allowed": false
+      },
+      "id": "USD-REGULATORY-CSA",
+      "im_params": {
+        "methodology": "simm",
+        "mpor_days": 10,
+        "mta": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "segregated": true,
+        "threshold": {
+          "amount": "50000000",
+          "currency": "USD"
+        }
+      },
+      "vm_params": {
+        "frequency": "daily",
+        "independent_amount": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "mta": {
+          "amount": "500000",
+          "currency": "USD"
+        },
+        "rounding": {
+          "amount": "10000",
+          "currency": "USD"
+        },
+        "settlement_lag": 1,
+        "threshold": {
+          "amount": "0",
+          "currency": "USD"
+        }
+      }
+    },
+    "with_im": {
+      "base_currency": "USD",
+      "calendar_id": "usny",
+      "call_timing": {
+        "delivery_grace_days": 0,
+        "dispute_resolution_days": 1,
+        "notification_deadline_hours": 13,
+        "response_deadline_hours": 2
+      },
+      "collateral_curve_id": "USD-OIS",
+      "eligible_collateral": {
+        "eligible": [
+          {
+            "asset_class": "cash",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.0
+          },
+          {
+            "asset_class": "government_bonds",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.005,
+            "maturity_constraints": {
+              "max_remaining_years": 1.0,
+              "min_remaining_years": null
+            },
+            "min_rating": "AA-"
+          },
+          {
+            "asset_class": "government_bonds",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.02,
+            "maturity_constraints": {
+              "max_remaining_years": 5.0,
+              "min_remaining_years": 1.0
+            },
+            "min_rating": "AA-"
+          },
+          {
+            "asset_class": "government_bonds",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.04,
+            "maturity_constraints": {
+              "max_remaining_years": null,
+              "min_remaining_years": 5.0
+            },
+            "min_rating": "AA-"
+          }
+        ],
+        "rehypothecation_allowed": false
+      },
+      "id": "USD-REGULATORY-CSA",
+      "im_params": {
+        "methodology": "schedule",
+        "mpor_days": 10,
+        "mta": {
+          "amount": "500000",
+          "currency": "USD"
+        },
+        "segregated": false,
+        "threshold": {
+          "amount": "50000000",
+          "currency": "USD"
+        }
+      },
+      "vm_params": {
+        "frequency": "daily",
+        "independent_amount": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "mta": {
+          "amount": "500000",
+          "currency": "USD"
+        },
+        "rounding": {
+          "amount": "10000",
+          "currency": "USD"
+        },
+        "settlement_lag": 1,
+        "threshold": {
+          "amount": "0",
+          "currency": "USD"
+        }
+      }
+    },
+    "with_im_default_segregated": {
+      "base_currency": "USD",
+      "calendar_id": "usny",
+      "call_timing": {
+        "delivery_grace_days": 0,
+        "dispute_resolution_days": 1,
+        "notification_deadline_hours": 13,
+        "response_deadline_hours": 2
+      },
+      "collateral_curve_id": "USD-OIS",
+      "eligible_collateral": {
+        "eligible": [
+          {
+            "asset_class": "cash",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.0
+          },
+          {
+            "asset_class": "government_bonds",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.005,
+            "maturity_constraints": {
+              "max_remaining_years": 1.0,
+              "min_remaining_years": null
+            },
+            "min_rating": "AA-"
+          },
+          {
+            "asset_class": "government_bonds",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.02,
+            "maturity_constraints": {
+              "max_remaining_years": 5.0,
+              "min_remaining_years": 1.0
+            },
+            "min_rating": "AA-"
+          },
+          {
+            "asset_class": "government_bonds",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.04,
+            "maturity_constraints": {
+              "max_remaining_years": null,
+              "min_remaining_years": 5.0
+            },
+            "min_rating": "AA-"
+          }
+        ],
+        "rehypothecation_allowed": false
+      },
+      "id": "USD-REGULATORY-CSA",
+      "im_params": {
+        "methodology": "simm",
+        "mpor_days": 10,
+        "mta": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "segregated": true,
+        "threshold": {
+          "amount": "0",
+          "currency": "USD"
+        }
+      },
+      "vm_params": {
+        "frequency": "daily",
+        "independent_amount": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "mta": {
+          "amount": "500000",
+          "currency": "USD"
+        },
+        "rounding": {
+          "amount": "10000",
+          "currency": "USD"
+        },
+        "settlement_lag": 1,
+        "threshold": {
+          "amount": "0",
+          "currency": "USD"
+        }
+      }
+    },
+    "with_vm_threshold": {
+      "base_currency": "USD",
+      "calendar_id": "usny",
+      "call_timing": {
+        "delivery_grace_days": 0,
+        "dispute_resolution_days": 1,
+        "notification_deadline_hours": 13,
+        "response_deadline_hours": 2
+      },
+      "collateral_curve_id": "USD-OIS",
+      "eligible_collateral": {
+        "eligible": [
+          {
+            "asset_class": "cash",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.0
+          },
+          {
+            "asset_class": "government_bonds",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.005,
+            "maturity_constraints": {
+              "max_remaining_years": 1.0,
+              "min_remaining_years": null
+            },
+            "min_rating": "AA-"
+          },
+          {
+            "asset_class": "government_bonds",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.02,
+            "maturity_constraints": {
+              "max_remaining_years": 5.0,
+              "min_remaining_years": 1.0
+            },
+            "min_rating": "AA-"
+          },
+          {
+            "asset_class": "government_bonds",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.04,
+            "maturity_constraints": {
+              "max_remaining_years": null,
+              "min_remaining_years": 5.0
+            },
+            "min_rating": "AA-"
+          }
+        ],
+        "rehypothecation_allowed": false
+      },
+      "id": "USD-REGULATORY-CSA",
+      "im_params": {
+        "methodology": "simm",
+        "mpor_days": 10,
+        "mta": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "segregated": true,
+        "threshold": {
+          "amount": "50000000",
+          "currency": "USD"
+        }
+      },
+      "vm_params": {
+        "frequency": "daily",
+        "independent_amount": {
+          "amount": "500000",
+          "currency": "USD"
+        },
+        "mta": {
+          "amount": "250000",
+          "currency": "USD"
+        },
+        "rounding": {
+          "amount": "10000",
+          "currency": "USD"
+        },
+        "settlement_lag": 1,
+        "threshold": {
+          "amount": "1000000",
+          "currency": "USD"
+        }
+      }
+    },
+    "with_vm_threshold_defaults": {
+      "base_currency": "USD",
+      "calendar_id": "usny",
+      "call_timing": {
+        "delivery_grace_days": 0,
+        "dispute_resolution_days": 1,
+        "notification_deadline_hours": 13,
+        "response_deadline_hours": 2
+      },
+      "collateral_curve_id": "USD-OIS",
+      "eligible_collateral": {
+        "eligible": [
+          {
+            "asset_class": "cash",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.0
+          },
+          {
+            "asset_class": "government_bonds",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.005,
+            "maturity_constraints": {
+              "max_remaining_years": 1.0,
+              "min_remaining_years": null
+            },
+            "min_rating": "AA-"
+          },
+          {
+            "asset_class": "government_bonds",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.02,
+            "maturity_constraints": {
+              "max_remaining_years": 5.0,
+              "min_remaining_years": 1.0
+            },
+            "min_rating": "AA-"
+          },
+          {
+            "asset_class": "government_bonds",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.04,
+            "maturity_constraints": {
+              "max_remaining_years": null,
+              "min_remaining_years": 5.0
+            },
+            "min_rating": "AA-"
+          }
+        ],
+        "rehypothecation_allowed": false
+      },
+      "id": "USD-REGULATORY-CSA",
+      "im_params": {
+        "methodology": "simm",
+        "mpor_days": 10,
+        "mta": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "segregated": true,
+        "threshold": {
+          "amount": "50000000",
+          "currency": "USD"
+        }
+      },
+      "vm_params": {
+        "frequency": "daily",
+        "independent_amount": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "mta": {
+          "amount": "250000",
+          "currency": "USD"
+        },
+        "rounding": {
+          "amount": "10000",
+          "currency": "USD"
+        },
+        "settlement_lag": 1,
+        "threshold": {
+          "amount": "1000000",
+          "currency": "USD"
+        }
+      }
+    }
+  },
+  "frtb": {
+    "base_currency": "USD",
+    "charge": {
+      "binding_scenario": "low",
+      "curvature_by_risk_class": {},
+      "delta_by_risk_class": {
+        "commodity": 70000.0,
+        "csr_non_sec": 25000.0,
+        "csr_sec_ctp": 4800.0,
+        "csr_sec_non_ctp": 810.0,
+        "equity": 1375548.9004393846,
+        "fx": 150000.0,
+        "girr": 105011.61840482225
+      },
+      "drc": 37470.0,
+      "rrao": 12000.0,
+      "scenario_charges": {
+        "high": 1727047.5436831617,
+        "low": 1737336.1537628171,
+        "medium": 1732324.2851352124
+      },
+      "total": 1786806.1537628171,
+      "vega_by_risk_class": {
+        "commodity": 250.0,
+        "csr_non_sec": 700.0,
+        "csr_sec_ctp": 150.0,
+        "csr_sec_non_ctp": 110.0,
+        "equity": 1555.6349186104048,
+        "fx": 400.0,
+        "girr": 3000.0
+      }
+    },
+    "charge_high": {
+      "binding_scenario": "high",
+      "curvature_by_risk_class": {},
+      "delta_by_risk_class": {
+        "commodity": 70000.0,
+        "csr_non_sec": 25000.0,
+        "csr_sec_ctp": 4800.0,
+        "csr_sec_non_ctp": 810.0,
+        "equity": 1375550.0,
+        "fx": 150000.0,
+        "girr": 94721.90876455142
+      },
+      "drc": 37470.0,
+      "rrao": 12000.0,
+      "scenario_charges": {
+        "high": 1727047.5436831617
+      },
+      "total": 1776517.5436831617,
+      "vega_by_risk_class": {
+        "commodity": 250.0,
+        "csr_non_sec": 700.0,
+        "csr_sec_ctp": 150.0,
+        "csr_sec_non_ctp": 110.0,
+        "equity": 1555.6349186104048,
+        "fx": 400.0,
+        "girr": 3000.0
+      }
+    },
+    "engine": {
+      "risk_classes": [
+        "girr",
+        "fx"
+      ],
+      "scenarios": [
+        "low",
+        "high"
+      ]
+    },
+    "engine_charge": {
+      "binding_scenario": "low",
+      "curvature_by_risk_class": {},
+      "delta_by_risk_class": {
+        "fx": 150000.0,
+        "girr": 105011.61840482225
+      },
+      "drc": 37470.0,
+      "rrao": 12000.0,
+      "scenario_charges": {
+        "high": 248121.90876455142,
+        "low": 258411.61840482225
+      },
+      "total": 307881.61840482225,
+      "vega_by_risk_class": {
+        "fx": 400.0,
+        "girr": 3000.0
+      }
+    },
+    "engine_default": {
+      "risk_classes": [
+        "girr",
+        "csr_non_sec",
+        "csr_sec_ctp",
+        "csr_sec_non_ctp",
+        "equity",
+        "commodity",
+        "fx"
+      ],
+      "scenarios": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "wire": {
+      "base_currency": "USD",
+      "commodity_curvature": [
+        [
+          "WTI",
+          2,
+          -100.0,
+          -180.0
+        ]
+      ],
+      "commodity_delta": [
+        [
+          "WTI",
+          2,
+          "1Y",
+          "cushing",
+          2000.0
+        ]
+      ],
+      "commodity_vega": [
+        [
+          "WTI",
+          2,
+          "1Y",
+          250.0
+        ]
+      ],
+      "csr_nonsec_curvature": [
+        [
+          "ACME",
+          3,
+          -300.0,
+          -500.0
+        ]
+      ],
+      "csr_nonsec_delta": [
+        [
+          "ACME",
+          3,
+          "5Y",
+          "bond",
+          5000.0
+        ]
+      ],
+      "csr_nonsec_vega": [
+        [
+          "ACME",
+          3,
+          "1Y",
+          700.0
+        ]
+      ],
+      "csr_sec_ctp_curvature": [
+        [
+          "TRANCHE_A",
+          2,
+          -80.0,
+          -120.0
+        ]
+      ],
+      "csr_sec_ctp_delta": [
+        [
+          "TRANCHE_A",
+          2,
+          "5Y",
+          "cds",
+          1200.0
+        ]
+      ],
+      "csr_sec_ctp_vega": [
+        [
+          "TRANCHE_A",
+          2,
+          "1Y",
+          150.0
+        ]
+      ],
+      "csr_sec_nonctp_curvature": [
+        [
+          "RMBS_A",
+          1,
+          -60.0,
+          -90.0
+        ]
+      ],
+      "csr_sec_nonctp_delta": [
+        [
+          "RMBS_A",
+          1,
+          "5Y",
+          "bond",
+          900.0
+        ]
+      ],
+      "csr_sec_nonctp_vega": [
+        [
+          "RMBS_A",
+          1,
+          "1Y",
+          110.0
+        ]
+      ],
+      "drc_positions": [
+        {
+          "asset_type": "corporate",
+          "issuer": "ACME",
+          "jtd_amount": 1000000.0,
+          "maturity_years": 2.0,
+          "pnl_adjustment": 0.0,
+          "rating_bucket": 4,
+          "sector": "corporate",
+          "seniority": "senior_unsecured"
+        },
+        {
+          "asset_type": "corporate",
+          "issuer": "ACME",
+          "jtd_amount": -250000.0,
+          "maturity_years": 0.5,
+          "pnl_adjustment": -1000.0,
+          "rating_bucket": 4,
+          "sector": "corporate",
+          "seniority": "subordinated"
+        }
+      ],
+      "equity_curvature": [
+        [
+          "AAPL",
+          1,
+          -1000.0,
+          -2000.0
+        ]
+      ],
+      "equity_delta": [
+        [
+          "AAPL",
+          1,
+          25000.0
+        ]
+      ],
+      "equity_repo_delta": [
+        [
+          "AAPL",
+          1,
+          1000.0
+        ]
+      ],
+      "equity_vega": [
+        [
+          "AAPL",
+          1,
+          "1Y",
+          2000.0
+        ]
+      ],
+      "fx_curvature": [
+        [
+          "EUR",
+          "USD",
+          -200.0,
+          -350.0
+        ]
+      ],
+      "fx_delta": [
+        [
+          "EUR",
+          "USD",
+          10000.0
+        ]
+      ],
+      "fx_vega": [
+        [
+          "EUR",
+          "USD",
+          "1Y",
+          400.0
+        ]
+      ],
+      "girr_curvature": [
+        [
+          "USD",
+          -1500.0,
+          -2500.0
+        ]
+      ],
+      "girr_delta": [
+        [
+          "USD",
+          "5Y",
+          100000.0
+        ],
+        [
+          "EUR",
+          "10Y",
+          -40000.0
+        ]
+      ],
+      "girr_inflation_delta": [
+        [
+          "USD",
+          5000.0
+        ]
+      ],
+      "girr_vega": [
+        [
+          "USD",
+          "1Y",
+          "5Y",
+          3000.0
+        ]
+      ],
+      "girr_xccy_basis_delta": [
+        [
+          "EUR",
+          2000.0
+        ]
+      ],
+      "rrao_exotic_notionals": [
+        {
+          "instrument_id": "EXOTIC_1",
+          "is_exotic": true,
+          "notional": 1000000.0
+        },
+        {
+          "instrument_id": "GAP_1",
+          "is_exotic": false,
+          "notional": 2000000.0
+        }
+      ]
+    }
+  },
+  "haircut_im": {
+    "default_asset_class": "government_bonds",
+    "eligible_collateral": {
+      "eligible": [
+        {
+          "asset_class": "cash",
+          "fx_haircut_addon": 0.08,
+          "haircut": 0.0
+        },
+        {
+          "asset_class": "government_bonds",
+          "fx_haircut_addon": 0.08,
+          "haircut": 0.005,
+          "maturity_constraints": {
+            "max_remaining_years": 1.0,
+            "min_remaining_years": null
+          },
+          "min_rating": "AA-"
+        },
+        {
+          "asset_class": "government_bonds",
+          "fx_haircut_addon": 0.08,
+          "haircut": 0.02,
+          "maturity_constraints": {
+            "max_remaining_years": 5.0,
+            "min_remaining_years": 1.0
+          },
+          "min_rating": "AA-"
+        },
+        {
+          "asset_class": "government_bonds",
+          "fx_haircut_addon": 0.08,
+          "haircut": 0.04,
+          "maturity_constraints": {
+            "max_remaining_years": null,
+            "min_remaining_years": 5.0
+          },
+          "min_rating": "AA-"
+        }
+      ],
+      "rehypothecation_allowed": false
+    },
+    "for_collateral": {
+      "amount": {
+        "amount": "800000.00",
+        "currency": "USD"
+      },
+      "approximation": false,
+      "as_of": "2025-01-15",
+      "breakdown": {
+        "cash": {
+          "amount": "800000.00",
+          "currency": "USD"
+        }
+      },
+      "methodology": "haircut",
+      "mpor_days": 2
+    },
+    "from_schedule_haircut": 0.0,
+    "haircut_for_cash": 0.0,
+    "mpor_days": 2,
+    "posted_collateral_currency": [
+      null,
+      "EUR"
+    ],
+    "treasuries_terms_haircut": 0.015,
+    "with_default_asset_class": "government_bonds"
+  },
+  "labels": {
+    "clearing_status": [
+      true,
+      true
+    ],
+    "collateral_asset_class": [
+      "cash",
+      "government_bonds",
+      "agency_bonds",
+      "covered_bonds",
+      "corporate_bonds",
+      "equity",
+      "gold",
+      "mutual_funds",
+      "gold"
+    ],
+    "im_methodology": [
+      "haircut",
+      "simm",
+      "schedule",
+      "internal_model",
+      "clearing_house",
+      "simm"
+    ],
+    "margin_call_type": [
+      "initial_margin",
+      "variation_margin_post",
+      "variation_margin_collect",
+      "top_up",
+      "substitution",
+      "top_up"
+    ],
+    "margin_tenor": [
+      "daily",
+      "weekly",
+      "monthly",
+      "on_demand",
+      "weekly"
+    ]
+  },
+  "metrics": {
+    "excess": {
+      "excess_percentage": 0.2,
+      "has_excess": true,
+      "has_shortfall": false,
+      "wire": {
+        "collateral_value": {
+          "amount": "12000000",
+          "currency": "USD"
+        },
+        "excess": {
+          "amount": "2000000",
+          "currency": "USD"
+        },
+        "required_value": {
+          "amount": "10000000",
+          "currency": "USD"
+        }
+      }
+    },
+    "funding_cost": {
+      "cost_for_period": 50000.0,
+      "spread": 0.020000000000000004,
+      "wire": {
+        "annual_cost": {
+          "amount": "200000.00",
+          "currency": "USD"
+        },
+        "collateral_rate": 0.03,
+        "funding_rate": 0.05,
+        "margin_posted": {
+          "amount": "10000000",
+          "currency": "USD"
+        }
+      }
+    },
+    "haircut01": {
+      "haircut_bp": 200.0,
+      "wire": {
+        "collateral_value": {
+          "amount": "10000000",
+          "currency": "USD"
+        },
+        "current_haircut": 0.02,
+        "pv_change": {
+          "amount": "1000.0000",
+          "currency": "USD"
+        }
+      }
+    },
+    "utilization": {
+      "is_adequate": false,
+      "ratio": 0.8,
+      "shortfall": 2000000.0,
+      "wire": {
+        "posted": {
+          "amount": "8000000",
+          "currency": "USD"
+        },
+        "required": {
+          "amount": "10000000",
+          "currency": "USD"
+        }
+      }
+    }
+  },
+  "mva": {
+    "profile": {
+      "im_values": [
+        2541311.6629157034,
+        1905983.7471867774,
+        635327.9157289257
+      ],
+      "times": [
+        1.0,
+        2.0,
+        4.0
+      ]
+    },
+    "with_survival": {
+      "average_im": 1826567.7577206618,
+      "im_profile": [
+        [
+          1.0,
+          2541311.6629157034
+        ],
+        [
+          2.0,
+          1905983.7471867774
+        ],
+        [
+          4.0,
+          635327.9157289257
+        ]
+      ],
+      "mva": 40195.56054945817
+    },
+    "without_survival": {
+      "average_im": 1826567.7577206618,
+      "im_profile": [
+        [
+          1.0,
+          2541311.6629157034
+        ],
+        [
+          2.0,
+          1905983.7471867774
+        ],
+        [
+          4.0,
+          635327.9157289257
+        ]
+      ],
+      "mva": 41614.23718250572
+    }
+  },
+  "netting_set_id": {
+    "bilateral": {
+      "counterparty_id": "CPTY",
+      "csa_id": "CSA",
+      "kind": "bilateral"
+    },
+    "cleared": {
+      "ccp_id": "LCH",
+      "kind": "cleared"
+    }
+  },
+  "saccr": {
+    "ead_alpha": {
+      "add_on_aggregate": 19104.515179709655,
+      "add_on_by_asset_class": {
+        "interest_rate": 19104.515179709655
+      },
+      "alpha": 1.5,
+      "ead": 42156.772769564486,
+      "maturity_factor": 1.0,
+      "multiplier": 1.0,
+      "pfe": 19104.515179709655,
+      "rc": 9000.0
+    },
+    "ead_margined": {
+      "add_on_aggregate": 5731.354553912898,
+      "add_on_by_asset_class": {
+        "interest_rate": 5731.354553912898
+      },
+      "alpha": 1.4,
+      "ead": 26055.87556315323,
+      "maturity_factor": 0.30000000000000004,
+      "multiplier": 0.916646377788665,
+      "pfe": 5253.625391666827,
+      "rc": 55000.0
+    },
+    "ead_unmargined": {
+      "add_on_aggregate": 19104.515179709655,
+      "add_on_by_asset_class": {
+        "interest_rate": 19104.515179709655
+      },
+      "alpha": 1.4,
+      "ead": 39346.321251593516,
+      "maturity_factor": 1.0,
+      "multiplier": 1.0,
+      "pfe": 19104.515179709655,
+      "rc": 9000.0
+    },
+    "engine_alpha": [
+      1.4,
+      1.5
+    ],
+    "engine_ead": {
+      "add_on_aggregate": 19104.515179709655,
+      "add_on_by_asset_class": {
+        "interest_rate": 19104.515179709655
+      },
+      "alpha": 1.5,
+      "ead": 42156.772769564486,
+      "maturity_factor": 1.0,
+      "multiplier": 1.0,
+      "pfe": 19104.515179709655,
+      "rc": 9000.0
+    },
+    "margined": {
+      "as_of": "2025-01-15",
+      "collateral": 10000.0,
+      "is_margined": true,
+      "mpor_days": 10,
+      "mta": 5000.0,
+      "netting_set_id": {
+        "counterparty_id": "CPTY",
+        "csa_id": "CSA",
+        "kind": "bilateral"
+      },
+      "nica": 0.0,
+      "threshold": 50000.0
+    },
+    "trades": [
+      {
+        "asset_class": "interest_rate",
+        "direction": 1.0,
+        "end_date": "2030-01-15",
+        "hedging_set": "USD",
+        "is_option": false,
+        "mtm": 12000.0,
+        "notional": 1000000.0,
+        "option_maturity_date": null,
+        "option_type": null,
+        "start_date": "2025-01-15",
+        "supervisory_category": null,
+        "supervisory_delta": 1.0,
+        "trade_id": "t1",
+        "underlier": "USD"
+      },
+      {
+        "asset_class": "interest_rate",
+        "direction": -1.0,
+        "end_date": "2027-01-15",
+        "hedging_set": "USD",
+        "is_option": false,
+        "mtm": -3000.0,
+        "notional": 500000.0,
+        "option_maturity_date": null,
+        "option_type": null,
+        "start_date": "2025-01-15",
+        "supervisory_category": null,
+        "supervisory_delta": -1.0,
+        "trade_id": "t2",
+        "underlier": "USD"
+      }
+    ],
+    "unmargined": {
+      "as_of": "2025-01-15",
+      "collateral": 0.0,
+      "is_margined": false,
+      "mpor_days": 10,
+      "mta": 0.0,
+      "netting_set_id": {
+        "counterparty_id": "CPTY",
+        "csa_id": "CSA",
+        "kind": "bilateral"
+      },
+      "nica": 0.0,
+      "threshold": 0.0
+    }
+  },
+  "schedule": {
+    "bcbs": {
+      "eligible": [
+        {
+          "asset_class": "cash",
+          "fx_haircut_addon": 0.08,
+          "haircut": 0.0
+        },
+        {
+          "asset_class": "government_bonds",
+          "fx_haircut_addon": 0.08,
+          "haircut": 0.005,
+          "maturity_constraints": {
+            "max_remaining_years": 1.0,
+            "min_remaining_years": null
+          },
+          "min_rating": "AA-"
+        },
+        {
+          "asset_class": "government_bonds",
+          "fx_haircut_addon": 0.08,
+          "haircut": 0.02,
+          "maturity_constraints": {
+            "max_remaining_years": 5.0,
+            "min_remaining_years": 1.0
+          },
+          "min_rating": "AA-"
+        },
+        {
+          "asset_class": "government_bonds",
+          "fx_haircut_addon": 0.08,
+          "haircut": 0.04,
+          "maturity_constraints": {
+            "max_remaining_years": null,
+            "min_remaining_years": 5.0
+          },
+          "min_rating": "AA-"
+        }
+      ],
+      "rehypothecation_allowed": false
+    },
+    "breaches": [
+      {
+        "asset_class": "equity",
+        "excess": 0.30000000000000004,
+        "fraction": 0.8,
+        "limit": 0.5
+      }
+    ],
+    "cash_only": {
+      "eligible": [
+        {
+          "asset_class": "cash",
+          "fx_haircut_addon": 0.08,
+          "haircut": 0.0
+        }
+      ],
+      "rehypothecation_allowed": false
+    },
+    "haircut_for": [
+      0.005,
+      null
+    ],
+    "haircut_for_maturity": [
+      0.005,
+      0.04
+    ],
+    "is_eligible": [
+      false,
+      false
+    ],
+    "limited": {
+      "eligible": [
+        {
+          "asset_class": "cash",
+          "fx_haircut_addon": 0.08,
+          "haircut": 0.0
+        },
+        {
+          "asset_class": "equity",
+          "concentration_limit": 0.5,
+          "fx_haircut_addon": 0.08,
+          "haircut": 0.15
+        }
+      ],
+      "rehypothecation_allowed": false
+    },
+    "no_breaches": [],
+    "us_treasuries": {
+      "eligible": [
+        {
+          "asset_class": "government_bonds",
+          "fx_haircut_addon": 0.0,
+          "haircut": 0.005,
+          "maturity_constraints": {
+            "max_remaining_years": 1.0,
+            "min_remaining_years": null
+          }
+        },
+        {
+          "asset_class": "government_bonds",
+          "fx_haircut_addon": 0.0,
+          "haircut": 0.01,
+          "maturity_constraints": {
+            "max_remaining_years": 5.0,
+            "min_remaining_years": 1.0
+          }
+        },
+        {
+          "asset_class": "government_bonds",
+          "fx_haircut_addon": 0.0,
+          "haircut": 0.015,
+          "maturity_constraints": {
+            "max_remaining_years": 10.0,
+            "min_remaining_years": 5.0
+          }
+        },
+        {
+          "asset_class": "government_bonds",
+          "fx_haircut_addon": 0.0,
+          "haircut": 0.02,
+          "maturity_constraints": {
+            "max_remaining_years": null,
+            "min_remaining_years": 10.0
+          }
+        }
+      ],
+      "rehypothecation_allowed": true
+    }
+  },
+  "schedule_im": {
+    "defaults": {
+      "asset_class": "interest_rate",
+      "maturity_years": 5.0,
+      "mpor_days": 10
+    },
+    "for_notional": {
+      "amount": {
+        "amount": "40000",
+        "currency": "USD"
+      },
+      "approximation": false,
+      "as_of": "2025-01-15",
+      "breakdown": {
+        "interest_rate": {
+          "amount": "40000",
+          "currency": "USD"
+        }
+      },
+      "methodology": "schedule",
+      "mpor_days": 10
+    },
+    "from_registry_rate": 0.05,
+    "ngr": {
+      "amount": {
+        "amount": "4400000",
+        "currency": "USD"
+      },
+      "approximation": false,
+      "as_of": "2025-01-15",
+      "breakdown": {
+        "credit_ngr": {
+          "amount": "2200000",
+          "currency": "USD"
+        },
+        "interest_rate_ngr": {
+          "amount": "2200000",
+          "currency": "USD"
+        }
+      },
+      "methodology": "schedule",
+      "mpor_days": 10
+    },
+    "ngr_empty": null,
+    "rate": 0.04,
+    "with_asset_class": "credit",
+    "with_maturity": 2.0
+  },
+  "simm": {
+    "base_currency": "USD",
+    "breakdown_ir_delta": 1897366.596101028,
+    "breakdown_keys": [
+      "Commodity_Delta",
+      "Commodity_Vega",
+      "Credit_NonQualifying_Delta",
+      "Credit_NonQualifying_Vega",
+      "Credit_Qualifying_Delta",
+      "Credit_Qualifying_Vega",
+      "Equity_Delta",
+      "Equity_Vega",
+      "FX_Delta",
+      "FX_Vega",
+      "IR_Delta",
+      "IR_Vega",
+      "equity_Curvature"
+    ],
+    "breakdown_missing": null,
+    "calculator": {
+      "mpor_days": 10,
+      "version": "v2_6"
+    },
+    "calculator_mpor_override": 5,
+    "eur": {
+      "base_currency": "EUR",
+      "total_ir_delta": 27000.0
+    },
+    "im": {
+      "amount": {
+        "amount": "3176639.578644629",
+        "currency": "USD"
+      },
+      "approximation": true,
+      "as_of": "2025-01-15",
+      "breakdown": {
+        "Commodity_Delta": {
+          "amount": "58000",
+          "currency": "USD"
+        },
+        "Commodity_Vega": {
+          "amount": "61.05",
+          "currency": "USD"
+        },
+        "Credit_NonQualifying_Delta": {
+          "amount": "1950000",
+          "currency": "USD"
+        },
+        "Credit_NonQualifying_Vega": {
+          "amount": "152",
+          "currency": "USD"
+        },
+        "Credit_Qualifying_Delta": {
+          "amount": "270000",
+          "currency": "USD"
+        },
+        "Credit_Qualifying_Vega": {
+          "amount": "380",
+          "currency": "USD"
+        },
+        "Equity_Delta": {
+          "amount": "500000",
+          "currency": "USD"
+        },
+        "Equity_Vega": {
+          "amount": "216",
+          "currency": "USD"
+        },
+        "FX_Delta": {
+          "amount": "37000",
+          "currency": "USD"
+        },
+        "FX_Vega": {
+          "amount": "82.08",
+          "currency": "USD"
+        },
+        "IR_Delta": {
+          "amount": "1897366.596101028",
+          "currency": "USD"
+        },
+        "IR_Vega": {
+          "amount": "920",
+          "currency": "USD"
+        },
+        "equity_Curvature": {
+          "amount": "127.2445923483521",
+          "currency": "USD"
+        }
+      },
+      "methodology": "simm",
+      "mpor_days": 10
+    },
+    "is_empty": [
+      true,
+      false
+    ],
+    "merged_total_ir_delta": 60000.0,
+    "scaled_total_ir_delta": 60000.0,
+    "total_equity_delta": 10000.0,
+    "total_ir_delta": 30000.0,
+    "wire": {
+      "base_currency": "USD",
+      "commodity_delta": [
+        [
+          "Crude",
+          2000.0
+        ]
+      ],
+      "commodity_vega": [
+        [
+          "Crude",
+          150.0
+        ]
+      ],
+      "credit_non_qualifying_delta": [
+        [
+          "RMBS_A",
+          "5Y",
+          1500.0
+        ]
+      ],
+      "credit_non_qualifying_vega": [
+        [
+          "RMBS_A",
+          "5Y",
+          200.0
+        ]
+      ],
+      "credit_qualifying_delta": [
+        [
+          "financial",
+          "ACME",
+          "5Y",
+          3000.0
+        ]
+      ],
+      "credit_qualifying_vega": [
+        [
+          "financial",
+          "ACME",
+          "5Y",
+          500.0
+        ]
+      ],
+      "curvature": [
+        {
+          "bucket": "residual",
+          "expiry_tenor": "1Y",
+          "factor": "AAPL",
+          "risk_class": "equity",
+          "risk_tenor": null,
+          "volatility_weighted_vega": 1000.0
+        }
+      ],
+      "equity_delta": [
+        [
+          "AAPL",
+          10000.0
+        ]
+      ],
+      "equity_vega": [
+        [
+          "AAPL",
+          800.0
+        ]
+      ],
+      "fx_delta": [
+        [
+          "EUR",
+          5000.0
+        ]
+      ],
+      "fx_vega": [
+        [
+          "EUR",
+          "USD",
+          300.0
+        ]
+      ],
+      "ir_delta": [
+        [
+          "USD",
+          "10Y",
+          -20000.0
+        ],
+        [
+          "USD",
+          "5Y",
+          50000.0
+        ]
+      ],
+      "ir_vega": [
+        [
+          "USD",
+          "5Y",
+          4000.0
+        ]
+      ]
+    }
+  },
+  "vm": {
+    "call_dates": [
+      "2024-06-17",
+      "2024-06-18",
+      "2024-06-20",
+      "2024-06-21"
+    ],
+    "calls": [
+      {
+        "amount": 1000000.0,
+        "call_date": "2024-06-17",
+        "call_type": "variation_margin_collect",
+        "currency": "USD",
+        "mta_applied": 500000.0,
+        "mtm_trigger": 1000000.0,
+        "settlement_date": "2024-06-18",
+        "threshold": 0.0
+      },
+      {
+        "amount": 1500000.0,
+        "call_date": "2024-06-18",
+        "call_type": "variation_margin_collect",
+        "currency": "USD",
+        "mta_applied": 500000.0,
+        "mtm_trigger": 2500000.0,
+        "settlement_date": "2024-06-20",
+        "threshold": 0.0
+      },
+      {
+        "amount": 2000000.0,
+        "call_date": "2024-06-19",
+        "call_type": "variation_margin_post",
+        "currency": "USD",
+        "mta_applied": 500000.0,
+        "mtm_trigger": 500000.0,
+        "settlement_date": "2024-06-20",
+        "threshold": 0.0
+      }
+    ],
+    "csa_id": "USD-REGULATORY-CSA",
+    "net_margin": -1000000.0,
+    "requires_call": true,
+    "result": {
+      "collect_amount": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "date": "2024-06-17",
+      "gross_exposure": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "net_exposure": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "post_amount": {
+        "amount": "0",
+        "currency": "USD"
+      },
+      "settlement_date": "2024-06-18"
+    }
+  },
+  "xva": {
+    "decay": {
+      "constant": "constant",
+      "factors": [
+        1.0,
+        0.4,
+        0.5
+      ],
+      "linear": {
+        "linear_to_maturity": {
+          "maturity_years": 5.0
+        }
+      },
+      "sqrt_time": {
+        "sqrt_time": {
+          "maturity_years": 4.0
+        }
+      }
+    },
+    "funding": {
+      "effective_benefit_bp": 20.0,
+      "effective_margin_spread_bp": 35.0,
+      "symmetric_benefit_bp": 50.0,
+      "symmetric_margin_spread_bp": 50.0,
+      "symmetric_wire": {
+        "funding_spread_bp": 50.0
+      },
+      "wire": {
+        "funding_benefit_bp": 20.0,
+        "funding_spread_bp": 50.0,
+        "margin_funding_spread_bp": 35.0
+      }
+    }
+  }
+}

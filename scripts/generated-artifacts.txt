@@ -435,6 +435,8 @@ finstack-quant-wasm/types/generated/core/core.ts
 finstack-quant-wasm/types/generated/core/index.ts
 finstack-quant-wasm/types/generated/covenants/covenants.ts
 finstack-quant-wasm/types/generated/covenants/index.ts
+finstack-quant-wasm/types/generated/features/features.ts
+finstack-quant-wasm/types/generated/features/index.ts
 finstack-quant-wasm/types/generated/index.ts
 finstack-quant-wasm/types/generated/margin/index.ts
 finstack-quant-wasm/types/generated/margin/margin.ts

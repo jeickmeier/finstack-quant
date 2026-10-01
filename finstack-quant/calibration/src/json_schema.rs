@@ -95,6 +95,30 @@ fn build_artifacts() -> Vec<SchemaArtifact> {
             "Step Params",
             "Kind-tagged parameters of one calibration step, flattened into `CalibrationStep`.",
         ),
+        component::<crate::hull_white::SwaptionQuote>(
+            "schemas/calibration/1/hull_white_swaption_quote.schema.json",
+            "https://finstack_quant.dev/schemas/calibration/1/hull_white_swaption_quote.schema.json",
+            "Hull-White Swaption Quote",
+            "ATM swaption volatility quote in year fractions for the direct Hull-White calibrator.",
+        ),
+        component::<crate::hull_white::CapFloorQuote>(
+            "schemas/calibration/1/hull_white_cap_floor_quote.schema.json",
+            "https://finstack_quant.dev/schemas/calibration/1/hull_white_cap_floor_quote.schema.json",
+            "Hull-White Cap/Floor Quote",
+            "Cap or floor volatility quote in year fractions for the direct Hull-White calibrators.",
+        ),
+        component::<crate::hull_white::CapFloorCalibrationConfig>(
+            "schemas/calibration/1/hull_white_cap_floor_calibration_config.schema.json",
+            "https://finstack_quant.dev/schemas/calibration/1/hull_white_cap_floor_calibration_config.schema.json",
+            "Hull-White Cap/Floor Calibration Config",
+            "Settings of the scalar Hull-White fit to cap/floor quotes.",
+        ),
+        component::<crate::hull_white::PiecewiseSigmaCalibrationConfig>(
+            "schemas/calibration/1/hull_white_piecewise_sigma_calibration_config.schema.json",
+            "https://finstack_quant.dev/schemas/calibration/1/hull_white_piecewise_sigma_calibration_config.schema.json",
+            "Hull-White Piecewise Sigma Calibration Config",
+            "Settings of the piecewise-constant Hull-White sigma bootstrap to cap/floor quotes.",
+        ),
         component::<crate::quotes::cds::CdsQuote>(
             "schemas/market/1/cds_quote.schema.json",
             "https://finstack_quant.dev/schemas/market/1/cds_quote.schema.json",

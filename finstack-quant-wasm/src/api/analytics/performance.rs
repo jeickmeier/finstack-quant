@@ -174,7 +174,7 @@ fn rolling_greeks_to_js(rg: &fa::RollingGreeks) -> Result<JsValue, JsValue> {
 /// returned as rejected JsValue errors.
 #[wasm_bindgen(js_name = Performance)]
 pub struct JsPerformance {
-    inner: fa::Performance,
+    pub(super) inner: fa::Performance,
 }
 
 #[wasm_bindgen(js_class = Performance)]

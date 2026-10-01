@@ -300,6 +300,32 @@ pub struct CalibrationReport {
 }
 
 impl CalibrationReport {
+    /// Per-quote fit rows of this report.
+    ///
+    /// Returns the diagnostic rows (`target_value`, `fitted_value`,
+    /// `residual`, `sensitivity`) when `CalibrationConfig::compute_diagnostics`
+    /// populated them. Otherwise it returns one row per entry of
+    /// [`Self::residuals`], ordered by quote id, carrying the signed residual
+    /// with `NaN` for the target, fitted value and sensitivity that were not
+    /// recorded.
+    pub fn quote_rows(&self) -> Vec<QuoteQuality> {
+        if let Some(diagnostics) = &self.diagnostics {
+            if !diagnostics.per_quote.is_empty() {
+                return diagnostics.per_quote.clone();
+            }
+        }
+        self.residuals
+            .iter()
+            .map(|(id, residual)| QuoteQuality {
+                quote_label: id.clone(),
+                target_value: f64::NAN,
+                fitted_value: f64::NAN,
+                residual: *residual,
+                sensitivity: f64::NAN,
+            })
+            .collect()
+    }
+
     /// Convenience constructor covering the common case of a completed calibration.
     ///
     /// # Arguments
@@ -639,6 +665,41 @@ impl CalibrationReport {
 mod tests {
     use super::*;
     use crate::constants::PENALTY;
+
+    #[test]
+    fn quote_rows_fall_back_to_residual_only_rows() {
+        let residuals: BTreeMap<String, f64> =
+            [("B".to_string(), -2e-6), ("A".to_string(), 1e-6)].into();
+        let mut report = CalibrationReport::new(residuals, 3, true, "converged");
+        let rows = report.quote_rows();
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.quote_label.as_str())
+                .collect::<Vec<_>>(),
+            ["A", "B"]
+        );
+        assert_eq!(rows[0].residual, 1e-6);
+        assert!(rows[0].target_value.is_nan() && rows[0].sensitivity.is_nan());
+
+        let measured = QuoteQuality {
+            quote_label: "A".to_string(),
+            target_value: 0.05,
+            fitted_value: 0.050001,
+            residual: 1e-6,
+            sensitivity: 2.0,
+        };
+        report.diagnostics = Some(CalibrationDiagnostics {
+            per_quote: vec![measured],
+            condition_number: None,
+            singular_values: None,
+            max_residual: 1e-6,
+            rms_residual: 1e-6,
+            r_squared: None,
+        });
+        let rows = report.quote_rows();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].target_value, 0.05);
+    }
 
     #[test]
     fn omitted_optional_report_fields_round_trip_as_absent_keys() {
