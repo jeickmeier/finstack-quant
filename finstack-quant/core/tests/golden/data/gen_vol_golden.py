@@ -426,10 +426,7 @@ suite = {
                     "mpmath at 50-digit precision (Gatheral 2004 raw "
                     "parameterisation); QuantLib has no analytic SVI."
                 ),
-                "sabr_normal_beta0_reference": (
-                    "sabr_normal cases with beta = 0 only: "
-                    + SABR_NORMAL_BETA0_REFERENCE
-                ),
+                "sabr_normal_beta0_reference": ("sabr_normal cases with beta = 0 only: " + SABR_NORMAL_BETA0_REFERENCE),
             },
         },
         "generated": {
