@@ -42,9 +42,26 @@ fn load_option(fixture: &Value) -> CdsOption {
         .expect("parse cds option spec")
 }
 
+/// Library NPV on the supplied curve. Bloomberg CDSO shows 118,781.76: an open
+/// reconciliation of 6,734.35 (5.7%), not a tolerance.
+///
+/// What is established (2026-10-01 reconciliation, see
+/// `docs/audits/2026-09-09-cdso-reconciliation.md`): the underlying CDS and
+/// discounting match CDSW to USD 6 on 100MM; the gap decomposes into the
+/// forward spread (screen ATM forward 55.2848 bp versus 55.0559 bp here, about
+/// +5,176) and the variance clock (42 settlement-to-settlement days versus 41,
+/// about +1,494). The fixture does not record enough Bloomberg intermediates to
+/// identify the forward-spread convention, so no formulation reproduces NPV,
+/// vega, theta, delta and the forward together. Closing it needs a receiver
+/// CDSO at the same strike, the forward-start CDSW, the CBBT mid curve and a
+/// second strike or expiry.
+const LIBRARY_NPV: f64 = 112_047.413_251_64;
+
+/// Pins the library value so an unintended pricing change is caught, and pins
+/// the size of the open Bloomberg difference so closing it is a deliberate,
+/// reviewed update of this test rather than a silent drift.
 #[test]
-#[ignore = "known difference: Bloomberg CDSO NPV 118781.76 versus 112047.41325164; USD 6 tolerance retained pending methodology reconciliation"]
-fn cdx_ig_46_bloomberg_npv_known_difference() {
+fn cdx_ig_46_npv_is_pinned_with_the_open_bloomberg_difference() {
     let fixture = load_fixture_json();
     let market = bootstrap_market(&fixture);
     let option = load_option(&fixture);
@@ -53,10 +70,14 @@ fn cdx_ig_46_bloomberg_npv_known_difference() {
         .expect("supplied market npv")
         .amount();
 
-    // Preserve the external expectation and tolerance for explicit rechecks.
     assert!(
-        (supplied_pv - BBG_NPV).abs() < 6.0,
-        "known Bloomberg CDSO difference: supplied={supplied_pv}, target={BBG_NPV}",
+        (supplied_pv - LIBRARY_NPV).abs() < 1e-4,
+        "CDX IG 46 CDSO NPV moved: got {supplied_pv}, pinned {LIBRARY_NPV}",
+    );
+    let open_difference = BBG_NPV - supplied_pv;
+    assert!(
+        (open_difference - 6_734.35).abs() < 0.01,
+        "open Bloomberg difference changed: {open_difference} (target {BBG_NPV})",
     );
 }
 

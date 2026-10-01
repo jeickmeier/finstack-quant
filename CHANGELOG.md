@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Release gate fixes (2026-10-01)
+
+#### Fixed
+
+- The published `common/1/day_count` schema had grown to 16.5 KB, past the 16 KiB inline budget of the LLM schema projection. `DayCount` variant descriptions now carry the convention name, defining rule and standards citation only; formulas, usage and examples moved to the type-level Rustdoc. The schema is 5.1 KB. Wire values are unchanged.
+- UI registry: the `finstack-quant-wasm` dependency pin, each item's `meta.wasmVersion` and the compiled hook version are derived from `finstack-quant-wasm/package.json`, and `ui-check` / `gen-check` fail on a stale pin. The separate `registryWasmVersion` field is removed. This fixes `ui-docs-install`, which requested the unpublished `finstack-quant-wasm@0.8.0` from npm. The registry gallery builds from the staged docs export again.
+- Every published schema artifact carries a validated example (125 added).
+
+#### Changed
+
+- The beta = 0 normal-SABR parity cases pin Hagan's exact beta = 0 form (`zeta = nu (F - K) / alpha`), which the library implements, through an independent high-precision evaluation. QuantLib's normal SABR has no beta = 0 special case and differs by about 0.13% in vol off the money. A cross-zero case is added. No pricing change.
+- The CDX IG 46 index-option test pins the library NPV (112,047.41) together with the open 6,734.35 difference to Bloomberg CDSO, replacing an always-failing known-difference test. The difference is a documented open reconciliation (forward-spread convention and variance clock) that needs further Bloomberg screens. No pricing change.
+
 ### WASM binding audit: schema accessors (2026-10-01)
 
 #### Added
