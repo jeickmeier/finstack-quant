@@ -51,7 +51,6 @@ export * from "./RateQuote";
 export * from "./RatesStepConventions";
 export * from "./ResidualWeightingScheme";
 export * from "./SabrInterpolationMethod";
-export * from "./SeasonalFactors";
 export * from "./Severity";
 export * from "./SolverConfig";
 export * from "./StepParams";

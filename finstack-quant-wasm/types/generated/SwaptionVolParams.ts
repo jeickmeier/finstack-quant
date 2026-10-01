@@ -39,7 +39,8 @@ vol_convention: SwaptionVolConvention,
  */
 sabr_beta: number,
 /**
- * Target expiry times (in years) for the surface grid.
+ * Target option expiry times in ACT/365F years from `base_date`, independent
+ * of the fixed-leg coupon day-count convention.
  */
 target_expiries: Array<number>,
 /**
@@ -55,7 +56,8 @@ sabr_interpolation: SabrInterpolationMethod,
  */
 calendar_id: string | null,
 /**
- * Optional day count convention for fixed leg calculations.
+ * Optional day count convention for fixed-leg coupon accrual only.
+ * Option expiry and variance always use ACT/365F.
  */
 fixed_day_count: string | null,
 /**

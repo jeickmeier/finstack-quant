@@ -220,8 +220,9 @@ def test_stochastic_pool_reports_draws_and_the_option_cost_by_tranche() -> None:
     restored = pickle.loads(pickle.dumps(result))  # noqa: S301 - trusted in-process round trip
     assert restored.npv == result.npv
     assert "StochasticPricingResult" in repr(result)
-    with pytest.raises(ValueError, match="at least one"):
-        deal.price_stochastic(ctx, AS_OF, num_paths=0)
+    for num_paths in (0, 1):
+        with pytest.raises(ValueError, match="at least two independent estimators"):
+            deal.price_stochastic(ctx, AS_OF, num_paths=num_paths)
 
 
 def test_reinvestment_period_round_trips_but_is_rejected_for_instrument_collateral() -> None:

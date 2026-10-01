@@ -334,7 +334,7 @@ fn asset_swap_projection_rate(
             ));
         }
         let curve_accrual = curve_time(fwd, end)? - curve_time(fwd, start)?;
-        let rate = rate_period_on_dates(fwd, start, end)? * curve_accrual / accrual_year_fraction;
+        let rate = rate_period_on_dates(fwd, start, end)? * (curve_accrual / accrual_year_fraction);
         if !rate.is_finite() || curve_accrual <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(
                 "asset-swap overnight projection produced an invalid rate or curve accrual".into(),

@@ -8,8 +8,9 @@ import type { ResidualWeightingScheme } from "./ResidualWeightingScheme";
  * bootstrapping or global solve process.
  *
  * # Invariants
- * - `df_hard_min` > 0
+ * - `0 < df_hard_min < df_hard_max`, with finite bounds
  * - `scan_grid_points` > 0
+ * - Scan and finite-difference step sizes are finite and strictly positive
  *
  * # Examples
  * ```
@@ -32,15 +33,15 @@ scan_grid_points: number,
  */
 min_scan_grid_points: number,
 /**
- * Initial step size for geometric scan grid.
+ * Finite, strictly positive initial step size for the geometric scan grid.
  */
 scan_grid_step: number,
 /**
- * Absolute minimum allowed discount factor (prevents singularity).
+ * Finite, strictly positive lower discount-factor bound, below `df_hard_max`.
  */
 df_hard_min: number,
 /**
- * Absolute maximum allowed discount factor (prevents divergence).
+ * Finite upper discount-factor bound, strictly above `df_hard_min`.
  */
 df_hard_max: number,
 /**
@@ -60,7 +61,8 @@ allow_non_monotonic_final: boolean | null,
  */
 weighting_scheme: ResidualWeightingScheme,
 /**
- * Step size (h) for finite-difference Jacobian calculation.
+ * Finite, strictly positive relative step for finite-difference Jacobians.
+ * The parameter bump is `max(h, abs(parameter) * h)`.
  */
 jacobian_step_size: number,
 /**

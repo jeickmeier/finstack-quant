@@ -416,13 +416,10 @@ mod tests {
         );
     }
 
-    /// M2.9: Sobol QMC requires one coordinate per (step, factor). The
-    /// weekly-refined grid of a one-year facility needs ~52×3 dimensions —
-    /// far beyond the supported Sobol table — so `use_sobol_qmc` must be
-    /// rejected rather than silently consuming a 3-dimensional sequence
-    /// once per time step (van-der-Corput anti-correlated, biased paths).
+    /// A single Sobol net contains dependent paths, so pricing must reject
+    /// its use for uncertainty estimates without independent randomizations.
     #[test]
-    fn sobol_qmc_with_underdimensioned_schedule_is_rejected() {
+    fn sobol_qmc_without_independent_replicates_is_rejected() {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
         let end = Date::from_calendar_date(2026, Month::January, 1).expect("date");
 
@@ -470,10 +467,11 @@ mod tests {
         let market = MarketContext::new().insert(disc);
 
         let err = RevolvingCreditPricer::price_with_paths(&facility, &market, start)
-            .expect_err("Sobol with num_steps×num_factors > MAX_SOBOL_DIMENSION must error");
+            .expect_err("Sobol pricing without independent replicates must error");
         assert!(
-            err.to_string().contains("use_sobol_qmc"),
-            "error should explain the Sobol dimension contract, got: {err}"
+            err.to_string()
+                .contains("independent randomized replicates"),
+            "error should explain the Sobol independence requirement, got: {err}"
         );
     }
 

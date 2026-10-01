@@ -141,7 +141,7 @@ pub(super) fn build_overnight_coupon(
                     let accrual = f64::from(tenor_days) / day_count_basis;
                     let curve_accrual = curve_end_time - curve_time;
                     let base_index_rate =
-                        forward.rate_period(curve_time, curve_end_time) * curve_accrual / accrual;
+                        forward.rate_period(curve_time, curve_end_time) * (curve_accrual / accrual);
                     if !curve_accrual.is_finite()
                         || curve_accrual <= 0.0
                         || !base_index_rate.is_finite()

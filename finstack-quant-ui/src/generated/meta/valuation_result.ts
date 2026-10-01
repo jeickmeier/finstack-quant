@@ -577,7 +577,7 @@ export default [
   {
     "path": "#/$defs/d_482fa346c77e25f26a51/properties/pv_confidence_interval",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/StochasticPricingResult/properties/pv_confidence_interval",
-    "description": "95% confidence interval for the mean PV"
+    "description": "Two-sided 95% Student-t confidence interval for the mean PV, in the\nNPV currency, using one fewer degree of freedom than the independent\nestimator count. Coverage is approximate for non-Gaussian payoffs."
   },
   {
     "path": "#/$defs/d_482fa346c77e25f26a51/properties/pv_confidence_interval/prefixItems/0",
@@ -592,7 +592,7 @@ export default [
   {
     "path": "#/$defs/d_482fa346c77e25f26a51/properties/pv_std_error",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/StochasticPricingResult/properties/pv_std_error",
-    "description": "Standard error of the mean PV estimate",
+    "description": "Sample standard error of the mean PV estimate, in the NPV currency.\n\nUses Bessel-corrected variance over independent estimators; each\nantithetic pair contributes one mean observation.",
     "format": "double"
   },
   {
@@ -3364,9 +3364,9 @@ export default [
   {
     "path": "#/$defs/d_fcd765f028a63b1f206f/oneOf/1/properties/monte_carlo/properties/num_paths",
     "source": "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json#/$defs/StructuredCreditPricingMode/oneOf/1/properties/monte_carlo/properties/num_paths",
-    "description": "Number of independent estimators. With `antithetic` each estimator\nsimulates a `(Z, -Z)` pair, so the engine prices `2 × num_paths`\nscenario paths.",
+    "description": "Number of independent estimators; must be at least two to estimate\nsampling uncertainty. With `antithetic` each estimator averages a\n`(Z, -Z)` pair, so the engine prices `2 × num_paths` scenario paths.\nSample standard error and the Student-t interval use this estimator\ncount, with `num_paths - 1` degrees of freedom.",
     "format": "uint",
-    "minimum": 0
+    "minimum": 2
   },
   {
     "path": "#/$defs/d_fcd765f028a63b1f206f/oneOf/2",

@@ -16,7 +16,8 @@ index_id: string,
  */
 series: number,
 /**
- * Maturity of the tranches in years.
+ * Finite positive CDS tenor in years, representable as a whole number of months.
+ * Quotes must resolve to the same CDS convention maturity as this tenor.
  */
 maturity_years: number,
 /**

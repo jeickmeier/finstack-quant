@@ -268,8 +268,7 @@ pub fn rate_between_on_dates(
     }
     let t_start = curve_time(fwd, start)?;
     let t_end = curve_time(fwd, end)?;
-    let growth = fwd.rate_between(t_start, t_end)? * (t_end - t_start);
-    let rate = growth / accrual_year_fraction;
+    let rate = fwd.rate_between(t_start, t_end)? * ((t_end - t_start) / accrual_year_fraction);
     if !rate.is_finite() {
         return Err(finstack_quant_core::Error::Validation(format!(
             "term forward for '{}' over {start} -> {end} is not finite on accrual {accrual_year_fraction}",

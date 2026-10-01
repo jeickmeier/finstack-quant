@@ -680,8 +680,8 @@ pub enum DayCount {
     ///     DayCountContext { calendar: Some(&NYSE), ..Default::default() }
     /// ).expect("Year fraction calculation should succeed");
     ///
-    /// // 5 business days / 252
-    /// assert!((yf * 252.0 - 5.0).abs() < 0.1);
+    /// // 4 business days / 252: NYSE was closed on January 9, 2025.
+    /// assert!((yf * 252.0 - 4.0).abs() < 1e-12);
     /// ```
     #[serde(rename = "bus_252")]
     Bus252,

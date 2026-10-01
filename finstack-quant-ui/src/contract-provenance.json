@@ -68,7 +68,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/composite/composite.schema.json",
-          "sha256": "afcdef32a74870379bf4a8af32755357b929c28ea8f743ac1f16053059052423",
+          "sha256": "33ab903ce88c87db35e53a5eddd6de4828e73ca3770b903f94816980944727fc",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -222,7 +222,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/exotics/basket.schema.json",
-          "sha256": "5e84d30d89a893687b42e2a066288ff2056b03b04c5512a7c36c7405cea4b023",
+          "sha256": "8e24947baef794dfdc03a40e4e06edd3ebcc9e7350c1fc94db59f6d47d9d7539",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -285,7 +285,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/asset_backed_facility.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/asset_backed_facility.schema.json",
-          "sha256": "f06e474bdb74a50e9ca1ade4785bd85e3eb68502912a501c468bb23f0aa20a17",
+          "sha256": "d6c8a4c0674f69d8d24943a64935861e6c0a6195a713dbd5a7110cc8788c58e1",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -334,7 +334,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/structured_credit.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/structured_credit.schema.json",
-          "sha256": "56b7d50805980d6044134e959ce7c7727c88ad9df87f6251184bbc215a41e4c0",
+          "sha256": "bb500a6f4d1a6545342ca2e726f2bb9690f4efa99506793f15aec202fd349ad6",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -565,7 +565,7 @@
           "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "pointer": "#",
           "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-          "sha256": "b90de247ca202a08d5253b2699804c86bff04922a593bf0a0f1fa3349ad6d87e",
+          "sha256": "c49f7b960128e01ef7f8d20faa1ae6334cc800f8a02603eaba485d7b17710705",
           "description": "Canonical v1 persisted snapshot of a complete market-data context."
         }
       ]
@@ -579,7 +579,7 @@
           "uri": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
           "pointer": "#",
           "source": "finstack-quant/calibration/schemas/calibration/1/calibration.schema.json",
-          "sha256": "06792b4fcd01c77dfba9c9b87eb308fa9148d509cbcf3e978a76f707ae4117d5",
+          "sha256": "0480f4295af14b86a9fb0fba339e8c8c73bc7ab08a4dcb42ac955f824b5ee7b3",
           "description": "Canonical typed calibration request and result envelope."
         }
       ]
@@ -1164,7 +1164,7 @@
           "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "pointer": "#",
           "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-          "sha256": "b90de247ca202a08d5253b2699804c86bff04922a593bf0a0f1fa3349ad6d87e",
+          "sha256": "c49f7b960128e01ef7f8d20faa1ae6334cc800f8a02603eaba485d7b17710705",
           "description": "Canonical v1 persisted snapshot of a complete market-data context."
         }
       ]
@@ -1186,8 +1186,8 @@
           }
         ],
         "returns": "CalibrationResultEnvelope",
-        "declaration": "/**\n   * Execute a calibration envelope and return its fitted market and reports.\n   * @param envelope - Typed calibration envelope or its serialized JSON form.\n   * @returns Calibration result including the materialized market and per-step reports.\n   * @throws TypeError - Object inputs containing NaN or infinities cannot be serialized without changing their meaning.\n   * @throws Error - Throws a JavaScript exception if `envelopeJson` is malformed or violates the calibration schema or static plan contract (fail-fast: first static error; `dryRun` lists every static error), solver configuration is invalid, market context construction or a calibration step fails, a solver does not converge, or the result envelope cannot be converted to a JavaScript value.\n   */\n  calibrate(envelope: CalibrationEnvelope | string): CalibrationResultEnvelope;",
-        "sha256": "6f222cf2587547c1e50c45fe98c040577817d21ebba10bd5296d372dc4342630"
+        "declaration": "/**\n   * Execute a calibration envelope and return its fitted market and reports.\n   * @param envelope - Typed calibration envelope or its serialized JSON form.\n   * @returns Calibration result including the materialized market and per-step reports.\n   * @throws Error - The JavaScript facade rejects object inputs containing non-finite numbers with `TypeError` before serialization. Explicit JSON strings are parsed in Rust. Throws a JavaScript exception if `envelopeJson` is malformed or violates the calibration schema or static plan contract (fail-fast: first static error; `dryRun` lists every static error), solver configuration is invalid, market context construction or a calibration step fails, a solver does not converge, or the result envelope cannot be converted to a JavaScript value.\n   */\n  calibrate(envelope: CalibrationEnvelope | string): CalibrationResultEnvelope;",
+        "sha256": "6198f8738213e6021f3680f53c0342f8cd48464b528b722cc5298dadb6e2a11c"
       }
     },
     {
@@ -1208,8 +1208,8 @@
           }
         ],
         "returns": "CalibrationResultEnvelope",
-        "declaration": "/**\n   * Execute a calibration envelope and return its fitted market and reports.\n   * @param envelope - Typed calibration envelope or its serialized JSON form.\n   * @returns Calibration result including the materialized market and per-step reports.\n   * @throws TypeError - Object inputs containing NaN or infinities cannot be serialized without changing their meaning.\n   * @throws Error - Throws a JavaScript exception if `envelopeJson` is malformed or violates the calibration schema or static plan contract (fail-fast: first static error; `dryRun` lists every static error), solver configuration is invalid, market context construction or a calibration step fails, a solver does not converge, or the result envelope cannot be converted to a JavaScript value.\n   */\n  calibrate(envelope: CalibrationEnvelope | string): CalibrationResultEnvelope;",
-        "sha256": "6f222cf2587547c1e50c45fe98c040577817d21ebba10bd5296d372dc4342630"
+        "declaration": "/**\n   * Execute a calibration envelope and return its fitted market and reports.\n   * @param envelope - Typed calibration envelope or its serialized JSON form.\n   * @returns Calibration result including the materialized market and per-step reports.\n   * @throws Error - The JavaScript facade rejects object inputs containing non-finite numbers with `TypeError` before serialization. Explicit JSON strings are parsed in Rust. Throws a JavaScript exception if `envelopeJson` is malformed or violates the calibration schema or static plan contract (fail-fast: first static error; `dryRun` lists every static error), solver configuration is invalid, market context construction or a calibration step fails, a solver does not converge, or the result envelope cannot be converted to a JavaScript value.\n   */\n  calibrate(envelope: CalibrationEnvelope | string): CalibrationResultEnvelope;",
+        "sha256": "6198f8738213e6021f3680f53c0342f8cd48464b528b722cc5298dadb6e2a11c"
       }
     },
     {
@@ -1300,7 +1300,7 @@
   ],
   "hostContract": {
     "source": "finstack-quant-wasm/schemas/host/1/valuation_result.schema.json",
-    "sha256": "c90840df75566d0cf1ebc85530a009fcd997ee571c9bfa068a83cc295c6e33fa"
+    "sha256": "81fa9a2f386234c188f21f0fc3be7ae6b3974834cbddf39dac45fdf7ae29ddbb"
   },
   "details": [
     {

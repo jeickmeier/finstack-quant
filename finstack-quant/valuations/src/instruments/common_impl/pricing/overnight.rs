@@ -416,7 +416,7 @@ fn projected_rate(
             }
             // ForwardCurve rates are annualized on its own clock. Preserve the
             // observation's growth when quoting it on the overnight index basis.
-            Ok(forward.rate_period(t0, t1) * (t1 - t0) / rate_accrual)
+            Ok(forward.rate_period(t0, t1) * ((t1 - t0) / rate_accrual))
         }
         OvernightProjectionCurve::Discount(discount) => {
             let dcf = day_count.year_fraction(obs_start, obs_end, day_count_context)?;

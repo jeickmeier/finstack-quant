@@ -740,12 +740,15 @@ mod tests {
                         .expect("flat discount"),
                 )
                 .insert(
-                    // Quote the tested coupon span in the curve's ACT/365F
-                    // time so its simple period rate is exactly 5%.
+                    // Express the 5% contractual ACT/365L rate on the curve's
+                    // ACT/365F basis while retaining the actual coupon tenor.
                     ForwardCurve::builder("TERM", (end - start).whole_days() as f64 / 365.0)
                         .base_date(as_of)
                         .day_count(DayCount::Act365F)
-                        .knots([(0.0, 0.05), (3.0, 0.05)])
+                        .knots([
+                            (0.0, 0.05 * 365.0 / denominator),
+                            (3.0, 0.05 * 365.0 / denominator),
+                        ])
                         .build()
                         .expect("flat forward"),
                 );

@@ -742,35 +742,63 @@ mod tests {
         );
     }
 
-    /// `num_paths` counts independent estimators (RNG streams). The registry
-    /// default was halved when it stopped counting antithetic mirrors, so the
-    /// default configuration must replay exactly the same streams: the PV is
-    /// pinned bit-for-bit to the value captured before the change.
+    /// The default estimator count and antithetic convention must reach the
+    /// pricer unchanged. Same-seed replay verifies the current numerical engine
+    /// without pinning a retired RNG or discretization's historical output.
     #[test]
-    fn rate_exotic_default_pv_unchanged() {
+    fn rate_exotic_defaults_match_explicit_estimator_configuration() {
         let as_of = date(2025, Month::January, 1);
         let curves = market(as_of, 0.02, 0.03);
         let inst = test_callable(vec![date(2025, Month::July, 1)], None, 0.06);
-        let estimate = CallableRangeAccrualPricer::with_hw_params(
-            HullWhiteCalibrationParams::new(0.05, 0.015).expect("hw params"),
-        )
-        .price_estimate(&inst, &curves, as_of)
-        .expect("default price");
+        let hw_params = HullWhiteCalibrationParams::new(0.05, 0.015).expect("hw params");
+        let default = CallableRangeAccrualPricer::with_hw_params(hw_params)
+            .price_estimate(&inst, &curves, as_of)
+            .expect("default price");
+        let explicit_config = RateExoticMcConfig {
+            num_paths: 10_000,
+            seed: 42,
+            antithetic: true,
+            min_steps_between_events: 4,
+            basis_degree: 2,
+            oos_lsmc: false,
+        };
+        let explicit = CallableRangeAccrualPricer::with_hw_params(hw_params)
+            .with_config(explicit_config)
+            .price_estimate(&inst, &curves, as_of)
+            .expect("explicit default price");
         assert_eq!(
-            estimate.mean.amount().to_bits(),
-            0x412e390a43af133a_u64,
-            "pv={}",
-            estimate.mean.amount()
+            default.mean.amount().to_bits(),
+            explicit.mean.amount().to_bits()
+        );
+        assert_eq!(default.stderr.to_bits(), explicit.stderr.to_bits());
+        assert_eq!(default.ci_95, explicit.ci_95);
+        assert_eq!(default.num_paths, 10_000);
+        assert_eq!(explicit.num_paths, 10_000);
+        assert_eq!(default.num_simulated_paths, 20_000);
+        assert_eq!(explicit.num_simulated_paths, 20_000);
+
+        // Unlike the replay above, this changes both estimator count and path
+        // pairing, proving the explicit configuration is consumed.
+        let reduced = CallableRangeAccrualPricer::with_hw_params(hw_params)
+            .with_config(RateExoticMcConfig {
+                num_paths: 127,
+                antithetic: false,
+                ..explicit_config
+            })
+            .price_estimate(&inst, &curves, as_of)
+            .expect("reduced unpaired sample");
+        assert_eq!(reduced.num_paths, 127);
+        assert_eq!(reduced.num_simulated_paths, 127);
+        assert_ne!(
+            default.mean.amount().to_bits(),
+            reduced.mean.amount().to_bits()
         );
     }
 
-    /// `BermudanCallProvision.price_pct_of_par` is a percent of par; the pricer
-    /// converts it once (`/ 100`) to the fraction of notional it used before
-    /// the rename. `102.0 / 100.0` is the correctly rounded `1.02`, so the PV
-    /// is pinned bit-for-bit to the value captured with the retired
-    /// fraction-of-notional `call_price = 1.02`.
+    /// A larger issuer redemption amount increases the holder's value under
+    /// the same stochastic paths and fitted exercise-policy convention.
     #[test]
-    fn bermudan_call_pct_of_par_is_pv_bit_identical() {
+    fn higher_call_price_increases_stochastic_note_value() {
         let as_of = date(2025, Month::January, 1);
         let curves = market(as_of, 0.02, 0.03);
         let mut inst = test_callable(vec![date(2025, Month::July, 1)], None, 0.06);
@@ -795,10 +823,9 @@ mod tests {
             .mean
             .amount();
         assert!(
-            (pv - at_par).abs() > 1e-6,
-            "call price must be live: {pv} vs {at_par}"
+            pv - at_par > 1e-6,
+            "a higher issuer call price must increase value: {pv} vs {at_par}"
         );
-        assert_eq!(pv.to_bits(), 0x412e92d0779f3e97_u64, "pv={pv}");
     }
 
     #[test]
@@ -905,23 +932,76 @@ mod tests {
     }
 
     #[test]
-    fn deep_itm_issuer_call_caps_coupon_value_at_call_price() {
+    fn forced_call_redeems_percent_of_par_on_the_call_date() {
         let as_of = date(2025, Month::January, 1);
-        let curves = market(as_of, 0.02, 0.03);
+        let discount_rate = 0.02;
+        let curves = market(as_of, discount_rate, 0.03);
         let call_date = date(2025, Month::July, 1);
-        let inst = test_callable(vec![call_date], None, 2.0);
-        let call_df = curves
-            .get_discount("USD-OIS")
-            .expect("discount")
-            .df_between_dates(as_of, call_date)
-            .expect("df");
-        let expected_call_value = inst.range_accrual.notional.amount() * call_df;
+        // A 200% coupon makes continuation more expensive to the issuer than
+        // either redemption amount. The validated HW APIs require positive
+        // sigma, so the end-to-end MC check below is only near deterministic;
+        // it still includes numerical theta/bank-account integration.
+        let mut inst = test_callable(vec![call_date], None, 2.0);
+        let discount = curves.get_discount("USD-OIS").expect("discount");
+        let call_df = discount.df_between_dates(as_of, call_date).expect("df");
+        let term_forward = Hw1fTermForward::new(
+            HullWhiteCalibrationParams::new(0.05, 1e-12).expect("hw params"),
+            discount.as_ref(),
+            as_of,
+        )
+        .expect("term forward");
+        let notional = inst.range_accrual.notional.amount();
+        let mut deterministic_prices = [0.0; 2];
+        for (slot, percent_of_par) in deterministic_prices.iter_mut().zip([100.0, 102.0]) {
+            inst.call_provision.price_pct_of_par = percent_of_par;
+            let mc_price = deterministic_pricer(4)
+                .price_estimate(&inst, &curves, as_of)
+                .expect("forced call price")
+                .mean
+                .amount();
+            let expected = notional * percent_of_par / 100.0 * call_df;
+            // Keep the original end-to-end PV budget. This rejects redemption
+            // at maturity without treating positive-sigma MC as exact.
+            assert!((mc_price - expected).abs() < 1.0);
 
-        let estimate = deterministic_pricer(4)
-            .price_estimate(&inst, &curves, as_of)
-            .expect("price");
-
-        assert!((estimate.mean.amount() - expected_call_value).abs() < 1.0);
+            // Isolate redemption units and scheduled payment timing from MC:
+            // evaluate the production schedule/payoff on an exact flat-rate
+            // bank account, with no random draws or fitted theta involved.
+            let schedule =
+                build_schedule(&inst, &curves, as_of, &term_forward).expect("callable schedule");
+            assert_eq!(schedule.exercise_times.len(), 1);
+            let call_time = schedule.exercise_times[0];
+            let payoff = CallableRangeAccrualPayoff::new(
+                0.02,
+                0.04,
+                inst.range_accrual.coupon_rate
+                    * inst.range_accrual.accrual_year_fraction().expect("accrual"),
+                notional,
+                schedule.events,
+                schedule.call_prices,
+                schedule.final_payment_event_idx,
+                schedule.final_payment_discount_factor,
+                0,
+                0,
+                schedule.future_observations,
+                2,
+            );
+            let redemption = payoff
+                .intrinsic_at(0, discount_rate, Currency::USD)
+                .expect("redemption")
+                .amount();
+            let bank_at_call = (discount_rate * call_time).exp();
+            *slot = redemption / bank_at_call;
+            assert!((*slot - expected).abs() < 1e-6);
+        }
+        // A 102% redemption pays exactly 2% extra notional on the eligible
+        // call date. This check is deterministic and independent of the RNG.
+        let expected_premium = 0.02 * notional * call_df;
+        assert!(
+            (deterministic_prices[1] - deterministic_prices[0] - expected_premium).abs() < 1e-6,
+            "redemption premium {}, expected {expected_premium}",
+            deterministic_prices[1] - deterministic_prices[0]
+        );
     }
 
     #[test]

@@ -767,7 +767,17 @@ fn lookback_rho_honours_rate_bump() {
         MetricId::Rho,
         PricingOptions::default(),
     );
-    assert_pins(&[("lookback rho", default_rho, 0x3f72bd0500ee5000)]);
+    // The log-CDF reflection formula changes the last bits of the old direct
+    // product formula. Retain an exact pin for the current stable calculation.
+    assert_pins(&[("lookback rho", default_rho, 0x3f72bd0500ee2000)]);
+    let default_ref =
+        pv(&opt, &bump_rate(&market, "USD-OIS", 1.0), as_of) - pv(&opt, &market, as_of);
+    assert_rel(
+        "default lookback rho per bp",
+        default_rho,
+        default_ref,
+        1e-12,
+    );
 
     let h_r = 5.0;
     opt.metric_pricing_overrides = overrides(None, None, Some(h_r));

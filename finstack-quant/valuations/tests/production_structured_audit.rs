@@ -174,11 +174,26 @@ fn production_structured_zero_vol_stochastic_matches_deterministic_with_constant
             &market,
             as_of,
             StructuredCreditPricingMode::MonteCarlo {
-                num_paths: 1,
+                num_paths: 2,
                 antithetic: false,
             },
         )
         .expect("zero-vol stochastic");
+    assert_eq!(
+        stochastic.pricing_mode,
+        StructuredCreditPricingMode::MonteCarlo {
+            num_paths: 2,
+            antithetic: false,
+        }
+    );
+    assert_eq!(
+        stochastic.num_paths, 2,
+        "two independent unpaired estimators"
+    );
+    assert_eq!(
+        stochastic.pv_std_error, 0.0,
+        "identical zero-volatility paths have zero sampling uncertainty"
+    );
     assert!(
         (stochastic.npv.amount() - deterministic.amount()).abs() < 1e-6,
         "stochastic {}, deterministic {}",

@@ -6,13 +6,13 @@
     "description": "Independent Bachelier reference for a 10MM USD out-of-the-money 1Y-into-5Y receiver swaption on the three-step calibrated rates/normal-SABR market. Contractual strike 3.766225%; projected forward 5.849967094365854%. The original ATM description was incorrect.",
     "valuation_date": "2026-05-08",
     "source": "formula",
-    "source_detail": "Independent formula recapture 2026-09-09: scripts/golden/normal_swaption_reference.py calibrates the original market envelope and takes its forward and normal cube quote as inputs. It independently sums contractual ACT/360 annual fixed accruals times payment-date discount factors, computes receiver Bachelier N*A*((K-F)*Phi(-d)+sigmaN*sqrt(T)*phi(d)) with Python math.erfc, computes vega per 0.01 normal-vol change, and centrally reprices +/-1bp parallel discount-zero-rate and forward-rate shocks using that same independent formula. Formula reference: https://github.com/lballabio/QuantLib/blob/master/ql/pricingengines/blackformula.cpp (bachelierBlackFormula). Inputs: F=0.05849967094365854, K=0.03766225, sigmaN=0.006869675711573747 decimal rate/sqrt(year), T=0.9917808219178083 ACT/365F, A=4.252728930362284 years, N=10000000 USD. Reference NPV=94.49416622253446 USD, vega=1634.3567820459073 USD per 100bp normal vol, signed DV01=-5.2449618313331285 USD per 1bp. Corrected production outputs differ by less than 5e-8 USD, 1e-10 USD, and 3e-9 USD respectively. This reference isolates option quote-unit/pricing/risk correctness; its calibration and underlying forward are not an independent external curve benchmark. Old self-captured million-dollar price used a lognormal-equivalent vol as a normal quote. Contract terms and input quotes are unchanged.",
+    "source_detail": "Independent formula recapture 2026-09-30: scripts/golden/normal_swaption_reference.py calibrates the original market envelope and takes its forward and normal cube quote as inputs. It independently sums contractual ACT/360 annual fixed accruals times payment-date discount factors, computes receiver Bachelier N*A*((K-F)*Phi(-d)+sigmaN*sqrt(T)*phi(d)) with Python math.erfc, computes vega per 0.01 normal-vol change, and centrally reprices +/-1bp continuous discount-zero-rate and additive forward-rate shocks using that same independent formula. Discount shocks preserve the source interpolation and multiply DF(t) by exp(-dr*t); off-pillar identities are checked during regeneration. Formula reference: https://github.com/lballabio/QuantLib/blob/master/ql/pricingengines/blackformula.cpp (bachelierBlackFormula). Inputs: F=0.05849967094365875, K=0.03766225, sigmaN=0.006869674056612067 decimal rate/sqrt(year), T=0.9917808219178083 ACT/365F, A=4.252728930362284 years, N=10000000 USD. Reference NPV=94.49389574304108 USD, vega=1634.353129480367 USD per 100bp normal vol, signed DV01=-5.2450994704562035 USD per 1bp. This reference isolates option quote-unit/pricing/risk correctness; its calibration and underlying forward are not an independent external curve benchmark. The calibrated input volatility can move slightly with floating-point solver changes: this recapture follows numerical calibration updates that shifted sigmaN from 0.006869675711573747 while leaving the underlying forward and annuity unchanged to floating-point precision. Contract terms, market quotes, and tolerances are unchanged. Old self-captured million-dollar price used a lognormal-equivalent vol as a normal quote.",
     "captured_by": "Codex independent formula verification",
-    "captured_on": "2026-09-09",
+    "captured_on": "2026-09-30",
     "last_reviewed_by": "Codex",
-    "last_reviewed_on": "2026-09-09",
+    "last_reviewed_on": "2026-09-30",
     "review_interval_months": 12,
-    "regen_command": "uv run --no-sync python scripts/golden/normal_swaption_reference.py",
+    "regen_command": "uv run --no-sync python scripts/golden/normal_swaption_reference.py --write",
     "screenshots": []
   },
   "kind": "pricing",
@@ -681,9 +681,9 @@
     }
   },
   "expected": {
-    "npv": 94.49416622253446,
-    "vega": 1634.3567820459073,
-    "dv01": -5.2449618313331285
+    "npv": 94.49389574304108,
+    "vega": 1634.353129480367,
+    "dv01": -5.2450994704562035
   },
   "tolerances": {
     "npv": {

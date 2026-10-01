@@ -52,7 +52,7 @@ fn b8_cached_hw_risk_rebuilds_the_active_grid() {
             },
         ))
         .expect("registry");
-    let market = MarketContext::new().insert(curve);
+    let market = MarketContext::new().insert(curve.clone());
     let result = registry
         .price_with_metrics(
             &swaption,
@@ -68,19 +68,31 @@ fn b8_cached_hw_risk_rebuilds_the_active_grid() {
             PricingOptions::default(),
         )
         .expect("cached model risk");
-    let pv = |rate, sigma| {
-        let curve = make_curve(rate);
+    let pv = |bump_bp, sigma| {
+        // Reuse the public zero-space shock contract used by the metric.
+        // Rebuilding nominally equivalent flat-curve knots changes floating
+        // interpolation/derivative rounding and tests curve reconstruction,
+        // rather than reuse of this deliberately nonstandard tree grid.
+        let curve = curve.with_parallel_bump(bump_bp).expect("bumped curve");
         let model = prepare(&curve, sigma);
         BermudanSwaptionTreeValuator::new(&swaption, &model, &curve, as_of)
             .expect("bumped valuator")
             .price()
             .expect("price")
     };
-    let delta = (pv(0.0301, 0.025) - pv(0.0299, 0.025)) / 0.0002;
+    let delta = (pv(1.0, 0.025) - pv(-1.0, 0.025)) / 0.0002;
     // HwSigmaVega: absolute σ ± 1e-4 (HW_SIGMA_BUMP), reported per 0.01 σ.
-    let vega = (pv(0.03, 0.0251) - pv(0.03, 0.0249)) / 0.0002 * 0.01;
-    assert!((result.measures["delta"] - delta).abs() < 1e-5);
-    assert!((result.measures["hw_sigma_vega"] - vega).abs() < 1e-5);
+    let vega = (pv(0.0, 0.0251) - pv(0.0, 0.0249)) / 0.0002 * 0.01;
+    assert!(
+        (result.measures["delta"] - delta).abs() < 1e-5,
+        "cached-grid delta {}, independently rebuilt delta {delta}",
+        result.measures["delta"]
+    );
+    assert!(
+        (result.measures["hw_sigma_vega"] - vega).abs() < 1e-5,
+        "cached-grid vega {}, independently rebuilt vega {vega}",
+        result.measures["hw_sigma_vega"]
+    );
     assert!(result.measures["theta"].is_finite());
     assert!((result.measures["exercise_probability"] - expected_time).abs() < 1e-12);
 }

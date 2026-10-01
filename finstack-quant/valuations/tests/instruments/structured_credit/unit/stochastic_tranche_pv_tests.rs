@@ -131,11 +131,11 @@ fn structured_credit(floating_senior: bool) -> StructuredCredit {
         sc.credit_model.default_spec.clone(),
     ));
     sc.instrument_pricing_overrides = InstrumentPricingOverrides::default();
-    sc.instrument_pricing_overrides.model_config.mc_paths = Some(1);
+    sc.instrument_pricing_overrides.model_config.mc_paths = Some(2);
     sc
 }
 
-fn stochastic_single_path(sc: &StructuredCredit, market: &MarketContext) -> ValuationResult {
+fn stochastic_two_estimators(sc: &StructuredCredit, market: &MarketContext) -> ValuationResult {
     let json = serde_json::to_string(&InstrumentEnvelope::new(InstrumentJson::StructuredCredit(
         Box::new(sc.clone()),
     )))
@@ -161,11 +161,11 @@ fn stochastic_details(result: &ValuationResult) -> StochasticPricingResult {
 }
 
 #[test]
-fn single_path_stochastic_pv_matches_deterministic_tranche_pv() {
+fn deterministic_specs_stochastic_pv_matches_deterministic_tranche_pv() {
     let sc = structured_credit(false);
     let market = fixed_market();
 
-    let result = stochastic_single_path(&sc, &market);
+    let result = stochastic_two_estimators(&sc, &market);
     let details = stochastic_details(&result);
 
     for tranche in &details.tranche_results {
@@ -184,11 +184,11 @@ fn single_path_stochastic_pv_matches_deterministic_tranche_pv() {
 
 /// A pool mixing a row originated at closing with a two-year seasoned row
 /// under PSA prepayment and SDA default curves. The deterministic engine
-/// reads each curve at the row's own age; the single deterministic-spec
-/// stochastic path must run the same per-row rates (its pool-level shock
-/// only scales them), so its tranche PVs match the deterministic ones.
+/// reads each curve at the row's own age; both deterministic-spec stochastic
+/// estimators must run the same per-row rates (the pool-level shock only
+/// scales them), so their mean tranche PVs match the deterministic ones.
 #[test]
-fn single_path_stochastic_pv_matches_deterministic_for_a_dated_psa_sda_pool() {
+fn deterministic_specs_stochastic_pv_matches_deterministic_for_a_dated_psa_sda_pool() {
     let mut sc = structured_credit(false);
     sc.pool.assets[0].origination_date = Some(closing_date());
     let mut seasoned = PoolAsset::fixed_rate_bond(
@@ -216,7 +216,7 @@ fn single_path_stochastic_pv_matches_deterministic_for_a_dated_psa_sda_pool() {
     ));
     let market = fixed_market();
 
-    let details = stochastic_details(&stochastic_single_path(&sc, &market));
+    let details = stochastic_details(&stochastic_two_estimators(&sc, &market));
     for tranche in &details.tranche_results {
         let deterministic = sc
             .value_tranche(&tranche.tranche_id, &market, as_of())
@@ -236,7 +236,7 @@ fn stochastic_json_result_contains_full_tranche_details() {
     let sc = structured_credit(false);
     let market = fixed_market();
 
-    let result = stochastic_single_path(&sc, &market);
+    let result = stochastic_two_estimators(&sc, &market);
     let details = stochastic_details(&result);
 
     assert_eq!(details.tranche_results.len(), sc.tranches.tranches.len());
@@ -263,7 +263,7 @@ fn invalid_attachment_detachment_errors_locally() {
             &market,
             as_of(),
             StructuredCreditPricingMode::MonteCarlo {
-                num_paths: 1,
+                num_paths: 2,
                 antithetic: false,
             },
         )
@@ -285,7 +285,7 @@ fn floating_coupon_market_data_error_propagates() {
             &market_without_forward,
             as_of(),
             StructuredCreditPricingMode::MonteCarlo {
-                num_paths: 1,
+                num_paths: 2,
                 antithetic: false,
             },
         )
@@ -311,7 +311,7 @@ fn junior_expected_loss_comes_from_writedowns() {
             &market,
             as_of(),
             StructuredCreditPricingMode::MonteCarlo {
-                num_paths: 1,
+                num_paths: 2,
                 antithetic: false,
             },
         )
@@ -416,7 +416,7 @@ fn non_pik_deferred_interest_cannot_consume_principal() {
             &market,
             as_of(),
             StructuredCreditPricingMode::MonteCarlo {
-                num_paths: 1,
+                num_paths: 2,
                 antithetic: false,
             },
         )

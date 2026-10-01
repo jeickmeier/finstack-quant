@@ -483,7 +483,7 @@ pub fn project_index_rate(
     let t0 = curve_time(reset_date)?;
     let curve_accrual = curve_time(accrual_end)? - curve_time(accrual_start)?;
     // Keep the tenor fixing at the reset date; only its annualization changes.
-    let index_rate = fwd.rate(t0) * curve_accrual / accrual_year_fraction;
+    let index_rate = fwd.rate(t0) * (curve_accrual / accrual_year_fraction);
     if !curve_accrual.is_finite() || curve_accrual <= 0.0 || !index_rate.is_finite() {
         return Err(finstack_quant_core::Error::Validation(
             "term index projection produced an invalid curve accrual or non-finite rate".into(),

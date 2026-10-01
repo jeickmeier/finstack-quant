@@ -95,7 +95,7 @@
         },
         {
           "base": "2026-04-30",
-          "day_count": "act_360",
+          "day_count": "act_365f",
           "extrapolation": "flat_forward",
           "id": "USD-TERM-1Y",
           "interp_style": "linear",

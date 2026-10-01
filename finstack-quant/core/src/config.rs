@@ -262,7 +262,11 @@ pub struct CurrencyScalePolicy {
     #[serde(deserialize_with = "deserialize_currency_scales")]
     #[cfg_attr(
         feature = "json-schema",
-        schemars(schema_with = "currency_scales_schema")
+        schemars(extend("additionalProperties" = {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 28
+        }))
     )]
     overrides: BTreeMap<crate::currency::Currency, u32>,
 }
@@ -326,17 +330,6 @@ where
     CurrencyScalePolicy::new(overrides)
         .map(|policy| policy.overrides)
         .map_err(serde::de::Error::custom)
-}
-
-#[cfg(feature = "json-schema")]
-fn currency_scales_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
-    let mut schema =
-        <BTreeMap<crate::currency::Currency, u32> as schemars::JsonSchema>::json_schema(generator);
-    schema.insert(
-        "additionalProperties".to_owned(),
-        serde_json::json!({"type": "integer", "minimum": 0, "maximum": 28}),
-    );
-    schema
 }
 
 /// Full rounding policy used at IO boundaries and normalization steps.
@@ -488,14 +481,22 @@ pub struct RoundingContext {
     #[serde(deserialize_with = "deserialize_currency_scales")]
     #[cfg_attr(
         feature = "json-schema",
-        schemars(schema_with = "currency_scales_schema")
+        schemars(extend("additionalProperties" = {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 28
+        }))
     )]
     ingest_scale_by_currency: BTreeMap<crate::currency::Currency, u32>,
     /// Validated output scale snapshot by currency code, with values in `0..=28`.
     #[serde(deserialize_with = "deserialize_currency_scales")]
     #[cfg_attr(
         feature = "json-schema",
-        schemars(schema_with = "currency_scales_schema")
+        schemars(extend("additionalProperties" = {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 28
+        }))
     )]
     output_scale_by_currency: BTreeMap<crate::currency::Currency, u32>,
     /// Tolerance settings snapshot for floating-point comparisons.

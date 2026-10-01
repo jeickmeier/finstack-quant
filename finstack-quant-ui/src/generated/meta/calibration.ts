@@ -140,29 +140,6 @@ export default [
     "description": "Adjust to the closer business day. A tie (equal calendar-day distance)\nrolls Following, matching FpML `NEAREST` and QuantLib `Nearest`.\n\n**FpML**: \"NEAREST\""
   },
   {
-    "path": "#/$defs/d_022e5f44e59eaa6c084b",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SwapFrequency",
-    "description": "Number of coupon payments per year for the underlying swap in HW1F calibration.\n\nUSD swaps are semi-annual (2), EUR swaps are annual (1)."
-  },
-  {
-    "path": "#/$defs/d_022e5f44e59eaa6c084b/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SwapFrequency/oneOf/0",
-    "const": "annual",
-    "description": "1 payment per year (EUR, GBP standard)."
-  },
-  {
-    "path": "#/$defs/d_022e5f44e59eaa6c084b/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SwapFrequency/oneOf/1",
-    "const": "semi_annual",
-    "description": "2 payments per year (USD standard)."
-  },
-  {
-    "path": "#/$defs/d_022e5f44e59eaa6c084b/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SwapFrequency/oneOf/2",
-    "const": "quarterly",
-    "description": "4 payments per year."
-  },
-  {
     "path": "#/$defs/d_08aea844abd10cb00e40",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep",
     "description": "A single step in the calibration process.\n\nEach step targets the construction or update of a specific market object\n(e.g., a yield curve) using a specified set of quotes."
@@ -368,7 +345,7 @@ export default [
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/10/properties/dividend_yield_override",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/10/properties/dividend_yield_override",
     "default": null,
-    "description": "Optional continuous dividend yield; defaults to the market scalar\n`\"<underlying_ticker>-DIVYIELD\"` or zero.",
+    "description": "Optional continuous dividend yield in decimal units. Without an override,\nuses the unitless market scalar `\"<underlying_ticker>-DIVYIELD\"`. When a\ndiscount curve is supplied, a matching cash-dividend schedule may supply\ncarry instead; otherwise an explicit yield is required.",
     "format": "double"
   },
   {
@@ -506,7 +483,7 @@ export default [
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/11/properties/method",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/11/properties/method",
     "default": "bootstrap",
-    "description": "Calibration method to use.",
+    "description": "Sequential bootstrap method. `GlobalSolve` is unsupported and rejected.",
     "ref": "#/$defs/CalibrationMethod",
     "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationMethod"
   },
@@ -739,22 +716,7 @@ export default [
   {
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/3/properties/observation_lag",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/3/properties/observation_lag",
-    "description": "Observation lag (e.g. \"3M\").\n\nOverrides the quote convention's lag and must match any supplied index\nlag. The same lag determines the output curve's reference-date origin and the dates\nof the CPI observations consumed by calibration instruments."
-  },
-  {
-    "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/3/properties/seasonal_factors",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/3/properties/seasonal_factors",
-    "description": "Optional seasonal adjustment factors for deseasonalizing CPI observations.\n\nWhen provided, the calibrator will:\n1. Deseasonalize input CPI levels using the monthly factors\n2. Fit the smooth zero-coupon curve to deseasonalized levels\n3. Reseasonalize the output CPI path\n\nMonthly adjustments are additive to log CPI level. They should approximately\nsum to zero over 12 months."
-  },
-  {
-    "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/3/properties/seasonal_factors/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/3/properties/seasonal_factors/anyOf/0",
-    "ref": "#/$defs/SeasonalFactors",
-    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SeasonalFactors"
-  },
-  {
-    "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/3/properties/seasonal_factors/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/3/properties/seasonal_factors/anyOf/1"
+    "description": "Month observation lag (e.g. \"3M\"); \"none\" means zero months.\nDay-based lags are unsupported because output curves carry month lags.\n\nOverrides the quote convention's lag and must match any supplied index\nlag. The same lag determines the output curve's reference-date origin and the dates\nof the CPI observations consumed by calibration instruments."
   },
   {
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/4",
@@ -899,7 +861,7 @@ export default [
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/5/properties/fixed_day_count",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/5/properties/fixed_day_count",
     "default": null,
-    "description": "Optional day count convention for fixed leg calculations."
+    "description": "Optional day count convention for fixed-leg coupon accrual only.\nOption expiry and variance always use ACT/365F."
   },
   {
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/5/properties/fixed_day_count/anyOf/0",
@@ -965,7 +927,7 @@ export default [
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/5/properties/target_expiries",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/5/properties/target_expiries",
     "default": [],
-    "description": "Target expiry times (in years) for the surface grid."
+    "description": "Target option expiry times in ACT/365F years from `base_date`, independent\nof the fixed-leg coupon day-count convention."
   },
   {
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/5/properties/target_expiries/items",
@@ -1107,7 +1069,7 @@ export default [
   {
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/6/properties/maturity_years",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/6/properties/maturity_years",
-    "description": "Maturity of the tranches in years.",
+    "description": "Finite positive CDS tenor in years, representable as a whole number of months.\nQuotes must resolve to the same CDS convention maturity as this tenor.",
     "format": "double"
   },
   {
@@ -1300,6 +1262,13 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
+    "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/9/properties/index_id",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/9/properties/index_id",
+    "description": "Term-rate index defining settlement, reset tenor, accrual day count,\ncalendar, business-day adjustments, and payment lag for caplets.\nIts currency must match `currency`; overnight indices are unsupported.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/9/properties/initial_kappa",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/9/properties/initial_kappa",
     "default": null,
@@ -1317,14 +1286,6 @@ export default [
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/9/properties/kind",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/9/properties/kind",
     "const": "cap_floor_hull_white"
-  },
-  {
-    "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/9/properties/payment_frequency",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/9/properties/payment_frequency",
-    "default": "semi_annual",
-    "description": "Payment frequency used to decompose quoted caps/floors into caplets.",
-    "ref": "#/$defs/SwapFrequency",
-    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SwapFrequency"
   },
   {
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/9/properties/volatility_mode",
@@ -2358,7 +2319,7 @@ export default [
   {
     "path": "#/$defs/d_65447e12defc07e99879",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveSolveConfig",
-    "description": "Discount-curve specific numerical solver configuration.\n\nControls the search space and numerical stability of the discount curve\nbootstrapping or global solve process.\n\n# Invariants\n- `df_hard_min` > 0\n- `scan_grid_points` > 0\n\n# Examples\n```\nuse finstack_quant_calibration::DiscountCurveSolveConfig;\n\nlet config = DiscountCurveSolveConfig {\n    scan_grid_points: 64,\n    df_hard_min: 1e-10,\n    ..Default::default()\n};\n```"
+    "description": "Discount-curve specific numerical solver configuration.\n\nControls the search space and numerical stability of the discount curve\nbootstrapping or global solve process.\n\n# Invariants\n- `0 < df_hard_min < df_hard_max`, with finite bounds\n- `scan_grid_points` > 0\n- Scan and finite-difference step sizes are finite and strictly positive\n\n# Examples\n```\nuse finstack_quant_calibration::DiscountCurveSolveConfig;\n\nlet config = DiscountCurveSolveConfig {\n    scan_grid_points: 64,\n    df_hard_min: 1e-10,\n    ..Default::default()\n};\n```"
   },
   {
     "path": "#/$defs/d_65447e12defc07e99879/properties/allow_non_monotonic_final",
@@ -2376,14 +2337,14 @@ export default [
     "path": "#/$defs/d_65447e12defc07e99879/properties/df_hard_max",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveSolveConfig/properties/df_hard_max",
     "default": 1000000,
-    "description": "Absolute maximum allowed discount factor (prevents divergence).",
+    "description": "Finite upper discount-factor bound, strictly above `df_hard_min`.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_65447e12defc07e99879/properties/df_hard_min",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveSolveConfig/properties/df_hard_min",
     "default": 1e-12,
-    "description": "Absolute minimum allowed discount factor (prevents singularity).",
+    "description": "Finite, strictly positive lower discount-factor bound, below `df_hard_max`.",
     "format": "double"
   },
   {
@@ -2405,8 +2366,8 @@ export default [
   {
     "path": "#/$defs/d_65447e12defc07e99879/properties/jacobian_step_size",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveSolveConfig/properties/jacobian_step_size",
-    "default": 0,
-    "description": "Step size (h) for finite-difference Jacobian calculation.",
+    "default": 0.000001,
+    "description": "Finite, strictly positive relative step for finite-difference Jacobians.\nThe parameter bump is `max(h, abs(parameter) * h)`.",
     "format": "double"
   },
   {
@@ -2436,7 +2397,7 @@ export default [
     "path": "#/$defs/d_65447e12defc07e99879/properties/scan_grid_step",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DiscountCurveSolveConfig/properties/scan_grid_step",
     "default": 0.0001,
-    "description": "Initial step size for geometric scan grid.",
+    "description": "Finite, strictly positive initial step size for the geometric scan grid.",
     "format": "double"
   },
   {
@@ -3597,7 +3558,7 @@ export default [
   {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/4/oneOf/1/properties/swaption_vol/properties/quote_type",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/4/oneOf/1/properties/swaption_vol/properties/quote_type",
-    "description": "Volatility quoting convention.",
+    "description": "Volatility quoting convention. Shifted Black quotes require a\n`ShiftedLognormal` calibration plan supplying their displacement;\nHull-White calibration rejects them because its quote contract\ncarries no displacement.",
     "ref": "#/$defs/VolQuoteType",
     "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/VolQuoteType"
   },
@@ -3644,7 +3605,7 @@ export default [
   {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/4/oneOf/2/properties/cap_floor_vol/properties/quote_type",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/4/oneOf/2/properties/cap_floor_vol/properties/quote_type",
-    "description": "Volatility quoting convention.",
+    "description": "Volatility quoting convention. Hull-White calibration accepts\nnormal and unshifted Black quotes; it rejects shifted Black\nbecause this quote does not carry a displacement.",
     "ref": "#/$defs/VolQuoteType",
     "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/VolQuoteType"
   },
@@ -3917,12 +3878,12 @@ export default [
     "path": "#/$defs/d_90f31cdba2ca2a488317/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SwaptionVolConvention/oneOf/1",
     "const": "lognormal",
-    "description": "Lognormal (Black) volatility in decimal units.\n\nExample: `0.20` means 20% Black volatility."
+    "description": "Lognormal (Black) volatility in decimal units.\n\nExample: `0.20` means 20% Black volatility.\nRequires `black_lognormal` quotes and positive forwards/strikes;\ncalibration does not introduce a displacement automatically."
   },
   {
     "path": "#/$defs/d_90f31cdba2ca2a488317/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SwaptionVolConvention/oneOf/2",
-    "description": "Shifted lognormal (Black) volatility in decimal units, with an explicit shift.\n\nExample: `0.20` means 20% Black volatility."
+    "description": "Shifted lognormal (Black) volatility in decimal units, with an explicit shift.\n\nExample: `0.20` means 20% Black volatility on displaced forward/strike\ncoordinates. Requires `shifted_black_lognormal` quotes."
   },
   {
     "path": "#/$defs/d_90f31cdba2ca2a488317/oneOf/2/properties/shifted_lognormal",
@@ -3931,7 +3892,7 @@ export default [
   {
     "path": "#/$defs/d_90f31cdba2ca2a488317/oneOf/2/properties/shifted_lognormal/properties/shift",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SwaptionVolConvention/oneOf/2/properties/shifted_lognormal/properties/shift",
-    "description": "Shift amount for negative rate handling",
+    "description": "Finite positive additive shift in decimal rate units, applied to\nboth forwards and strikes and retained in calibrated artifacts.",
     "format": "double"
   },
   {
@@ -6234,7 +6195,7 @@ export default [
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/12",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/12",
     "const": "bus_252",
-    "description": "Business/252 day count convention.\n\nYear fraction = (business days between dates) / 252\n\n# Market Convention\n\n- **Brazil**: Standard for BRL-denominated instruments (ANBIMA)\n- **Also used**: Some equity derivatives and variance swaps\n- **Basis**: 252 represents typical trading days per year\n\n# Requirements\n\nRequires `calendar` in [`DayCountContext`] to determine business days.\n\n# Performance\n\nIterates each calendar day in the range to check business-day status,\ngiving O(n) cost where n is the number of calendar days between the\ndates. For 30Y instruments this is ~11,000 iterations.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse finstack_quant_core::dates::calendar::NYSE;\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 6).expect(\"Valid date\"); // Monday\nlet end = Date::from_calendar_date(2025, Month::January, 13).expect(\"Valid date\"); // Next Monday\n\nlet yf = DayCount::Bus252.year_fraction(\n    start,\n    end,\n    DayCountContext { calendar: Some(&NYSE), ..Default::default() }\n).expect(\"Year fraction calculation should succeed\");\n\n// 5 business days / 252\nassert!((yf * 252.0 - 5.0).abs() < 0.1);\n```"
+    "description": "Business/252 day count convention.\n\nYear fraction = (business days between dates) / 252\n\n# Market Convention\n\n- **Brazil**: Standard for BRL-denominated instruments (ANBIMA)\n- **Also used**: Some equity derivatives and variance swaps\n- **Basis**: 252 represents typical trading days per year\n\n# Requirements\n\nRequires `calendar` in [`DayCountContext`] to determine business days.\n\n# Performance\n\nIterates each calendar day in the range to check business-day status,\ngiving O(n) cost where n is the number of calendar days between the\ndates. For 30Y instruments this is ~11,000 iterations.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse finstack_quant_core::dates::calendar::NYSE;\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 6).expect(\"Valid date\"); // Monday\nlet end = Date::from_calendar_date(2025, Month::January, 13).expect(\"Valid date\"); // Next Monday\n\nlet yf = DayCount::Bus252.year_fraction(\n    start,\n    end,\n    DayCountContext { calendar: Some(&NYSE), ..Default::default() }\n).expect(\"Year fraction calculation should succeed\");\n\n// 4 business days / 252: NYSE was closed on January 9, 2025.\nassert!((yf * 252.0 - 4.0).abs() < 1e-12);\n```"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/2",
@@ -7528,6 +7489,16 @@ export default [
     "description": "Pre-built volatility surface (expiry x strike)."
   },
   {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/9/properties/displacements",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/9/properties/displacements",
+    "description": "Additive displacements in forward/strike units, one per expiry for shifted Black quotes."
+  },
+  {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/9/properties/displacements/items",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/9/properties/displacements/items",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/9/properties/expiries",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/9/properties/expiries",
     "description": "Expiry times in years"
@@ -7649,21 +7620,6 @@ export default [
     "description": "Stable identifier for an Interest Rate Future contract (e.g., \"CME:SR3\").\n\nUsed to look up [`IrFutureConventions`](crate::market::conventions::defs::IrFutureConventions)\nfrom the convention registry."
   },
   {
-    "path": "#/$defs/d_f4c196ca4f3c0a638b09",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SeasonalFactors",
-    "description": "Monthly seasonal adjustment factors for inflation curves.\n\nUsed to deseasonalize CPI observations before fitting a smooth\nzero-coupon inflation curve, then reseasonalize the output.\nMonthly adjustments should approximately sum to zero."
-  },
-  {
-    "path": "#/$defs/d_f4c196ca4f3c0a638b09/properties/monthly_adjustments",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SeasonalFactors/properties/monthly_adjustments",
-    "description": "Monthly adjustment factors (Jan=index 0 through Dec=index 11).\nThese are additive adjustments to the log CPI level."
-  },
-  {
-    "path": "#/$defs/d_f4c196ca4f3c0a638b09/properties/monthly_adjustments/items",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SeasonalFactors/properties/monthly_adjustments/items",
-    "format": "double"
-  },
-  {
     "path": "#/$defs/d_f6b6b6746b36a7a4a06d",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/VolQuoteType",
     "description": "Quoting convention of the volatilities stored on a [`VolSurface`].\n\nThe same `vol_surface_id` channel is read by consumers with very different\nexpectations: rates calibrations typically read normal (Bachelier, absolute)\nvols on an `expiry × tenor` ATM matrix, while equity/FX/swaption smile\nconsumers read Black (lognormal, relative) vols on `expiry × strike`. The\nstored numbers are an order of magnitude apart (e.g. 0.008 normal vs 0.20\nBlack), so misreading one as the other silently mis-prices. Tagging the\nquote type lets consumers enforce their convention via\n[`VolSurface::require_quote_type`]."
@@ -7677,6 +7633,12 @@ export default [
   {
     "path": "#/$defs/d_f6b6b6746b36a7a4a06d/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/VolQuoteType/oneOf/1",
+    "const": "shifted_black_lognormal",
+    "description": "Displaced Black volatility; per-expiry displacements accompany the grid."
+  },
+  {
+    "path": "#/$defs/d_f6b6b6746b36a7a4a06d/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/VolQuoteType/oneOf/2",
     "const": "normal",
     "description": "Normal (Bachelier) implied volatility, absolute rate units."
   },

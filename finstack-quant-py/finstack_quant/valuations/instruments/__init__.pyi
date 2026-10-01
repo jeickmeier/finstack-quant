@@ -23087,10 +23087,11 @@ class StructuredCredit:
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date (ISO 8601 strings accepted).
         num_paths : int, optional
-            Number of independent Monte Carlo estimators; defaults to the
-            deal's configured ``mc_paths`` override or 5,000. With
-            ``antithetic`` each estimator simulates a mirrored pair, so
-            ``2 * num_paths`` paths run.
+            Number of independent Monte Carlo estimators; must be at least
+            two. Defaults to the deal's configured ``mc_paths`` override or
+            5,000. With ``antithetic`` each estimator averages a mirrored pair,
+            so ``2 * num_paths`` physical paths run while the statistical
+            sample size remains ``num_paths``.
         antithetic : bool, default True
             Pair each estimator's path with its sign-flipped mirror.
 
@@ -23098,12 +23099,15 @@ class StructuredCredit:
         -------
         StochasticPricingResult
             Deal and tranche present values, loss statistics, Monte Carlo
-            error, draw diagnostics and the draw option cost.
+            error, draw diagnostics and the draw option cost. Sampling error
+            uses the sample standard deviation and a 95% Student-t confidence
+            interval with ``num_paths - 1`` degrees of freedom.
 
         Raises
         ------
         ValueError
-            If the deal fails validation or ``num_paths`` is zero.
+            If the deal fails validation or the resolved ``num_paths`` is less
+            than two independent estimators.
         KeyError
             If a required curve is missing from ``market``.
         RuntimeError
@@ -28554,7 +28558,11 @@ class StochasticPricingResult:
     @property
     def pv_std_error(self) -> float:
         """
-        Standard error of the mean present value, in currency units.
+        Sample standard error of the mean present value, in currency units.
+
+        Monte Carlo uses the sample standard deviation divided by the square
+        root of the independent-estimator count; each antithetic pair
+        contributes its average as one observation.
 
         Returns
         -------
@@ -28569,7 +28577,9 @@ class StochasticPricingResult:
     @property
     def pv_confidence_interval(self) -> tuple[float, float]:
         """
-        95% confidence interval of the mean present value, in currency units.
+        Two-sided 95% Student-t confidence interval of mean present value, in
+        currency units. Monte Carlo uses one fewer degree of freedom than the
+        independent-estimator count; each antithetic pair counts once.
 
         Returns
         -------
@@ -28585,6 +28595,9 @@ class StochasticPricingResult:
     def num_paths(self) -> int:
         """
         Number of simulated scenario paths (two per antithetic estimator).
+
+        Monte Carlo sampling uncertainty uses independent estimator counts,
+        which equal half this value when antithetic pairing is enabled.
 
         Returns
         -------

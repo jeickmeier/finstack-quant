@@ -36,7 +36,9 @@ target_strikes: Array<number>,
  */
 spot_override: number | null,
 /**
- * Optional continuous dividend yield; defaults to the market scalar
- * `"<underlying_ticker>-DIVYIELD"` or zero.
+ * Optional continuous dividend yield in decimal units. Without an override,
+ * uses the unitless market scalar `"<underlying_ticker>-DIVYIELD"`. When a
+ * discount curve is supplied, a matching cash-dividend schedule may supply
+ * carry instead; otherwise an explicit yield is required.
  */
 dividend_yield_override: number | null, };

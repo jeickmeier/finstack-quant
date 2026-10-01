@@ -110,7 +110,7 @@ def _structured_credit_json() -> str:
         "frequency": {"count": 1, "unit": "months"},
         "calendar_id": "nyse",
         "discount_curve_id": "USD-OIS",
-        "instrument_pricing_overrides": {"model_config": {"mc_paths": 1}},
+        "instrument_pricing_overrides": {"model_config": {"mc_paths": 2}},
         "attributes": {},
         "prepayment_spec": {"cpr": 0.0, "curve": None},
         "default_spec": {"cdr": 0.0, "curve": None},
@@ -590,6 +590,20 @@ def test_structured_credit_stochastic_json_details_include_all_tranches() -> Non
     assert details["type"] == "structured_credit_stochastic"
     assert len(details["data"]["tranche_results"]) == 2
     assert {row["tranche_id"] for row in details["data"]["tranche_results"]} == {"SR", "EQ"}
+
+
+@pytest.mark.parametrize("antithetic", [False, True])
+def test_structured_credit_stochastic_rejects_one_independent_estimator(antithetic: bool) -> None:
+    instrument = json.loads(_structured_credit_json())
+    config = instrument["instrument"]["spec"]["instrument_pricing_overrides"]["model_config"]
+    config.update(mc_paths=1, mc_antithetic=antithetic)
+    with pytest.raises(ValueError, match="at least two independent estimators"):
+        price_instrument(
+            json.dumps(instrument),
+            _market_json(),
+            "2024-01-01",
+            "structured_credit_stochastic",
+        )
 
 
 def test_structured_credit_stochastic_json_missing_market_data_raises() -> None:

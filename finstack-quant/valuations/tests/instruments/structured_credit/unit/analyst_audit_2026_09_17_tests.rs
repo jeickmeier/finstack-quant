@@ -633,7 +633,7 @@ fn p8_stochastic_price_uses_the_same_face_as_deterministic() {
             &mkt,
             close,
             StructuredCreditPricingMode::MonteCarlo {
-                num_paths: 1,
+                num_paths: 2,
                 antithetic: false,
             },
         )

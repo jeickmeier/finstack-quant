@@ -286,10 +286,10 @@ impl StochasticPricer {
         antithetic: bool,
         prepared: &PreparedRun,
     ) -> Result<StochasticPricingResult> {
-        if num_paths == 0 {
+        if num_paths < 2 {
             return Err(finstack_quant_core::Error::Validation(
-                "Monte Carlo pricing requires at least one independent estimator \
-                 (pricing_mode.monte_carlo.num_paths)"
+                "Monte Carlo pricing requires at least two independent estimators \
+                 (pricing_mode.monte_carlo.num_paths); each antithetic pair counts once"
                     .to_string(),
             ));
         }
@@ -1490,11 +1490,10 @@ struct ScenarioCollector {
     /// Each pair is one negatively-correlated draw, *not* two i.i.d. samples,
     /// so the deal-PV std-error must be computed over the `n/2` pair means.
     antithetic: bool,
-    deal_pv_stats: OnlineStats,
     deal_loss_stats: OnlineStats,
     deal_losses: Vec<f64>,
-    /// Per-path deal PVs, recorded in path order. Retained so the std-error
-    /// can be recomputed pair-aware under antithetic mode; the order matches
+    /// Per-path deal PVs, recorded in path order. Retained so sampling
+    /// statistics can use independent antithetic pair means; the order matches
     /// the antithetic pairing `(2k, 2k+1)` because `record_output` is fed in
     /// path order (see `price_factor_sets`).
     deal_pvs: Vec<f64>,
@@ -1524,7 +1523,6 @@ impl ScenarioCollector {
             currency: instrument.pool.get_currency(),
             num_paths,
             antithetic,
-            deal_pv_stats: OnlineStats::new(),
             deal_loss_stats: OnlineStats::new(),
             deal_losses: Vec::with_capacity(num_paths),
             deal_pvs: Vec::with_capacity(num_paths),
@@ -1547,7 +1545,6 @@ impl ScenarioCollector {
     }
 
     fn record_deal(&mut self, pv: f64, loss: f64) {
-        self.deal_pv_stats.update(pv);
         self.deal_loss_stats.update(loss);
         self.deal_losses.push(loss);
         self.deal_pvs.push(pv);
@@ -1572,18 +1569,12 @@ impl ScenarioCollector {
         pricer: &StochasticPricer,
         pricing_mode: StructuredCreditPricingMode,
     ) -> Result<StochasticPricingResult> {
-        let mean_pv = self.deal_pv_stats.mean();
+        let pv_stats = deal_pv_estimator_stats(&self.deal_pvs, self.antithetic)?;
+        let mean_pv = pv_stats.mean();
         let mean_loss = self.deal_loss_stats.mean();
         // Welford population variance avoids catastrophic cancellation when
         // tranche PVs are large (≥ 1e7) and relative dispersion is small.
         let loss_pop_var = self.deal_loss_stats.population_variance();
-        // Std-error: under antithetic mode each pair `(2k, 2k+1)` is one
-        // negatively-correlated draw — dividing the per-path variance by
-        // `√num_paths` would treat the `n/2` pairs as `n` i.i.d. samples and
-        // report a CI that is wrong (typically too narrow). `deal_pv_std_error`
-        // collapses each pair to its mean and computes the SE over the `n/2`
-        // pair means, the genuine i.i.d. unit under antithetic sampling.
-        let std_error = deal_pv_std_error(&self.deal_pvs, self.antithetic);
         let es = expected_shortfall(&mut self.deal_losses, pricer.config.es_confidence);
 
         let mut result = StochasticPricingResult::new(
@@ -1620,8 +1611,8 @@ impl ScenarioCollector {
             result.dirty_price = mean_pv / notional * 100.0;
             result.clean_price = result.dirty_price;
         }
-        result.pv_std_error = std_error;
-        result.pv_confidence_interval = (mean_pv - 1.96 * std_error, mean_pv + 1.96 * std_error);
+        result.pv_std_error = pv_stats.stderr();
+        result.pv_confidence_interval = pv_stats.confidence_interval(0.05);
         result.unfunded_draw_path_fraction =
             self.unfunded_paths as f64 / self.num_paths.max(1) as f64;
         result.expected_collateral_draws = Money::new(self.draw_stats.mean(), self.currency)?;
@@ -1644,47 +1635,33 @@ impl ScenarioCollector {
     }
 }
 
-/// Standard error of the deal-PV Monte Carlo mean.
+/// Accumulate independent deal-PV estimators for canonical sampling statistics.
 ///
-/// In plain (non-antithetic) mode every path is an i.i.d. sample and the SE
-/// is `√(population_variance / n)`.
-///
-/// Under antithetic mode the paths are generated as negatively-correlated
-/// pairs `(2k, 2k+1)`: `path 2k+1` negates the systematic factors of `path 2k`.
-/// The pair is *not* two independent samples — the genuine i.i.d. unit is the
-/// pair mean `(pv_2k + pv_2k+1)/2`. Treating the `n` paths as `n` i.i.d.
-/// samples (`√(per-path variance / n)`) misstates the SE and the reported
-/// 95% CI. This routine collapses each complete pair to its mean and computes
-/// the SE over the `n/2` pair means; a lone trailing path (odd `n`) is treated
-/// as its own one-element "pair". When every pair averages to the same value
-/// the pair-mean variance — and hence the SE — is zero even if per-path
-/// dispersion is large.
-fn deal_pv_std_error(deal_pvs: &[f64], antithetic: bool) -> f64 {
-    if !antithetic {
-        return sample_std_error(deal_pvs);
-    }
-    let pair_means: Vec<f64> = deal_pvs
-        .chunks(2)
-        .map(|pair| pair.iter().sum::<f64>() / pair.len() as f64)
-        .collect();
-    sample_std_error(&pair_means)
-}
-
-/// Standard error of the mean of an i.i.d. sample: `√(population_variance / n)`.
-///
-/// Population variance is accumulated with Welford's algorithm to avoid the
-/// catastrophic cancellation of the `E[X²] − E[X]²` form when PVs are large
-/// relative to their dispersion.
-fn sample_std_error(samples: &[f64]) -> f64 {
-    let n = samples.len();
-    if n == 0 {
-        return 0.0;
+/// Each complete antithetic pair contributes its mean as one observation.
+/// At least two observations are required for a sample standard error and
+/// Student-t confidence interval. Incomplete pairs are invalid.
+fn deal_pv_estimator_stats(deal_pvs: &[f64], antithetic: bool) -> Result<OnlineStats> {
+    if antithetic && !deal_pvs.len().is_multiple_of(2) {
+        return Err(finstack_quant_core::Error::Validation(
+            "Monte Carlo statistics require complete antithetic pairs".to_string(),
+        ));
     }
     let mut stats = OnlineStats::new();
-    for &x in samples {
-        stats.update(x);
+    if antithetic {
+        for pair in deal_pvs.chunks_exact(2) {
+            stats.update(0.5 * pair[0] + 0.5 * pair[1]);
+        }
+    } else {
+        for &pv in deal_pvs {
+            stats.update(pv);
+        }
     }
-    (stats.population_variance() / n as f64).sqrt()
+    if stats.count() < 2 {
+        return Err(finstack_quant_core::Error::Validation(
+            "Monte Carlo statistics require at least two independent estimators".to_string(),
+        ));
+    }
+    Ok(stats)
 }
 
 fn expected_shortfall(losses: &mut [f64], confidence: f64) -> f64 {
@@ -1850,7 +1827,7 @@ mod tests {
     }
 
     #[test]
-    fn monte_carlo_one_path_prices_waterfall_cashflows() {
+    fn monte_carlo_two_estimators_price_waterfall_cashflows() {
         let instrument = test_instrument();
         let market = MarketContext::new().insert((*test_discount_curve()).clone());
         let config = StochasticPricerConfig::new(
@@ -1859,16 +1836,63 @@ mod tests {
             ScenarioTreeConfig::new(test_date().months_until(instrument.maturity) as usize, 2),
         )
         .with_pricing_mode(StructuredCreditPricingMode::MonteCarlo {
-            num_paths: 1,
+            num_paths: 2,
             antithetic: false,
         });
         let pricer = StochasticPricer::new(config);
 
         let result = pricer.price(&instrument, &market).expect("price");
 
-        assert_eq!(result.num_paths, 1);
+        assert_eq!(result.num_paths, 2);
         assert_eq!(result.tranche_results.len(), 1);
         assert!(result.npv.amount().is_finite());
+    }
+
+    #[test]
+    fn scenario_collector_small_sample_interval_uses_independent_estimator_count() {
+        let instrument = test_instrument();
+        let config = StochasticPricerConfig::new(
+            test_date(),
+            test_discount_curve(),
+            ScenarioTreeConfig::new(12, 2),
+        );
+        let pricer = StochasticPricer::new(config);
+        for antithetic in [false, true] {
+            // The independent observations are [1, 3] in either mode:
+            // sample variance = 2, standard error = 1, and t_1 is Cauchy.
+            let pvs: &[f64] = if antithetic {
+                &[0.0, 2.0, 2.0, 4.0]
+            } else {
+                &[1.0, 3.0]
+            };
+            let mut collector = ScenarioCollector::new(&instrument, pvs.len(), antithetic, false)
+                .expect("collector");
+            for &pv in pvs {
+                collector.record_deal(pv, 0.0);
+            }
+            let result = collector
+                .finalize(
+                    &pricer,
+                    StructuredCreditPricingMode::MonteCarlo {
+                        num_paths: 2,
+                        antithetic,
+                    },
+                )
+                .expect("two independent estimators define sampling uncertainty");
+            let critical = 1.0 / (std::f64::consts::PI * 0.025).tan();
+            assert_eq!(result.npv.amount(), 2.0);
+            assert_eq!(result.pv_std_error, 1.0);
+            assert!((result.pv_confidence_interval.0 - (2.0 - critical)).abs() < 1e-10);
+            assert!((result.pv_confidence_interval.1 - (2.0 + critical)).abs() < 1e-10);
+        }
+    }
+
+    #[test]
+    fn deal_pv_statistics_reject_insufficient_or_incomplete_estimators() {
+        assert!(deal_pv_estimator_stats(&[], false).is_err());
+        assert!(deal_pv_estimator_stats(&[1.0], false).is_err());
+        assert!(deal_pv_estimator_stats(&[1.0, 3.0], true).is_err());
+        assert!(deal_pv_estimator_stats(&[1.0, 3.0, 2.0], true).is_err());
     }
 
     #[test]
@@ -1908,7 +1932,7 @@ mod tests {
     /// When `delta = 0.05` (`delta² = 0.0025 ≪ 0.555`) the two terms in the
     /// subtraction are identical in f64, so the naive form returns **exactly
     /// zero**, collapsing `pv_std_error` to zero even though the true value is
-    /// `0.05 / √1000 ≈ 0.00158`.
+    /// `0.05 / √999 ≈ 0.00158` after the sample-variance correction.
     ///
     /// This test drives `ScenarioCollector` directly with synthetic path outputs
     /// whose population variance is known exactly, then verifies that the
@@ -1958,9 +1982,9 @@ mod tests {
             .expect("valid pricing result");
 
         // True population variance = delta² = 0.0025
-        // True std_error of the mean = 0.05 / sqrt(1000) ≈ 0.001581
+        // Bessel-corrected standard error = 0.05 / sqrt(999).
         let true_pop_var: f64 = delta * delta; // = 0.0025
-        let true_std_error = true_pop_var.sqrt() / (n as f64).sqrt();
+        let true_std_error = true_pop_var.sqrt() / ((n - 1) as f64).sqrt();
 
         // The E[X²]-E[X]² form collapses sq_sum/n − mean² to exactly 0.0 here:
         // delta² = 0.0025 is below the ~0.555 ULP of mean², so the subtraction
@@ -2003,7 +2027,9 @@ mod tests {
 
         // Plain i.i.d. estimator treats all 1000 paths as independent: it
         // sees per-path population variance = 25 and reports a non-zero SE.
-        let iid_se = deal_pv_std_error(&pvs, false);
+        let iid_se = deal_pv_estimator_stats(&pvs, false)
+            .expect("valid observations")
+            .stderr();
         assert!(
             iid_se > 0.0,
             "i.i.d. estimator should see per-path dispersion (got {iid_se})"
@@ -2011,7 +2037,9 @@ mod tests {
 
         // Pair-aware estimator: every pair averages to exactly 1e7, so the
         // pair-mean variance — and therefore the SE — is zero.
-        let pair_se = deal_pv_std_error(&pvs, true);
+        let pair_se = deal_pv_estimator_stats(&pvs, true)
+            .expect("complete pairs")
+            .stderr();
         assert!(
             pair_se.abs() < 1e-9,
             "antithetic SE must be ~0 when every pair averages identically; \
@@ -2044,20 +2072,29 @@ mod tests {
             pvs.push(pair_mean - spread);
         }
 
-        let reported = deal_pv_std_error(&pvs, true);
+        let reported = deal_pv_estimator_stats(&pvs, true)
+            .expect("complete pairs")
+            .stderr();
 
         // Independent recomputation: collapse each pair to its mean, then take
         // the plain SE over the n/2 pair means.
         let pair_means: Vec<f64> = pvs.chunks(2).map(|p| (p[0] + p[1]) / 2.0).collect();
-        let expected = sample_std_error(&pair_means);
+        let mean = pair_means.iter().sum::<f64>() / n_pairs as f64;
+        let sample_var =
+            pair_means.iter().map(|pv| (pv - mean).powi(2)).sum::<f64>() / (n_pairs - 1) as f64;
+        let expected = (sample_var / n_pairs as f64).sqrt();
+        // Welford and the two-pass reference accumulate different rounding
+        // at a 1e7 PV level; require seven significant digits in the SE.
         assert!(
-            (reported - expected).abs() < 1e-9,
+            (reported - expected).abs() / expected < 1e-7,
             "pair-aware SE {reported} must match pair-mean recomputation {expected}"
         );
 
         // The i.i.d. estimator sees the huge ±100 per-path swing and reports a
         // far larger SE; antithetic mode must NOT inflate variance beyond it.
-        let iid = deal_pv_std_error(&pvs, false);
+        let iid = deal_pv_estimator_stats(&pvs, false)
+            .expect("valid observations")
+            .stderr();
         assert!(
             reported <= iid,
             "antithetic SE {reported} must not exceed the i.i.d. SE {iid}"

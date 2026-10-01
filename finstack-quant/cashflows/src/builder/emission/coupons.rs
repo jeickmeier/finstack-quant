@@ -159,7 +159,7 @@ fn observed_overnight_rate(
                 .into(),
         ));
     }
-    let rate = fwd.rate_period(t, t_end) * curve_year_fraction / index_year_fraction;
+    let rate = fwd.rate_period(t, t_end) * (curve_year_fraction / index_year_fraction);
     if !rate.is_finite() {
         return Err(finstack_quant_core::Error::Validation(
             "overnight projection produced a non-finite index rate".into(),

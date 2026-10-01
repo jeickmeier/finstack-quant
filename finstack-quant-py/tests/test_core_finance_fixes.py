@@ -72,5 +72,5 @@ def test_zero_dated_cashflows_do_not_change_xirr() -> None:
 @pytest.mark.parametrize("amounts", [(-100.0, 100.0, -100.0), (-1.0, 10000.0, -100000000.0)])
 def test_rootless_xirr_is_rejected_with_earlier_zero(amounts: tuple[float, float, float]) -> None:
     flows = [("2030-01-01", amounts[0]), ("2031-01-01", amounts[1]), ("2032-01-01", amounts[2])]
-    with pytest.raises(ValueError, match="no convergence"):
+    with pytest.raises(ValueError, match="exactly one sign change"):
         mwr_xirr([("2025-01-01", 0.0), *flows])

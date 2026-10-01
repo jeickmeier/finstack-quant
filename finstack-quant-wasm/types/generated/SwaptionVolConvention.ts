@@ -5,6 +5,7 @@
  */
 export type SwaptionVolConvention = "normal" | "lognormal" | { "shifted_lognormal": {
 /**
- * Shift amount for negative rate handling
+ * Finite positive additive shift in decimal rate units, applied to
+ * both forwards and strikes and retained in calibrated artifacts.
  */
 shift: number, } };

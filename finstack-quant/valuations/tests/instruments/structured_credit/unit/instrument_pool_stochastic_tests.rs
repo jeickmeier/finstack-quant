@@ -369,7 +369,7 @@ fn stochastic_result_money_fields_share_the_pool_currency() {
     let deal = parity_deal(60_000_000.0);
     let market = market_with_curves(CLOSING);
     let result = deal
-        .price_stochastic_with_mode(&market, CLOSING, monte_carlo(1))
+        .price_stochastic_with_mode(&market, CLOSING, monte_carlo(2))
         .expect("pricing");
     assert_eq!(result.npv.currency(), Currency::USD);
     assert_eq!(result.expected_collateral_draws.currency(), Currency::USD);

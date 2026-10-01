@@ -69,7 +69,8 @@ impl StructuredCredit {
     }
 
     /// Monte Carlo with `model_config.mc_paths` independent estimators
-    /// (default 5,000) and `model_config.mc_antithetic` pairing (default on).
+    /// (minimum two, default 5,000) and `model_config.mc_antithetic` pairing
+    /// (default on). Each antithetic pair counts as one estimator.
     fn default_stochastic_pricing_mode(&self) -> StructuredCreditPricingMode {
         let model_config = &self.instrument_pricing_overrides.model_config;
         StructuredCreditPricingMode::MonteCarlo {

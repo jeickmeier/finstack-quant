@@ -1381,7 +1381,12 @@ mod tests {
             let forward = ForwardCurve::builder("USD-SOFR-OIS", 1.0 / 365.0)
                 .base_date(as_of)
                 .day_count(DayCount::Act365F)
-                .knots([(0.0, 0.05), (3.0, 0.05)])
+                // The analytical coupon below assumes a 5% ACT/365L index;
+                // raw curve rates must represent it on their ACT/365F basis.
+                .knots([
+                    (0.0, 0.05 * 365.0 / denominator),
+                    (3.0, 0.05 * 365.0 / denominator),
+                ])
                 .build()
                 .expect("flat overnight curve");
             let vol = VolSurface::builder("TEST-VOL")

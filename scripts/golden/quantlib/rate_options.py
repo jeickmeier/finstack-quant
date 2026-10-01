@@ -512,7 +512,7 @@ def _build_swaption_fixture(
         "market": market_snapshot(
             [
                 flat_discount_curve("USD-OIS", discount_rate),
-                flat_forward_curve("USD-TERM-1Y", forward_rate),
+                flat_forward_curve("USD-TERM-1Y", forward_rate, day_count="act_365f"),
             ],
             surfaces=[
                 {

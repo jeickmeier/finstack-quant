@@ -69,7 +69,8 @@ use crate::monte_carlo::estimate::Estimate;
 ///
 /// An [`Estimate`] carrying the adjusted mean, plug-in standard error, and
 /// a 95 % confidence interval. When `num_samples < 2`, returns the raw
-/// `mc_mean` with zero stderr.
+/// `mc_mean` with `NaN` stderr and confidence bounds, and no sample standard
+/// deviation, because sampling uncertainty cannot be estimated.
 pub fn apply_control_variate(
     mc_mean: f64,
     mc_var: f64,
@@ -80,8 +81,7 @@ pub fn apply_control_variate(
     num_samples: usize,
 ) -> Estimate {
     if num_samples < 2 {
-        let ci_95 = (mc_mean, mc_mean);
-        return Estimate::new(mc_mean, 0.0, ci_95, num_samples).with_std_dev(0.0);
+        return Estimate::new(mc_mean, f64::NAN, (f64::NAN, f64::NAN), num_samples);
     }
 
     // Optimal beta coefficient
@@ -173,8 +173,8 @@ mod tests {
     }
 
     #[test]
-    /// A single sample must yield 0.0, not NaN -- `apply_control_variate`
-    /// relies on it (see `control_variate_handles_single_sample_without_nan`).
+    /// The covariance utility retains its zero singleton convention; the
+    /// control-variate estimate separately reports unknown sampling uncertainty.
     fn covariance_returns_zero_for_single_sample() {
         assert_eq!(
             finstack_quant_core::math::stats::covariance(&[1.0], &[2.0]),
@@ -183,11 +183,15 @@ mod tests {
     }
 
     #[test]
-    fn control_variate_handles_single_sample_without_nan() {
-        let estimate = apply_control_variate(10.0, 1.0, 9.5, 0.5, 0.2, 9.0, 1);
-        assert_eq!(estimate.mean, 10.0);
-        assert_eq!(estimate.stderr, 0.0);
-        assert_eq!(estimate.ci_95, (10.0, 10.0));
-        assert_eq!(estimate.std_dev, Some(0.0));
+    fn control_variate_reports_unknown_uncertainty_for_insufficient_samples() {
+        for num_samples in [0, 1] {
+            let estimate = apply_control_variate(10.0, 1.0, 9.5, 0.5, 0.2, 9.0, num_samples);
+            assert_eq!(estimate.mean, 10.0);
+            assert!(estimate.stderr.is_nan());
+            assert!(estimate.ci_95.0.is_nan());
+            assert!(estimate.ci_95.1.is_nan());
+            assert_eq!(estimate.std_dev, None);
+            assert_eq!(estimate.num_paths, num_samples);
+        }
     }
 }

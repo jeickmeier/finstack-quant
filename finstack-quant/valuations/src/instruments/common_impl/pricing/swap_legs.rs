@@ -248,18 +248,20 @@ mod tests {
 
     #[test]
     fn relative_df_discount_curve_accepts_small_absolute_df() {
-        // Create a curve with very small absolute DFs (stress scenario).
-        // The new policy accepts these as long as the RELATIVE DF between dates is valid.
+        // Keep DF(0) = 1, then value a seasoned period whose two absolute
+        // discount factors are tiny but whose relative factor remains valid.
         let base_date = date(2024, 1, 1);
+        let as_of = base_date + time::Duration::days(365);
+        let target = base_date + time::Duration::days(730);
         let disc = DiscountCurve::builder(CurveId::new("EXTREME"))
             .base_date(base_date)
-            .knots(vec![(0.0, 1e-12), (1.0, 1e-15)]) // Very small DFs
+            .day_count(DayCount::Act365F)
+            .knots(vec![(0.0, 1.0), (1.0, 1e-12), (2.0, 1e-15)])
             .build()
             .expect("curve should build");
 
-        // Under the new policy, df_between_dates computes df(target) / df(as_of)
-        // = 1e-15 / 1e-12 = 0.001, which is a valid positive relative DF.
-        let result = relative_df_discount_curve(&disc, base_date, date(2025, 1, 1));
+        // DF(target) / DF(as_of) = 1e-15 / 1e-12 = 0.001.
+        let result = relative_df_discount_curve(&disc, as_of, target);
         assert!(
             result.is_ok(),
             "Small absolute DFs should be accepted if relative DF is valid: {:?}",

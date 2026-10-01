@@ -94,7 +94,10 @@ strike: number,
  */
 vol: number,
 /**
- * Volatility quoting convention.
+ * Volatility quoting convention. Shifted Black quotes require a
+ * `ShiftedLognormal` calibration plan supplying their displacement;
+ * Hull-White calibration rejects them because its quote contract
+ * carries no displacement.
  */
 quote_type: string,
 /**
@@ -119,7 +122,9 @@ strike: number,
  */
 vol: number,
 /**
- * Volatility quoting convention.
+ * Volatility quoting convention. Hull-White calibration accepts
+ * normal and unshifted Black quotes; it rejects shifted Black
+ * because this quote does not carry a displacement.
  */
 quote_type: string,
 /**

@@ -810,6 +810,15 @@ returns a `StochasticPricingResult` with the tranche shares of the draw
 option cost and its per-path distribution (`draw_option_cost_dataframe()`).
 WASM carries the same fields in the deal JSON.
 
+Structured-credit Monte Carlo requires at least two independent estimators.
+The `num_paths` argument and `model_config.mc_paths` count those estimators;
+an antithetic estimator averages a mirrored pair, so the result's `num_paths`
+reports twice that many simulated scenarios when pairing is enabled. Present-value
+sampling uncertainty uses the sample standard deviation divided by the square
+root of the independent-estimator count, and a two-sided 95% Student-t interval
+with one fewer degree of freedom. These calculations use pair averages when
+antithetics are enabled.
+
 Both bindings expose structured credit under their `instruments` namespace:
 
 - **Python** (`finstack_quant.valuations.instruments`): typed

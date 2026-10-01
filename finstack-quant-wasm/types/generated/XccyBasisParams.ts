@@ -36,7 +36,7 @@ fx_spot: number,
  */
 domestic_discount_id: string,
 /**
- * Calibration method to use.
+ * Sequential bootstrap method. `GlobalSolve` is unsupported and rejected.
  */
 method: CalibrationMethod,
 /**

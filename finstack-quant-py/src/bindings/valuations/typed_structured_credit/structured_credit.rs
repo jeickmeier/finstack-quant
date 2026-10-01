@@ -363,9 +363,11 @@ impl PyStructuredCredit {
     /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
     ///     Valuation date.
     /// num_paths : int, optional
-    ///     Number of independent Monte Carlo estimators; defaults to the deal's
-    ///     configured ``mc_paths`` override or 5,000. With ``antithetic`` each
-    ///     estimator simulates a mirrored pair, so ``2 * num_paths`` paths run.
+    ///     Number of independent Monte Carlo estimators; must be at least two.
+    ///     Defaults to the deal's configured ``mc_paths`` override or 5,000.
+    ///     With ``antithetic`` each estimator averages a mirrored pair, so
+    ///     ``2 * num_paths`` physical paths run while the statistical sample
+    ///     size remains ``num_paths``.
     /// antithetic : bool, default True
     ///     Pair each estimator's path with its sign-flipped mirror.
     ///
@@ -373,12 +375,15 @@ impl PyStructuredCredit {
     /// -------
     /// StochasticPricingResult
     ///     Deal and tranche present values, loss statistics, Monte Carlo
-    ///     error, draw diagnostics and the draw option cost.
+    ///     error, draw diagnostics and the draw option cost. Sampling error
+    ///     uses the sample standard deviation and a 95% Student-t confidence
+    ///     interval with ``num_paths - 1`` degrees of freedom.
     ///
     /// Raises
     /// ------
     /// ValueError
-    ///     If the deal fails validation or ``num_paths`` is zero.
+    ///     If the deal fails validation or the resolved ``num_paths`` is less
+    ///     than two independent estimators.
     /// KeyError
     ///     If a required curve is missing from ``market``.
     /// RuntimeError

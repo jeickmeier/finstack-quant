@@ -41,9 +41,11 @@ initial_kappa: number | null,
  */
 initial_sigma: number | null,
 /**
- * Payment frequency used to decompose quoted caps/floors into caplets.
+ * Term-rate index defining settlement, reset tenor, accrual day count,
+ * calendar, business-day adjustments, and payment lag for caplets.
+ * Its currency must match `currency`; overnight indices are unsupported.
  */
-payment_frequency: string,
+index_id: string,
 /**
  * Scalar or expiry-bootstraped piecewise short-rate volatility calibration.
  */

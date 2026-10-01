@@ -7,7 +7,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
-use finstack_quant_core::math::interp::InterpStyle;
+use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::money::Money;
 pub use finstack_quant_test_utils::assert::{approx_eq, in_range};
 use finstack_quant_valuations::instruments::rates::fra::ForwardRateAgreement;
@@ -64,7 +64,9 @@ pub fn build_flat_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> 
             (5.0, (-rate * 5.0).exp()),
             (10.0, (-rate * 10.0).exp()),
         ])
-        .interp(InterpStyle::Linear);
+        .interp(InterpStyle::Linear)
+        // Long-tenor risk buckets must see positive DFs beyond the last pillar.
+        .extrapolation(ExtrapolationPolicy::FlatZero);
     let builder = if rate < 0.0 {
         builder.validation(
             finstack_quant_core::market_data::term_structures::ValidationMode::NegativeRateFriendly {

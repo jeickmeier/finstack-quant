@@ -1069,14 +1069,60 @@ fn test_irs_forward_curve_daycount_used_for_projection() {
         pv_360
     );
 
-    // The PVs should be slightly different due to different time calculations
-    // in forward rate projection (ACT/365F vs ACT/360 will give different t values)
-    // For a 5Y swap with upward sloping rates, the difference should be measurable
-    let diff = (pv_365 - pv_360).abs();
-    let diff_pct = diff / pv_365.abs() * 100.0;
+    // The curve clock controls both the reset lookup and annualization of the
+    // raw curve rate. For each period the floating growth is rate(t_reset)
+    // times the curve time span; the fixed growth remains K times ACT/360.
+    let periods = build_periods(BuildPeriodsParams {
+        start,
+        end,
+        frequency: Tenor::quarterly(),
+        stub: StubKind::None,
+        business_day_convention: BusinessDayConvention::ModifiedFollowing,
+        calendar_id: "weekends_only",
+        end_of_month: false,
+        day_count: DayCount::Act360,
+        payment_lag_days: 0,
+        reset_lag_days: Some(0),
+        adjust_accrual_dates: false,
+        roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
+    })
+    .unwrap();
+    for (market, curve_id, pv) in [
+        (&market_365, "USD-SOFR-365", pv_365),
+        (&market_360, "USD-SOFR-360", pv_360),
+    ] {
+        let forward = market.get_forward(curve_id).unwrap();
+        let discount = market.get_discount("USD-OIS").unwrap();
+        let curve_time = |date| {
+            forward
+                .day_count()
+                .year_fraction(as_of, date, DayCountContext::default())
+                .unwrap()
+        };
+        let expected: f64 = periods
+            .iter()
+            .map(|period| {
+                let curve_accrual =
+                    curve_time(period.accrual_end) - curve_time(period.accrual_start);
+                let reset_time = curve_time(period.reset_date.unwrap());
+                let floating_growth = forward.rate(reset_time) * curve_accrual;
+                let fixed_growth = 0.04 * period.accrual_year_fraction;
+                10_000_000.0
+                    * (floating_growth - fixed_growth)
+                    * discount.df_on_date_curve(period.payment_date).unwrap()
+            })
+            .sum();
+        assert!(
+            (pv - expected).abs() < 1e-6,
+            "{curve_id}: PV={pv}, independent period sum={expected}"
+        );
+    }
 
-    // The difference should exist (forward curve day count is being used)
-    // but be relatively small (< 1% of PV)
+    let diff = (pv_365 - pv_360).abs();
+
+    // Identical raw nodes on different clocks represent different economics.
+    // Their PVs must differ, with no arbitrary percentage bound relative to
+    // an off-market swap's potentially small net PV.
     assert!(
         diff > 1.0,
         "Different forward curve day counts should produce measurable PV difference.\n\
@@ -1084,11 +1130,6 @@ fn test_irs_forward_curve_daycount_used_for_projection() {
         pv_365,
         pv_360,
         diff
-    );
-    assert!(
-        diff_pct < 5.0,
-        "Day count difference impact should be < 5% of PV, got {:.2}%",
-        diff_pct
     );
 }
 

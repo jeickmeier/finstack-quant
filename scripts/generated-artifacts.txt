@@ -476,7 +476,6 @@ finstack-quant-wasm/types/generated/RateQuote.ts
 finstack-quant-wasm/types/generated/RatesStepConventions.ts
 finstack-quant-wasm/types/generated/ResidualWeightingScheme.ts
 finstack-quant-wasm/types/generated/SabrInterpolationMethod.ts
-finstack-quant-wasm/types/generated/SeasonalFactors.ts
 finstack-quant-wasm/types/generated/Severity.ts
 finstack-quant-wasm/types/generated/SolverConfig.ts
 finstack-quant-wasm/types/generated/StepParams.ts

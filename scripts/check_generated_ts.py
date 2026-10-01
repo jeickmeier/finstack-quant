@@ -22,27 +22,29 @@ def files_by_relative_path(directory: Path) -> dict[str, bytes]:
     }
 
 
-def git_tracked_relative_paths(directory: Path, *, root: Path = ROOT) -> list[str]:
-    """Return git-recorded paths relative to ``directory``, preserving case."""
+def git_worktree_relative_paths(directory: Path, *, root: Path = ROOT) -> list[str]:
+    """List present tracked and untracked files, preserving git-recorded case."""
     git = shutil.which("git")
     if git is None:
-        raise RuntimeError("git is required to compare committed TypeScript declaration names")
+        raise RuntimeError("git is required to compare tracked TypeScript declaration names")
     rel = directory.relative_to(root).as_posix()
     result = subprocess.run(  # noqa: S603
-        [git, "ls-files", "-z", "--", rel],
+        [git, "ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", rel],
         cwd=root,
         check=True,
         capture_output=True,
     )
     prefix = f"{rel}/"
-    return [
-        text[len(prefix) :] for raw in result.stdout.split(b"\0") if (text := raw.decode()) and text.startswith(prefix)
-    ]
+    return sorted({
+        text[len(prefix) :]
+        for raw in result.stdout.split(b"\0")
+        if (text := raw.decode()) and text.startswith(prefix) and (root / text).is_file()
+    })
 
 
 def files_by_git_path(directory: Path, *, root: Path = ROOT) -> dict[str, bytes]:
-    """Read committed generated files keyed by git-recorded relative paths."""
-    return {name: (directory / name).read_bytes() for name in git_tracked_relative_paths(directory, root=root)}
+    """Read worktree declarations using git-recorded names for tracked files."""
+    return {name: (directory / name).read_bytes() for name in git_worktree_relative_paths(directory, root=root)}
 
 
 def inventory_drift(expected: dict[str, bytes], actual: dict[str, bytes]) -> tuple[list[str], list[str], list[str]]:
