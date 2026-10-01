@@ -283,6 +283,13 @@ for (const statement of sourceFile.statements) {
   }
 }
 
+// A JSDoc block followed directly by another documents nothing: only the last
+// block before a declaration is attached to it.
+for (const match of sourceText.matchAll(/\*\/[ \t]*\n[ \t]*\/\*\*/g)) {
+  const line = sourceFile.getLineAndCharacterOfPosition(match.index).line + 1;
+  failures.push(`${declarationPath}:${line}: orphan JSDoc block before another JSDoc block`);
+}
+
 if (failures.length > 0) {
   if (process.argv.includes('--summary')) {
     const summary = new Map();

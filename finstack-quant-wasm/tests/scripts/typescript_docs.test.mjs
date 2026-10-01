@@ -223,12 +223,15 @@ test('synchronizer documents `<Name>Instrument` interfaces from the raw class', 
   assert.doesNotMatch(updated, /per 1\.0 absolute move/);
 });
 
-test('checker rejects placeholders, template units, internal names and repeated parameters', (t) => {
+test('checker rejects placeholders, template units, internal names, repeats and orphan blocks', (t) => {
   const paths = temporaryDeclarations(t, {
     'bad.d.ts': `/**
  * Facade interface used to exercise the documentation checker.
  */
 export interface Sample {
+  /**
+   * Stale description left above the real one.
+   */
   /**
    * Calibrate against the supplied instrument.
    * @param instrument - Instrument used by this call.
@@ -267,7 +270,8 @@ export interface Sample {
   assert.match(result.stderr, /Sample\.theta: contains template Greek unit/);
   assert.match(result.stderr, /Sample\.currency: names the internal Rust wrapper \[`JsCurrency`\]/);
   assert.match(result.stderr, /Sample\.lookback: documents @param `refDate` more than once/);
-  assert.match(result.stderr, /5 error\(s\)/);
+  assert.match(result.stderr, /orphan JSDoc block before another JSDoc block/);
+  assert.match(result.stderr, /6 error\(s\)/);
 });
 
 test('checker accepts concrete contracts and rejects exact legacy shapes', () => {

@@ -11123,14 +11123,6 @@ export interface CorrelationNamespace {
    */
   validateCorrelationMatrix(matrix: NumericArray, n: number): void;
   /**
-   * Nearest correlation matrix (Higham 2002) for a near-PSD input.
-   *
-   * Projects a symmetric, near-unit-diagonal, near-PSD matrix onto the set of
-   * valid correlation matrices in Frobenius norm. Gross input violations
-   * (asymmetry > 1e-6 or diagonal far from 1) throw rather than being silently
-   * reshaped. Returns the flat row-major result as a `Float64Array`.
-   */
-  /**
    * Nearest correlation matrix (Higham 2002).
    *
    * Given a flat row-major `n*n` matrix that is approximately a correlation
