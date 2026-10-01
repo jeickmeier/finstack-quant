@@ -1,10 +1,10 @@
 "use client";
 import type { ExampleProps } from "./props";
-import model from "../../../../../finstack-quant-ui/src/fixtures/statements/analyst-model.json";
-import checkSuite from "../../../../../finstack-quant-ui/src/fixtures/statements/analyst-checks.json";
-import rolledQ2 from "../../../../../finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q2.json";
-import rolledQ3 from "../../../../../finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q3.json";
-import rolledQ4 from "../../../../../finstack-quant-ui/src/fixtures/statements/roll-forward-2025Q4.json";
+import model from "finstack-quant-ui/fixtures/statements/analyst-model.json";
+import checkSuite from "finstack-quant-ui/fixtures/statements/analyst-checks.json";
+import rolledQ2 from "finstack-quant-ui/fixtures/statements/roll-forward-2025Q2.json";
+import rolledQ3 from "finstack-quant-ui/fixtures/statements/roll-forward-2025Q3.json";
+import rolledQ4 from "finstack-quant-ui/fixtures/statements/roll-forward-2025Q4.json";
 import type { FinancialModelSpecWire } from "@/lib/finstack/generated/types/financial_model_spec";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
 import { FinancialModelEditor } from "@/components/finstack/statements/components/financial-model-editor/financial-model-editor";

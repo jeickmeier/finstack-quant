@@ -9,6 +9,7 @@
   "exports": {
     "./instruments": "./src/generated/instruments.ts",
     "./codec": "./src/codec.mjs",
+    "./fixtures/*": "./src/fixtures/*",
     "./host": "./src/host.ts",
     "./views": "./src/views.ts"
   },
