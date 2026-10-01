@@ -2,6 +2,34 @@
 
 ## [Unreleased]
 
+### WASM binding audit: schema accessors (2026-10-01)
+
+#### Added
+
+- WASM `schema` namespaces mirror Python: a root `schema` (`index`, `get`, `validate`, `domains`) and a `schema` sub-namespace on `core`, `attribution`, `calibration`, `cashflows` (plus `resources`), `margin`, `models.factor`, `portfolio`, `scenarios`, `statements` and `valuations` (plus `validateInstrumentEnvelopeJson` and `validateInstrumentTypeJson`). They return plain objects where Python returns JSON text.
+- `finstack_quant::schema::domains()`; the Python binding calls it.
+
+#### Changed
+
+- The release WASM package grows by about 24% (29.7 MB to 36.8 MB optimized, 5.15 MB to 6.07 MB brotli), because the schema registries and the JSON Schema validator are now compiled in.
+
+### WASM binding audit: literal twins, naming and host behaviour (2026-10-01)
+
+#### Changed (BREAKING)
+
+- `StructuredCredit::price_stochastic(market, as_of, num_paths, antithetic)` is the single stochastic entry in Rust, Python and WASM; `price_stochastic_monte_carlo` is removed. An omitted `antithetic` now uses the deal's `mc_antithetic` setting. The bindings used to hard-code `true`, so a deal configured with `mc_antithetic = false` prices differently.
+- Python `Portfolio.to_spec_json()` is replaced by `to_json()`, and `to_spec()` returns the spec as a dict. WASM gains `Portfolio.toSpec()`.
+- The Hull-White curve-input calibrators take the short names: `calibrate_hull_white_to_swaptions`, `calibrate_hull_white_to_cap_floors` and `bootstrap_hull_white_sigma_schedule_to_cap_floors`. The closure-input forms are now `*_with_fn`.
+- WASM: 40 zero-argument enum-constructor functions in `scenarios` and `margin` are removed (for example `curveKindDiscount()`, `compoundingAnnual()`, `imMethodologySimm()`, `marginTenorDaily()`). Use the string or object literal of the generated type.
+- WASM `ScheduleBuilder` setters update the builder in place and return it; they used to return a new builder. `MarketContext.insert*` and `mapCollateral` return the context; they used to return nothing. Both now match Python.
+- Python `SensitivityMatrix.delta` / `position_deltas` / `factor_deltas` raise `ValueError` with the Rust message for an out-of-range index.
+
+#### Added
+
+- Rust `SensitivityMatrix::try_delta` / `try_position_deltas` / `try_factor_deltas`, `PortfolioMetrics::require_total` and `PortfolioOptimizationResultWire::to_trade_list`.
+- WASM `portfolio`: `constraintBudget`, `constraintWeightBounds`, `constraintMaxTurnover`, `constraintExposureLimit`, `constraintExposureMinimum`, `sensitivityMatrixDelta`, `sensitivityMatrixPositionDeltas`, `sensitivityMatrixFactorDeltas`, `portfolioMetricsRequireTotal` and `portfolioOptimizationResultToTradeList`.
+- The parity ledger has a `literal` exclusion reason for members that only construct a plain data value. The Python↔WASM backlog is empty.
+
 ### WASM binding audit: executable examples and contributor docs (2026-10-01)
 
 #### Changed (BREAKING)

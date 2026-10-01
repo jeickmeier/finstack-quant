@@ -121,6 +121,7 @@
       "pnlAttributionResidualWithinTolerance",
       "pnlAttributionValidateCurrencies",
       "pnlBridge",
+      "schema",
       "validateAttributionJson",
       "validateReturnContributionJson"
     ]
@@ -182,6 +183,19 @@
   "attribution.pnlAttributionRequiredMetrics": {
     "kind": "function"
   },
+  "attribution.schema": {
+    "kind": "namespace",
+    "keys": ["get", "index", "validate"]
+  },
+  "attribution.schema.index": {
+    "kind": "function"
+  },
+  "attribution.schema.get": {
+    "kind": "function"
+  },
+  "attribution.schema.validate": {
+    "kind": "function"
+  },
   "calibration": {
     "kind": "namespace",
     "keys": [
@@ -219,6 +233,7 @@
       "rateQuoteFra",
       "rateQuoteFutures",
       "rateQuoteSwap",
+      "schema",
       "validateCalibration",
       "validateCalibrationJson",
       "volQuoteCapFloorVol",
@@ -343,6 +358,19 @@
   "calibration.hullWhiteParamsSigmaAt": {
     "kind": "function"
   },
+  "calibration.schema": {
+    "kind": "namespace",
+    "keys": ["get", "index", "validate"]
+  },
+  "calibration.schema.index": {
+    "kind": "function"
+  },
+  "calibration.schema.get": {
+    "kind": "function"
+  },
+  "calibration.schema.validate": {
+    "kind": "function"
+  },
   "cashflows": {
     "kind": "namespace",
     "keys": [
@@ -431,6 +459,7 @@
       "scheduleParamsUsdTreasury",
       "scheduleParamsValidate",
       "scheduleWal",
+      "schema",
       "smmToCpr",
       "validateCashflowScheduleJson"
     ]
@@ -739,6 +768,22 @@
   "cashflows.validateCashflowScheduleJson": {
     "kind": "function"
   },
+  "cashflows.schema": {
+    "kind": "namespace",
+    "keys": ["get", "index", "resources", "validate"]
+  },
+  "cashflows.schema.index": {
+    "kind": "function"
+  },
+  "cashflows.schema.get": {
+    "kind": "function"
+  },
+  "cashflows.schema.validate": {
+    "kind": "function"
+  },
+  "cashflows.schema.resources": {
+    "kind": "function"
+  },
   "core": {
     "kind": "namespace",
     "keys": [
@@ -855,6 +900,7 @@
       "registryFromConfig",
       "sampleStdOrNan",
       "sampleVarianceOrNan",
+      "schema",
       "sifmaSettlementDate",
       "sifmaSettlementDateForClass",
       "singularThreshold",
@@ -1784,6 +1830,19 @@
   "core.longestPositiveRun": {
     "kind": "function"
   },
+  "core.schema": {
+    "kind": "namespace",
+    "keys": ["get", "index", "validate"]
+  },
+  "core.schema.index": {
+    "kind": "function"
+  },
+  "core.schema.get": {
+    "kind": "function"
+  },
+  "core.schema.validate": {
+    "kind": "function"
+  },
   "covenants": {
     "kind": "namespace",
     "keys": [
@@ -2126,6 +2185,7 @@
       "saCcrNettingSetConfigUnmargined",
       "saCcrNettingSetConfigValidate",
       "saccrEad",
+      "schema",
       "validateCsaJson",
       "vmResultNetMargin",
       "vmResultRequiresCall"
@@ -2424,6 +2484,19 @@
     "kind": "function"
   },
   "margin.vmResultRequiresCall": {
+    "kind": "function"
+  },
+  "margin.schema": {
+    "kind": "namespace",
+    "keys": ["get", "index", "validate"]
+  },
+  "margin.schema.index": {
+    "kind": "function"
+  },
+  "margin.schema.get": {
+    "kind": "function"
+  },
+  "margin.schema.validate": {
     "kind": "function"
   },
   "models": {
@@ -2918,7 +2991,7 @@
   },
   "models.factor": {
     "kind": "namespace",
-    "keys": ["credit", "risk"]
+    "keys": ["credit", "risk", "schema"]
   },
   "models.factor.credit": {
     "kind": "namespace",
@@ -3054,6 +3127,39 @@
     "kind": "function"
   },
   "models.factor.risk.defaultUtilizationThreshold": {
+    "kind": "function"
+  },
+  "models.factor.schema": {
+    "kind": "namespace",
+    "keys": [
+      "creditCalibrationConfigSchema",
+      "creditCalibrationInputsSchema",
+      "creditFactorModelSchema",
+      "factorModelConfigSchema",
+      "get",
+      "index",
+      "validate"
+    ]
+  },
+  "models.factor.schema.index": {
+    "kind": "function"
+  },
+  "models.factor.schema.get": {
+    "kind": "function"
+  },
+  "models.factor.schema.validate": {
+    "kind": "function"
+  },
+  "models.factor.schema.creditCalibrationConfigSchema": {
+    "kind": "function"
+  },
+  "models.factor.schema.creditCalibrationInputsSchema": {
+    "kind": "function"
+  },
+  "models.factor.schema.creditFactorModelSchema": {
+    "kind": "function"
+  },
+  "models.factor.schema.factorModelConfigSchema": {
     "kind": "function"
   },
   "models.liquidity": {
@@ -3533,6 +3639,7 @@
       "scenarioPnl",
       "scenarioPnlBatch",
       "scenarioPnlBuilt",
+      "schema",
       "sensitivityMatrixDelta",
       "sensitivityMatrixFactorDeltas",
       "sensitivityMatrixPositionDeltas",
@@ -3756,6 +3863,19 @@
   "portfolio.constraintExposureMinimum": {
     "kind": "function"
   },
+  "portfolio.schema": {
+    "kind": "namespace",
+    "keys": ["get", "index", "validate"]
+  },
+  "portfolio.schema.index": {
+    "kind": "function"
+  },
+  "portfolio.schema.get": {
+    "kind": "function"
+  },
+  "portfolio.schema.validate": {
+    "kind": "function"
+  },
   "scenarios": {
     "kind": "namespace",
     "keys": [
@@ -3803,6 +3923,7 @@
       "scenarioSpecMutatesInstruments",
       "scenarioSpecRequiresInstruments",
       "scenarioSpecWithHazardBumpMode",
+      "schema",
       "validateScenarioSpec"
     ]
   },
@@ -3941,6 +4062,35 @@
   "scenarios.horizonResultFactorContribution": {
     "kind": "function"
   },
+  "scenarios.schema": {
+    "kind": "namespace",
+    "keys": ["get", "index", "validate"]
+  },
+  "scenarios.schema.index": {
+    "kind": "function"
+  },
+  "scenarios.schema.get": {
+    "kind": "function"
+  },
+  "scenarios.schema.validate": {
+    "kind": "function"
+  },
+  "schema": {
+    "kind": "namespace",
+    "keys": ["domains", "get", "index", "validate"]
+  },
+  "schema.index": {
+    "kind": "function"
+  },
+  "schema.get": {
+    "kind": "function"
+  },
+  "schema.validate": {
+    "kind": "function"
+  },
+  "schema.domains": {
+    "kind": "function"
+  },
   "statements": {
     "kind": "namespace",
     "keys": [
@@ -3992,6 +4142,7 @@
       "normalizeJson",
       "parseAndCompile",
       "parseFormula",
+      "schema",
       "statementResultAllPeriods",
       "statementResultGet",
       "statementResultGetMoney",
@@ -4245,6 +4396,35 @@
     "kind": "function"
   },
   "statements.checkSuiteSpecBuiltinCheckNames": {
+    "kind": "function"
+  },
+  "statements.schema": {
+    "kind": "namespace",
+    "keys": [
+      "financialModelSpecSchema",
+      "get",
+      "index",
+      "normalizationConfigSchema",
+      "statementResultSchema",
+      "validate"
+    ]
+  },
+  "statements.schema.index": {
+    "kind": "function"
+  },
+  "statements.schema.get": {
+    "kind": "function"
+  },
+  "statements.schema.validate": {
+    "kind": "function"
+  },
+  "statements.schema.financialModelSpecSchema": {
+    "kind": "function"
+  },
+  "statements.schema.normalizationConfigSchema": {
+    "kind": "function"
+  },
+  "statements.schema.statementResultSchema": {
     "kind": "function"
   },
   "statements_analytics": {
@@ -6032,11 +6212,25 @@
   "valuations.schema": {
     "kind": "namespace",
     "keys": [
+      "get",
+      "index",
       "instrumentEnvelopeSchema",
       "instrumentSchema",
       "instrumentTypes",
+      "validate",
+      "validateInstrumentEnvelopeJson",
+      "validateInstrumentTypeJson",
       "valuationResultSchema"
     ]
+  },
+  "valuations.schema.index": {
+    "kind": "function"
+  },
+  "valuations.schema.get": {
+    "kind": "function"
+  },
+  "valuations.schema.validate": {
+    "kind": "function"
   },
   "valuations.schema.instrumentEnvelopeSchema": {
     "kind": "function"
@@ -6048,6 +6242,12 @@
     "kind": "function"
   },
   "valuations.schema.valuationResultSchema": {
+    "kind": "function"
+  },
+  "valuations.schema.validateInstrumentEnvelopeJson": {
+    "kind": "function"
+  },
+  "valuations.schema.validateInstrumentTypeJson": {
     "kind": "function"
   },
   "valuations.validateValuationResultJson": {
