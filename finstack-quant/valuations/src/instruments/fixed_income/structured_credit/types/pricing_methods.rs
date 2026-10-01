@@ -68,6 +68,75 @@ impl StructuredCredit {
         self.apply_stochastic_price_scenario(result)
     }
 
+    /// Monte Carlo stochastic pricing with optional estimator-count and
+    /// pairing overrides.
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market context supplying the discount and forward curves.
+    /// * `as_of` - Requested valuation date.
+    /// * `num_paths` - Number of independent estimators; `None` uses
+    ///   `model_config.mc_paths` (default 5,000).
+    /// * `antithetic` - Pair each estimator's path with its sign-flipped
+    ///   mirror, so the engine simulates `2 × num_paths` scenario paths.
+    ///
+    /// # Errors
+    ///
+    /// Returns the deal's validation error, or the Monte Carlo pricer's
+    /// error when a path cannot be simulated or discounted.
+    pub fn price_stochastic_monte_carlo(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+        num_paths: Option<usize>,
+        antithetic: bool,
+    ) -> finstack_quant_core::Result<StochasticPricingResult> {
+        let num_paths = num_paths.unwrap_or_else(|| {
+            self.instrument_pricing_overrides
+                .model_config
+                .mc_paths
+                .unwrap_or(5_000)
+        });
+        self.price_stochastic_with_mode(
+            market,
+            as_of,
+            StructuredCreditPricingMode::MonteCarlo {
+                num_paths,
+                antithetic,
+            },
+        )
+    }
+
+    /// Projected cashflows of one tranche from the deterministic simulation.
+    ///
+    /// # Arguments
+    ///
+    /// * `tranche_id` - Identifier of a tranche of this deal.
+    /// * `market` - Market context supplying the discount and forward curves.
+    /// * `as_of` - Requested valuation date.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::NotFound` when `tranche_id` is not a class of the
+    /// deal, and the simulation's error otherwise.
+    pub fn tranche_cashflows(
+        &self,
+        tranche_id: &str,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<super::TrancheCashflows> {
+        crate::instruments::fixed_income::structured_credit::pricing::run_simulation(
+            self, market, as_of,
+        )?
+        .remove(tranche_id)
+        .ok_or_else(|| {
+            finstack_quant_core::InputError::NotFound {
+                id: format!("tranche {tranche_id:?} of deal {:?}", self.id.as_str()),
+            }
+            .into()
+        })
+    }
+
     /// Monte Carlo with `model_config.mc_paths` independent estimators
     /// (default 5,000) and `model_config.mc_antithetic` pairing (default on).
     fn default_stochastic_pricing_mode(&self) -> StructuredCreditPricingMode {

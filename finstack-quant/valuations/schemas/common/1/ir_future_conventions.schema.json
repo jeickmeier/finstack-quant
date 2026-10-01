@@ -1,0 +1,192 @@
+{
+  "$defs": {
+    "FloatingLegCompounding": {
+      "description": "How the fixings of one accrual period combine into the period rate.\n\nOne canonical enum for every floating leg and coupon: swaps, basis and\ncross-currency legs, TRS financing, IR futures, FRN / loan / structured\ncredit coupons.\n\n| Variant | Period rate | Typical use |\n|---------|-------------|-------------|\n| `simple` | One term fixing / forward over the period | EURIBOR, Term SOFR, legacy IBOR |\n| `simple_average` | `(Σ rᵢ·dᵢ) / D` of daily overnight fixings | Averaged overnight loans, Fed-Funds futures |\n| `compounded_in_arrears` | `[∏(1 + rᵢ·dᵢ/B) − 1]·B/D` | SOFR / SONIA / €STR / TONA OIS (lookback 0) |\n| `compounded_with_observation_shift` | as above, observations and weights shifted | ISDA 2021 observation shift |\n| `compounded_with_rate_cutoff` | as above, last fixings frozen | ARRC lockout / SWPM \"Rate Cut-Off Days\" |\n\nDay counts are business days and must be non-negative.\n\n# References\n\n- ISDA 2021 Definitions, compounded RFR conventions `docs/REFERENCES.md#isda-2021-definitions`\n- ARRC (2020). \"SOFR: A User's Guide.\" `docs/REFERENCES.md#arrc-sofr-users-guide`\n- BoE SONIA conventions `docs/REFERENCES.md#boe-sonia-key-features`\n\n# Examples\n\n```\nuse finstack_quant_cashflows::builder::FloatingLegCompounding;\n\nassert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);\nassert_eq!(\n    FloatingLegCompounding::sofr(),\n    FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }\n);\n```",
+      "oneOf": [
+        {
+          "const": "simple",
+          "description": "Simple term-rate projection: one fixing or forward over the period.\n\n`Coupon = Notional × (Forward_Rate + Spread) × DCF`. This is the\ndefault; a registered overnight RFR index rejects it.",
+          "type": "string"
+        },
+        {
+          "const": "simple_average",
+          "description": "Arithmetic average of daily overnight fixings weighted by accrual days,\n`Rate = (Σ rᵢ·dᵢ) / D`, for instruments that contractually specify a\nsimple-average overnight index.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Compounded in arrears (overnight RFR rates).\n\n`Coupon = Notional × [∏(1 + rᵢ·dᵢ/B) − 1]` over the daily observations\nof the accrual period.",
+          "properties": {
+            "compounded_in_arrears": {
+              "additionalProperties": false,
+              "properties": {
+                "lookback_days": {
+                  "description": "Business days by which observation dates move backward while the\nday-count weights stay on the original accrual dates (\"lookback\nwithout observation shift\", ISDA 2021 / ARRC). `0` is plain\nin-arrears, the cleared-OIS convention.",
+                  "format": "uint32",
+                  "maximum": 31,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "lookback_days"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "compounded_in_arrears"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Compounded in arrears with ISDA 2021 observation shift: both the\nobservation dates and their day-count weights move back\n(ISDA 2021 Definitions Section 4.5(c)).",
+          "properties": {
+            "compounded_with_observation_shift": {
+              "additionalProperties": false,
+              "properties": {
+                "shift_days": {
+                  "description": "Business days to shift both observation dates and weights.",
+                  "format": "uint32",
+                  "maximum": 31,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "shift_days"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "compounded_with_observation_shift"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Compounded in arrears with a rate cut-off near the period end.\n\nThe last `cutoff_days` business-day observations are frozen at the\nfixing immediately preceding them: for fixings `b_1..b_n` the source is\n`b_{n-cutoff}`, so a positive cut-off must leave a preceding fixing.\nReference: ARRC, December 3, 2021 Statement, Appendix A (\"Lockout\").",
+          "properties": {
+            "compounded_with_rate_cutoff": {
+              "additionalProperties": false,
+              "properties": {
+                "cutoff_days": {
+                  "description": "Business days before period end over which the rate is frozen.",
+                  "format": "uint32",
+                  "maximum": 31,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "cutoff_days"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "compounded_with_rate_cutoff"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "IrFutureReferencePeriod": {
+      "description": "Rule for deriving an interest-rate future's reference period from its expiry.",
+      "oneOf": [
+        {
+          "const": "forward_starting",
+          "description": "The quoted expiry precedes the term-rate period; the period starts after the\nconfigured business-day settlement lag.",
+          "type": "string"
+        },
+        {
+          "const": "imm_quarter_in_arrears",
+          "description": "The quoted expiry is the business day before the ending IMM Wednesday; the\nreference period runs between IMM Wednesdays and settles in arrears.",
+          "type": "string"
+        },
+        {
+          "const": "calendar_month_in_arrears",
+          "description": "The reference period is the complete calendar month containing the quoted\nexpiry and settles in arrears.",
+          "type": "string"
+        },
+        {
+          "const": "business_month_in_arrears",
+          "description": "The reference period runs from the first business day in the expiry month\nto the first business day of the following month and settles in arrears.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/common/1/ir_future_conventions.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Contract conventions of one interest-rate future.",
+  "properties": {
+    "calendar_id": {
+      "description": "Calendar for business day adjustments.",
+      "type": "string"
+    },
+    "compounding": {
+      "$ref": "#/$defs/FloatingLegCompounding",
+      "description": "Exchange-defined averaging or fixing method for final settlement."
+    },
+    "convexity_adjustment": {
+      "default": null,
+      "description": "Optional convexity adjustment in rate terms.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "delivery_months": {
+      "description": "Number of delivery months for the underlying rate period.",
+      "format": "uint8",
+      "maximum": 255,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "face_value": {
+      "description": "Face value of the contract.",
+      "format": "double",
+      "type": "number"
+    },
+    "index_id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Underlying rate index identifier."
+    },
+    "reference_period": {
+      "$ref": "#/$defs/IrFutureReferencePeriod",
+      "description": "Rule used to derive the rate reference period from the quoted expiry."
+    },
+    "settlement_days": {
+      "description": "Business-day lag from expiry to period start for forward-starting contracts.\n\nThis must be zero for in-arrears reference-period rules.",
+      "format": "int32",
+      "type": "integer"
+    },
+    "tick_size": {
+      "description": "Tick size in price points.",
+      "format": "double",
+      "type": "number"
+    },
+    "tick_value": {
+      "description": "Tick value in currency units.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "index_id",
+    "compounding",
+    "reference_period",
+    "calendar_id",
+    "settlement_days",
+    "delivery_months",
+    "face_value",
+    "tick_size",
+    "tick_value"
+  ],
+  "title": "IrFutureConventions",
+  "type": "object"
+}

@@ -48,4 +48,16 @@ export const composite = {
    * before the first observation.
    */
   history: wasm.compositeHistory,
+  weightingMethodFixedQuantity: wasm.weightingMethodFixedQuantity,
+  weightingMethodNotionalWeighted: wasm.weightingMethodNotionalWeighted,
+  weightingMethodMetricWeighted: wasm.weightingMethodMetricWeighted,
+  weightingMethodDv01Neutral: wasm.weightingMethodDv01Neutral,
+  weightingMethodDeltaNeutral: wasm.weightingMethodDeltaNeutral,
+  weightingMethodDurationWeighted: wasm.weightingMethodDurationWeighted,
+  weightingMethodVolatilityWeighted: wasm.weightingMethodVolatilityWeighted,
+  rebalanceRuleManual: wasm.rebalanceRuleManual,
+  rebalanceRuleDates: wasm.rebalanceRuleDates,
+  rebalanceRuleCalendar: wasm.rebalanceRuleCalendar,
+  compositeLegSpecInstrumentDict: wasm.compositeLegSpecInstrumentDict,
+  compositeHistoryResultRowJson: wasm.compositeHistoryResultRowJson,
 };

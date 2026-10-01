@@ -17086,6 +17086,40 @@ class Tranche:
         """
         ...
 
+    @property
+    def oc_trigger(self) -> dict[str, Any] | None:
+        """
+        Per-tranche overcollateralization trigger as its ``CoverageTrigger`` serde ``dict``.
+
+        Returns
+        -------
+        dict[str, Any] | None
+            ``None`` without a trigger.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    @property
+    def ic_trigger(self) -> dict[str, Any] | None:
+        """
+        Per-tranche interest-coverage trigger as its ``CoverageTrigger`` serde ``dict``.
+
+        Returns
+        -------
+        dict[str, Any] | None
+            ``None`` without a trigger.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
 class TrancheBuilder:
     """
     Fluent builder returned by :meth:`Tranche.builder`.
@@ -17506,40 +17540,6 @@ class TrancheBuilder:
         ValueError
             If ``value`` is invalid or this builder was already consumed by a
             prior call to :meth:`TrancheBuilder.build`.
-        """
-        ...
-
-    @property
-    def oc_trigger(self) -> dict[str, Any] | None:
-        """
-        Per-tranche overcollateralization trigger as its ``CoverageTrigger`` serde ``dict``.
-
-        Returns
-        -------
-        dict[str, Any] | None
-            ``None`` without a trigger.
-
-        Raises
-        ------
-        ValueError
-            If the value cannot be serialized.
-        """
-        ...
-
-    @property
-    def ic_trigger(self) -> dict[str, Any] | None:
-        """
-        Per-tranche interest-coverage trigger as its ``CoverageTrigger`` serde ``dict``.
-
-        Returns
-        -------
-        dict[str, Any] | None
-            ``None`` without a trigger.
-
-        Raises
-        ------
-        ValueError
-            If the value cannot be serialized.
         """
         ...
 

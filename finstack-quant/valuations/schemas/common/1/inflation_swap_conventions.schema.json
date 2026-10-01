@@ -1,0 +1,59 @@
+{
+  "$defs": {
+    "InflationInterpolation": {
+      "description": "Interpolation method for CPI/RPI values between monthly observations.\n\nDetermines how index values are computed for dates between published\nmonthly levels. Different markets use different conventions.\n\n# Market Conventions\n\n- **US TIPS**: Linear interpolation (daily pro-rata)\n- **UK Index-Linked Gilts**: Linear interpolation with 3-month lag\n- **Euro inflation bonds**: Varies by issuer (typically linear)\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationInterpolation;\n\nlet linear = InflationInterpolation::Linear; // TIPS standard\nlet step = InflationInterpolation::Step;     // Conservative approach\n```",
+      "oneOf": [
+        {
+          "const": "step",
+          "description": "Last observation carried forward until next publication.\n\nConservative approach: assumes no intra-month inflation.",
+          "type": "string"
+        },
+        {
+          "const": "linear",
+          "description": "Linear interpolation between monthly observations.\n\nStandard for TIPS and most inflation-linked bonds.\nAssumes constant daily inflation rate within each month.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/common/1/inflation_swap_conventions.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Market conventions of one inflation-swap market.",
+  "properties": {
+    "business_day_convention": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
+      "description": "Business day convention."
+    },
+    "calendar_id": {
+      "description": "Calendar for payment/fixing.",
+      "type": "string"
+    },
+    "day_count": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+      "description": "Day count for the fixed leg."
+    },
+    "inflation_lag": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+      "description": "Inflation lag (observation lag) in months/period."
+    },
+    "interpolation": {
+      "$ref": "#/$defs/InflationInterpolation",
+      "description": "Monthly reference CPI rule: interpolated daily for USD, monthly step for EUR/UK."
+    },
+    "settlement_days": {
+      "description": "Settlement lag in business days.",
+      "format": "int32",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "calendar_id",
+    "settlement_days",
+    "business_day_convention",
+    "day_count",
+    "inflation_lag",
+    "interpolation"
+  ],
+  "title": "InflationSwapConventions",
+  "type": "object"
+}

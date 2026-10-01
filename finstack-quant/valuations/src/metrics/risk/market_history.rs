@@ -23,6 +23,7 @@ use std::sync::Arc;
 /// Represents the change in a market variable from its base value.
 /// For example, a +15bp shift in 5Y USD rates.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct RiskFactorShift {
     /// Risk factor being shifted
@@ -39,9 +40,14 @@ pub struct RiskFactorShift {
 /// Represents a complete market scenario that can be applied to revalue
 /// a portfolio. Each scenario contains shifts for all relevant risk factors.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct MarketScenario {
     /// Historical date this scenario represents
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub date: Date,
     /// All risk factor shifts on this date (relative to base date)
     pub shifts: Vec<RiskFactorShift>,
@@ -307,9 +313,14 @@ fn find_triangular_neighbors(tenor: f64) -> (Option<f64>, Option<f64>) {
 /// Stores a time series of market scenarios representing historical market
 /// shifts over a lookback window (e.g., last 500 days).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct MarketHistory {
     /// Base date (current market state reference point)
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub base_date: Date,
     /// Historical window size in days
     pub window_days: u32,

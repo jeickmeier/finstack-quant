@@ -766,3 +766,152 @@ impl core::fmt::Display for StructuredCredit {
         )
     }
 }
+
+/// Setters for single fields of the staged [`CreditModelConfig`].
+///
+/// `credit_model(...)` replaces the whole configuration; these setters change
+/// one field of the staged configuration (starting from
+/// [`CreditModelConfig::default`] when none was staged) and leave the rest.
+impl super::StructuredCreditBuilder {
+    fn staged_credit_model(&mut self) -> &mut CreditModelConfig {
+        self.credit_model
+            .get_or_insert_with(CreditModelConfig::default)
+    }
+
+    /// Set the deterministic prepayment model of the staged credit model.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - Prepayment curve and speed (CPR / PSA / SMM) applied to the
+    ///   collateral pool.
+    pub fn prepayment_spec(mut self, value: PrepaymentModelSpec) -> Self {
+        self.staged_credit_model().prepayment_spec = value;
+        self
+    }
+
+    /// Set the deterministic default model of the staged credit model.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - Default curve and rate (CDR / SDA / MDR) applied to the
+    ///   collateral pool.
+    pub fn default_spec(mut self, value: DefaultModelSpec) -> Self {
+        self.staged_credit_model().default_spec = value;
+        self
+    }
+
+    /// Set the deterministic recovery model of the staged credit model.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - Recovery rate (decimal fraction of defaulted par) and the
+    ///   recovery lag in months.
+    pub fn recovery_spec(mut self, value: RecoveryModelSpec) -> Self {
+        self.staged_credit_model().recovery_spec = value;
+        self
+    }
+
+    /// Set the stochastic prepayment model used by stochastic pricing.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - Factor-driven prepayment specification; replaces any
+    ///   previously staged one.
+    pub fn stochastic_prepay_spec(mut self, value: super::StochasticPrepaySpec) -> Self {
+        self.staged_credit_model().stochastic_prepay_spec = Some(value);
+        self
+    }
+
+    /// Set the stochastic default model used by stochastic pricing.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - Factor-driven default specification; replaces any
+    ///   previously staged one.
+    pub fn stochastic_default_spec(mut self, value: super::StochasticDefaultSpec) -> Self {
+        self.staged_credit_model().stochastic_default_spec = Some(value);
+        self
+    }
+
+    /// Set the stochastic recovery model used by stochastic pricing.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - Recovery specification (constant or market-correlated);
+    ///   without one, recoveries stay at `recovery_spec.rate`.
+    pub fn stochastic_recovery_spec(
+        mut self,
+        value: finstack_quant_models::correlation::RecoverySpec,
+    ) -> Self {
+        self.staged_credit_model().stochastic_recovery_spec = Some(value);
+        self
+    }
+
+    /// Set the correlation structure used by stochastic pricing.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - Asset and prepayment-default correlation structure of the
+    ///   collateral pool.
+    pub fn correlation_structure(mut self, value: super::CorrelationStructure) -> Self {
+        self.staged_credit_model().correlation_structure = Some(value);
+        self
+    }
+
+    /// Set the roll-rate delinquency model (asset and rep-line pools only).
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - Delinquency buckets, roll rates, servicer advancing and
+    ///   loan-modification assumptions.
+    pub fn delinquency(mut self, value: super::DelinquencyModel) -> Self {
+        self.staged_credit_model().delinquency = Some(value);
+        self
+    }
+
+    /// Set the credit-card master-trust portfolio model (asset and rep-line
+    /// pools only).
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - Payment rate, portfolio yield and charge-off rate that
+    ///   replace the prepayment, coupon and default assumptions.
+    pub fn card(mut self, value: super::CardPortfolioSpec) -> Self {
+        self.staged_credit_model().card = Some(value);
+        self
+    }
+}
+
+#[cfg(test)]
+mod builder_credit_model_tests {
+    use super::*;
+
+    #[test]
+    fn field_setters_edit_the_staged_credit_model() {
+        let prepayment = PrepaymentModelSpec::constant_cpr(0.123);
+        let default = DefaultModelSpec::constant_cdr(0.045);
+        let builder = StructuredCredit::builder()
+            .prepayment_spec(prepayment.clone())
+            .default_spec(default.clone());
+        let staged = builder.credit_model.as_ref().expect("staged credit model");
+        assert_eq!(staged.prepayment_spec.cpr, prepayment.cpr);
+        assert_eq!(staged.default_spec.cdr, default.cdr);
+        // The fields that were not set keep the defaults.
+        assert_eq!(
+            staged.recovery_spec.rate,
+            CreditModelConfig::default().recovery_spec.rate
+        );
+
+        // `credit_model` replaces the whole staged configuration.
+        let replaced = builder.credit_model(CreditModelConfig::default());
+        assert_eq!(
+            replaced
+                .credit_model
+                .as_ref()
+                .expect("credit model")
+                .prepayment_spec
+                .cpr,
+            CreditModelConfig::default().prepayment_spec.cpr
+        );
+    }
+}

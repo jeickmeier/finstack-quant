@@ -261,6 +261,60 @@ fn default_day_count() -> DayCount {
     DayCount::Act360
 }
 
+/// Setters for single fields of the staged [`CreditModelConfig`].
+///
+/// `credit_model(...)` replaces the whole configuration; these setters change
+/// one field of the staged configuration (starting from
+/// [`CreditModelConfig::default`] when none was staged) and leave the rest.
+impl AssetBackedFacilityBuilder {
+    fn staged_credit_model(&mut self) -> &mut CreditModelConfig {
+        self.credit_model
+            .get_or_insert_with(CreditModelConfig::default)
+    }
+
+    /// Set the deterministic prepayment model of the staged credit model.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - Prepayment curve and speed (CPR / PSA / SMM) applied to the
+    ///   collateral pool.
+    pub fn prepayment_spec(
+        mut self,
+        value: crate::instruments::fixed_income::structured_credit::PrepaymentModelSpec,
+    ) -> Self {
+        self.staged_credit_model().prepayment_spec = value;
+        self
+    }
+
+    /// Set the deterministic default model of the staged credit model.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - Default curve and rate (CDR / SDA / MDR) applied to the
+    ///   collateral pool.
+    pub fn default_spec(
+        mut self,
+        value: crate::instruments::fixed_income::structured_credit::DefaultModelSpec,
+    ) -> Self {
+        self.staged_credit_model().default_spec = value;
+        self
+    }
+
+    /// Set the deterministic recovery model of the staged credit model.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - Recovery rate (decimal fraction of defaulted par) and the
+    ///   recovery lag in months.
+    pub fn recovery_spec(
+        mut self,
+        value: crate::instruments::fixed_income::structured_credit::RecoveryModelSpec,
+    ) -> Self {
+        self.staged_credit_model().recovery_spec = value;
+        self
+    }
+}
+
 impl AssetBackedFacility {
     /// Canonical example: the USD 100M example CLO pool financed by a
     /// USD 80M commitment drawn USD 70M at a fixed 6% (600 bp),

@@ -32,6 +32,7 @@ pub const RESIDUAL_TRANCHE_ID: &str = "RESIDUAL";
 
 /// Projected cashflows of a facility and its residual.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct FacilityProjection {
     /// Interest and principal paid to the facility note.
@@ -41,10 +42,18 @@ pub struct FacilityProjection {
     /// Commitment fee accrued on `commitment − opening facility balance` per
     /// accrual period while the line revolves, paid on the period's payment
     /// date.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<(finstack_quant_core::wire::DateWire, Money)>")
+    )]
     pub commitment_fees: Vec<(Date, Money)>,
     /// Lender draws applied (scheduled draws and re-advances) per payment
     /// date: cash the lender advances, an outflow in the lender's IRR.
     #[serde(default)]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<(finstack_quant_core::wire::DateWire, Money)>")
+    )]
     pub draws: Vec<(Date, Money)>,
     /// Per-period deal record of the synthetic deal.
     pub diagnostics: SimulationDiagnostics,

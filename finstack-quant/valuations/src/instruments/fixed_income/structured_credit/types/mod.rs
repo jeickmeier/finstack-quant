@@ -281,15 +281,18 @@ pub struct StructuredCredit {
     pub credit_model: CreditModelConfig,
 
     /// Market conditions impacting behavior.
+    #[builder(default)]
     pub market_conditions: MarketConditions,
 
     /// Deal metadata (counterparties, identifiers).
+    #[builder(default)]
     #[serde(default)]
     pub deal_metadata: Metadata,
 
     /// Interest rate swaps settled through the waterfall: net receipts join
     /// interest proceeds, net payments rank as senior or junior fees. See
     /// [`HedgeSwap`].
+    #[builder(default)]
     #[serde(default)]
     pub hedge_swaps: Vec<HedgeSwap>,
 

@@ -1,0 +1,257 @@
+{
+  "$defs": {
+    "CoverageTestDiagnostic": {
+      "description": "One coverage test as the waterfall executor evaluated it in a period.",
+      "properties": {
+        "cushion": {
+          "description": "`ratio − trigger_level`; negative while the test fails.",
+          "format": "double",
+          "type": "number"
+        },
+        "passing": {
+          "description": "Whether the test passed in this period.",
+          "type": "boolean"
+        },
+        "ratio": {
+          "description": "Ratio the executor computed (OC: collateral ÷ notes; IC: interest ÷ due).",
+          "format": "double",
+          "type": "number"
+        },
+        "test_id": {
+          "description": "`CoverageTestSpec::id` of the test.",
+          "type": "string"
+        },
+        "trigger_level": {
+          "description": "Trigger level the ratio was tested against.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "test_id",
+        "ratio",
+        "trigger_level",
+        "cushion",
+        "passing"
+      ],
+      "type": "object"
+    },
+    "PeriodDiagnostics": {
+      "description": "Deal accounting for one payment period, recorded after the waterfall.\n\nBalances are end-of-period; collections, defaults, recoveries and fees are\nthe period's amounts; composition statistics are balance-weighted over the\nperforming pool at period end.",
+      "properties": {
+        "coverage_tests": {
+          "description": "Every coverage test the executor evaluated this period.",
+          "items": {
+            "$ref": "#/$defs/CoverageTestDiagnostic"
+          },
+          "type": "array"
+        },
+        "defaults": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Par that defaulted (charged off) this period."
+        },
+        "delinquent_balance": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Delinquent collateral balance at period end (delinquency model)."
+        },
+        "excess_spread": {
+          "description": "Annualized excess spread realized this period (decimal).",
+          "format": "double",
+          "type": "number"
+        },
+        "fees_paid": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Fees paid through the waterfall this period."
+        },
+        "funding_account": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Controlled-accumulation funding account at period end."
+        },
+        "interest_collections": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Interest collected from the pool (including servicer advances)."
+        },
+        "payment_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Payment date of the period."
+        },
+        "pool_balance": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Collateral balance at period end."
+        },
+        "pool_factor": {
+          "description": "`pool_balance` divided by the original (cut-off) pool balance\n(`AssetPool::original_balance_or_reconstructed`).",
+          "format": "double",
+          "type": "number"
+        },
+        "principal_collections": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Scheduled and prepaid principal collected from the pool."
+        },
+        "recoveries": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Recovery cash released to the waterfall this period."
+        },
+        "reinvested_par": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Principal recycled into replacement collateral this period."
+        },
+        "reserve_balance": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Reserve account balance at period end."
+        },
+        "servicer_advances_outstanding": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Servicer advances of missed principal and interest outstanding at\nperiod end (not yet repaid by cures or liquidations)."
+        },
+        "spread_account": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Excess-spread account balance at period end."
+        },
+        "wac": {
+          "description": "Weighted-average coupon (annual decimal) of the performing fixed-rate\ncollateral at period end: the same population as `AssetPool::wac`.",
+          "format": "double",
+          "type": "number"
+        },
+        "warf": {
+          "description": "Balance-weighted Moody's rating factor of the collateral.",
+          "format": "double",
+          "type": "number"
+        },
+        "weighted_avg_spread_bp": {
+          "description": "Balance-weighted spread of the floating-rate collateral (basis points).",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "payment_date",
+        "pool_balance",
+        "pool_factor",
+        "wac",
+        "weighted_avg_spread_bp",
+        "warf",
+        "interest_collections",
+        "principal_collections",
+        "defaults",
+        "recoveries",
+        "reinvested_par",
+        "fees_paid",
+        "reserve_balance",
+        "spread_account",
+        "funding_account",
+        "delinquent_balance",
+        "servicer_advances_outstanding",
+        "excess_spread",
+        "coverage_tests"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/results/1/simulation_diagnostics.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Deal-level accounting produced alongside the tranche cashflows.",
+  "properties": {
+    "draws_from_principal": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+      "description": "Collateral draws funded from principal collections over the simulation."
+    },
+    "draws_from_reserve": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+      "description": "Collateral draws funded from the reserve account over the simulation."
+    },
+    "early_amortization_date": {
+      "anyOf": [
+        {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Payment date on which an early-amortization event (or a coverage-test\nacceleration) ended the revolving period, when one fired."
+    },
+    "periods": {
+      "default": [],
+      "description": "Per-period deal accounting, in payment order.",
+      "items": {
+        "$ref": "#/$defs/PeriodDiagnostics"
+      },
+      "type": "array"
+    },
+    "reserve_balance_path": {
+      "description": "Reserve-account balance at the end of each simulated period.",
+      "items": {
+        "maxItems": 2,
+        "minItems": 2,
+        "prefixItems": [
+          {
+            "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+          },
+          {
+            "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+          }
+        ],
+        "type": "array"
+      },
+      "type": "array"
+    },
+    "reserve_interest_paid": {
+      "description": "Reserve interest earned each period, before routing to its destination.",
+      "items": {
+        "maxItems": 2,
+        "minItems": 2,
+        "prefixItems": [
+          {
+            "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+          },
+          {
+            "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+          }
+        ],
+        "type": "array"
+      },
+      "type": "array"
+    },
+    "reserve_replenished": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+      "description": "Revolver repayments diverted to replenish the reserve over the simulation."
+    },
+    "tranche_draws": {
+      "default": [],
+      "description": "Lender draws applied to notes, as `(tranche id, payment date, amount)`.",
+      "items": {
+        "maxItems": 3,
+        "minItems": 3,
+        "prefixItems": [
+          {
+            "type": "string"
+          },
+          {
+            "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+          },
+          {
+            "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+          }
+        ],
+        "type": "array"
+      },
+      "type": "array"
+    },
+    "unfunded_draws": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+      "description": "Collateral draws that could not be funded over the simulation."
+    }
+  },
+  "required": [
+    "reserve_balance_path",
+    "reserve_interest_paid",
+    "draws_from_reserve",
+    "draws_from_principal",
+    "unfunded_draws",
+    "reserve_replenished"
+  ],
+  "title": "SimulationDiagnostics",
+  "type": "object"
+}

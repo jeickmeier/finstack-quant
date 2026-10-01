@@ -439,6 +439,28 @@ impl TrancheBuilder {
         self
     }
 
+    /// Set the attachment point alone; pair it with [`Self::detach_pct`].
+    ///
+    /// # Arguments
+    ///
+    /// * `attachment` - Attachment point in percent of the pool (0 = first loss).
+    #[must_use]
+    pub fn attach_pct(mut self, attachment: f64) -> Self {
+        self.attach_pct = Some(attachment);
+        self
+    }
+
+    /// Set the detachment point alone; pair it with [`Self::attach_pct`].
+    ///
+    /// # Arguments
+    ///
+    /// * `detachment` - Detachment point in percent of the pool (100 = top of the structure).
+    #[must_use]
+    pub fn detach_pct(mut self, detachment: f64) -> Self {
+        self.detach_pct = Some(detachment);
+        self
+    }
+
     /// Set tranche seniority level
     #[must_use]
     pub fn seniority(mut self, seniority: TrancheSeniority) -> Self {
@@ -578,7 +600,13 @@ impl TrancheBuilder {
         let points = match (self.attach_pct, self.detach_pct) {
             (Some(attachment), Some(detachment)) => Some((attachment, detachment)),
             (None, None) => None,
-            _ => return Err(finstack_quant_core::InputError::Invalid.into()),
+            _ => {
+                return Err(finstack_quant_core::Error::Validation(
+                    "attach_pct and detach_pct must be set together, or both omitted so the \
+                     TrancheStructure derives them from the balances"
+                        .to_string(),
+                ))
+            }
         };
         let seniority = self
             .seniority
@@ -983,6 +1011,39 @@ mod tests {
 
     fn test_date() -> Date {
         Date::from_calendar_date(2024, Month::January, 1).expect("valid date")
+    }
+
+    #[test]
+    fn builder_requires_both_attachment_points_or_neither() {
+        let builder = || {
+            Tranche::builder()
+                .id("A")
+                .seniority(TrancheSeniority::Senior)
+                .balance(Money::from((10_000_000_i64, Currency::USD)))
+                .coupon(RateSpec::Fixed { rate: 0.05 })
+                .maturity(test_date())
+        };
+        let both = builder()
+            .detach_pct(100.0)
+            .attach_pct(10.0)
+            .build()
+            .expect("both points");
+        assert_eq!(
+            (both.attach_pct, both.detach_pct),
+            (Some(10.0), Some(100.0))
+        );
+        let neither = builder().build().expect("no points");
+        assert_eq!((neither.attach_pct, neither.detach_pct), (None, None));
+        let error = builder()
+            .detach_pct(100.0)
+            .build()
+            .expect_err("one point only");
+        assert!(
+            error
+                .to_string()
+                .contains("attach_pct and detach_pct must be set together"),
+            "{error}"
+        );
     }
 
     #[test]

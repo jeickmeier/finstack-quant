@@ -1,0 +1,42 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/common/1/swaption_conventions.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Market conventions of one swaption market.",
+  "properties": {
+    "business_day_convention": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
+      "description": "Business day convention for dates."
+    },
+    "calendar_id": {
+      "description": "Calendar for exercise and settlement.",
+      "type": "string"
+    },
+    "fixed_leg_day_count": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+      "description": "Fixed leg day count."
+    },
+    "fixed_leg_frequency": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+      "description": "Fixed leg payment frequency."
+    },
+    "float_leg_index": {
+      "description": "Floating leg index (implies float leg conventions).",
+      "type": "string"
+    },
+    "settlement_days": {
+      "description": "Settlement lag in business days.",
+      "format": "int32",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "calendar_id",
+    "settlement_days",
+    "business_day_convention",
+    "fixed_leg_frequency",
+    "fixed_leg_day_count",
+    "float_leg_index"
+  ],
+  "title": "SwaptionConventions",
+  "type": "object"
+}

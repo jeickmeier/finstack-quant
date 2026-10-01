@@ -274,6 +274,11 @@ fn bare_string_returns_are_named_or_allowlisted() {
         ("CalibrationNamespace", "calibrationEnvelopeContentHash"),
         ("CalibrationNamespace", "calibrationResultContentHash"),
         ("StatementsNamespace", "financialModelContentHash"),
+        // Exact decimal text of the present value.
+        ("ValuationsNamespace", "valuationResultPriceDecimal"),
+        // ISO-8601 dates of the underlying swap.
+        ("Swaption", "getUnderlyingStartDate"),
+        ("Swaption", "getUnderlyingMaturity"),
     ];
     let dts = index_dts();
     let offenders: Vec<String> = members(&dts)

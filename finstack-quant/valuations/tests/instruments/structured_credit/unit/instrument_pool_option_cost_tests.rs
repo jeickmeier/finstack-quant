@@ -63,6 +63,22 @@ fn tranche_cost(result: &StochasticPricingResult, id: &str) -> f64 {
         .amount()
 }
 
+/// The Monte Carlo entry point is the explicit mode with the same estimator
+/// count and pairing.
+#[test]
+fn price_stochastic_monte_carlo_matches_the_explicit_mode() {
+    let deal = pool_of(Vec::new(), CreditSpreadProcessSpec::Constant(0.025), 0.25);
+    let explicit = deal
+        .price_stochastic_with_mode(&market(), CLOSING, monte_carlo(4))
+        .expect("explicit mode");
+    let paths = deal
+        .price_stochastic_monte_carlo(&market(), CLOSING, Some(4), true)
+        .expect("monte carlo");
+    assert_eq!(paths.npv, explicit.npv);
+    assert_eq!(paths.num_paths, explicit.num_paths);
+    assert_eq!(paths.pricing_mode, monte_carlo(4));
+}
+
 /// A constant spread equal to the contractual margin: the counterfactual
 /// waterfall is the actual one, so the deal and tranche option costs are
 /// exactly zero on every path.

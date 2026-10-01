@@ -6,7 +6,6 @@
 //! accepts. There is no loose data file that can drift from the binary.
 
 use crate::bindings::schema_registry::schema_registry_functions;
-use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
 use serde_json::Value;
@@ -72,18 +71,6 @@ fn ensure_valid_against(schema: &Value, instance: &Value, context: &str) -> PyRe
         "{context} validation failed with {} error(s):\n  {}",
         rendered.len(),
         rendered.join("\n  ")
-    )))
-}
-
-/// Reject an unregistered discriminator as a lookup miss, not a value error.
-fn ensure_known_instrument_type(instrument_type: &str) -> PyResult<()> {
-    let known = canonical::instrument_types().map_err(core_to_py)?;
-    if known.iter().any(|tag| tag == instrument_type) {
-        return Ok(());
-    }
-    Err(PyKeyError::new_err(format!(
-        "unknown instrument type {instrument_type:?}; \
-         call instrument_types() for the valid set"
     )))
 }
 
@@ -180,7 +167,6 @@ fn instrument_types() -> PyResult<Vec<String>> {
 #[pyfunction]
 #[pyo3(text_signature = "(instrument_type)")]
 fn instrument_schema(instrument_type: &str) -> PyResult<String> {
-    ensure_known_instrument_type(instrument_type)?;
     schema_json(&canonical::instrument_schema(instrument_type).map_err(core_to_py)?)
 }
 
@@ -304,7 +290,6 @@ fn validate_instrument_envelope_json(instrument_json: &str) -> PyResult<String> 
 #[pyfunction]
 #[pyo3(text_signature = "(instrument_type, instrument_json)")]
 fn validate_instrument_type_json(instrument_type: &str, instrument_json: &str) -> PyResult<String> {
-    ensure_known_instrument_type(instrument_type)?;
     let instance = parse_instance(instrument_json)?;
     let schema = canonical::instrument_schema(instrument_type).map_err(core_to_py)?;
     ensure_valid_against(&schema, &instance, instrument_type)?;

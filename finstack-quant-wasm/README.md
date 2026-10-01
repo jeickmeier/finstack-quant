@@ -110,6 +110,22 @@ const bond = valuations.instruments.Bond.fixed(
   'USD-OIS'
 );
 JSON.parse(bond.toJson()).schema; // 'finstack_quant.instrument/1'
+
+// Every typed instrument has one getter per Rust field, `price` / `metric`,
+// and a fluent builder whose setters map one for one onto the Rust builder.
+// `Money`, `Tenor`, `DayCount` and `Currency` are handles; dates are ISO-8601
+// strings; nested specs are plain objects.
+const swap = valuations.instruments.InterestRateSwap.example();
+swap.notional.amount; // 10000000
+swap.fixedLeg.rate; // '0.04'
+const copy = valuations.instruments.InterestRateSwap.builder()
+  .id('IRS-COPY')
+  .notional(swap.notional)
+  .side(swap.side)
+  .fixedLeg(swap.fixedLeg)
+  .floatLeg(swap.floatLeg)
+  .build();
+copy.toDict().id; // 'IRS-COPY'
 ```
 
 ### Pricing against a market
