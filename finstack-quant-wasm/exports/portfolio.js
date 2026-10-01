@@ -1,4 +1,5 @@
 import * as wasm from '../pkg/finstack_quant_wasm.js';
+import { schema } from './portfolio/schema.js';
 
 // Rust `Portfolio::from_materialization` / `validate_materialization` borrow a
 // cache; the published statics make it optional. wasm-bindgen 0.2.126 cannot
@@ -108,4 +109,5 @@ export const portfolio = {
   constraintMaxTurnover: wasm.constraintMaxTurnover,
   constraintExposureLimit: wasm.constraintExposureLimit,
   constraintExposureMinimum: wasm.constraintExposureMinimum,
+  schema,
 };

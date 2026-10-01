@@ -7655,6 +7655,332 @@ export type MarketContextCurve =
   | VolCube;
 
 /**
+ * Rendering of a published JSON Schema: the validation contract, or the
+ * self-contained projection for structured-output generation.
+ */
+export type SchemaProfile = 'canonical' | 'llm';
+
+/**
+ * One published JSON Schema, as listed by a `schema.index()` call.
+ */
+export interface SchemaIndexRow {
+  /**
+   * Owning domain (`"core"`, `"valuations"`, …). Present only in the workspace-wide `schema.index()`.
+   */
+  domain?: string;
+  /**
+   * Registry path of the schema, e.g. `"schemas/dates/1/period_plan.schema.json"`.
+   */
+  path: string;
+  /**
+   * Absolute `$id` of the schema document.
+   */
+  $id: string;
+  /**
+   * `title` of the schema document.
+   */
+  title: string;
+  /**
+   * Rust root type the schema describes.
+   */
+  type_name: string;
+  /**
+   * One-line description of the contract.
+   */
+  summary: string;
+  /**
+   * Size of the canonical rendering in bytes.
+   */
+  bytes: number;
+  /**
+   * `input` for documents you author, `output` for documents the library emits, `component` for shared definitions.
+   */
+  kind: 'input' | 'output' | 'component';
+}
+
+/**
+ * Result of a `schema.index()` call.
+ */
+export interface SchemaIndex {
+  /**
+   * One row per published schema.
+   */
+  artifacts: SchemaIndexRow[];
+  /**
+   * Version of the index layout.
+   */
+  schema_index_version: number;
+}
+
+/**
+ * One failure reported by a `schema.validate()` call.
+ */
+export interface SchemaValidationFailure {
+  /**
+   * JSON Pointer into the payload naming the value that failed; empty for the document root.
+   */
+  pointer: string;
+  /**
+   * What was wrong with that value.
+   */
+  message: string;
+}
+
+/**
+ * Registry of the JSON Schemas one domain crate publishes.
+ *
+ * Schemas are rendered by this build, so they always describe the wire format it accepts.
+ * The Python `finstack_quant.<crate>.schema` functions return the same documents as JSON text.
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const paths = core.schema.index().artifacts.map((row) => row.path);
+ * const document = core.schema.get("period_plan.schema.json");
+ * const failures = core.schema.validate("period_plan.schema.json", {});
+ * console.log(paths.length, document.title, failures[0]?.message);
+ * ```
+ */
+export interface SchemaRegistryNamespace {
+  /**
+   * List every JSON Schema this crate publishes.
+   * @returns The index: `schema_index_version` and one `artifacts` row per published schema.
+   * @throws Error - Throws with kind `internal` if a schema cannot be rendered (does not occur for a released build).
+   */
+  index(): SchemaIndex;
+  /**
+   * Fetch one published JSON Schema by `$id`, registry path or filename.
+   * @param selector - Schema `$id`, registry `path` or trailing filename from `index()`, e.g. `"period_plan.schema.json"`. Partial filenames do not match.
+   * @param profile - `"canonical"` (the default) for the validation contract, or `"llm"` for a self-contained projection with cross-document references inlined, intended for structured-output generation and not for validation.
+   * @returns JSON Schema document.
+   * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `profile` is unknown, and a `TypeError` (kind `invalid_type`) if either argument is not a string.
+   */
+  get(selector: string, profile?: SchemaProfile): Record<string, unknown>;
+  /**
+   * Validate a payload against one published JSON Schema.
+   *
+   * A failure inside a tagged union is reported at the offending field of the
+   * branch the payload most nearly matches, not at the union.
+   * @param selector - Schema `$id`, registry `path` or trailing filename from `index()`.
+   * @param payload - Document to check, as a plain object/array or as JSON text. Pass JSON text for a scalar payload (`'"USD"'`, `'1.5'`).
+   * @returns One row per failure, locating the offending value by JSON Pointer; empty when the payload is valid.
+   * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `payload` is JSON text that does not parse, and a `TypeError` (kind `invalid_type`) if `selector` is not a string or `payload` is neither JSON text nor a plain object/array.
+   */
+  validate(selector: string, payload: string | object): SchemaValidationFailure[];
+}
+
+/**
+ * Registry of the JSON Schemas the cashflows crate publishes, plus the embedded resolver resources.
+ * @example
+ * ```typescript
+ * import init, { cashflows } from "finstack-quant-wasm";
+ * await init();
+ * const resources = cashflows.schema.resources();
+ * console.log(Object.keys(resources).length);
+ * ```
+ */
+export interface CashflowsSchemaNamespace {
+  /**
+   * List every JSON Schema the cashflows crate publishes.
+   * @returns The index: `schema_index_version` and one `artifacts` row per published schema.
+   * @throws Error - Throws with kind `internal` if a schema cannot be rendered (does not occur for a released build).
+   */
+  index(): SchemaIndex;
+  /**
+   * Fetch one published JSON Schema by `$id`, registry path or filename.
+   * @param selector - Schema `$id`, registry `path` or trailing filename from `index()`, e.g. `"amortization_spec.schema.json"`. Partial filenames do not match.
+   * @param profile - `"canonical"` (the default) for the validation contract, or `"llm"` for a self-contained projection with cross-document references inlined, intended for structured-output generation and not for validation.
+   * @returns JSON Schema document.
+   * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `profile` is unknown, and a `TypeError` (kind `invalid_type`) if either argument is not a string.
+   */
+  get(selector: string, profile?: SchemaProfile): Record<string, unknown>;
+  /**
+   * Validate a payload against one published JSON Schema.
+   *
+   * A failure inside a tagged union is reported at the offending field of the
+   * branch the payload most nearly matches, not at the union.
+   * @param selector - Schema `$id`, registry `path` or trailing filename from `index()`.
+   * @param payload - Document to check, as a plain object/array or as JSON text. Pass JSON text for a scalar payload (`'"USD"'`, `'1.5'`).
+   * @returns One row per failure, locating the offending value by JSON Pointer; empty when the payload is valid.
+   * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `payload` is JSON text that does not parse, and a `TypeError` (kind `invalid_type`) if `selector` is not a string or `payload` is neither JSON text nor a plain object/array.
+   */
+  validate(selector: string, payload: string | object): SchemaValidationFailure[];
+  /**
+   * The embedded cashflow schemas, keyed by `$id`.
+   *
+   * These are the documents a JSON Schema resolver needs to follow the
+   * cross-document `$ref`s of the cashflow contracts.
+   * @returns Object mapping each schema `$id` to its JSON Schema document, in registry order.
+   * @throws Error - Throws with kind `validation` if an embedded schema is malformed (does not occur for a released build).
+   */
+  resources(): Record<string, Record<string, unknown>>;
+}
+
+/**
+ * Registry and named accessors of the factor-model JSON Schemas.
+ * @example
+ * ```typescript
+ * import init, { models } from "finstack-quant-wasm";
+ * await init();
+ * const document = models.factor.schema.factorModelConfigSchema();
+ * console.log(document.title);
+ * ```
+ */
+export interface FactorSchemaNamespace {
+  /**
+   * List every JSON Schema the factor-model module publishes.
+   * @returns The index: `schema_index_version` and one `artifacts` row per published schema.
+   * @throws Error - Throws with kind `internal` if a schema cannot be rendered (does not occur for a released build).
+   */
+  index(): SchemaIndex;
+  /**
+   * Fetch one published JSON Schema by `$id`, registry path or filename.
+   * @param selector - Schema `$id`, registry `path` or trailing filename from `index()`, e.g. `"factor_model_config.schema.json"`. Partial filenames do not match.
+   * @param profile - `"canonical"` (the default) for the validation contract, or `"llm"` for a self-contained projection with cross-document references inlined, intended for structured-output generation and not for validation.
+   * @returns JSON Schema document.
+   * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `profile` is unknown, and a `TypeError` (kind `invalid_type`) if either argument is not a string.
+   */
+  get(selector: string, profile?: SchemaProfile): Record<string, unknown>;
+  /**
+   * Validate a payload against one published JSON Schema.
+   *
+   * A failure inside a tagged union is reported at the offending field of the
+   * branch the payload most nearly matches, not at the union.
+   * @param selector - Schema `$id`, registry `path` or trailing filename from `index()`.
+   * @param payload - Document to check, as a plain object/array or as JSON text. Pass JSON text for a scalar payload (`'"USD"'`, `'1.5'`).
+   * @returns One row per failure, locating the offending value by JSON Pointer; empty when the payload is valid.
+   * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `payload` is JSON text that does not parse, and a `TypeError` (kind `invalid_type`) if `selector` is not a string or `payload` is neither JSON text nor a plain object/array.
+   */
+  validate(selector: string, payload: string | object): SchemaValidationFailure[];
+  /**
+   * JSON Schema of a versioned factor-model configuration (`FactorModelConfig`).
+   * @returns JSON Schema document.
+   * @throws Error - Throws with kind `validation` if the embedded schema is malformed (does not occur for a released build).
+   */
+  factorModelConfigSchema(): Record<string, unknown>;
+  /**
+   * JSON Schema of a serialized `CreditFactorModel`.
+   * @returns JSON Schema document.
+   * @throws Error - Throws with kind `validation` if the embedded schema is malformed (does not occur for a released build).
+   */
+  creditFactorModelSchema(): Record<string, unknown>;
+  /**
+   * JSON Schema of a serialized `CreditCalibrationConfig`.
+   * @returns JSON Schema document.
+   * @throws Error - Throws with kind `validation` if the embedded schema is malformed (does not occur for a released build).
+   */
+  creditCalibrationConfigSchema(): Record<string, unknown>;
+  /**
+   * JSON Schema of a serialized `CreditCalibrationInputs`.
+   * @returns JSON Schema document.
+   * @throws Error - Throws with kind `validation` if the embedded schema is malformed (does not occur for a released build).
+   */
+  creditCalibrationInputsSchema(): Record<string, unknown>;
+}
+
+/**
+ * Registry and named accessors of the statements JSON Schemas.
+ * @example
+ * ```typescript
+ * import init, { statements } from "finstack-quant-wasm";
+ * await init();
+ * const document = statements.schema.financialModelSpecSchema();
+ * console.log(document.title);
+ * ```
+ */
+export interface StatementsSchemaNamespace {
+  /**
+   * List every JSON Schema the statements crate publishes.
+   * @returns The index: `schema_index_version` and one `artifacts` row per published schema.
+   * @throws Error - Throws with kind `internal` if a schema cannot be rendered (does not occur for a released build).
+   */
+  index(): SchemaIndex;
+  /**
+   * Fetch one published JSON Schema by `$id`, registry path or filename.
+   * @param selector - Schema `$id`, registry `path` or trailing filename from `index()`, e.g. `"financial_model_spec.schema.json"`. Partial filenames do not match.
+   * @param profile - `"canonical"` (the default) for the validation contract, or `"llm"` for a self-contained projection with cross-document references inlined, intended for structured-output generation and not for validation.
+   * @returns JSON Schema document.
+   * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `profile` is unknown, and a `TypeError` (kind `invalid_type`) if either argument is not a string.
+   */
+  get(selector: string, profile?: SchemaProfile): Record<string, unknown>;
+  /**
+   * Validate a payload against one published JSON Schema.
+   *
+   * A failure inside a tagged union is reported at the offending field of the
+   * branch the payload most nearly matches, not at the union.
+   * @param selector - Schema `$id`, registry `path` or trailing filename from `index()`.
+   * @param payload - Document to check, as a plain object/array or as JSON text. Pass JSON text for a scalar payload (`'"USD"'`, `'1.5'`).
+   * @returns One row per failure, locating the offending value by JSON Pointer; empty when the payload is valid.
+   * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `payload` is JSON text that does not parse, and a `TypeError` (kind `invalid_type`) if `selector` is not a string or `payload` is neither JSON text nor a plain object/array.
+   */
+  validate(selector: string, payload: string | object): SchemaValidationFailure[];
+  /**
+   * JSON Schema of a serialized `FinancialModelSpec`.
+   * @returns JSON Schema document.
+   * @throws Error - Throws with kind `validation` if the schema cannot be built (does not occur for a released build).
+   */
+  financialModelSpecSchema(): Record<string, unknown>;
+  /**
+   * JSON Schema of a serialized `NormalizationConfig`.
+   * @returns JSON Schema document.
+   * @throws Error - Throws with kind `validation` if the schema cannot be built (does not occur for a released build).
+   */
+  normalizationConfigSchema(): Record<string, unknown>;
+  /**
+   * JSON Schema of a serialized `StatementResult`.
+   * @returns JSON Schema document.
+   * @throws Error - Throws with kind `validation` if the schema cannot be built (does not occur for a released build).
+   */
+  statementResultSchema(): Record<string, unknown>;
+}
+
+/**
+ * Every JSON Schema the workspace publishes, across all domains.
+ *
+ * The per-crate `schema` namespaces list one crate each; this one merges them
+ * and labels each `index()` row with its `domain`.
+ * @example
+ * ```typescript
+ * import init, { schema } from "finstack-quant-wasm";
+ * await init();
+ * const failures = schema.validate("bond.schema.json", {});
+ * console.log(schema.domains(), failures.map((failure) => failure.message));
+ * ```
+ */
+export interface WorkspaceSchemaNamespace {
+  /**
+   * List every JSON Schema the workspace publishes.
+   * @returns The index: `schema_index_version` and one `artifacts` row per published schema.
+   * @throws Error - Throws with kind `internal` if a schema cannot be rendered (does not occur for a released build).
+   */
+  index(): SchemaIndex;
+  /**
+   * Fetch one published JSON Schema by `$id`, registry path or filename.
+   * @param selector - Schema `$id`, registry `path` or trailing filename from `index()`, e.g. `"bond.schema.json"`. Partial filenames do not match.
+   * @param profile - `"canonical"` (the default) for the validation contract, or `"llm"` for a self-contained projection with cross-document references inlined, intended for structured-output generation and not for validation.
+   * @returns JSON Schema document.
+   * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `profile` is unknown, and a `TypeError` (kind `invalid_type`) if either argument is not a string.
+   */
+  get(selector: string, profile?: SchemaProfile): Record<string, unknown>;
+  /**
+   * Validate a payload against one published JSON Schema.
+   *
+   * A failure inside a tagged union is reported at the offending field of the
+   * branch the payload most nearly matches, not at the union.
+   * @param selector - Schema `$id`, registry `path` or trailing filename from `index()`.
+   * @param payload - Document to check, as a plain object/array or as JSON text. Pass JSON text for a scalar payload (`'"USD"'`, `'1.5'`).
+   * @returns One row per failure, locating the offending value by JSON Pointer; empty when the payload is valid.
+   * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `payload` is JSON text that does not parse, and a `TypeError` (kind `invalid_type`) if `selector` is not a string or `payload` is neither JSON text nor a plain object/array.
+   */
+  validate(selector: string, payload: string | object): SchemaValidationFailure[];
+  /**
+   * Domains that publish schemas, sorted.
+   * @returns Domain names, each a `domain` value of the `index()` rows, e.g. `"core"`, `"valuations"`.
+   */
+  domains(): string[];
+}
+
+/**
  * Namespaced TypeScript entry points for core calculations and types.
  * @example
  * ```typescript
@@ -7664,6 +7990,10 @@ export type MarketContextCurve =
  * ```
  */
 export interface CoreNamespace {
+  /**
+   * Registry of the JSON Schemas this crate publishes (`index` / `get` / `validate`).
+   */
+  schema: SchemaRegistryNamespace;
   /**
    * ISO-4217 currency constructor (`new core.Currency("USD")`).
    */
@@ -10060,6 +10390,10 @@ export interface FactorNamespace {
    * Pure factor and position risk decomposition kernels.
    */
   risk: FactorRiskNamespace;
+  /**
+   * Registry and named accessors of the factor-model JSON Schemas.
+   */
+  schema: FactorSchemaNamespace;
 }
 
 // --- features ---------------------------------------------------------------
@@ -12986,6 +13320,10 @@ export interface SaCcrEngineConstructor {
  */
 export interface MarginNamespace {
   /**
+   * Registry of the JSON Schemas this crate publishes (`index` / `get` / `validate`).
+   */
+  schema: SchemaRegistryNamespace;
+  /**
    * Create a standard USD regulatory CSA specification as JSON.
    *
    * Returns the canonical ISDA-compliant CSA for USD OTC derivatives.
@@ -14107,6 +14445,10 @@ export interface AccrualIndexConstructor {
  * ```
  */
 export interface CashflowsNamespace {
+  /**
+   * Registry of the cashflows JSON Schemas and the embedded resolver resources.
+   */
+  schema: CashflowsSchemaNamespace;
   /**
    * Build a cashflow schedule from a `CashflowScheduleBuildSpec` JSON string.
    *
@@ -21909,7 +22251,8 @@ export type CompositeHistoryResult = CompositeHistoryRow[];
 /**
  * Compiled-in JSON Schemas of the valuations wire format.
  *
- * Each accessor returns the JSON Schema document as a plain object that always matches this build.
+ * Each accessor returns the JSON Schema document as a plain object that always matches this build;
+ * `index` / `get` / `validate` cover every schema the valuations crate publishes.
  * @example
  * ```typescript
  * import init, { valuations } from "finstack-quant-wasm";
@@ -21919,6 +22262,31 @@ export type CompositeHistoryResult = CompositeHistoryRow[];
  * ```
  */
 export interface ValuationsSchemaNamespace {
+  /**
+   * List every JSON Schema the valuations crate publishes.
+   * @returns The index: `schema_index_version` and one `artifacts` row per published schema.
+   * @throws Error - Throws with kind `internal` if a schema cannot be rendered (does not occur for a released build).
+   */
+  index(): SchemaIndex;
+  /**
+   * Fetch one published JSON Schema by `$id`, registry path or filename.
+   * @param selector - Schema `$id`, registry `path` or trailing filename from `index()`, e.g. `"bond.schema.json"`. Partial filenames do not match.
+   * @param profile - `"canonical"` (the default) for the validation contract, or `"llm"` for a self-contained projection with cross-document references inlined, intended for structured-output generation and not for validation.
+   * @returns JSON Schema document.
+   * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `profile` is unknown, and a `TypeError` (kind `invalid_type`) if either argument is not a string.
+   */
+  get(selector: string, profile?: SchemaProfile): Record<string, unknown>;
+  /**
+   * Validate a payload against one published JSON Schema.
+   *
+   * A failure inside a tagged union is reported at the offending field of the
+   * branch the payload most nearly matches, not at the union.
+   * @param selector - Schema `$id`, registry `path` or trailing filename from `index()`.
+   * @param payload - Document to check, as a plain object/array or as JSON text. Pass JSON text for a scalar payload (`'"USD"'`, `'1.5'`).
+   * @returns One row per failure, locating the offending value by JSON Pointer; empty when the payload is valid.
+   * @throws Error - Throws with kind `not_found` if no schema matches `selector`, kind `validation` if `payload` is JSON text that does not parse, and a `TypeError` (kind `invalid_type`) if `selector` is not a string or `payload` is neither JSON text nor a plain object/array.
+   */
+  validate(selector: string, payload: string | object): SchemaValidationFailure[];
   /**
    * JSON Schema of the canonical instrument envelope.
    *
@@ -21948,6 +22316,24 @@ export interface ValuationsSchemaNamespace {
    * @throws Error - Throws with kind `validation` if the embedded schema is malformed (does not occur for a released build).
    */
   valuationResultSchema(): Record<string, unknown>;
+  /**
+   * Validate an instrument envelope against the canonical schemas.
+   *
+   * Both the envelope schema and the schema selected by `instrument.type` are
+   * applied, as the Rust loader does when it decodes tagged instrument JSON.
+   * @param instrumentJson - A `finstack_quant.instrument/1` envelope, as JSON text or a plain object.
+   * @returns Canonical compact JSON of the validated payload.
+   * @throws Error - Throws with kind `validation` if `instrumentJson` is JSON text that does not parse, or if it violates the envelope schema or its instrument type's schema (the message lists every violation); and kind `invalid_type` if it is neither JSON text nor a plain object.
+   */
+  validateInstrumentEnvelopeJson(instrumentJson: string | object): string;
+  /**
+   * Validate a payload against one instrument type's schema.
+   * @param instrumentType - Canonical instrument type discriminator from `instrumentTypes()`, e.g. `"bond"`.
+   * @param instrumentJson - Payload to check against that type's schema, as JSON text or a plain object.
+   * @returns Canonical compact JSON of the validated payload.
+   * @throws Error - Throws with kind `not_found` if `instrumentType` is not a registered instrument type; kind `validation` if `instrumentJson` is JSON text that does not parse or violates the type schema (the message lists every violation); and kind `invalid_type` if `instrumentType` is not a string or `instrumentJson` is neither JSON text nor a plain object.
+   */
+  validateInstrumentTypeJson(instrumentType: string, instrumentJson: string | object): string;
 }
 
 /**
@@ -28409,6 +28795,10 @@ export declare const models: ModelsNamespace;
  */
 export interface CalibrationNamespace {
   /**
+   * Registry of the JSON Schemas this crate publishes (`index` / `get` / `validate`).
+   */
+  schema: SchemaRegistryNamespace;
+  /**
    * Execute a calibration envelope and return its fitted market and reports.
    * @returns Calibration result including the materialized market and per-step reports.
    * @param envelope - `CalibrationEnvelope` as a plain object or its JSON string: the plan (steps, quote sets, settings) plus `market_data` and optional `prior_market`.
@@ -29422,6 +29812,10 @@ export interface AttributionJsonInputs extends WasmOwned {
  */
 export interface AttributionNamespace {
   /**
+   * Registry of the JSON Schemas this crate publishes (`index` / `get` / `validate`).
+   */
+  schema: SchemaRegistryNamespace;
+  /**
    * Parameters constructor emitted by wasm-bindgen for attribution calls.
    *
    * `methodJson` is an `AttributionMethod` wire value: a unit variant name
@@ -30283,6 +30677,10 @@ export interface MixedNodeBuilderConstructor {
  * ```
  */
 export interface StatementsNamespace {
+  /**
+   * Registry and named accessors of the statements JSON Schemas.
+   */
+  schema: StatementsSchemaNamespace;
   /**
    * Validate a `FinancialModelSpec` JSON string.
    *
@@ -32629,6 +33027,10 @@ declare class Portfolio {
  */
 export interface PortfolioNamespace {
   /**
+   * Registry of the JSON Schemas this crate publishes (`index` / `get` / `validate`).
+   */
+  schema: SchemaRegistryNamespace;
+  /**
    * Reusable bounded decoded-instrument cache constructor.
    */
   InstrumentArtifactCache: typeof InstrumentArtifactCache;
@@ -33672,6 +34074,10 @@ export declare const portfolio: PortfolioNamespace;
  */
 export interface ScenariosNamespace {
   /**
+   * Registry of the JSON Schemas this crate publishes (`index` / `get` / `validate`).
+   */
+  schema: SchemaRegistryNamespace;
+  /**
    * Parse and validate a scenario specification from JSON.
    *
    * Returns the validated scenario as a plain JavaScript object.
@@ -34273,3 +34679,8 @@ export interface ScenariosNamespace {
  * Namespaced TypeScript entry point for scenarios APIs.
  */
 export declare const scenarios: ScenariosNamespace;
+
+/**
+ * Namespaced TypeScript entry point for schema APIs.
+ */
+export declare const schema: WorkspaceSchemaNamespace;

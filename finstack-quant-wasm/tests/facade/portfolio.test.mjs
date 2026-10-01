@@ -90,6 +90,7 @@ const EXPORTED_KEYS = [
   'sensitivityMatrixDelta',
   'sensitivityMatrixFactorDeltas',
   'sensitivityMatrixPositionDeltas',
+  'schema',
   'twrrLinked',
   'twrrModifiedDietz',
   'validateAllocationJson',
@@ -116,10 +117,12 @@ function assertStructured(value, label) {
 test('portfolio namespace exposes exactly the pinned contract surface', () => {
   assert.deepEqual(Object.keys(portfolio).sort(), EXPORTED_KEYS);
   for (const key of EXPORTED_KEYS) {
+    // `schema` is the nested JSON Schema namespace; every other key is callable.
+    const expected = key === 'schema' ? 'object' : 'function';
     assert.equal(
       typeof portfolio[key],
-      'function',
-      `portfolio.${key} must be a function (got ${typeof portfolio[key]})`
+      expected,
+      `portfolio.${key} must be a ${expected} (got ${typeof portfolio[key]})`
     );
   }
 });

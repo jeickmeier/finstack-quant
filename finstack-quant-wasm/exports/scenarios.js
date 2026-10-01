@@ -1,4 +1,5 @@
 import * as wasm from '../pkg/finstack_quant_wasm.js';
+import { schema } from './scenarios/schema.js';
 
 export const scenarios = {
   parseScenarioSpec: wasm.parseScenarioSpec,
@@ -46,4 +47,5 @@ export const scenarios = {
   scenarioSpecWithHazardBumpMode: wasm.scenarioSpecWithHazardBumpMode,
   horizonResultExplainText: wasm.horizonResultExplainText,
   horizonResultFactorContribution: wasm.horizonResultFactorContribution,
+  schema,
 };

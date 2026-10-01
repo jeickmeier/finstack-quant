@@ -7,7 +7,7 @@
 //! plain object; the Python `finstack_quant.valuations.schema` accessors
 //! return the same document as JSON text.
 
-use crate::utils::input::js_string;
+use crate::utils::input::{from_js_json, js_string};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_valuations::schema as canonical;
 use wasm_bindgen::prelude::*;
@@ -48,4 +48,39 @@ pub fn instrument_schema(instrument_type: JsValue) -> Result<JsValue, JsValue> {
 #[wasm_bindgen(js_name = valuationResultSchema)]
 pub fn valuation_result_schema() -> Result<JsValue, JsValue> {
     to_js_value(canonical::valuation_result_schema().map_err(to_js_err)?)
+}
+
+/// Canonical compact JSON of a validated instrument payload.
+fn canonical_json(instance: &serde_json::Value) -> Result<String, JsValue> {
+    serde_json::to_string(instance).map_err(to_js_err)
+}
+
+/// Validate an instrument envelope against the canonical schemas.
+///
+/// Both the envelope schema and the schema selected by `instrument.type` are
+/// applied, as the Rust loader does when it decodes tagged instrument JSON.
+/// @param instrument_json - A `finstack_quant.instrument/1` envelope, as JSON text or a plain object.
+/// @returns Canonical compact JSON of the validated payload.
+/// @throws Error - Throws with kind `validation` if `instrumentJson` is JSON text that does not parse, or if it violates the envelope schema or its instrument type's schema (the message lists every violation); and kind `invalid_type` if it is neither JSON text nor a plain object.
+#[wasm_bindgen(js_name = validateInstrumentEnvelopeJson)]
+pub fn validate_instrument_envelope_json(instrument_json: JsValue) -> Result<String, JsValue> {
+    let instance: serde_json::Value = from_js_json(&instrument_json, "instrumentJson")?;
+    canonical::validate_instrument_envelope_json(&instance).map_err(to_js_err)?;
+    canonical_json(&instance)
+}
+
+/// Validate a payload against one instrument type's schema.
+/// @param instrument_type - Canonical instrument type discriminator from `instrumentTypes()`, e.g. `"bond"`.
+/// @param instrument_json - Payload to check against that type's schema, as JSON text or a plain object.
+/// @returns Canonical compact JSON of the validated payload.
+/// @throws Error - Throws with kind `not_found` if `instrumentType` is not a registered instrument type; kind `validation` if `instrumentJson` is JSON text that does not parse or violates the type schema (the message lists every violation); and kind `invalid_type` if `instrumentType` is not a string or `instrumentJson` is neither JSON text nor a plain object.
+#[wasm_bindgen(js_name = validateInstrumentTypeJson)]
+pub fn validate_instrument_type_json(
+    instrument_type: JsValue,
+    instrument_json: JsValue,
+) -> Result<String, JsValue> {
+    let instrument_type = js_string(&instrument_type, "instrumentType")?;
+    let instance: serde_json::Value = from_js_json(&instrument_json, "instrumentJson")?;
+    canonical::validate_instrument_type_json(&instrument_type, &instance).map_err(to_js_err)?;
+    canonical_json(&instance)
 }

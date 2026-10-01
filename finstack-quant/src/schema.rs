@@ -101,6 +101,25 @@ pub fn artifacts_with_domain() -> Vec<(&'static str, &'static SchemaArtifact)> {
         .collect()
 }
 
+/// The domain names that label the rows of [`index`], sorted and unique.
+///
+/// # Examples
+/// ```
+/// let domains = finstack_quant::schema::domains();
+/// assert!(domains.contains(&"valuations"));
+/// assert!(domains.windows(2).all(|pair| pair[0] < pair[1]));
+/// ```
+#[must_use]
+pub fn domains() -> Vec<&'static str> {
+    let mut names: Vec<&'static str> = domain_registries()
+        .into_iter()
+        .map(|(domain, _)| domain)
+        .collect();
+    names.sort_unstable();
+    names.dedup();
+    names
+}
+
 /// Render every artifact once, keyed by `$id`.
 ///
 /// Published schemas reference each other by absolute `$id` on a host that
@@ -677,6 +696,25 @@ mod tests {
             ]
             .into_iter()
             .collect::<std::collections::BTreeSet<&str>>()
+        );
+    }
+
+    #[test]
+    fn domains_are_the_sorted_registry_labels() {
+        assert_eq!(
+            domains(),
+            [
+                "attribution",
+                "calibration",
+                "cashflows",
+                "core",
+                "factor_model",
+                "margin",
+                "portfolio",
+                "scenarios",
+                "statements",
+                "valuations",
+            ]
         );
     }
 

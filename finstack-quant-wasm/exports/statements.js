@@ -1,4 +1,5 @@
 import * as wasm from '../pkg/finstack_quant_wasm.js';
+import { schema } from './statements/schema.js';
 
 export const statements = {
   Evaluator: wasm.Evaluator,
@@ -65,4 +66,5 @@ export const statements = {
   normalize: wasm.normalize,
   normalizeJson: wasm.normalizeJson,
   checkSuiteSpecBuiltinCheckNames: wasm.checkSuiteSpecBuiltinCheckNames,
+  schema,
 };

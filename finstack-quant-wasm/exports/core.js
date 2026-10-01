@@ -1,4 +1,5 @@
 import * as wasm from '../pkg/finstack_quant_wasm.js';
+import { schema } from './core/schema.js';
 
 // Rust `DayCount::year_fraction` / `signed_year_fraction` take a context; the
 // published methods make it optional. An omitted context is the Rust default
@@ -223,4 +224,5 @@ export const core = {
   kahanSum: wasm.kahanSum,
   neumaierSum: wasm.neumaierSum,
   longestPositiveRun: wasm.longestPositiveRun,
+  schema,
 };

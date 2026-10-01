@@ -163,10 +163,7 @@ fn validate(selector: &str, payload: &str) -> PyResult<String> {
 ///     Sorted domain names, each of which is also a ``domain`` value in
 ///     :func:`index` and a ``finstack_quant.<domain>.schema`` namespace.
 ///
-/// Raises
-/// ------
-/// ValueError
-///     If the registry cannot be read.
+///     This function does not raise; the domain list is compiled in.
 ///
 /// Examples
 /// --------
@@ -175,14 +172,8 @@ fn validate(selector: &str, payload: &str) -> PyResult<String> {
 /// True
 #[pyfunction]
 #[pyo3(text_signature = "()")]
-fn domains() -> PyResult<Vec<String>> {
-    let mut names: Vec<String> = finstack_quant::schema::artifacts_with_domain()
-        .into_iter()
-        .map(|(domain, _)| domain.to_string())
-        .collect();
-    names.sort_unstable();
-    names.dedup();
-    Ok(names)
+fn domains() -> Vec<&'static str> {
+    finstack_quant::schema::domains()
 }
 
 /// Register the `finstack_quant.schema` Python namespace.
