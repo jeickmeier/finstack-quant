@@ -44,6 +44,15 @@ const MATERIALIZATION = new URL(
   '../../../finstack-quant/portfolio/tests/data/canonical/portfolio_materialization.json',
   import.meta.url
 );
+const PARITY_INPUTS = JSON.parse(
+  readFileSync(
+    new URL(
+      '../../../finstack-quant-py/tests/fixtures/statements_parity_inputs.json',
+      import.meta.url
+    ),
+    'utf8'
+  )
+);
 const BARRIER = new URL(
   '../../../finstack-quant/valuations/tests/golden/data/pricing/quantlib/fx_barrier_option/eurusd_up_out_call_3m_quantlib.json',
   import.meta.url
@@ -495,6 +504,36 @@ test('namespace results match their published result types', () => {
     'fq.PeerStats',
     statements_analytics.peerStats([1.0, 2.0, 3.0, 4.0]),
   ]);
+
+  // LboResult and DcfSensitivityResult, with their nullable members both null
+  // and populated (`checks`, `terminal_growth_up`).
+  const lbo = (config) => statements_analytics.evaluateLbo(PARITY_INPUTS.lbo_model, config);
+  const plainLbo = lbo(PARITY_INPUTS.lbo_config);
+  const checkedLbo = lbo({
+    ...PARITY_INPUTS.lbo_config,
+    check_mappings: PARITY_INPUTS.lbo_check_mappings,
+  });
+  assert.equal(plainLbo.checks, null);
+  assert.ok(checkedLbo.checks.results.length > 0);
+  declarations.push(['lbo', 'fq.LboResult', plainLbo]);
+  declarations.push(['lbo_checked', 'fq.LboResult', checkedLbo]);
+  const tornado = (terminalValue, options) =>
+    statements_analytics.dcfSensitivity(
+      PARITY_INPUTS.dcf_model,
+      0.1,
+      terminalValue,
+      'ufcf',
+      0.0,
+      options
+    );
+  const gordon = tornado(statements_analytics.terminalValueSpecGordonGrowth(0.02));
+  const exitMultiple = tornado(statements_analytics.terminalValueSpecExitMultiple(8.0, 999.0), {
+    exit_multiple_metric_node: 'ebitda',
+  });
+  assert.equal(typeof gordon.terminal_growth_up, 'number');
+  assert.equal(exitMultiple.terminal_growth_up, null);
+  declarations.push(['dcf_sensitivity_gordon', 'fq.DcfSensitivityResult', gordon]);
+  declarations.push(['dcf_sensitivity_exit', 'fq.DcfSensitivityResult', exitMultiple]);
 
   typecheck(declarations);
 });

@@ -258,6 +258,22 @@ test('instrumentCashflows is the typed twin of instrumentCashflowsJson', () => {
   );
   assert.deepEqual(handled, envelope);
   market.free();
+
+  // The success-path content: dated flows whose PVs sum to the priced value.
+  assert.equal(typeof envelope.total_pv, 'number');
+  assert.ok(Array.isArray(envelope.flows) && envelope.flows.length > 0);
+  assert.equal(envelope.reconciles_with_base_value, true);
+  const priced = valuations.instruments.priceInstrument(...args);
+  assert.ok(Math.abs(envelope.total_pv - Number(priced.value.amount)) < 0.01);
+});
+
+test('listModelsGrouped maps each instrument type to its registered models', () => {
+  const grouped = valuations.instruments.listModelsGrouped();
+  assert.equal(Object.getPrototypeOf(grouped), Object.prototype);
+  for (const model of ['discounting', 'hazard_rate', 'tree', 'rates_credit']) {
+    assert.ok(grouped.bond.includes(model), `bond prices under ${model}`);
+  }
+  assert.ok(Object.values(grouped).every((models) => models.every((m) => typeof m === 'string')));
 });
 
 test('valuationResultMetricSeries decodes composite metric keys', () => {

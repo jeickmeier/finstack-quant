@@ -635,6 +635,61 @@ const CASES = {
   },
   'models.bs_greeks_is_valid': () =>
     models.bsGreeksIsValid(models.bsGreeks(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, true)),
+
+  // Closed-form, COS and SVI kernels (audit finding F128).
+  'closed_form.forward_greeks': () => [
+    models.black76Greeks(0.03, 0.035, 2.0, 0.25, true),
+    models.black76Greeks(0.03, 0.035, 2.0, 0.25, false),
+    models.bachelierGreeks(0.03, 0.035, 0.0075, 2.0, true),
+    models.bachelierGreeks(-0.002, 0.001, 0.0075, 2.0, false),
+    models.blackShiftedVega(-0.002, 0.001, 0.3, 2.0, 0.03),
+  ],
+  'closed_form.barrier_call': () =>
+    [
+      [120.0, 'up'],
+      [85.0, 'down'],
+    ].flatMap(([barrier, direction]) =>
+      ['in', 'out'].map((knock) =>
+        models.barrierCall(100.0, 100.0, barrier, 0.05, 0.01, 0.2, 1.0, direction, knock)
+      )
+    ),
+  'closed_form.asian': () => [
+    models.asianOptionPrice(...GBM, 12),
+    models.asianOptionPrice(...GBM, 12, 'geometric', false),
+    models.asianOptionPrice(...GBM, 1, 'arithmetic', true),
+  ],
+  'closed_form.quanto': () => [
+    models.quantoOptionPrice(100.0, 105.0, 1.5, 0.04, 0.01, 0.02, 0.25, 0.1, -0.3),
+    models.quantoOptionPrice(100.0, 105.0, 1.5, 0.04, 0.01, 0.02, 0.25, 0.1, -0.3, false),
+  ],
+  'fourier.heston': () => [
+    models.hestonPrice(100.0, 100.0, 1.0, 0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04),
+    models.hestonPrice(100.0, 110.0, 1.0, 0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04, false),
+  ],
+  'fourier.cos': () => [
+    models.vgCosPrice(100.0, 100.0, 0.05, 0.0, 0.2, -0.14, 0.2, 1.0, true),
+    models.vgCosPrice(100.0, 95.0, 0.05, 0.0, 0.2, -0.14, 0.2, 1.0, false, 512),
+    models.mertonJumpCosPrice(100.0, 100.0, 0.05, 0.0, 0.2, -0.1, 0.15, 0.5, 1.0, true),
+    models.mertonJumpCosPrice(100.0, 95.0, 0.05, 0.0, 0.2, -0.1, 0.15, 0.5, 1.0, false, 512),
+  ],
+  'volatility.convert_atm': () => [
+    volatility.convertAtmVolatility(0.2, 'lognormal', 'normal', 0.03, 2.0),
+    volatility.convertAtmVolatility(0.006, 'normal', 'lognormal', 0.03, 2.0),
+    volatility.convertAtmVolatility(
+      0.2,
+      { shifted_lognormal: { shift: 0.02 } },
+      'normal',
+      0.03,
+      2.0
+    ),
+  ],
+  'volatility.calibrate_svi': () =>
+    volatility.calibrateSvi(
+      STRIKES,
+      STRIKES.map((strike) => volatility.sviImpliedVol(SVI, Math.log(strike / 100.0), 1.0)),
+      100.0,
+      1.0
+    ),
 };
 
 /** Reduce a result to JSON data (typed arrays become arrays). */

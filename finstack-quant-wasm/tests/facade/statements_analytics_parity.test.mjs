@@ -182,6 +182,38 @@ test('statements_analytics matches the cross-host golden', () => {
     forecast_summary: sa.forecastMetricsSummaryText(
       sa.backtestForecast([100.0, 110.0], [98.0, 112.0])
     ),
+    // Execution goldens for the comps statistics, the LBO and the DCF tornado
+    // (audit finding F240). The empty and one-element samples pin the Rust
+    // "no statistic" answers on both hosts.
+    comps_stats: {
+      peer_stats: INPUTS.comps_samples.map((sample) => orNull(sa.peerStats(sample))),
+      percentile_rank: INPUTS.comps_samples.map((sample) => orNull(sa.percentileRank(sample, 2.5))),
+      z_score: INPUTS.comps_samples.map((sample) => orNull(sa.zScore(sample, 2.5))),
+    },
+    lbo: {
+      plain: sa.evaluateLbo(INPUTS.lbo_model, INPUTS.lbo_config),
+      checked: sa.evaluateLbo(INPUTS.lbo_model, {
+        ...INPUTS.lbo_config,
+        check_mappings: INPUTS.lbo_check_mappings,
+      }),
+    },
+    dcf_sensitivity: {
+      gordon_growth: sa.dcfSensitivity(
+        INPUTS.dcf_model,
+        0.1,
+        sa.terminalValueSpecGordonGrowth(0.02),
+        'ufcf',
+        0.0
+      ),
+      exit_multiple: sa.dcfSensitivity(
+        INPUTS.dcf_model,
+        0.1,
+        sa.terminalValueSpecExitMultiple(8.0, 999.0),
+        'ufcf',
+        0.0,
+        { exit_multiple_metric_node: 'ebitda' }
+      ),
+    },
   };
   tracer.free();
   corkscrew.free();

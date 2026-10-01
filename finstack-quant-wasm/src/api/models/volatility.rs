@@ -9,6 +9,7 @@ use crate::api::core::surfaces::{JsFxDeltaVolSurface, JsVolCube};
 use crate::utils::input::{
     from_js_json, invalid_type, js_bool, js_f64, js_f64_matrix, js_f64_seq, js_opt_f64, js_uint,
 };
+use crate::utils::wire::js_wire;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_models::volatility as vol;
@@ -452,8 +453,10 @@ pub fn convert_atm_volatility(
     let vol = js_f64(&vol, "vol")?;
     let forward_rate = js_f64(&forward_rate, "forwardRate")?;
     let time_to_expiry = js_f64(&time_to_expiry, "timeToExpiry")?;
-    let from: vol::VolatilityConvention = from_js_json(&from_convention, "fromConvention")?;
-    let to: vol::VolatilityConvention = from_js_json(&to_convention, "toConvention")?;
+    // `js_wire`, not `from_js_json`: the unit variants are bare wire strings
+    // (`"normal"`), which `from_js_json` would parse as JSON text.
+    let from: vol::VolatilityConvention = js_wire(&from_convention, "fromConvention")?;
+    let to: vol::VolatilityConvention = js_wire(&to_convention, "toConvention")?;
     vol::convert_atm_volatility(vol, from, to, forward_rate, time_to_expiry).map_err(to_js_err)
 }
 

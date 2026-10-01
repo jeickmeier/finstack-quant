@@ -624,6 +624,50 @@ def _volatility_cases() -> dict[str, Callable[[], Any]]:
     }
 
 
+def _analytic_cases() -> dict[str, Callable[[], Any]]:
+    """Closed-form, COS and SVI kernels (audit finding F128)."""
+    smile = [volatility.SviParams(*SVI).implied_vol(math.log(strike / 100.0), 1.0) for strike in STRIKES]
+    return {
+        "closed_form.forward_greeks": lambda: [
+            _json(models.black76_greeks(0.03, 0.035, 2.0, 0.25, True)),
+            _json(models.black76_greeks(0.03, 0.035, 2.0, 0.25, False)),
+            _json(models.bachelier_greeks(0.03, 0.035, 0.0075, 2.0, True)),
+            _json(models.bachelier_greeks(-0.002, 0.001, 0.0075, 2.0, False)),
+            models.black_shifted_vega(-0.002, 0.001, 0.3, 2.0, 0.03),
+        ],
+        "closed_form.barrier_call": lambda: [
+            models.barrier_call(100.0, 100.0, barrier, 0.05, 0.01, 0.2, 1.0, direction, knock)
+            for barrier, direction in ((120.0, "up"), (85.0, "down"))
+            for knock in ("in", "out")
+        ],
+        "closed_form.asian": lambda: [
+            models.asian_option_price(*GBM, 12),
+            models.asian_option_price(*GBM, 12, "geometric", False),
+            models.asian_option_price(*GBM, 1, "arithmetic", True),
+        ],
+        "closed_form.quanto": lambda: [
+            models.quanto_option_price(100.0, 105.0, 1.5, 0.04, 0.01, 0.02, 0.25, 0.1, -0.3),
+            models.quanto_option_price(100.0, 105.0, 1.5, 0.04, 0.01, 0.02, 0.25, 0.1, -0.3, False),
+        ],
+        "fourier.heston": lambda: [
+            models.heston_price(100.0, 100.0, 1.0, 0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04),
+            models.heston_price(100.0, 110.0, 1.0, 0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04, False),
+        ],
+        "fourier.cos": lambda: [
+            models.vg_cos_price(100.0, 100.0, 0.05, 0.0, 0.2, -0.14, 0.2, 1.0, True),
+            models.vg_cos_price(100.0, 95.0, 0.05, 0.0, 0.2, -0.14, 0.2, 1.0, False, 512),
+            models.merton_jump_cos_price(100.0, 100.0, 0.05, 0.0, 0.2, -0.1, 0.15, 0.5, 1.0, True),
+            models.merton_jump_cos_price(100.0, 95.0, 0.05, 0.0, 0.2, -0.1, 0.15, 0.5, 1.0, False, 512),
+        ],
+        "volatility.convert_atm": lambda: [
+            volatility.convert_atm_volatility(0.2, "lognormal", "normal", 0.03, 2.0),
+            volatility.convert_atm_volatility(0.006, "normal", "lognormal", 0.03, 2.0),
+            volatility.convert_atm_volatility(0.2, {"shifted_lognormal": {"shift": 0.02}}, "normal", 0.03, 2.0),
+        ],
+        "volatility.calibrate_svi": lambda: _json(volatility.calibrate_svi(STRIKES, smile, 100.0, 1.0)),
+    }
+
+
 def cases() -> dict[str, Callable[[], Any]]:
     out: dict[str, Callable[[], Any]] = {}
     for group in (
@@ -635,6 +679,7 @@ def cases() -> dict[str, Callable[[], Any]]:
         _monte_carlo_cases,
         _rates_cases,
         _volatility_cases,
+        _analytic_cases,
     ):
         out.update(group())
     return out

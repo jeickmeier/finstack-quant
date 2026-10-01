@@ -189,5 +189,94 @@
     [1.0, 0.02],
     [2.0, 0.05],
     [3.0, 0.09]
-  ]
+  ],
+  "comps_samples": [[1.0, 2.0, 3.0, 4.0, 5.5], [], [3.0]],
+  "lbo_model": {
+    "id": "lbo",
+    "schema_version": 1,
+    "meta": { "currency": "USD" },
+    "periods": [
+      { "id": "2025Q1", "start": "2025-01-01", "end": "2025-04-01", "is_actual": false },
+      { "id": "2025Q2", "start": "2025-04-01", "end": "2025-07-01", "is_actual": false },
+      { "id": "2025Q3", "start": "2025-07-01", "end": "2025-10-01", "is_actual": false },
+      { "id": "2025Q4", "start": "2025-10-01", "end": "2026-01-01", "is_actual": false },
+      { "id": "2026Q1", "start": "2026-01-01", "end": "2026-04-01", "is_actual": false }
+    ],
+    "nodes": {
+      "ebitda": {
+        "node_id": "ebitda",
+        "node_type": "value",
+        "values": {
+          "2025Q1": { "amount": "100", "currency": "USD" },
+          "2025Q2": { "amount": "100", "currency": "USD" },
+          "2025Q3": { "amount": "100", "currency": "USD" },
+          "2025Q4": { "amount": "100", "currency": "USD" },
+          "2026Q1": { "amount": "120", "currency": "USD" }
+        }
+      },
+      "net_debt": {
+        "node_id": "net_debt",
+        "node_type": "value",
+        "values": {
+          "2025Q1": { "amount": "300", "currency": "USD" },
+          "2025Q2": { "amount": "300", "currency": "USD" },
+          "2025Q3": { "amount": "300", "currency": "USD" },
+          "2025Q4": { "amount": "300", "currency": "USD" },
+          "2026Q1": { "amount": "200", "currency": "USD" }
+        }
+      }
+    }
+  },
+  "lbo_config": {
+    "entry_multiple": 8.0,
+    "entry_metric_node": "ebitda",
+    "transaction_fees": 10.0,
+    "sources": [{ "name": "debt", "amount": 500.0 }],
+    "exit_multiple": 9.0,
+    "exit_metric_node": "ebitda",
+    "exit_net_debt_node": "net_debt",
+    "exit_period": "2026Q1"
+  },
+  "lbo_check_mappings": {
+    "three_statement": {
+      "assets_nodes": ["ebitda"],
+      "liabilities_nodes": ["net_debt"],
+      "equity_nodes": ["ebitda"],
+      "cash_node": "net_debt",
+      "retained_earnings_node": "ebitda",
+      "net_income_node": "ebitda"
+    },
+    "credit": {
+      "debt_node": "net_debt",
+      "ebitda_node": "ebitda",
+      "interest_expense_node": "ebitda"
+    }
+  },
+  "dcf_model": {
+    "id": "dcf",
+    "schema_version": 1,
+    "meta": { "currency": "USD" },
+    "periods": [
+      { "id": "2025", "start": "2025-01-01", "end": "2026-01-01", "is_actual": false },
+      { "id": "2026", "start": "2026-01-01", "end": "2027-01-01", "is_actual": false }
+    ],
+    "nodes": {
+      "ufcf": {
+        "node_id": "ufcf",
+        "node_type": "value",
+        "values": {
+          "2025": { "amount": "100", "currency": "USD" },
+          "2026": { "amount": "110", "currency": "USD" }
+        }
+      },
+      "ebitda": {
+        "node_id": "ebitda",
+        "node_type": "value",
+        "values": {
+          "2025": { "amount": "50", "currency": "USD" },
+          "2026": { "amount": "60", "currency": "USD" }
+        }
+      }
+    }
+  }
 }

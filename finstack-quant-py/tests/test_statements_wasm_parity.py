@@ -208,6 +208,11 @@ def analytics_cases() -> dict[str, Any]:
     with pytest.raises(ValueError, match="terminal_value is required"):
         sa.run_corporate_analysis(MODEL, wacc=0.10)
 
+    samples: list[list[float]] = INPUTS["comps_samples"]
+    lbo_model = json.dumps(INPUTS["lbo_model"])
+    lbo_config: dict[str, Any] = INPUTS["lbo_config"]
+    dcf_json = json.dumps(INPUTS["dcf_model"])
+
     scenario_set = sa.ScenarioSet.from_json(json.dumps(INPUTS["scenario_set"]))
     scenario_results = sa.evaluate_scenario_set(MODEL, scenario_set)
     down = scenario_results.get("down")
@@ -289,6 +294,33 @@ def analytics_cases() -> dict[str, Any]:
         },
         "explanation_text": sa.explain_formula(MODEL, result, "profit", Q1).to_text(),
         "forecast_summary": sa.backtest_forecast([100.0, 110.0], [98.0, 112.0]).summary(),
+        # Execution goldens for the comps statistics, the LBO and the DCF tornado
+        # (audit finding F240). The empty and one-element samples pin the Rust
+        # "no statistic" answers on both hosts.
+        "comps_stats": {
+            "peer_stats": [None if stats is None else doc(stats) for stats in map(sa.peer_stats, samples)],
+            "percentile_rank": [sa.percentile_rank(sample, 2.5) for sample in samples],
+            "z_score": [sa.z_score(sample, 2.5) for sample in samples],
+        },
+        "lbo": {
+            "plain": doc(sa.evaluate_lbo(lbo_model, lbo_config)),
+            "checked": doc(sa.evaluate_lbo(lbo_model, {**lbo_config, "check_mappings": INPUTS["lbo_check_mappings"]})),
+        },
+        "dcf_sensitivity": {
+            "gordon_growth": doc(
+                sa.dcf_sensitivity(dcf_json, 0.10, sa.TerminalValueSpec.gordon_growth(0.02), "ufcf", 0.0)
+            ),
+            "exit_multiple": doc(
+                sa.dcf_sensitivity(
+                    dcf_json,
+                    0.10,
+                    sa.TerminalValueSpec.exit_multiple(8.0, 999.0),
+                    "ufcf",
+                    0.0,
+                    {"exit_multiple_metric_node": "ebitda"},
+                )
+            ),
+        },
     }
 
 

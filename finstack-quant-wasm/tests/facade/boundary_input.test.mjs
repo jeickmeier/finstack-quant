@@ -179,6 +179,19 @@ test('counts reject negatives, fractions and oversized values before Rust sizes 
   const asian = [100, 100, 0.05, 0, 0.2, 1];
   assert.throws(() => models.asianOptionPrice(...asian, -1), invalidType('numFixings'));
   assert.throws(() => models.asianOptionPrice(...asian, 0), /num_fixings must be positive/);
+  assert.throws(() => models.asianOptionPrice(...asian, 2.5), invalidType('numFixings'));
+  assert.throws(() => models.asianOptionPrice(...asian, 2 ** 53), invalidType('numFixings'));
+  // The other COS kernels share the count check (audit finding F128).
+  const vg = [100, 100, 0.05, 0, 0.2, -0.14, 0.2, 1, true];
+  const mertonJump = [100, 100, 0.05, 0, 0.2, -0.1, 0.15, 0.5, 1, true];
+  for (const price of [
+    (nTerms) => models.vgCosPrice(...vg, nTerms),
+    (nTerms) => models.mertonJumpCosPrice(...mertonJump, nTerms),
+  ]) {
+    assert.ok(price(256) > 0);
+    for (const bad of [-1, 2.5, 2 ** 53]) assert.throws(() => price(bad), invalidType('nTerms'));
+    assert.throws(() => price(1_000_000), /num_terms must be in 1\.\.=65536/);
+  }
 });
 
 test('u64 seeds accept exact BigInt or safe integers and reject wrapping', () => {

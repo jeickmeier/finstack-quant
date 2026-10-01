@@ -40,6 +40,11 @@ test('volatility argument errors are structured', () => {
   assert.throws(() => volatility.sviImpliedVol({}, 0, 1), structured('validation'));
   assert.throws(
     () => volatility.convertAtmVolatility(0.2, 'bogus', 'normal', 0.03, 1),
-    structured('validation')
+    (error) =>
+      structured('validation')(error) && /fromConvention: unknown variant/.test(error.message)
+  );
+  assert.throws(
+    () => volatility.convertAtmVolatility(0.2, 'lognormal', { shifted_normal: {} }, 0.03, 1),
+    (error) => structured('validation')(error) && /toConvention/.test(error.message)
   );
 });

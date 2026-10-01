@@ -2,6 +2,147 @@
 
 ## [Unreleased]
 
+### WASM binding audit: execution tests and cross-host goldens (2026-10-01)
+
+#### Fixed
+
+- WASM `models.volatility.convertAtmVolatility` accepts the bare convention strings its type declares (`'normal'`, `'lognormal'`). It parsed them as JSON text and rejected every call that did not pass a quoted JSON string or the shifted-lognormal object.
+
+### WASM binding audit: Python parity for statements and statements analytics (2026-10-01)
+
+#### Changed (BREAKING)
+
+- WASM `statements.evaluateModel`, `evaluateModelWithMarket` and `evaluateMonteCarlo` are removed. Use the `statements.Evaluator` class (`new Evaluator().evaluate(model)` and its market and Monte Carlo members).
+- WASM `statements_analytics.dependencyTree` and `dependencyTreeText` are removed. Use `new statements_analytics.DependencyTracer(model)` and its `dependencyTree`, `dependencyTreeText`, `directDependencies`, `allDependencies` and `dependents` members.
+- Python `run_corporate_analysis(interest_coverage_node=None)` takes the Rust default node when the argument is omitted.
+- Python `SensitivityResult.get_parameter_value` / `get_value` raise `ValueError` for an out-of-range scenario index.
+
+#### Added
+
+- WASM classes `statements.Evaluator`, `ModelBuilder`, `MixedNodeBuilder` and `Registry`, and `statements_analytics.DependencyTracer`, `CorkscrewExtension` and `CreditScorecardExtension`.
+- WASM functions: `normalize` / `normalizeJson`, the ECL entry points (`classifyStage`, `computeEcl`, `computeEclWeighted`), `evaluateDcf`, `runCorporateAnalysis`, `scenarioDiff`, `varianceBridge`, `plSummaryReport`, the seven `add*` model templates and `validateScorecardConfig`.
+- WASM free-function twins of the Python result and spec methods: `statementResult*`, `capitalStructureCashflows*`, `checkReport*`, `forecastSpec*`, `adjustment*`, `terminalValueSpec*`, `sensitivityResult*` and `companyMetricsGet`.
+- Rust `run_corporate_analysis` with `CorporateAnalysisOptions` (one request for both hosts), `SensitivityResult::get_parameter_value` / `get_value`, `CompanyMetrics::get` and `Adjustment::with_category`.
+- JSON Schemas for `CheckSuiteSpec`, `MetricRegistry`, `MonteCarloConfig`, `NormalizationResult` and `CorporateAnalysisOptions`.
+
+### WASM binding audit: Python parity for core (2026-10-01)
+
+#### Added
+
+- WASM `core` dates: `BusinessDayConvention`, `HolidayCalendar`, `PeriodKind`, `PeriodId`, `FiscalConfig`, `StubKind`, `ScheduleErrorPolicy`, `Schedule`, `ScheduleBuilder`, `SifmaSettlementClass`, `Thirty360Convention`, `TenorUnit`, the `DateExt` helpers, the IMM, CDS, option-expiry and SIFMA date rules, `days30360`, `days30e360Isda`, `buildPeriods`, `buildFiscalPeriods` and `daysSinceEpoch`.
+- WASM `core` market data: `InflationCurve`, `PriceCurve`, `BaseCorrelationCurve`, `CreditIndexData`, `VolSurface`, `ScalarTimeSeries`, `InflationIndex`, the remaining `DiscountCurve` members, `FxMatrix.fromDict` / `setQuotes`, and every `MarketContext` insert, lookup and conversion member.
+- WASM `core` math: `symmetricEigen`, `ledoitWolfShrinkage`, the NaN-sentinel statistics, `logReturns`, the parameterised normal and Student-t functions and the linear-algebra tolerances.
+- WASM `core` config and types: `RoundingMode`, `FinstackConfig`, `UnknownScalePolicy`, `RatingScaleRegistry`, `embeddedRegistry`, `registryFromConfig`, `CreditRating`, `CurveId`, `InstrumentId` and `Attributes`.
+- WASM `Currency.fromNumeric` and one `Currency` static per ISO 4217 code; `Money.zero`, `Money.fromTuple` and `toTuple`; `Rate.zero`, `Bps.zero` and `Percentage.zero`.
+- Rust `canonical_calendar_id`, `Display` / `FromStr` labels for `PriceCurveKind`, and `Serialize` for `ContextStats`.
+- JSON Schemas (and generated TypeScript types) for `PeriodPlan`, `ScheduleSpec`, `Schedule` and `ScorecardScale`.
+
+### WASM binding audit: Python parity for margin, calibration, scenarios, features, attribution and analytics (2026-10-01)
+
+#### Changed (BREAKING)
+
+- `SimmSensitivities::merge` checks that both containers share a base currency and returns `Result`; `merge_unchecked` keeps the raw sum. Python `SimmSensitivities.merge` raises `ValueError` on a currency mismatch.
+
+#### Added
+
+- WASM `margin` classes `VmCalculator`, `SimmSensitivities`, `SimmCalculator`, `ScheduleImCalculator`, `HaircutImCalculator`, `FrtbSensitivities`, `FrtbSbaEngine` and `SaCcrEngine`; functions `computeMva`, `imProfileFromSimm`, `frtbSbaCharge` and `saccrEad`; the margin constants; and free-function twins of the spec methods (`csaSpec*`, `eligibleCollateralSchedule*`, `imMethodology*`, `marginUtilization*`, ...).
+- Rust `ImDecayProfile::linear_to_maturity` / `sqrt_time`, `FrtbSbaEngine::with_selection`, `frtb_sba_charge`, `saccr_ead` and `MarginConstants::current`. `ConcentrationBreach` is a serde type.
+- WASM `calibration.validateCalibration`, the three Hull-White calibrators on curve handles, and twins for the quote, step and result members. Rust owns the authoring defaults and the `*_from_curve(s)` calibrators.
+- WASM `scenarios`: `OperationSpec` constructors and predicates, enum labels, and `RateBindingSpec`, `ScenarioSpec` and `HorizonResult` twins. Rust `OperationSpec::time_roll_forward`.
+- WASM `features`: typed `transformPanel` and the operation selector twins. The crate publishes JSON Schemas, so its TypeScript types are generated like every other crate's.
+- WASM `analytics.Performance` gains `fromArrays`, `fromReturnsArrays`, `fromJson` and `toJson`. `ReturnContributionResult` and `RollingGreeks` are declared TypeScript types.
+
+### WASM binding audit: Python parity for valuations (2026-10-01)
+
+#### Changed (BREAKING)
+
+- An unknown instrument type in the valuations schema accessors is a not-found error (Python `KeyError`, WASM kind `not_found`).
+- Python structured-credit, facility and tranche builders and `StructuredCredit.tranche_cashflows` / `price_stochastic` call the Rust methods; the binding copies are deleted.
+
+#### Added
+
+- WASM typed instrument classes `InterestRateSwap`, `Swaption`, `CapFloor`, `CreditDefaultSwap`, `CdsIndex`, `CdsTranche`, `ConvertibleBond`, `EquityOption` and `StructuredCredit`, each with a fluent builder (plus `TrancheBuilder`).
+- WASM member parity for `Bond`, `TermLoan`, `RevolvingCredit`, `AssetBackedFacility`, `FxForward` and `FxOption`: one getter per Rust field, `toDict`, `marketDependencies`, `price` / `metric` and the Rust analytics (`parSpread`, `riskyPv01`, `cs01`, `greeks`, `impliedVol`, `priceMertonMc`, ...).
+- WASM `MertonMcConfig` and `ConventionRegistry` classes, `valuations.schema` with the instrument and valuation-result schema accessors, the `valuationResult*` functions, and free-function twins for the instrument and composite data types.
+- Rust `StructuredCredit::tranche_cashflows` and `price_stochastic_monte_carlo`; per-field credit-model setters on the `StructuredCredit` and `AssetBackedFacility` builders; `TrancheBuilder::attach_pct` / `detach_pct`; builder defaults for `market_conditions`, `deal_metadata` and `hedge_swaps`.
+- Serde and JSON Schemas for `CdsIndexParams`, `CdsTrancheParams`, `MertonMcResult` and `PathStatistics`; JSON Schemas for the market conventions, `MarketHistory`, `SimulationDiagnostics` and `FacilityProjection`.
+
+#### Fixed
+
+- WASM `StructuredCredit.priceStochastic` returns its path and step counts as numbers, as the `StochasticPricingResult` type declares (they were `bigint`).
+
+### WASM binding audit: Python parity for models (2026-10-01)
+
+#### Changed (BREAKING)
+
+- The WASM `models.credit` JSON-string functions are replaced by classes:
+  - `mertonModelJson`, `mertonModelWithDynamicsJson`, `mertonFromEquityJson`, `mertonFromCdsSpreadJson`, `mertonFromTargetPdJson`, `mertonDistanceToDefault*`, `mertonDefaultProbability*`, `mertonImpliedSpread`, `mertonDebtSpread`, `mertonCdsParSpread`, `mertonTryImpliedEquity`, `mertonSimulatePathsJson`, `mertonToHazardCurveJson` and `mertonKmvDefaultPoint` → `MertonModel` (with `AssetDynamics`, `MertonBarrierType` and `SimulatedPaths`).
+  - `creditGradesModelJson` → `MertonModel.creditGrades`; `creditStateJson` → a plain `CreditState` object.
+  - `dynamicRecoveryConstantJson` / `dynamicRecoveryAtNotional` → `DynamicRecoverySpec`.
+  - `endogenousHazardPowerLawJson`, `endogenousHazardAtLeverage` and `endogenousHazardAfterPikAccrual` → `EndogenousHazardSpec`.
+  - `toggleExerciseThresholdJson` / `toggleExerciseOptimalJson` → `ToggleExerciseModel`.
+- `TransitionMatrix.probability_by_index` raises `ValueError` for an index outside the rating scale in Python (was `IndexError`), through the new Rust `TransitionMatrix::try_probability_by_index`.
+- Python migration and PD-calibration errors take their exception type from the Rust error kind.
+- Python `ToggleExerciseModel.should_pik` runs the nested simulation for optimal-exercise rules, seeded from the draw `u` (it returned `False`).
+
+#### Added
+
+- WASM `models.credit` classes `MertonModel`, `AssetDynamics`, `MertonBarrierType`, `SimulatedPaths`, `DynamicRecoverySpec`, `EndogenousHazardSpec`, `ToggleExerciseModel`, `RatingScale`, `TransitionMatrix`, `GeneratorMatrix`, `MigrationSimulator`, `RatingPath`, `RatingPaths`, `MasterScale`, `RatingFactorTable`, `BetaRecovery`, `DownturnLgd`, `EadCalculator`, `WorkoutCosts`, `WorkoutLgd` and `WorkoutLgdBuilder`, plus the scoring (`altmanZScore`, `ohlsonOScore`, `zmijewskiScore`, ...), PD (`pitToTtc`, `ttcToPit`, `centralTendency`, `baselIrbPdFloor`), LGD / EAD and recovery-waterfall functions.
+- WASM `models.correlation`: `CorrelatedBernoulli`, `LatentFactorSpec`, `LatentSingleFactor`, `LatentTwoFactor`, `LatentMultiFactor`, `choleskyDecompose`, `simulatePortfolioLoss` and `maxPortfolioLossPaths`.
+- WASM `models.monteCarlo`: `EuropeanPricer`, `PathDependentPricer`, `LsmcPricer`, `simulateGbmPaths`, the finite-difference delta and gamma helpers, `hestonSatisfiesFeller` and `relativeStderr`.
+- WASM `models.rates`: `dtsm.YieldPanel`, `DieboldLi` and `YieldPca` with their free functions, and `hullWhite.HullWhiteParams` with `hw1fZcbOptionPrice`, `hw1fCapFloorPrice`, `hw1fCapletForwardRateNormalVol`, `hw1fConvexityAdjustment` and `hwBondVol`.
+- WASM `models.volatility`: `sviTotalVariance`, `sviDurrlemanG`, the grid arbitrage checks (`checkSurfaceGrid`, `checkButterflyGrid`, `checkCalendarSpreadGrid`, `checkLocalVolDensityGrid`), the cube and FX-delta surface materializers, `getSurfaceVol` and `getSurfaceVolClamped`.
+- WASM `models.liquidity.AlmgrenChrissModel` and `KyleLambdaModel`; `models.factor.credit.VolHorizon` and the factor covariance functions; `models.factor.risk.DecompositionConfig`, `buildStressAttribution` and `positionComponentVar`; `models.bsGreeksIsValid`.
+- Rust `MigrationSimulator::simulate_seeded` / `empirical_matrix_seeded`, `migration::default_rate`, `MasterScale::map_pds`, `MertonModel::default_probabilities`, `to_rows` on the transition, generator and factor covariance matrices, and the Monte Carlo convenience constructors both hosts call.
+
+### WASM binding audit: Python parity for cashflows and covenants (2026-10-01)
+
+#### Changed (BREAKING)
+
+- Python `PeriodAggregation.get` is renamed `get_amount`, the Rust name (`PeriodAggregation::get_amount`).
+
+#### Added
+
+- WASM `cashflows` handles `CashFlowSchedule`, `CashFlowBuilder` and `AccrualIndex`; functions `buildCashflowSchedule`, `datedFlows`, `scheduleFromDatedFlows`, `scheduleFromClassifiedFlows`, `mergeCashflowSchedules`, `accruedInterestAmount`, `aggregateByPeriod`, `aggregateCashflowsChecked`, `calendarYearLadder`, `materializeFixings` and `isCashSettlementKind`; and free-function twins for the plain-object types (specs, presets, `CashFlow`, `CFKind`, `ExCouponRule`, `PeriodAggregation`). `pvByPeriod` and `scaleAmounts` are methods of `CashFlowSchedule`.
+- WASM `covenants`: the `CovenantEngine` handle; `lboStandard`, `covLite`, `realEstate`, `projectFinance`, `forecastCovenant` and `forecastBreaches`; and free-function twins for `CovenantType`, `CovenantConsequence`, `Covenant`, `CovenantSpec`, `ThresholdSchedule` and `CovenantForecastConfig`.
+- Rust `forecast_covenant`, `forecast_breaches`, `CovenantEngine::evaluate_series` and the `DatedMetrics`, `DatedCovenantReports` and `DatedMetricSeries` types; Python calls them instead of its own series loop. `CovenantForecastConfig` fields default on the wire.
+- Serde and a JSON Schema for `ScheduleBuildOpts`, and seven more cashflows schemas (schedule, build spec, floating and step-up coupon specs, accrual config, period aggregation, build options).
+
+### WASM binding audit: Python parity for portfolio (2026-10-01)
+
+#### Changed (BREAKING)
+
+- Python `finstack_quant.portfolio.FactorRiskDecomposition` is removed. `decompose_factor_risk` returns `finstack_quant.models.factor.risk.RiskDecomposition`, whose `factor_contributions`, `position_factor_contributions` and `position_residual_contributions` are properties returning typed rows.
+
+#### Added
+
+- WASM `portfolio` functions `allocateWeights`, `allocateWeightsJson`, `validateAllocationJson`, `factorStress`, `positionWhatIf`, `buildCreditVolReport`, `scenarioPnlBatch` and `attributePortfolioPnl`.
+- WASM `Portfolio.builder` and the `PortfolioBuilder` class (`name`, `entity`, `position`, `tag`, `meta`, `build`).
+- WASM free-function twins of the result methods: `portfolioAttributionExplainText`, `portfolioAttributionReconciliationCheck`, `portfolioValuationGetPositionValue`, `portfolioValuationGetEntityValue`, `portfolioMetricsGetMetric`, `portfolioMetricsGetPositionMetrics`, `portfolioMetricsGetTotal`, `portfolioOptimizationResultNewPositionTrades` and `portfolioOptimizationResultBindingConstraints`.
+- Rust `FactorModel::position_what_if` (baseline analysis and what-if in one call) and `PortfolioResult::require_metric` (a not-found error for a missing metric).
+- `CreditVolReport`, `LevelVolContribution` and `PositionVolContribution` are serde types with a JSON Schema; Python `CreditVolReport` gains `to_json`, `from_json` and pickle support.
+
+### WASM binding audit: Rust computations JavaScript could not reach (2026-09-30)
+
+#### Changed (BREAKING)
+
+- `PnlAttribution::residual_within_tolerance(pct_tolerance, abs_tolerance)` takes `Option<f64>` for both arguments; `None` uses the tolerances recorded in the attribution metadata.
+- `FxForward::from_trade_date` takes `Option` for the settlement lag and the business-day convention and applies the Rust defaults when they are `None`.
+
+#### Added
+
+- WASM `attribution`: `pnlBridge`, `attributePnlMany`, `attributeReturnContribution` / `attributeReturnContributionJson`, `validateReturnContributionJson`, and the `pnlAttribution*` helpers (`ExplainText`, `ExplainVerboseText`, `RequiredMetrics`, `ResidualWithinTolerance`, `ValidateCurrencies`).
+- WASM `cashflows`: `absToSmm`, `scheduleWal`, `scheduleOutstandingByDate` and `scheduleCalendarYearLadder`. Python gains `abs_to_smm`.
+- WASM `valuations`: typed `instrumentCashflows` / `instrumentCashflowsWithMarket`, `valuationResultMetricSeries`, and constructors, examples and analytics on `FxForward`, `FxOption`, `Bond`, `TermLoan`, `RevolvingCredit` and `AssetBackedFacility`.
+- WASM `portfolio`: `Portfolio` getters, `netInCurrencyByDate`, `collapseToBaseByDateKind`, `portfolioMetricsSeries` and `rebalanceFromSpec` (Rust `optimization::rebalance_from_spec`, also bound in Python).
+- WASM `statements`: `nodeToDatedSchedule`, `statementResultToTableLong` / `statementResultToTableWide`, `monteCarloBreachProbability`, `monteCarloPercentileByPeriod` and `financialModelContentHash`; `statements_analytics.scenarioComparisonTable` and `parameterSpecWithPercentages`.
+- WASM `calibration.calibrationEnvelopeContentHash` and `calibrationResultContentHash`, computed in Rust.
+- `PeriodDateConvention` implements `Default` and `FromStr`.
+
+#### Fixed
+
+- `MonteCarloResults::breach_probability` works on a result restored from JSON.
+
 ### WASM binding audit: handle members and JSON round trips (2026-09-30)
 
 #### Changed (BREAKING)
