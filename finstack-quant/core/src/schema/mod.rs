@@ -86,6 +86,45 @@ fn market_context_state_examples() -> Result<Vec<Value>> {
     Ok(vec![value])
 }
 
+/// Serialize one example payload for a registered artifact.
+fn example_payload<T: serde::Serialize>(label: &str, value: &T) -> Result<Vec<Value>> {
+    serde_json::to_value(value)
+        .map(|example| vec![example])
+        .map_err(|error| Error::Internal(format!("serialize {label} example: {error}")))
+}
+
+/// Two calendar quarters, the first marked actual.
+fn period_plan_examples() -> Result<Vec<Value>> {
+    let plan = crate::dates::build_periods("2025Q1..Q2", Some("2025Q1"))?;
+    example_payload("period plan", &plan)
+}
+
+/// A one-year schedule with the builder defaults.
+fn schedule_spec_example() -> Result<crate::dates::ScheduleSpec> {
+    let start = crate::dates::create_date(2025, time::Month::January, 15)?;
+    let end = crate::dates::create_date(2026, time::Month::January, 15)?;
+    crate::dates::ScheduleSpec::new(start, end)
+}
+
+/// The persisted inputs of [`schedule_examples`].
+fn schedule_spec_examples() -> Result<Vec<Value>> {
+    example_payload("schedule spec", &schedule_spec_example()?)
+}
+
+/// The schedule generated from [`schedule_spec_example`].
+fn schedule_examples() -> Result<Vec<Value>> {
+    example_payload("schedule", &schedule_spec_example()?.build()?)
+}
+
+/// The default scorecard scale of the rating-scale registry compiled into the library.
+fn scorecard_scale_examples() -> Result<Vec<Value>> {
+    let registry = crate::rating_scales::embedded_registry()?;
+    example_payload(
+        "scorecard scale",
+        registry.rating_scale(registry.default_scale_id())?,
+    )
+}
+
 /// The core crate's schema registry.
 ///
 /// This lives beside the emitter rather than in the generator binary, so the
@@ -111,4 +150,36 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "Column-oriented table with a shared row count and typed column storage.",
     )
     .with_kind(SchemaKind::Output),
+    SchemaArtifact::new::<crate::dates::PeriodPlan>(
+        "schemas/dates/1/period_plan.schema.json",
+        "https://finstack_quant.dev/schemas/dates/1/period_plan.schema.json",
+        "PeriodPlan",
+        "Ordered reporting periods with their calendar bounds and actual/forecast flags.",
+    )
+    .with_kind(SchemaKind::Output)
+    .with_examples(period_plan_examples),
+    SchemaArtifact::new::<crate::dates::ScheduleSpec>(
+        "schemas/dates/1/schedule_spec.schema.json",
+        "https://finstack_quant.dev/schemas/dates/1/schedule_spec.schema.json",
+        "ScheduleSpec",
+        "Persisted inputs of a date schedule: range, frequency, stub, adjustment and lags.",
+    )
+    .with_kind(SchemaKind::Input)
+    .with_examples(schedule_spec_examples),
+    SchemaArtifact::new::<crate::dates::Schedule>(
+        "schemas/dates/1/schedule.schema.json",
+        "https://finstack_quant.dev/schemas/dates/1/schedule.schema.json",
+        "Schedule",
+        "Generated accrual, payment and fixing dates with any construction warnings.",
+    )
+    .with_kind(SchemaKind::Output)
+    .with_examples(schedule_examples),
+    SchemaArtifact::new::<crate::rating_scales::ScorecardScale>(
+        "schemas/rating_scales/1/scorecard_scale.schema.json",
+        "https://finstack_quant.dev/schemas/rating_scales/1/scorecard_scale.schema.json",
+        "ScorecardScale",
+        "Named scorecard rating scale: rating levels ordered best to worst with score thresholds.",
+    )
+    .with_kind(SchemaKind::Output)
+    .with_examples(scorecard_scale_examples),
 ];

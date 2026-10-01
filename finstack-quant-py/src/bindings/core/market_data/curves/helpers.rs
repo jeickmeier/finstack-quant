@@ -41,23 +41,15 @@ pub(super) fn parse_compounding(s: &str) -> PyResult<Compounding> {
     })
 }
 
-/// Parse a [`PriceCurveKind`] from `"price"` or `"vol_index"`.
+/// Parse a price-curve kind label (Rust `PriceCurveKind::from_str`).
 pub(super) fn parse_price_curve_kind(s: &str) -> PyResult<PriceCurveKind> {
-    match s {
-        "price" => Ok(PriceCurveKind::Price),
-        "vol_index" => Ok(PriceCurveKind::VolIndex),
-        other => Err(crate::errors::value_error(format!(
-            "Invalid price curve kind {other:?}: expected \"price\" or \"vol_index\""
-        ))),
-    }
+    s.parse::<PriceCurveKind>()
+        .map_err(crate::errors::core_to_py)
 }
 
-/// Label of a [`PriceCurveKind`] (`"price"` or `"vol_index"`).
+/// Canonical label of a price-curve kind (Rust `PriceCurveKind::as_str`).
 pub(super) fn price_curve_kind_name(kind: PriceCurveKind) -> &'static str {
-    match kind {
-        PriceCurveKind::Price => "price",
-        PriceCurveKind::VolIndex => "vol_index",
-    }
+    kind.as_str()
 }
 
 /// Parse a [`ParInterp`] from its serde name (`"linear"` or `"log_linear"`).

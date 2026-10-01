@@ -397,6 +397,31 @@ pub fn json_text(value: &JsValue, label: &str) -> Result<String, JsValue> {
     Ok(out)
 }
 
+/// Any JSON-representable JavaScript value as a `serde_json::Value`.
+///
+/// Unlike [`json_text`], a string argument is a JSON *string value*, not JSON
+/// text to parse; use this where the argument is itself the value to store.
+///
+/// # Arguments
+///
+/// * `value` - The JavaScript argument: `null`, a boolean, finite number,
+///   string, BigInt, array, typed array or plain object.
+/// * `label` - The camelCase argument name, used in the error message.
+///
+/// # Errors
+///
+/// Throws a `TypeError` (`kind: "invalid_type"`) when `value` (or anything
+/// nested in it) is `undefined`, non-finite, or not JSON-representable.
+pub fn js_json_value(value: &JsValue, label: &str) -> Result<serde_json::Value, JsValue> {
+    let mut out = String::new();
+    write_json(value, &mut out, label, 0).map_err(|problem| invalid_type(label, &problem))?;
+    serde_json::from_str(&out).map_err(|error| {
+        super::to_js_err(finstack_quant_core::Error::Validation(format!(
+            "{label}: {error}"
+        )))
+    })
+}
+
 /// Deserialize a structured argument (JSON string or plain object/array)
 /// through `serde_json`, so the target type's `deny_unknown_fields` and
 /// validating `Deserialize` impls apply exactly as for JSON text.

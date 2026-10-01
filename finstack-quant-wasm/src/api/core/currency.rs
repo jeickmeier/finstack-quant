@@ -50,6 +50,24 @@ impl JsCurrency {
             .map_err(to_js_err)
     }
 
+    /// Look up a currency by its ISO-4217 numeric code (Rust `Currency::try_from`).
+    ///
+    /// # Arguments
+    ///
+    /// * `code` - ISO-4217 numeric code, such as `840` for USD or `978` for EUR.
+    ///
+    /// @returns The matching `Currency`.
+    /// @throws `TypeError` (kind `invalid_type`) if `code` is not an integer in
+    /// `0..=65535`; `FinstackError` (kind `validation`) if no supported
+    /// currency has that numeric code.
+    #[wasm_bindgen(js_name = fromNumeric)]
+    pub fn from_numeric(code: JsValue) -> Result<JsCurrency, JsValue> {
+        let code: u16 = crate::utils::input::js_uint(&code, "code")?;
+        RustCurrency::try_from(code)
+            .map(|inner| JsCurrency { inner })
+            .map_err(|error| to_js_err(error.to_string()))
+    }
+
     /// Three-letter ISO-4217 alphabetic code.
     ///
     /// @returns The uppercase alphabetic code (e.g. `"USD"`).

@@ -91,7 +91,12 @@ import type {
   StrictLoadDiagnostic,
 } from './types/generated/calibration/index.js';
 import type {
+  MarketScalar,
+  PeriodPlan,
   SabrParameterData,
+  ScheduleSpec,
+  ScheduleWarning,
+  ScorecardScale,
   TableColumn,
   TableColumnData,
   TableEnvelope,
@@ -147,6 +152,7 @@ import type {
   ScenarioCell,
   ScenarioTable,
   TrancheMetrics,
+  ToleranceConfig,
   ValidationReport,
 } from './types/generated/valuations/index.js';
 import type {
@@ -226,7 +232,18 @@ export type {
   PriorMarketObject,
   StepParams,
 } from './types/generated/calibration/index.js';
-export type { TableColumn, TableColumnData, TableEnvelope };
+export type {
+  MarketScalar,
+  PeriodPlan,
+  ScheduleSpec,
+  ScheduleWarning,
+  ScorecardScale,
+  TableColumn,
+  TableColumnData,
+  TableEnvelope,
+  ToleranceConfig,
+};
+export type { Period, RatingLevel } from './types/generated/core/index.js';
 export type { DrawdownEpisode, LookbackReturns, PeriodicReturn };
 export type { CovenantReport };
 export type { VmResult, XvaResult };
@@ -773,6 +790,968 @@ export interface CurrencyConstructor {
    * @throws If `json` is malformed or contains an unknown code.
    */
   fromJson(json: JsonInput): Currency;
+  /**
+   * Look up a currency by its ISO-4217 numeric code (Rust `Currency::try_from`).
+   *
+   * @param code - ISO-4217 numeric code, such as `840` for USD or `978` for EUR.
+   * @returns The matching `Currency`.
+   * @throws `TypeError` (kind `invalid_type`) if `code` is not an integer in `0..=65535`; `FinstackError` (kind `validation`) if no supported currency has that numeric code.
+   */
+  fromNumeric(code: number): Currency;
+  /**
+   * UAE Dirham (`AED`, ISO-4217 numeric 784).
+   *
+   * @returns The `AED` currency.
+   */
+  aed(): Currency;
+  /**
+   * Afghani (`AFN`, ISO-4217 numeric 971).
+   *
+   * @returns The `AFN` currency.
+   */
+  afn(): Currency;
+  /**
+   * Lek (`ALL`, ISO-4217 numeric 8).
+   *
+   * @returns The `ALL` currency.
+   */
+  all(): Currency;
+  /**
+   * Armenian Dram (`AMD`, ISO-4217 numeric 51).
+   *
+   * @returns The `AMD` currency.
+   */
+  amd(): Currency;
+  /**
+   * Netherlands Antillean Guilder (`ANG`, ISO-4217 numeric 532).
+   *
+   * @returns The `ANG` currency.
+   */
+  ang(): Currency;
+  /**
+   * Kwanza (`AOA`, ISO-4217 numeric 973).
+   *
+   * @returns The `AOA` currency.
+   */
+  aoa(): Currency;
+  /**
+   * Argentine Peso (`ARS`, ISO-4217 numeric 32).
+   *
+   * @returns The `ARS` currency.
+   */
+  ars(): Currency;
+  /**
+   * Australian Dollar (`AUD`, ISO-4217 numeric 36).
+   *
+   * @returns The `AUD` currency.
+   */
+  aud(): Currency;
+  /**
+   * Aruban Florin (`AWG`, ISO-4217 numeric 533).
+   *
+   * @returns The `AWG` currency.
+   */
+  awg(): Currency;
+  /**
+   * Azerbaijan Manat (`AZN`, ISO-4217 numeric 944).
+   *
+   * @returns The `AZN` currency.
+   */
+  azn(): Currency;
+  /**
+   * Convertible Mark (`BAM`, ISO-4217 numeric 977).
+   *
+   * @returns The `BAM` currency.
+   */
+  bam(): Currency;
+  /**
+   * Barbados Dollar (`BBD`, ISO-4217 numeric 52).
+   *
+   * @returns The `BBD` currency.
+   */
+  bbd(): Currency;
+  /**
+   * Taka (`BDT`, ISO-4217 numeric 50).
+   *
+   * @returns The `BDT` currency.
+   */
+  bdt(): Currency;
+  /**
+   * Bulgarian Lev (`BGN`, ISO-4217 numeric 975).
+   *
+   * @returns The `BGN` currency.
+   */
+  bgn(): Currency;
+  /**
+   * Bahraini Dinar (`BHD`, ISO-4217 numeric 48).
+   *
+   * @returns The `BHD` currency.
+   */
+  bhd(): Currency;
+  /**
+   * Burundi Franc (`BIF`, ISO-4217 numeric 108).
+   *
+   * @returns The `BIF` currency.
+   */
+  bif(): Currency;
+  /**
+   * Bermudian Dollar (`BMD`, ISO-4217 numeric 60).
+   *
+   * @returns The `BMD` currency.
+   */
+  bmd(): Currency;
+  /**
+   * Brunei Dollar (`BND`, ISO-4217 numeric 96).
+   *
+   * @returns The `BND` currency.
+   */
+  bnd(): Currency;
+  /**
+   * Boliviano (`BOB`, ISO-4217 numeric 68).
+   *
+   * @returns The `BOB` currency.
+   */
+  bob(): Currency;
+  /**
+   * Brazilian Real (`BRL`, ISO-4217 numeric 986).
+   *
+   * @returns The `BRL` currency.
+   */
+  brl(): Currency;
+  /**
+   * Bahamian Dollar (`BSD`, ISO-4217 numeric 44).
+   *
+   * @returns The `BSD` currency.
+   */
+  bsd(): Currency;
+  /**
+   * Ngultrum (`BTN`, ISO-4217 numeric 64).
+   *
+   * @returns The `BTN` currency.
+   */
+  btn(): Currency;
+  /**
+   * Pula (`BWP`, ISO-4217 numeric 72).
+   *
+   * @returns The `BWP` currency.
+   */
+  bwp(): Currency;
+  /**
+   * Belarusian Ruble (`BYN`, ISO-4217 numeric 933).
+   *
+   * @returns The `BYN` currency.
+   */
+  byn(): Currency;
+  /**
+   * Belize Dollar (`BZD`, ISO-4217 numeric 84).
+   *
+   * @returns The `BZD` currency.
+   */
+  bzd(): Currency;
+  /**
+   * Canadian Dollar (`CAD`, ISO-4217 numeric 124).
+   *
+   * @returns The `CAD` currency.
+   */
+  cad(): Currency;
+  /**
+   * Congolese Franc (`CDF`, ISO-4217 numeric 976).
+   *
+   * @returns The `CDF` currency.
+   */
+  cdf(): Currency;
+  /**
+   * Swiss Franc (`CHF`, ISO-4217 numeric 756).
+   *
+   * @returns The `CHF` currency.
+   */
+  chf(): Currency;
+  /**
+   * Unidad de Fomento (`CLF`, ISO-4217 numeric 990).
+   *
+   * @returns The `CLF` currency.
+   */
+  clf(): Currency;
+  /**
+   * Chilean Peso (`CLP`, ISO-4217 numeric 152).
+   *
+   * @returns The `CLP` currency.
+   */
+  clp(): Currency;
+  /**
+   * Yuan Renminbi (`CNY`, ISO-4217 numeric 156).
+   *
+   * @returns The `CNY` currency.
+   */
+  cny(): Currency;
+  /**
+   * Colombian Peso (`COP`, ISO-4217 numeric 170).
+   *
+   * @returns The `COP` currency.
+   */
+  cop(): Currency;
+  /**
+   * Costa Rican Colon (`CRC`, ISO-4217 numeric 188).
+   *
+   * @returns The `CRC` currency.
+   */
+  crc(): Currency;
+  /**
+   * Peso Convertible (`CUC`, ISO-4217 numeric 931).
+   *
+   * @returns The `CUC` currency.
+   */
+  cuc(): Currency;
+  /**
+   * Cuban Peso (`CUP`, ISO-4217 numeric 192).
+   *
+   * @returns The `CUP` currency.
+   */
+  cup(): Currency;
+  /**
+   * Cabo Verde Escudo (`CVE`, ISO-4217 numeric 132).
+   *
+   * @returns The `CVE` currency.
+   */
+  cve(): Currency;
+  /**
+   * Czech Koruna (`CZK`, ISO-4217 numeric 203).
+   *
+   * @returns The `CZK` currency.
+   */
+  czk(): Currency;
+  /**
+   * Djibouti Franc (`DJF`, ISO-4217 numeric 262).
+   *
+   * @returns The `DJF` currency.
+   */
+  djf(): Currency;
+  /**
+   * Danish Krone (`DKK`, ISO-4217 numeric 208).
+   *
+   * @returns The `DKK` currency.
+   */
+  dkk(): Currency;
+  /**
+   * Dominican Peso (`DOP`, ISO-4217 numeric 214).
+   *
+   * @returns The `DOP` currency.
+   */
+  dop(): Currency;
+  /**
+   * Algerian Dinar (`DZD`, ISO-4217 numeric 12).
+   *
+   * @returns The `DZD` currency.
+   */
+  dzd(): Currency;
+  /**
+   * Egyptian Pound (`EGP`, ISO-4217 numeric 818).
+   *
+   * @returns The `EGP` currency.
+   */
+  egp(): Currency;
+  /**
+   * Nakfa (`ERN`, ISO-4217 numeric 232).
+   *
+   * @returns The `ERN` currency.
+   */
+  ern(): Currency;
+  /**
+   * Ethiopian Birr (`ETB`, ISO-4217 numeric 230).
+   *
+   * @returns The `ETB` currency.
+   */
+  etb(): Currency;
+  /**
+   * Euro (`EUR`, ISO-4217 numeric 978).
+   *
+   * @returns The `EUR` currency.
+   */
+  eur(): Currency;
+  /**
+   * Fiji Dollar (`FJD`, ISO-4217 numeric 242).
+   *
+   * @returns The `FJD` currency.
+   */
+  fjd(): Currency;
+  /**
+   * Falkland Islands Pound (`FKP`, ISO-4217 numeric 238).
+   *
+   * @returns The `FKP` currency.
+   */
+  fkp(): Currency;
+  /**
+   * Pound Sterling (`GBP`, ISO-4217 numeric 826).
+   *
+   * @returns The `GBP` currency.
+   */
+  gbp(): Currency;
+  /**
+   * Lari (`GEL`, ISO-4217 numeric 981).
+   *
+   * @returns The `GEL` currency.
+   */
+  gel(): Currency;
+  /**
+   * Ghana Cedi (`GHS`, ISO-4217 numeric 936).
+   *
+   * @returns The `GHS` currency.
+   */
+  ghs(): Currency;
+  /**
+   * Gibraltar Pound (`GIP`, ISO-4217 numeric 292).
+   *
+   * @returns The `GIP` currency.
+   */
+  gip(): Currency;
+  /**
+   * Dalasi (`GMD`, ISO-4217 numeric 270).
+   *
+   * @returns The `GMD` currency.
+   */
+  gmd(): Currency;
+  /**
+   * Guinean Franc (`GNF`, ISO-4217 numeric 324).
+   *
+   * @returns The `GNF` currency.
+   */
+  gnf(): Currency;
+  /**
+   * Quetzal (`GTQ`, ISO-4217 numeric 320).
+   *
+   * @returns The `GTQ` currency.
+   */
+  gtq(): Currency;
+  /**
+   * Guyana Dollar (`GYD`, ISO-4217 numeric 328).
+   *
+   * @returns The `GYD` currency.
+   */
+  gyd(): Currency;
+  /**
+   * Hong Kong Dollar (`HKD`, ISO-4217 numeric 344).
+   *
+   * @returns The `HKD` currency.
+   */
+  hkd(): Currency;
+  /**
+   * Lempira (`HNL`, ISO-4217 numeric 340).
+   *
+   * @returns The `HNL` currency.
+   */
+  hnl(): Currency;
+  /**
+   * Kuna (`HRK`, ISO-4217 numeric 191).
+   *
+   * @returns The `HRK` currency.
+   */
+  hrk(): Currency;
+  /**
+   * Gourde (`HTG`, ISO-4217 numeric 332).
+   *
+   * @returns The `HTG` currency.
+   */
+  htg(): Currency;
+  /**
+   * Forint (`HUF`, ISO-4217 numeric 348).
+   *
+   * @returns The `HUF` currency.
+   */
+  huf(): Currency;
+  /**
+   * Rupiah (`IDR`, ISO-4217 numeric 360).
+   *
+   * @returns The `IDR` currency.
+   */
+  idr(): Currency;
+  /**
+   * New Israeli Sheqel (`ILS`, ISO-4217 numeric 376).
+   *
+   * @returns The `ILS` currency.
+   */
+  ils(): Currency;
+  /**
+   * Indian Rupee (`INR`, ISO-4217 numeric 356).
+   *
+   * @returns The `INR` currency.
+   */
+  inr(): Currency;
+  /**
+   * Iraqi Dinar (`IQD`, ISO-4217 numeric 368).
+   *
+   * @returns The `IQD` currency.
+   */
+  iqd(): Currency;
+  /**
+   * Iranian Rial (`IRR`, ISO-4217 numeric 364).
+   *
+   * @returns The `IRR` currency.
+   */
+  irr(): Currency;
+  /**
+   * Iceland Krona (`ISK`, ISO-4217 numeric 352).
+   *
+   * @returns The `ISK` currency.
+   */
+  isk(): Currency;
+  /**
+   * Jamaican Dollar (`JMD`, ISO-4217 numeric 388).
+   *
+   * @returns The `JMD` currency.
+   */
+  jmd(): Currency;
+  /**
+   * Jordanian Dinar (`JOD`, ISO-4217 numeric 400).
+   *
+   * @returns The `JOD` currency.
+   */
+  jod(): Currency;
+  /**
+   * Yen (`JPY`, ISO-4217 numeric 392).
+   *
+   * @returns The `JPY` currency.
+   */
+  jpy(): Currency;
+  /**
+   * Kenyan Shilling (`KES`, ISO-4217 numeric 404).
+   *
+   * @returns The `KES` currency.
+   */
+  kes(): Currency;
+  /**
+   * Som (`KGS`, ISO-4217 numeric 417).
+   *
+   * @returns The `KGS` currency.
+   */
+  kgs(): Currency;
+  /**
+   * Riel (`KHR`, ISO-4217 numeric 116).
+   *
+   * @returns The `KHR` currency.
+   */
+  khr(): Currency;
+  /**
+   * Comorian Franc (`KMF`, ISO-4217 numeric 174).
+   *
+   * @returns The `KMF` currency.
+   */
+  kmf(): Currency;
+  /**
+   * North Korean Won (`KPW`, ISO-4217 numeric 408).
+   *
+   * @returns The `KPW` currency.
+   */
+  kpw(): Currency;
+  /**
+   * Won (`KRW`, ISO-4217 numeric 410).
+   *
+   * @returns The `KRW` currency.
+   */
+  krw(): Currency;
+  /**
+   * Kuwaiti Dinar (`KWD`, ISO-4217 numeric 414).
+   *
+   * @returns The `KWD` currency.
+   */
+  kwd(): Currency;
+  /**
+   * Cayman Islands Dollar (`KYD`, ISO-4217 numeric 136).
+   *
+   * @returns The `KYD` currency.
+   */
+  kyd(): Currency;
+  /**
+   * Tenge (`KZT`, ISO-4217 numeric 398).
+   *
+   * @returns The `KZT` currency.
+   */
+  kzt(): Currency;
+  /**
+   * Lao Kip (`LAK`, ISO-4217 numeric 418).
+   *
+   * @returns The `LAK` currency.
+   */
+  lak(): Currency;
+  /**
+   * Lebanese Pound (`LBP`, ISO-4217 numeric 422).
+   *
+   * @returns The `LBP` currency.
+   */
+  lbp(): Currency;
+  /**
+   * Sri Lanka Rupee (`LKR`, ISO-4217 numeric 144).
+   *
+   * @returns The `LKR` currency.
+   */
+  lkr(): Currency;
+  /**
+   * Liberian Dollar (`LRD`, ISO-4217 numeric 430).
+   *
+   * @returns The `LRD` currency.
+   */
+  lrd(): Currency;
+  /**
+   * Loti (`LSL`, ISO-4217 numeric 426).
+   *
+   * @returns The `LSL` currency.
+   */
+  lsl(): Currency;
+  /**
+   * Libyan Dinar (`LYD`, ISO-4217 numeric 434).
+   *
+   * @returns The `LYD` currency.
+   */
+  lyd(): Currency;
+  /**
+   * Moroccan Dirham (`MAD`, ISO-4217 numeric 504).
+   *
+   * @returns The `MAD` currency.
+   */
+  mad(): Currency;
+  /**
+   * Moldovan Leu (`MDL`, ISO-4217 numeric 498).
+   *
+   * @returns The `MDL` currency.
+   */
+  mdl(): Currency;
+  /**
+   * Malagasy Ariary (`MGA`, ISO-4217 numeric 969).
+   *
+   * @returns The `MGA` currency.
+   */
+  mga(): Currency;
+  /**
+   * Denar (`MKD`, ISO-4217 numeric 807).
+   *
+   * @returns The `MKD` currency.
+   */
+  mkd(): Currency;
+  /**
+   * Kyat (`MMK`, ISO-4217 numeric 104).
+   *
+   * @returns The `MMK` currency.
+   */
+  mmk(): Currency;
+  /**
+   * Tugrik (`MNT`, ISO-4217 numeric 496).
+   *
+   * @returns The `MNT` currency.
+   */
+  mnt(): Currency;
+  /**
+   * Pataca (`MOP`, ISO-4217 numeric 446).
+   *
+   * @returns The `MOP` currency.
+   */
+  mop(): Currency;
+  /**
+   * Ouguiya (`MRU`, ISO-4217 numeric 929).
+   *
+   * @returns The `MRU` currency.
+   */
+  mru(): Currency;
+  /**
+   * Mauritius Rupee (`MUR`, ISO-4217 numeric 480).
+   *
+   * @returns The `MUR` currency.
+   */
+  mur(): Currency;
+  /**
+   * Rufiyaa (`MVR`, ISO-4217 numeric 462).
+   *
+   * @returns The `MVR` currency.
+   */
+  mvr(): Currency;
+  /**
+   * Malawi Kwacha (`MWK`, ISO-4217 numeric 454).
+   *
+   * @returns The `MWK` currency.
+   */
+  mwk(): Currency;
+  /**
+   * Mexican Peso (`MXN`, ISO-4217 numeric 484).
+   *
+   * @returns The `MXN` currency.
+   */
+  mxn(): Currency;
+  /**
+   * Malaysian Ringgit (`MYR`, ISO-4217 numeric 458).
+   *
+   * @returns The `MYR` currency.
+   */
+  myr(): Currency;
+  /**
+   * Mozambique Metical (`MZN`, ISO-4217 numeric 943).
+   *
+   * @returns The `MZN` currency.
+   */
+  mzn(): Currency;
+  /**
+   * Namibia Dollar (`NAD`, ISO-4217 numeric 516).
+   *
+   * @returns The `NAD` currency.
+   */
+  nad(): Currency;
+  /**
+   * Naira (`NGN`, ISO-4217 numeric 566).
+   *
+   * @returns The `NGN` currency.
+   */
+  ngn(): Currency;
+  /**
+   * Cordoba Oro (`NIO`, ISO-4217 numeric 558).
+   *
+   * @returns The `NIO` currency.
+   */
+  nio(): Currency;
+  /**
+   * Norwegian Krone (`NOK`, ISO-4217 numeric 578).
+   *
+   * @returns The `NOK` currency.
+   */
+  nok(): Currency;
+  /**
+   * Nepalese Rupee (`NPR`, ISO-4217 numeric 524).
+   *
+   * @returns The `NPR` currency.
+   */
+  npr(): Currency;
+  /**
+   * New Zealand Dollar (`NZD`, ISO-4217 numeric 554).
+   *
+   * @returns The `NZD` currency.
+   */
+  nzd(): Currency;
+  /**
+   * Rial Omani (`OMR`, ISO-4217 numeric 512).
+   *
+   * @returns The `OMR` currency.
+   */
+  omr(): Currency;
+  /**
+   * Balboa (`PAB`, ISO-4217 numeric 590).
+   *
+   * @returns The `PAB` currency.
+   */
+  pab(): Currency;
+  /**
+   * Sol (`PEN`, ISO-4217 numeric 604).
+   *
+   * @returns The `PEN` currency.
+   */
+  pen(): Currency;
+  /**
+   * Kina (`PGK`, ISO-4217 numeric 598).
+   *
+   * @returns The `PGK` currency.
+   */
+  pgk(): Currency;
+  /**
+   * Philippine Peso (`PHP`, ISO-4217 numeric 608).
+   *
+   * @returns The `PHP` currency.
+   */
+  php(): Currency;
+  /**
+   * Pakistan Rupee (`PKR`, ISO-4217 numeric 586).
+   *
+   * @returns The `PKR` currency.
+   */
+  pkr(): Currency;
+  /**
+   * Zloty (`PLN`, ISO-4217 numeric 985).
+   *
+   * @returns The `PLN` currency.
+   */
+  pln(): Currency;
+  /**
+   * Guarani (`PYG`, ISO-4217 numeric 600).
+   *
+   * @returns The `PYG` currency.
+   */
+  pyg(): Currency;
+  /**
+   * Qatari Rial (`QAR`, ISO-4217 numeric 634).
+   *
+   * @returns The `QAR` currency.
+   */
+  qar(): Currency;
+  /**
+   * Romanian Leu (`RON`, ISO-4217 numeric 946).
+   *
+   * @returns The `RON` currency.
+   */
+  ron(): Currency;
+  /**
+   * Serbian Dinar (`RSD`, ISO-4217 numeric 941).
+   *
+   * @returns The `RSD` currency.
+   */
+  rsd(): Currency;
+  /**
+   * Russian Ruble (`RUB`, ISO-4217 numeric 643).
+   *
+   * @returns The `RUB` currency.
+   */
+  rub(): Currency;
+  /**
+   * Rwanda Franc (`RWF`, ISO-4217 numeric 646).
+   *
+   * @returns The `RWF` currency.
+   */
+  rwf(): Currency;
+  /**
+   * Saudi Riyal (`SAR`, ISO-4217 numeric 682).
+   *
+   * @returns The `SAR` currency.
+   */
+  sar(): Currency;
+  /**
+   * Solomon Islands Dollar (`SBD`, ISO-4217 numeric 90).
+   *
+   * @returns The `SBD` currency.
+   */
+  sbd(): Currency;
+  /**
+   * Seychelles Rupee (`SCR`, ISO-4217 numeric 690).
+   *
+   * @returns The `SCR` currency.
+   */
+  scr(): Currency;
+  /**
+   * Sudanese Pound (`SDG`, ISO-4217 numeric 938).
+   *
+   * @returns The `SDG` currency.
+   */
+  sdg(): Currency;
+  /**
+   * Swedish Krona (`SEK`, ISO-4217 numeric 752).
+   *
+   * @returns The `SEK` currency.
+   */
+  sek(): Currency;
+  /**
+   * Singapore Dollar (`SGD`, ISO-4217 numeric 702).
+   *
+   * @returns The `SGD` currency.
+   */
+  sgd(): Currency;
+  /**
+   * Saint Helena Pound (`SHP`, ISO-4217 numeric 654).
+   *
+   * @returns The `SHP` currency.
+   */
+  shp(): Currency;
+  /**
+   * Leone (`SLE`, ISO-4217 numeric 925).
+   *
+   * @returns The `SLE` currency.
+   */
+  sle(): Currency;
+  /**
+   * Leone (`SLL`, ISO-4217 numeric 694).
+   *
+   * @returns The `SLL` currency.
+   */
+  sll(): Currency;
+  /**
+   * Somali Shilling (`SOS`, ISO-4217 numeric 706).
+   *
+   * @returns The `SOS` currency.
+   */
+  sos(): Currency;
+  /**
+   * Surinam Dollar (`SRD`, ISO-4217 numeric 968).
+   *
+   * @returns The `SRD` currency.
+   */
+  srd(): Currency;
+  /**
+   * South Sudanese Pound (`SSP`, ISO-4217 numeric 728).
+   *
+   * @returns The `SSP` currency.
+   */
+  ssp(): Currency;
+  /**
+   * Dobra (`STN`, ISO-4217 numeric 930).
+   *
+   * @returns The `STN` currency.
+   */
+  stn(): Currency;
+  /**
+   * Syrian Pound (`SYP`, ISO-4217 numeric 760).
+   *
+   * @returns The `SYP` currency.
+   */
+  syp(): Currency;
+  /**
+   * Lilangeni (`SZL`, ISO-4217 numeric 748).
+   *
+   * @returns The `SZL` currency.
+   */
+  szl(): Currency;
+  /**
+   * Baht (`THB`, ISO-4217 numeric 764).
+   *
+   * @returns The `THB` currency.
+   */
+  thb(): Currency;
+  /**
+   * Somoni (`TJS`, ISO-4217 numeric 972).
+   *
+   * @returns The `TJS` currency.
+   */
+  tjs(): Currency;
+  /**
+   * Turkmenistan New Manat (`TMT`, ISO-4217 numeric 934).
+   *
+   * @returns The `TMT` currency.
+   */
+  tmt(): Currency;
+  /**
+   * Tunisian Dinar (`TND`, ISO-4217 numeric 788).
+   *
+   * @returns The `TND` currency.
+   */
+  tnd(): Currency;
+  /**
+   * Pa'anga (`TOP`, ISO-4217 numeric 776).
+   *
+   * @returns The `TOP` currency.
+   */
+  top(): Currency;
+  /**
+   * Turkish Lira (`TRY`, ISO-4217 numeric 949).
+   *
+   * @returns The `TRY` currency.
+   */
+  try(): Currency;
+  /**
+   * Trinidad and Tobago Dollar (`TTD`, ISO-4217 numeric 780).
+   *
+   * @returns The `TTD` currency.
+   */
+  ttd(): Currency;
+  /**
+   * New Taiwan Dollar (`TWD`, ISO-4217 numeric 901).
+   *
+   * @returns The `TWD` currency.
+   */
+  twd(): Currency;
+  /**
+   * Tanzanian Shilling (`TZS`, ISO-4217 numeric 834).
+   *
+   * @returns The `TZS` currency.
+   */
+  tzs(): Currency;
+  /**
+   * Hryvnia (`UAH`, ISO-4217 numeric 980).
+   *
+   * @returns The `UAH` currency.
+   */
+  uah(): Currency;
+  /**
+   * Uganda Shilling (`UGX`, ISO-4217 numeric 800).
+   *
+   * @returns The `UGX` currency.
+   */
+  ugx(): Currency;
+  /**
+   * US Dollar (`USD`, ISO-4217 numeric 840).
+   *
+   * @returns The `USD` currency.
+   */
+  usd(): Currency;
+  /**
+   * Peso Uruguayo (`UYU`, ISO-4217 numeric 858).
+   *
+   * @returns The `UYU` currency.
+   */
+  uyu(): Currency;
+  /**
+   * Uzbekistan Sum (`UZS`, ISO-4217 numeric 860).
+   *
+   * @returns The `UZS` currency.
+   */
+  uzs(): Currency;
+  /**
+   * Bolívar Soberano (`VED`, ISO-4217 numeric 926).
+   *
+   * @returns The `VED` currency.
+   */
+  ved(): Currency;
+  /**
+   * Bolívar Soberano (`VES`, ISO-4217 numeric 928).
+   *
+   * @returns The `VES` currency.
+   */
+  ves(): Currency;
+  /**
+   * Dong (`VND`, ISO-4217 numeric 704).
+   *
+   * @returns The `VND` currency.
+   */
+  vnd(): Currency;
+  /**
+   * Vatu (`VUV`, ISO-4217 numeric 548).
+   *
+   * @returns The `VUV` currency.
+   */
+  vuv(): Currency;
+  /**
+   * Tala (`WST`, ISO-4217 numeric 882).
+   *
+   * @returns The `WST` currency.
+   */
+  wst(): Currency;
+  /**
+   * CFA Franc BEAC (`XAF`, ISO-4217 numeric 950).
+   *
+   * @returns The `XAF` currency.
+   */
+  xaf(): Currency;
+  /**
+   * East Caribbean Dollar (`XCD`, ISO-4217 numeric 951).
+   *
+   * @returns The `XCD` currency.
+   */
+  xcd(): Currency;
+  /**
+   * CFA Franc BCEAO (`XOF`, ISO-4217 numeric 952).
+   *
+   * @returns The `XOF` currency.
+   */
+  xof(): Currency;
+  /**
+   * CFP Franc (`XPF`, ISO-4217 numeric 953).
+   *
+   * @returns The `XPF` currency.
+   */
+  xpf(): Currency;
+  /**
+   * Yemeni Rial (`YER`, ISO-4217 numeric 886).
+   *
+   * @returns The `YER` currency.
+   */
+  yer(): Currency;
+  /**
+   * Rand (`ZAR`, ISO-4217 numeric 710).
+   *
+   * @returns The `ZAR` currency.
+   */
+  zar(): Currency;
+  /**
+   * Zambian Kwacha (`ZMW`, ISO-4217 numeric 967).
+   *
+   * @returns The `ZMW` currency.
+   */
+  zmw(): Currency;
+  /**
+   * Zimbabwe Dollar (`ZWL`, ISO-4217 numeric 932).
+   *
+   * @returns The `ZWL` currency.
+   */
+  zwl(): Currency;
 }
 
 /**
@@ -924,6 +1903,12 @@ export interface Money extends WasmOwned {
    * @throws If serialization fails (should not happen for valid `Money`).
    */
   toJson(): string;
+  /**
+   * The amount and currency code as an `[amount, currencyCode]` pair.
+   *
+   * @returns A two-element array: the amount in major units as a `number` (the `f64` view of the exact decimal) and the ISO-4217 code.
+   */
+  toTuple(): [number, string];
 }
 
 /**
@@ -1003,6 +1988,22 @@ export interface MoneyConstructor {
    * @throws If `amount` is malformed, non-finite, needs more precision than `Decimal` can hold, or underflows its supported scale; or if `currency` is not a `Currency` object.
    */
   fromDecimalStr(amount: string, currency: Currency): Money;
+  /**
+   * A zero amount in a currency.
+   *
+   * @param currency - ISO-4217 `Currency` object that tags the amount.
+   * @returns `Money` with amount `0` in `currency`.
+   * @throws If the amount cannot be constructed (not expected for zero).
+   */
+  zero(currency: Currency): Money;
+  /**
+   * Construct from an `[amount, currencyCode]` pair, the inverse of `toTuple`.
+   *
+   * @param tup - Two-element array: the amount in major units (a finite `number`) and the ISO-4217 alphabetic currency code (a string).
+   * @returns The constructed `Money`.
+   * @throws `TypeError` (kind `invalid_type`) if `tup` is not a two-element array of a number and a string; `FinstackError` (kind `validation`) for a non-finite amount or an unknown currency code.
+   */
+  fromTuple(tup: readonly [number, string]): Money;
 }
 
 /**
@@ -1174,6 +2175,12 @@ export interface RateConstructor {
    * @throws If `json` is malformed or holds an invalid value.
    */
   fromJson(json: JsonInput): Rate;
+  /**
+   * The zero rate (Rust `Rate::ZERO`).
+   *
+   * @returns A `Rate` equal to zero.
+   */
+  zero(): Rate;
 }
 
 /**
@@ -1281,6 +2288,12 @@ export interface BpsConstructor {
    * @throws If `json` is malformed or holds an invalid value.
    */
   fromJson(json: JsonInput): Bps;
+  /**
+   * The zero basis-point value (Rust `Bps::ZERO`).
+   *
+   * @returns A `Bps` equal to zero.
+   */
+  zero(): Bps;
 }
 
 /**
@@ -1390,6 +2403,12 @@ export interface PercentageConstructor {
    * @throws If `json` is malformed or holds an invalid value.
    */
   fromJson(json: JsonInput): Percentage;
+  /**
+   * The zero percentage (Rust `Percentage::ZERO`).
+   *
+   * @returns A `Percentage` equal to zero.
+   */
+  zero(): Percentage;
 }
 
 /**
@@ -1995,6 +3014,91 @@ export interface DiscountCurve extends WasmOwned {
    * @throws Error - Throws a JavaScript exception if either time is non-finite, `t2` is not later than `t1`, the interval is shorter than the curve's minimum forward tenor, or either endpoint discount factor is non-finite or non-positive.
    */
   forward(t1: number, t2: number): number;
+  /**
+   * Pillar times in years from the base date, strictly increasing.
+   */
+  readonly knots: Float64Array;
+  /**
+   * Discount factor at each pillar, aligned with `knots`.
+   */
+  readonly dfs: Float64Array;
+  /**
+   * Day count that converts dates to curve time, such as `"act_365f"`.
+   */
+  readonly dayCount: string;
+  /**
+   * Interpolation style between pillars, such as `"monotone_convex"`.
+   */
+  readonly interpStyle: string;
+  /**
+   * Extrapolation policy beyond the last pillar, such as `"flat_forward"`.
+   */
+  readonly extrapolation: string;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
+   *
+   * @returns Compact JSON text.
+   * @throws If serialization fails (not expected for a valid curve).
+   */
+  toJson(): string;
+  /**
+   * Annually compounded zero rate at year fraction `t` (Rust `DiscountCurve::zero_annual`).
+   *
+   * @param t - Time from the curve base date in years.
+   * @returns The zero rate as a decimal; `0` at `t = 0`.
+   * @throws `TypeError` if `t` is not a number.
+   */
+  zeroAnnual(t: number): number;
+  /**
+   * Zero rate at year fraction `t` under a compounding convention (Rust
+   * `DiscountCurve::zero_rate`).
+   *
+   * @param t - Time from the curve base date in years.
+   * @param compounding - `"continuous"`, `"simple"`, `"annual"`, `"semi_annual"`, `"quarterly"` or `"monthly"`; omitted means `"continuous"`.
+   * @returns The zero rate as a decimal; `0` at `t = 0`.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for an unknown compounding.
+   */
+  zeroRate(t: number, compounding?: string | null): number;
+  /**
+   * Zero rate to a date, measured with the curve day count (Rust
+   * `DiscountCurve::zero_rate_on_date`).
+   *
+   * @param date - ISO-8601 target date.
+   * @param compounding - `"continuous"`, `"simple"`, `"annual"`, `"semi_annual"`, `"quarterly"` or `"monthly"`; omitted means `"continuous"`.
+   * @returns The zero rate as a decimal.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for a malformed date, an unknown compounding, or a year fraction that cannot be computed.
+   */
+  zeroRateOnDate(date: string, compounding?: string | null): number;
+  /**
+   * Discount factor to a date, measured with the curve day count (Rust
+   * `DiscountCurve::df_on_date_curve`).
+   *
+   * @param date - ISO-8601 target date.
+   * @returns The discount factor from the base date to `date`.
+   * @throws `TypeError` if `date` is not a string; `FinstackError` (kind `validation`) for a malformed date or a year fraction that cannot be computed.
+   */
+  dfOnDateCurve(date: string): number;
+  /**
+   * Forward discount factor between two dates, `df(toDate) / df(fromDate)`
+   * (Rust `DiscountCurve::df_between_dates`).
+   *
+   * @param fromDate - ISO-8601 start date of the discounting interval.
+   * @param toDate - ISO-8601 end date of the discounting interval.
+   * @returns The discount factor that brings a cashflow on `toDate` back to `fromDate`.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for a malformed date, a year fraction that cannot be computed, or a non-finite or non-positive discount factor.
+   */
+  dfBetweenDates(fromDate: string, toDate: string): number;
+  /**
+   * Derive a single-curve forward curve from this discount curve (Rust
+   * `DiscountCurve::to_forward_curve`).
+   *
+   * @param forwardId - Identifier of the new forward curve.
+   * @param tenor - Index tenor in years (for example `0.25` for 3M); finite and strictly positive.
+   * @param interp - Interpolation style of the forward curve (for example `"linear"`); omitted uses the Rust default.
+   * @returns A `ForwardCurve` of simple forward rates implied by this curve.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for a non-positive tenor, an unknown interpolation style, or forwards the forward-curve builder rejects.
+   */
+  toForwardCurve(forwardId: string, tenor: number, interp?: string | null): ForwardCurve;
 }
 
 /**
@@ -2041,6 +3145,46 @@ export interface DiscountCurveConstructor {
    * @throws Error - Throws a JavaScript exception if `baseDate` is not a valid ISO date, `continuousRate` is non-finite or `|continuousRate| > 1` (rates are decimals: `0.05` is 5%), or the implied discount factors are not finite and strictly positive.
    */
   flat(id: string, baseDate: string, continuousRate: number): DiscountCurve;
+  /**
+   * Construct a curve from zero rates (Rust `DiscountCurve::from_zero_rates`).
+   *
+   * @param id - Curve identifier stored on the curve.
+   * @param baseDate - ISO-8601 valuation date anchoring `t = 0`.
+   * @param points - Flat `[t0, z0, t1, z1, …]` array: times in years and zero rates as decimals (`0.05` is 5%), with strictly increasing times.
+   * @param compounding - Compounding of the zero rates: `"continuous"`, `"simple"`, `"annual"`, `"semi_annual"`, `"quarterly"` or `"monthly"`; omitted means `"continuous"`.
+   * @returns Curve whose discount factors reproduce every zero rate.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for an empty or odd-length `points`, a malformed date, an unknown compounding, or discount factors the curve validation rejects.
+   */
+  fromZeroRates(
+    id: string,
+    baseDate: string,
+    points: NumericArray,
+    compounding?: string | null
+  ): DiscountCurve;
+  /**
+   * Construct a curve from dated discount factors (Rust `DiscountCurve::from_dates`).
+   *
+   * @param id - Curve identifier stored on the curve.
+   * @param baseDate - ISO-8601 valuation date anchoring `t = 0`.
+   * @param points - Array of `[isoDate, discountFactor]` pairs with strictly increasing dates on or after `baseDate` and strictly positive discount factors.
+   * @param dayCount - Day count that converts each date to curve time; omitted uses the Rust default (`"act_365f"`).
+   * @returns Curve with one pillar per dated point.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for empty `points`, a malformed date, an unknown day count, or discount factors the curve validation rejects.
+   */
+  fromDates(
+    id: string,
+    baseDate: string,
+    points: readonly (readonly [string, number])[] | string,
+    dayCount?: string | null
+  ): DiscountCurve;
+  /**
+   * Deserialize from the canonical JSON wire form shared with Python `DiscountCurve.to_json`.
+   *
+   * @param json - Canonical DiscountCurve JSON text or plain object; unknown fields are rejected and the curve is re-validated.
+   * @returns The validated `DiscountCurve`.
+   * @throws `TypeError` if `json` is not a JSON string or plain object; `FinstackError` (kind `validation`) if it does not match the schema or fails curve validation.
+   */
+  fromJson(json: JsonInput): DiscountCurve;
 }
 
 /**
@@ -2761,6 +3905,13 @@ export interface FxMatrix extends WasmOwned {
    * @throws Error - Throws a JavaScript exception if either currency code or `date` is invalid, no direct, inverse, or triangulated quote is available, or a resolved quote is non-finite or non-positive.
    */
   rate(base: string, quote: string, date: string, policy?: FxConversionPolicy): FxRateResult;
+  /**
+   * Set several pair-global quotes atomically (Rust `FxMatrix::set_quotes`).
+   *
+   * @param quotes - Array of `[base, quote, rate]` triples: two ISO-4217 currency codes and the finite, strictly positive number of quote units per one base unit.
+   * @throws `TypeError` (kind `invalid_type`) if `quotes` is not an array (or its JSON text); `FinstackError` (kind `validation`) for a triple of the wrong shape, an unknown currency code, or a non-positive or non-finite rate. On an error none of the batch is applied.
+   */
+  setQuotes(quotes: readonly (readonly [string, string, number])[] | string): void;
 }
 
 /**
@@ -2780,6 +3931,15 @@ export interface FxMatrixConstructor {
    * @returns An `FxMatrix` handle.
    */
   new (): FxMatrix;
+  /**
+   * Build a matrix from quotes keyed by currency pair (Rust `CurrencyPair`
+   * parsing plus `FxMatrix::set_quotes`).
+   *
+   * @param quotes - Plain object (or its JSON text) mapping a pair to its rate, such as `{ "EUR/USD": 1.1, "GBPUSD": 1.27 }`. A key is `"BASE/QUOTE"` or the six-letter compact form; the rate is the finite, strictly positive number of quote units per one base unit.
+   * @returns A new `FxMatrix` holding every quote.
+   * @throws `TypeError` (kind `invalid_type`) if `quotes` is not a plain object or JSON text; `FinstackError` (kind `validation`) for a malformed pair key, an unknown currency code, or a non-positive or non-finite rate.
+   */
+  fromDict(quotes: Record<string, number> | string): FxMatrix;
 }
 
 /**
@@ -3017,49 +4177,3350 @@ export interface FxDeltaVolSurfaceConstructor {
 }
 
 /**
- * Parsed Rust `MarketContext` held across pricing calls.
+ * Market data container: curves, surfaces, prices, series and FX for one
+ * valuation date.
  *
- * Build it with `MarketContext.fromJson`, then pass it to
- * `valuations.instruments.priceInstrumentWithMarket` and the other
- * `*WithMarket` entry points. This avoids re-parsing the market JSON in
- * bulk-pricing and Greeks-sweep loops. WASM binds only the JSON round trip;
- * the Python class also exposes the insertion and lookup methods.
+ * Build one with `new MarketContext()` plus the `insert*` methods, or parse
+ * a persisted snapshot with `MarketContext.fromJson`; then pass the handle
+ * to `priceInstrumentWithMarket` and the other `*WithMarket` entry points so
+ * the market is not re-parsed on every pricing call. The `insert*` methods
+ * change the context in place and return nothing.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const market = new core.MarketContext();
+ * market.insert(core.DiscountCurve.flat("USD-OIS", "2025-01-02", 0.04));
+ * market.insertPrice("SPX", 5900.0);
+ * market.curveIds(); // ["USD-OIS"]
+ * market.getDiscount("USD-OIS").df(1.0); // exp(-0.04)
+ * const copy = core.MarketContext.fromJson(market.toJson());
+ * copy.contains("USD-OIS"); // true
+ * ```
  */
 export interface MarketContext extends WasmOwned {
   /**
+   * The attached FX matrix, or `undefined` when none is attached.
+   */
+  readonly fx: FxMatrix | undefined;
+  /**
    * Serialize the wrapped MarketContext back to canonical JSON.
+   *
    * @returns Canonical MarketContext JSON accepted by `MarketContext.fromJson` and every `marketJson` argument.
    * @throws Error - Throws if the market context cannot be serialized to JSON.
    */
   toJson(): string;
+  /**
+   * Store a curve or surface under its own id, replacing any item with the same id.
+   *
+   * The class of the handle selects the store: discount, forward, hazard,
+   * inflation, price and base-correlation curves; volatility surfaces; FX
+   * delta-quoted surfaces; and SABR cubes. The context is changed in place.
+   *
+   * @param curve - A `DiscountCurve`, `ForwardCurve`, `HazardCurve`, `InflationCurve`, `PriceCurve`, `BaseCorrelationCurve`, `VolSurface`, `FxDeltaVolSurface` or `VolCube` handle; its data is shared with the context, not copied.
+   * @throws `TypeError` (kind `invalid_type`) if `curve` is not one of those handles.
+   */
+  insert(curve: MarketContextCurve): void;
+  /**
+   * Attach the FX matrix used for currency conversion (Rust `MarketContext::insert_fx_mut`).
+   *
+   * @param fx - FX matrix to attach; it replaces any matrix already attached and is shared, so later `setQuote` calls on it are visible here.
+   */
+  insertFx(fx: FxMatrix): void;
+  /**
+   * Store a market scalar: a unitless number, or a price in a currency
+   * (Rust `MarketContext::insert_price_mut`).
+   *
+   * @param id - Identifier to store the scalar under.
+   * @param value - Finite scalar value: an index level, a spot price, a recovery assumption and so on.
+   * @param currency - ISO-4217 code that makes the scalar a monetary price; omitted stores a unitless number.
+   * @throws `TypeError` (kind `invalid_type`) for a mistyped argument; `FinstackError` (kind `validation`) for an unknown currency or a monetary value that is not finite.
+   */
+  insertPrice(id: string, value: number, currency?: string | null): void;
+  /**
+   * Store credit-index market data (Rust `MarketContext::insert_credit_index_mut`).
+   *
+   * @param id - Identifier of the index, such as `"CDX-IG-43"`.
+   * @param data - Constituent count, recovery, index hazard curve and base-correlation curve of the index.
+   * @throws `TypeError` if `id` is not a string.
+   */
+  insertCreditIndex(id: string, data: CreditIndexData): void;
+  /**
+   * Store a scalar time series under its own id (Rust `MarketContext::insert_series_mut`).
+   *
+   * @param series - Series to store; one with the same id is replaced.
+   */
+  insertSeries(series: ScalarTimeSeries): void;
+  /**
+   * Store an inflation index under its own id (Rust
+   * `MarketContext::insert_inflation_index_mut`).
+   *
+   * @param index - Inflation index to store; one with the same id is replaced.
+   */
+  insertInflationIndex(index: InflationIndex): void;
+  /**
+   * Map a CSA code to the discount curve used for collateralised trades
+   * (Rust `MarketContext::map_collateral_mut`).
+   *
+   * @param csaCode - Credit-support-annex code, such as `"USD-CSA"`.
+   * @param discountId - Identifier of the discount curve to use for that CSA; it is resolved when a collateral curve is requested.
+   * @throws `TypeError` if an argument is not a string.
+   */
+  mapCollateral(csaCode: string, discountId: string): void;
+  /**
+   * Look up a discount curve by id (Rust `MarketContext::get_discount`).
+   *
+   * @param id - Identifier the item was inserted under.
+   * @returns The stored `DiscountCurve`; it shares the context's data.
+   * @throws `TypeError` if `id` is not a string; `FinstackError` (kind `not_found`) if no such item is stored under `id`.
+   */
+  getDiscount(id: string): DiscountCurve;
+  /**
+   * Look up a forward curve by id (Rust `MarketContext::get_forward`).
+   *
+   * @param id - Identifier the item was inserted under.
+   * @returns The stored `ForwardCurve`; it shares the context's data.
+   * @throws `TypeError` if `id` is not a string; `FinstackError` (kind `not_found`) if no such item is stored under `id`.
+   */
+  getForward(id: string): ForwardCurve;
+  /**
+   * Look up a hazard curve by id (Rust `MarketContext::get_hazard`).
+   *
+   * @param id - Identifier the item was inserted under.
+   * @returns The stored `HazardCurve`; it shares the context's data.
+   * @throws `TypeError` if `id` is not a string; `FinstackError` (kind `not_found`) if no such item is stored under `id`.
+   */
+  getHazard(id: string): HazardCurve;
+  /**
+   * Look up a base-correlation curve by id (Rust `MarketContext::get_base_correlation`).
+   *
+   * @param id - Identifier the item was inserted under.
+   * @returns The stored `BaseCorrelationCurve`; it shares the context's data.
+   * @throws `TypeError` if `id` is not a string; `FinstackError` (kind `not_found`) if no such item is stored under `id`.
+   */
+  getBaseCorrelation(id: string): BaseCorrelationCurve;
+  /**
+   * Look up a inflation curve by id (Rust `MarketContext::get_inflation_curve`).
+   *
+   * @param id - Identifier the item was inserted under.
+   * @returns The stored `InflationCurve`; it shares the context's data.
+   * @throws `TypeError` if `id` is not a string; `FinstackError` (kind `not_found`) if no such item is stored under `id`.
+   */
+  getInflationCurve(id: string): InflationCurve;
+  /**
+   * Look up a price curve (kind `"price"`) by id (Rust `MarketContext::get_price_curve`).
+   *
+   * @param id - Identifier the item was inserted under.
+   * @returns The stored `PriceCurve`; it shares the context's data.
+   * @throws `TypeError` if `id` is not a string; `FinstackError` (kind `not_found`) if no such item is stored under `id`.
+   */
+  getPriceCurve(id: string): PriceCurve;
+  /**
+   * Look up a volatility-index curve (a `PriceCurve` of kind `"vol_index"`) by id (Rust `MarketContext::get_vol_index_curve`).
+   *
+   * @param id - Identifier the item was inserted under.
+   * @returns The stored `PriceCurve`; it shares the context's data.
+   * @throws `TypeError` if `id` is not a string; `FinstackError` (kind `not_found`) if no such item is stored under `id`.
+   */
+  getVolIndexCurve(id: string): PriceCurve;
+  /**
+   * Look up a inflation index by id (Rust `MarketContext::get_inflation_index`).
+   *
+   * @param id - Identifier the item was inserted under.
+   * @returns The stored `InflationIndex`; it shares the context's data.
+   * @throws `TypeError` if `id` is not a string; `FinstackError` (kind `not_found`) if no such item is stored under `id`.
+   */
+  getInflationIndex(id: string): InflationIndex;
+  /**
+   * Look up a volatility surface by id (Rust `MarketContext::get_surface`).
+   *
+   * @param id - Identifier the item was inserted under.
+   * @returns The stored `VolSurface`; it shares the context's data.
+   * @throws `TypeError` if `id` is not a string; `FinstackError` (kind `not_found`) if no such item is stored under `id`.
+   */
+  getSurface(id: string): VolSurface;
+  /**
+   * Look up a FX delta-quoted volatility surface by id (Rust `MarketContext::get_fx_delta_vol_surface`).
+   *
+   * @param id - Identifier the item was inserted under.
+   * @returns The stored `FxDeltaVolSurface`; it shares the context's data.
+   * @throws `TypeError` if `id` is not a string; `FinstackError` (kind `not_found`) if no such item is stored under `id`.
+   */
+  getFxDeltaVolSurface(id: string): FxDeltaVolSurface;
+  /**
+   * Look up a SABR volatility cube by id (Rust `MarketContext::get_vol_cube`).
+   *
+   * @param id - Identifier the item was inserted under.
+   * @returns The stored `VolCube`; it shares the context's data.
+   * @throws `TypeError` if `id` is not a string; `FinstackError` (kind `not_found`) if no such item is stored under `id`.
+   */
+  getVolCube(id: string): VolCube;
+  /**
+   * Look up a credit-index data by id (Rust `MarketContext::get_credit_index`).
+   *
+   * @param id - Identifier the item was inserted under.
+   * @returns The stored `CreditIndexData`; it shares the context's data.
+   * @throws `TypeError` if `id` is not a string; `FinstackError` (kind `not_found`) if no such item is stored under `id`.
+   */
+  getCreditIndex(id: string): CreditIndexData;
+  /**
+   * Look up a market scalar by id (Rust `MarketContext::get_price`).
+   *
+   * @param id - Identifier the scalar was inserted under.
+   * @returns A plain `MarketScalar` object: `{ unitless: number }`, or `{ price: { amount, currency } }` for a monetary price.
+   * @throws `TypeError` if `id` is not a string; `FinstackError` (kind `not_found`) if no scalar is stored under `id`.
+   */
+  getPrice(id: string): MarketScalar;
+  /**
+   * Look up a scalar time series by id (Rust `MarketContext::get_series`).
+   *
+   * @param id - Identifier the series was inserted under.
+   * @returns A copy of the stored `ScalarTimeSeries`.
+   * @throws `TypeError` if `id` is not a string; `FinstackError` (kind `not_found`) if no series is stored under `id`.
+   */
+  getSeries(id: string): ScalarTimeSeries;
+  /**
+   * The attached FX matrix, required (Rust `MarketContext::fx_required`).
+   *
+   * @returns The attached `FxMatrix`; it shares the context's quotes.
+   * @throws `FinstackError` (kind `not_found`) if no FX matrix is attached.
+   */
+  fxRequired(): FxMatrix;
+  /**
+   * Convert an amount into another currency with the attached FX matrix
+   * (Rust `MarketContext::convert_money`).
+   *
+   * @param amount - Monetary amount to convert.
+   * @param targetCurrency - Destination `Currency` object; an amount already in it is returned unchanged.
+   * @param asOf - ISO-8601 date of the FX rate lookup.
+   * @returns The converted `Money` in `targetCurrency`.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `not_found`) if no FX matrix is attached or the pair has no rate, or kind `validation` for a malformed date.
+   */
+  convertMoney(amount: Money, targetCurrency: Currency, asOf: string): Money;
+  /**
+   * Whether any market data is stored under an id (Rust `MarketContext::contains`).
+   *
+   * @param id - Identifier to look for.
+   * @returns `true` when a curve, surface, price, series, index, dividend schedule or collateral mapping is registered under `id`.
+   * @throws `TypeError` if `id` is not a string.
+   */
+  contains(id: string): boolean;
+  /**
+   * Identifiers of every stored curve.
+   *
+   * @returns Curve ids in sorted order; surfaces, prices and series are not listed.
+   */
+  curveIds(): string[];
+  /**
+   * Whether the context holds no market data at all.
+   *
+   * @returns `true` for a context with nothing inserted.
+   */
+  isEmpty(): boolean;
+  /**
+   * Counts of the stored market data (Rust `MarketContext::stats`).
+   *
+   * @returns A plain object with `curve_counts` (count per curve type), `total_curves`, `has_fx`, `surface_count`, `vol_cube_count`, `price_count`, `series_count`, `inflation_index_count`, `credit_index_count`, `dividend_schedule_count`, `fx_delta_vol_surface_count` and `collateral_mapping_count`.
+   * @throws If the counts cannot be converted (not expected).
+   */
+  stats(): ContextStats;
+  /**
+   * A copy of the context with every curve rolled forward in time (Rust
+   * `MarketContext::roll_forward`).
+   *
+   * @param days - Calendar days to advance each curve's base date; the curves keep their shape and drop expired pillars.
+   * @returns A new `MarketContext`; this context is unchanged.
+   * @throws `TypeError` if `days` is not an integer; `FinstackError` if a curve cannot be rolled (for example no pillar remains).
+   */
+  rollForward(days: number): MarketContext;
 }
 
 /**
- * Static entry points of the `MarketContext` handle.
+ * Market data container: curves, surfaces, prices, series and FX for one
+ * valuation date.
+ *
+ * Build one with `new MarketContext()` plus the `insert*` methods, or parse
+ * a persisted snapshot with `MarketContext.fromJson`; then pass the handle
+ * to `priceInstrumentWithMarket` and the other `*WithMarket` entry points so
+ * the market is not re-parsed on every pricing call. The `insert*` methods
+ * change the context in place and return nothing.
+ *
  * @example
  * ```typescript
- * import init, { core, valuations } from "finstack-quant-wasm";
+ * import init, { core } from "finstack-quant-wasm";
  * await init();
- * const market = core.MarketContext.fromJson(marketJson);
- * for (const instr of instruments) {
- *   const result = valuations.instruments.priceInstrumentWithMarket(instr, market, "2025-06-15");
- * }
- * market.free();
+ * const market = new core.MarketContext();
+ * market.insert(core.DiscountCurve.flat("USD-OIS", "2025-01-02", 0.04));
+ * market.insertPrice("SPX", 5900.0);
+ * market.curveIds(); // ["USD-OIS"]
+ * market.getDiscount("USD-OIS").df(1.0); // exp(-0.04)
+ * const copy = core.MarketContext.fromJson(market.toJson());
+ * copy.contains("USD-OIS"); // true
  * ```
  */
 export interface MarketContextConstructor {
   /**
-   * JavaScript prototype of `MarketContext`; instances come from `fromJson`, not `new`.
+   * Create an empty market context.
+   *
+   * @returns A `MarketContext` with no curves, surfaces, prices, series or FX.
    */
-  readonly prototype: MarketContext;
+  new (): MarketContext;
   /**
    * Parse a market context from its canonical JSON representation.
+   *
    * @param json - Canonical MarketContext JSON (string or plain object), the same payload accepted by pricing `marketJson` arguments. Unknown fields are rejected.
    * @returns A `MarketContext` handle that can be reused across pricing calls; release it with free().
    * @throws Error - Throws with kind `validation` when the JSON is malformed or does not match the MarketContext schema, and a `TypeError` when `json` is neither a string nor a plain object.
    */
   fromJson(json: JsonInput): MarketContext;
 }
+
+/**
+ * Business-day adjustment convention (ISDA 2006 Definitions, Section 4.12).
+ *
+ * Each static factory is one Rust `BusinessDayConvention` variant;
+ * `toString()` is the canonical snake_case name that `adjust`,
+ * `ScheduleBuilder.adjustWith` and the JSON wire format accept.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const convention = core.BusinessDayConvention.modifiedFollowing();
+ * convention.toString(); // "modified_following"
+ * core.BusinessDayConvention.fromName("following").toString(); // "following"
+ * ```
+ */
+export interface BusinessDayConvention extends WasmOwned {
+  /**
+   * Canonical snake_case name of the convention.
+   *
+   * @returns The name accepted by `fromName` and the JSON wire format.
+   */
+  toString(): string;
+}
+
+/**
+ * Business-day adjustment convention (ISDA 2006 Definitions, Section 4.12).
+ *
+ * Each static factory is one Rust `BusinessDayConvention` variant;
+ * `toString()` is the canonical snake_case name that `adjust`,
+ * `ScheduleBuilder.adjustWith` and the JSON wire format accept.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const convention = core.BusinessDayConvention.modifiedFollowing();
+ * convention.toString(); // "modified_following"
+ * core.BusinessDayConvention.fromName("following").toString(); // "following"
+ * ```
+ */
+export interface BusinessDayConventionConstructor {
+  /**
+   * JavaScript prototype of `BusinessDayConvention`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: BusinessDayConvention;
+  /**
+   * Leave the date unchanged even when it is not a business day.
+   *
+   * @returns The `unadjusted` convention.
+   */
+  unadjusted(): BusinessDayConvention;
+  /**
+   * Roll forward to the next business day.
+   *
+   * @returns The `following` convention.
+   */
+  following(): BusinessDayConvention;
+  /**
+   * Roll forward unless that crosses a month end, then roll backward.
+   *
+   * @returns The `modified_following` convention (the Rust default).
+   */
+  modifiedFollowing(): BusinessDayConvention;
+  /**
+   * Roll backward to the previous business day.
+   *
+   * @returns The `preceding` convention.
+   */
+  preceding(): BusinessDayConvention;
+  /**
+   * Roll backward unless that crosses a month start, then roll forward.
+   *
+   * @returns The `modified_preceding` convention.
+   */
+  modifiedPreceding(): BusinessDayConvention;
+  /**
+   * Roll to the nearest business day (forward on a tie).
+   *
+   * @returns The `nearest` convention.
+   */
+  nearest(): BusinessDayConvention;
+  /**
+   * Parse a convention name (Rust `BusinessDayConvention::from_str`).
+   *
+   * @param name - Convention name such as `"following"`, `"modified_following"` or `"preceding"`; case and `-`/space separators are normalised by the Rust parser.
+   * @returns The matching `BusinessDayConvention`.
+   * @throws `TypeError` (kind `invalid_type`) if `name` is not a string; `FinstackError` (kind `validation`) if no convention matches.
+   */
+  fromName(name: string): BusinessDayConvention;
+}
+
+/**
+ * Identifier, display name and weekend rule of a built-in holiday calendar
+ * (the Rust `CalendarMetadata`), as returned by `HolidayCalendar.metadata`.
+ */
+export interface CalendarMetadata {
+  /**
+   * Lowercase registry identifier of the calendar, such as `"nyse"`.
+   */
+  id: string;
+  /**
+   * Human-readable name of the calendar.
+   */
+  name: string;
+  /**
+   * Whether weekends are ignored when classifying holidays.
+   */
+  ignore_weekends: boolean;
+  /**
+   * Weekend convention of the calendar, such as `"saturday_sunday"`.
+   */
+  weekend_rule: string;
+}
+
+/**
+ * Holiday calendar resolved from the built-in registry.
+ *
+ * A calendar classifies dates as holidays or business days. `+`-joined
+ * codes such as `"nyse+gblo"` resolve to the union calendar, on which a day
+ * is a business day only when every member market is open.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const calendar = new core.HolidayCalendar("nyse");
+ * calendar.isHoliday(core.createDate(2025, 1, 1)); // true
+ * calendar.isBusinessDay(core.createDate(2025, 1, 6)); // true
+ * calendar.code; // "nyse"
+ * ```
+ */
+export interface HolidayCalendar extends WasmOwned {
+  /**
+   * Calendar metadata, or `undefined` for union calendars.
+   *
+   * A plain `CalendarMetadata` object with `id`, `name`,
+   * `ignore_weekends` and `weekend_rule`.
+   */
+  readonly metadata: CalendarMetadata | undefined;
+  /**
+   * Canonical calendar id: the registry id, or the sorted `a+b` union form.
+   */
+  readonly code: string;
+  /**
+   * Whether a date is a holiday on this calendar.
+   *
+   * @param date - Date as days since 1970-01-01.
+   * @returns `true` for a holiday; weekends follow the calendar's weekend rule.
+   * @throws `TypeError` if `date` is not an integer; `FinstackError` (kind `validation`) if it is outside the supported date range.
+   */
+  isHoliday(date: number): boolean;
+  /**
+   * Whether a date is a business day (neither a weekend nor a holiday).
+   *
+   * @param date - Date as days since 1970-01-01.
+   * @returns `true` when the market is open on `date`.
+   * @throws `TypeError` if `date` is not an integer; `FinstackError` (kind `validation`) if it is outside the supported date range.
+   */
+  isBusinessDay(date: number): boolean;
+  /**
+   * Count business days in the half-open interval `[start, end)`.
+   *
+   * @param start - First date counted, as days since 1970-01-01.
+   * @param end - Exclusive end date, as days since 1970-01-01.
+   * @returns Number of business days; `0` when `start` is on or after `end`.
+   * @throws `TypeError` if a date is not an integer; `FinstackError` (kind `validation`) if a date is outside the supported range.
+   */
+  countBusinessDays(start: number, end: number): number;
+  /**
+   * Canonical calendar id (same as `code`).
+   *
+   * @returns The id accepted by `new HolidayCalendar(code)`.
+   */
+  toString(): string;
+}
+
+/**
+ * Holiday calendar resolved from the built-in registry.
+ *
+ * A calendar classifies dates as holidays or business days. `+`-joined
+ * codes such as `"nyse+gblo"` resolve to the union calendar, on which a day
+ * is a business day only when every member market is open.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const calendar = new core.HolidayCalendar("nyse");
+ * calendar.isHoliday(core.createDate(2025, 1, 1)); // true
+ * calendar.isBusinessDay(core.createDate(2025, 1, 6)); // true
+ * calendar.code; // "nyse"
+ * ```
+ */
+export interface HolidayCalendarConstructor {
+  /**
+   * Resolve a calendar by its registry id.
+   *
+   * @param code - Built-in calendar id in any case (for example `"target2"` or `"nyse"`; see `availableCalendars()`), or `+`-joined ids for a union calendar (`"nyse+gblo"`).
+   * @returns The resolved `HolidayCalendar`.
+   * @throws `TypeError` (kind `invalid_type`) if `code` is not a string; `FinstackError` (kind `not_found`) naming close matches if `code` or a `+` member is not a registered calendar.
+   */
+  new (code: string): HolidayCalendar;
+}
+
+/**
+ * Reporting-period frequency (Rust `PeriodKind`).
+ *
+ * Each static factory is one frequency; `toString()` is the canonical
+ * snake_case name shared with the JSON wire format.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const kind = core.PeriodKind.quarterly();
+ * kind.periodsPerYear; // 4
+ * kind.priorObservationDate(core.createDate(2025, 3, 31)); // 2024-12-31 as epoch days
+ * ```
+ */
+export interface PeriodKind extends WasmOwned {
+  /**
+   * Number of periods per year (daily uses the 252 trading-day convention).
+   */
+  readonly periodsPerYear: number;
+  /**
+   * Factor that scales per-period statistics to annual ones (`periodsPerYear` as a float).
+   */
+  readonly annualizationFactor: number;
+  /**
+   * Observation date one frequency step before `first` (Rust
+   * `PeriodKind::prior_observation_date`).
+   *
+   * @param first - First return-aligned observation date, as days since 1970-01-01.
+   * @returns The prior observation date as epoch days: one or seven calendar days back for daily/weekly, otherwise 1/3/6/12 months back clamped to the last valid day of the target month.
+   * @throws `TypeError` if `first` is not an integer; `FinstackError` (kind `validation`) if it is outside the supported date range.
+   */
+  priorObservationDate(first: number): number;
+  /**
+   * Canonical snake_case name of the frequency.
+   *
+   * @returns The name accepted by `fromName` and the JSON wire format.
+   */
+  toString(): string;
+}
+
+/**
+ * Reporting-period frequency (Rust `PeriodKind`).
+ *
+ * Each static factory is one frequency; `toString()` is the canonical
+ * snake_case name shared with the JSON wire format.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const kind = core.PeriodKind.quarterly();
+ * kind.periodsPerYear; // 4
+ * kind.priorObservationDate(core.createDate(2025, 3, 31)); // 2024-12-31 as epoch days
+ * ```
+ */
+export interface PeriodKindConstructor {
+  /**
+   * JavaScript prototype of `PeriodKind`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: PeriodKind;
+  /**
+   * Daily periods (252 trading days per year).
+   *
+   * @returns The `daily` frequency.
+   */
+  daily(): PeriodKind;
+  /**
+   * ISO-week periods (52 per year).
+   *
+   * @returns The `weekly` frequency.
+   */
+  weekly(): PeriodKind;
+  /**
+   * Calendar-month periods (12 per year).
+   *
+   * @returns The `monthly` frequency.
+   */
+  monthly(): PeriodKind;
+  /**
+   * Calendar-quarter periods (4 per year).
+   *
+   * @returns The `quarterly` frequency.
+   */
+  quarterly(): PeriodKind;
+  /**
+   * Half-year periods (2 per year).
+   *
+   * @returns The `semi_annual` frequency.
+   */
+  semiAnnual(): PeriodKind;
+  /**
+   * Full-year periods (1 per year).
+   *
+   * @returns The `annual` frequency.
+   */
+  annual(): PeriodKind;
+  /**
+   * Parse a frequency name (Rust `PeriodKind::from_str`).
+   *
+   * @param name - Frequency name such as `"daily"`, `"monthly"`, `"quarterly"`, `"semi_annual"` or `"annual"`.
+   * @returns The matching `PeriodKind`.
+   * @throws `TypeError` (kind `invalid_type`) if `name` is not a string; `FinstackError` (kind `validation`) if no frequency matches.
+   */
+  fromName(name: string): PeriodKind;
+}
+
+/**
+ * Identifier of one reporting period, such as `2025Q1`, `2025M03` or `FY2025Q2`.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const q1 = core.PeriodId.quarter(2025, 1);
+ * q1.code; // "2025Q1"
+ * q1.next().code; // "2025Q2"
+ * core.PeriodId.parse("2025M12").next().code; // "2026M01"
+ * ```
+ */
+export interface PeriodId extends WasmOwned {
+  /**
+   * Period code, such as `"2025Q1"` (the text `parse` accepts).
+   */
+  readonly code: string;
+  /**
+   * Calendar (or fiscal) year of the period.
+   */
+  readonly year: number;
+  /**
+   * One-based index of the period within its year (quarter, month, week or day number).
+   */
+  readonly index: number;
+  /**
+   * Frequency of the period as a `PeriodKind`.
+   */
+  readonly kind: PeriodKind;
+  /**
+   * Whether the identifier uses fiscal-year (`FY…`) semantics.
+   */
+  readonly isFiscal: boolean;
+  /**
+   * Number of periods per year at this identifier's frequency.
+   */
+  readonly periodsPerYear: number;
+  /**
+   * Step forward to the next period (Rust `PeriodId::next`).
+   *
+   * @returns The following `PeriodId`, rolling the year where needed.
+   * @throws `FinstackError` (kind `validation`) for a fiscal identifier (use `nextFiscal`) or when the year would overflow.
+   */
+  next(): PeriodId;
+  /**
+   * Step back to the previous period (Rust `PeriodId::prev`).
+   *
+   * @returns The preceding `PeriodId`, rolling the year where needed.
+   * @throws `FinstackError` (kind `validation`) for a fiscal identifier (use `prevFiscal`) or when the year would overflow.
+   */
+  prev(): PeriodId;
+  /**
+   * Step forward to the next fiscal period (Rust `PeriodId::next_fiscal`).
+   *
+   * @param fiscalConfig - Fiscal-year start used to size fiscal weeks and days.
+   * @returns The following `PeriodId`, marked fiscal.
+   * @throws `FinstackError` (kind `validation`) if the configuration has an invalid fiscal start date for the year or the fiscal-year boundary is outside the supported date range.
+   */
+  nextFiscal(fiscalConfig: FiscalConfig): PeriodId;
+  /**
+   * Step back to the previous fiscal period (Rust `PeriodId::prev_fiscal`).
+   *
+   * @param fiscalConfig - Fiscal-year start used to size fiscal weeks and days.
+   * @returns The preceding `PeriodId`, marked fiscal.
+   * @throws `FinstackError` (kind `validation`) if the configuration has an invalid fiscal start date for the year or the fiscal-year boundary is outside the supported date range.
+   */
+  prevFiscal(fiscalConfig: FiscalConfig): PeriodId;
+  /**
+   * Period code (same as `code`).
+   *
+   * @returns The text accepted by `PeriodId.parse`.
+   */
+  toString(): string;
+}
+
+/**
+ * Identifier of one reporting period, such as `2025Q1`, `2025M03` or `FY2025Q2`.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const q1 = core.PeriodId.quarter(2025, 1);
+ * q1.code; // "2025Q1"
+ * q1.next().code; // "2025Q2"
+ * core.PeriodId.parse("2025M12").next().code; // "2026M01"
+ * ```
+ */
+export interface PeriodIdConstructor {
+  /**
+   * JavaScript prototype of `PeriodId`; instances come from `parse` and the static factories, not `new`.
+   */
+  readonly prototype: PeriodId;
+  /**
+   * Parse a period code (Rust `PeriodId::from_str`).
+   *
+   * @param code - Period code such as `"2025Q1"`, `"2025M03"`, `"2025H1"`, `"2025W05"`, `"2025D032"`, `"2025"`, or a fiscal code such as `"FY2025Q1"`.
+   * @returns The parsed `PeriodId`.
+   * @throws `TypeError` (kind `invalid_type`) if `code` is not a string; `FinstackError` (kind `validation`) if it is not a period code.
+   */
+  parse(code: string): PeriodId;
+  /**
+   * Build a monthly identifier.
+   *
+   * @param year - Calendar year of the period.
+   * @param month - Month number, `1` through `12`.
+   * @returns The monthly `PeriodId`.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `month` is outside `1..=12`.
+   */
+  month(year: number, month: number): PeriodId;
+  /**
+   * Build a quarterly identifier.
+   *
+   * @param year - Calendar year of the period.
+   * @param quarter - Quarter number, `1` through `4`.
+   * @returns The quarterly `PeriodId`.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `quarter` is outside `1..=4`.
+   */
+  quarter(year: number, quarter: number): PeriodId;
+  /**
+   * Build an annual identifier.
+   *
+   * @param year - Calendar year of the period.
+   * @returns The annual `PeriodId`.
+   * @throws `TypeError` if `year` is not an integer.
+   */
+  annual(year: number): PeriodId;
+  /**
+   * Build a half-year identifier.
+   *
+   * @param year - Calendar year of the period.
+   * @param half - Half number, `1` or `2`.
+   * @returns The semi-annual `PeriodId`.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `half` is not `1` or `2`.
+   */
+  half(year: number, half: number): PeriodId;
+  /**
+   * Build an ISO-week identifier.
+   *
+   * @param year - ISO week-year of the period.
+   * @param week - ISO week number, `1` through `52` (or `53` in long years).
+   * @returns The weekly `PeriodId`.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `week` is not valid for `year`.
+   */
+  week(year: number, week: number): PeriodId;
+  /**
+   * Build a daily identifier from a day-of-year ordinal.
+   *
+   * @param year - Calendar year of the period.
+   * @param ordinal - One-based day of the year, `1` through `365` (or `366` in leap years).
+   * @returns The daily `PeriodId`.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `ordinal` is not valid for `year`.
+   */
+  day(year: number, ordinal: number): PeriodId;
+}
+
+/**
+ * Fiscal-year start (month and day) used to map fiscal periods onto calendar dates.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const fiscal = core.FiscalConfig.usFederal(); // 1 October
+ * core.fiscalYear(core.createDate(2024, 11, 15), fiscal); // 2025
+ * new core.FiscalConfig(4, 6).startDay; // 6
+ * ```
+ */
+export interface FiscalConfig extends WasmOwned {
+  /**
+   * Month the fiscal year starts in (1 = January).
+   */
+  readonly startMonth: number;
+  /**
+   * Day of the start month the fiscal year starts on.
+   */
+  readonly startDay: number;
+}
+
+/**
+ * Fiscal-year start (month and day) used to map fiscal periods onto calendar dates.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const fiscal = core.FiscalConfig.usFederal(); // 1 October
+ * core.fiscalYear(core.createDate(2024, 11, 15), fiscal); // 2025
+ * new core.FiscalConfig(4, 6).startDay; // 6
+ * ```
+ */
+export interface FiscalConfigConstructor {
+  /**
+   * Create a fiscal configuration (Rust `FiscalConfig::new`).
+   *
+   * @param startMonth - Month the fiscal year starts in, `1` (January) through `12`.
+   * @param startDay - Day of that month the fiscal year starts on, `1` through `31`; validity for a specific year (for example 30 February) is checked when the configuration is applied.
+   * @returns The validated `FiscalConfig`.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `startMonth` is outside `1..=12` or `startDay` is outside `1..=31`.
+   */
+  new (startMonth: number, startDay: number): FiscalConfig;
+  /**
+   * Calendar-year fiscal configuration (1 January).
+   *
+   * @returns The calendar-year `FiscalConfig`.
+   */
+  calendarYear(): FiscalConfig;
+  /**
+   * US federal government fiscal year (1 October).
+   *
+   * @returns The US federal `FiscalConfig`.
+   */
+  usFederal(): FiscalConfig;
+  /**
+   * UK government fiscal year (6 April).
+   *
+   * @returns The UK `FiscalConfig`.
+   */
+  uk(): FiscalConfig;
+  /**
+   * Japanese government fiscal year (1 April).
+   *
+   * @returns The Japanese `FiscalConfig`.
+   */
+  japan(): FiscalConfig;
+  /**
+   * Australian government fiscal year (1 July).
+   *
+   * @returns The Australian `FiscalConfig`.
+   */
+  australia(): FiscalConfig;
+}
+
+/**
+ * Stub convention: where an irregular first or last accrual period goes.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * core.StubKind.shortFront().toString(); // "short_front"
+ * core.StubKind.fromName("long_back").toString(); // "long_back"
+ * ```
+ */
+export interface StubKind extends WasmOwned {
+  /**
+   * Canonical snake_case name of the stub rule.
+   *
+   * @returns The name accepted by `fromName` and the JSON wire format.
+   */
+  toString(): string;
+}
+
+/**
+ * Stub convention: where an irregular first or last accrual period goes.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * core.StubKind.shortFront().toString(); // "short_front"
+ * core.StubKind.fromName("long_back").toString(); // "long_back"
+ * ```
+ */
+export interface StubKindConstructor {
+  /**
+   * JavaScript prototype of `StubKind`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: StubKind;
+  /**
+   * No stub: the range must divide evenly into the frequency.
+   *
+   * @returns The `none` stub rule (the Rust default).
+   */
+  none(): StubKind;
+  /**
+   * A short irregular period at the start of the schedule.
+   *
+   * @returns The `short_front` stub rule.
+   */
+  shortFront(): StubKind;
+  /**
+   * A short irregular period at the end of the schedule.
+   *
+   * @returns The `short_back` stub rule.
+   */
+  shortBack(): StubKind;
+  /**
+   * A long irregular period at the start of the schedule.
+   *
+   * @returns The `long_front` stub rule.
+   */
+  longFront(): StubKind;
+  /**
+   * A long irregular period at the end of the schedule.
+   *
+   * @returns The `long_back` stub rule.
+   */
+  longBack(): StubKind;
+  /**
+   * Parse a stub rule name (Rust `StubKind::from_str`).
+   *
+   * @param name - Stub name: `"none"`, `"short_front"`, `"short_back"`, `"long_front"` or `"long_back"`.
+   * @returns The matching `StubKind`.
+   * @throws `TypeError` (kind `invalid_type`) if `name` is not a string; `FinstackError` (kind `validation`) if no stub rule matches.
+   */
+  fromName(name: string): StubKind;
+}
+
+/**
+ * Policy for recoverable schedule-construction errors.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * core.ScheduleErrorPolicy.strict().toString(); // "strict"
+ * core.ScheduleErrorPolicy.fromName("graceful_empty").toString(); // "graceful_empty"
+ * ```
+ */
+export interface ScheduleErrorPolicy extends WasmOwned {
+  /**
+   * Canonical snake_case name of the policy.
+   *
+   * @returns The name accepted by `fromName` and the JSON wire format.
+   * @throws If the label cannot be produced (not expected).
+   */
+  toString(): string;
+}
+
+/**
+ * Policy for recoverable schedule-construction errors.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * core.ScheduleErrorPolicy.strict().toString(); // "strict"
+ * core.ScheduleErrorPolicy.fromName("graceful_empty").toString(); // "graceful_empty"
+ * ```
+ */
+export interface ScheduleErrorPolicyConstructor {
+  /**
+   * JavaScript prototype of `ScheduleErrorPolicy`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: ScheduleErrorPolicy;
+  /**
+   * Fail on any construction error, including an unknown calendar.
+   *
+   * @returns The `strict` policy (the Rust default).
+   */
+  strict(): ScheduleErrorPolicy;
+  /**
+   * Build an unadjusted schedule carrying a warning when the calendar is unknown.
+   *
+   * @returns The `missing_calendar_warning` policy.
+   */
+  missingCalendarWarning(): ScheduleErrorPolicy;
+  /**
+   * Return an empty schedule carrying a warning instead of a recoverable error.
+   *
+   * @returns The `graceful_empty` policy.
+   */
+  gracefulEmpty(): ScheduleErrorPolicy;
+  /**
+   * Parse a policy name (the Rust serde label).
+   *
+   * @param name - Policy name: `"strict"`, `"missing_calendar_warning"` or `"graceful_empty"`.
+   * @returns The matching `ScheduleErrorPolicy`.
+   * @throws `TypeError` (kind `invalid_type`) if `name` is not a string; `FinstackError` (kind `validation`) if no policy matches.
+   */
+  fromName(name: string): ScheduleErrorPolicy;
+}
+
+/**
+ * A generated schedule: the accrual grid plus payment and fixing dates.
+ *
+ * Build one with `Schedule.builder(start, end)` or `Schedule.fromSpec(spec)`.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const schedule = core.Schedule.builder(
+ *   core.createDate(2025, 1, 15),
+ *   core.createDate(2026, 1, 15),
+ * )
+ *   .frequency("3M")
+ *   .adjustWith("modified_following", "nyse")
+ *   .build();
+ * schedule.dates.length; // 5 accrual boundaries
+ * schedule.paymentDates.length; // 4 payments
+ * ```
+ */
+export interface Schedule extends WasmOwned {
+  /**
+   * Unadjusted accrual grid as epoch days: the period start plus each period end.
+   */
+  readonly dates: Int32Array;
+  /**
+   * Payment date of each accrual period as epoch days (one per period end).
+   */
+  readonly paymentDates: Int32Array;
+  /**
+   * Fixing date of each accrual period as epoch days; empty when no fixing lag is set.
+   */
+  readonly fixingDates: Int32Array;
+  /**
+   * Construction warnings in the Rust `ScheduleWarning` wire form (an
+   * array of single-key objects such as `{ graceful_fallback: { … } }`).
+   */
+  readonly warnings: ScheduleWarning[];
+  /**
+   * Whether schedule construction produced any warning.
+   *
+   * @returns `true` when `warnings` is non-empty.
+   */
+  hasWarnings(): boolean;
+  /**
+   * Whether a graceful-fallback policy suppressed a construction error.
+   *
+   * @returns `true` when a `graceful_fallback` warning is present.
+   */
+  usedGracefulFallback(): boolean;
+  /**
+   * Serialize to the canonical JSON wire form shared with Python `Schedule.to_json`.
+   *
+   * @returns Compact JSON text with ISO-8601 dates.
+   * @throws If serialization fails (not expected for a valid schedule).
+   */
+  toJson(): string;
+}
+
+/**
+ * A generated schedule: the accrual grid plus payment and fixing dates.
+ *
+ * Build one with `Schedule.builder(start, end)` or `Schedule.fromSpec(spec)`.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const schedule = core.Schedule.builder(
+ *   core.createDate(2025, 1, 15),
+ *   core.createDate(2026, 1, 15),
+ * )
+ *   .frequency("3M")
+ *   .adjustWith("modified_following", "nyse")
+ *   .build();
+ * schedule.dates.length; // 5 accrual boundaries
+ * schedule.paymentDates.length; // 4 payments
+ * ```
+ */
+export interface ScheduleConstructor {
+  /**
+   * JavaScript prototype of `Schedule`; instances come from `builder`, `fromSpec` or `fromJson`, not `new`.
+   */
+  readonly prototype: Schedule;
+  /**
+   * Start a schedule builder for an accrual range (Rust `ScheduleSpec::new`).
+   *
+   * @param start - First unadjusted accrual date, as days since 1970-01-01.
+   * @param end - Last unadjusted accrual date, as days since 1970-01-01; must be on or after `start`.
+   * @returns A `ScheduleBuilder` with the Rust defaults: monthly frequency, no stub, no business-day adjustment, strict error policy.
+   * @throws `TypeError` if a date is not an integer; `FinstackError` (kind `validation`) if a date is out of range or `start` is after `end`.
+   */
+  builder(start: number, end: number): ScheduleBuilder;
+  /**
+   * Build a schedule from a persisted specification (Rust `ScheduleSpec::build`).
+   *
+   * @param spec - `ScheduleSpec` JSON text or plain object, such as `ScheduleBuilder.toSpec()` output: ISO `start`/`end`, `frequency` (a `{ count, unit }` tenor), `stub`, `business_day_convention`, `calendar_id`, `end_of_month`, `imm_mode`, `cds_imm_mode`, `error_policy`, `payment_lag_days` and `fixing_lag_business_days`. Unknown fields are rejected.
+   * @returns The generated `Schedule`.
+   * @throws `TypeError` if `spec` is not a JSON string or plain object; `FinstackError` (kind `validation`) for an invalid spec, both IMM modes together, or a generation failure; kind `not_found` for an unknown calendar under the strict policy.
+   */
+  fromSpec(spec: ScheduleSpec | string): Schedule;
+  /**
+   * Deserialize from the canonical JSON wire form produced by `toJson`.
+   *
+   * @param json - Schedule JSON text or plain object with ISO `dates`, `payment_dates`, `fixing_dates` and optional `warnings`.
+   * @returns The parsed `Schedule`.
+   * @throws `TypeError` if `json` is not a JSON string or plain object; `FinstackError` (kind `validation`) if it does not match the schema.
+   */
+  fromJson(json: JsonInput): Schedule;
+}
+
+/**
+ * Fluent builder for a `Schedule`.
+ *
+ * As with the consuming Rust builder, every setter returns a new builder
+ * and leaves the receiver unchanged, so settings must be chained (or the
+ * returned builder kept).
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const monthly = core.Schedule.builder(
+ *   core.createDate(2025, 1, 15),
+ *   core.createDate(2025, 7, 15),
+ * ).frequency("1M");
+ * const schedule = monthly.paymentLagDays(2).build();
+ * schedule.paymentDates.length; // 6
+ * ```
+ */
+export interface ScheduleBuilder extends WasmOwned {
+  /**
+   * Set the period frequency.
+   *
+   * @param frequency - Tenor text such as `"3M"`, `"6M"` or `"1Y"` (use `tenor.toString()` for a `Tenor`).
+   * @returns A new builder with the setting applied; this builder is unchanged.
+   * @throws `TypeError` if `frequency` is not a string; `FinstackError` (kind `validation`) if it is not a tenor.
+   */
+  frequency(frequency: string): ScheduleBuilder;
+  /**
+   * Set the stub rule.
+   *
+   * @param stub - Stub name: `"none"`, `"short_front"`, `"short_back"`, `"long_front"` or `"long_back"` (use `stubKind.toString()` for a `StubKind`).
+   * @returns A new builder with the setting applied; this builder is unchanged.
+   * @throws `TypeError` if `stub` is not a string; `FinstackError` (kind `validation`) if no stub rule matches.
+   */
+  stubRule(stub: string): ScheduleBuilder;
+  /**
+   * Adjust payment dates with a business-day convention and calendar.
+   *
+   * @param convention - Business-day convention name such as `"modified_following"`.
+   * @param calendar - Registered holiday-calendar id (for example `"nyse"`); it is resolved when the schedule is built, under the error policy.
+   * @returns A new builder with the setting applied; this builder is unchanged.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if the convention is unknown.
+   */
+  adjustWith(convention: string, calendar: string): ScheduleBuilder;
+  /**
+   * Set the payment lag in business days after each adjusted period end.
+   *
+   * @param lag - Signed number of business days; `0` pays on the period end. A non-zero lag needs a calendar (`adjustWith`), or `build` fails.
+   * @returns A new builder with the setting applied; this builder is unchanged.
+   * @throws `TypeError` if `lag` is not an integer.
+   */
+  paymentLagDays(lag: number): ScheduleBuilder;
+  /**
+   * Set the fixing lag in business days before each period's accrual start.
+   *
+   * @param lag - Number of business days the fixing precedes the accrual start; it needs a calendar (`adjustWith`), or `build` fails.
+   * @returns A new builder with the setting applied; this builder is unchanged.
+   * @throws `TypeError` if `lag` is not an integer.
+   */
+  fixingLagBusinessDays(lag: number): ScheduleBuilder;
+  /**
+   * Enable or disable end-of-month rolling.
+   *
+   * @param eom - `true` keeps period ends on the last day of the month when the anchor date is a month end.
+   * @returns A new builder with the setting applied; this builder is unchanged.
+   * @throws `TypeError` if `eom` is not a boolean.
+   */
+  endOfMonth(eom: boolean): ScheduleBuilder;
+  /**
+   * Use CDS IMM dates (the 20th of March, June, September and December).
+   *
+   * @returns A new builder with CDS IMM mode on and standard IMM mode off.
+   */
+  cdsImm(): ScheduleBuilder;
+  /**
+   * Use standard IMM dates (the third Wednesday of quarterly months).
+   *
+   * @returns A new builder with standard IMM mode on and CDS IMM mode off.
+   */
+  imm(): ScheduleBuilder;
+  /**
+   * Set the policy for recoverable construction errors.
+   *
+   * @param policy - Policy name: `"strict"`, `"missing_calendar_warning"` or `"graceful_empty"`.
+   * @returns A new builder with the setting applied; this builder is unchanged.
+   * @throws `TypeError` if `policy` is not a string; `FinstackError` (kind `validation`) if no policy matches.
+   */
+  errorPolicy(policy: string): ScheduleBuilder;
+  /**
+   * The persisted specification this builder holds.
+   *
+   * @returns A plain `ScheduleSpec` object accepted by `Schedule.fromSpec`.
+   * @throws If the specification cannot be serialized (not expected).
+   */
+  toSpec(): ScheduleSpec;
+  /**
+   * Generate the schedule (Rust `ScheduleSpec::build`).
+   *
+   * @returns The generated `Schedule`.
+   * @throws `FinstackError` (kind `validation`) for an invalid frequency or a generation failure; kind `not_found` for an unknown calendar under the strict policy.
+   */
+  build(): Schedule;
+}
+
+/**
+ * Fluent builder for a `Schedule`.
+ *
+ * As with the consuming Rust builder, every setter returns a new builder
+ * and leaves the receiver unchanged, so settings must be chained (or the
+ * returned builder kept).
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const monthly = core.Schedule.builder(
+ *   core.createDate(2025, 1, 15),
+ *   core.createDate(2025, 7, 15),
+ * ).frequency("1M");
+ * const schedule = monthly.paymentLagDays(2).build();
+ * schedule.paymentDates.length; // 6
+ * ```
+ */
+export interface ScheduleBuilderConstructor {
+  /**
+   * JavaScript prototype of `ScheduleBuilder`; instances come from `Schedule.builder`, not `new`.
+   */
+  readonly prototype: ScheduleBuilder;
+}
+
+/**
+ * SIFMA agency-MBS settlement class (A through D).
+ *
+ * SIFMA publishes a separate TBA settlement date per class each month.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const cls = core.SifmaSettlementClass.fromAgencyTerm("FNMA", 15);
+ * cls.toString(); // "b"
+ * core.sifmaSettlementDateForClass(1, 2026, cls); // epoch days, or undefined
+ * ```
+ */
+export interface SifmaSettlementClass extends WasmOwned {
+  /**
+   * Lower-case class letter (`"a"` through `"d"`), the JSON wire label.
+   *
+   * @returns The class label.
+   * @throws If the label cannot be produced (not expected).
+   */
+  toString(): string;
+}
+
+/**
+ * SIFMA agency-MBS settlement class (A through D).
+ *
+ * SIFMA publishes a separate TBA settlement date per class each month.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const cls = core.SifmaSettlementClass.fromAgencyTerm("FNMA", 15);
+ * cls.toString(); // "b"
+ * core.sifmaSettlementDateForClass(1, 2026, cls); // epoch days, or undefined
+ * ```
+ */
+export interface SifmaSettlementClassConstructor {
+  /**
+   * JavaScript prototype of `SifmaSettlementClass`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: SifmaSettlementClass;
+  /**
+   * Class A: conventional 30-year pools (FNMA/FHLMC UMBS).
+   *
+   * @returns Settlement class A (the Rust default).
+   */
+  a(): SifmaSettlementClass;
+  /**
+   * Class B: fixed-rate 15-year agency pools.
+   *
+   * @returns Settlement class B.
+   */
+  b(): SifmaSettlementClass;
+  /**
+   * Class C: GNMA single-family 30-year pools.
+   *
+   * @returns Settlement class C.
+   */
+  c(): SifmaSettlementClass;
+  /**
+   * Class D: balloons, ARMs, multifamily and other non-standard products.
+   *
+   * @returns Settlement class D.
+   */
+  d(): SifmaSettlementClass;
+  /**
+   * Infer the settlement class from the agency program and original term
+   * (Rust `SifmaSettlementClass::from_agency_term`).
+   *
+   * @param agency - Agency program label; a value containing `GNMA` or `GN` (any case) is treated as Ginnie Mae.
+   * @param termYears - Original mortgage term in whole years: 15-year pools are class B, conventional 30-year pools class A, GNMA 30-year pools class C, anything else class D.
+   * @returns The inferred `SifmaSettlementClass`.
+   * @throws `TypeError` if `agency` is not a string or `termYears` is not a non-negative integer.
+   */
+  fromAgencyTerm(agency: string, termYears: number): SifmaSettlementClass;
+}
+
+/**
+ * 30/360 day-count variant used by `days30360`.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const isda = core.Thirty360Convention.isda();
+ * core.days30360(core.createDate(2025, 1, 31), core.createDate(2025, 3, 31), isda.toString()); // 60
+ * ```
+ */
+export interface Thirty360Convention extends WasmOwned {
+  /**
+   * Canonical snake_case name of the variant.
+   *
+   * @returns The name accepted by `fromName` and `days30360`.
+   * @throws If the label cannot be produced (not expected).
+   */
+  toString(): string;
+}
+
+/**
+ * 30/360 day-count variant used by `days30360`.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const isda = core.Thirty360Convention.isda();
+ * core.days30360(core.createDate(2025, 1, 31), core.createDate(2025, 3, 31), isda.toString()); // 60
+ * ```
+ */
+export interface Thirty360ConventionConstructor {
+  /**
+   * JavaScript prototype of `Thirty360Convention`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: Thirty360Convention;
+  /**
+   * 30U/360 (US SIA bond basis).
+   *
+   * @returns The `us_sia` variant.
+   */
+  usSia(): Thirty360Convention;
+  /**
+   * 30/360 ISDA bond basis (ISDA 2006 Section 4.16(f); no February month-end rule).
+   *
+   * @returns The `isda` variant.
+   */
+  isda(): Thirty360Convention;
+  /**
+   * 30E/360 (European): day 31 becomes 30 on both dates.
+   *
+   * @returns The `european` variant.
+   */
+  european(): Thirty360Convention;
+  /**
+   * 30/360 Italian: day 31 and any February day after the 27th become 30.
+   *
+   * @returns The `italian` variant.
+   */
+  italian(): Thirty360Convention;
+  /**
+   * Parse a variant name (the Rust serde label).
+   *
+   * @param name - Variant name: `"us_sia"`, `"isda"`, `"european"` or `"italian"`.
+   * @returns The matching `Thirty360Convention`.
+   * @throws `TypeError` (kind `invalid_type`) if `name` is not a string; `FinstackError` (kind `validation`) if no variant matches.
+   */
+  fromName(name: string): Thirty360Convention;
+}
+
+/**
+ * Unit of a tenor: days, weeks, months or years.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * core.TenorUnit.months().toString(); // "M"
+ * core.TenorUnit.fromChar("y").toString(); // "Y"
+ * ```
+ */
+export interface TenorUnit extends WasmOwned {
+  /**
+   * One-letter unit code: `"D"`, `"W"`, `"M"` or `"Y"`.
+   *
+   * @returns The designator accepted by `fromChar` and used in tenor text.
+   */
+  toString(): string;
+}
+
+/**
+ * Unit of a tenor: days, weeks, months or years.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * core.TenorUnit.months().toString(); // "M"
+ * core.TenorUnit.fromChar("y").toString(); // "Y"
+ * ```
+ */
+export interface TenorUnitConstructor {
+  /**
+   * JavaScript prototype of `TenorUnit`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: TenorUnit;
+  /**
+   * Calendar days (`D`).
+   *
+   * @returns The days unit.
+   */
+  days(): TenorUnit;
+  /**
+   * Calendar weeks (`W`).
+   *
+   * @returns The weeks unit.
+   */
+  weeks(): TenorUnit;
+  /**
+   * Calendar months (`M`).
+   *
+   * @returns The months unit.
+   */
+  months(): TenorUnit;
+  /**
+   * Calendar years (`Y`).
+   *
+   * @returns The years unit.
+   */
+  years(): TenorUnit;
+  /**
+   * Parse a one-letter unit code (Rust `TenorUnit::from_char`).
+   *
+   * @param ch - Exactly one character: `D`, `W`, `M` or `Y`, in either case.
+   * @returns The matching `TenorUnit`.
+   * @throws `TypeError` (kind `invalid_type`) if `ch` is not a string; `FinstackError` (kind `validation`) if it is not exactly one of the four unit letters.
+   */
+  fromChar(ch: string): TenorUnit;
+}
+
+/**
+ * Decimal rounding mode used when amounts are scaled for ingest or output.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * core.RoundingMode.bankers().name; // "bankers"
+ * core.RoundingMode.fromName("away_from_zero").toJson(); // "\"away_from_zero\""
+ * ```
+ */
+export interface RoundingMode extends WasmOwned {
+  /**
+   * Lowercase name of the mode, such as `"bankers"`.
+   */
+  readonly name: string;
+  /**
+   * Serialize to the canonical JSON wire form (a quoted lowercase name).
+   *
+   * @returns JSON text such as `"\"bankers\""`.
+   * @throws If serialization fails (not expected).
+   */
+  toJson(): string;
+  /**
+   * Lowercase name of the mode (same as `name`).
+   *
+   * @returns The name accepted by `fromName`.
+   */
+  toString(): string;
+}
+
+/**
+ * Decimal rounding mode used when amounts are scaled for ingest or output.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * core.RoundingMode.bankers().name; // "bankers"
+ * core.RoundingMode.fromName("away_from_zero").toJson(); // "\"away_from_zero\""
+ * ```
+ */
+export interface RoundingModeConstructor {
+  /**
+   * JavaScript prototype of `RoundingMode`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: RoundingMode;
+  /**
+   * Round half to even (banker's rounding).
+   *
+   * @returns The `bankers` mode (the Rust default).
+   */
+  bankers(): RoundingMode;
+  /**
+   * Round half away from zero.
+   *
+   * @returns The `away_from_zero` mode.
+   */
+  awayFromZero(): RoundingMode;
+  /**
+   * Truncate toward zero.
+   *
+   * @returns The `toward_zero` mode.
+   */
+  towardZero(): RoundingMode;
+  /**
+   * Round toward negative infinity.
+   *
+   * @returns The `floor` mode.
+   */
+  floor(): RoundingMode;
+  /**
+   * Round toward positive infinity.
+   *
+   * @returns The `ceil` mode.
+   */
+  ceil(): RoundingMode;
+  /**
+   * Parse a rounding-mode name (Rust `RoundingMode::from_str`).
+   *
+   * @param name - Lowercase mode name: `"bankers"`, `"away_from_zero"`, `"toward_zero"`, `"floor"` or `"ceil"`.
+   * @returns The matching `RoundingMode`.
+   * @throws `TypeError` (kind `invalid_type`) if `name` is not a string; `FinstackError` (kind `validation`) if no mode matches.
+   */
+  fromName(name: string): RoundingMode;
+  /**
+   * Deserialize from the canonical JSON wire form produced by `toJson`.
+   *
+   * @param json - JSON text holding the quoted lowercase mode name, such as `"\"bankers\""`.
+   * @returns The parsed `RoundingMode`.
+   * @throws `TypeError` if `json` is not a string; `FinstackError` (kind `validation`) if it is not a quoted mode name.
+   */
+  fromJson(json: string): RoundingMode;
+}
+
+/**
+ * Global configuration: rounding mode, per-currency decimal scales, numeric
+ * tolerances and versioned extension sections.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const config = new core.FinstackConfig("away_from_zero");
+ * config.setOutputScale("JPY", 2);
+ * config.outputScale("JPY"); // 2
+ * config.outputScale("USD"); // 2 (the ISO-4217 minor units)
+ * const copy = core.FinstackConfig.fromJson(config.toJson());
+ * copy.roundingMode.name; // "away_from_zero"
+ * ```
+ */
+export interface FinstackConfig extends WasmOwned {
+  /**
+   * Active rounding mode as a `RoundingMode`.
+   */
+  readonly roundingMode: RoundingMode;
+  /**
+   * Numeric tolerances as a plain `ToleranceConfig` object (`rate_epsilon`, `generic_epsilon`).
+   */
+  readonly tolerances: ToleranceConfig;
+  /**
+   * Decimal places used when formatting amounts in a currency (Rust
+   * `FinstackConfig::output_scale`).
+   *
+   * @param currency - ISO-4217 alphabetic code, such as `"USD"`.
+   * @returns The override for that currency, or its ISO-4217 minor units.
+   * @throws `TypeError` if `currency` is not a string; `FinstackError` (kind `validation`) if it is not a supported currency code.
+   */
+  outputScale(currency: string): number;
+  /**
+   * Decimal places kept when amounts in a currency are ingested (Rust
+   * `FinstackConfig::ingest_scale`).
+   *
+   * @param currency - ISO-4217 alphabetic code, such as `"USD"`.
+   * @returns The override for that currency, or the larger of `6` and its ISO-4217 minor units.
+   * @throws `TypeError` if `currency` is not a string; `FinstackError` (kind `validation`) if it is not a supported currency code.
+   */
+  ingestScale(currency: string): number;
+  /**
+   * Override the output decimal places of one currency.
+   *
+   * @param currency - ISO-4217 alphabetic code, such as `"JPY"`.
+   * @param scale - Number of decimal places, a non-negative integer.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `currency` is not a supported currency code.
+   */
+  setOutputScale(currency: string, scale: number): void;
+  /**
+   * Override the ingest decimal places of one currency.
+   *
+   * @param currency - ISO-4217 alphabetic code, such as `"JPY"`.
+   * @param scale - Number of decimal places, a non-negative integer.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `currency` is not a supported currency code.
+   */
+  setIngestScale(currency: string, scale: number): void;
+  /**
+   * Per-currency output-scale overrides.
+   *
+   * @returns A plain object mapping ISO-4217 code to decimal places; empty when no override is set.
+   * @throws If the map cannot be converted (not expected).
+   */
+  outputScaleOverrides(): Record<string, number>;
+  /**
+   * Per-currency ingest-scale overrides.
+   *
+   * @returns A plain object mapping ISO-4217 code to decimal places; empty when no override is set.
+   * @throws If the map cannot be converted (not expected).
+   */
+  ingestScaleOverrides(): Record<string, number>;
+  /**
+   * Store a versioned extension section (Rust `ConfigExtensions::insert`).
+   *
+   * @param key - Extension key of the form `{crate}.{domain}.v{N}`, such as `"core.rating_scales.v1"`: lowercase identifiers and a version suffix.
+   * @param value - The section itself: any JSON-representable value (plain object, array, string, finite number, boolean or `null`). A string is stored as a string, not parsed as JSON text.
+   * @throws `TypeError` (kind `invalid_type`) if `key` is not a string or `value` is not JSON-representable; `FinstackError` (kind `validation`) if `key` does not match the required pattern.
+   */
+  setExtension(key: string, value: unknown): void;
+  /**
+   * Remove an extension section.
+   *
+   * @param key - Extension key to remove.
+   * @returns `true` if a section was stored under `key`.
+   * @throws `TypeError` if `key` is not a string.
+   */
+  removeExtension(key: string): boolean;
+  /**
+   * Keys of the stored extension sections.
+   *
+   * @returns Extension keys in sorted order.
+   */
+  extensionKeys(): string[];
+  /**
+   * JSON text of one extension section.
+   *
+   * @param key - Extension key to read.
+   * @returns Compact JSON text of the section, or `undefined` if none is stored under `key`.
+   * @throws `TypeError` if `key` is not a string.
+   */
+  getExtensionJson(key: string): string | undefined;
+  /**
+   * One extension section as a plain value.
+   *
+   * @param key - Extension key to read.
+   * @returns The stored section (plain object, array or primitive), or `undefined` if none is stored under `key`.
+   * @throws `TypeError` if `key` is not a string.
+   */
+  getExtension(key: string): unknown;
+  /**
+   * Serialize to the canonical JSON wire form shared with Python `FinstackConfig.to_json`.
+   *
+   * @returns Compact JSON text with `rounding`, `tolerances` and any `extensions`.
+   * @throws If serialization fails (not expected for a valid configuration).
+   */
+  toJson(): string;
+}
+
+/**
+ * Global configuration: rounding mode, per-currency decimal scales, numeric
+ * tolerances and versioned extension sections.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const config = new core.FinstackConfig("away_from_zero");
+ * config.setOutputScale("JPY", 2);
+ * config.outputScale("JPY"); // 2
+ * config.outputScale("USD"); // 2 (the ISO-4217 minor units)
+ * const copy = core.FinstackConfig.fromJson(config.toJson());
+ * copy.roundingMode.name; // "away_from_zero"
+ * ```
+ */
+export interface FinstackConfigConstructor {
+  /**
+   * Create a configuration from the Rust defaults.
+   *
+   * @param roundingMode - Lowercase rounding-mode name (for example `"bankers"`, or `mode.name` of a `RoundingMode`); omitted uses the Rust default, `"bankers"`.
+   * @param tolerances - `ToleranceConfig` object or JSON text with the optional absolute tolerances `rate_epsilon` (default `1e-12`) and `generic_epsilon` (default `1e-10`), both finite and positive; omitted uses the defaults.
+   * @returns A new `FinstackConfig`.
+   * @throws `TypeError` (kind `invalid_type`) for a mistyped argument; `FinstackError` (kind `validation`) for an unknown rounding mode, an unknown tolerance field, or a non-positive tolerance.
+   */
+  new (roundingMode?: string | null, tolerances?: ToleranceConfig | string | null): FinstackConfig;
+  /**
+   * Deserialize from the canonical JSON wire form produced by `toJson`.
+   *
+   * @param json - FinstackConfig JSON text or plain object; unknown fields and malformed extension keys are rejected.
+   * @returns The parsed `FinstackConfig`.
+   * @throws `TypeError` if `json` is not a JSON string or plain object; `FinstackError` (kind `validation`) if it does not match the schema.
+   */
+  fromJson(json: JsonInput): FinstackConfig;
+}
+
+/**
+ * What a registry does when asked for a rating scale it does not know.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * core.UnknownScalePolicy.fallbackToDefault().name; // "fallback_to_default"
+ * core.embeddedRegistry().unknownScalePolicy().name;
+ * ```
+ */
+export interface UnknownScalePolicy extends WasmOwned {
+  /**
+   * Snake_case name of the policy, such as `"fallback_to_default"`.
+   */
+  readonly name: string;
+  /**
+   * Serialize to the canonical JSON wire form (a quoted snake_case name).
+   *
+   * @returns JSON text such as `"\"error\""`.
+   * @throws If serialization fails (not expected).
+   */
+  toJson(): string;
+  /**
+   * Snake_case name of the policy (same as `name`).
+   *
+   * @returns The name accepted by `fromName`.
+   * @throws If the label cannot be produced (not expected).
+   */
+  toString(): string;
+}
+
+/**
+ * What a registry does when asked for a rating scale it does not know.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * core.UnknownScalePolicy.fallbackToDefault().name; // "fallback_to_default"
+ * core.embeddedRegistry().unknownScalePolicy().name;
+ * ```
+ */
+export interface UnknownScalePolicyConstructor {
+  /**
+   * JavaScript prototype of `UnknownScalePolicy`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: UnknownScalePolicy;
+  /**
+   * Reject unknown scale names.
+   *
+   * @returns The `error` policy.
+   */
+  error(): UnknownScalePolicy;
+  /**
+   * Use the registry's default scale for unknown names.
+   *
+   * @returns The `fallback_to_default` policy.
+   */
+  fallbackToDefault(): UnknownScalePolicy;
+  /**
+   * Use the default scale for unknown names and let the caller warn.
+   *
+   * @returns The `warn_and_fallback` policy.
+   */
+  warnAndFallback(): UnknownScalePolicy;
+  /**
+   * Parse a policy name (the Rust serde label).
+   *
+   * @param name - Policy name: `"error"`, `"fallback_to_default"` or `"warn_and_fallback"`.
+   * @returns The matching `UnknownScalePolicy`.
+   * @throws `TypeError` (kind `invalid_type`) if `name` is not a string; `FinstackError` (kind `validation`) if no policy matches.
+   */
+  fromName(name: string): UnknownScalePolicy;
+  /**
+   * Deserialize from the canonical JSON wire form (Rust `UnknownScalePolicy::from_json`).
+   *
+   * @param json - JSON text holding the quoted policy name, such as `"\"warn_and_fallback\""`.
+   * @returns The parsed `UnknownScalePolicy`.
+   * @throws `TypeError` if `json` is not a string; `FinstackError` (kind `validation`) if it is not a quoted policy name.
+   */
+  fromJson(json: string): UnknownScalePolicy;
+}
+
+/**
+ * Versioned registry of scorecard rating scales (S&P, Moody's, Fitch, …).
+ *
+ * Get one from `embeddedRegistry()`, `registryFromConfig(config)` or
+ * `RatingScaleRegistry.fromJson(json)`.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const registry = core.embeddedRegistry();
+ * const scale = registry.ratingScale(registry.defaultScaleId());
+ * scale.ratings[0].name; // strongest grade of the default scale
+ * ```
+ */
+export interface RatingScaleRegistry extends WasmOwned {
+  /**
+   * Score assigned when a scorecard value falls in a threshold gap.
+   *
+   * @returns The default scorecard score on the 0–100 scale.
+   */
+  defaultScorecardScore(): number;
+  /**
+   * Identifier of the default rating scale.
+   *
+   * @returns The id used when a caller names no scale or an unknown one under a fallback policy.
+   */
+  defaultScaleId(): string;
+  /**
+   * Primary id of every registered scale, in registry order.
+   *
+   * @returns Scale ids; aliases are not listed.
+   */
+  scaleIds(): string[];
+  /**
+   * Policy applied when `ratingScale` is asked for an unknown name.
+   *
+   * @returns The registry's `UnknownScalePolicy`.
+   */
+  unknownScalePolicy(): UnknownScalePolicy;
+  /**
+   * Whether a name is a registered scale id or alias.
+   *
+   * @param name - Scale id or alias to look up.
+   * @returns `true` when the registry knows the name.
+   * @throws `TypeError` if `name` is not a string.
+   */
+  isKnownRatingScale(name: string): boolean;
+  /**
+   * Resolve a scale by id or alias under the unknown-scale policy (Rust
+   * `RatingScaleRegistry::rating_scale`).
+   *
+   * @param name - Scale id or alias; an unknown name returns the default scale under a fallback policy.
+   * @returns A plain `ScorecardScale` object: `scale_name`, optional `description` and `ratings` ordered best to worst, each with `name`, `score` and `min_score` on the 0–100 scale.
+   * @throws `TypeError` if `name` is not a string; `FinstackError` if the name is unknown and the policy is `error`.
+   */
+  ratingScale(name: string): ScorecardScale;
+  /**
+   * Serialize to the canonical JSON wire form shared with Python `RatingScaleRegistry.to_json`.
+   *
+   * @returns Compact JSON text.
+   * @throws If serialization fails (not expected for a valid registry).
+   */
+  toJson(): string;
+}
+
+/**
+ * Versioned registry of scorecard rating scales (S&P, Moody's, Fitch, …).
+ *
+ * Get one from `embeddedRegistry()`, `registryFromConfig(config)` or
+ * `RatingScaleRegistry.fromJson(json)`.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const registry = core.embeddedRegistry();
+ * const scale = registry.ratingScale(registry.defaultScaleId());
+ * scale.ratings[0].name; // strongest grade of the default scale
+ * ```
+ */
+export interface RatingScaleRegistryConstructor {
+  /**
+   * JavaScript prototype of `RatingScaleRegistry`; instances come from `embeddedRegistry`, `registryFromConfig` or `fromJson`, not `new`.
+   */
+  readonly prototype: RatingScaleRegistry;
+  /**
+   * Deserialize and validate a registry (Rust `RatingScaleRegistry::from_json`).
+   *
+   * @param json - Registry JSON text or plain object, such as `toJson()` output. Validation enforces the schema version, unique scale ids and aliases, an existing default scale and in-range scores.
+   * @returns The validated `RatingScaleRegistry`.
+   * @throws `TypeError` if `json` is not a JSON string or plain object; `FinstackError` (kind `validation`) if it is malformed or fails validation.
+   */
+  fromJson(json: JsonInput): RatingScaleRegistry;
+}
+
+/**
+ * Agency credit rating on the 23-step S&P/Fitch scale (`AAA` … `D`, plus `NR`).
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const rating = new core.CreditRating("Baa3"); // Moody's spelling
+ * rating.name; // "BBB-"
+ * rating.isInvestmentGrade(); // true
+ * core.CreditRating.bbb().notchesTo("BB"); // 3
+ * ```
+ */
+export interface CreditRating extends WasmOwned {
+  /**
+   * S&P/Fitch spelling of the rating, such as `"BBB-"`.
+   */
+  readonly name: string;
+  /**
+   * Whether the rating is investment grade (`BBB-` or better).
+   *
+   * @returns `true` for `AAA` through `BBB-`.
+   */
+  isInvestmentGrade(): boolean;
+  /**
+   * Whether the rating is speculative grade (below `BBB-`).
+   *
+   * @returns `true` for `BB+` through `D`; `false` for investment grade and `NR`.
+   */
+  isSpeculativeGrade(): boolean;
+  /**
+   * Whether the rating is the default state `D`.
+   *
+   * @returns `true` only for `D`.
+   */
+  isDefault(): boolean;
+  /**
+   * Moody's spelling of the rating, such as `"Baa3"` for `BBB-`.
+   *
+   * @returns The Moody's rating text.
+   */
+  toMoodysString(): string;
+  /**
+   * Signed notch distance to another rating (Rust `CreditRating::notches_to`).
+   *
+   * @param other - Rating text to measure against (S&P/Fitch or Moody's spelling; use `rating.name` for a `CreditRating`).
+   * @returns Notches from this rating to `other`: positive when `other` is weaker, negative when stronger. `NR` sits between `C` and `D`.
+   * @throws `TypeError` if `other` is not a string; `FinstackError` (kind `validation`) if it is not a rating.
+   */
+  notchesTo(other: string): number;
+  /**
+   * Serialize to the canonical JSON wire form (the quoted S&P/Fitch spelling).
+   *
+   * @returns JSON text such as `"\"BBB-\""`.
+   * @throws If serialization fails (not expected).
+   */
+  toJson(): string;
+  /**
+   * S&P/Fitch spelling of the rating (same as `name`).
+   *
+   * @returns The rating text accepted by `new CreditRating(name)`.
+   */
+  toString(): string;
+}
+
+/**
+ * Agency credit rating on the 23-step S&P/Fitch scale (`AAA` … `D`, plus `NR`).
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const rating = new core.CreditRating("Baa3"); // Moody's spelling
+ * rating.name; // "BBB-"
+ * rating.isInvestmentGrade(); // true
+ * core.CreditRating.bbb().notchesTo("BB"); // 3
+ * ```
+ */
+export interface CreditRatingConstructor {
+  /**
+   * Parse a rating (Rust `CreditRating::from_str`).
+   *
+   * @param name - Rating text in S&P/Fitch (`"BBB-"`) or Moody's (`"Baa3"`) spelling; case and spaces are ignored, and `"NR"`, `"Not Rated"` and `"Unrated"` all mean not rated.
+   * @returns The parsed `CreditRating`.
+   * @throws `TypeError` (kind `invalid_type`) if `name` is not a string; `FinstackError` (kind `validation`) if it is not a rating.
+   */
+  new (name: string): CreditRating;
+  /**
+   * Parse a rating; the same as `new CreditRating(name)`.
+   *
+   * @param name - Rating text in S&P/Fitch (`"BBB-"`) or Moody's (`"Baa3"`) spelling; case and spaces are ignored.
+   * @returns The parsed `CreditRating`.
+   * @throws `TypeError` (kind `invalid_type`) if `name` is not a string; `FinstackError` (kind `validation`) if it is not a rating.
+   */
+  fromName(name: string): CreditRating;
+  /**
+   * Deserialize from the canonical JSON wire form produced by `toJson`.
+   *
+   * @param json - JSON text holding the quoted S&P/Fitch spelling, such as `"\"BBB-\""`.
+   * @returns The parsed `CreditRating`.
+   * @throws `TypeError` if `json` is not a string; `FinstackError` (kind `validation`) if it is not a quoted rating.
+   */
+  fromJson(json: string): CreditRating;
+  /**
+   * S&P/Fitch `AAA`, Moody's `Aaa`.
+   *
+   * @returns The `AAA` rating.
+   */
+  aaa(): CreditRating;
+  /**
+   * S&P/Fitch `AA+`, Moody's `Aa1`.
+   *
+   * @returns The `AA+` rating.
+   */
+  aaPlus(): CreditRating;
+  /**
+   * S&P/Fitch `AA`, Moody's `Aa2`.
+   *
+   * @returns The `AA` rating.
+   */
+  aa(): CreditRating;
+  /**
+   * S&P/Fitch `AA-`, Moody's `Aa3`.
+   *
+   * @returns The `AA-` rating.
+   */
+  aaMinus(): CreditRating;
+  /**
+   * S&P/Fitch `A+`, Moody's `A1`.
+   *
+   * @returns The `A+` rating.
+   */
+  aPlus(): CreditRating;
+  /**
+   * S&P/Fitch `A`, Moody's `A2`.
+   *
+   * @returns The `A` rating.
+   */
+  a(): CreditRating;
+  /**
+   * S&P/Fitch `A-`, Moody's `A3`.
+   *
+   * @returns The `A-` rating.
+   */
+  aMinus(): CreditRating;
+  /**
+   * S&P/Fitch `BBB+`, Moody's `Baa1`.
+   *
+   * @returns The `BBB+` rating.
+   */
+  bbbPlus(): CreditRating;
+  /**
+   * S&P/Fitch `BBB`, Moody's `Baa2`.
+   *
+   * @returns The `BBB` rating.
+   */
+  bbb(): CreditRating;
+  /**
+   * S&P/Fitch `BBB-`, Moody's `Baa3`.
+   *
+   * @returns The `BBB-` rating.
+   */
+  bbbMinus(): CreditRating;
+  /**
+   * S&P/Fitch `BB+`, Moody's `Ba1`.
+   *
+   * @returns The `BB+` rating.
+   */
+  bbPlus(): CreditRating;
+  /**
+   * S&P/Fitch `BB`, Moody's `Ba2`.
+   *
+   * @returns The `BB` rating.
+   */
+  bb(): CreditRating;
+  /**
+   * S&P/Fitch `BB-`, Moody's `Ba3`.
+   *
+   * @returns The `BB-` rating.
+   */
+  bbMinus(): CreditRating;
+  /**
+   * S&P/Fitch `B+`, Moody's `B1`.
+   *
+   * @returns The `B+` rating.
+   */
+  bPlus(): CreditRating;
+  /**
+   * S&P/Fitch `B`, Moody's `B2`.
+   *
+   * @returns The `B` rating.
+   */
+  b(): CreditRating;
+  /**
+   * S&P/Fitch `B-`, Moody's `B3`.
+   *
+   * @returns The `B-` rating.
+   */
+  bMinus(): CreditRating;
+  /**
+   * S&P/Fitch `CCC+`, Moody's `Caa1`.
+   *
+   * @returns The `CCC+` rating.
+   */
+  cccPlus(): CreditRating;
+  /**
+   * S&P/Fitch `CCC`, Moody's `Caa2`.
+   *
+   * @returns The `CCC` rating.
+   */
+  ccc(): CreditRating;
+  /**
+   * S&P/Fitch `CCC-`, Moody's `Caa3`.
+   *
+   * @returns The `CCC-` rating.
+   */
+  cccMinus(): CreditRating;
+  /**
+   * S&P/Fitch `CC`, Moody's `Ca`.
+   *
+   * @returns The `CC` rating.
+   */
+  cc(): CreditRating;
+  /**
+   * S&P/Fitch `C`, Moody's `C`.
+   *
+   * @returns The `C` rating.
+   */
+  c(): CreditRating;
+  /**
+   * Default (`D`): the obligor has failed to pay.
+   *
+   * @returns The `D` rating.
+   */
+  d(): CreditRating;
+  /**
+   * Not rated (`NR`): no agency rating is assigned.
+   *
+   * @returns The `NR` rating.
+   */
+  nr(): CreditRating;
+}
+
+/**
+ * Typed identifier of a market curve, such as `"USD-OIS"`.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const id = new core.CurveId("USD-OIS");
+ * id.asStr(); // "USD-OIS"
+ * core.CurveId.fromJson(id.toJson()).isEmpty(); // false
+ * ```
+ */
+export interface CurveId extends WasmOwned {
+  /**
+   * The identifier text.
+   *
+   * @returns The text passed at construction.
+   */
+  asStr(): string;
+  /**
+   * Whether the identifier text is empty.
+   *
+   * @returns `true` for the empty string.
+   */
+  isEmpty(): boolean;
+  /**
+   * Serialize to the canonical JSON wire form (a quoted string).
+   *
+   * @returns JSON text such as `"\"USD-OIS\""`.
+   * @throws If serialization fails (not expected).
+   */
+  toJson(): string;
+  /**
+   * The identifier text (same as `asStr`).
+   *
+   * @returns The text passed at construction.
+   */
+  toString(): string;
+}
+
+/**
+ * Typed identifier of a market curve, such as `"USD-OIS"`.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const id = new core.CurveId("USD-OIS");
+ * id.asStr(); // "USD-OIS"
+ * core.CurveId.fromJson(id.toJson()).isEmpty(); // false
+ * ```
+ */
+export interface CurveIdConstructor {
+  /**
+   * Wrap identifier text (Rust `CurveId::new`); the text is stored unchanged.
+   *
+   * @param value - Identifier text, such as `"USD-OIS"`; it is not trimmed or case-folded.
+   * @returns The `CurveId`.
+   * @throws `TypeError` (kind `invalid_type`) if `value` is not a string.
+   */
+  new (value: string): CurveId;
+  /**
+   * Deserialize from the canonical JSON wire form produced by `toJson`.
+   *
+   * @param json - JSON text holding the quoted identifier, such as `"\"USD-OIS\""`.
+   * @returns The parsed `CurveId`.
+   * @throws `TypeError` if `json` is not a string; `FinstackError` (kind `validation`) if it is not a JSON string.
+   */
+  fromJson(json: string): CurveId;
+}
+
+/**
+ * Typed identifier of an instrument, such as `"BOND_A"`.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const id = new core.InstrumentId("BOND_A");
+ * id.asStr(); // "BOND_A"
+ * core.InstrumentId.fromJson(id.toJson()).isEmpty(); // false
+ * ```
+ */
+export interface InstrumentId extends WasmOwned {
+  /**
+   * The identifier text.
+   *
+   * @returns The text passed at construction.
+   */
+  asStr(): string;
+  /**
+   * Whether the identifier text is empty.
+   *
+   * @returns `true` for the empty string.
+   */
+  isEmpty(): boolean;
+  /**
+   * Serialize to the canonical JSON wire form (a quoted string).
+   *
+   * @returns JSON text such as `"\"BOND_A\""`.
+   * @throws If serialization fails (not expected).
+   */
+  toJson(): string;
+  /**
+   * The identifier text (same as `asStr`).
+   *
+   * @returns The text passed at construction.
+   */
+  toString(): string;
+}
+
+/**
+ * Typed identifier of an instrument, such as `"BOND_A"`.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const id = new core.InstrumentId("BOND_A");
+ * id.asStr(); // "BOND_A"
+ * core.InstrumentId.fromJson(id.toJson()).isEmpty(); // false
+ * ```
+ */
+export interface InstrumentIdConstructor {
+  /**
+   * Wrap identifier text (Rust `InstrumentId::new`); the text is stored unchanged.
+   *
+   * @param value - Identifier text, such as `"BOND_A"`; it is not trimmed or case-folded.
+   * @returns The `InstrumentId`.
+   * @throws `TypeError` (kind `invalid_type`) if `value` is not a string.
+   */
+  new (value: string): InstrumentId;
+  /**
+   * Deserialize from the canonical JSON wire form produced by `toJson`.
+   *
+   * @param json - JSON text holding the quoted identifier, such as `"\"BOND_A\""`.
+   * @returns The parsed `InstrumentId`.
+   * @throws `TypeError` if `json` is not a string; `FinstackError` (kind `validation`) if it is not a JSON string.
+   */
+  fromJson(json: string): InstrumentId;
+}
+
+/**
+ * Tags and key/value metadata attached to an instrument or position, used
+ * by scenario and reporting selectors.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const attributes = new core.Attributes();
+ * attributes.addTag("energy");
+ * attributes.setMeta("sector", "utilities");
+ * attributes.hasTag("energy"); // true
+ * attributes.getMeta("sector"); // "utilities"
+ * ```
+ */
+export interface Attributes extends WasmOwned {
+  /**
+   * Tags in sorted order.
+   */
+  readonly tags: string[];
+  /**
+   * Add a tag; adding an existing tag has no effect.
+   *
+   * @param tag - Tag text, stored exactly as given.
+   * @throws `TypeError` if `tag` is not a string.
+   */
+  addTag(tag: string): void;
+  /**
+   * Whether a tag is present (Rust `Attributes::has_tag`).
+   *
+   * @param tag - Tag text to look for (exact match).
+   * @returns `true` when the tag is present.
+   * @throws `TypeError` if `tag` is not a string.
+   */
+  hasTag(tag: string): boolean;
+  /**
+   * Whether the attributes match a selector (Rust `Attributes::matches_selector`).
+   *
+   * @param selector - `"tag:<name>"` matches a tag, `"meta:<key>=<value>"` matches a metadata entry, and `"*"` matches everything.
+   * @returns `true` when the selector matches; `false` for an unrecognised selector.
+   * @throws `TypeError` if `selector` is not a string.
+   */
+  matchesSelector(selector: string): boolean;
+  /**
+   * Read a metadata value (Rust `Attributes::get_meta`).
+   *
+   * @param key - Metadata key (exact match).
+   * @returns The stored text, or `undefined` when the key is absent.
+   * @throws `TypeError` if `key` is not a string.
+   */
+  getMeta(key: string): string | undefined;
+  /**
+   * Store a metadata value (Rust `Attributes::set_meta`), replacing any
+   * existing value for the key.
+   *
+   * @param key - Metadata key to set; an existing entry under it is replaced.
+   * @param value - Metadata text; convert numbers with `String(value)`.
+   * @throws `TypeError` if `key` or `value` is not a string.
+   */
+  setMeta(key: string, value: string): void;
+  /**
+   * Whether a metadata key is present (Rust `Attributes::contains_meta_key`).
+   *
+   * @param key - Metadata key (exact match).
+   * @returns `true` when the key is present.
+   * @throws `TypeError` if `key` is not a string.
+   */
+  containsMetaKey(key: string): boolean;
+  /**
+   * Metadata keys in sorted order.
+   *
+   * @returns The keys of every metadata entry.
+   */
+  keys(): string[];
+  /**
+   * Metadata entries in key order.
+   *
+   * @returns An array of `[key, value]` pairs.
+   */
+  items(): [string, string][];
+  /**
+   * Serialize to the canonical JSON wire form shared with Python `Attributes.to_json`.
+   *
+   * @returns Compact JSON text with `tags` and `meta`.
+   * @throws If serialization fails (not expected).
+   */
+  toJson(): string;
+}
+
+/**
+ * Tags and key/value metadata attached to an instrument or position, used
+ * by scenario and reporting selectors.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const attributes = new core.Attributes();
+ * attributes.addTag("energy");
+ * attributes.setMeta("sector", "utilities");
+ * attributes.hasTag("energy"); // true
+ * attributes.getMeta("sector"); // "utilities"
+ * ```
+ */
+export interface AttributesConstructor {
+  /**
+   * Create an empty attribute set (no tags, no metadata).
+   *
+   * @returns A new `Attributes`.
+   */
+  new (): Attributes;
+  /**
+   * Deserialize from the canonical JSON wire form produced by `toJson`.
+   *
+   * @param json - Attributes JSON text or plain object with `tags` (array of strings) and `meta` (string-to-string map); unknown fields are rejected.
+   * @returns The parsed `Attributes`.
+   * @throws `TypeError` if `json` is not a JSON string or plain object; `FinstackError` (kind `validation`) if it does not match the schema.
+   */
+  fromJson(json: JsonInput): Attributes;
+}
+
+/**
+ * Named options for constructing an `InflationCurve`; unknown keys are rejected.
+ */
+export interface InflationCurveOptions {
+  /**
+   * Curve identifier; the lookup key inside a `MarketContext`.
+   */
+  id: string;
+  /**
+   * ISO-8601 base date; knot times are year fractions from it under `dayCount`.
+   */
+  baseDate: string;
+  /**
+   * Strictly positive CPI index level at the base date.
+   */
+  baseCpi: number;
+  /**
+   * Flat `[t0, cpi0, t1, cpi1, …]` pairs: `t` in years, `cpi` the projected index level; even length.
+   */
+  knots: NumericArray;
+  /**
+   * Day-count convention for the time axis; omitted uses the Rust builder default.
+   */
+  dayCount?: string;
+  /**
+   * Indexation (publication) lag in whole months; omitted uses the Rust builder default.
+   */
+  indexationLagMonths?: number;
+  /**
+   * Interpolation style between pillars; omitted uses the Rust builder default.
+   */
+  interp?: string;
+  /**
+   * Extrapolation policy beyond the pillar range; omitted uses the Rust builder default.
+   */
+  extrapolation?: string;
+}
+
+/**
+ * Projected CPI curve for inflation-linked valuation.
+ *
+ * Built from `(time, CPI level)` pillars; `time` is a year fraction from
+ * `baseDate` and the level is the consumer-price index itself (not a rate).
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const curve = new core.InflationCurve({
+ *   id: "US-CPI",
+ *   baseDate: "2025-01-02",
+ *   baseCpi: 300.0,
+ *   knots: [0.0, 300.0, 5.0, 331.2],
+ * });
+ * curve.cpi(2.5); // projected CPI level at 2.5y
+ * curve.inflationRate(0.0, 5.0); // annualised inflation over 5y
+ * ```
+ */
+export interface InflationCurve extends WasmOwned {
+  /**
+   * Curve identifier (the `MarketContext` lookup key).
+   */
+  readonly id: string;
+  /**
+   * Base date as an ISO-8601 string; knot times are measured from it.
+   */
+  readonly baseDate: string;
+  /**
+   * Day count that converts dates to curve time, such as `"act_365f"`.
+   */
+  readonly dayCount: string;
+  /**
+   * Indexation (publication) lag in whole months.
+   */
+  readonly indexationLagMonths: number;
+  /**
+   * CPI index level at the base date.
+   */
+  readonly baseCpi: number;
+  /**
+   * Pillar times in years from the base date, strictly increasing.
+   */
+  readonly knots: Float64Array;
+  /**
+   * CPI index level at each pillar, aligned with `knots`.
+   */
+  readonly cpiLevels: Float64Array;
+  /**
+   * Interpolation style between pillars, such as `"log_linear"`.
+   */
+  readonly interpStyle: string;
+  /**
+   * Extrapolation policy beyond the pillar range, such as `"flat_forward"`.
+   */
+  readonly extrapolation: string;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
+   *
+   * @returns Compact JSON text.
+   * @throws If serialization fails (not expected for a valid curve).
+   */
+  toJson(): string;
+  /**
+   * Projected CPI level at year fraction `t`, without indexation lag (Rust
+   * `InflationCurve::cpi`).
+   *
+   * @param t - Time from the curve base date in years.
+   * @returns The interpolated index level.
+   * @throws `TypeError` if `t` is not a number.
+   */
+  cpi(t: number): number;
+  /**
+   * Projected CPI level on a date, measured with the curve day count (Rust
+   * `InflationCurve::cpi_on_date`).
+   *
+   * @param date - ISO-8601 target date.
+   * @returns The interpolated index level.
+   * @throws `TypeError` if `date` is not a string; `FinstackError` (kind `validation`) for a malformed date or a year fraction that cannot be computed.
+   */
+  cpiOnDate(date: string): number;
+  /**
+   * CPI level at `t` shifted back by the indexation lag (Rust
+   * `InflationCurve::cpi_with_lag`).
+   *
+   * @param t - Settlement time from the curve base date in years; the curve is evaluated at `t - indexationLagMonths / 12`.
+   * @returns The lagged index level (a continuous shift, with no seasonality adjustment).
+   * @throws `TypeError` if `t` is not a number.
+   */
+  cpiWithLag(t: number): number;
+  /**
+   * Principal indexation ratio `cpiWithLag(t) / baseCpi` (Rust
+   * `InflationCurve::index_ratio`).
+   *
+   * @param t - Settlement time from the curve base date in years.
+   * @returns The uplift factor of an inflation-linked notional: `1.08` is 108% of face; no deflation floor is applied.
+   * @throws `TypeError` if `t` is not a number; `FinstackError` (kind `validation`) if the ratio is not finite and positive.
+   */
+  indexRatio(t: number): number;
+  /**
+   * Annualised inflation rate between two times, by the CAGR formula
+   * `(I(t2) / I(t1))^(1 / (t2 - t1)) - 1` (Rust `InflationCurve::inflation_rate`).
+   *
+   * @param t1 - Start time in years from the curve base date.
+   * @param t2 - End time in years, strictly greater than `t1`.
+   * @returns The annualised inflation rate as a decimal.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for an invalid interval or non-positive CPI levels.
+   */
+  inflationRate(t1: number, t2: number): number;
+}
+
+/**
+ * Projected CPI curve for inflation-linked valuation.
+ *
+ * Built from `(time, CPI level)` pillars; `time` is a year fraction from
+ * `baseDate` and the level is the consumer-price index itself (not a rate).
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const curve = new core.InflationCurve({
+ *   id: "US-CPI",
+ *   baseDate: "2025-01-02",
+ *   baseCpi: 300.0,
+ *   knots: [0.0, 300.0, 5.0, 331.2],
+ * });
+ * curve.cpi(2.5); // projected CPI level at 2.5y
+ * curve.inflationRate(0.0, 5.0); // annualised inflation over 5y
+ * ```
+ */
+export interface InflationCurveConstructor {
+  /**
+   * Construct an inflation curve from named options.
+   *
+   * @param options - InflationCurveOptions object (or its JSON text) with: `id` (curve identifier, the `MarketContext` lookup key); `baseDate` (ISO-8601; knot times are year fractions from it under `dayCount`); `baseCpi` (strictly positive index level at the base date); `knots` (flat `[t0, cpi0, t1, cpi1, …]` array, `t` in years, `cpi` the projected index level); and the optional `dayCount`, `indexationLagMonths` (publication lag in whole months), `interp` and `extrapolation`. Omitted options use the Rust builder defaults. Unknown keys are rejected.
+   * @returns The constructed `InflationCurve`.
+   * @throws `TypeError` (kind `invalid_type`) if `options` is not a JSON string or plain object; `FinstackError` (kind `validation`) for an unknown, missing or mistyped key, an odd-length `knots`, a malformed date, an unknown day-count/interpolation/extrapolation name, or CPI levels the curve builder rejects.
+   */
+  new (options: InflationCurveOptions | string): InflationCurve;
+  /**
+   * Deserialize from the canonical JSON wire form shared with Python `InflationCurve.to_json`.
+   *
+   * @param json - Canonical InflationCurve JSON text or plain object; unknown fields are rejected and the curve is re-validated.
+   * @returns The validated `InflationCurve`.
+   * @throws `TypeError` if `json` is not a JSON string or plain object; `FinstackError` (kind `validation`) if it does not match the schema or fails curve validation.
+   */
+  fromJson(json: JsonInput): InflationCurve;
+}
+
+/**
+ * Named options for constructing a `PriceCurve`; unknown keys are rejected.
+ */
+export interface PriceCurveOptions {
+  /**
+   * Curve identifier; the lookup key inside a `MarketContext`.
+   */
+  id: string;
+  /**
+   * ISO-8601 base date; knot times are year fractions from it under `dayCount`.
+   */
+  baseDate: string;
+  /**
+   * Flat `[t0, p0, t1, p1, …]` pairs: `t` in years, `p` the forward price or index level; even length.
+   */
+  knots: NumericArray;
+  /**
+   * Level family: `"price"` (the default, any finite level) or `"vol_index"` (non-negative levels).
+   */
+  kind?: 'price' | 'vol_index';
+  /**
+   * Spot level at `t = 0`; omitted uses the Rust builder default.
+   */
+  spotPrice?: number;
+  /**
+   * Extrapolation policy beyond the pillar range; omitted uses the Rust builder default.
+   */
+  extrapolation?: string;
+  /**
+   * Interpolation style between pillars; omitted uses the Rust builder default.
+   */
+  interp?: string;
+  /**
+   * Day-count convention for the time axis; omitted uses the Rust builder default.
+   */
+  dayCount?: string;
+}
+
+/**
+ * Forward price curve for commodities and other price-based assets, or a
+ * volatility-index forward curve.
+ *
+ * Built from `(time, level)` pillars; `time` is a year fraction from
+ * `baseDate` and the level is an absolute price (or index points).
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const curve = new core.PriceCurve({
+ *   id: "WTI",
+ *   baseDate: "2025-01-02",
+ *   knots: [0.0, 72.0, 1.0, 70.5],
+ *   spotPrice: 72.0,
+ * });
+ * curve.price(0.5); // forward price at 6 months
+ * curve.kind; // "price"
+ * ```
+ */
+export interface PriceCurve extends WasmOwned {
+  /**
+   * Curve identifier (the `MarketContext` lookup key).
+   */
+  readonly id: string;
+  /**
+   * Base date as an ISO-8601 string; knot times are measured from it.
+   */
+  readonly baseDate: string;
+  /**
+   * Level family of the curve: `"price"` or `"vol_index"`.
+   */
+  readonly kind: string;
+  /**
+   * Spot level at `t = 0` (a price, or index points for a vol-index curve).
+   */
+  readonly spotPrice: number;
+  /**
+   * Pillar times in years from the base date, strictly increasing.
+   */
+  readonly knots: Float64Array;
+  /**
+   * Forward level at each pillar, aligned with `knots`.
+   */
+  readonly prices: Float64Array;
+  /**
+   * Day count that converts dates to curve time, such as `"act_365f"`.
+   */
+  readonly dayCount: string;
+  /**
+   * Interpolation style between pillars, such as `"linear"`.
+   */
+  readonly interpStyle: string;
+  /**
+   * Extrapolation policy beyond the pillar range, such as `"flat_zero"`.
+   */
+  readonly extrapolation: string;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
+   *
+   * @returns Compact JSON text.
+   * @throws If serialization fails (not expected for a valid curve).
+   */
+  toJson(): string;
+  /**
+   * Forward price at year fraction `t` (Rust `PriceCurve::price`).
+   *
+   * @param t - Time from the curve base date in years.
+   * @returns The interpolated forward price (or index level).
+   * @throws `TypeError` if `t` is not a number.
+   */
+  price(t: number): number;
+  /**
+   * Forward price on a date, measured with the curve day count (Rust
+   * `PriceCurve::price_on_date`).
+   *
+   * @param date - ISO-8601 target date.
+   * @returns The interpolated forward price (or index level).
+   * @throws `TypeError` if `date` is not a string; `FinstackError` (kind `validation`) for a malformed date or a year fraction that cannot be computed.
+   */
+  priceOnDate(date: string): number;
+}
+
+/**
+ * Forward price curve for commodities and other price-based assets, or a
+ * volatility-index forward curve.
+ *
+ * Built from `(time, level)` pillars; `time` is a year fraction from
+ * `baseDate` and the level is an absolute price (or index points).
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const curve = new core.PriceCurve({
+ *   id: "WTI",
+ *   baseDate: "2025-01-02",
+ *   knots: [0.0, 72.0, 1.0, 70.5],
+ *   spotPrice: 72.0,
+ * });
+ * curve.price(0.5); // forward price at 6 months
+ * curve.kind; // "price"
+ * ```
+ */
+export interface PriceCurveConstructor {
+  /**
+   * Construct a price curve from named options.
+   *
+   * @param options - PriceCurveOptions object (or its JSON text) with: `id` (curve identifier, the `MarketContext` lookup key); `baseDate` (ISO-8601; knot times are year fractions from it under `dayCount`); `knots` (flat `[t0, p0, t1, p1, …]` array, `t` in years, `p` the forward price or index level); and the optional `kind` (`"price"`, the default, accepts any finite level; `"vol_index"` requires non-negative levels), `spotPrice` (level at `t = 0`), `extrapolation`, `interp` and `dayCount`. Omitted options use the Rust builder defaults. Unknown keys are rejected.
+   * @returns The constructed `PriceCurve`.
+   * @throws `TypeError` (kind `invalid_type`) if `options` is not a JSON string or plain object; `FinstackError` (kind `validation`) for an unknown, missing or mistyped key, an odd-length `knots`, a malformed date, an unknown kind/day-count/interpolation/extrapolation name, or levels the curve builder rejects.
+   */
+  new (options: PriceCurveOptions | string): PriceCurve;
+  /**
+   * Deserialize from the canonical JSON wire form shared with Python `PriceCurve.to_json`.
+   *
+   * @param json - Canonical PriceCurve JSON text or plain object; unknown fields are rejected and the curve is re-validated.
+   * @returns The validated `PriceCurve`.
+   * @throws `TypeError` if `json` is not a JSON string or plain object; `FinstackError` (kind `validation`) if it does not match the schema or fails curve validation.
+   */
+  fromJson(json: JsonInput): PriceCurve;
+}
+
+/**
+ * Base-correlation curve for credit tranche pricing: correlation as a
+ * function of the detachment point.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const curve = new core.BaseCorrelationCurve("CDX-IG", [3.0, 0.25, 7.0, 0.45]);
+ * curve.correlation(5.0); // 0.35
+ * ```
+ */
+export interface BaseCorrelationCurve extends WasmOwned {
+  /**
+   * Curve identifier (the `MarketContext` lookup key).
+   */
+  readonly id: string;
+  /**
+   * Detachment points in percent, strictly increasing.
+   */
+  readonly detachmentPoints: Float64Array;
+  /**
+   * Base correlation at each detachment point, aligned with `detachmentPoints`.
+   */
+  readonly correlations: Float64Array;
+  /**
+   * Interpolation style between detachment points, such as `"linear"`.
+   */
+  readonly interpStyle: string;
+  /**
+   * Extrapolation policy beyond the pillar range, such as `"flat_zero"`.
+   */
+  readonly extrapolation: string;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
+   *
+   * @returns Compact JSON text.
+   * @throws If serialization fails (not expected for a valid curve).
+   */
+  toJson(): string;
+  /**
+   * Base correlation at a detachment point (Rust `BaseCorrelationCurve::correlation`).
+   *
+   * @param detachmentPct - Tranche detachment point in percent (`7.0` is 7%).
+   * @returns The interpolated correlation as a decimal; flat beyond the first and last pillar.
+   * @throws `TypeError` if `detachmentPct` is not a number.
+   */
+  correlation(detachmentPct: number): number;
+}
+
+/**
+ * Base-correlation curve for credit tranche pricing: correlation as a
+ * function of the detachment point.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const curve = new core.BaseCorrelationCurve("CDX-IG", [3.0, 0.25, 7.0, 0.45]);
+ * curve.correlation(5.0); // 0.35
+ * ```
+ */
+export interface BaseCorrelationCurveConstructor {
+  /**
+   * Construct a base-correlation curve (Rust `BaseCorrelationCurve::builder`).
+   *
+   * @param id - Curve identifier, the `MarketContext` lookup key.
+   * @param knots - Flat `[d0, rho0, d1, rho1, …]` array: detachment points in percent (`3.0` is 3%), strictly increasing, and base correlations as decimals in `[0, 1]`.
+   * @returns The validated `BaseCorrelationCurve`.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for an odd-length or too-short `knots`, unsorted detachment points, or correlations the builder rejects.
+   */
+  new (id: string, knots: NumericArray): BaseCorrelationCurve;
+  /**
+   * Deserialize from the canonical JSON wire form shared with Python
+   * `BaseCorrelationCurve.to_json`.
+   *
+   * @param json - Canonical BaseCorrelationCurve JSON text or plain object; unknown fields are rejected and the curve is re-validated.
+   * @returns The validated `BaseCorrelationCurve`.
+   * @throws `TypeError` if `json` is not a JSON string or plain object; `FinstackError` (kind `validation`) if it does not match the schema or fails curve validation.
+   */
+  fromJson(json: JsonInput): BaseCorrelationCurve;
+}
+
+/**
+ * Market data of one credit index: constituent count, recovery, the index
+ * hazard curve and its base-correlation curve.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const hazard = core.HazardCurve.flat("CDX-IG-HZD", "2025-01-02", 0.01, 0.4);
+ * const correlation = new core.BaseCorrelationCurve("CDX-IG", [3.0, 0.25, 7.0, 0.45]);
+ * const index = new core.CreditIndexData(125, 0.4, hazard, correlation);
+ * index.numConstituents; // 125
+ * ```
+ */
+export interface CreditIndexData extends WasmOwned {
+  /**
+   * Number of names in the index.
+   */
+  readonly numConstituents: number;
+  /**
+   * Index-level recovery rate on default, as a decimal.
+   */
+  readonly recoveryRate: number;
+  /**
+   * Hazard curve of the index as a whole, as a `HazardCurve`.
+   */
+  readonly indexCreditCurve: HazardCurve;
+  /**
+   * Base-correlation curve used for tranche pricing, as a `BaseCorrelationCurve`.
+   */
+  readonly baseCorrelationCurve: BaseCorrelationCurve;
+}
+
+/**
+ * Market data of one credit index: constituent count, recovery, the index
+ * hazard curve and its base-correlation curve.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const hazard = core.HazardCurve.flat("CDX-IG-HZD", "2025-01-02", 0.01, 0.4);
+ * const correlation = new core.BaseCorrelationCurve("CDX-IG", [3.0, 0.25, 7.0, 0.45]);
+ * const index = new core.CreditIndexData(125, 0.4, hazard, correlation);
+ * index.numConstituents; // 125
+ * ```
+ */
+export interface CreditIndexDataConstructor {
+  /**
+   * Assemble credit-index market data (Rust `CreditIndexData::builder`).
+   *
+   * @param numConstituents - Number of names in the index (for example `125` for CDX IG), an integer in `1..=65535`.
+   * @param recoveryRate - Index-level recovery on default as a decimal in `[0, 1]`.
+   * @param indexCreditCurve - Hazard curve of the index as a whole.
+   * @param baseCorrelationCurve - Base-correlation curve used for tranches.
+   * @returns The validated `CreditIndexData`; the curves are shared, not copied.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for a zero constituent count or a recovery outside `[0, 1]`.
+   */
+  new (
+    numConstituents: number,
+    recoveryRate: number,
+    indexCreditCurve: HazardCurve,
+    baseCorrelationCurve: BaseCorrelationCurve
+  ): CreditIndexData;
+}
+
+/**
+ * Implied-volatility surface on an expiry × strike (or expiry × tenor) grid.
+ *
+ * Volatilities are decimals (`0.20` is 20%); expiries are year fractions.
+ * Lookups inside the grid interpolate bilinearly in volatility or in total
+ * variance, per `interpolationMode`.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const surface = new core.VolSurface(
+ *   "SPX-VOL",
+ *   [0.5, 1.0],
+ *   [90, 100, 110],
+ *   [0.24, 0.2, 0.22, 0.23, 0.21, 0.22],
+ * );
+ * surface.vol(0.75, 100); // 0.205
+ * surface.gridShape; // [2, 3]
+ * ```
+ */
+export interface VolSurface extends WasmOwned {
+  /**
+   * Surface identifier (the `MarketContext` lookup key).
+   */
+  readonly id: string;
+  /**
+   * Expiry axis in years, strictly increasing.
+   */
+  readonly expiries: Float64Array;
+  /**
+   * Secondary axis (strikes, or swap tenors in years), strictly increasing.
+   */
+  readonly strikes: Float64Array;
+  /**
+   * Flat row-major grid of decimal volatilities (`gridShape[0]` rows of `gridShape[1]`).
+   */
+  readonly vols: Float64Array;
+  /**
+   * What the secondary axis holds: `"strike"` or `"tenor"`.
+   */
+  readonly secondaryAxis: string;
+  /**
+   * Volatility quote convention: `"black_lognormal"` or `"normal"`.
+   */
+  readonly quoteType: string;
+  /**
+   * Interpolation across the expiry axis: `"vol"` or `"total_variance"`.
+   */
+  readonly interpolationMode: string;
+  /**
+   * Grid dimensions as `[expiryCount, strikeCount]`.
+   */
+  readonly gridShape: Uint32Array;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
+   *
+   * @returns Compact JSON text.
+   * @throws If serialization fails (not expected for a valid surface).
+   */
+  toJson(): string;
+  /**
+   * Implied volatility at an expiry and strike inside the grid (Rust
+   * `models::volatility::get_surface_vol`).
+   *
+   * @param expiry - Option expiry in years, within the expiry axis.
+   * @param strike - Secondary-axis coordinate, within the strike (or tenor) axis.
+   * @returns The interpolated volatility as a decimal.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for a non-finite or out-of-grid coordinate, or when total-variance interpolation is invalid.
+   */
+  vol(expiry: number, strike: number): number;
+}
+
+/**
+ * Implied-volatility surface on an expiry × strike (or expiry × tenor) grid.
+ *
+ * Volatilities are decimals (`0.20` is 20%); expiries are year fractions.
+ * Lookups inside the grid interpolate bilinearly in volatility or in total
+ * variance, per `interpolationMode`.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const surface = new core.VolSurface(
+ *   "SPX-VOL",
+ *   [0.5, 1.0],
+ *   [90, 100, 110],
+ *   [0.24, 0.2, 0.22, 0.23, 0.21, 0.22],
+ * );
+ * surface.vol(0.75, 100); // 0.205
+ * surface.gridShape; // [2, 3]
+ * ```
+ */
+export interface VolSurfaceConstructor {
+  /**
+   * Construct a surface from a row-major volatility grid (Rust
+   * `VolSurface::from_grid_opts`).
+   *
+   * @param id - Surface identifier, the `MarketContext` lookup key.
+   * @param expiries - Option expiries in years, strictly increasing.
+   * @param strikes - Secondary-axis coordinates (strikes, or swap tenors in years), strictly increasing.
+   * @param vols - Flat row-major grid of decimal volatilities, `expiries.length * strikes.length` entries; row `i` holds the smile at `expiries[i]`. Entries must be finite and non-negative.
+   * @param secondaryAxis - What `strikes` holds: `"strike"` or `"tenor"`; omitted uses the Rust default (`"strike"`).
+   * @param interpolationMode - `"vol"` or `"total_variance"`; omitted uses the Rust default (`"vol"`).
+   * @param quoteType - `"black_lognormal"` or `"normal"`; omitted uses the Rust default (`"black_lognormal"`).
+   * @returns The validated `VolSurface`.
+   * @throws `TypeError` (kind `invalid_type`) for a mistyped argument; `FinstackError` (kind `validation`) for an empty or unsorted axis, a grid of the wrong length, a negative or non-finite volatility, or an unknown axis, mode or quote-type name.
+   */
+  new (
+    id: string,
+    expiries: NumericArray,
+    strikes: NumericArray,
+    vols: NumericArray,
+    secondaryAxis?: string | null,
+    interpolationMode?: string | null,
+    quoteType?: string | null
+  ): VolSurface;
+  /**
+   * Deserialize from the canonical JSON wire form shared with Python `VolSurface.to_json`.
+   *
+   * @param json - Canonical VolSurface JSON text or plain object; unknown fields are rejected and the grid is re-validated.
+   * @returns The validated `VolSurface`.
+   * @throws `TypeError` if `json` is not a JSON string or plain object; `FinstackError` (kind `validation`) if it does not match the schema or fails grid validation.
+   */
+  fromJson(json: JsonInput): VolSurface;
+}
+
+/**
+ * Dated scalar market series, such as an equity index level or a fixing history.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const series = new core.ScalarTimeSeries(
+ *   "SOFR-FIXINGS",
+ *   [
+ *     ["2025-01-02", 0.0431],
+ *     ["2025-01-03", 0.0433],
+ *   ],
+ * );
+ * series.valueOn("2025-01-03"); // 0.0433
+ * series.lastDate; // "2025-01-03"
+ * ```
+ */
+export interface ScalarTimeSeries extends WasmOwned {
+  /**
+   * Series identifier (the `MarketContext` lookup key).
+   */
+  readonly id: string;
+  /**
+   * Currency of the series values, or `undefined` for a unitless series.
+   */
+  readonly currency: Currency | undefined;
+  /**
+   * Interpolation between observations: `"step"` or `"linear"`.
+   */
+  readonly interpolation: string;
+  /**
+   * Observations in date order as `[isoDate, value]` pairs.
+   */
+  readonly observations: [string, number][];
+  /**
+   * Date of the first observation as an ISO-8601 string, or `undefined` when empty.
+   */
+  readonly firstDate: string | undefined;
+  /**
+   * Date of the last observation as an ISO-8601 string, or `undefined` when empty.
+   */
+  readonly lastDate: string | undefined;
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
+   *
+   * @returns Compact JSON text.
+   * @throws If serialization fails (not expected for a valid series).
+   */
+  toJson(): string;
+  /**
+   * Value on a date under the series interpolation (Rust `ScalarTimeSeries::value_on`).
+   *
+   * @param date - ISO-8601 lookup date.
+   * @returns The observed or interpolated value.
+   * @throws `TypeError` if `date` is not a string; `FinstackError` for a malformed date or a date the series cannot serve (for example before the first observation).
+   */
+  valueOn(date: string): number;
+  /**
+   * Value observed exactly on a date, with no interpolation (Rust
+   * `ScalarTimeSeries::value_on_exact`).
+   *
+   * @param date - ISO-8601 observation date.
+   * @returns The value recorded on `date`.
+   * @throws `TypeError` if `date` is not a string; `FinstackError` for a malformed date or a date with no observation.
+   */
+  valueOnExact(date: string): number;
+}
+
+/**
+ * Dated scalar market series, such as an equity index level or a fixing history.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const series = new core.ScalarTimeSeries(
+ *   "SOFR-FIXINGS",
+ *   [
+ *     ["2025-01-02", 0.0431],
+ *     ["2025-01-03", 0.0433],
+ *   ],
+ * );
+ * series.valueOn("2025-01-03"); // 0.0433
+ * series.lastDate; // "2025-01-03"
+ * ```
+ */
+export interface ScalarTimeSeriesConstructor {
+  /**
+   * Construct a series from dated observations (Rust `ScalarTimeSeries::new`).
+   *
+   * @param id - Series identifier, the `MarketContext` lookup key.
+   * @param observations - Array of `[isoDate, value]` pairs (or its JSON text); dates must be unique and values finite.
+   * @param currency - ISO-4217 code of the series' unit; omitted for a unitless series such as a rate or an index level.
+   * @param interpolation - How `valueOn` fills dates between observations: `"step"` or `"linear"`; omitted uses the Rust default (`"step"`).
+   * @returns The validated `ScalarTimeSeries`.
+   * @throws `TypeError` (kind `invalid_type`) for a mistyped argument; `FinstackError` (kind `validation`) for a malformed date or pair, an empty or duplicated observation set, an unknown currency, or an unknown interpolation name.
+   */
+  new (
+    id: string,
+    observations: readonly (readonly [string, number])[] | string,
+    currency?: string | null,
+    interpolation?: string | null
+  ): ScalarTimeSeries;
+  /**
+   * Deserialize from the canonical JSON wire form shared with Python
+   * `ScalarTimeSeries.to_json`.
+   *
+   * @param json - Canonical ScalarTimeSeries JSON text or plain object; unknown fields are rejected and the series is re-validated.
+   * @returns The validated `ScalarTimeSeries`.
+   * @throws `TypeError` if `json` is not a JSON string or plain object; `FinstackError` (kind `validation`) if it does not match the schema or fails validation.
+   */
+  fromJson(json: JsonInput): ScalarTimeSeries;
+}
+
+/**
+ * Historical consumer-price index with the publication lag, interpolation
+ * and seasonality used to index inflation-linked cashflows.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const index = new core.InflationIndex(
+ *   "US-CPI-U",
+ *   [
+ *     ["2024-10-01", 315.664],
+ *     ["2024-11-01", 315.493],
+ *     ["2024-12-01", 315.605],
+ *   ],
+ *   "USD",
+ *   "linear",
+ *   "3M",
+ * );
+ * index.lag; // "3M"
+ * index.dateRange(); // ["2024-10-01", "2024-12-01"]
+ * ```
+ */
+export interface InflationIndex extends WasmOwned {
+  /**
+   * Index identifier (the `MarketContext` lookup key).
+   */
+  readonly id: string;
+  /**
+   * Currency of the index.
+   */
+  readonly currency: Currency;
+  /**
+   * Interpolation between prints: `"step"` or `"linear"`.
+   */
+  readonly interpolation: string;
+  /**
+   * Observation lag as text, such as `"3M"`, `"90D"` or `"none"`.
+   */
+  readonly lag: string;
+  /**
+   * Twelve monthly seasonality factors (January first), or `undefined` when none are set.
+   */
+  readonly seasonality: Float64Array | undefined;
+  /**
+   * Observations in date order as `[isoDate, level]` pairs.
+   */
+  readonly observations: [string, number][];
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
+   *
+   * @returns Compact JSON text.
+   * @throws If serialization fails (not expected for a valid index).
+   */
+  toJson(): string;
+  /**
+   * Index level on a date, applying the index lag, interpolation and
+   * seasonality (Rust `InflationIndex::value_on`).
+   *
+   * @param date - ISO-8601 lookup date.
+   * @returns The index level applicable on `date`.
+   * @throws `TypeError` if `date` is not a string; `FinstackError` for a malformed date or a date the index history cannot serve.
+   */
+  valueOn(date: string): number;
+  /**
+   * Index ratio `I(settleDate) / I(baseDate)` (Rust `InflationIndex::ratio`).
+   *
+   * @param baseDate - ISO-8601 date of the base (issue) index level.
+   * @param settleDate - ISO-8601 date of the settlement index level.
+   * @returns The uplift factor applied to an inflation-linked notional.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` for a malformed date or a date the index history cannot serve.
+   */
+  ratio(baseDate: string, settleDate: string): number;
+  /**
+   * Reference CPI on a date under a months-lag convention, interpolated
+   * linearly by day of month between the two lagged monthly prints (Rust
+   * `InflationIndex::ref_cpi_months_lag`).
+   *
+   * @param date - ISO-8601 settlement date.
+   * @param lagMonths - Indexation lag in whole months (for example `3` for US TIPS and UK index-linked gilts issued since 2005).
+   * @returns The reference index level for `date`.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` for a malformed date or when a required monthly print is missing.
+   */
+  refCpiMonthsLag(date: string, lagMonths: number): number;
+  /**
+   * First and last observation dates (Rust `InflationIndex::date_range`).
+   *
+   * @returns A two-element array `[firstIsoDate, lastIsoDate]`.
+   * @throws `FinstackError` if the index holds no observations.
+   */
+  dateRange(): string[];
+}
+
+/**
+ * Historical consumer-price index with the publication lag, interpolation
+ * and seasonality used to index inflation-linked cashflows.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const index = new core.InflationIndex(
+ *   "US-CPI-U",
+ *   [
+ *     ["2024-10-01", 315.664],
+ *     ["2024-11-01", 315.493],
+ *     ["2024-12-01", 315.605],
+ *   ],
+ *   "USD",
+ *   "linear",
+ *   "3M",
+ * );
+ * index.lag; // "3M"
+ * index.dateRange(); // ["2024-10-01", "2024-12-01"]
+ * ```
+ */
+export interface InflationIndexConstructor {
+  /**
+   * Construct an index from dated CPI prints (Rust `InflationIndex::new`).
+   *
+   * @param id - Index identifier, the `MarketContext` lookup key.
+   * @param observations - Array of `[isoDate, level]` pairs (or its JSON text): unique dates and strictly positive index levels.
+   * @param currency - ISO-4217 code of the index's currency.
+   * @param interpolation - How the level is read between prints: `"step"` or `"linear"`; omitted uses the Rust default (`"step"`).
+   * @param lag - Observation lag as text: `"3M"`, `"90D"` or `"none"`; omitted keeps the Rust default (`"none"`).
+   * @param seasonality - Twelve multiplicative monthly factors, January first; omitted applies no seasonality.
+   * @returns The validated `InflationIndex`.
+   * @throws `TypeError` (kind `invalid_type`) for a mistyped argument; `FinstackError` (kind `validation`) for a malformed date or pair, an empty or duplicated observation set, an unknown currency, interpolation or lag, or a `seasonality` array that does not hold twelve valid factors.
+   */
+  new (
+    id: string,
+    observations: readonly (readonly [string, number])[] | string,
+    currency: string,
+    interpolation?: string | null,
+    lag?: string | null,
+    seasonality?: NumericArray | null
+  ): InflationIndex;
+  /**
+   * Deserialize from the canonical JSON wire form shared with Python
+   * `InflationIndex.to_json`.
+   *
+   * @param json - Canonical InflationIndex JSON text or plain object; unknown fields are rejected and the index is re-validated.
+   * @returns The validated `InflationIndex`.
+   * @throws `TypeError` if `json` is not a JSON string or plain object; `FinstackError` (kind `validation`) if it does not match the schema or fails validation.
+   */
+  fromJson(json: JsonInput): InflationIndex;
+}
+
+/**
+ * Counts of the market data held by a `MarketContext` (the Rust
+ * `ContextStats`), as returned by `MarketContext.stats()`.
+ */
+export interface ContextStats {
+  /**
+   * Number of curves per curve type, keyed by the type label.
+   */
+  curve_counts: Record<string, number>;
+  /**
+   * Total number of curves of every type.
+   */
+  total_curves: number;
+  /**
+   * Whether an FX matrix is attached.
+   */
+  has_fx: boolean;
+  /**
+   * Number of volatility surfaces.
+   */
+  surface_count: number;
+  /**
+   * Number of SABR volatility cubes.
+   */
+  vol_cube_count: number;
+  /**
+   * Number of market scalars (prices and unitless values).
+   */
+  price_count: number;
+  /**
+   * Number of scalar time series.
+   */
+  series_count: number;
+  /**
+   * Number of inflation indices.
+   */
+  inflation_index_count: number;
+  /**
+   * Number of credit indices.
+   */
+  credit_index_count: number;
+  /**
+   * Number of dividend schedules.
+   */
+  dividend_schedule_count: number;
+  /**
+   * Number of FX delta-quoted volatility surfaces.
+   */
+  fx_delta_vol_surface_count: number;
+  /**
+   * Number of CSA-code to discount-curve collateral mappings.
+   */
+  collateral_mapping_count: number;
+}
+
+/**
+ * Any curve or surface handle that `MarketContext.insert` stores.
+ */
+export type MarketContextCurve =
+  | DiscountCurve
+  | ForwardCurve
+  | HazardCurve
+  | InflationCurve
+  | PriceCurve
+  | BaseCorrelationCurve
+  | VolSurface
+  | FxDeltaVolSurface
+  | VolCube;
 
 /**
  * Namespaced TypeScript entry points for core calculations and types.
@@ -3379,6 +7840,579 @@ export interface CoreNamespace {
    * @returns Length of the longest run of strictly positive observations.
    */
   longestPositiveRun(values: NumericArray): number;
+  /**
+   * Agency credit rating on the 23-step scale (`new core.CreditRating("BBB-")`).
+   */
+  CreditRating: CreditRatingConstructor;
+  /**
+   * Typed market-curve identifier constructor (`new core.CurveId("USD-OIS")`).
+   */
+  CurveId: CurveIdConstructor;
+  /**
+   * Typed instrument identifier constructor (`new core.InstrumentId("BOND_A")`).
+   */
+  InstrumentId: InstrumentIdConstructor;
+  /**
+   * Tags and key/value metadata used by scenario and reporting selectors.
+   */
+  Attributes: AttributesConstructor;
+  /**
+   * Decimal rounding-mode factories (`core.RoundingMode.bankers()`).
+   */
+  RoundingMode: RoundingModeConstructor;
+  /**
+   * Rounding, scale, tolerance and extension configuration constructor.
+   */
+  FinstackConfig: FinstackConfigConstructor;
+  /**
+   * Unknown-rating-scale policy factories (`core.UnknownScalePolicy.error()`).
+   */
+  UnknownScalePolicy: UnknownScalePolicyConstructor;
+  /**
+   * Scorecard rating-scale registry; get one from `core.embeddedRegistry()`.
+   */
+  RatingScaleRegistry: RatingScaleRegistryConstructor;
+  /**
+   * 30/360 day-count variant factories used with `core.days30360`.
+   */
+  Thirty360Convention: Thirty360ConventionConstructor;
+  /**
+   * Tenor-unit factories (`core.TenorUnit.months()`).
+   */
+  TenorUnit: TenorUnitConstructor;
+  /**
+   * Business-day convention factories (`core.BusinessDayConvention.following()`).
+   */
+  BusinessDayConvention: BusinessDayConventionConstructor;
+  /**
+   * Holiday-calendar constructor (`new core.HolidayCalendar("nyse")`).
+   */
+  HolidayCalendar: HolidayCalendarConstructor;
+  /**
+   * Reporting-period frequency factories (`core.PeriodKind.quarterly()`).
+   */
+  PeriodKind: PeriodKindConstructor;
+  /**
+   * Reporting-period identifier factories (`core.PeriodId.parse("2025Q1")`).
+   */
+  PeriodId: PeriodIdConstructor;
+  /**
+   * Fiscal-year start constructor and presets (`core.FiscalConfig.usFederal()`).
+   */
+  FiscalConfig: FiscalConfigConstructor;
+  /**
+   * Schedule stub-rule factories (`core.StubKind.shortFront()`).
+   */
+  StubKind: StubKindConstructor;
+  /**
+   * Schedule error-policy factories (`core.ScheduleErrorPolicy.strict()`).
+   */
+  ScheduleErrorPolicy: ScheduleErrorPolicyConstructor;
+  /**
+   * Generated date schedule; start with `core.Schedule.builder(start, end)`.
+   */
+  Schedule: ScheduleConstructor;
+  /**
+   * Fluent schedule builder returned by `core.Schedule.builder`.
+   */
+  ScheduleBuilder: ScheduleBuilderConstructor;
+  /**
+   * SIFMA agency-MBS settlement class factories (`core.SifmaSettlementClass.a()`).
+   */
+  SifmaSettlementClass: SifmaSettlementClassConstructor;
+  /**
+   * Projected CPI curve constructor for inflation-linked valuation.
+   */
+  InflationCurve: InflationCurveConstructor;
+  /**
+   * Forward price (or volatility-index) curve constructor.
+   */
+  PriceCurve: PriceCurveConstructor;
+  /**
+   * Base-correlation curve constructor for credit tranches.
+   */
+  BaseCorrelationCurve: BaseCorrelationCurveConstructor;
+  /**
+   * Credit-index market data constructor (hazard and base-correlation curves).
+   */
+  CreditIndexData: CreditIndexDataConstructor;
+  /**
+   * Implied-volatility surface constructor (expiry × strike grid).
+   */
+  VolSurface: VolSurfaceConstructor;
+  /**
+   * Dated scalar market series constructor (fixings, index levels).
+   */
+  ScalarTimeSeries: ScalarTimeSeriesConstructor;
+  /**
+   * Historical CPI index constructor with lag, interpolation and seasonality.
+   */
+  InflationIndex: InflationIndexConstructor;
+  /**
+   * The rating-scale registry compiled into the library (Rust `embedded_registry`).
+   *
+   * @returns A copy of the embedded `RatingScaleRegistry`.
+   * @throws If the embedded registry fails validation (not expected).
+   */
+  embeddedRegistry(): RatingScaleRegistry;
+  /**
+   * Rating-scale registry selected by a configuration (Rust `registry_from_config`).
+   *
+   * @param config - Configuration to read; when its extensions hold the `ratingScalesExtensionKey()` section, that section replaces the embedded registry, otherwise the embedded registry is returned.
+   * @returns The validated `RatingScaleRegistry`.
+   * @throws `FinstackError` (kind `validation`) if the extension section is malformed or fails registry validation.
+   */
+  registryFromConfig(config: FinstackConfig): RatingScaleRegistry;
+  /**
+   * Extension key under which a `FinstackConfig` carries a rating-scale
+   * registry (Rust `RATING_SCALES_EXTENSION_KEY`).
+   *
+   * @returns The key `"core.rating_scales.v1"`.
+   */
+  ratingScalesExtensionKey(): string;
+  /**
+   * Day count between two dates under a 30/360 variant (Rust `days_30_360`).
+   *
+   * @param start - Inclusive accrual start as days since 1970-01-01.
+   * @param end - Exclusive accrual end as days since 1970-01-01; an earlier end gives a negative count rather than an error.
+   * @param convention - Variant name: `"us_sia"`, `"isda"`, `"european"` or `"italian"`.
+   * @returns The 30/360 day count.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for an unknown variant or a date outside the supported range.
+   */
+  days30360(start: number, end: number, convention: string): number;
+  /**
+   * Day count under 30E/360 ISDA (Rust `days_30e_360_isda`).
+   *
+   * @param start - Inclusive accrual start as days since 1970-01-01.
+   * @param end - Exclusive accrual end as days since 1970-01-01; an earlier end gives a negative count rather than an error.
+   * @param endIsTerminationDate - Whether `end` is the instrument's final maturity, which keeps a February month-end day unadjusted.
+   * @returns The 30E/360 ISDA day count.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for a date outside the supported range.
+   */
+  days30e360Isda(start: number, end: number, endIsTerminationDate: boolean): number;
+  /**
+   * Convert an ISO-8601 date to epoch days (Rust `days_since_epoch`).
+   *
+   * This is the bridge from the ISO strings used by curves and series to the
+   * epoch-day numbers used by the `core` date utilities.
+   *
+   * @param date - Calendar date as strict ISO-8601 text (`"YYYY-MM-DD"`).
+   * @returns Days since 1970-01-01 (negative before the epoch).
+   * @throws `TypeError` (kind `invalid_type`) if `date` is not a string; `FinstackError` (kind `validation`) if it is not a valid ISO date.
+   */
+  daysSinceEpoch(date: string): number;
+  /**
+   * Add business days on a holiday calendar (Rust `DateExt::add_business_days`).
+   *
+   * @param date - Start date as days since 1970-01-01.
+   * @param n - Signed number of business days to move; negative moves backward and `0` returns `date` unchanged, even on a holiday.
+   * @param calendar - Registered holiday-calendar id (for example `"nyse"`, or a `+`-joined union).
+   * @returns The shifted date as epoch days.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `not_found`) for an unknown calendar, or kind `validation` if no business day is found within the bounded search window.
+   */
+  addBusinessDays(date: number, n: number, calendar: string): number;
+  /**
+   * Add weekdays, skipping Saturdays and Sundays only (Rust `DateExt::add_weekdays`).
+   *
+   * @param date - Start date as days since 1970-01-01.
+   * @param n - Signed number of weekdays to move; holidays are not considered.
+   * @returns The shifted date as epoch days.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `date` is outside the supported range.
+   */
+  addWeekdays(date: number, n: number): number;
+  /**
+   * Add calendar months, clamping to the last day of the target month (Rust
+   * `DateExt::add_months`).
+   *
+   * @param date - Start date as days since 1970-01-01.
+   * @param months - Signed number of months to move (`Jan 31 + 1` gives the last day of February).
+   * @returns The shifted date as epoch days.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `date` is outside the supported range.
+   */
+  addMonths(date: number, months: number): number;
+  /**
+   * Last calendar day of the date's month (Rust `DateExt::end_of_month`).
+   *
+   * @param date - Any date in the month, as days since 1970-01-01.
+   * @returns The month-end date as epoch days.
+   * @throws `TypeError` if `date` is not an integer; `FinstackError` (kind `validation`) if it is outside the supported range.
+   */
+  endOfMonth(date: number): number;
+  /**
+   * Whether a date falls on a Saturday or Sunday (Rust `DateExt::is_weekend`).
+   *
+   * @param date - Date as days since 1970-01-01.
+   * @returns `true` on Saturday or Sunday.
+   * @throws `TypeError` if `date` is not an integer; `FinstackError` (kind `validation`) if it is outside the supported range.
+   */
+  isWeekend(date: number): boolean;
+  /**
+   * Calendar quarter of a date (Rust `DateExt::quarter`).
+   *
+   * @param date - Date as days since 1970-01-01.
+   * @returns The quarter number, `1` through `4`.
+   * @throws `TypeError` if `date` is not an integer; `FinstackError` (kind `validation`) if it is outside the supported range.
+   */
+  quarter(date: number): number;
+  /**
+   * Fiscal year containing a date (Rust `DateExt::fiscal_year`).
+   *
+   * @param date - Date as days since 1970-01-01.
+   * @param config - Fiscal-year start month and day that decide which fiscal year the date belongs to (for example `FiscalConfig.usFederal()`).
+   * @returns The fiscal year the date falls in.
+   * @throws `TypeError` if `date` is not an integer; `FinstackError` (kind `validation`) if it is outside the supported range.
+   */
+  fiscalYear(date: number, config: FiscalConfig): number;
+  /**
+   * Whole months from `date` to `other` (Rust `DateExt::months_until`).
+   *
+   * @param date - Start date as days since 1970-01-01.
+   * @param other - End date as days since 1970-01-01.
+   * @returns `(other.year - date.year) * 12 + (other.month - date.month)`, ignoring the day of month; `0` when `other` is before `date`.
+   * @throws `TypeError` if a date is not an integer; `FinstackError` (kind `validation`) if a date is outside the supported range.
+   */
+  monthsUntil(date: number, other: number): number;
+  /**
+   * Build a plan of calendar periods from a range expression (Rust `build_periods`).
+   *
+   * @param spec - Period range such as `"2025Q1..Q4"` or `"2025M01..2025M12"`; both ends must use the same frequency.
+   * @param actualsCutoff - Inclusive period code up to which periods are marked actual (`is_actual: true`); omitted marks every period as forecast.
+   * @returns A plain `PeriodPlan` object: `periods` in ascending order, each with `id`, ISO `start`/`end` dates (end exclusive) and `is_actual`.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if the range or the cutoff cannot be parsed or the two ends are incompatible.
+   */
+  buildPeriods(spec: string, actualsCutoff?: string | null): PeriodPlan;
+  /**
+   * Build a plan of fiscal periods mapped onto calendar dates (Rust
+   * `build_fiscal_periods`).
+   *
+   * @param spec - Fiscal period range such as `"FY2025Q1..Q4"`.
+   * @param fiscalConfig - Fiscal-year start that maps fiscal periods to calendar dates.
+   * @param actualsCutoff - Inclusive fiscal period code up to which periods are marked actual; omitted marks every period as forecast.
+   * @returns A plain `PeriodPlan` object with fiscal identifiers and calendar `start`/`end` dates.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if a fiscal identifier cannot be parsed or the configuration produces invalid calendar boundaries.
+   */
+  buildFiscalPeriods(
+    spec: string,
+    fiscalConfig: FiscalConfig,
+    actualsCutoff?: string | null
+  ): PeriodPlan;
+  /**
+   * Third Wednesday of a month, the standard IMM date (Rust `third_wednesday`).
+   *
+   * @param month - Calendar month number, `1` through `12`.
+   * @param year - Four-digit calendar year.
+   * @returns The third Wednesday of that month as epoch days.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `month` is outside `1..=12` or `year` is outside the supported date range.
+   */
+  thirdWednesday(month: number, year: number): number;
+  /**
+   * Third Friday of a month, the standard equity-option expiry (Rust `third_friday`).
+   *
+   * @param month - Calendar month number, `1` through `12`.
+   * @param year - Four-digit calendar year.
+   * @returns The third Friday of that month as epoch days.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `month` is outside `1..=12` or `year` is outside the supported date range.
+   */
+  thirdFriday(month: number, year: number): number;
+  /**
+   * Next quarterly IMM date strictly after a date (Rust `next_imm`).
+   *
+   * @param date - Reference date as days since 1970-01-01.
+   * @returns The next third Wednesday of March, June, September or December, as epoch days.
+   * @throws `TypeError` if `date` is not an integer; `FinstackError` (kind `validation`) if it is outside the supported date range.
+   */
+  nextImm(date: number): number;
+  /**
+   * Whether a date is a quarterly IMM date (Rust `is_imm_date`).
+   *
+   * @param date - Date as days since 1970-01-01.
+   * @returns `true` on the third Wednesday of March, June, September or December.
+   * @throws `TypeError` if `date` is not an integer; `FinstackError` (kind `validation`) if it is outside the supported date range.
+   */
+  isImmDate(date: number): boolean;
+  /**
+   * Whether a date is a quarterly CDS roll date (Rust `is_cds_date`).
+   *
+   * @param date - Date as days since 1970-01-01.
+   * @returns `true` on the 20th of March, June, September or December.
+   * @throws `TypeError` if `date` is not an integer; `FinstackError` (kind `validation`) if it is outside the supported date range.
+   */
+  isCdsDate(date: number): boolean;
+  /**
+   * Next quarterly CDS date strictly after a date (Rust `next_cds_date`).
+   *
+   * @param date - Reference date as days since 1970-01-01.
+   * @returns The next 20th of March, June, September or December, as epoch days.
+   * @throws `TypeError` if `date` is not an integer; `FinstackError` (kind `validation`) if it is outside the supported date range.
+   */
+  nextCdsDate(date: number): number;
+  /**
+   * Previous quarterly CDS date strictly before a date (Rust `prev_cds_date`).
+   *
+   * @param date - Reference date as days since 1970-01-01.
+   * @returns The latest 20th of March, June, September or December before `date`, as epoch days; a roll date returns the preceding roll.
+   * @throws `TypeError` if `date` is not an integer; `FinstackError` (kind `validation`) if it is outside the supported date range.
+   */
+  prevCdsDate(date: number): number;
+  /**
+   * Most recent semi-annual CDS roll on or before a date (Rust
+   * `prev_cds_semiannual_roll`).
+   *
+   * @param date - Reference date as days since 1970-01-01.
+   * @returns The latest 20 March or 20 September that is not after `date`, as epoch days.
+   * @throws `TypeError` if `date` is not an integer; `FinstackError` (kind `validation`) if it is outside the supported date range.
+   */
+  prevCdsSemiannualRoll(date: number): number;
+  /**
+   * Standard semi-annual CDS maturity on or after a date (Rust
+   * `next_semiannual_cds_maturity`).
+   *
+   * @param date - Unadjusted candidate maturity (roll date plus tenor) as days since 1970-01-01.
+   * @returns The first 20 June or 20 December on or after `date`, as epoch days; a date already on that grid is returned unchanged.
+   * @throws `TypeError` if `date` is not an integer; `FinstackError` (kind `validation`) if it is outside the supported date range.
+   */
+  nextSemiannualCdsMaturity(date: number): number;
+  /**
+   * IMM option expiry of a month: the Friday before the third Wednesday (Rust
+   * `imm_option_expiry`).
+   *
+   * @param month - Calendar month number, `1` through `12`.
+   * @param year - Four-digit calendar year.
+   * @returns The option expiry date as epoch days.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `month` is outside `1..=12` or `year` is outside the supported date range.
+   */
+  immOptionExpiry(month: number, year: number): number;
+  /**
+   * Next quarterly IMM option expiry strictly after a date (Rust
+   * `next_imm_option_expiry`).
+   *
+   * @param date - Reference date as days since 1970-01-01.
+   * @returns The next March/June/September/December IMM option expiry, as epoch days.
+   * @throws `TypeError` if `date` is not an integer; `FinstackError` (kind `validation`) if it is outside the supported date range.
+   */
+  nextImmOptionExpiry(date: number): number;
+  /**
+   * Next monthly equity-option expiry strictly after a date (Rust
+   * `next_equity_option_expiry`).
+   *
+   * @param date - Reference date as days since 1970-01-01.
+   * @returns The next third Friday of a month, as epoch days.
+   * @throws `TypeError` if `date` is not an integer; `FinstackError` (kind `validation`) if it is outside the supported date range.
+   */
+  nextEquityOptionExpiry(date: number): number;
+  /**
+   * Published SIFMA class A settlement date of a month (Rust `sifma_settlement_date`).
+   *
+   * @param month - Settlement month number, `1` through `12`.
+   * @param year - Settlement year.
+   * @returns The published date as epoch days, or `undefined` when the month is outside the embedded SIFMA calendar (dates are never approximated).
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `month` is outside `1..=12` or `year` is outside the supported date range.
+   */
+  sifmaSettlementDate(month: number, year: number): number | undefined;
+  /**
+   * Published SIFMA settlement date of a month for one class (Rust
+   * `sifma_settlement_date_for_class`).
+   *
+   * @param month - Settlement month number, `1` through `12`.
+   * @param year - Settlement year.
+   * @param settlementClass - Agency-MBS settlement class whose date is requested.
+   * @returns The published date as epoch days, or `undefined` when that month and class are outside the embedded SIFMA calendar.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `month` is outside `1..=12` or `year` is outside the supported date range.
+   */
+  sifmaSettlementDateForClass(
+    month: number,
+    year: number,
+    settlementClass: SifmaSettlementClass
+  ): number | undefined;
+  /**
+   * Projection-only estimate of a SIFMA settlement date (Rust
+   * `estimated_sifma_settlement_date_for_class`).
+   *
+   * The estimate counts business days of the month on the SIFMA calendar; use
+   * `sifmaSettlementDateForClass` for published dates.
+   *
+   * @param month - Settlement month number, `1` through `12`.
+   * @param year - Settlement year.
+   * @param settlementClass - Agency-MBS settlement class whose business-day anchor is used.
+   * @returns The estimated settlement date as epoch days.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `month` is outside `1..=12` or `year` is outside the supported date range.
+   */
+  estimatedSifmaSettlementDateForClass(
+    month: number,
+    year: number,
+    settlementClass: SifmaSettlementClass
+  ): number;
+  /**
+   * Next published SIFMA class A settlement strictly after a date (Rust
+   * `next_sifma_settlement`).
+   *
+   * @param date - Reference date as days since 1970-01-01; a settlement on this date is not returned.
+   * @returns The next settlement date as epoch days, or `undefined` when a required month is outside the embedded SIFMA calendar.
+   * @throws `TypeError` if `date` is not an integer; `FinstackError` (kind `validation`) if it is outside the supported date range.
+   */
+  nextSifmaSettlement(date: number): number | undefined;
+  /**
+   * Symmetric eigendecomposition of a flat row-major matrix (Rust `symmetric_eigen`).
+   *
+   * @param matrix - Flat row-major `n * n` entries of a symmetric matrix; it need not be positive definite.
+   * @param n - Positive matrix dimension; `matrix` must contain exactly `n * n` entries.
+   * @returns A two-element array `[eigenvalues, eigenvectors]`: `n` eigenvalues (in the solver's order, not sorted) and a flat `n * n` `Float64Array` in which `eigenvectors[i * n + k]` is component `i` of eigenvector `k`.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `matrix` does not hold exactly `n * n` entries or contains a non-finite value.
+   */
+  symmetricEigen(matrix: NumericArray, n: number): [Float64Array, Float64Array];
+  /**
+   * Ledoit-Wolf (2004) shrinkage of a sample covariance matrix toward a scaled
+   * identity (Rust `ledoit_wolf_shrinkage`).
+   *
+   * @param observations - Flat row-major `t * n` observation matrix; each row is one date and each column one variable.
+   * @param t - Number of observations (rows); at least `2`.
+   * @param n - Number of variables (columns); at least `1`.
+   * @returns A two-element array `[covariance, shrinkage]`: the shrunk covariance as a flat row-major `n * n` `Float64Array`, and the optimal shrinkage intensity in `[0, 1]`.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `t < 2`, `n == 0`, an entry is non-finite, or `observations` does not hold exactly `t * n` entries.
+   */
+  ledoitWolfShrinkage(observations: NumericArray, t: number, n: number): [Float64Array, number];
+  /**
+   * Pivot threshold below which Cholesky treats a matrix as singular (Rust
+   * `linalg::SINGULAR_THRESHOLD`).
+   *
+   * @returns The absolute pivot threshold.
+   */
+  singularThreshold(): number;
+  /**
+   * Tolerance on the unit diagonal of a correlation matrix (Rust
+   * `linalg::DIAGONAL_TOLERANCE`).
+   *
+   * @returns The absolute tolerance on `|diagonal - 1|`.
+   */
+  diagonalTolerance(): number;
+  /**
+   * Tolerance on the symmetry of a matrix (Rust `linalg::SYMMETRY_TOLERANCE`).
+   *
+   * @returns The absolute tolerance on `|a[i][j] - a[j][i]|`.
+   */
+  symmetryTolerance(): number;
+  /**
+   * Mean and sample variance in one pass (Rust `stats::mean_var`).
+   *
+   * @param data - Sample observations in input order.
+   * @returns A two-element array `[mean, variance]`; `[0, 0]` for an empty series.
+   * @throws `TypeError` if `data` is not an array of numbers.
+   */
+  meanVar(data: NumericArray): Float64Array;
+  /**
+   * Arithmetic mean with a NaN sentinel for missing data (Rust `stats::mean_or_nan`).
+   *
+   * @param data - Observations to average.
+   * @returns The mean, or `NaN` for an empty series.
+   * @throws `TypeError` if `data` is not an array of numbers.
+   */
+  meanOrNan(data: NumericArray): number;
+  /**
+   * Sample variance with a NaN sentinel (Rust `stats::sample_variance_or_nan`).
+   *
+   * @param data - Sample observations.
+   * @returns The unbiased sample variance, or `NaN` for fewer than two observations.
+   * @throws `TypeError` if `data` is not an array of numbers.
+   */
+  sampleVarianceOrNan(data: NumericArray): number;
+  /**
+   * Sample standard deviation with a NaN sentinel (Rust `stats::sample_std_or_nan`).
+   *
+   * @param data - Sample observations.
+   * @returns The sample standard deviation, or `NaN` for fewer than two observations.
+   * @throws `TypeError` if `data` is not an array of numbers.
+   */
+  sampleStdOrNan(data: NumericArray): number;
+  /**
+   * Median with a NaN sentinel (Rust `stats::median_or_nan`).
+   *
+   * @param data - Observations whose median is required; the input is not modified.
+   * @returns The median, or `NaN` for an empty series.
+   * @throws `TypeError` if `data` is not an array of numbers.
+   */
+  medianOrNan(data: NumericArray): number;
+  /**
+   * Linear-interpolation quantile (R-7, the NumPy and Excel default) with a
+   * NaN sentinel (Rust `stats::quantile_linear_or_nan`).
+   *
+   * @param data - Finite observations; the input is not modified.
+   * @param q - Quantile probability; values outside `[0, 1]` are clamped to the nearest endpoint.
+   * @returns The quantile, or `NaN` for an empty series, a non-finite observation or a NaN `q`.
+   * @throws `TypeError` for a mistyped argument.
+   */
+  quantileLinearOrNan(data: NumericArray, q: number): number;
+  /**
+   * Smallest finite value (Rust `stats::finite_min_or_nan`).
+   *
+   * @param data - Observations to inspect; NaN and infinite entries are ignored.
+   * @returns The minimum finite value, or `NaN` when none is finite.
+   * @throws `TypeError` if `data` is not an array of numbers.
+   */
+  finiteMinOrNan(data: NumericArray): number;
+  /**
+   * Largest finite value (Rust `stats::finite_max_or_nan`).
+   *
+   * @param data - Observations to inspect; NaN and infinite entries are ignored.
+   * @returns The maximum finite value, or `NaN` when none is finite.
+   * @throws `TypeError` if `data` is not an array of numbers.
+   */
+  finiteMaxOrNan(data: NumericArray): number;
+  /**
+   * Number of finite observations (Rust `stats::finite_count`).
+   *
+   * @param data - Observations to inspect; NaN and infinite entries are not counted.
+   * @returns The count of finite values.
+   * @throws `TypeError` if `data` is not an array of numbers.
+   */
+  finiteCount(data: NumericArray): number;
+  /**
+   * Log returns of a price series (Rust `stats::log_returns`).
+   *
+   * @param prices - Chronologically ordered price levels.
+   * @returns `prices.length - 1` values `ln(p[t] / p[t-1])`; a window with a non-positive or non-finite price gives `NaN`. Empty for fewer than two prices.
+   * @throws `TypeError` if `prices` is not an array of numbers.
+   */
+  logReturns(prices: NumericArray): Float64Array;
+  /**
+   * Normal cumulative distribution function `Φ((x - mean) / stdDev)` (Rust
+   * `norm_cdf_with_params`).
+   *
+   * @param x - Point at which to evaluate the CDF.
+   * @param mean - Mean of the distribution, in the units of `x`.
+   * @param stdDev - Strictly positive standard deviation (not the variance), in the units of `x`.
+   * @returns The probability that a `N(mean, stdDev²)` variable is at most `x`.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `stdDev` is non-finite or not strictly positive.
+   */
+  normCdfWithParams(x: number, mean: number, stdDev: number): number;
+  /**
+   * Normal probability density `φ((x - mean) / stdDev) / stdDev` (Rust
+   * `norm_pdf_with_params`).
+   *
+   * @param x - Point at which to evaluate the density.
+   * @param mean - Mean of the distribution, in the units of `x`.
+   * @param stdDev - Strictly positive standard deviation (not the variance), in the units of `x`.
+   * @returns The density of `N(mean, stdDev²)` at `x`.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `stdDev` is non-finite or not strictly positive.
+   */
+  normPdfWithParams(x: number, mean: number, stdDev: number): number;
+  /**
+   * Student-t cumulative distribution function (Rust `student_t_cdf`).
+   *
+   * @param x - Point at which to evaluate the CDF; `NaN` returns `NaN`.
+   * @param df - Degrees of freedom, strictly positive.
+   * @returns The probability that a Student-t variable with `df` degrees of freedom is at most `x`.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `df` is non-finite or not strictly positive.
+   */
+  studentTCdf(x: number, df: number): number;
+  /**
+   * Student-t inverse cumulative distribution function (Rust `student_t_inv_cdf`).
+   *
+   * @param p - Probability; `p <= 0` returns `-Infinity`, `p >= 1` returns `Infinity` and `NaN` returns `NaN`.
+   * @param df - Degrees of freedom, strictly positive.
+   * @returns The quantile `x` with `studentTCdf(x, df) === p`.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if `df` is non-finite or not strictly positive.
+   */
+  studentTInvCdf(p: number, df: number): number;
 }
 
 /**

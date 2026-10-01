@@ -174,13 +174,16 @@ fn json_suffixed_exports_return_strings() {
         );
     }
     // And the rule holds for every Json-suffixed method, pinned or not
-    // (`fromJson` is a constructor, not a wire surface).
+    // (`fromJson` is a constructor, not a wire surface). A lookup that can
+    // miss returns the JSON string or `undefined` (Rust `Option<String>`).
     for member in members(&dts) {
         if member.name.ends_with("Json") && !member.name.starts_with("from") {
-            assert_eq!(
-                member.ret, "string",
+            assert!(
+                matches!(member.ret.as_str(), "string" | "string | undefined"),
                 "{}.{} is Json-suffixed but returns {:?}",
-                member.owner, member.name, member.ret
+                member.owner,
+                member.name,
+                member.ret
             );
         }
     }
@@ -260,6 +263,27 @@ fn bare_string_returns_are_named_or_allowlisted() {
         ("Tenor", "toString"),
         ("FxConversionPolicy", "toString"),
         ("FxQuoteConvention", "toString"),
+        // Canonical labels of the core enum, identifier and calendar handles.
+        ("BusinessDayConvention", "toString"),
+        ("HolidayCalendar", "toString"),
+        ("PeriodKind", "toString"),
+        ("PeriodId", "toString"),
+        ("StubKind", "toString"),
+        ("ScheduleErrorPolicy", "toString"),
+        ("SifmaSettlementClass", "toString"),
+        ("Thirty360Convention", "toString"),
+        ("TenorUnit", "toString"),
+        ("RoundingMode", "toString"),
+        ("UnknownScalePolicy", "toString"),
+        ("CreditRating", "toString"),
+        ("CurveId", "toString"),
+        ("InstrumentId", "toString"),
+        // Identifier text and rating spellings: the value itself.
+        ("CurveId", "asStr"),
+        ("InstrumentId", "asStr"),
+        ("CreditRating", "toMoodysString"),
+        ("RatingScaleRegistry", "defaultScaleId"),
+        ("CoreNamespace", "ratingScalesExtensionKey"),
         // Exact decimal text of the amount.
         ("Money", "amountDecimal"),
         // Display formatting of the amount.

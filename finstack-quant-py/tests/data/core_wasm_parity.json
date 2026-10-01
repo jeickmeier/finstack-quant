@@ -1,0 +1,907 @@
+{
+  "add_business_days": "2025-07-02",
+  "add_months": "2024-02-29",
+  "add_weekdays": "2025-06-24",
+  "attributes": {
+    "items": [
+      [
+        "sector",
+        "utilities"
+      ]
+    ],
+    "json": {
+      "meta": {
+        "sector": "utilities"
+      },
+      "tags": [
+        "energy"
+      ]
+    },
+    "matches": [
+      true,
+      false
+    ]
+  },
+  "base_correlation": 0.35,
+  "base_correlation_curve": {
+    "correlations": [
+      0.25,
+      0.45
+    ],
+    "detachment_points": [
+      3.0,
+      7.0
+    ],
+    "id": "CDX-IG"
+  },
+  "build_fiscal_periods": {
+    "periods": [
+      {
+        "end": "2025-01-01",
+        "id": "FY2025Q1",
+        "is_actual": false,
+        "start": "2024-10-01"
+      },
+      {
+        "end": "2025-04-01",
+        "id": "FY2025Q2",
+        "is_actual": false,
+        "start": "2025-01-01"
+      }
+    ]
+  },
+  "build_periods": {
+    "periods": [
+      {
+        "end": "2025-04-01",
+        "id": "2025Q1",
+        "is_actual": true,
+        "start": "2025-01-01"
+      },
+      {
+        "end": "2025-07-01",
+        "id": "2025Q2",
+        "is_actual": true,
+        "start": "2025-04-01"
+      },
+      {
+        "end": "2025-10-01",
+        "id": "2025Q3",
+        "is_actual": false,
+        "start": "2025-07-01"
+      },
+      {
+        "end": "2026-01-01",
+        "id": "2025Q4",
+        "is_actual": false,
+        "start": "2025-10-01"
+      }
+    ]
+  },
+  "credit_rating": [
+    "BBB-",
+    3,
+    "Aa1",
+    false,
+    false,
+    true,
+    "\"BBB-\""
+  ],
+  "currency": [
+    "USD",
+    0,
+    949
+  ],
+  "days_30_360": [
+    60,
+    60,
+    60,
+    60
+  ],
+  "days_30e_360_isda": [
+    30,
+    28
+  ],
+  "days_since_epoch": 20090,
+  "discount_curve": {
+    "allow_non_monotonic": false,
+    "base": "2025-01-02",
+    "calibration_ois_cutoff_days": null,
+    "day_count": "act_365f",
+    "extrapolation": "flat_forward",
+    "fx_policy": null,
+    "id": "USD-OIS",
+    "interp_style": "monotone_convex",
+    "knot_points": [
+      [
+        0.0,
+        1.0
+      ],
+      [
+        0.5,
+        0.9803921568627451
+      ],
+      [
+        1.0,
+        0.9592869044866807
+      ],
+      [
+        5.0,
+        0.8005101321504569
+      ]
+    ],
+    "min_forward_rate": -0.005,
+    "min_forward_tenor": 1e-06,
+    "rate_calibration": null
+  },
+  "discount_curve_from_dates": {
+    "allow_non_monotonic": false,
+    "base": "2025-01-02",
+    "calibration_ois_cutoff_days": null,
+    "day_count": "act_365f",
+    "extrapolation": "flat_forward",
+    "fx_policy": null,
+    "id": "USD-OIS",
+    "interp_style": "monotone_convex",
+    "knot_points": [
+      [
+        0.0,
+        1.0
+      ],
+      [
+        1.0,
+        0.96
+      ],
+      [
+        5.002739726027397,
+        0.8
+      ]
+    ],
+    "min_forward_rate": -0.005,
+    "min_forward_tenor": 1e-06,
+    "rate_calibration": null
+  },
+  "discount_curve_queries": [
+    0.043825578623513994,
+    0.0433556505156063,
+    0.04312319922666319,
+    0.9177917091683159,
+    0.9567437070971284,
+    0.04409015516265047,
+    "act_365f",
+    "monotone_convex",
+    "flat_forward",
+    [
+      0.0,
+      0.5,
+      1.0,
+      5.0
+    ],
+    [
+      1.0,
+      0.9803921568627451,
+      0.9592869044866807,
+      0.8005101321504569
+    ]
+  ],
+  "end_of_month": "2024-02-29",
+  "estimated_sifma_settlement_date_for_class": "2031-03-20",
+  "finite_count": 2,
+  "finstack_config": {
+    "extensions": {
+      "core.example.v1": {
+        "flag": true,
+        "levels": [
+          1,
+          2
+        ]
+      }
+    },
+    "rounding": {
+      "ingest_scale": {
+        "overrides": {}
+      },
+      "mode": "away_from_zero",
+      "output_scale": {
+        "overrides": {
+          "JPY": 2
+        }
+      }
+    },
+    "tolerances": {
+      "generic_epsilon": 1e-10,
+      "rate_epsilon": 1e-12
+    }
+  },
+  "finstack_config_scales": [
+    2,
+    2,
+    6,
+    "away_from_zero",
+    [
+      "core.example.v1"
+    ]
+  ],
+  "fiscal_year": [
+    2025,
+    2024
+  ],
+  "fx_matrix": [
+    1.1,
+    0.7874015748031495
+  ],
+  "holiday_calendar": {
+    "code": "gblo+nyse",
+    "count_business_days": 21,
+    "is_business_day": true,
+    "is_holiday": true,
+    "metadata_id": "nyse"
+  },
+  "identifiers": [
+    "\"USD-OIS\"",
+    "BOND_A",
+    true
+  ],
+  "imm_option_expiry": "2025-03-14",
+  "inflation_curve": {
+    "base_cpi": 300.0,
+    "base_date": "2025-01-02",
+    "day_count": "act_365f",
+    "extrapolation": "flat_zero",
+    "id": "US-CPI",
+    "indexation_lag_months": 3,
+    "interp_style": "log_linear",
+    "knot_points": [
+      [
+        0.0,
+        300.0
+      ],
+      [
+        5.0,
+        331.2
+      ]
+    ]
+  },
+  "inflation_curve_queries": [
+    315.21421287752867,
+    315.18858054075855,
+    313.65869972034375,
+    1.0455289990678125,
+    0.019985069629570616,
+    3
+  ],
+  "inflation_index": {
+    "currency": "USD",
+    "id": "US-CPI-U",
+    "interpolation": "linear",
+    "lag": {
+      "months": 3
+    },
+    "observations": [
+      [
+        "2024-10-01",
+        315.664
+      ],
+      [
+        "2024-11-01",
+        315.493
+      ],
+      [
+        "2024-12-01",
+        315.605
+      ]
+    ],
+    "seasonality": null
+  },
+  "inflation_index_queries": [
+    0.9998130924020479,
+    315.549,
+    315.549,
+    [
+      "2024-10-01",
+      "2024-12-01"
+    ],
+    "3M"
+  ],
+  "is_cds_date": [
+    true,
+    false
+  ],
+  "is_imm_date": [
+    true,
+    false
+  ],
+  "is_weekend": [
+    true,
+    false
+  ],
+  "ledoit_wolf_shrinkage": {
+    "covariance": [
+      2.5,
+      -0.08333333333333337,
+      -0.08333333333333337,
+      2.5
+    ],
+    "shrinkage": 0.9444444444444444
+  },
+  "linalg_constants": [
+    1e-10,
+    1e-10,
+    1e-10
+  ],
+  "log_returns": [
+    0.014888612493750559,
+    -0.01739174271186922,
+    0.024753739152938395,
+    0.007308193306724622
+  ],
+  "market_context": {
+    "collateral": {
+      "USD-CSA": "USD-OIS"
+    },
+    "credit_indices": [
+      {
+        "base_correlation_curve_id": "CDX-IG",
+        "id": "CDX-IG-43",
+        "index_credit_curve_id": "CDX-IG-HZD",
+        "issuer_credit_curve_ids": null,
+        "issuer_recovery_rates": null,
+        "issuer_weights": null,
+        "num_constituents": 125,
+        "recovery_rate": 0.4
+      }
+    ],
+    "curves": [
+      {
+        "correlations": [
+          0.25,
+          0.45
+        ],
+        "detachment_points": [
+          3.0,
+          7.0
+        ],
+        "id": "CDX-IG",
+        "type": "base_correlation"
+      },
+      {
+        "base": "2025-01-02",
+        "currency": null,
+        "day_count": "act_365f",
+        "fx_policy": null,
+        "hazard_calibration": null,
+        "id": "CDX-IG-HZD",
+        "issuer": null,
+        "knot_points": [
+          [
+            1.0,
+            0.01
+          ]
+        ],
+        "par_interp": "linear",
+        "par_points": [],
+        "recovery_rate": 0.4,
+        "seniority": null,
+        "survival_interp": "log_linear",
+        "type": "hazard"
+      },
+      {
+        "base_cpi": 300.0,
+        "base_date": "2025-01-02",
+        "day_count": "act_365f",
+        "extrapolation": "flat_zero",
+        "id": "US-CPI",
+        "indexation_lag_months": 3,
+        "interp_style": "log_linear",
+        "knot_points": [
+          [
+            0.0,
+            300.0
+          ],
+          [
+            5.0,
+            331.2
+          ]
+        ],
+        "type": "inflation"
+      },
+      {
+        "allow_non_monotonic": false,
+        "base": "2025-01-02",
+        "calibration_ois_cutoff_days": null,
+        "day_count": "act_365f",
+        "extrapolation": "flat_forward",
+        "fx_policy": null,
+        "id": "USD-OIS",
+        "interp_style": "log_linear",
+        "knot_points": [
+          [
+            0.0,
+            1.0
+          ],
+          [
+            1.0,
+            0.9607894391523232
+          ]
+        ],
+        "min_forward_rate": null,
+        "min_forward_tenor": 1e-06,
+        "rate_calibration": null,
+        "type": "discount"
+      },
+      {
+        "base": "2025-01-02",
+        "day_count": "act_365f",
+        "extrapolation": "flat_zero",
+        "id": "WTI",
+        "interp_style": "linear",
+        "knot_points": [
+          [
+            0.0,
+            72.0
+          ],
+          [
+            1.0,
+            70.5
+          ]
+        ],
+        "spot_price": 72.0,
+        "type": "price"
+      }
+    ],
+    "dividends": [],
+    "fx": {
+      "config": {
+        "cache_capacity": 256,
+        "enable_triangulation": true,
+        "pivot_currency": "USD"
+      },
+      "pinned_quotes": [],
+      "provider_quotes": [],
+      "quotes": [
+        [
+          "GBP",
+          "USD",
+          1.27
+        ],
+        [
+          "EUR",
+          "USD",
+          1.1
+        ]
+      ]
+    },
+    "fx_delta_vol_surfaces": [],
+    "hierarchy": null,
+    "inflation_indices": [
+      {
+        "currency": "USD",
+        "id": "US-CPI-U",
+        "interpolation": "linear",
+        "lag": {
+          "months": 3
+        },
+        "observations": [
+          [
+            "2024-10-01",
+            315.664
+          ],
+          [
+            "2024-11-01",
+            315.493
+          ],
+          [
+            "2024-12-01",
+            315.605
+          ]
+        ],
+        "seasonality": null
+      }
+    ],
+    "prices": {
+      "ACME": {
+        "price": {
+          "amount": "12.5",
+          "currency": "USD"
+        }
+      },
+      "SPX": {
+        "unitless": 5900.0
+      }
+    },
+    "schema_version": 1,
+    "series": [
+      {
+        "currency": null,
+        "id": "SOFR-FIXINGS",
+        "interpolation": "linear",
+        "observations": [
+          [
+            "2025-01-02",
+            0.0431
+          ],
+          [
+            "2025-01-06",
+            0.0433
+          ]
+        ]
+      }
+    ],
+    "surfaces": [
+      {
+        "expiries": [
+          0.5,
+          1.0
+        ],
+        "id": "SPX-VOL",
+        "interpolation_mode": "vol",
+        "quote_type": "black_lognormal",
+        "secondary_axis": "strike",
+        "strikes": [
+          90.0,
+          100.0,
+          110.0
+        ],
+        "vols_row_major": [
+          0.24,
+          0.2,
+          0.22,
+          0.23,
+          0.21,
+          0.22
+        ]
+      }
+    ],
+    "vol_cubes": []
+  },
+  "market_context_queries": {
+    "contains": [
+      true,
+      false
+    ],
+    "converted": [
+      110.0,
+      "USD"
+    ],
+    "credit_index": 125,
+    "curve_ids": [
+      "CDX-IG",
+      "CDX-IG-HZD",
+      "US-CPI",
+      "USD-OIS",
+      "WTI"
+    ],
+    "df": 0.9607894391523232,
+    "fx_rate": 1.1,
+    "index_lag": "3M",
+    "is_empty": [
+      false,
+      true
+    ],
+    "rolled_base_date": "2025-02-01",
+    "round_trip": true,
+    "series": 0.0433,
+    "stats": {
+      "collateral_mapping_count": 1,
+      "credit_index_count": 1,
+      "curve_counts": {
+        "BaseCorrelation": 1,
+        "Discount": 1,
+        "Hazard": 1,
+        "Inflation": 1,
+        "Price": 1
+      },
+      "dividend_schedule_count": 0,
+      "fx_delta_vol_surface_count": 0,
+      "has_fx": true,
+      "inflation_index_count": 1,
+      "price_count": 2,
+      "series_count": 1,
+      "surface_count": 1,
+      "total_curves": 5,
+      "vol_cube_count": 0
+    },
+    "vol": 0.20500000000000002
+  },
+  "mean_var": [
+    101.3,
+    1.981250000000001
+  ],
+  "money": [
+    {
+      "amount": "0",
+      "currency": "USD"
+    },
+    [
+      12.5,
+      "EUR"
+    ]
+  ],
+  "months_until": 25,
+  "next_cds_date": "2025-06-20",
+  "next_equity_option_expiry": "2025-04-18",
+  "next_imm": "2025-06-18",
+  "next_imm_option_expiry": "2025-06-13",
+  "next_semiannual_cds_maturity": "2028-12-20",
+  "next_sifma_settlement": "2027-04-13",
+  "norm_with_params": [
+    0.5987063256829237,
+    0.19333405840142462
+  ],
+  "period_id": [
+    "2026M01",
+    "2024Q4",
+    "FY2026Q1",
+    52
+  ],
+  "period_kind_prior_observation_date": "2024-12-31",
+  "prev_cds_date": "2024-12-20",
+  "prev_cds_semiannual_roll": "2023-09-20",
+  "price_curve": {
+    "base": "2025-01-02",
+    "day_count": "act_365f",
+    "extrapolation": "flat_zero",
+    "id": "WTI",
+    "interp_style": "linear",
+    "knot_points": [
+      [
+        0.0,
+        72.0
+      ],
+      [
+        1.0,
+        70.5
+      ]
+    ],
+    "spot_price": 72.0
+  },
+  "price_curve_queries": [
+    71.25,
+    71.25616438356164,
+    "price"
+  ],
+  "quarter": 3,
+  "rate_zero": [
+    0.0,
+    0,
+    0.0
+  ],
+  "rating_registry": {
+    "default_scale_id": "sp",
+    "default_score": 50.0,
+    "extension_key": "core.rating_scales.v1",
+    "from_config": "sp",
+    "known": true,
+    "policy": "fallback_to_default",
+    "scale": {
+      "description": "Standard & Poor's credit rating scale",
+      "ratings": [
+        {
+          "min_score": 95.0,
+          "name": "AAA",
+          "score": 100.0
+        },
+        {
+          "min_score": 90.0,
+          "name": "AA+",
+          "score": 95.0
+        },
+        {
+          "min_score": 85.0,
+          "name": "AA",
+          "score": 90.0
+        },
+        {
+          "min_score": 80.0,
+          "name": "AA-",
+          "score": 85.0
+        },
+        {
+          "min_score": 75.0,
+          "name": "A+",
+          "score": 80.0
+        },
+        {
+          "min_score": 70.0,
+          "name": "A",
+          "score": 75.0
+        },
+        {
+          "min_score": 65.0,
+          "name": "A-",
+          "score": 70.0
+        },
+        {
+          "min_score": 60.0,
+          "name": "BBB+",
+          "score": 65.0
+        },
+        {
+          "min_score": 55.0,
+          "name": "BBB",
+          "score": 60.0
+        },
+        {
+          "min_score": 50.0,
+          "name": "BBB-",
+          "score": 55.0
+        },
+        {
+          "min_score": 45.0,
+          "name": "BB+",
+          "score": 50.0
+        },
+        {
+          "min_score": 40.0,
+          "name": "BB",
+          "score": 45.0
+        },
+        {
+          "min_score": 35.0,
+          "name": "BB-",
+          "score": 40.0
+        },
+        {
+          "min_score": 30.0,
+          "name": "B+",
+          "score": 35.0
+        },
+        {
+          "min_score": 25.0,
+          "name": "B",
+          "score": 30.0
+        },
+        {
+          "min_score": 20.0,
+          "name": "B-",
+          "score": 25.0
+        },
+        {
+          "min_score": 15.0,
+          "name": "CCC+",
+          "score": 20.0
+        },
+        {
+          "min_score": 10.0,
+          "name": "CCC",
+          "score": 15.0
+        },
+        {
+          "min_score": 5.0,
+          "name": "CCC-",
+          "score": 10.0
+        },
+        {
+          "min_score": 2.0,
+          "name": "CC",
+          "score": 5.0
+        },
+        {
+          "min_score": 0.01,
+          "name": "C",
+          "score": 2.0
+        },
+        {
+          "min_score": 0.0,
+          "name": "D",
+          "score": 0.0
+        }
+      ],
+      "scale_name": "S&P"
+    },
+    "scale_ids": [
+      "sp",
+      "moodys"
+    ]
+  },
+  "scalar_time_series": {
+    "currency": null,
+    "id": "SOFR-FIXINGS",
+    "interpolation": "linear",
+    "observations": [
+      [
+        "2025-01-02",
+        0.0431
+      ],
+      [
+        "2025-01-06",
+        0.0433
+      ]
+    ]
+  },
+  "scalar_time_series_queries": [
+    0.0432,
+    0.0433,
+    "2025-01-02",
+    "2025-01-06"
+  ],
+  "schedule": {
+    "dates": [
+      "2025-01-15",
+      "2025-04-15",
+      "2025-07-15",
+      "2025-10-15",
+      "2026-01-15"
+    ],
+    "fixing_dates": [],
+    "payment_dates": [
+      "2025-04-17",
+      "2025-07-17",
+      "2025-10-17",
+      "2026-01-20"
+    ]
+  },
+  "schedule_cds_imm": [
+    "2025-03-20",
+    "2025-06-20",
+    "2025-09-20",
+    "2025-12-20",
+    "2026-03-20"
+  ],
+  "schedule_dates": [
+    "2025-04-17",
+    "2025-07-17",
+    "2025-10-17",
+    "2026-01-20"
+  ],
+  "sifma_settlement_date": "2027-03-11",
+  "sifma_settlement_date_for_class": "2026-01-20",
+  "sifma_settlement_date_uncovered": null,
+  "stats_empty_is_nan": [
+    true,
+    true,
+    true
+  ],
+  "stats_or_nan": [
+    101.3,
+    1.981250000000001,
+    1.4075688260259251,
+    101.5,
+    100.3,
+    99.75,
+    103.0
+  ],
+  "student_t": [
+    0.8580544716469488,
+    2.570581835636315
+  ],
+  "symmetric_eigen": [
+    2.0,
+    5.0
+  ],
+  "third_friday": "2025-03-21",
+  "third_wednesday": "2025-03-19",
+  "vol_surface": {
+    "expiries": [
+      0.5,
+      1.0
+    ],
+    "id": "SPX-VOL",
+    "interpolation_mode": "vol",
+    "quote_type": "black_lognormal",
+    "secondary_axis": "strike",
+    "strikes": [
+      90.0,
+      100.0,
+      110.0
+    ],
+    "vols_row_major": [
+      0.24,
+      0.2,
+      0.22,
+      0.23,
+      0.21,
+      0.22
+    ]
+  },
+  "vol_surface_queries": [
+    0.20500000000000002,
+    [
+      2,
+      3
+    ],
+    "strike",
+    "black_lognormal",
+    "vol"
+  ]
+}

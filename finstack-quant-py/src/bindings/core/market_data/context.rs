@@ -8,7 +8,7 @@ use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::types::CurveId;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyModule};
+use pyo3::types::{PyList, PyModule};
 use pyo3::IntoPyObjectExt;
 
 use crate::bindings::core::currency::extract_currency;
@@ -562,29 +562,8 @@ impl PyMarketContext {
     ///     ``dividend_schedule_count``, ``fx_delta_vol_surface_count``,
     ///     ``collateral_mapping_count``.
     #[pyo3(text_signature = "(self)")]
-    fn stats<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
-        let stats = self.inner.stats();
-        let out = PyDict::new(py);
-        let counts = PyDict::new(py);
-        for (kind, count) in &stats.curve_counts {
-            counts.set_item(*kind, *count)?;
-        }
-        out.set_item("curve_counts", counts)?;
-        out.set_item("total_curves", stats.total_curves)?;
-        out.set_item("has_fx", stats.has_fx)?;
-        out.set_item("surface_count", stats.surface_count)?;
-        out.set_item("vol_cube_count", stats.vol_cube_count)?;
-        out.set_item("price_count", stats.price_count)?;
-        out.set_item("series_count", stats.series_count)?;
-        out.set_item("inflation_index_count", stats.inflation_index_count)?;
-        out.set_item("credit_index_count", stats.credit_index_count)?;
-        out.set_item("dividend_schedule_count", stats.dividend_schedule_count)?;
-        out.set_item(
-            "fx_delta_vol_surface_count",
-            stats.fx_delta_vol_surface_count,
-        )?;
-        out.set_item("collateral_mapping_count", stats.collateral_mapping_count)?;
-        Ok(out)
+    fn stats<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.stats())
     }
 
     /// Roll every dated term structure forward by ``days`` calendar days.

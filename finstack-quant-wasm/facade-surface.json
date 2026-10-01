@@ -270,11 +270,19 @@
   "core": {
     "kind": "namespace",
     "keys": [
+      "Attributes",
+      "BaseCorrelationCurve",
       "Bps",
+      "BusinessDayConvention",
+      "CreditIndexData",
+      "CreditRating",
       "Currency",
+      "CurveId",
       "DayCount",
       "DayCountContext",
       "DiscountCurve",
+      "FinstackConfig",
+      "FiscalConfig",
       "ForwardCurve",
       "FxConversionPolicy",
       "FxDeltaVolSurface",
@@ -283,50 +291,282 @@
       "FxQuoteConvention",
       "FxRateResult",
       "HazardCurve",
+      "HolidayCalendar",
+      "InflationCurve",
+      "InflationIndex",
+      "InstrumentId",
       "MarketContext",
       "Money",
       "Percentage",
+      "PeriodId",
+      "PeriodKind",
+      "PriceCurve",
       "Rate",
+      "RatingScaleRegistry",
+      "RoundingMode",
+      "ScalarTimeSeries",
+      "Schedule",
+      "ScheduleBuilder",
+      "ScheduleErrorPolicy",
+      "SifmaSettlementClass",
+      "StubKind",
       "Tenor",
+      "TenorUnit",
+      "Thirty360Convention",
+      "UnknownScalePolicy",
       "VolCube",
+      "VolSurface",
+      "addBusinessDays",
+      "addMonths",
+      "addWeekdays",
       "adjust",
       "applyLowerTriangular",
       "availableCalendars",
+      "buildFiscalPeriods",
+      "buildPeriods",
       "choleskyDecomposition",
       "choleskySolve",
       "correlation",
       "covariance",
       "createDate",
       "dateFromEpochDays",
+      "days30360",
+      "days30e360Isda",
+      "daysSinceEpoch",
+      "diagonalTolerance",
+      "embeddedRegistry",
+      "endOfMonth",
       "erf",
+      "estimatedSifmaSettlementDateForClass",
+      "finiteCount",
+      "finiteMaxOrNan",
+      "finiteMinOrNan",
+      "fiscalYear",
       "fxMarketPair",
       "fxPairConvention",
       "fxPipSize",
+      "immOptionExpiry",
       "invertFxRate",
+      "isCdsDate",
+      "isImmDate",
+      "isWeekend",
       "kahanSum",
+      "ledoitWolfShrinkage",
       "lnGamma",
+      "logReturns",
       "longestPositiveRun",
       "mean",
+      "meanOrNan",
+      "meanVar",
+      "medianOrNan",
+      "monthsUntil",
       "neumaierSum",
+      "nextCdsDate",
+      "nextEquityOptionExpiry",
+      "nextImm",
+      "nextImmOptionExpiry",
+      "nextSemiannualCdsMaturity",
+      "nextSifmaSettlement",
       "normCdf",
+      "normCdfWithParams",
       "normPdf",
+      "normPdfWithParams",
       "populationVariance",
+      "prevCdsDate",
+      "prevCdsSemiannualRoll",
       "quantile",
+      "quantileLinearOrNan",
+      "quarter",
+      "ratingScalesExtensionKey",
       "realizedVariance",
       "realizedVarianceOhlc",
+      "registryFromConfig",
+      "sampleStdOrNan",
+      "sampleVarianceOrNan",
+      "sifmaSettlementDate",
+      "sifmaSettlementDateForClass",
+      "singularThreshold",
       "standardNormalInvCdf",
+      "studentTCdf",
+      "studentTInvCdf",
+      "symmetricEigen",
+      "symmetryTolerance",
+      "thirdFriday",
+      "thirdWednesday",
       "variance"
     ]
   },
   "core.Currency": {
     "kind": "class",
-    "statics": ["fromJson"],
+    "statics": [
+      "aed",
+      "afn",
+      "all",
+      "amd",
+      "ang",
+      "aoa",
+      "ars",
+      "aud",
+      "awg",
+      "azn",
+      "bam",
+      "bbd",
+      "bdt",
+      "bgn",
+      "bhd",
+      "bif",
+      "bmd",
+      "bnd",
+      "bob",
+      "brl",
+      "bsd",
+      "btn",
+      "bwp",
+      "byn",
+      "bzd",
+      "cad",
+      "cdf",
+      "chf",
+      "clf",
+      "clp",
+      "cny",
+      "cop",
+      "crc",
+      "cuc",
+      "cup",
+      "cve",
+      "czk",
+      "djf",
+      "dkk",
+      "dop",
+      "dzd",
+      "egp",
+      "ern",
+      "etb",
+      "eur",
+      "fjd",
+      "fkp",
+      "fromJson",
+      "fromNumeric",
+      "gbp",
+      "gel",
+      "ghs",
+      "gip",
+      "gmd",
+      "gnf",
+      "gtq",
+      "gyd",
+      "hkd",
+      "hnl",
+      "hrk",
+      "htg",
+      "huf",
+      "idr",
+      "ils",
+      "inr",
+      "iqd",
+      "irr",
+      "isk",
+      "jmd",
+      "jod",
+      "jpy",
+      "kes",
+      "kgs",
+      "khr",
+      "kmf",
+      "kpw",
+      "krw",
+      "kwd",
+      "kyd",
+      "kzt",
+      "lak",
+      "lbp",
+      "lkr",
+      "lrd",
+      "lsl",
+      "lyd",
+      "mad",
+      "mdl",
+      "mga",
+      "mkd",
+      "mmk",
+      "mnt",
+      "mop",
+      "mru",
+      "mur",
+      "mvr",
+      "mwk",
+      "mxn",
+      "myr",
+      "mzn",
+      "nad",
+      "ngn",
+      "nio",
+      "nok",
+      "npr",
+      "nzd",
+      "omr",
+      "pab",
+      "pen",
+      "pgk",
+      "php",
+      "pkr",
+      "pln",
+      "pyg",
+      "qar",
+      "ron",
+      "rsd",
+      "rub",
+      "rwf",
+      "sar",
+      "sbd",
+      "scr",
+      "sdg",
+      "sek",
+      "sgd",
+      "shp",
+      "sle",
+      "sll",
+      "sos",
+      "srd",
+      "ssp",
+      "stn",
+      "syp",
+      "szl",
+      "thb",
+      "tjs",
+      "tmt",
+      "tnd",
+      "top",
+      "try",
+      "ttd",
+      "twd",
+      "tzs",
+      "uah",
+      "ugx",
+      "usd",
+      "uyu",
+      "uzs",
+      "ved",
+      "ves",
+      "vnd",
+      "vuv",
+      "wst",
+      "xaf",
+      "xcd",
+      "xof",
+      "xpf",
+      "yer",
+      "zar",
+      "zmw",
+      "zwl"
+    ],
     "methods": ["free", "toJson", "toString"],
     "getters": ["code", "decimals", "numeric"]
   },
   "core.Money": {
     "kind": "class",
-    "statics": ["fromDecimalStr", "fromJson"],
+    "statics": ["fromDecimalStr", "fromJson", "fromTuple", "zero"],
     "methods": [
       "checkedAdd",
       "checkedDivF64",
@@ -337,27 +577,154 @@
       "formatWith",
       "free",
       "toJson",
-      "toString"
+      "toString",
+      "toTuple"
     ],
     "getters": ["amount", "amountDecimal", "currency"]
   },
   "core.Rate": {
     "kind": "class",
-    "statics": ["fromBp", "fromJson", "fromPercent", "parse"],
+    "statics": ["fromBp", "fromJson", "fromPercent", "parse", "zero"],
     "methods": ["abs", "free", "isNegative", "isPositive", "isZero", "toJson"],
     "getters": ["asBasisPoints", "asBp", "asDecimal", "asPercent", "asPercentage"]
   },
   "core.Bps": {
     "kind": "class",
-    "statics": ["fromJson"],
+    "statics": ["fromJson", "zero"],
     "methods": ["abs", "free", "isNegative", "isPositive", "isZero", "toJson"],
     "getters": ["asBp", "asDecimal", "asPercent", "asPercentage", "asRate"]
   },
   "core.Percentage": {
     "kind": "class",
-    "statics": ["fromJson"],
+    "statics": ["fromJson", "zero"],
     "methods": ["abs", "free", "isNegative", "isPositive", "isZero", "toJson"],
     "getters": ["asBasisPoints", "asBp", "asDecimal", "asPercent", "asRate"]
+  },
+  "core.CreditRating": {
+    "kind": "class",
+    "statics": [
+      "a",
+      "aMinus",
+      "aPlus",
+      "aa",
+      "aaMinus",
+      "aaPlus",
+      "aaa",
+      "b",
+      "bMinus",
+      "bPlus",
+      "bb",
+      "bbMinus",
+      "bbPlus",
+      "bbb",
+      "bbbMinus",
+      "bbbPlus",
+      "c",
+      "cc",
+      "ccc",
+      "cccMinus",
+      "cccPlus",
+      "d",
+      "fromJson",
+      "fromName",
+      "nr"
+    ],
+    "methods": [
+      "free",
+      "isDefault",
+      "isInvestmentGrade",
+      "isSpeculativeGrade",
+      "notchesTo",
+      "toJson",
+      "toMoodysString",
+      "toString"
+    ],
+    "getters": ["name"]
+  },
+  "core.CurveId": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": ["asStr", "free", "isEmpty", "toJson", "toString"],
+    "getters": []
+  },
+  "core.InstrumentId": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": ["asStr", "free", "isEmpty", "toJson", "toString"],
+    "getters": []
+  },
+  "core.Attributes": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": [
+      "addTag",
+      "containsMetaKey",
+      "free",
+      "getMeta",
+      "hasTag",
+      "items",
+      "keys",
+      "matchesSelector",
+      "setMeta",
+      "toJson"
+    ],
+    "getters": ["tags"]
+  },
+  "core.RoundingMode": {
+    "kind": "class",
+    "statics": ["awayFromZero", "bankers", "ceil", "floor", "fromJson", "fromName", "towardZero"],
+    "methods": ["free", "toJson", "toString"],
+    "getters": ["name"]
+  },
+  "core.FinstackConfig": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": [
+      "extensionKeys",
+      "free",
+      "getExtension",
+      "getExtensionJson",
+      "ingestScale",
+      "ingestScaleOverrides",
+      "outputScale",
+      "outputScaleOverrides",
+      "removeExtension",
+      "setExtension",
+      "setIngestScale",
+      "setOutputScale",
+      "toJson"
+    ],
+    "getters": ["roundingMode", "tolerances"]
+  },
+  "core.UnknownScalePolicy": {
+    "kind": "class",
+    "statics": ["error", "fallbackToDefault", "fromJson", "fromName", "warnAndFallback"],
+    "methods": ["free", "toJson", "toString"],
+    "getters": ["name"]
+  },
+  "core.RatingScaleRegistry": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": [
+      "defaultScaleId",
+      "defaultScorecardScore",
+      "free",
+      "isKnownRatingScale",
+      "ratingScale",
+      "scaleIds",
+      "toJson",
+      "unknownScalePolicy"
+    ],
+    "getters": []
+  },
+  "core.embeddedRegistry": {
+    "kind": "function"
+  },
+  "core.registryFromConfig": {
+    "kind": "function"
+  },
+  "core.ratingScalesExtensionKey": {
+    "kind": "function"
   },
   "core.DayCount": {
     "kind": "class",
@@ -388,6 +755,18 @@
     "methods": ["free", "toJson"],
     "getters": ["busBasis", "calendarId", "couponPeriod", "endIsTerminationDate", "frequency"]
   },
+  "core.Thirty360Convention": {
+    "kind": "class",
+    "statics": ["european", "fromName", "isda", "italian", "usSia"],
+    "methods": ["free", "toString"],
+    "getters": []
+  },
+  "core.days30360": {
+    "kind": "function"
+  },
+  "core.days30e360Isda": {
+    "kind": "function"
+  },
   "core.Tenor": {
     "kind": "class",
     "statics": [
@@ -414,11 +793,40 @@
     ],
     "getters": ["count", "days", "months", "unit"]
   },
+  "core.TenorUnit": {
+    "kind": "class",
+    "statics": ["days", "fromChar", "months", "weeks", "years"],
+    "methods": ["free", "toString"],
+    "getters": []
+  },
   "core.createDate": {
     "kind": "function"
   },
   "core.dateFromEpochDays": {
     "kind": "function"
+  },
+  "core.daysSinceEpoch": {
+    "kind": "function"
+  },
+  "core.BusinessDayConvention": {
+    "kind": "class",
+    "statics": [
+      "following",
+      "fromName",
+      "modifiedFollowing",
+      "modifiedPreceding",
+      "nearest",
+      "preceding",
+      "unadjusted"
+    ],
+    "methods": ["free", "toString"],
+    "getters": []
+  },
+  "core.HolidayCalendar": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["countBusinessDays", "free", "isBusinessDay", "isHoliday", "toString"],
+    "getters": ["code", "metadata"]
   },
   "core.adjust": {
     "kind": "function"
@@ -426,11 +834,162 @@
   "core.availableCalendars": {
     "kind": "function"
   },
+  "core.addBusinessDays": {
+    "kind": "function"
+  },
+  "core.addWeekdays": {
+    "kind": "function"
+  },
+  "core.addMonths": {
+    "kind": "function"
+  },
+  "core.endOfMonth": {
+    "kind": "function"
+  },
+  "core.isWeekend": {
+    "kind": "function"
+  },
+  "core.quarter": {
+    "kind": "function"
+  },
+  "core.fiscalYear": {
+    "kind": "function"
+  },
+  "core.monthsUntil": {
+    "kind": "function"
+  },
+  "core.PeriodKind": {
+    "kind": "class",
+    "statics": ["annual", "daily", "fromName", "monthly", "quarterly", "semiAnnual", "weekly"],
+    "methods": ["free", "priorObservationDate", "toString"],
+    "getters": ["annualizationFactor", "periodsPerYear"]
+  },
+  "core.PeriodId": {
+    "kind": "class",
+    "statics": ["annual", "day", "half", "month", "parse", "quarter", "week"],
+    "methods": ["free", "next", "nextFiscal", "prev", "prevFiscal", "toString"],
+    "getters": ["code", "index", "isFiscal", "kind", "periodsPerYear", "year"]
+  },
+  "core.FiscalConfig": {
+    "kind": "class",
+    "statics": ["australia", "calendarYear", "japan", "uk", "usFederal"],
+    "methods": ["free"],
+    "getters": ["startDay", "startMonth"]
+  },
+  "core.buildPeriods": {
+    "kind": "function"
+  },
+  "core.buildFiscalPeriods": {
+    "kind": "function"
+  },
+  "core.StubKind": {
+    "kind": "class",
+    "statics": ["fromName", "longBack", "longFront", "none", "shortBack", "shortFront"],
+    "methods": ["free", "toString"],
+    "getters": []
+  },
+  "core.ScheduleErrorPolicy": {
+    "kind": "class",
+    "statics": ["fromName", "gracefulEmpty", "missingCalendarWarning", "strict"],
+    "methods": ["free", "toString"],
+    "getters": []
+  },
+  "core.Schedule": {
+    "kind": "class",
+    "statics": ["builder", "fromJson", "fromSpec"],
+    "methods": ["free", "hasWarnings", "toJson", "usedGracefulFallback"],
+    "getters": ["dates", "fixingDates", "paymentDates", "warnings"]
+  },
+  "core.ScheduleBuilder": {
+    "kind": "class",
+    "statics": [],
+    "methods": [
+      "adjustWith",
+      "build",
+      "cdsImm",
+      "endOfMonth",
+      "errorPolicy",
+      "fixingLagBusinessDays",
+      "free",
+      "frequency",
+      "imm",
+      "paymentLagDays",
+      "stubRule",
+      "toSpec"
+    ],
+    "getters": []
+  },
+  "core.thirdWednesday": {
+    "kind": "function"
+  },
+  "core.thirdFriday": {
+    "kind": "function"
+  },
+  "core.nextImm": {
+    "kind": "function"
+  },
+  "core.isImmDate": {
+    "kind": "function"
+  },
+  "core.isCdsDate": {
+    "kind": "function"
+  },
+  "core.nextCdsDate": {
+    "kind": "function"
+  },
+  "core.prevCdsDate": {
+    "kind": "function"
+  },
+  "core.prevCdsSemiannualRoll": {
+    "kind": "function"
+  },
+  "core.nextSemiannualCdsMaturity": {
+    "kind": "function"
+  },
+  "core.immOptionExpiry": {
+    "kind": "function"
+  },
+  "core.nextImmOptionExpiry": {
+    "kind": "function"
+  },
+  "core.nextEquityOptionExpiry": {
+    "kind": "function"
+  },
+  "core.SifmaSettlementClass": {
+    "kind": "class",
+    "statics": ["a", "b", "c", "d", "fromAgencyTerm"],
+    "methods": ["free", "toString"],
+    "getters": []
+  },
+  "core.sifmaSettlementDate": {
+    "kind": "function"
+  },
+  "core.sifmaSettlementDateForClass": {
+    "kind": "function"
+  },
+  "core.estimatedSifmaSettlementDateForClass": {
+    "kind": "function"
+  },
+  "core.nextSifmaSettlement": {
+    "kind": "function"
+  },
   "core.DiscountCurve": {
     "kind": "class",
-    "statics": ["flat"],
-    "methods": ["df", "forward", "free", "zero"],
-    "getters": ["baseDate", "id"]
+    "statics": ["flat", "fromDates", "fromJson", "fromZeroRates"],
+    "methods": [
+      "df",
+      "dfBetweenDates",
+      "dfOnDateCurve",
+      "forward",
+      "free",
+      "toForwardCurve",
+      "toJson",
+      "zero",
+      "zeroAnnual",
+      "zeroRate",
+      "zeroRateOnDate"
+    ],
+    "getters": ["baseDate", "dayCount", "dfs", "extrapolation", "id", "interpStyle", "knots"]
   },
   "core.HazardCurve": {
     "kind": "class",
@@ -477,6 +1036,65 @@
       "tenor"
     ]
   },
+  "core.InflationCurve": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": ["cpi", "cpiOnDate", "cpiWithLag", "free", "indexRatio", "inflationRate", "toJson"],
+    "getters": [
+      "baseCpi",
+      "baseDate",
+      "cpiLevels",
+      "dayCount",
+      "extrapolation",
+      "id",
+      "indexationLagMonths",
+      "interpStyle",
+      "knots"
+    ]
+  },
+  "core.PriceCurve": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": ["free", "price", "priceOnDate", "toJson"],
+    "getters": [
+      "baseDate",
+      "dayCount",
+      "extrapolation",
+      "id",
+      "interpStyle",
+      "kind",
+      "knots",
+      "prices",
+      "spotPrice"
+    ]
+  },
+  "core.BaseCorrelationCurve": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": ["correlation", "free", "toJson"],
+    "getters": ["correlations", "detachmentPoints", "extrapolation", "id", "interpStyle"]
+  },
+  "core.CreditIndexData": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["free"],
+    "getters": ["baseCorrelationCurve", "indexCreditCurve", "numConstituents", "recoveryRate"]
+  },
+  "core.VolSurface": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": ["free", "toJson", "vol"],
+    "getters": [
+      "expiries",
+      "gridShape",
+      "id",
+      "interpolationMode",
+      "quoteType",
+      "secondaryAxis",
+      "strikes",
+      "vols"
+    ]
+  },
   "core.VolCube": {
     "kind": "class",
     "statics": ["fromJson"],
@@ -489,11 +1107,54 @@
     "methods": ["free", "toJson"],
     "getters": ["atmVols", "bf10d", "bf25d", "expiries", "id", "numExpiries", "rr10d", "rr25d"]
   },
+  "core.ScalarTimeSeries": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": ["free", "toJson", "valueOn", "valueOnExact"],
+    "getters": ["currency", "firstDate", "id", "interpolation", "lastDate", "observations"]
+  },
+  "core.InflationIndex": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": ["dateRange", "free", "ratio", "refCpiMonthsLag", "toJson", "valueOn"],
+    "getters": ["currency", "id", "interpolation", "lag", "observations", "seasonality"]
+  },
   "core.MarketContext": {
     "kind": "class",
     "statics": ["fromJson"],
-    "methods": ["free", "toJson"],
-    "getters": []
+    "methods": [
+      "contains",
+      "convertMoney",
+      "curveIds",
+      "free",
+      "fxRequired",
+      "getBaseCorrelation",
+      "getCreditIndex",
+      "getDiscount",
+      "getForward",
+      "getFxDeltaVolSurface",
+      "getHazard",
+      "getInflationCurve",
+      "getInflationIndex",
+      "getPrice",
+      "getPriceCurve",
+      "getSeries",
+      "getSurface",
+      "getVolCube",
+      "getVolIndexCurve",
+      "insert",
+      "insertCreditIndex",
+      "insertFx",
+      "insertInflationIndex",
+      "insertPrice",
+      "insertSeries",
+      "isEmpty",
+      "mapCollateral",
+      "rollForward",
+      "stats",
+      "toJson"
+    ],
+    "getters": ["fx"]
   },
   "core.FxConversionPolicy": {
     "kind": "class",
@@ -509,8 +1170,8 @@
   },
   "core.FxMatrix": {
     "kind": "class",
-    "statics": [],
-    "methods": ["free", "rate", "setQuote", "setQuoteOn"],
+    "statics": ["fromDict"],
+    "methods": ["free", "rate", "setQuote", "setQuoteOn", "setQuotes"],
     "getters": []
   },
   "core.FxQuoteConvention": {
@@ -546,6 +1207,21 @@
   "core.choleskySolve": {
     "kind": "function"
   },
+  "core.symmetricEigen": {
+    "kind": "function"
+  },
+  "core.ledoitWolfShrinkage": {
+    "kind": "function"
+  },
+  "core.singularThreshold": {
+    "kind": "function"
+  },
+  "core.diagonalTolerance": {
+    "kind": "function"
+  },
+  "core.symmetryTolerance": {
+    "kind": "function"
+  },
   "core.mean": {
     "kind": "function"
   },
@@ -553,6 +1229,36 @@
     "kind": "function"
   },
   "core.populationVariance": {
+    "kind": "function"
+  },
+  "core.meanVar": {
+    "kind": "function"
+  },
+  "core.meanOrNan": {
+    "kind": "function"
+  },
+  "core.sampleVarianceOrNan": {
+    "kind": "function"
+  },
+  "core.sampleStdOrNan": {
+    "kind": "function"
+  },
+  "core.medianOrNan": {
+    "kind": "function"
+  },
+  "core.quantileLinearOrNan": {
+    "kind": "function"
+  },
+  "core.finiteMinOrNan": {
+    "kind": "function"
+  },
+  "core.finiteMaxOrNan": {
+    "kind": "function"
+  },
+  "core.finiteCount": {
+    "kind": "function"
+  },
+  "core.logReturns": {
     "kind": "function"
   },
   "core.correlation": {
@@ -576,7 +1282,19 @@
   "core.normPdf": {
     "kind": "function"
   },
+  "core.normCdfWithParams": {
+    "kind": "function"
+  },
+  "core.normPdfWithParams": {
+    "kind": "function"
+  },
   "core.standardNormalInvCdf": {
+    "kind": "function"
+  },
+  "core.studentTCdf": {
+    "kind": "function"
+  },
+  "core.studentTInvCdf": {
     "kind": "function"
   },
   "core.erf": {

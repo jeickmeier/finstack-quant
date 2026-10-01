@@ -276,7 +276,9 @@ impl MarketContext {
 /// assert_eq!(stats.total_curves, 0);
 /// assert!(!stats.has_fx);
 /// ```
-#[derive(Debug, Clone)]
+///
+/// Serializes with these field names; host bindings return that shape.
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct ContextStats {
     /// Count of curves by type
     pub curve_counts: BTreeMap<&'static str, usize>,
@@ -330,5 +332,37 @@ impl core::fmt::Display for ContextStats {
         )?;
         writeln!(f, "  Has FX: {}", self.has_fx)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod stats_serde_tests {
+    use super::*;
+
+    #[test]
+    fn context_stats_serializes_every_count_by_field_name() {
+        let value = serde_json::to_value(MarketContext::new().stats()).expect("serializable");
+        let object = value.as_object().expect("an object");
+        let mut keys: Vec<&str> = object.keys().map(String::as_str).collect();
+        keys.sort_unstable();
+        assert_eq!(
+            keys,
+            [
+                "collateral_mapping_count",
+                "credit_index_count",
+                "curve_counts",
+                "dividend_schedule_count",
+                "fx_delta_vol_surface_count",
+                "has_fx",
+                "inflation_index_count",
+                "price_count",
+                "series_count",
+                "surface_count",
+                "total_curves",
+                "vol_cube_count",
+            ]
+        );
+        assert_eq!(object["total_curves"], 0);
+        assert_eq!(object["has_fx"], false);
     }
 }

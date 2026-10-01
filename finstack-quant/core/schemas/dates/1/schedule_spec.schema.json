@@ -1,0 +1,230 @@
+{
+  "$defs": {
+    "BusinessDayConvention": {
+      "description": "Business day adjustment conventions per ISDA standards.\n\nDefines how dates are adjusted when they fall on non-business days\n(weekends or holidays). Used throughout fixed income and derivatives\nmarkets for determining payment dates, fixing dates, and maturity dates.\n\n# Standards References\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.12\n- **FpML**: BusinessDayConventionEnum\n- **ISO 20022**: Business Day Convention codes\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{adjust, BusinessDayConvention, Date};\nuse finstack_quant_core::dates::calendar::TARGET2;\nuse time::Month;\n\n// Saturday, January 4, 2025\nlet weekend = Date::from_calendar_date(2025, Month::January, 4).expect(\"Valid date\");\n\n// Following: moves to next Monday (Jan 6)\nlet adj = adjust(weekend, BusinessDayConvention::Following, &TARGET2)?;\nassert_eq!(adj.day(), 6);\n\n// Preceding: moves to previous Friday (Jan 3)\nlet adj = adjust(weekend, BusinessDayConvention::Preceding, &TARGET2)?;\nassert_eq!(adj.day(), 3);\n# Ok::<(), finstack_quant_core::Error>(())\n```\n\n# Default\n\n`BusinessDayConvention::default()` is `ModifiedFollowing`, the ISDA 2006\nDefinitions Section 4.12(c) convention used for swap and bond period dates.\nHost bindings use it whenever a caller omits the convention.",
+      "oneOf": [
+        {
+          "const": "unadjusted",
+          "description": "No adjustment - date remains as specified.\n\n**ISDA**: Section 4.12(a) - \"Unadjusted\"\n**FpML**: \"NONE\"",
+          "type": "string"
+        },
+        {
+          "const": "following",
+          "description": "Adjust to next business day (may cross month boundary).\n\n**ISDA**: Section 4.12(b) - \"Following Business Day Convention\"\n**FpML**: \"FOLLOWING\"\n**ISO 20022**: \"FWNG\"",
+          "type": "string"
+        },
+        {
+          "const": "modified_following",
+          "description": "Following, unless that crosses into next month, then preceding.\n\nEnsures month-end dates don't shift to next month, important for\nconsistent period calculations in swaps and bonds.\n\n**ISDA**: Section 4.12(c) - \"Modified Following Business Day Convention\"\n**FpML**: \"MODFOLLOWING\"\n**ISO 20022**: \"MODF\"",
+          "type": "string"
+        },
+        {
+          "const": "preceding",
+          "description": "Adjust to previous business day (may cross month boundary).\n\n**ISDA**: Section 4.12(d) - \"Preceding Business Day Convention\"\n**FpML**: \"PRECEDING\"\n**ISO 20022**: \"PREC\"",
+          "type": "string"
+        },
+        {
+          "const": "modified_preceding",
+          "description": "Preceding, unless that crosses into previous month, then following.\n\n**ISDA**: Section 4.12(e) - \"Modified Preceding Business Day Convention\"\n**FpML**: \"MODPRECEDING\"",
+          "type": "string"
+        },
+        {
+          "const": "nearest",
+          "description": "Adjust to the closer business day. A tie (equal calendar-day distance)\nrolls Following, matching FpML `NEAREST` and QuantLib `Nearest`.\n\n**FpML**: \"NEAREST\"",
+          "type": "string"
+        }
+      ]
+    },
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    },
+    "ScheduleErrorPolicy": {
+      "description": "Explicit policy for how schedule construction should respond to recoverable issues.",
+      "oneOf": [
+        {
+          "const": "strict",
+          "description": "Strict production mode: propagate all errors.",
+          "type": "string"
+        },
+        {
+          "const": "missing_calendar_warning",
+          "description": "Allow missing calendar IDs and continue with a warning.",
+          "type": "string"
+        },
+        {
+          "const": "graceful_empty",
+          "description": "Return an empty schedule with a warning instead of propagating build errors.",
+          "type": "string"
+        }
+      ]
+    },
+    "StubKind": {
+      "description": "Stub period handling when start/end dates don't align with payment frequency.\n\nControls how schedules are generated when the start and end dates don't\ndivide evenly by the payment frequency, resulting in an irregular period\n(stub) at the beginning or end of the schedule.\n\n# Variants\n\n- **`None`**: No stub allowed (default). Generates regular periods from\n  start to end and returns an error\n  ([`InputError::NonIntegerScheduleTenor`]) when the dates don't divide\n  evenly by the frequency. Use a stub variant for misaligned schedules.\n\n[`InputError::NonIntegerScheduleTenor`]: crate::error::InputError::NonIntegerScheduleTenor\n- **`ShortFront`**: Short stub period at the start. Schedule is built\n  backward from the end date, creating a short first period.\n- **`ShortBack`**: Short stub period at the end. Schedule is built forward\n  from the start date, creating a short final period.\n- **`LongFront`**: Long stub period at the start. Combines the first two\n  periods into a single longer period.\n- **`LongBack`**: Long stub period at the end. Combines the last two periods\n  into a single longer period.\n\n# Financial Context\n\nStub conventions are important for:\n- Interest accrual calculations (short/long first coupons)\n- Cash flow present value computations\n- Matching market conventions for specific instruments\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{ScheduleBuilder, Tenor, StubKind};\nuse time::{Date, Month};\n\nlet start = Date::from_calendar_date(2025, Month::January, 10)?;\nlet end = Date::from_calendar_date(2025, Month::December, 15)?;\n\n// Short stub at front\nlet sched = ScheduleBuilder::new(start, end)?\n    .frequency(Tenor::quarterly())\n    .stub_rule(StubKind::ShortFront)\n    .build()?;\n# Ok::<(), Box<dyn std::error::Error>>(())\n```\n\n# See Also\n\n- [`ScheduleBuilder::stub_rule`] to configure stub behavior",
+      "oneOf": [
+        {
+          "const": "none",
+          "description": "No stub allowed: start/end must align exactly with the frequency,\notherwise schedule generation returns an error.",
+          "type": "string"
+        },
+        {
+          "const": "short_front",
+          "description": "Short stub period at the beginning of the schedule.",
+          "type": "string"
+        },
+        {
+          "const": "short_back",
+          "description": "Short stub period at the end of the schedule (final step truncated to maturity).",
+          "type": "string"
+        },
+        {
+          "const": "long_front",
+          "description": "Long stub period at the beginning of the schedule.",
+          "type": "string"
+        },
+        {
+          "const": "long_back",
+          "description": "Long stub period at the end of the schedule (merges final two periods).",
+          "type": "string"
+        }
+      ]
+    },
+    "Tenor": {
+      "additionalProperties": false,
+      "description": "A parsed tenor representing a time period.\n\nTenors are commonly used in financial markets to specify maturities,\npayment frequencies, and rate fixing periods.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Tenor, TenorUnit};\n# fn main() -> finstack_quant_core::Result<()> {\n\nlet tenor = Tenor::new(3, TenorUnit::Months).expect(\"valid tenor fixture\");\nassert_eq!(tenor.count(), 3);\nassert_eq!(tenor.unit(), TenorUnit::Months);\n\n// Parse from string\nlet parsed = Tenor::parse(\"6M\")?;\nassert_eq!(parsed.count(), 6);\nassert_eq!(parsed.unit(), TenorUnit::Months);\n# Ok(())\n# }\n```",
+      "properties": {
+        "count": {
+          "description": "Number of `unit` periods in the tenor. Must be at least 1; `0` is\nrejected because a zero-length period makes schedule generation loop.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unit": {
+          "$ref": "#/$defs/TenorUnit",
+          "description": "Calendar unit the count is expressed in, such as days, weeks, months,\nor years."
+        }
+      },
+      "required": [
+        "count",
+        "unit"
+      ],
+      "type": "object"
+    },
+    "TenorUnit": {
+      "description": "Unit of a tenor period.",
+      "oneOf": [
+        {
+          "const": "days",
+          "description": "Days (D)",
+          "type": "string"
+        },
+        {
+          "const": "weeks",
+          "description": "Weeks (W)",
+          "type": "string"
+        },
+        {
+          "const": "months",
+          "description": "Months (M)",
+          "type": "string"
+        },
+        {
+          "const": "years",
+          "description": "Years (Y)",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/dates/1/schedule_spec.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Persisted inputs of a date schedule: range, frequency, stub, adjustment and lags.",
+  "examples": [
+    {
+      "business_day_convention": null,
+      "calendar_id": null,
+      "cds_imm_mode": false,
+      "end": "2026-01-15",
+      "end_of_month": false,
+      "error_policy": "strict",
+      "fixing_lag_business_days": null,
+      "frequency": {
+        "count": 1,
+        "unit": "months"
+      },
+      "imm_mode": false,
+      "payment_lag_days": 0,
+      "start": "2025-01-15",
+      "stub": "none"
+    }
+  ],
+  "properties": {
+    "business_day_convention": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BusinessDayConvention"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "calendar_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "cds_imm_mode": {
+      "type": "boolean"
+    },
+    "end": {
+      "$ref": "#/$defs/DateWire"
+    },
+    "end_of_month": {
+      "type": "boolean"
+    },
+    "error_policy": {
+      "$ref": "#/$defs/ScheduleErrorPolicy"
+    },
+    "fixing_lag_business_days": {
+      "default": null,
+      "format": "int32",
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "frequency": {
+      "$ref": "#/$defs/Tenor"
+    },
+    "imm_mode": {
+      "default": false,
+      "type": "boolean"
+    },
+    "payment_lag_days": {
+      "default": 0,
+      "format": "int32",
+      "type": "integer"
+    },
+    "start": {
+      "$ref": "#/$defs/DateWire"
+    },
+    "stub": {
+      "$ref": "#/$defs/StubKind"
+    }
+  },
+  "required": [
+    "start",
+    "end",
+    "frequency",
+    "stub",
+    "end_of_month",
+    "cds_imm_mode",
+    "error_policy"
+  ],
+  "title": "ScheduleSpec",
+  "type": "object"
+}

@@ -31,6 +31,16 @@ pub struct JsRate {
 
 #[wasm_bindgen(js_class = Rate)]
 impl JsRate {
+    /// The zero rate (Rust `Rate::ZERO`).
+    ///
+    /// @returns A `Rate` equal to zero.
+    #[wasm_bindgen(js_name = zero)]
+    pub fn zero() -> JsRate {
+        JsRate {
+            inner: RustRate::ZERO,
+        }
+    }
+
     /// Create a rate from a decimal value.
     ///
     /// @param decimal - Rate as a decimal (e.g. `0.05` for 5%).
@@ -232,6 +242,16 @@ pub struct JsBps {
 
 #[wasm_bindgen(js_class = Bps)]
 impl JsBps {
+    /// The zero basis-point value (Rust `Bps::ZERO`).
+    ///
+    /// @returns A `Bps` equal to zero.
+    #[wasm_bindgen(js_name = zero)]
+    pub fn zero() -> JsBps {
+        JsBps {
+            inner: RustBps::ZERO,
+        }
+    }
+
     /// Create basis points from a whole-number value.
     ///
     /// Delegates to the canonical Rust `Bps::try_new`, which rejects
@@ -366,6 +386,16 @@ pub struct JsPercentage {
 
 #[wasm_bindgen(js_class = Percentage)]
 impl JsPercentage {
+    /// The zero percentage (Rust `Percentage::ZERO`).
+    ///
+    /// @returns A `Percentage` equal to zero.
+    #[wasm_bindgen(js_name = zero)]
+    pub fn zero() -> JsPercentage {
+        JsPercentage {
+            inner: RustPercentage::ZERO,
+        }
+    }
+
     /// Create a percentage.
     ///
     /// @param percent - Value in percent (e.g. `5.0` for 5%).

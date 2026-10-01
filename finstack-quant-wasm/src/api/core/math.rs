@@ -285,3 +285,304 @@ pub fn longest_positive_run(values: JsValue) -> Result<usize, JsValue> {
     let values: &[f64] = &js_f64_seq(&values, "values")?;
     Ok(math::longest_positive_run(values))
 }
+/// Symmetric eigendecomposition of a flat row-major matrix (Rust `symmetric_eigen`).
+///
+/// # Arguments
+///
+/// * `matrix` - Flat row-major `n * n` entries of a symmetric matrix; it need
+///   not be positive definite.
+/// * `n` - Positive matrix dimension; `matrix` must contain exactly `n * n`
+///   entries.
+///
+/// @returns A two-element array `[eigenvalues, eigenvectors]`: `n` eigenvalues
+/// (in the solver's order, not sorted) and a flat `n * n` `Float64Array` in
+/// which `eigenvectors[i * n + k]` is component `i` of eigenvector `k`.
+/// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
+/// `validation`) if `matrix` does not hold exactly `n * n` entries or contains
+/// a non-finite value.
+#[wasm_bindgen(js_name = symmetricEigen)]
+pub fn symmetric_eigen(matrix: JsValue, n: JsValue) -> Result<js_sys::Array, JsValue> {
+    let matrix: &[f64] = &js_f64_seq(&matrix, "matrix")?;
+    let n: usize = js_uint(&n, "n")?;
+    let (values, vectors) = linalg::symmetric_eigen(matrix, n).map_err(to_js_err)?;
+    Ok(js_sys::Array::of2(
+        &js_sys::Float64Array::from(values.as_slice()),
+        &js_sys::Float64Array::from(vectors.as_slice()),
+    ))
+}
+
+/// Ledoit-Wolf (2004) shrinkage of a sample covariance matrix toward a scaled
+/// identity (Rust `ledoit_wolf_shrinkage`).
+///
+/// # Arguments
+///
+/// * `observations` - Flat row-major `t * n` observation matrix; each row is
+///   one date and each column one variable.
+/// * `t` - Number of observations (rows); at least `2`.
+/// * `n` - Number of variables (columns); at least `1`.
+///
+/// @returns A two-element array `[covariance, shrinkage]`: the shrunk
+/// covariance as a flat row-major `n * n` `Float64Array`, and the optimal
+/// shrinkage intensity in `[0, 1]`.
+/// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
+/// `validation`) if `t < 2`, `n == 0`, an entry is non-finite, or
+/// `observations` does not hold exactly `t * n` entries.
+#[wasm_bindgen(js_name = ledoitWolfShrinkage)]
+pub fn ledoit_wolf_shrinkage(
+    observations: JsValue,
+    t: JsValue,
+    n: JsValue,
+) -> Result<js_sys::Array, JsValue> {
+    let observations: &[f64] = &js_f64_seq(&observations, "observations")?;
+    let t: usize = js_uint(&t, "t")?;
+    let n: usize = js_uint(&n, "n")?;
+    let result = linalg::ledoit_wolf_shrinkage(observations, t, n).map_err(to_js_err)?;
+    Ok(js_sys::Array::of2(
+        &js_sys::Float64Array::from(result.covariance.as_slice()),
+        &JsValue::from_f64(result.shrinkage),
+    ))
+}
+
+/// Pivot threshold below which Cholesky treats a matrix as singular (Rust
+/// `linalg::SINGULAR_THRESHOLD`).
+///
+/// @returns The absolute pivot threshold.
+#[wasm_bindgen(js_name = singularThreshold)]
+pub fn singular_threshold() -> f64 {
+    linalg::SINGULAR_THRESHOLD
+}
+
+/// Tolerance on the unit diagonal of a correlation matrix (Rust
+/// `linalg::DIAGONAL_TOLERANCE`).
+///
+/// @returns The absolute tolerance on `|diagonal - 1|`.
+#[wasm_bindgen(js_name = diagonalTolerance)]
+pub fn diagonal_tolerance() -> f64 {
+    linalg::DIAGONAL_TOLERANCE
+}
+
+/// Tolerance on the symmetry of a matrix (Rust `linalg::SYMMETRY_TOLERANCE`).
+///
+/// @returns The absolute tolerance on `|a[i][j] - a[j][i]|`.
+#[wasm_bindgen(js_name = symmetryTolerance)]
+pub fn symmetry_tolerance() -> f64 {
+    linalg::SYMMETRY_TOLERANCE
+}
+
+/// Mean and sample variance in one pass (Rust `stats::mean_var`).
+///
+/// # Arguments
+///
+/// * `data` - Sample observations in input order.
+///
+/// @returns A two-element array `[mean, variance]`; `[0, 0]` for an empty series.
+/// @throws `TypeError` if `data` is not an array of numbers.
+#[wasm_bindgen(js_name = meanVar)]
+pub fn mean_var(data: JsValue) -> Result<Box<[f64]>, JsValue> {
+    let (mean, variance) = stats::mean_var(&js_f64_seq(&data, "data")?);
+    Ok(Box::new([mean, variance]))
+}
+
+/// Arithmetic mean with a NaN sentinel for missing data (Rust `stats::mean_or_nan`).
+///
+/// # Arguments
+///
+/// * `data` - Observations to average.
+///
+/// @returns The mean, or `NaN` for an empty series.
+/// @throws `TypeError` if `data` is not an array of numbers.
+#[wasm_bindgen(js_name = meanOrNan)]
+pub fn mean_or_nan(data: JsValue) -> Result<f64, JsValue> {
+    Ok(stats::mean_or_nan(&js_f64_seq(&data, "data")?))
+}
+
+/// Sample variance with a NaN sentinel (Rust `stats::sample_variance_or_nan`).
+///
+/// # Arguments
+///
+/// * `data` - Sample observations.
+///
+/// @returns The unbiased sample variance, or `NaN` for fewer than two observations.
+/// @throws `TypeError` if `data` is not an array of numbers.
+#[wasm_bindgen(js_name = sampleVarianceOrNan)]
+pub fn sample_variance_or_nan(data: JsValue) -> Result<f64, JsValue> {
+    Ok(stats::sample_variance_or_nan(&js_f64_seq(&data, "data")?))
+}
+
+/// Sample standard deviation with a NaN sentinel (Rust `stats::sample_std_or_nan`).
+///
+/// # Arguments
+///
+/// * `data` - Sample observations.
+///
+/// @returns The sample standard deviation, or `NaN` for fewer than two observations.
+/// @throws `TypeError` if `data` is not an array of numbers.
+#[wasm_bindgen(js_name = sampleStdOrNan)]
+pub fn sample_std_or_nan(data: JsValue) -> Result<f64, JsValue> {
+    Ok(stats::sample_std_or_nan(&js_f64_seq(&data, "data")?))
+}
+
+/// Median with a NaN sentinel (Rust `stats::median_or_nan`).
+///
+/// # Arguments
+///
+/// * `data` - Observations whose median is required; the input is not modified.
+///
+/// @returns The median, or `NaN` for an empty series.
+/// @throws `TypeError` if `data` is not an array of numbers.
+#[wasm_bindgen(js_name = medianOrNan)]
+pub fn median_or_nan(data: JsValue) -> Result<f64, JsValue> {
+    Ok(stats::median_or_nan(&js_f64_seq(&data, "data")?))
+}
+
+/// Linear-interpolation quantile (R-7, the NumPy and Excel default) with a
+/// NaN sentinel (Rust `stats::quantile_linear_or_nan`).
+///
+/// # Arguments
+///
+/// * `data` - Finite observations; the input is not modified.
+/// * `q` - Quantile probability; values outside `[0, 1]` are clamped to the
+///   nearest endpoint.
+///
+/// @returns The quantile, or `NaN` for an empty series, a non-finite
+/// observation or a NaN `q`.
+/// @throws `TypeError` for a mistyped argument.
+#[wasm_bindgen(js_name = quantileLinearOrNan)]
+pub fn quantile_linear_or_nan(data: JsValue, q: JsValue) -> Result<f64, JsValue> {
+    let q = js_f64(&q, "q")?;
+    Ok(stats::quantile_linear_or_nan(
+        &js_f64_seq(&data, "data")?,
+        q,
+    ))
+}
+
+/// Smallest finite value (Rust `stats::finite_min_or_nan`).
+///
+/// # Arguments
+///
+/// * `data` - Observations to inspect; NaN and infinite entries are ignored.
+///
+/// @returns The minimum finite value, or `NaN` when none is finite.
+/// @throws `TypeError` if `data` is not an array of numbers.
+#[wasm_bindgen(js_name = finiteMinOrNan)]
+pub fn finite_min_or_nan(data: JsValue) -> Result<f64, JsValue> {
+    Ok(stats::finite_min_or_nan(&js_f64_seq(&data, "data")?))
+}
+
+/// Largest finite value (Rust `stats::finite_max_or_nan`).
+///
+/// # Arguments
+///
+/// * `data` - Observations to inspect; NaN and infinite entries are ignored.
+///
+/// @returns The maximum finite value, or `NaN` when none is finite.
+/// @throws `TypeError` if `data` is not an array of numbers.
+#[wasm_bindgen(js_name = finiteMaxOrNan)]
+pub fn finite_max_or_nan(data: JsValue) -> Result<f64, JsValue> {
+    Ok(stats::finite_max_or_nan(&js_f64_seq(&data, "data")?))
+}
+
+/// Number of finite observations (Rust `stats::finite_count`).
+///
+/// # Arguments
+///
+/// * `data` - Observations to inspect; NaN and infinite entries are not counted.
+///
+/// @returns The count of finite values.
+/// @throws `TypeError` if `data` is not an array of numbers.
+#[wasm_bindgen(js_name = finiteCount)]
+pub fn finite_count(data: JsValue) -> Result<usize, JsValue> {
+    Ok(stats::finite_count(&js_f64_seq(&data, "data")?))
+}
+
+/// Log returns of a price series (Rust `stats::log_returns`).
+///
+/// # Arguments
+///
+/// * `prices` - Chronologically ordered price levels.
+///
+/// @returns `prices.length - 1` values `ln(p[t] / p[t-1])`; a window with a
+/// non-positive or non-finite price gives `NaN`. Empty for fewer than two prices.
+/// @throws `TypeError` if `prices` is not an array of numbers.
+#[wasm_bindgen(js_name = logReturns)]
+pub fn log_returns(prices: JsValue) -> Result<Box<[f64]>, JsValue> {
+    Ok(stats::log_returns(&js_f64_seq(&prices, "prices")?).into_boxed_slice())
+}
+
+/// Normal cumulative distribution function `Φ((x - mean) / stdDev)` (Rust
+/// `norm_cdf_with_params`).
+///
+/// # Arguments
+///
+/// * `x` - Point at which to evaluate the CDF.
+/// * `mean` - Mean of the distribution, in the units of `x`.
+/// * `std_dev` - Strictly positive standard deviation (not the variance), in
+///   the units of `x`.
+///
+/// @returns The probability that a `N(mean, stdDev²)` variable is at most `x`.
+/// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
+/// `validation`) if `stdDev` is non-finite or not strictly positive.
+#[wasm_bindgen(js_name = normCdfWithParams)]
+pub fn norm_cdf_with_params(x: JsValue, mean: JsValue, std_dev: JsValue) -> Result<f64, JsValue> {
+    special_functions::norm_cdf_with_params(
+        js_f64(&x, "x")?,
+        js_f64(&mean, "mean")?,
+        js_f64(&std_dev, "stdDev")?,
+    )
+    .map_err(to_js_err)
+}
+
+/// Normal probability density `φ((x - mean) / stdDev) / stdDev` (Rust
+/// `norm_pdf_with_params`).
+///
+/// # Arguments
+///
+/// * `x` - Point at which to evaluate the density.
+/// * `mean` - Mean of the distribution, in the units of `x`.
+/// * `std_dev` - Strictly positive standard deviation (not the variance), in
+///   the units of `x`.
+///
+/// @returns The density of `N(mean, stdDev²)` at `x`.
+/// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
+/// `validation`) if `stdDev` is non-finite or not strictly positive.
+#[wasm_bindgen(js_name = normPdfWithParams)]
+pub fn norm_pdf_with_params(x: JsValue, mean: JsValue, std_dev: JsValue) -> Result<f64, JsValue> {
+    special_functions::norm_pdf_with_params(
+        js_f64(&x, "x")?,
+        js_f64(&mean, "mean")?,
+        js_f64(&std_dev, "stdDev")?,
+    )
+    .map_err(to_js_err)
+}
+
+/// Student-t cumulative distribution function (Rust `student_t_cdf`).
+///
+/// # Arguments
+///
+/// * `x` - Point at which to evaluate the CDF; `NaN` returns `NaN`.
+/// * `df` - Degrees of freedom, strictly positive.
+///
+/// @returns The probability that a Student-t variable with `df` degrees of
+/// freedom is at most `x`.
+/// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
+/// `validation`) if `df` is non-finite or not strictly positive.
+#[wasm_bindgen(js_name = studentTCdf)]
+pub fn student_t_cdf(x: JsValue, df: JsValue) -> Result<f64, JsValue> {
+    special_functions::student_t_cdf(js_f64(&x, "x")?, js_f64(&df, "df")?).map_err(to_js_err)
+}
+
+/// Student-t inverse cumulative distribution function (Rust `student_t_inv_cdf`).
+///
+/// # Arguments
+///
+/// * `p` - Probability; `p <= 0` returns `-Infinity`, `p >= 1` returns
+///   `Infinity` and `NaN` returns `NaN`.
+/// * `df` - Degrees of freedom, strictly positive.
+///
+/// @returns The quantile `x` with `studentTCdf(x, df) === p`.
+/// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
+/// `validation`) if `df` is non-finite or not strictly positive.
+#[wasm_bindgen(js_name = studentTInvCdf)]
+pub fn student_t_inv_cdf(p: JsValue, df: JsValue) -> Result<f64, JsValue> {
+    special_functions::student_t_inv_cdf(js_f64(&p, "p")?, js_f64(&df, "df")?).map_err(to_js_err)
+}

@@ -1,4 +1,8 @@
-"""Compiled-in JSON Schemas for the market-data wire format.
+"""Compiled-in JSON Schemas for the core wire formats.
+
+The registry covers the persisted market context, the columnar table
+envelope, period plans, date schedules and their specifications, and
+scorecard rating scales.
 
 Schemas are rendered from the crate's registry on demand, so what you read here
 always matches the installed wheel.
