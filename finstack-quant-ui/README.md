@@ -152,8 +152,8 @@ modified stock source and direct Base UI imports from domain components.
 Every generated contract has one owner and installs under `lib/finstack` with
 relative imports. `instrument-catalogue` depends on all instrument modules for
 installation, while its runtime imports remain lazy. `contract-bond` can install
-independently with just its codec closure. `finstack-host` declares the published
-WASM package; this checkout validates against the matching local facade.
+independently with just its codec closure. `finstack-host` declares the
+workspace WASM package at its current version.
 
 The root registry owns existing `src/` contracts. The pinned CLI forbids parent
 traversal from included indexes, so category indexes own only sources beneath
@@ -460,9 +460,11 @@ publishing have separate gates and evidence.
 
 ## Independent installation gate
 
-Registry items still install the published `finstack-quant-wasm@0.8.0`. The
-workspace's 0.9.0 binding artifact is unpublished; update the external registry
-pin when that npm version is available.
+Registry items depend on `finstack-quant-wasm` at the version in
+`finstack-quant-wasm/package.json`; the generators read it from there, so a
+version bump without `mise run ui-gen` fails `ui-check` and `gen-check`. The
+package is not on npm: the local install tasks serve that exact dependency as a
+`file:` path to the workspace package.
 
 After a fresh `mise run wasm-pkg`, run `mise run ui-install`. It builds the registry,
 initializes a separate Next 16/Base UI application outside the repository for
