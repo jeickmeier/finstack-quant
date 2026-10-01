@@ -140,7 +140,7 @@ def test_rebalance_from_spec_works_on_a_result_rebuilt_from_json() -> None:
     )
     result = PortfolioOptimizationResult.from_json(optimize_portfolio(spec, market).to_json())
     rebalanced = rebalance_from_spec(spec, result)
-    quantities = [p["quantity"] for p in json.loads(rebalanced.to_spec_json())["positions"]]
+    quantities = [p["quantity"] for p in json.loads(rebalanced.to_json())["positions"]]
     assert quantities == [0.0, 3.0]
 
     foreign = json.loads(result.to_json())

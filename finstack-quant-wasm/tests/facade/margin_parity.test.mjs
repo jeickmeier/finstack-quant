@@ -137,54 +137,27 @@ test('constants() is the Rust MarginConstants value Python publishes as CONSTANT
   close(margin.constants(), golden.constants, 'constants');
 });
 
-test('enum-variant twins return the wire labels and fromStr validates', () => {
+test('enum-variant literals are the Python wire labels and fromStr validates', () => {
+  // A payload-free Python enum variant has no WASM function: its twin is the
+  // TypeScript string literal, which Rust accepts as the canonical label.
   const labels = golden.labels;
-  assert.deepEqual(
-    [
-      margin.imMethodologyHaircut(),
-      margin.imMethodologySimm(),
-      margin.imMethodologySchedule(),
-      margin.imMethodologyInternalModel(),
-      margin.imMethodologyClearingHouse(),
-      margin.imMethodologyFromStr('simm'),
-    ],
-    labels.im_methodology
-  );
-  assert.deepEqual(
-    [
-      margin.marginTenorDaily(),
-      margin.marginTenorWeekly(),
-      margin.marginTenorMonthly(),
-      margin.marginTenorOnDemand(),
-      margin.marginTenorFromStr('weekly'),
-    ],
-    labels.margin_tenor
-  );
-  assert.deepEqual(
-    [
-      margin.marginCallTypeInitialMargin(),
-      margin.marginCallTypeVariationMarginPost(),
-      margin.marginCallTypeVariationMarginCollect(),
-      margin.marginCallTypeTopUp(),
-      margin.marginCallTypeSubstitution(),
-      margin.marginCallTypeFromStr('top_up'),
-    ],
-    labels.margin_call_type
-  );
-  assert.deepEqual(
-    [
-      margin.collateralAssetClassCash(),
-      margin.collateralAssetClassGovernmentBonds(),
-      margin.collateralAssetClassAgencyBonds(),
-      margin.collateralAssetClassCoveredBonds(),
-      margin.collateralAssetClassCorporateBonds(),
-      margin.collateralAssetClassEquity(),
-      margin.collateralAssetClassGold(),
-      margin.collateralAssetClassMutualFunds(),
-      margin.collateralAssetClassFromStr('gold'),
-    ],
-    labels.collateral_asset_class
-  );
+  for (const [fromStr, values] of [
+    [margin.imMethodologyFromStr, labels.im_methodology],
+    [margin.marginTenorFromStr, labels.margin_tenor],
+    [margin.marginCallTypeFromStr, labels.margin_call_type],
+    [margin.collateralAssetClassFromStr, labels.collateral_asset_class],
+  ]) {
+    for (const label of values) assert.equal(fromStr(label), label);
+  }
+  assert.deepEqual(labels.im_methodology.slice(0, 5), [
+    'haircut',
+    'simm',
+    'schedule',
+    'internal_model',
+    'clearing_house',
+  ]);
+  assert.equal(margin.imMethodologySimm, undefined);
+  assert.equal(margin.marginTenorDaily, undefined);
   for (const fromStr of [
     margin.imMethodologyFromStr,
     margin.marginTenorFromStr,
@@ -197,7 +170,6 @@ test('enum-variant twins return the wire labels and fromStr validates', () => {
 });
 
 test('clearing status and netting-set id factories return the serde values', () => {
-  assert.equal(margin.clearingStatusBilateral(), 'bilateral');
   assert.deepEqual(margin.clearingStatusCleared('LCH'), { cleared: { ccp: 'LCH' } });
   close(margin.nettingSetIdBilateral('CPTY', 'CSA'), golden.netting_set_id.bilateral, 'bilateral');
   close(margin.nettingSetIdCleared('LCH'), golden.netting_set_id.cleared, 'cleared');
@@ -232,7 +204,7 @@ test('CsaSpec twins build, amend, apply and validate plain specifications', () =
   );
   close(margin.csaSpecWithIm(usd, 'schedule', 10, 50_000_000, 500_000, false), csa.with_im, 'im');
   close(
-    margin.csaSpecWithIm(usd, margin.imMethodologySimm(), 10, 0, 0),
+    margin.csaSpecWithIm(usd, 'simm', 10, 0, 0),
     csa.with_im_default_segregated,
     'im default segregated'
   );
@@ -368,7 +340,7 @@ test('FundingConfig, profile and decay twins match Python', () => {
   );
   throwsKind(() => margin.fundingConfigEffectiveBenefitBp({ funding_spread_bp: -1 }), 'validation');
 
-  const constant = margin.imDecayProfileConstant();
+  const constant = 'constant';
   const linear = margin.imDecayProfileLinearToMaturity(5.0);
   const sqrtTime = margin.imDecayProfileSqrtTime(4.0);
   close(constant, xva.decay.constant, 'constant');

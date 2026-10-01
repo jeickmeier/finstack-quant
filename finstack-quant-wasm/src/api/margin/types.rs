@@ -3,8 +3,10 @@
 //!
 //! These Rust types cross the boundary as plain JSON values (the generated
 //! `ImMethodology`, `MarginTenor`, `CsaSpec`, … TypeScript types). The
-//! functions here are the twins of the Python class factories and methods:
-//! each takes and returns the plain value.
+//! functions here are the twins of the Python class factories and methods
+//! that validate, default or compute in Rust: each takes and returns the
+//! plain value. A payload-free enum variant (`"simm"`, `"daily"`, `"cash"`)
+//! has no function; its twin is the TypeScript string literal.
 
 use super::{base_money, js_currency};
 use crate::utils::input::{from_js_json, js_f64, js_opt_bool, js_opt_f64, js_string, js_uint};
@@ -24,41 +26,6 @@ where
 // ImMethodology
 // ---------------------------------------------------------------------------
 
-/// Haircut-based initial margin methodology label (repos and securities financing).
-/// @returns The `ImMethodology` wire label `"haircut"`.
-#[wasm_bindgen(js_name = imMethodologyHaircut)]
-pub fn im_methodology_haircut() -> String {
-    fm::ImMethodology::Haircut.to_string()
-}
-
-/// ISDA SIMM initial margin methodology label (sensitivities-based, OTC derivatives).
-/// @returns The `ImMethodology` wire label `"simm"`.
-#[wasm_bindgen(js_name = imMethodologySimm)]
-pub fn im_methodology_simm() -> String {
-    fm::ImMethodology::Simm.to_string()
-}
-
-/// BCBS-IOSCO regulatory schedule initial margin methodology label.
-/// @returns The `ImMethodology` wire label `"schedule"`.
-#[wasm_bindgen(js_name = imMethodologySchedule)]
-pub fn im_methodology_schedule() -> String {
-    fm::ImMethodology::Schedule.to_string()
-}
-
-/// Regulator-approved internal model initial margin methodology label.
-/// @returns The `ImMethodology` wire label `"internal_model"`.
-#[wasm_bindgen(js_name = imMethodologyInternalModel)]
-pub fn im_methodology_internal_model() -> String {
-    fm::ImMethodology::InternalModel.to_string()
-}
-
-/// Clearing-house (CCP-specific) initial margin methodology label.
-/// @returns The `ImMethodology` wire label `"clearing_house"`.
-#[wasm_bindgen(js_name = imMethodologyClearingHouse)]
-pub fn im_methodology_clearing_house() -> String {
-    fm::ImMethodology::ClearingHouse.to_string()
-}
-
 /// Parse an initial margin methodology from its lower-case wire label.
 /// @param s - One of `"haircut"`, `"simm"`, `"schedule"`, `"internal_model"`, `"clearing_house"`.
 /// @returns The canonical `ImMethodology` wire label.
@@ -74,34 +41,6 @@ pub fn im_methodology_from_str(s: JsValue) -> Result<String, JsValue> {
 // ---------------------------------------------------------------------------
 // MarginTenor
 // ---------------------------------------------------------------------------
-
-/// Daily margin call frequency label (standard for OTC derivatives since 2016).
-/// @returns The `MarginTenor` wire label `"daily"`.
-#[wasm_bindgen(js_name = marginTenorDaily)]
-pub fn margin_tenor_daily() -> String {
-    fm::MarginTenor::Daily.to_string()
-}
-
-/// Weekly margin call frequency label.
-/// @returns The `MarginTenor` wire label `"weekly"`.
-#[wasm_bindgen(js_name = marginTenorWeekly)]
-pub fn margin_tenor_weekly() -> String {
-    fm::MarginTenor::Weekly.to_string()
-}
-
-/// Monthly margin call frequency label.
-/// @returns The `MarginTenor` wire label `"monthly"`.
-#[wasm_bindgen(js_name = marginTenorMonthly)]
-pub fn margin_tenor_monthly() -> String {
-    fm::MarginTenor::Monthly.to_string()
-}
-
-/// On-demand margin call frequency label.
-/// @returns The `MarginTenor` wire label `"on_demand"`.
-#[wasm_bindgen(js_name = marginTenorOnDemand)]
-pub fn margin_tenor_on_demand() -> String {
-    fm::MarginTenor::OnDemand.to_string()
-}
 
 /// Parse a margin call frequency from its lower-case wire label.
 /// @param s - One of `"daily"`, `"weekly"`, `"monthly"`, `"on_demand"`.
@@ -119,41 +58,6 @@ pub fn margin_tenor_from_str(s: JsValue) -> Result<String, JsValue> {
 // MarginCallType
 // ---------------------------------------------------------------------------
 
-/// Initial margin call type label.
-/// @returns The `MarginCallType` wire label `"initial_margin"`.
-#[wasm_bindgen(js_name = marginCallTypeInitialMargin)]
-pub fn margin_call_type_initial_margin() -> String {
-    fm::MarginCallType::InitialMargin.to_string()
-}
-
-/// Variation margin delivery (the desk posts) call type label.
-/// @returns The `MarginCallType` wire label `"variation_margin_post"`.
-#[wasm_bindgen(js_name = marginCallTypeVariationMarginPost)]
-pub fn margin_call_type_variation_margin_post() -> String {
-    fm::MarginCallType::VariationMarginPost.to_string()
-}
-
-/// Variation margin return (the desk collects) call type label.
-/// @returns The `MarginCallType` wire label `"variation_margin_collect"`.
-#[wasm_bindgen(js_name = marginCallTypeVariationMarginCollect)]
-pub fn margin_call_type_variation_margin_collect() -> String {
-    fm::MarginCallType::VariationMarginCollect.to_string()
-}
-
-/// Top-up call type label (additional margin after a threshold breach).
-/// @returns The `MarginCallType` wire label `"top_up"`.
-#[wasm_bindgen(js_name = marginCallTypeTopUp)]
-pub fn margin_call_type_top_up() -> String {
-    fm::MarginCallType::TopUp.to_string()
-}
-
-/// Collateral substitution call type label.
-/// @returns The `MarginCallType` wire label `"substitution"`.
-#[wasm_bindgen(js_name = marginCallTypeSubstitution)]
-pub fn margin_call_type_substitution() -> String {
-    fm::MarginCallType::Substitution.to_string()
-}
-
 /// Parse a margin call type from its lower-case wire label.
 /// @param s - One of `"initial_margin"`, `"variation_margin_post"`, `"variation_margin_collect"`, `"top_up"`, `"substitution"`.
 /// @returns The canonical `MarginCallType` wire label.
@@ -169,17 +73,6 @@ pub fn margin_call_type_from_str(s: JsValue) -> Result<String, JsValue> {
 // ---------------------------------------------------------------------------
 // ClearingStatus
 // ---------------------------------------------------------------------------
-
-/// Bilateral (non-cleared) clearing status.
-/// @returns The `ClearingStatus` value `"bilateral"`.
-///
-/// # Errors
-///
-/// Throws if the value cannot be converted to a JavaScript value.
-#[wasm_bindgen(js_name = clearingStatusBilateral)]
-pub fn clearing_status_bilateral() -> Result<JsValue, JsValue> {
-    to_js_value(&fm::ClearingStatus::Bilateral)
-}
 
 /// Cleared status through a named central counterparty.
 /// @param ccp - CCP identifier, for example `"LCH"`, `"CME"`, `"ICE"` or `"JSCC"`.
@@ -197,62 +90,6 @@ pub fn clearing_status_cleared(ccp: JsValue) -> Result<JsValue, JsValue> {
 // ---------------------------------------------------------------------------
 // CollateralAssetClass
 // ---------------------------------------------------------------------------
-
-/// Cash collateral asset class label.
-/// @returns The `CollateralAssetClass` wire label `"cash"`.
-#[wasm_bindgen(js_name = collateralAssetClassCash)]
-pub fn collateral_asset_class_cash() -> String {
-    fm::CollateralAssetClass::Cash.to_string()
-}
-
-/// Sovereign government bond collateral asset class label.
-/// @returns The `CollateralAssetClass` wire label `"government_bonds"`.
-#[wasm_bindgen(js_name = collateralAssetClassGovernmentBonds)]
-pub fn collateral_asset_class_government_bonds() -> String {
-    fm::CollateralAssetClass::GovernmentBonds.to_string()
-}
-
-/// Agency bond collateral asset class label.
-/// @returns The `CollateralAssetClass` wire label `"agency_bonds"`.
-#[wasm_bindgen(js_name = collateralAssetClassAgencyBonds)]
-pub fn collateral_asset_class_agency_bonds() -> String {
-    fm::CollateralAssetClass::AgencyBonds.to_string()
-}
-
-/// Covered bond collateral asset class label.
-/// @returns The `CollateralAssetClass` wire label `"covered_bonds"`.
-#[wasm_bindgen(js_name = collateralAssetClassCoveredBonds)]
-pub fn collateral_asset_class_covered_bonds() -> String {
-    fm::CollateralAssetClass::CoveredBonds.to_string()
-}
-
-/// Investment-grade corporate bond collateral asset class label.
-/// @returns The `CollateralAssetClass` wire label `"corporate_bonds"`.
-#[wasm_bindgen(js_name = collateralAssetClassCorporateBonds)]
-pub fn collateral_asset_class_corporate_bonds() -> String {
-    fm::CollateralAssetClass::CorporateBonds.to_string()
-}
-
-/// Listed equity collateral asset class label.
-/// @returns The `CollateralAssetClass` wire label `"equity"`.
-#[wasm_bindgen(js_name = collateralAssetClassEquity)]
-pub fn collateral_asset_class_equity() -> String {
-    fm::CollateralAssetClass::Equity.to_string()
-}
-
-/// Gold collateral asset class label.
-/// @returns The `CollateralAssetClass` wire label `"gold"`.
-#[wasm_bindgen(js_name = collateralAssetClassGold)]
-pub fn collateral_asset_class_gold() -> String {
-    fm::CollateralAssetClass::Gold.to_string()
-}
-
-/// Mutual fund / ETF collateral asset class label.
-/// @returns The `CollateralAssetClass` wire label `"mutual_funds"`.
-#[wasm_bindgen(js_name = collateralAssetClassMutualFunds)]
-pub fn collateral_asset_class_mutual_funds() -> String {
-    fm::CollateralAssetClass::MutualFunds.to_string()
-}
 
 /// Parse a collateral asset class from its lower-case wire label.
 /// @param s - One of `"cash"`, `"government_bonds"`, `"agency_bonds"`, `"covered_bonds"`, `"corporate_bonds"`, `"equity"`, `"gold"`, `"mutual_funds"`.

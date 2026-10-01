@@ -609,12 +609,12 @@ impl JsStructuredCredit {
 
     /// Monte Carlo stochastic price of the deal.
     ///
-    /// Mirrors Rust `StructuredCredit::price_stochastic_monte_carlo`. Call
+    /// Mirrors Rust `StructuredCredit::price_stochastic`. Call
     /// `enableStochastic()` first when the deal carries no stochastic specs.
     /// @param market_json - Canonical market-context JSON (string or plain object) supplying the discount and forward curves.
     /// @param as_of - ISO-8601 valuation date.
     /// @param num_paths - Optional number of independent estimators; omit to use `model_config.mc_paths` (default 5,000).
-    /// @param antithetic - Optional antithetic pairing; `true` (the default) simulates `2 x numPaths` scenario paths.
+    /// @param antithetic - Optional antithetic pairing (`true` simulates `2 x numPaths` scenario paths); omit to use `model_config.mc_antithetic` (default `true`).
     /// @returns `StochasticPricingResult` plain object with NPV, expected and unexpected loss, expected shortfall and per-tranche results.
     /// @throws Error - Throws with kind `not_found` if a curve is missing, kind `validation` if an input is malformed or the deal has no stochastic specs, and kind `computation` if the simulation fails.
     #[wasm_bindgen(js_name = priceStochastic)]
@@ -628,12 +628,11 @@ impl JsStructuredCredit {
         let market = super::market(&market_json)?;
         let as_of = super::as_of(&as_of)?;
         let num_paths = crate::utils::input::js_opt_uint(num_paths.as_ref(), "numPaths")?;
-        let antithetic =
-            crate::utils::input::js_opt_bool(antithetic.as_ref(), "antithetic")?.unwrap_or(true);
+        let antithetic = crate::utils::input::js_opt_bool(antithetic.as_ref(), "antithetic")?;
         crate::utils::to_js_value(
             &self
                 .inner
-                .price_stochastic_monte_carlo(&market, as_of, num_paths, antithetic)
+                .price_stochastic(&market, as_of, num_paths, antithetic)
                 .map_err(to_js_err)?,
         )
     }

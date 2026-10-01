@@ -79,18 +79,28 @@ class TestReduceCoverage:
         assert not missing, f"JSON-capable classes without __reduce__: {sorted(set(missing))}"
 
     def test_known_unpicklable_types_are_exactly_the_documented_set(self) -> None:
-        """A type with `to_json` but no `from_json` cannot pickle.
+        """A type with `to_json` but no `from_json` cannot pickle through the JSON bridge.
 
         The coverage test above requires BOTH methods, so it would silently
         exempt any such type rather than flag it. Pin the known set instead, so
         a new result type that ships without a `from_json` fails here.
 
-        The set is currently empty: every type carrying `to_json` also carries
-        `from_json`. Keep it that way — a new result type that ships without a
-        `from_json` fails here rather than silently losing pickle support.
+        A class that defines its own `__reduce__` on another constructor is
+        pickleable by construction (`Portfolio` rebuilds through `from_spec`,
+        the twin of its `to_json`), and
+        `test_reduce_is_backed_by_a_working_constructor` checks that route.
+
+        The set is currently empty: every other type carrying `to_json` also
+        carries `from_json`. Keep it that way — a new result type that ships
+        without a `from_json` fails here rather than silently losing pickle
+        support.
         """
         expected: set[str] = set()
-        actual = {name for name, cls in _walk_classes() if hasattr(cls, "to_json") and not hasattr(cls, "from_json")}
+        actual = {
+            name
+            for name, cls in _walk_classes()
+            if hasattr(cls, "to_json") and not hasattr(cls, "from_json") and "__reduce__" not in cls.__dict__
+        }
         assert actual == expected, (
             f"un-pickleable set changed.\n  newly un-pickleable: {sorted(actual - expected)}\n"
             f"  now fixed (drop from `expected`): {sorted(expected - actual)}"

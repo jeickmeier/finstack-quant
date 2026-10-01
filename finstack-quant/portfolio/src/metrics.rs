@@ -182,6 +182,26 @@ impl PortfolioMetrics {
         self.aggregated.get(metric_id).map(|m| m.total)
     }
 
+    /// Get the aggregated total of one metric, failing when it was not produced.
+    ///
+    /// # Arguments
+    ///
+    /// * `metric_id` - Fully qualified identifier of the metric to retrieve
+    ///   (for example `dv01` or `bucketed_dv01::USD-OIS::10y`).
+    ///
+    /// # Errors
+    ///
+    /// Returns a not-found [`crate::Error`] naming `metric_id` when no
+    /// aggregate was produced for it.
+    pub fn require_total(&self, metric_id: &str) -> crate::Result<f64> {
+        self.get_total(metric_id).ok_or_else(|| {
+            finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound {
+                id: format!("metric '{metric_id}'"),
+            })
+            .into()
+        })
+    }
+
     /// Return decoded components and aggregate payloads for a composite metric.
     ///
     /// Entries retain the deterministic insertion order of [`Self::aggregated`].

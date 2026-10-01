@@ -88,17 +88,6 @@ pub fn im_profile_validate(im_profile: JsValue) -> Result<(), JsValue> {
 // ImDecayProfile
 // ---------------------------------------------------------------------------
 
-/// Constant IM decay profile: IM stays at today's level for the whole horizon.
-/// @returns The `ImDecayProfile` value `"constant"`.
-///
-/// # Errors
-///
-/// Throws if the value cannot be converted to a JavaScript value.
-#[wasm_bindgen(js_name = imDecayProfileConstant)]
-pub fn im_decay_profile_constant() -> Result<JsValue, JsValue> {
-    to_js_value(&mva::ImDecayProfile::Constant)
-}
-
 /// Linear IM decay profile: `factor(t) = max(1 - t/T, 0)`.
 /// @param maturity_years - Portfolio maturity `T` in years; positive and finite.
 /// @returns The `ImDecayProfile` value `{ linear_to_maturity: { maturity_years } }`.

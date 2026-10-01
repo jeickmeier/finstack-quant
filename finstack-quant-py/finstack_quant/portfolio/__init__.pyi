@@ -1444,17 +1444,40 @@ class Portfolio:
         """
         ...
 
-    def to_spec_json(self) -> str:
+    def to_spec(self) -> dict[str, Any]:
+        """
+        Return the canonical ``PortfolioSpec`` of the portfolio as a plain dict.
+
+        Mirrors Rust ``Portfolio::to_spec``. The dict (or its JSON form from
+        :meth:`to_json`) is the input accepted by :meth:`from_spec`.
+
+        Returns
+        -------
+        dict[str, Any]
+            ``PortfolioSpec`` wire object: identifier, base currency, valuation
+            date, entities, books and positions with their instrument specs.
+
+        Raises
+        ------
+        ValueError
+            If the specification cannot be converted to Python objects.
+        """
+        ...
+
+    def to_json(self) -> str:
         """
         Serialize the portfolio back to its canonical ``PortfolioSpec`` JSON.
+
         Returns
         -------
         str
-            Compact canonical JSON reconstructed as a ``PortfolioSpec``.
+            Compact canonical JSON of :meth:`to_spec`, accepted by
+            :meth:`from_spec`.
 
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
+        Raises
+        ------
+        ValueError
+            If the specification cannot be serialized.
         """
         ...
 

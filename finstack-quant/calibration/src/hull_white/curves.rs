@@ -6,10 +6,10 @@
 //! ([`ModelDiscountCurve`]) once for every caller.
 
 use super::{
-    bootstrap_hull_white_sigma_schedule_to_cap_floors, calibrate_hull_white_to_cap_floors,
-    calibrate_hull_white_to_swaptions, CapFloorCalibrationConfig, CapFloorQuote,
-    HullWhiteCalibrationParams, HullWhiteParams, PiecewiseSigmaCalibrationConfig, SwapFrequency,
-    SwaptionQuote,
+    bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn,
+    calibrate_hull_white_to_cap_floors_with_fn, calibrate_hull_white_to_swaptions_with_fn,
+    CapFloorCalibrationConfig, CapFloorQuote, HullWhiteCalibrationParams, HullWhiteParams,
+    PiecewiseSigmaCalibrationConfig, SwapFrequency, SwaptionQuote,
 };
 use crate::CalibrationReport;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -36,7 +36,7 @@ fn with_model_curves<T>(
 
 /// Calibrate scalar Hull-White `(κ, σ)` to ATM swaption quotes on a discount curve.
 ///
-/// Curve-input form of [`calibrate_hull_white_to_swaptions`] with the
+/// Curve-input form of [`calibrate_hull_white_to_swaptions_with_fn`] with the
 /// synthetic constant-period fixed-leg schedule (no contractual schedules).
 ///
 /// # Arguments
@@ -58,7 +58,7 @@ fn with_model_curves<T>(
 /// Returns a validation error for a non-positive `fit_tolerance`, fewer than
 /// two quotes, an invalid quote or an unusable discount curve, and a
 /// calibration error when the solver does not converge.
-pub fn calibrate_hull_white_to_swaptions_from_curve(
+pub fn calibrate_hull_white_to_swaptions(
     discount: &DiscountCurve,
     quotes: &[SwaptionQuote],
     frequency: SwapFrequency,
@@ -66,13 +66,20 @@ pub fn calibrate_hull_white_to_swaptions_from_curve(
     fit_tolerance: f64,
 ) -> Result<(HullWhiteCalibrationParams, CalibrationReport)> {
     with_model_curves(discount, None, |df, _| {
-        calibrate_hull_white_to_swaptions(df, quotes, frequency, None, initial_guess, fit_tolerance)
+        calibrate_hull_white_to_swaptions_with_fn(
+            df,
+            quotes,
+            frequency,
+            None,
+            initial_guess,
+            fit_tolerance,
+        )
     })
 }
 
 /// Calibrate scalar Hull-White `(κ, σ)` to cap/floor quotes on market curves.
 ///
-/// Curve-input form of [`calibrate_hull_white_to_cap_floors`].
+/// Curve-input form of [`calibrate_hull_white_to_cap_floors_with_fn`].
 ///
 /// # Arguments
 ///
@@ -91,20 +98,20 @@ pub fn calibrate_hull_white_to_swaptions_from_curve(
 /// Returns a validation error when no quotes are supplied, a single quote is
 /// given without `config.fixed_kappa`, the tolerance is not positive or a
 /// curve is unusable, and a calibration error when the solver does not converge.
-pub fn calibrate_hull_white_to_cap_floors_from_curves(
+pub fn calibrate_hull_white_to_cap_floors(
     discount: &DiscountCurve,
     forward: Option<&DiscountCurve>,
     quotes: &[CapFloorQuote],
     config: CapFloorCalibrationConfig,
 ) -> Result<(HullWhiteCalibrationParams, CalibrationReport)> {
     with_model_curves(discount, forward, |discount_df, forward_df| {
-        calibrate_hull_white_to_cap_floors(discount_df, forward_df, quotes, config)
+        calibrate_hull_white_to_cap_floors_with_fn(discount_df, forward_df, quotes, config)
     })
 }
 
 /// Bootstrap a piecewise-constant Hull-White sigma schedule to cap/floor quotes on market curves.
 ///
-/// Curve-input form of [`bootstrap_hull_white_sigma_schedule_to_cap_floors`].
+/// Curve-input form of [`bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn`].
 ///
 /// # Arguments
 ///
@@ -122,14 +129,19 @@ pub fn calibrate_hull_white_to_cap_floors_from_curves(
 /// Returns a validation error when no quotes are supplied, maturities repeat,
 /// the configuration bounds are invalid or a curve is unusable, and a
 /// calibration error when an interval's sigma cannot be bracketed or solved.
-pub fn bootstrap_hull_white_sigma_schedule_to_cap_floors_from_curves(
+pub fn bootstrap_hull_white_sigma_schedule_to_cap_floors(
     discount: &DiscountCurve,
     forward: Option<&DiscountCurve>,
     quotes: &[CapFloorQuote],
     config: PiecewiseSigmaCalibrationConfig,
 ) -> Result<(HullWhiteParams, CalibrationReport)> {
     with_model_curves(discount, forward, |discount_df, forward_df| {
-        bootstrap_hull_white_sigma_schedule_to_cap_floors(discount_df, forward_df, quotes, config)
+        bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn(
+            discount_df,
+            forward_df,
+            quotes,
+            config,
+        )
     })
 }
 
@@ -172,18 +184,18 @@ mod tests {
             sigma_max: 0.1,
             frequency: SwapFrequency::SemiAnnual,
         };
-        let (from_curve, _) = bootstrap_hull_white_sigma_schedule_to_cap_floors_from_curves(
-            &curve,
-            None,
+        let (from_curve, _) =
+            bootstrap_hull_white_sigma_schedule_to_cap_floors(&curve, None, &cap_quotes(), config)
+                .expect("curve form");
+        let model = ModelDiscountCurve::new(&curve, curve.base_date()).expect("model curve");
+        let df = |t: f64| model.get_df(t).unwrap_or(f64::NAN);
+        let (from_closure, _) = bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn(
+            &df,
+            &df,
             &cap_quotes(),
             config,
         )
-        .expect("curve form");
-        let model = ModelDiscountCurve::new(&curve, curve.base_date()).expect("model curve");
-        let df = |t: f64| model.get_df(t).unwrap_or(f64::NAN);
-        let (from_closure, _) =
-            bootstrap_hull_white_sigma_schedule_to_cap_floors(&df, &df, &cap_quotes(), config)
-                .expect("closure form");
+        .expect("closure form");
         assert_eq!(from_curve, from_closure);
     }
 
@@ -198,10 +210,9 @@ mod tests {
         };
         let quote = [cap_quotes()[1]];
         let (single, _) =
-            calibrate_hull_white_to_cap_floors_from_curves(&curve, None, &quote, config)
-                .expect("single curve");
+            calibrate_hull_white_to_cap_floors(&curve, None, &quote, config).expect("single curve");
         let (explicit, _) =
-            calibrate_hull_white_to_cap_floors_from_curves(&curve, Some(&curve), &quote, config)
+            calibrate_hull_white_to_cap_floors(&curve, Some(&curve), &quote, config)
                 .expect("explicit forward");
         assert_eq!(single, explicit);
     }
@@ -210,7 +221,7 @@ mod tests {
     fn swaption_curve_form_requires_two_quotes() {
         let curve = flat_curve("USD-OIS", 0.03);
         let quote = [SwaptionQuote::try_new(1.0, 5.0, 0.0065, true).expect("quote")];
-        let error = calibrate_hull_white_to_swaptions_from_curve(
+        let error = calibrate_hull_white_to_swaptions(
             &curve,
             &quote,
             SwapFrequency::SemiAnnual,

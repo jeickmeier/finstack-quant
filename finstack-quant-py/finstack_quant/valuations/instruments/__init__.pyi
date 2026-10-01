@@ -23096,7 +23096,7 @@ class StructuredCredit:
         market: MarketContext | str,
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         num_paths: int | None = None,
-        antithetic: bool = True,
+        antithetic: bool | None = None,
     ) -> StochasticPricingResult:
         """
         Price the deal with the scenario-waterfall Monte Carlo engine.
@@ -23117,8 +23117,9 @@ class StructuredCredit:
             deal's configured ``mc_paths`` override or 5,000. With
             ``antithetic`` each estimator simulates a mirrored pair, so
             ``2 * num_paths`` paths run.
-        antithetic : bool, default True
-            Pair each estimator's path with its sign-flipped mirror.
+        antithetic : bool, optional
+            Pair each estimator's path with its sign-flipped mirror; defaults
+            to the deal's configured ``mc_antithetic`` override or ``True``.
 
         Returns
         -------

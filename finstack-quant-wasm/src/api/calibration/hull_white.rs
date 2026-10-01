@@ -16,10 +16,8 @@ use crate::api::core::market_data::JsDiscountCurve;
 use crate::utils::input::{from_js_json, js_f64, js_opt_string};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_calibration::hull_white::{
-    bootstrap_hull_white_sigma_schedule_to_cap_floors_from_curves,
-    calibrate_hull_white_to_cap_floors_from_curves, calibrate_hull_white_to_swaptions_from_curve,
-    CapFloorCalibrationConfig, CapFloorQuote, HullWhiteCalibrationParams, HullWhiteParams,
-    PiecewiseSigmaCalibrationConfig, SwapFrequency, SwaptionQuote,
+    self as rust_hw, CapFloorCalibrationConfig, CapFloorQuote, HullWhiteCalibrationParams,
+    HullWhiteParams, PiecewiseSigmaCalibrationConfig, SwapFrequency, SwaptionQuote,
 };
 use wasm_bindgen::prelude::*;
 
@@ -34,7 +32,7 @@ fn parse_frequency(frequency: Option<&str>) -> finstack_quant_core::Result<SwapF
 /// Fit scalar Hull-White `(kappa, sigma)` to at-the-money swaption quotes.
 ///
 /// Twin of Python `calibrate_hull_white_to_swaptions` (Rust
-/// `calibrate_hull_white_to_swaptions_from_curve`).
+/// `calibrate_hull_white_to_swaptions`).
 /// @param discount - Discount curve the swap annuities and forward swap rates are read from; its base date is the valuation date.
 /// @param quotes - Array (or JSON) of at least two `SwaptionQuote` objects: `expiry` and `tenor` in years, `volatility` as a decimal, `is_normal_vol`.
 /// @param fit_tolerance - Required positive maximum reconstructed quote error: decimal rate volatility for normal quotes, relative volatility for Black quotes.
@@ -65,7 +63,7 @@ pub fn calibrate_hull_white_to_swaptions(
         }
         _ => None,
     };
-    let fitted = calibrate_hull_white_to_swaptions_from_curve(
+    let fitted = rust_hw::calibrate_hull_white_to_swaptions(
         &discount.inner,
         &quotes,
         frequency,
@@ -79,7 +77,7 @@ pub fn calibrate_hull_white_to_swaptions(
 /// Fit scalar Hull-White `(kappa, sigma)` to cap/floor quotes.
 ///
 /// Twin of Python `calibrate_hull_white_to_cap_floors` (Rust
-/// `calibrate_hull_white_to_cap_floors_from_curves`).
+/// `calibrate_hull_white_to_cap_floors`).
 /// @param discount - Discounting curve; its base date is the valuation date.
 /// @param quotes - Array (or JSON) of `CapFloorQuote` objects: `maturity` in years, `strike` and `volatility` as decimals, `is_cap`, `is_normal_vol`. A single quote requires `config.fixed_kappa`.
 /// @param config - `CapFloorCalibrationConfig` object: required `fit_tolerance` (normal-vol units), optional `frequency` (default `"semi_annual"`), `fixed_kappa` and `initial_guess`.
@@ -101,7 +99,7 @@ pub fn calibrate_hull_white_to_cap_floors(
 ) -> Result<JsValue, JsValue> {
     let quotes: Vec<CapFloorQuote> = from_js_json(&quotes, "quotes")?;
     let config: CapFloorCalibrationConfig = from_js_json(&config, "config")?;
-    let fitted = calibrate_hull_white_to_cap_floors_from_curves(
+    let fitted = rust_hw::calibrate_hull_white_to_cap_floors(
         &discount.inner,
         Some(&forward.inner),
         &quotes,
@@ -114,7 +112,7 @@ pub fn calibrate_hull_white_to_cap_floors(
 /// Bootstrap a piecewise-constant Hull-White sigma schedule to cap/floor quotes.
 ///
 /// Twin of Python `bootstrap_hull_white_sigma_schedule_to_cap_floors` (Rust
-/// `bootstrap_hull_white_sigma_schedule_to_cap_floors_from_curves`).
+/// `bootstrap_hull_white_sigma_schedule_to_cap_floors`).
 /// @param discount - Discounting curve; its base date is the valuation date.
 /// @param quotes - Array (or JSON) of `CapFloorQuote` objects with distinct maturities in years; each maturity adds one constant-sigma interval.
 /// @param config - `PiecewiseSigmaCalibrationConfig` object: `fixed_kappa`, `sigma_min`, `sigma_max` (absolute rate volatility), `fit_tolerance` and optional `frequency` (default `"semi_annual"`).
@@ -136,7 +134,7 @@ pub fn bootstrap_hull_white_sigma_schedule_to_cap_floors(
 ) -> Result<JsValue, JsValue> {
     let quotes: Vec<CapFloorQuote> = from_js_json(&quotes, "quotes")?;
     let config: PiecewiseSigmaCalibrationConfig = from_js_json(&config, "config")?;
-    let fitted = bootstrap_hull_white_sigma_schedule_to_cap_floors_from_curves(
+    let fitted = rust_hw::bootstrap_hull_white_sigma_schedule_to_cap_floors(
         &discount.inner,
         Some(&forward.inner),
         &quotes,

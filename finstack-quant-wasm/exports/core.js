@@ -51,7 +51,10 @@ const marketContextInserts = [
 });
 wasm.MarketContext.prototype.insert = function insert(curve) {
   for (const [curveClass, insertTyped] of marketContextInserts) {
-    if (curve instanceof curveClass) return insertTyped.call(this, curve);
+    if (curve instanceof curveClass) {
+      insertTyped.call(this, curve);
+      return this;
+    }
   }
   const error = new TypeError(
     'curve: expected a DiscountCurve, ForwardCurve, HazardCurve, InflationCurve, PriceCurve, BaseCorrelationCurve, VolSurface, FxDeltaVolSurface or VolCube'
@@ -59,6 +62,41 @@ wasm.MarketContext.prototype.insert = function insert(curve) {
   error.kind = 'invalid_type';
   throw error;
 };
+
+// Fluent mutators update the receiver in place and return it, as the Python
+// twins do (Rust `MarketContext::insert_*` and the schedule builder return the
+// builder). wasm-bindgen cannot return the receiver of a `&mut self` method,
+// so the Rust methods return nothing and `this` is returned here.
+const chain = (cls, names) => {
+  for (const name of names) {
+    const raw = cls.prototype[name];
+    cls.prototype[name] = {
+      [name](...args) {
+        raw.apply(this, args);
+        return this;
+      },
+    }[name];
+  }
+};
+chain(wasm.MarketContext, [
+  'insertFx',
+  'insertPrice',
+  'insertCreditIndex',
+  'insertSeries',
+  'insertInflationIndex',
+  'mapCollateral',
+]);
+chain(wasm.ScheduleBuilder, [
+  'frequency',
+  'stubRule',
+  'adjustWith',
+  'paymentLagDays',
+  'fixingLagBusinessDays',
+  'endOfMonth',
+  'cdsImm',
+  'imm',
+  'errorPolicy',
+]);
 
 export const core = {
   Currency: wasm.Currency,

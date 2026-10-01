@@ -526,12 +526,11 @@ test('handles round-trip through their JSON wire form', () => {
   assert.equal(core.CurveId.fromJson(new core.CurveId('USD-OIS').toJson()).toString(), 'USD-OIS');
 });
 
-test('ScheduleBuilder setters return a new builder and leave the receiver unchanged', () => {
+test('ScheduleBuilder setters update the builder in place and round-trip its spec', () => {
   const base = core.Schedule.builder(ep('2025-01-15'), ep('2025-07-15'));
-  const before = base.toSpec().frequency;
   const quarterly = base.frequency('3M');
-  assert.deepEqual(base.toSpec().frequency, before);
-  assert.deepEqual(quarterly.toSpec().frequency, { count: 3, unit: 'months' });
+  assert.equal(quarterly, base);
+  assert.deepEqual(base.toSpec().frequency, { count: 3, unit: 'months' });
   assert.equal(quarterly.build().dates.length, 3);
   assert.equal(core.Schedule.fromSpec(quarterly.toSpec()).toJson(), quarterly.build().toJson());
   const imm = base.cdsImm().imm().toSpec();

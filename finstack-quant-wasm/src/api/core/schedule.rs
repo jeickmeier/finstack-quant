@@ -320,9 +320,10 @@ impl JsSchedule {
 
 /// Fluent builder for a `Schedule`.
 ///
-/// As with the consuming Rust builder, every setter returns a new builder
-/// and leaves the receiver unchanged, so settings must be chained (or the
-/// returned builder kept).
+/// Every setter updates this builder in place and returns it, so settings
+/// can be chained or applied one statement at a time, exactly as in Python.
+/// wasm-bindgen cannot return the receiver, so the setters are bound without
+/// a return value and `exports/core.js` returns `this` from each.
 ///
 /// @example
 /// ```typescript
@@ -351,15 +352,14 @@ impl JsScheduleBuilder {
     /// * `frequency` - Tenor text such as `"3M"`, `"6M"` or `"1Y"` (use
     ///   `tenor.toString()` for a `Tenor`).
     ///
-    /// @returns A new builder with the setting applied; this builder is unchanged.
+    /// @returns This builder, updated in place.
     /// @throws `TypeError` if `frequency` is not a string; `FinstackError`
     /// (kind `validation`) if it is not a tenor.
     #[wasm_bindgen(js_name = frequency)]
-    pub fn frequency(&self, frequency: JsValue) -> Result<JsScheduleBuilder, JsValue> {
-        let mut next = self.clone();
-        next.spec.frequency =
+    pub fn frequency(&mut self, frequency: JsValue) -> Result<(), JsValue> {
+        self.spec.frequency =
             Tenor::parse(&js_string(&frequency, "frequency")?).map_err(to_js_err)?;
-        Ok(next)
+        Ok(())
     }
 
     /// Set the stub rule.
@@ -370,16 +370,15 @@ impl JsScheduleBuilder {
     ///   `"long_front"` or `"long_back"` (use `stubKind.toString()` for a
     ///   `StubKind`).
     ///
-    /// @returns A new builder with the setting applied; this builder is unchanged.
+    /// @returns This builder, updated in place.
     /// @throws `TypeError` if `stub` is not a string; `FinstackError` (kind
     /// `validation`) if no stub rule matches.
     #[wasm_bindgen(js_name = stubRule)]
-    pub fn stub_rule(&self, stub: JsValue) -> Result<JsScheduleBuilder, JsValue> {
-        let mut next = self.clone();
-        next.spec.stub = js_string(&stub, "stub")?
+    pub fn stub_rule(&mut self, stub: JsValue) -> Result<(), JsValue> {
+        self.spec.stub = js_string(&stub, "stub")?
             .parse::<StubKind>()
             .map_err(to_js_err)?;
-        Ok(next)
+        Ok(())
     }
 
     /// Adjust payment dates with a business-day convention and calendar.
@@ -391,23 +390,18 @@ impl JsScheduleBuilder {
     /// * `calendar` - Registered holiday-calendar id (for example `"nyse"`);
     ///   it is resolved when the schedule is built, under the error policy.
     ///
-    /// @returns A new builder with the setting applied; this builder is unchanged.
+    /// @returns This builder, updated in place.
     /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
     /// `validation`) if the convention is unknown.
     #[wasm_bindgen(js_name = adjustWith)]
-    pub fn adjust_with(
-        &self,
-        convention: JsValue,
-        calendar: JsValue,
-    ) -> Result<JsScheduleBuilder, JsValue> {
-        let mut next = self.clone();
-        next.spec.business_day_convention = Some(
-            js_string(&convention, "convention")?
-                .parse::<BusinessDayConvention>()
-                .map_err(to_js_err)?,
-        );
-        next.spec.calendar_id = Some(js_string(&calendar, "calendar")?);
-        Ok(next)
+    pub fn adjust_with(&mut self, convention: JsValue, calendar: JsValue) -> Result<(), JsValue> {
+        let convention = js_string(&convention, "convention")?
+            .parse::<BusinessDayConvention>()
+            .map_err(to_js_err)?;
+        let calendar = js_string(&calendar, "calendar")?;
+        self.spec.business_day_convention = Some(convention);
+        self.spec.calendar_id = Some(calendar);
+        Ok(())
     }
 
     /// Set the payment lag in business days after each adjusted period end.
@@ -417,13 +411,12 @@ impl JsScheduleBuilder {
     /// * `lag` - Signed number of business days; `0` pays on the period end.
     ///   A non-zero lag needs a calendar (`adjustWith`), or `build` fails.
     ///
-    /// @returns A new builder with the setting applied; this builder is unchanged.
+    /// @returns This builder, updated in place.
     /// @throws `TypeError` if `lag` is not an integer.
     #[wasm_bindgen(js_name = paymentLagDays)]
-    pub fn payment_lag_days(&self, lag: JsValue) -> Result<JsScheduleBuilder, JsValue> {
-        let mut next = self.clone();
-        next.spec.payment_lag_days = js_int(&lag, "lag")?;
-        Ok(next)
+    pub fn payment_lag_days(&mut self, lag: JsValue) -> Result<(), JsValue> {
+        self.spec.payment_lag_days = js_int(&lag, "lag")?;
+        Ok(())
     }
 
     /// Set the fixing lag in business days before each period's accrual start.
@@ -433,13 +426,12 @@ impl JsScheduleBuilder {
     /// * `lag` - Number of business days the fixing precedes the accrual
     ///   start; it needs a calendar (`adjustWith`), or `build` fails.
     ///
-    /// @returns A new builder with the setting applied; this builder is unchanged.
+    /// @returns This builder, updated in place.
     /// @throws `TypeError` if `lag` is not an integer.
     #[wasm_bindgen(js_name = fixingLagBusinessDays)]
-    pub fn fixing_lag_business_days(&self, lag: JsValue) -> Result<JsScheduleBuilder, JsValue> {
-        let mut next = self.clone();
-        next.spec.fixing_lag_business_days = Some(js_int(&lag, "lag")?);
-        Ok(next)
+    pub fn fixing_lag_business_days(&mut self, lag: JsValue) -> Result<(), JsValue> {
+        self.spec.fixing_lag_business_days = Some(js_int(&lag, "lag")?);
+        Ok(())
     }
 
     /// Enable or disable end-of-month rolling.
@@ -449,35 +441,30 @@ impl JsScheduleBuilder {
     /// * `eom` - `true` keeps period ends on the last day of the month when
     ///   the anchor date is a month end.
     ///
-    /// @returns A new builder with the setting applied; this builder is unchanged.
+    /// @returns This builder, updated in place.
     /// @throws `TypeError` if `eom` is not a boolean.
     #[wasm_bindgen(js_name = endOfMonth)]
-    pub fn end_of_month(&self, eom: JsValue) -> Result<JsScheduleBuilder, JsValue> {
-        let mut next = self.clone();
-        next.spec.end_of_month = js_bool(&eom, "eom")?;
-        Ok(next)
+    pub fn end_of_month(&mut self, eom: JsValue) -> Result<(), JsValue> {
+        self.spec.end_of_month = js_bool(&eom, "eom")?;
+        Ok(())
     }
 
     /// Use CDS IMM dates (the 20th of March, June, September and December).
     ///
-    /// @returns A new builder with CDS IMM mode on and standard IMM mode off.
+    /// @returns This builder, with CDS IMM mode on and standard IMM mode off.
     #[wasm_bindgen(js_name = cdsImm)]
-    pub fn cds_imm(&self) -> JsScheduleBuilder {
-        let mut next = self.clone();
-        next.spec.cds_imm_mode = true;
-        next.spec.imm_mode = false;
-        next
+    pub fn cds_imm(&mut self) {
+        self.spec.cds_imm_mode = true;
+        self.spec.imm_mode = false;
     }
 
     /// Use standard IMM dates (the third Wednesday of quarterly months).
     ///
-    /// @returns A new builder with standard IMM mode on and CDS IMM mode off.
+    /// @returns This builder, with standard IMM mode on and CDS IMM mode off.
     #[wasm_bindgen(js_name = imm)]
-    pub fn imm(&self) -> JsScheduleBuilder {
-        let mut next = self.clone();
-        next.spec.imm_mode = true;
-        next.spec.cds_imm_mode = false;
-        next
+    pub fn imm(&mut self) {
+        self.spec.imm_mode = true;
+        self.spec.cds_imm_mode = false;
     }
 
     /// Set the policy for recoverable construction errors.
@@ -487,14 +474,13 @@ impl JsScheduleBuilder {
     /// * `policy` - Policy name: `"strict"`, `"missing_calendar_warning"` or
     ///   `"graceful_empty"`.
     ///
-    /// @returns A new builder with the setting applied; this builder is unchanged.
+    /// @returns This builder, updated in place.
     /// @throws `TypeError` if `policy` is not a string; `FinstackError` (kind
     /// `validation`) if no policy matches.
     #[wasm_bindgen(js_name = errorPolicy)]
-    pub fn error_policy(&self, policy: JsValue) -> Result<JsScheduleBuilder, JsValue> {
-        let mut next = self.clone();
-        next.spec.error_policy = serde_parse(&js_string(&policy, "policy")?).map_err(to_js_err)?;
-        Ok(next)
+    pub fn error_policy(&mut self, policy: JsValue) -> Result<(), JsValue> {
+        self.spec.error_policy = serde_parse(&js_string(&policy, "policy")?).map_err(to_js_err)?;
+        Ok(())
     }
 
     /// The persisted specification this builder holds.

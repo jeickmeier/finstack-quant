@@ -125,7 +125,7 @@ class TestPortfolioBuilder:
 
     def test_portfolio_equality_and_pickle(self) -> None:
         pf = _portfolio()
-        assert pf == Portfolio.from_spec(pf.to_spec_json())
+        assert pf == Portfolio.from_spec(pf.to_json())
         assert pf != Portfolio.builder("other", "USD", AS_OF).build()
         assert pickle.loads(pickle.dumps(pf)) == pf  # noqa: S301
 

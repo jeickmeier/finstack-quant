@@ -4347,15 +4347,17 @@ export interface MarketContext extends WasmOwned {
    * delta-quoted surfaces; and SABR cubes. The context is changed in place.
    *
    * @param curve - A `DiscountCurve`, `ForwardCurve`, `HazardCurve`, `InflationCurve`, `PriceCurve`, `BaseCorrelationCurve`, `VolSurface`, `FxDeltaVolSurface` or `VolCube` handle; its data is shared with the context, not copied.
+   * @returns This context, updated in place, so calls can be chained.
    * @throws `TypeError` (kind `invalid_type`) if `curve` is not one of those handles.
    */
-  insert(curve: MarketContextCurve): void;
+  insert(curve: MarketContextCurve): MarketContext;
   /**
    * Attach the FX matrix used for currency conversion (Rust `MarketContext::insert_fx_mut`).
    *
    * @param fx - FX matrix to attach; it replaces any matrix already attached and is shared, so later `setQuote` calls on it are visible here.
+   * @returns This context, updated in place, so calls can be chained.
    */
-  insertFx(fx: FxMatrix): void;
+  insertFx(fx: FxMatrix): MarketContext;
   /**
    * Store a market scalar: a unitless number, or a price in a currency
    * (Rust `MarketContext::insert_price_mut`).
@@ -4363,39 +4365,44 @@ export interface MarketContext extends WasmOwned {
    * @param id - Identifier to store the scalar under.
    * @param value - Finite scalar value: an index level, a spot price, a recovery assumption and so on.
    * @param currency - ISO-4217 code that makes the scalar a monetary price; omitted stores a unitless number.
+   * @returns This context, updated in place, so calls can be chained.
    * @throws `TypeError` (kind `invalid_type`) for a mistyped argument; `FinstackError` (kind `validation`) for an unknown currency or a monetary value that is not finite.
    */
-  insertPrice(id: string, value: number, currency?: string | null): void;
+  insertPrice(id: string, value: number, currency?: string | null): MarketContext;
   /**
    * Store credit-index market data (Rust `MarketContext::insert_credit_index_mut`).
    *
    * @param id - Identifier of the index, such as `"CDX-IG-43"`.
    * @param data - Constituent count, recovery, index hazard curve and base-correlation curve of the index.
+   * @returns This context, updated in place, so calls can be chained.
    * @throws `TypeError` if `id` is not a string.
    */
-  insertCreditIndex(id: string, data: CreditIndexData): void;
+  insertCreditIndex(id: string, data: CreditIndexData): MarketContext;
   /**
    * Store a scalar time series under its own id (Rust `MarketContext::insert_series_mut`).
    *
    * @param series - Series to store; one with the same id is replaced.
+   * @returns This context, updated in place, so calls can be chained.
    */
-  insertSeries(series: ScalarTimeSeries): void;
+  insertSeries(series: ScalarTimeSeries): MarketContext;
   /**
    * Store an inflation index under its own id (Rust
    * `MarketContext::insert_inflation_index_mut`).
    *
    * @param index - Inflation index to store; one with the same id is replaced.
+   * @returns This context, updated in place, so calls can be chained.
    */
-  insertInflationIndex(index: InflationIndex): void;
+  insertInflationIndex(index: InflationIndex): MarketContext;
   /**
    * Map a CSA code to the discount curve used for collateralised trades
    * (Rust `MarketContext::map_collateral_mut`).
    *
    * @param csaCode - Credit-support-annex code, such as `"USD-CSA"`.
    * @param discountId - Identifier of the discount curve to use for that CSA; it is resolved when a collateral curve is requested.
+   * @returns This context, updated in place, so calls can be chained.
    * @throws `TypeError` if an argument is not a string.
    */
-  mapCollateral(csaCode: string, discountId: string): void;
+  mapCollateral(csaCode: string, discountId: string): MarketContext;
   /**
    * Look up a discount curve by id (Rust `MarketContext::get_discount`).
    *
@@ -5405,9 +5412,8 @@ export interface ScheduleConstructor {
 /**
  * Fluent builder for a `Schedule`.
  *
- * As with the consuming Rust builder, every setter returns a new builder
- * and leaves the receiver unchanged, so settings must be chained (or the
- * returned builder kept).
+ * Every setter updates this builder in place and returns it, so settings
+ * can be chained or applied one statement at a time, exactly as in Python.
  *
  * @example
  * ```typescript
@@ -5426,7 +5432,7 @@ export interface ScheduleBuilder extends WasmOwned {
    * Set the period frequency.
    *
    * @param frequency - Tenor text such as `"3M"`, `"6M"` or `"1Y"` (use `tenor.toString()` for a `Tenor`).
-   * @returns A new builder with the setting applied; this builder is unchanged.
+   * @returns This builder, updated in place.
    * @throws `TypeError` if `frequency` is not a string; `FinstackError` (kind `validation`) if it is not a tenor.
    */
   frequency(frequency: string): ScheduleBuilder;
@@ -5434,7 +5440,7 @@ export interface ScheduleBuilder extends WasmOwned {
    * Set the stub rule.
    *
    * @param stub - Stub name: `"none"`, `"short_front"`, `"short_back"`, `"long_front"` or `"long_back"` (use `stubKind.toString()` for a `StubKind`).
-   * @returns A new builder with the setting applied; this builder is unchanged.
+   * @returns This builder, updated in place.
    * @throws `TypeError` if `stub` is not a string; `FinstackError` (kind `validation`) if no stub rule matches.
    */
   stubRule(stub: string): ScheduleBuilder;
@@ -5443,7 +5449,7 @@ export interface ScheduleBuilder extends WasmOwned {
    *
    * @param convention - Business-day convention name such as `"modified_following"`.
    * @param calendar - Registered holiday-calendar id (for example `"nyse"`); it is resolved when the schedule is built, under the error policy.
-   * @returns A new builder with the setting applied; this builder is unchanged.
+   * @returns This builder, updated in place.
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) if the convention is unknown.
    */
   adjustWith(convention: string, calendar: string): ScheduleBuilder;
@@ -5451,7 +5457,7 @@ export interface ScheduleBuilder extends WasmOwned {
    * Set the payment lag in business days after each adjusted period end.
    *
    * @param lag - Signed number of business days; `0` pays on the period end. A non-zero lag needs a calendar (`adjustWith`), or `build` fails.
-   * @returns A new builder with the setting applied; this builder is unchanged.
+   * @returns This builder, updated in place.
    * @throws `TypeError` if `lag` is not an integer.
    */
   paymentLagDays(lag: number): ScheduleBuilder;
@@ -5459,7 +5465,7 @@ export interface ScheduleBuilder extends WasmOwned {
    * Set the fixing lag in business days before each period's accrual start.
    *
    * @param lag - Number of business days the fixing precedes the accrual start; it needs a calendar (`adjustWith`), or `build` fails.
-   * @returns A new builder with the setting applied; this builder is unchanged.
+   * @returns This builder, updated in place.
    * @throws `TypeError` if `lag` is not an integer.
    */
   fixingLagBusinessDays(lag: number): ScheduleBuilder;
@@ -5467,27 +5473,27 @@ export interface ScheduleBuilder extends WasmOwned {
    * Enable or disable end-of-month rolling.
    *
    * @param eom - `true` keeps period ends on the last day of the month when the anchor date is a month end.
-   * @returns A new builder with the setting applied; this builder is unchanged.
+   * @returns This builder, updated in place.
    * @throws `TypeError` if `eom` is not a boolean.
    */
   endOfMonth(eom: boolean): ScheduleBuilder;
   /**
    * Use CDS IMM dates (the 20th of March, June, September and December).
    *
-   * @returns A new builder with CDS IMM mode on and standard IMM mode off.
+   * @returns This builder, with CDS IMM mode on and standard IMM mode off.
    */
   cdsImm(): ScheduleBuilder;
   /**
    * Use standard IMM dates (the third Wednesday of quarterly months).
    *
-   * @returns A new builder with standard IMM mode on and CDS IMM mode off.
+   * @returns This builder, with standard IMM mode on and CDS IMM mode off.
    */
   imm(): ScheduleBuilder;
   /**
    * Set the policy for recoverable construction errors.
    *
    * @param policy - Policy name: `"strict"`, `"missing_calendar_warning"` or `"graceful_empty"`.
-   * @returns A new builder with the setting applied; this builder is unchanged.
+   * @returns This builder, updated in place.
    * @throws `TypeError` if `policy` is not a string; `FinstackError` (kind `validation`) if no policy matches.
    */
   errorPolicy(policy: string): ScheduleBuilder;
@@ -5510,9 +5516,8 @@ export interface ScheduleBuilder extends WasmOwned {
 /**
  * Fluent builder for a `Schedule`.
  *
- * As with the consuming Rust builder, every setter returns a new builder
- * and leaves the receiver unchanged, so settings must be chained (or the
- * returned builder kept).
+ * Every setter updates this builder in place and returns it, so settings
+ * can be chained or applied one statement at a time, exactly as in Python.
  *
  * @example
  * ```typescript
@@ -13194,57 +13199,12 @@ export interface MarginNamespace {
     alpha?: number | null
   ): EadResult;
   /**
-   * Haircut-based initial margin methodology label (repos and securities financing).
-   * @returns The `ImMethodology` wire label `"haircut"`.
-   */
-  imMethodologyHaircut(): ImMethodology;
-  /**
-   * ISDA SIMM initial margin methodology label (sensitivities-based, OTC derivatives).
-   * @returns The `ImMethodology` wire label `"simm"`.
-   */
-  imMethodologySimm(): ImMethodology;
-  /**
-   * BCBS-IOSCO regulatory schedule initial margin methodology label.
-   * @returns The `ImMethodology` wire label `"schedule"`.
-   */
-  imMethodologySchedule(): ImMethodology;
-  /**
-   * Regulator-approved internal model initial margin methodology label.
-   * @returns The `ImMethodology` wire label `"internal_model"`.
-   */
-  imMethodologyInternalModel(): ImMethodology;
-  /**
-   * Clearing-house (CCP-specific) initial margin methodology label.
-   * @returns The `ImMethodology` wire label `"clearing_house"`.
-   */
-  imMethodologyClearingHouse(): ImMethodology;
-  /**
    * Parse an initial margin methodology from its lower-case wire label.
    * @param s - One of `"haircut"`, `"simm"`, `"schedule"`, `"internal_model"`, `"clearing_house"`.
    * @returns The canonical `ImMethodology` wire label.
    * @throws Error - Throws a validation error for any other spelling, including `"SIMM"`.
    */
   imMethodologyFromStr(s: string): ImMethodology;
-  /**
-   * Daily margin call frequency label (standard for OTC derivatives since 2016).
-   * @returns The `MarginTenor` wire label `"daily"`.
-   */
-  marginTenorDaily(): MarginTenor;
-  /**
-   * Weekly margin call frequency label.
-   * @returns The `MarginTenor` wire label `"weekly"`.
-   */
-  marginTenorWeekly(): MarginTenor;
-  /**
-   * Monthly margin call frequency label.
-   * @returns The `MarginTenor` wire label `"monthly"`.
-   */
-  marginTenorMonthly(): MarginTenor;
-  /**
-   * On-demand margin call frequency label.
-   * @returns The `MarginTenor` wire label `"on_demand"`.
-   */
-  marginTenorOnDemand(): MarginTenor;
   /**
    * Parse a margin call frequency from its lower-case wire label.
    * @param s - One of `"daily"`, `"weekly"`, `"monthly"`, `"on_demand"`.
@@ -13253,31 +13213,6 @@ export interface MarginNamespace {
    */
   marginTenorFromStr(s: string): MarginTenor;
   /**
-   * Initial margin call type label.
-   * @returns The `MarginCallType` wire label `"initial_margin"`.
-   */
-  marginCallTypeInitialMargin(): MarginCallType;
-  /**
-   * Variation margin delivery (the desk posts) call type label.
-   * @returns The `MarginCallType` wire label `"variation_margin_post"`.
-   */
-  marginCallTypeVariationMarginPost(): MarginCallType;
-  /**
-   * Variation margin return (the desk collects) call type label.
-   * @returns The `MarginCallType` wire label `"variation_margin_collect"`.
-   */
-  marginCallTypeVariationMarginCollect(): MarginCallType;
-  /**
-   * Top-up call type label (additional margin after a threshold breach).
-   * @returns The `MarginCallType` wire label `"top_up"`.
-   */
-  marginCallTypeTopUp(): MarginCallType;
-  /**
-   * Collateral substitution call type label.
-   * @returns The `MarginCallType` wire label `"substitution"`.
-   */
-  marginCallTypeSubstitution(): MarginCallType;
-  /**
    * Parse a margin call type from its lower-case wire label.
    * @param s - One of `"initial_margin"`, `"variation_margin_post"`, `"variation_margin_collect"`, `"top_up"`, `"substitution"`.
    * @returns The canonical `MarginCallType` wire label.
@@ -13285,58 +13220,12 @@ export interface MarginNamespace {
    */
   marginCallTypeFromStr(s: string): MarginCallType;
   /**
-   * Bilateral (non-cleared) clearing status.
-   * @returns The `ClearingStatus` value `"bilateral"`.
-   * @throws Error - Throws if the value cannot be converted to a JavaScript value.
-   */
-  clearingStatusBilateral(): ClearingStatus;
-  /**
    * Cleared status through a named central counterparty.
    * @param ccp - CCP identifier, for example `"LCH"`, `"CME"`, `"ICE"` or `"JSCC"`.
    * @returns The `ClearingStatus` value `{ cleared: { ccp } }`.
    * @throws Error - Throws a `TypeError` when `ccp` is not a string.
    */
   clearingStatusCleared(ccp: string): ClearingStatus;
-  /**
-   * Cash collateral asset class label.
-   * @returns The `CollateralAssetClass` wire label `"cash"`.
-   */
-  collateralAssetClassCash(): CollateralAssetClass;
-  /**
-   * Sovereign government bond collateral asset class label.
-   * @returns The `CollateralAssetClass` wire label `"government_bonds"`.
-   */
-  collateralAssetClassGovernmentBonds(): CollateralAssetClass;
-  /**
-   * Agency bond collateral asset class label.
-   * @returns The `CollateralAssetClass` wire label `"agency_bonds"`.
-   */
-  collateralAssetClassAgencyBonds(): CollateralAssetClass;
-  /**
-   * Covered bond collateral asset class label.
-   * @returns The `CollateralAssetClass` wire label `"covered_bonds"`.
-   */
-  collateralAssetClassCoveredBonds(): CollateralAssetClass;
-  /**
-   * Investment-grade corporate bond collateral asset class label.
-   * @returns The `CollateralAssetClass` wire label `"corporate_bonds"`.
-   */
-  collateralAssetClassCorporateBonds(): CollateralAssetClass;
-  /**
-   * Listed equity collateral asset class label.
-   * @returns The `CollateralAssetClass` wire label `"equity"`.
-   */
-  collateralAssetClassEquity(): CollateralAssetClass;
-  /**
-   * Gold collateral asset class label.
-   * @returns The `CollateralAssetClass` wire label `"gold"`.
-   */
-  collateralAssetClassGold(): CollateralAssetClass;
-  /**
-   * Mutual fund / ETF collateral asset class label.
-   * @returns The `CollateralAssetClass` wire label `"mutual_funds"`.
-   */
-  collateralAssetClassMutualFunds(): CollateralAssetClass;
   /**
    * Parse a collateral asset class from its lower-case wire label.
    * @param s - One of `"cash"`, `"government_bonds"`, `"agency_bonds"`, `"covered_bonds"`, `"corporate_bonds"`, `"equity"`, `"gold"`, `"mutual_funds"`.
@@ -13672,12 +13561,6 @@ export interface MarginNamespace {
    * @throws Error - Throws if the profile is malformed, empty, has mismatched lengths, a non-positive or non-increasing time, or a negative or non-finite IM value.
    */
   imProfileValidate(imProfile: ImProfile | string): void;
-  /**
-   * Constant IM decay profile: IM stays at today's level for the whole horizon.
-   * @returns The `ImDecayProfile` value `"constant"`.
-   * @throws Error - Throws if the value cannot be converted to a JavaScript value.
-   */
-  imDecayProfileConstant(): ImDecayProfile;
   /**
    * Linear IM decay profile: `factor(t) = max(1 - t/T, 0)`.
    * @param maturityYears - Portfolio maturity `T` in years; positive and finite.
@@ -21175,11 +21058,11 @@ export interface StructuredCredit extends WasmOwned {
   /**
    * Monte Carlo stochastic price of the deal.
    *
-   * Mirrors Rust `StructuredCredit::price_stochastic_monte_carlo`. Call `enableStochastic()` first when the deal carries no stochastic specs.
+   * Mirrors Rust `StructuredCredit::price_stochastic`. Call `enableStochastic()` first when the deal carries no stochastic specs.
    * @param marketJson - Canonical market-context JSON (string or plain object) supplying the discount and forward curves.
    * @param asOf - ISO-8601 valuation date.
    * @param numPaths - Optional number of independent estimators; omit to use `model_config.mc_paths` (default 5,000).
-   * @param antithetic - Optional antithetic pairing; `true` (the default) simulates `2 x numPaths` scenario paths.
+   * @param antithetic - Optional antithetic pairing (`true` simulates `2 x numPaths` scenario paths); omit to use `model_config.mc_antithetic` (default `true`).
    * @returns `StochasticPricingResult` plain object with NPV, expected and unexpected loss, expected shortfall and per-tranche results.
    * @throws Error - Throws with kind `not_found` if a curve is missing, kind `validation` if an input is malformed or the deal has no stochastic specs, and kind `computation` if the simulation fails.
    */
@@ -29079,7 +28962,7 @@ export interface CalibrationNamespace {
    * Fit scalar Hull-White `(kappa, sigma)` to at-the-money swaption quotes.
    *
    * Twin of Python `calibrate_hull_white_to_swaptions` (Rust
-   * `calibrate_hull_white_to_swaptions_from_curve`).
+   * `calibrate_hull_white_to_swaptions`).
    * @param discount - Discount curve the swap annuities and forward swap rates are read from; its base date is the valuation date.
    * @param quotes - Array (or JSON) of at least two `SwaptionQuote` objects: `expiry` and `tenor` in years, `volatility` as a decimal, `is_normal_vol`.
    * @param fitTolerance - Required positive maximum reconstructed quote error: decimal rate volatility for normal quotes, relative volatility for Black quotes.
@@ -29099,7 +28982,7 @@ export interface CalibrationNamespace {
    * Fit scalar Hull-White `(kappa, sigma)` to cap/floor quotes.
    *
    * Twin of Python `calibrate_hull_white_to_cap_floors` (Rust
-   * `calibrate_hull_white_to_cap_floors_from_curves`).
+   * `calibrate_hull_white_to_cap_floors`).
    * @param discount - Discounting curve; its base date is the valuation date.
    * @param quotes - Array (or JSON) of `CapFloorQuote` objects: `maturity` in years, `strike` and `volatility` as decimals, `is_cap`, `is_normal_vol`. A single quote requires `config.fixed_kappa`.
    * @param config - `CapFloorCalibrationConfig` object: required `fit_tolerance` (normal-vol units), optional `frequency` (default `"semi_annual"`), `fixed_kappa` and `initial_guess`.
@@ -29117,7 +29000,7 @@ export interface CalibrationNamespace {
    * Bootstrap a piecewise-constant Hull-White sigma schedule to cap/floor quotes.
    *
    * Twin of Python `bootstrap_hull_white_sigma_schedule_to_cap_floors` (Rust
-   * `bootstrap_hull_white_sigma_schedule_to_cap_floors_from_curves`).
+   * `bootstrap_hull_white_sigma_schedule_to_cap_floors`).
    * @param discount - Discounting curve; its base date is the valuation date.
    * @param quotes - Array (or JSON) of `CapFloorQuote` objects with distinct maturities in years; each maturity adds one constant-sigma interval.
    * @param config - `PiecewiseSigmaCalibrationConfig` object: `fixed_kappa`, `sigma_min`, `sigma_max` (absolute rate volatility), `fit_tolerance` and optional `frequency` (default `"semi_annual"`).
@@ -32611,8 +32494,14 @@ declare class Portfolio {
    */
   numPositions(): number;
   /**
-   * Serialize the portable portfolio specification.
-   * @returns Canonical JSON string.
+   * Canonical `PortfolioSpec` of the portfolio (Rust `Portfolio::to_spec`).
+   * @returns Plain `PortfolioSpec` object accepted by `Portfolio.fromSpec`.
+   * @throws Error - Throws a JavaScript exception if the specification cannot be converted to a JavaScript value.
+   */
+  toSpec(): generated.portfolio.PortfolioSpec;
+  /**
+   * Serialize the canonical portfolio specification (Rust `Portfolio::to_spec`).
+   * @returns Canonical JSON string accepted by `Portfolio.fromSpec`.
    * @throws Error - Throws a JavaScript exception if the canonical portfolio specification cannot be serialized to JSON.
    */
   toJson(): string;
@@ -33522,6 +33411,142 @@ export interface PortfolioNamespace {
   portfolioOptimizationResultBindingConstraints(
     result: PortfolioOptimizationResult | string
   ): [string, number][];
+  /**
+   * Executable trade list of an optimization result.
+   *
+   * Twin of Python `PortfolioOptimizationResult.to_trade_list` (Rust
+   * `PortfolioOptimizationResultWire::to_trade_list`): the trades from current
+   * to target quantities, largest absolute quantity change first.
+   * @param result - `PortfolioOptimizationResult` object or JSON from `optimizePortfolio`.
+   * @returns The `TradeSpec` rows; empty for an infeasible solve (check `is_feasible`).
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `result` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the optimization-result schema.
+   */
+  portfolioOptimizationResultToTradeList(result: PortfolioOptimizationResult | string): TradeSpec[];
+  /**
+   * Look up one metric's portfolio-wide total, failing when it was not aggregated.
+   *
+   * Twin of Python `PortfolioResult.require_metric` (Rust
+   * `PortfolioMetrics::require_total`, which `PortfolioResult::require_metric`
+   * calls on its metrics).
+   * @param metrics - `PortfolioMetrics` object or JSON from `aggregateMetrics`.
+   * @param metricId - Fully qualified metric key (for example `dv01` or `bucketed_dv01::USD-OIS::10y`).
+   * @returns The aggregated total in base-currency metric units.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `metrics` is not a JSON string or plain object or `metricId` is not a string, a `FinstackError` (kind `validation`) if `metrics` does not match the `PortfolioMetrics` schema, and a `FinstackError` (kind `not_found`) naming the metric when it was not aggregated.
+   */
+  portfolioMetricsRequireTotal(metrics: PortfolioMetrics | string, metricId: string): number;
+  /**
+   * Read one position-by-factor sensitivity.
+   *
+   * Twin of Python `SensitivityMatrix.delta` (Rust `SensitivityMatrix::try_delta`).
+   * @param matrix - Sensitivity-matrix object or JSON `{ base_currency, position_ids, factor_ids, data }` from `computeFactorSensitivities`.
+   * @param positionIdx - Zero-based row index into `position_ids`.
+   * @param factorIdx - Zero-based column index into `factor_ids`.
+   * @returns The sensitivity in base-currency PV change per factor bump.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `matrix` is not a JSON string or plain object or an index is not a non-negative integer, and a `FinstackError` (kind `validation`) if `matrix` does not match the schema, its rows do not match its axes, or an index is out of bounds.
+   */
+  sensitivityMatrixDelta(
+    matrix: SensitivityMatrixJson | string,
+    positionIdx: number,
+    factorIdx: number
+  ): number;
+  /**
+   * Sensitivities of one position to every factor.
+   *
+   * Twin of Python `SensitivityMatrix.position_deltas` (Rust
+   * `SensitivityMatrix::try_position_deltas`).
+   * @param matrix - Sensitivity-matrix object or JSON from `computeFactorSensitivities`.
+   * @param positionIdx - Zero-based row index into `position_ids`.
+   * @returns One value per factor, in `factor_ids` order.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `matrix` is not a JSON string or plain object or `positionIdx` is not a non-negative integer, and a `FinstackError` (kind `validation`) if `matrix` does not match the schema, its rows do not match its axes, or `positionIdx` is out of bounds.
+   */
+  sensitivityMatrixPositionDeltas(
+    matrix: SensitivityMatrixJson | string,
+    positionIdx: number
+  ): Float64Array;
+  /**
+   * Sensitivities of every position to one factor.
+   *
+   * Twin of Python `SensitivityMatrix.factor_deltas` (Rust
+   * `SensitivityMatrix::try_factor_deltas`).
+   * @param matrix - Sensitivity-matrix object or JSON from `computeFactorSensitivities`.
+   * @param factorIdx - Zero-based column index into `factor_ids`.
+   * @returns One value per position, in `position_ids` order.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `matrix` is not a JSON string or plain object or `factorIdx` is not a non-negative integer, and a `FinstackError` (kind `validation`) if `matrix` does not match the schema, its rows do not match its axes, or `factorIdx` is out of bounds.
+   */
+  sensitivityMatrixFactorDeltas(
+    matrix: SensitivityMatrixJson | string,
+    factorIdx: number
+  ): Float64Array;
+  /**
+   * Build a budget (weight-sum) constraint.
+   *
+   * Twin of Python `Constraint.budget` (Rust `Constraint::budget`).
+   * @param rhs - Target sum of weights as a decimal (`1.0` is fully invested); finite and non-negative.
+   * @returns The `Constraint` object `{ budget: { rhs } }`.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `rhs` is not a number, and a `FinstackError` (kind `validation`) if it is negative or not finite.
+   */
+  constraintBudget(rhs: number): generated.portfolio.Constraint;
+  /**
+   * Build per-position weight bounds for the positions a filter selects.
+   *
+   * Twin of Python `Constraint.weight_bounds` (Rust `Constraint::weight_bounds`).
+   * @param filter - `PositionFilter` value selecting the bounded positions: `"all"` or a filter object such as `{ by_entity_id: "FUND" }`.
+   * @param min - Inclusive minimum weight as a decimal fraction of portfolio value.
+   * @param max - Inclusive maximum weight as a decimal fraction of portfolio value.
+   * @param label - Optional label reported in constraint slacks.
+   * @returns The `weight_bounds` `Constraint` object.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) for a wrong argument type, and a `FinstackError` (kind `validation`) if `filter` does not match the schema or `min > max`.
+   */
+  constraintWeightBounds(
+    filter: generated.portfolio.PositionFilter,
+    min: number,
+    max: number,
+    label?: string | null
+  ): generated.portfolio.Constraint;
+  /**
+   * Build a maximum-turnover constraint: `sum |w_new - w_current| <= maxTurnover`.
+   *
+   * Twin of Python `Constraint.max_turnover` (Rust `Constraint::max_turnover`).
+   * @param maxTurnover - Largest allowed gross turnover as a decimal fraction of portfolio value; non-negative.
+   * @param label - Optional label reported in constraint slacks.
+   * @returns The `max_turnover` `Constraint` object.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) for a wrong argument type, and a `FinstackError` (kind `validation`) if `maxTurnover` is negative.
+   */
+  constraintMaxTurnover(maxTurnover: number, label?: string | null): generated.portfolio.Constraint;
+  /**
+   * Build an attribute exposure cap: `sum w_i * I[attr == value] <= maxShare`.
+   *
+   * Twin of Python `Constraint.exposure_limit` (Rust `Constraint::exposure_limit`).
+   * @param key - Position attribute key (for example `"rating"`).
+   * @param value - Text value the attribute must equal to count toward the exposure.
+   * @param maxShare - Largest allowed share of portfolio weight as a decimal in `[0, 1]`.
+   * @param label - Optional label reported in constraint slacks.
+   * @returns The `metric_bound` `Constraint` object with operator `le`.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) for a wrong argument type, and a `FinstackError` (kind `validation`) if `maxShare` is outside `[0, 1]`.
+   */
+  constraintExposureLimit(
+    key: string,
+    value: string,
+    maxShare: number,
+    label?: string | null
+  ): generated.portfolio.Constraint;
+  /**
+   * Build an attribute exposure floor: `sum w_i * I[attr == value] >= minShare`.
+   *
+   * Twin of Python `Constraint.exposure_minimum` (Rust `Constraint::exposure_minimum`).
+   * @param key - Position attribute key (for example `"sector"`).
+   * @param value - Text value the attribute must equal to count toward the exposure.
+   * @param minShare - Smallest required share of portfolio weight as a decimal in `[0, 1]`.
+   * @param label - Optional label reported in constraint slacks.
+   * @returns The `metric_bound` `Constraint` object with operator `ge`.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) for a wrong argument type, and a `FinstackError` (kind `validation`) if `minShare` is outside `[0, 1]`.
+   */
+  constraintExposureMinimum(
+    key: string,
+    value: string,
+    minShare: number,
+    label?: string | null
+  ): generated.portfolio.Constraint;
 }
 
 /**
@@ -34070,140 +34095,6 @@ export interface ScenariosNamespace {
    * @throws Error - Throws a `TypeError` when `operation` is not an object or JSON string, and a `validation` error when it matches no `OperationSpec` variant.
    */
   operationSpecMutatesInstruments(operation: OperationSpec | string): boolean;
-  /**
-   * Wire label of the discount-factor curve kind.
-   *
-   * Free-function twin of Python `CurveKind.discount` (Rust `CurveKind::Discount`).
-   * @returns `"discount"`, for operations that target a discount curve.
-   * @throws Error - Throws only if the label cannot be converted to a JavaScript value.
-   */
-  curveKindDiscount(): CurveKind;
-  /**
-   * Wire label of the forward-rate curve kind.
-   *
-   * Free-function twin of Python `CurveKind.forward` (Rust `CurveKind::Forward`).
-   * @returns `"forward"`, for operations that target a forward curve.
-   * @throws Error - Throws only if the label cannot be converted to a JavaScript value.
-   */
-  curveKindForward(): CurveKind;
-  /**
-   * Wire label of the par CDS spread curve kind.
-   *
-   * Free-function twin of Python `CurveKind.par_cds` (Rust `CurveKind::ParCDS`).
-   * @returns `"par_cds"`, for operations that shock par CDS spreads.
-   * @throws Error - Throws only if the label cannot be converted to a JavaScript value.
-   */
-  curveKindParCds(): CurveKind;
-  /**
-   * Wire label of the inflation index curve kind.
-   *
-   * Free-function twin of Python `CurveKind.inflation` (Rust `CurveKind::Inflation`).
-   * @returns `"inflation"`, for operations that target an inflation curve.
-   * @throws Error - Throws only if the label cannot be converted to a JavaScript value.
-   */
-  curveKindInflation(): CurveKind;
-  /**
-   * Wire label of the commodity forward price curve kind.
-   *
-   * Free-function twin of Python `CurveKind.commodity` (Rust `CurveKind::Commodity`).
-   * @returns `"commodity"`; basis-point shocks on this kind are percent of the forward, not additive bp.
-   * @throws Error - Throws only if the label cannot be converted to a JavaScript value.
-   */
-  curveKindCommodity(): CurveKind;
-  /**
-   * Wire label of exact tenor-pillar matching.
-   *
-   * Free-function twin of Python `TenorMatchMode.exact` (Rust `TenorMatchMode::Exact`).
-   * @returns `"exact"`: the requested tenor must be an existing pillar or the operation fails.
-   * @throws Error - Throws only if the label cannot be converted to a JavaScript value.
-   */
-  tenorMatchModeExact(): TenorMatchMode;
-  /**
-   * Wire label of interpolated tenor-pillar matching.
-   *
-   * Free-function twin of Python `TenorMatchMode.interpolate` (Rust `TenorMatchMode::Interpolate`).
-   * @returns `"interpolate"`: the bump is spread across the adjacent pillars (the Rust default).
-   * @throws Error - Throws only if the label cannot be converted to a JavaScript value.
-   */
-  tenorMatchModeInterpolate(): TenorMatchMode;
-  /**
-   * Wire label of the business-day-adjusted time roll.
-   *
-   * Free-function twin of Python `TimeRollMode.business_days` (Rust `TimeRollMode::BusinessDays`).
-   * @returns `"business_days"`: the roll target is adjusted ModifiedFollowing (the Rust default).
-   * @throws Error - Throws only if the label cannot be converted to a JavaScript value.
-   */
-  timeRollModeBusinessDays(): TimeRollMode;
-  /**
-   * Wire label of the pure calendar-day time roll.
-   *
-   * Free-function twin of Python `TimeRollMode.calendar_days` (Rust `TimeRollMode::CalendarDays`).
-   * @returns `"calendar_days"`: the tenor is added with no business-day adjustment.
-   * @throws Error - Throws only if the label cannot be converted to a JavaScript value.
-   */
-  timeRollModeCalendarDays(): TimeRollMode;
-  /**
-   * Wire label of the approximate fixed-day-count time roll.
-   *
-   * Free-function twin of Python `TimeRollMode.approximate` (Rust `TimeRollMode::Approximate`).
-   * @returns `"approximate"`: fixed day counts, not additive across successive rolls.
-   * @throws Error - Throws only if the label cannot be converted to a JavaScript value.
-   */
-  timeRollModeApproximate(): TimeRollMode;
-  /**
-   * Wire value of simple (non-compounded) interest.
-   *
-   * Free-function twin of Python `Compounding.simple` (Rust `Compounding::Simple`). The
-   * result is the serde value a `RateBindingSpec.compounding` field takes.
-   * @returns `"simple"`.
-   * @throws Error - Throws only if the value cannot be converted to a JavaScript value.
-   */
-  compoundingSimple(): Compounding;
-  /**
-   * Wire value of continuous compounding.
-   *
-   * Free-function twin of Python `Compounding.continuous` (Rust `Compounding::Continuous`). The
-   * result is the serde value a `RateBindingSpec.compounding` field takes.
-   * @returns `"continuous"`, the `RateBindingSpec` default.
-   * @throws Error - Throws only if the value cannot be converted to a JavaScript value.
-   */
-  compoundingContinuous(): Compounding;
-  /**
-   * Wire value of annual compounding.
-   *
-   * Free-function twin of Python `Compounding.annual` (Rust `Compounding::Annual`). The
-   * result is the serde value a `RateBindingSpec.compounding` field takes.
-   * @returns `"annual"`.
-   * @throws Error - Throws only if the value cannot be converted to a JavaScript value.
-   */
-  compoundingAnnual(): Compounding;
-  /**
-   * Wire value of semi-annual compounding.
-   *
-   * Free-function twin of Python `Compounding.semi_annual` (Rust `Compounding::SEMI_ANNUAL`). The
-   * result is the serde value a `RateBindingSpec.compounding` field takes.
-   * @returns `{periodic: 2}` (two compounding periods per year).
-   * @throws Error - Throws only if the value cannot be converted to a JavaScript value.
-   */
-  compoundingSemiAnnual(): Compounding;
-  /**
-   * Wire value of quarterly compounding.
-   *
-   * Free-function twin of Python `Compounding.quarterly` (Rust `Compounding::QUARTERLY`). The
-   * result is the serde value a `RateBindingSpec.compounding` field takes.
-   * @returns `{periodic: 4}` (four compounding periods per year).
-   * @throws Error - Throws only if the value cannot be converted to a JavaScript value.
-   */
-  compoundingQuarterly(): Compounding;
-  /**
-   * Wire value of monthly compounding.
-   *
-   * Free-function twin of Python `Compounding.monthly` (Rust `Compounding::MONTHLY`). The
-   * result is the serde value a `RateBindingSpec.compounding` field takes.
-   * @returns `{periodic: 12}` (twelve compounding periods per year).
-   * @throws Error - Throws only if the value cannot be converted to a JavaScript value.
-   */
-  compoundingMonthly(): Compounding;
   /**
    * Validate a rate binding's identifiers and tenor.
    *
