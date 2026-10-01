@@ -33,11 +33,7 @@ type PiecewiseConfigReduce<'py> = (Bound<'py, PyAny>, (f64, f64, f64, f64, Strin
 const MODULE_DOC: &str = "Direct Hull-White one-factor calibrators (swaptions, caps/floors, piecewise sigma).\n\nThese take a calibrated DiscountCurve and year-fraction quotes; the plan-level\nequivalents are the `hull_white` / `cap_floor_hull_white` calibration steps.\n\nExamples\n--------\n>>> from finstack_quant.calibration.hull_white import SwaptionQuote\n>>> SwaptionQuote(1.0, 5.0, 0.0065).expiry\n1.0\n";
 
 fn parse_frequency(value: &str) -> PyResult<SwapFrequency> {
-    serde_json::from_value(serde_json::Value::String(value.to_string())).map_err(|_| {
-        value_error(format!(
-            "invalid swap frequency '{value}': expected 'annual', 'semi_annual' or 'quarterly'"
-        ))
-    })
+    value.parse().map_err(core_to_py)
 }
 
 fn frequency_name(value: SwapFrequency) -> String {
@@ -764,16 +760,10 @@ fn calibrate_hull_white_to_swaptions(
     let initial_guess = initial_guess.map(|p| p.inner);
     let (params, report) = py
         .detach(move || {
-            let model_curve = finstack_quant_models::rates::clock::ModelDiscountCurve::new(
+            rust_hw::calibrate_hull_white_to_swaptions_from_curve(
                 curve.as_ref(),
-                curve.base_date(),
-            )?;
-            let df = |t| model_curve.get_df(t).unwrap_or(f64::NAN);
-            rust_hw::calibrate_hull_white_to_swaptions(
-                &df,
                 &quotes,
                 frequency,
-                None,
                 initial_guess,
                 fit_tolerance,
             )
@@ -822,24 +812,19 @@ fn calibrate_hull_white_to_cap_floors(
 ) -> PyResult<(PyHullWhiteCalibrationParams, PyCalibrationReport)> {
     let discount = curve_of(discount, "discount")?;
     let forward = match forward {
-        Some(curve) if !curve.is_none() => curve_of(curve, "forward")?,
-        _ => Arc::clone(&discount),
+        Some(curve) if !curve.is_none() => Some(curve_of(curve, "forward")?),
+        _ => None,
     };
     let quotes = cap_floor_quotes(quotes);
     let config = config.inner;
     let (params, report) = py
         .detach(move || {
-            let model_discount = finstack_quant_models::rates::clock::ModelDiscountCurve::new(
+            rust_hw::calibrate_hull_white_to_cap_floors_from_curves(
                 discount.as_ref(),
-                discount.base_date(),
-            )?;
-            let model_forward = finstack_quant_models::rates::clock::ModelDiscountCurve::new(
-                forward.as_ref(),
-                discount.base_date(),
-            )?;
-            let discount_df = |t| model_discount.get_df(t).unwrap_or(f64::NAN);
-            let forward_df = |t| model_forward.get_df(t).unwrap_or(f64::NAN);
-            rust_hw::calibrate_hull_white_to_cap_floors(&discount_df, &forward_df, &quotes, config)
+                forward.as_deref(),
+                &quotes,
+                config,
+            )
         })
         .map_err(core_to_py)?;
     Ok((
@@ -886,26 +871,16 @@ fn bootstrap_hull_white_sigma_schedule_to_cap_floors(
 ) -> PyResult<(PyHullWhiteParams, PyCalibrationReport)> {
     let discount = curve_of(discount, "discount")?;
     let forward = match forward {
-        Some(curve) if !curve.is_none() => curve_of(curve, "forward")?,
-        _ => Arc::clone(&discount),
+        Some(curve) if !curve.is_none() => Some(curve_of(curve, "forward")?),
+        _ => None,
     };
     let quotes = cap_floor_quotes(quotes);
     let config = config.inner;
     let (params, report) = py
         .detach(move || {
-            let model_discount = finstack_quant_models::rates::clock::ModelDiscountCurve::new(
+            rust_hw::bootstrap_hull_white_sigma_schedule_to_cap_floors_from_curves(
                 discount.as_ref(),
-                discount.base_date(),
-            )?;
-            let model_forward = finstack_quant_models::rates::clock::ModelDiscountCurve::new(
-                forward.as_ref(),
-                discount.base_date(),
-            )?;
-            let discount_df = |t| model_discount.get_df(t).unwrap_or(f64::NAN);
-            let forward_df = |t| model_forward.get_df(t).unwrap_or(f64::NAN);
-            rust_hw::bootstrap_hull_white_sigma_schedule_to_cap_floors(
-                &discount_df,
-                &forward_df,
+                forward.as_deref(),
                 &quotes,
                 config,
             )

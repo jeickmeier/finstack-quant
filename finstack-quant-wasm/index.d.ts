@@ -102,7 +102,53 @@ import type {
   PeriodicReturn,
 } from './types/generated/analytics/index.js';
 import type { CovenantReport } from './types/generated/covenants/index.js';
-import type { VmResult, XvaResult } from './types/generated/margin/index.js';
+import type {
+  CrossSectionalOp,
+  PairwiseOp,
+  PanelOperation,
+  PanelTransformColumn,
+  PanelTransformResult,
+  PanelTransformSpec,
+  TimeSeriesOp,
+} from './types/generated/features/index.js';
+import type {
+  ClearingStatus,
+  CollateralAssetClass,
+  ConcentrationBreach,
+  CorrelationScenario,
+  CsaSpec,
+  DrcAssetType,
+  DrcSector,
+  DrcSeniority,
+  EadResult,
+  EligibleCollateralSchedule,
+  ExcessCollateral,
+  ExposureProfile,
+  FrtbRiskClass,
+  FrtbSbaResult,
+  FrtbSensitivities as FrtbSensitivitiesWire,
+  FundingConfig,
+  Haircut01,
+  ImCollateralResult,
+  ImDecayProfile,
+  ImMethodology,
+  ImProfile,
+  ImResult,
+  MarginCall,
+  MarginCallType,
+  MarginConstants,
+  MarginFundingCost,
+  MarginTenor,
+  MarginUtilization,
+  MvaResult,
+  NettingSetId,
+  SaCcrNettingSetConfig,
+  SaCcrTrade,
+  SimmCurvatureSensitivity,
+  SimmSensitivitiesJson,
+  VmResult,
+  XvaResult,
+} from './types/generated/margin/index.js';
 import type {
   ArbitrageValidationResult,
   BsGreeks,
@@ -201,13 +247,21 @@ import type {
 import type {
   ApplicationEnvelope,
   ApplicationReport,
+  AttributionFactor,
+  Compounding,
+  CurveKind,
+  HazardBumpMode,
+  HierarchyTarget,
   HorizonResult,
   HorizonSummary,
   OperationSpec,
+  RateBindingSpec,
   RollForwardReport,
   ScenarioChangeManifest,
   ScenarioSpec,
   TemplateMetadata,
+  TenorMatchMode,
+  TimeRollMode,
   Warning,
 } from './types/generated/scenarios/index.js';
 
@@ -229,7 +283,52 @@ export type {
 export type { TableColumn, TableColumnData, TableEnvelope };
 export type { DrawdownEpisode, LookbackReturns, PeriodicReturn };
 export type { CovenantReport };
-export type { VmResult, XvaResult };
+export type {
+  CrossSectionalOp,
+  PairwiseOp,
+  PanelOperation,
+  PanelTransformColumn,
+  PanelTransformResult,
+  PanelTransformSpec,
+  TimeSeriesOp,
+};
+export type {
+  ClearingStatus,
+  CollateralAssetClass,
+  ConcentrationBreach,
+  CorrelationScenario,
+  CsaSpec,
+  DrcAssetType,
+  DrcSector,
+  DrcSeniority,
+  EadResult,
+  EligibleCollateralSchedule,
+  ExcessCollateral,
+  ExposureProfile,
+  FrtbRiskClass,
+  FrtbSbaResult,
+  FundingConfig,
+  Haircut01,
+  ImCollateralResult,
+  ImDecayProfile,
+  ImMethodology,
+  ImProfile,
+  ImResult,
+  MarginCall,
+  MarginCallType,
+  MarginConstants,
+  MarginFundingCost,
+  MarginTenor,
+  MarginUtilization,
+  MvaResult,
+  NettingSetId,
+  SaCcrNettingSetConfig,
+  SaCcrTrade,
+  SimmCurvatureSensitivity,
+  SimmSensitivitiesJson,
+  VmResult,
+  XvaResult,
+};
 export type {
   ArbitrageValidationResult,
   BsGreeks,
@@ -567,7 +666,7 @@ export interface ReturnContributionResult {
   /**
    * Benchmark-relative (Brinson) attribution when a benchmark is supplied.
    */
-  benchmark_relative?: Record<string, unknown>;
+  benchmark_relative?: Record<string, unknown> | null;
   /**
    * Diagnostic warnings.
    */
@@ -3500,6 +3599,65 @@ declare class Performance {
     frequency?: string
   ): Performance;
   /**
+   * Construct from a ticker-major, column-oriented price matrix.
+   *
+   * Same call as `new Performance(...)`, under the name of Python
+   * `Performance.from_arrays` (Rust `Performance::new`).
+   * @param dates - ISO-8601 observation dates in ascending order, with one entry per value in each inner price series.
+   * @param prices - Ticker-major, column-oriented matrix where `prices[tickerIdx][dateIdx]` is the price for `tickerIdx` at `dates[dateIdx]`.
+   * @param tickerNames - Ticker labels aligned with the outer elements of `prices`.
+   * @param benchmarkTicker - Optional ticker label to use as the benchmark return series.
+   * @param frequency - Optional observation frequency token; defaults to daily.
+   * @returns A `Performance` handle over the returns derived from the price panel.
+   * @throws Error - Rejects malformed dates or matrices, invalid prices, unsupported frequencies, and an unknown benchmark ticker.
+   */
+  static fromArrays(
+    dates: string[],
+    prices: NumericMatrix,
+    tickerNames: string[],
+    benchmarkTicker?: string | null,
+    frequency?: string
+  ): Performance;
+  /**
+   * Construct from a ticker-major, column-oriented return matrix.
+   *
+   * Same call as `Performance.fromReturns(...)`, under the name of Python
+   * `Performance.from_returns_arrays` (Rust `Performance::from_returns`).
+   * @param dates - ISO-8601 observation dates in ascending order, with one entry per value in each inner return series.
+   * @param returns - Ticker-major, column-oriented simple decimal return matrix where `returns[tickerIdx][dateIdx]` is the return for `tickerIdx` at `dates[dateIdx]`.
+   * @param tickerNames - Ticker labels aligned with the outer elements of `returns`.
+   * @param benchmarkTicker - Optional ticker label to use as the benchmark return series.
+   * @param frequency - Optional observation frequency token; defaults to daily.
+   * @returns A `Performance` handle over the supplied return panel.
+   * @throws Error - Rejects malformed dates or matrices and invalid benchmark or frequency inputs.
+   */
+  static fromReturnsArrays(
+    dates: string[],
+    returns: NumericMatrix,
+    tickerNames: string[],
+    benchmarkTicker?: string | null,
+    frequency?: string
+  ): Performance;
+  /**
+   * Rebuild a panel from JSON produced by `toJson`.
+   *
+   * Twin of Python `Performance.from_json`.
+   * @param json - `Performance` JSON string produced by `toJson`, or the equivalent parsed object.
+   * @returns A `Performance` handle equivalent to the serialized one.
+   * @throws Error - Rejects JSON that is malformed or does not describe a valid `Performance` panel.
+   */
+  static fromJson(json: string | Record<string, unknown>): Performance;
+  /**
+   * Serialize the full panel state to compact JSON.
+   *
+   * The JSON holds the dates, return panel, ticker names, benchmark index,
+   * frequency and active date window, so `Performance.fromJson` rebuilds an
+   * equivalent handle. Twin of Python `Performance.to_json`.
+   * @returns Compact JSON string of the Rust `Performance` panel.
+   * @throws Error - Rejects a panel that cannot be serialized.
+   */
+  toJson(): string;
+  /**
    * Restrict subsequent analytics to `[start, end]`.
    * @param start - Inclusive ISO-8601 start date for the active analysis window.
    * @param end - Inclusive ISO-8601 end date for the active analysis window.
@@ -4720,6 +4878,85 @@ export interface FeaturesNamespace {
    * @throws Error - Rejects malformed JSON or panel specifications, blank, reserved (`values`), or duplicate operation names, unknown `input` columns, missing partition columns, unequal row counts, malformed operation parameters, operations that cannot be evaluated, non-finite arithmetic, or a result that cannot be serialized to JSON.
    */
   transformPanelJson(specJson: JsonInput): string;
+  /**
+   * Apply a named panel transform pipeline and return its columns as an object.
+   *
+   * Typed twin of `transformPanelJson` (Rust `transform_panel`). Operations run
+   * sequentially; each reads the previous column unless `input` selects
+   * `"values"` or an earlier operation name.
+   * @param spec - `PanelTransformSpec` object or JSON: `values` (`null` marks a missing row), `operations`, and the `entity` / `order` / `time_key` columns the operations need.
+   * @returns `PanelTransformResult` with one `{name, values}` column per operation, in operation order, row-aligned to `spec.values`.
+   * @throws Error - Throws a `TypeError` when `spec` is not an object or JSON string, and a `validation` error for a malformed specification, blank, reserved (`values`) or duplicate operation names, an unknown `input` column, a missing partition column, unequal row counts, malformed operation parameters or an operation that cannot be evaluated.
+   */
+  transformPanel(spec: PanelTransformSpec | string): PanelTransformResult;
+  /**
+   * Look up one output column of a panel transform result by name.
+   *
+   * Free-function twin of Python `PanelTransformResult.get_column` (Rust
+   * `PanelTransformResult::get_column`).
+   * @param result - `PanelTransformResult` object or JSON returned by `transformPanel` / `transformPanelJson`.
+   * @param name - Operation output name; the lookup is case-sensitive.
+   * @returns The column's values, row-aligned to the input rows, with `null` for missing rows.
+   * @throws Error - Throws a `TypeError` for wrongly typed arguments, a `validation` error when `result` is not a `PanelTransformResult`, and a `not_found` error when no column is named `name`.
+   */
+  panelTransformResultGetColumn(
+    result: PanelTransformResult | string,
+    name: string
+  ): FeatureValue[];
+  /**
+   * List every accepted time-series operation name.
+   *
+   * Free-function twin of Python `TimeSeriesOp.values` (Rust `TimeSeriesOp::names`).
+   * @returns Snake_case operation names accepted by `transformTimeseries`, in declaration order.
+   * @throws Error - Throws only if the names cannot be converted to a JavaScript array.
+   */
+  timeSeriesOpValues(): TimeSeriesOp[];
+  /**
+   * List the `params` keys one time-series operation reads.
+   *
+   * Free-function twin of the Python `TimeSeriesOp.param_keys` property (Rust
+   * `TimeSeriesOp::param_keys`). Any other key in `params` is rejected.
+   * @param op - Snake_case operation name, e.g. `"rolling_mean"`; see `timeSeriesOpValues`.
+   * @returns Parameter keys the operation reads; empty when it takes none.
+   * @throws Error - Throws a `TypeError` when `op` is not a string and a `validation` error, listing the accepted names, when it is not a time-series operation.
+   */
+  timeSeriesOpParamKeys(op: TimeSeriesOp): string[];
+  /**
+   * List every accepted cross-sectional operation name.
+   *
+   * Free-function twin of Python `CrossSectionalOp.values` (Rust `CrossSectionalOp::names`).
+   * @returns Snake_case operation names accepted by `transformCrossSectional`, in declaration order.
+   * @throws Error - Throws only if the names cannot be converted to a JavaScript array.
+   */
+  crossSectionalOpValues(): CrossSectionalOp[];
+  /**
+   * List the `params` keys one cross-sectional operation reads.
+   *
+   * Free-function twin of the Python `CrossSectionalOp.param_keys` property (Rust
+   * `CrossSectionalOp::param_keys`). Any other key in `params` is rejected.
+   * @param op - Snake_case operation name, e.g. `"winsorize"`; see `crossSectionalOpValues`.
+   * @returns Parameter keys the operation reads; empty when it takes none.
+   * @throws Error - Throws a `TypeError` when `op` is not a string and a `validation` error, listing the accepted names, when it is not a cross-sectional operation.
+   */
+  crossSectionalOpParamKeys(op: CrossSectionalOp): string[];
+  /**
+   * List every accepted pairwise rolling operation name.
+   *
+   * Free-function twin of Python `PairwiseOp.values` (Rust `PairwiseOp::names`).
+   * @returns Snake_case operation names accepted by `transformTimeseriesPairwise`, in declaration order.
+   * @throws Error - Throws only if the names cannot be converted to a JavaScript array.
+   */
+  pairwiseOpValues(): PairwiseOp[];
+  /**
+   * List the `params` keys one pairwise rolling operation reads.
+   *
+   * Free-function twin of the Python `PairwiseOp.param_keys` property (Rust
+   * `PairwiseOp::param_keys`). Any other key in `params` is rejected.
+   * @param op - Snake_case operation name, e.g. `"rolling_beta"`; see `pairwiseOpValues`.
+   * @returns Parameter keys the operation reads; empty when it takes none.
+   * @throws Error - Throws a `TypeError` when `op` is not a string and a `validation` error, listing the accepted names, when it is not a pairwise rolling operation.
+   */
+  pairwiseOpParamKeys(op: PairwiseOp): string[];
 }
 
 /**
@@ -5256,6 +5493,1109 @@ export interface MonteCarloNamespace {
 // --- margin ----------------------------------------------------------------
 
 /**
+ * ISDA SIMM sensitivity portfolio.
+ *
+ * Stores signed sensitivity amounts by SIMM risk class and bucket. Amounts
+ * are currency amounts in the base currency, not percentages or spot
+ * levels: rate and credit deltas are DV01/CS01-style amounts per 1bp move,
+ * vegas are sigma times dPV/dsigma before VRW, HVR and concentration.
+ * Tenor labels must be SIMM buckets (`margin.constants().SIMM_TENORS`);
+ * `validate()` rejects anything else so a typo cannot price to zero margin.
+ *
+ * @example
+ * ```javascript
+ * import init, { margin } from "finstack-quant-wasm";
+ * await init();
+ * const sens = new margin.SimmSensitivities("USD");
+ * sens.addIrDelta("USD", "5Y", 25_000);
+ * sens.totalIrDelta(); // 25000
+ * const im = new margin.SimmCalculator().calculateFromSensitivities(sens, "USD", "2025-01-15");
+ * im.amount.amount; // decimal string
+ * ```
+ */
+export interface SimmSensitivities extends WasmOwned {
+  /**
+   * ISO-4217 currency in which every sensitivity amount is expressed.
+   */
+  readonly baseCurrency: string;
+  /**
+   * Serialize these sensitivities to the canonical Rust JSON shape.
+   * @returns Compact JSON text accepted by `SimmSensitivities.fromJson`.
+   * @throws Error - Throws if serialization fails.
+   */
+  toJson(): string;
+  /**
+   * Add an interest-rate delta bucket.
+   * @param currency - ISO-4217 currency risk factor, such as `"USD"`.
+   * @param tenor - SIMM tenor bucket, such as `"2W"`, `"1Y"`, `"5Y"` or `"30Y"`.
+   * @param amount - Signed DV01-style amount per 1bp move, in the base currency.
+   * @throws Error - Throws if `currency` is not a known currency code.
+   */
+  addIrDelta(currency: string, tenor: string, amount: number): void;
+  /**
+   * Add an interest-rate vega bucket.
+   * @param currency - ISO-4217 currency risk factor, such as `"USD"`.
+   * @param tenor - SIMM tenor bucket of the option expiry.
+   * @param amount - Signed sigma times dPV/dsigma, in the base currency.
+   * @throws Error - Throws if `currency` is not a known currency code.
+   */
+  addIrVega(currency: string, tenor: string, amount: number): void;
+  /**
+   * Add a qualifying-credit delta for one issuer and tenor.
+   * @param sector - SIMM credit-qualifying sector label, such as `"sovereign"` or `"financial"`.
+   * @param name - Issuer or index name.
+   * @param tenor - SIMM tenor bucket, such as `"5Y"`.
+   * @param amount - Signed CS01-style amount per 1bp spread move, in the base currency.
+   * @throws Error - Throws if `sector` is not a known SIMM credit sector.
+   */
+  addCreditQualifyingDelta(sector: string, name: string, tenor: string, amount: number): void;
+  /**
+   * Add a qualifying-credit vega for one issuer and tenor.
+   * @param sector - SIMM credit-qualifying sector label, such as `"sovereign"` or `"financial"`.
+   * @param name - Issuer or index name.
+   * @param tenor - SIMM tenor bucket of the option expiry.
+   * @param amount - Signed sigma times dPV/dsigma, in the base currency.
+   * @throws Error - Throws if `sector` is not a known SIMM credit sector.
+   */
+  addCreditQualifyingVega(sector: string, name: string, tenor: string, amount: number): void;
+  /**
+   * Add a non-qualifying-credit delta for one name and tenor.
+   * @param name - Securitization or issuer name.
+   * @param tenor - SIMM tenor bucket, such as `"5Y"`.
+   * @param amount - Signed CS01-style amount per 1bp spread move, in the base currency.
+   * @throws Error - Throws a `TypeError` for an argument of the wrong type.
+   */
+  addCreditNonQualifyingDelta(name: string, tenor: string, amount: number): void;
+  /**
+   * Add a non-qualifying-credit vega for one name and tenor.
+   * @param name - Securitization or issuer name.
+   * @param tenor - SIMM tenor bucket of the option expiry.
+   * @param amount - Signed sigma times dPV/dsigma, in the base currency.
+   * @throws Error - Throws a `TypeError` for an argument of the wrong type.
+   */
+  addCreditNonQualifyingVega(name: string, tenor: string, amount: number): void;
+  /**
+   * Add an equity delta for one underlier.
+   * @param underlier - Equity or index identifier.
+   * @param amount - Signed value change for a 1% relative move, in the base currency.
+   * @throws Error - Throws a `TypeError` for an argument of the wrong type.
+   */
+  addEquityDelta(underlier: string, amount: number): void;
+  /**
+   * Add an equity vega for one underlier.
+   * @param underlier - Equity or index identifier.
+   * @param amount - Signed sigma times dPV/dsigma, in the base currency.
+   * @throws Error - Throws a `TypeError` for an argument of the wrong type.
+   */
+  addEquityVega(underlier: string, amount: number): void;
+  /**
+   * Add an FX delta for one currency against the base currency.
+   * @param currency - ISO-4217 currency risk factor.
+   * @param amount - Signed value change for a 1% relative move of the FX rate, in the base currency.
+   * @throws Error - Throws if `currency` is not a known currency code.
+   */
+  addFxDelta(currency: string, amount: number): void;
+  /**
+   * Add an FX vega for one currency pair.
+   * @param ccy1 - First ISO-4217 currency of the pair.
+   * @param ccy2 - Second ISO-4217 currency of the pair.
+   * @param amount - Signed sigma times dPV/dsigma, in the base currency.
+   * @throws Error - Throws if either currency code is unknown.
+   */
+  addFxVega(ccy1: string, ccy2: string, amount: number): void;
+  /**
+   * Add a commodity delta for one SIMM commodity bucket.
+   * @param bucket - SIMM commodity bucket label (one of the 17 ISDA buckets).
+   * @param amount - Signed value change for a 1% relative price move, in the base currency.
+   * @throws Error - Throws a `TypeError` for an argument of the wrong type.
+   */
+  addCommodityDelta(bucket: string, amount: number): void;
+  /**
+   * Add a commodity vega for one SIMM commodity bucket.
+   * @param bucket - SIMM commodity bucket label (one of the 17 ISDA buckets).
+   * @param amount - Signed sigma times dPV/dsigma before HVR, VRW and concentration, in the base currency.
+   * @throws Error - Throws a `TypeError` for an argument of the wrong type.
+   */
+  addCommodityVega(bucket: string, amount: number): void;
+  /**
+   * Add an expiry-resolved curvature input, kept unscaled until netting.
+   * @param sensitivity - `SimmCurvatureSensitivity` (object or JSON): `risk_class`, `bucket`, `factor`, `expiry_tenor`, `volatility_weighted_vega` and optional `risk_tenor`.
+   * @throws Error - Throws if `sensitivity` is malformed or fails its validation (unknown risk class or tenor, non-finite vega).
+   */
+  addCurvature(sensitivity: SimmCurvatureSensitivity | string): void;
+  /**
+   * Add every bucket of another set into this one, so offsetting risk nets.
+   * @param other - Sensitivities in the same base currency; use `scaledToCurrency` first otherwise.
+   * @throws Error - Throws a validation error, leaving this set unchanged, on a base currency mismatch.
+   */
+  merge(other: SimmSensitivities): void;
+  /**
+   * Copy with every amount multiplied by a signed factor.
+   * @param factor - Multiplier, for example the position quantity for unit-notional sensitivities; a negative value flips the position.
+   * @returns A new `SimmSensitivities` handle in the same base currency.
+   * @throws Error - Throws a `TypeError` when `factor` is not a number.
+   */
+  scaled(factor: number): SimmSensitivities;
+  /**
+   * Copy re-expressed in another currency at a spot FX rate.
+   * @param targetCurrency - ISO-4217 currency the amounts should be expressed in.
+   * @param fxRate - Value of one unit of the current base currency in `target_currency`; every amount is multiplied by it.
+   * @returns A new `SimmSensitivities` handle whose base currency is `target_currency`.
+   * @throws Error - Throws if `target_currency` is not a known currency code.
+   */
+  scaledToCurrency(targetCurrency: string, fxRate: number): SimmSensitivities;
+  /**
+   * Sum of all interest-rate deltas across currencies and tenors.
+   * @returns The net DV01-style amount in the base currency.
+   */
+  totalIrDelta(): number;
+  /**
+   * Sum of all equity deltas across underliers.
+   * @returns The net equity delta amount in the base currency.
+   */
+  totalEquityDelta(): number;
+  /**
+   * Check every tenor and bucket label and every amount.
+   * @throws Error - Throws a validation error for an unknown SIMM tenor or commodity bucket, a non-finite amount, or an invalid curvature input.
+   */
+  validate(): void;
+  /**
+   * Whether no sensitivity of any risk class has been added.
+   * @returns `true` for an empty set.
+   */
+  isEmpty(): boolean;
+}
+
+/**
+ * ISDA SIMM sensitivity portfolio.
+ *
+ * Stores signed sensitivity amounts by SIMM risk class and bucket. Amounts
+ * are currency amounts in the base currency, not percentages or spot
+ * levels: rate and credit deltas are DV01/CS01-style amounts per 1bp move,
+ * vegas are sigma times dPV/dsigma before VRW, HVR and concentration.
+ * Tenor labels must be SIMM buckets (`margin.constants().SIMM_TENORS`);
+ * `validate()` rejects anything else so a typo cannot price to zero margin.
+ *
+ * @example
+ * ```javascript
+ * import init, { margin } from "finstack-quant-wasm";
+ * await init();
+ * const sens = new margin.SimmSensitivities("USD");
+ * sens.addIrDelta("USD", "5Y", 25_000);
+ * sens.totalIrDelta(); // 25000
+ * const im = new margin.SimmCalculator().calculateFromSensitivities(sens, "USD", "2025-01-15");
+ * im.amount.amount; // decimal string
+ * ```
+ */
+export interface SimmSensitivitiesConstructor {
+  /**
+   * JavaScript prototype of `SimmSensitivities`.
+   */
+  readonly prototype: SimmSensitivities;
+  /**
+   * Create an empty SIMM sensitivity set.
+   * @returns Returns a `SimmSensitivities` handle.
+   * @param baseCurrency - ISO-4217 currency in which every sensitivity amount is expressed.
+   * @throws Error - Throws if `base_currency` is not a known currency code.
+   */
+  new (baseCurrency: string): SimmSensitivities;
+  /**
+   * Deserialize sensitivities from the canonical Rust JSON shape.
+   * @param json - `SimmSensitivities` JSON text or plain object.
+   * @returns A `SimmSensitivities` handle.
+   * @throws Error - Throws if the JSON is malformed, has unknown fields, or carries an unknown currency, risk class or credit sector.
+   */
+  fromJson(json: SimmSensitivitiesJson | string): SimmSensitivities;
+}
+
+/**
+ * Indicative historical SIMM v2.6 calculator, with USD concentration thresholds.
+ *
+ * Loads registry-backed SIMM parameters for the requested rule version and
+ * calculates an approximation from explicit `SimmSensitivities`.
+ * Product-class, subcurve and some non-IR dimensions are incomplete, so
+ * every result has `approximation: true`; this is not a current regulatory
+ * SIMM implementation.
+ *
+ * @example
+ * ```javascript
+ * import init, { margin } from "finstack-quant-wasm";
+ * await init();
+ * const calculator = new margin.SimmCalculator("v2_6");
+ * calculator.version;  // "v2_6"
+ * calculator.mporDays; // 10
+ * ```
+ */
+export interface SimmCalculator extends WasmOwned {
+  /**
+   * Supported SIMM version label, `"v2_6"`.
+   */
+  readonly version: string;
+  /**
+   * Margin period of risk in business days stamped on every result.
+   */
+  readonly mporDays: number;
+  /**
+   * Calculate SIMM initial margin from explicit sensitivities.
+   * @param sensitivities - Sensitivity set to aggregate; validated first, so an unknown tenor or commodity bucket throws instead of pricing to zero.
+   * @param currency - Reporting currency; must be `"USD"` and match the sensitivities' base currency (concentration thresholds are in USD).
+   * @param asOf - ISO-8601 calculation date stamped on the result.
+   * @returns The `ImResult` as a plain object: `amount` (Money), `methodology`, `mpor_days`, `as_of`, `approximation` and the SIMM component `breakdown`.
+   * @throws Error - Throws if the sensitivities fail validation, the input or output currency is not USD, or the date is not ISO 8601.
+   */
+  calculateFromSensitivities(
+    sensitivities: SimmSensitivities,
+    currency: string,
+    asOf: string
+  ): ImResult;
+}
+
+/**
+ * Indicative historical SIMM v2.6 calculator, with USD concentration thresholds.
+ *
+ * Loads registry-backed SIMM parameters for the requested rule version and
+ * calculates an approximation from explicit `SimmSensitivities`.
+ * Product-class, subcurve and some non-IR dimensions are incomplete, so
+ * every result has `approximation: true`; this is not a current regulatory
+ * SIMM implementation.
+ *
+ * @example
+ * ```javascript
+ * import init, { margin } from "finstack-quant-wasm";
+ * await init();
+ * const calculator = new margin.SimmCalculator("v2_6");
+ * calculator.version;  // "v2_6"
+ * calculator.mporDays; // 10
+ * ```
+ */
+export interface SimmCalculatorConstructor {
+  /**
+   * JavaScript prototype of `SimmCalculator`.
+   */
+  readonly prototype: SimmCalculator;
+  /**
+   * Create a SIMM calculator from the embedded margin registry.
+   * @returns Returns a `SimmCalculator` handle.
+   * @param version - Canonical version label `"v2_6"`; omitted uses the default version.
+   * @param mporDays - Margin period of risk override in business days, stamped on results; omitted uses the registry default for the version (10).
+   * @throws Error - Throws if the version is unknown, `mpor_days` is not a non-negative integer, or the registry parameters cannot be loaded.
+   */
+  new (version?: string | null, mporDays?: number | null): SimmCalculator;
+}
+
+/**
+ * Variation margin calculator following ISDA CSA rules.
+ *
+ * Applies the CSA threshold, independent amount, minimum transfer amount and
+ * rounding to a signed exposure, dates the settlement on the CSA calendar,
+ * and can run a whole MTM series into a margin-call schedule
+ * (`generateMarginCalls`) or list the contractual call dates
+ * (`marginCallDates`).
+ *
+ * @example
+ * ```javascript
+ * import init, { margin } from "finstack-quant-wasm";
+ * await init();
+ * const calc = new margin.VmCalculator(margin.csaSpecUsdRegulatory());
+ * const vm = calc.calculate(1_000_000, 0, "USD", "2024-06-17");
+ * margin.vmResultRequiresCall(vm); // true
+ * ```
+ */
+export interface VmCalculator extends WasmOwned {
+  /**
+   * CSA specification this calculator applies, as a plain `CsaSpec` object.
+   * @throws Error - Throws if the specification cannot be converted to a JavaScript value.
+   */
+  readonly csa: CsaSpec;
+  /**
+   * Calculate variation margin for one date.
+   * @param exposure - Signed mark-to-market in `currency`: positive means the counterparty owes the desk.
+   * @param postedCollateral - Signed collateral balance in `currency`: positive held, negative posted, including pending agreed calls.
+   * @param currency - ISO-4217 code; must equal the CSA base currency.
+   * @param asOf - ISO-8601 calculation date; the settlement date is derived from it on the CSA calendar.
+   * @returns The `VmResult` as a plain object: `date`, `gross_exposure`, `net_exposure`, `post_amount`, `collect_amount` (Money) and `settlement_date`.
+   * @throws Error - Throws if the currency is unknown or differs from the CSA base currency, an amount is non-finite, the date is not ISO 8601, or the CSA calendar is not registered.
+   */
+  calculate(exposure: number, postedCollateral: number, currency: string, asOf: string): VmResult;
+  /**
+   * Run an exposure time series into a margin-call schedule.
+   * @param exposures - Array of `[date, exposure]` pairs: ISO-8601 date and signed exposure in the CSA base currency (positive means the counterparty owes the desk), processed in the order given.
+   * @param initialCollateral - Collateral balance before the first date, in major units of the CSA base currency.
+   * @returns One `MarginCall` plain object per call (`call_date`, `settlement_date`, `call_type`, `amount`, `mtm_trigger`, `threshold`, `mta_applied`); dates without a call produce no entry.
+   * @throws Error - Throws if `exposures` is not an array of `[string, number]` pairs, an amount is non-finite, a date is not ISO 8601, or the CSA calendar is not registered.
+   */
+  generateMarginCalls(
+    exposures: readonly (readonly [string, number])[] | string,
+    initialCollateral: number
+  ): MarginCall[];
+  /**
+   * Contractual margin-call dates between two dates, inclusive.
+   *
+   * Follows the CSA VM frequency on the CSA calendar: daily lists every
+   * business day, weekly and monthly roll from `start` with each date
+   * adjusted forward, on-demand returns just the adjusted endpoints.
+   * @param start - ISO-8601 first date of the window.
+   * @param end - ISO-8601 last date of the window.
+   * @returns The call dates as ISO-8601 strings, in order.
+   * @throws Error - Throws if a date is not ISO 8601 or the CSA calendar is not registered.
+   */
+  marginCallDates(start: string, end: string): string[];
+}
+
+/**
+ * Variation margin calculator following ISDA CSA rules.
+ *
+ * Applies the CSA threshold, independent amount, minimum transfer amount and
+ * rounding to a signed exposure, dates the settlement on the CSA calendar,
+ * and can run a whole MTM series into a margin-call schedule
+ * (`generateMarginCalls`) or list the contractual call dates
+ * (`marginCallDates`).
+ *
+ * @example
+ * ```javascript
+ * import init, { margin } from "finstack-quant-wasm";
+ * await init();
+ * const calc = new margin.VmCalculator(margin.csaSpecUsdRegulatory());
+ * const vm = calc.calculate(1_000_000, 0, "USD", "2024-06-17");
+ * margin.vmResultRequiresCall(vm); // true
+ * ```
+ */
+export interface VmCalculatorConstructor {
+  /**
+   * JavaScript prototype of `VmCalculator`.
+   */
+  readonly prototype: VmCalculator;
+  /**
+   * Bind a variation margin calculator to one CSA specification.
+   * @returns Returns a `VmCalculator` handle.
+   * @param csa - `CsaSpec` (object or JSON): thresholds, transfer minimums, rounding rules, base currency and calendar applied to each margin call.
+   * @throws Error - Throws if `csa` is malformed, has unknown fields, or fails CSA validation.
+   */
+  new (csa: CsaSpec | string): VmCalculator;
+}
+
+/**
+ * BCBS-IOSCO regulatory schedule initial margin calculator.
+ *
+ * Applies registry-backed schedule rates to explicit notionals, or to a
+ * heterogeneous netting set with trade-specific rates and the BCBS-IOSCO
+ * net-to-gross ratio reduction.
+ *
+ * @example
+ * ```javascript
+ * import init, { margin } from "finstack-quant-wasm";
+ * await init();
+ * const calc = margin.ScheduleImCalculator.bcbsStandard();
+ * calc.rate("interest_rate", 5.0); // 0.04
+ * calc.calculateForNotional(1_000_000, "USD", "interest_rate", 5.0, "2025-01-15").amount.amount;
+ * ```
+ */
+export interface ScheduleImCalculator extends WasmOwned {
+  /**
+   * Default schedule asset class label used when a trade does not name one.
+   */
+  readonly defaultAssetClass: string;
+  /**
+   * Default remaining maturity in years used for the schedule-rate lookup.
+   */
+  readonly defaultMaturityYears: number;
+  /**
+   * Margin period of risk in business days stamped on every result.
+   */
+  readonly mporDays: number;
+  /**
+   * Copy with a new default schedule asset class.
+   * @param assetClass - Lower-case schedule asset class label: `"interest_rate"`, `"credit"`, `"equity"`, `"commodity"`, `"fx"`, `"other"`, or `"custom_<name>"` for a registry-defined class.
+   * @returns A new `ScheduleImCalculator` handle.
+   * @throws Error - Throws if the asset class label is unknown.
+   */
+  withAssetClass(assetClass: string): ScheduleImCalculator;
+  /**
+   * Copy with a new default maturity.
+   * @param years - Representative remaining maturity in years; finite and non-negative.
+   * @returns A new `ScheduleImCalculator` handle.
+   * @throws Error - Throws if `years` is negative or non-finite.
+   */
+  withMaturity(years: number): ScheduleImCalculator;
+  /**
+   * Look up a schedule rate.
+   * @param assetClass - Lower-case schedule asset class label such as `"interest_rate"`.
+   * @param maturityYears - Remaining maturity in years; finite and non-negative.
+   * @returns The IM rate as a decimal fraction of notional (0.04 is 4%).
+   * @throws Error - Throws if the asset class is unknown, the maturity is negative or non-finite, or the selected rate is outside `[0, 1]`.
+   */
+  rate(assetClass: string, maturityYears: number): number;
+  /**
+   * Gross schedule IM for an explicit notional: `abs(notional) * rate`.
+   * @param notional - Regulatory notional or exposure base, in major units of `currency`; its absolute value is used.
+   * @param currency - ISO-4217 currency of the notional and of the result.
+   * @param assetClass - Lower-case schedule asset class label such as `"interest_rate"`.
+   * @param maturityYears - Remaining maturity in years used for the rate lookup.
+   * @param asOf - ISO-8601 calculation date stamped on the result.
+   * @returns The `ImResult` as a plain object, with one breakdown entry keyed by the asset class.
+   * @throws Error - Throws if the currency, asset class, amount, maturity or date is invalid.
+   */
+  calculateForNotional(
+    notional: number,
+    currency: string,
+    assetClass: string,
+    maturityYears: number,
+    asOf: string
+  ): ImResult;
+  /**
+   * Schedule IM for a netting set with the net-to-gross ratio reduction.
+   *
+   * Applies the BCBS-IOSCO reduction `0.4 + 0.6 * NGR` to the sum of
+   * trade-specific gross IM across the netting set.
+   * @param positions - Array of `[signedMtm, grossNotional, assetClass, maturityYears]` tuples in the common reporting currency: MTM signs determine NGR; each absolute notional receives its own class and maturity rate.
+   * @param currency - ISO-4217 reporting currency of every MTM, notional and of the result.
+   * @param asOf - ISO-8601 calculation date stamped on the result.
+   * @returns The NGR-adjusted `ImResult` as a plain object, or `undefined` for an empty position list or zero gross notional.
+   * @throws Error - Throws if `positions` is not an array of `[number, number, string, number]` tuples, or the currency, an asset class, an amount or the date is invalid.
+   */
+  calculateNettingSetWithNgr(
+    positions: readonly (readonly [number, number, string, number])[] | string,
+    currency: string,
+    asOf: string
+  ): ImResult | undefined;
+}
+
+/**
+ * BCBS-IOSCO regulatory schedule initial margin calculator.
+ *
+ * Applies registry-backed schedule rates to explicit notionals, or to a
+ * heterogeneous netting set with trade-specific rates and the BCBS-IOSCO
+ * net-to-gross ratio reduction.
+ *
+ * @example
+ * ```javascript
+ * import init, { margin } from "finstack-quant-wasm";
+ * await init();
+ * const calc = margin.ScheduleImCalculator.bcbsStandard();
+ * calc.rate("interest_rate", 5.0); // 0.04
+ * calc.calculateForNotional(1_000_000, "USD", "interest_rate", 5.0, "2025-01-15").amount.amount;
+ * ```
+ */
+export interface ScheduleImCalculatorConstructor {
+  /**
+   * JavaScript prototype of `ScheduleImCalculator`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: ScheduleImCalculator;
+  /**
+   * Calculator on the BCBS-IOSCO standard regulatory schedule.
+   * @returns A `ScheduleImCalculator` handle.
+   * @throws Error - Throws if the embedded margin registry cannot be loaded.
+   */
+  bcbsStandard(): ScheduleImCalculator;
+  /**
+   * Calculator on a schedule from the embedded margin registry.
+   * @param scheduleId - Schedule identifier in the registry, for example `"bcbs_iosco"` (`margin.constants().BCBS_IOSCO_SCHEDULE_ID`).
+   * @returns A `ScheduleImCalculator` handle.
+   * @throws Error - Throws if `schedule_id` is unknown or the registry data is invalid.
+   */
+  fromRegistryId(scheduleId: string): ScheduleImCalculator;
+}
+
+/**
+ * Haircut-based initial margin calculator.
+ *
+ * Applies eligible-collateral haircuts and optional FX add-ons to explicit
+ * collateral values. This path is intended for repo and securities-financing
+ * collateral IM rather than SIMM sensitivities.
+ *
+ * @example
+ * ```javascript
+ * import init, { margin } from "finstack-quant-wasm";
+ * await init();
+ * const calc = margin.HaircutImCalculator.bcbsStandard();
+ * calc.haircutFor("cash"); // 0
+ * calc.calculateForCollateral(1e7, "USD", "cash", true, "2025-01-15").amount.amount;
+ * ```
+ */
+export interface HaircutImCalculator extends WasmOwned {
+  /**
+   * Eligible-collateral schedule supplying the haircuts, as a plain `EligibleCollateralSchedule` object.
+   * @throws Error - Throws if the schedule cannot be converted to a JavaScript value.
+   */
+  readonly eligibleCollateral: EligibleCollateralSchedule;
+  /**
+   * Default `CollateralAssetClass` wire label.
+   */
+  readonly defaultAssetClass: CollateralAssetClass;
+  /**
+   * ISO-4217 posted-collateral currency, or `undefined` when none is configured.
+   */
+  readonly postedCollateralCurrency: string | undefined;
+  /**
+   * Margin period of risk in business days stamped on every result (`HAIRCUT_MPOR_DAYS`).
+   */
+  readonly mporDays: number;
+  /**
+   * Copy with a default collateral asset class.
+   * @param assetClass - `CollateralAssetClass` wire label such as `"government_bonds"`.
+   * @returns A new `HaircutImCalculator` handle.
+   * @throws Error - Throws if the label is not a collateral asset class.
+   */
+  withDefaultAssetClass(assetClass: CollateralAssetClass): HaircutImCalculator;
+  /**
+   * Copy with a posted-collateral currency, used to detect FX mismatch.
+   * @param currency - ISO-4217 currency of the posted collateral.
+   * @returns A new `HaircutImCalculator` handle.
+   * @throws Error - Throws if `currency` is not a known currency code.
+   */
+  withPostedCollateralCurrency(currency: string): HaircutImCalculator;
+  /**
+   * Copy configured to select an eligible entry by collateral maturity and rating.
+   * @param remainingYears - Residual collateral maturity in years; finite and non-negative.
+   * @param rating - Credit rating such as `"AAA"` or `"A-"`; required when the schedule imposes a minimum rating (no rating is inferred).
+   * @returns A new `HaircutImCalculator` handle using these terms for eligibility, haircut and FX add-on lookup.
+   * @throws Error - Throws if the maturity is negative or non-finite, or the rating is unknown.
+   */
+  withCollateralTerms(remainingYears: number, rating?: string | null): HaircutImCalculator;
+  /**
+   * Look up the haircut for a collateral asset class.
+   * @param assetClass - `CollateralAssetClass` wire label such as `"government_bonds"`.
+   * @returns The base haircut as a decimal fraction, without the FX add-on.
+   * @throws Error - Throws if the label is unknown or no schedule or standard haircut exists for the asset class.
+   */
+  haircutFor(assetClass: CollateralAssetClass): number;
+  /**
+   * Haircut IM for an explicit collateral value and asset class.
+   * @param collateralValue - Collateral market value in major units of `currency`; finite and non-negative.
+   * @param currency - ISO-4217 currency of the collateral value and of the result.
+   * @param assetClass - `CollateralAssetClass` wire label used for the haircut lookup and as the breakdown key.
+   * @param currencyMismatch - Whether to add the asset class's FX mismatch add-on.
+   * @param asOf - ISO-8601 calculation date stamped on the result.
+   * @returns The `ImResult` as a plain object; its MPOR is the repo haircut horizon (`HAIRCUT_MPOR_DAYS`, 2 business days).
+   * @throws Error - Throws if the currency, amount or date is invalid, or the haircut or FX add-on cannot be resolved.
+   */
+  calculateForCollateral(
+    collateralValue: number,
+    currency: string,
+    assetClass: CollateralAssetClass,
+    currencyMismatch: boolean,
+    asOf: string
+  ): ImResult;
+}
+
+/**
+ * Haircut-based initial margin calculator.
+ *
+ * Applies eligible-collateral haircuts and optional FX add-ons to explicit
+ * collateral values. This path is intended for repo and securities-financing
+ * collateral IM rather than SIMM sensitivities.
+ *
+ * @example
+ * ```javascript
+ * import init, { margin } from "finstack-quant-wasm";
+ * await init();
+ * const calc = margin.HaircutImCalculator.bcbsStandard();
+ * calc.haircutFor("cash"); // 0
+ * calc.calculateForCollateral(1e7, "USD", "cash", true, "2025-01-15").amount.amount;
+ * ```
+ */
+export interface HaircutImCalculatorConstructor {
+  /**
+   * JavaScript prototype of `HaircutImCalculator`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: HaircutImCalculator;
+  /**
+   * Calculator on the BCBS-IOSCO standard eligible-collateral schedule.
+   * @returns A `HaircutImCalculator` handle.
+   * @throws Error - Throws if the embedded margin registry cannot be loaded.
+   */
+  bcbsStandard(): HaircutImCalculator;
+  /**
+   * Calculator on the US Treasury repo collateral schedule.
+   * @returns A `HaircutImCalculator` handle.
+   * @throws Error - Throws if the embedded margin registry cannot be loaded.
+   */
+  usTreasuries(): HaircutImCalculator;
+  /**
+   * Calculator on a caller-supplied eligible-collateral schedule.
+   * @param schedule - `EligibleCollateralSchedule` (object or JSON) whose entries supply the haircuts.
+   * @returns A `HaircutImCalculator` handle.
+   * @throws Error - Throws if `schedule` is malformed or has unknown fields.
+   */
+  fromSchedule(schedule: EligibleCollateralSchedule | string): HaircutImCalculator;
+}
+
+/**
+ * FRTB sensitivity portfolio for the Sensitivity-Based Approach.
+ *
+ * Build up delta, vega, curvature, DRC and RRAO inputs with the `add*`
+ * methods, then pass the handle to `frtbSbaCharge` or
+ * `FrtbSbaEngine.calculate` to compute the capital charge under one or more
+ * correlation scenarios per BCBS d457.
+ *
+ * Units: GIRR deltas are base-currency P&L per 1 percentage point of curve
+ * shift (`100 * DV01`); CSR deltas are per 1 percentage point of spread;
+ * equity, commodity and FX deltas are per 1 percentage point of the
+ * underlying; vegas are volatility-scaled; curvature pairs are the up/down
+ * shocked P&L positions; DRC amounts are signed JTD notionals before LGD;
+ * RRAO amounts are gross notionals. Bucket numbers are 1-based FRTB buckets.
+ *
+ * @example
+ * ```javascript
+ * import init, { margin } from "finstack-quant-wasm";
+ * await init();
+ * const sens = new margin.FrtbSensitivities("USD");
+ * sens.addGirrDelta("5Y", 100_000);
+ * margin.frtbSbaCharge(sens).total; // capital charge in USD
+ * ```
+ */
+export interface FrtbSensitivities extends WasmOwned {
+  /**
+   * ISO-4217 reporting currency of every sensitivity and capital amount.
+   */
+  readonly baseCurrency: string;
+  /**
+   * Serialize these sensitivities to the canonical Rust JSON shape.
+   * @returns Compact JSON text accepted by `FrtbSensitivities.fromJson`.
+   * @throws Error - Throws if serialization fails.
+   */
+  toJson(): string;
+  /**
+   * Validate labels, buckets, identifiers and amounts without pricing.
+   *
+   * The engine runs this automatically; call it directly to check a
+   * container built from external data.
+   * @throws Error - Throws a validation error naming the first invalid field when a tenor or bucket is unsupported, an identifier is empty, or a value is non-finite.
+   */
+  validate(): void;
+  /**
+   * Add a GIRR delta sensitivity.
+   * @param tenor - GIRR tenor bucket, such as `"5Y"`.
+   * @param amount - Signed base-currency P&L per 1 percentage point of curve shift (`100 * DV01`).
+   * @param currency - ISO-4217 currency of the curve; omitted uses the base currency.
+   * @throws Error - Throws if a supplied currency is not a known ISO-4217 code.
+   */
+  addGirrDelta(tenor: string, amount: number, currency?: string | null): void;
+  /**
+   * Add a GIRR inflation delta sensitivity.
+   * @param amount - Base-currency P&L per 1 percentage point of inflation shift.
+   * @param currency - ISO-4217 currency of the inflation curve; omitted uses the base currency.
+   * @throws Error - Throws if a supplied currency is not a known ISO-4217 code.
+   */
+  addGirrInflationDelta(amount: number, currency?: string | null): void;
+  /**
+   * Add a GIRR cross-currency basis delta sensitivity.
+   * @param amount - Base-currency P&L per 1 percentage point of basis shift.
+   * @param currency - ISO-4217 currency whose basis moves; omitted uses the base currency.
+   * @throws Error - Throws if a supplied currency is not a known ISO-4217 code.
+   */
+  addGirrXccyBasisDelta(amount: number, currency?: string | null): void;
+  /**
+   * Add a CSR non-securitisation delta sensitivity.
+   * @param issuer - Issuer or reference-entity identifier.
+   * @param bucket - 1-based CSR non-securitisation bucket (MAR21.51).
+   * @param tenor - Credit-spread tenor label such as `"5Y"`.
+   * @param basis - Spread curve identifier (bond or CDS) or commodity delivery location; equal labels identify the same basis for correlation.
+   * @param amount - Base-currency P&L per 1 percentage point of spread move (`100 * CS01`).
+   * @throws Error - Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+   */
+  addCsrNonsecDelta(issuer: string, bucket: number, tenor: string, basis: string, amount: number): void;
+  /**
+   * Add a CSR non-securitisation vega sensitivity.
+   * @param issuer - Issuer or reference-entity identifier.
+   * @param bucket - 1-based CSR non-securitisation bucket (MAR21.51).
+   * @param maturity - Option maturity label such as `"1Y"`.
+   * @param amount - Volatility-scaled vega (sigma times dV/dsigma) in the base currency.
+   * @throws Error - Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+   */
+  addCsrNonsecVega(issuer: string, bucket: number, maturity: string, amount: number): void;
+  /**
+   * Add a CSR non-securitisation curvature pair.
+   * @param issuer - Issuer or reference-entity identifier.
+   * @param bucket - 1-based CSR non-securitisation bucket (MAR21.51).
+   * @param cvrUp - Curvature risk position under the upward spread shock, in the base currency.
+   * @param cvrDown - Curvature risk position under the downward spread shock, in the base currency.
+   * @throws Error - Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+   */
+  addCsrNonsecCurvature(issuer: string, bucket: number, cvrUp: number, cvrDown: number): void;
+  /**
+   * Add a CSR securitisation (correlation trading portfolio) delta sensitivity.
+   * @param tranche - Tranche or index identifier.
+   * @param bucket - 1-based CSR securitisation CTP bucket (MAR21.59).
+   * @param tenor - Credit-spread tenor label such as `"5Y"`.
+   * @param basis - Spread curve identifier (bond or CDS) or commodity delivery location; equal labels identify the same basis for correlation.
+   * @param amount - Base-currency P&L per 1 percentage point of spread move (`100 * CS01`).
+   * @throws Error - Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+   */
+  addCsrSecCtpDelta(tranche: string, bucket: number, tenor: string, basis: string, amount: number): void;
+  /**
+   * Add a CSR securitisation (correlation trading portfolio) vega sensitivity.
+   * @param tranche - Tranche or index identifier.
+   * @param bucket - 1-based CSR securitisation CTP bucket (MAR21.59).
+   * @param maturity - Option maturity label such as `"1Y"`.
+   * @param amount - Volatility-scaled vega (sigma times dV/dsigma) in the base currency.
+   * @throws Error - Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+   */
+  addCsrSecCtpVega(tranche: string, bucket: number, maturity: string, amount: number): void;
+  /**
+   * Add a CSR securitisation (correlation trading portfolio) curvature pair.
+   * @param tranche - Tranche or index identifier.
+   * @param bucket - 1-based CSR securitisation CTP bucket (MAR21.59).
+   * @param cvrUp - Curvature risk position under the upward spread shock, in the base currency.
+   * @param cvrDown - Curvature risk position under the downward spread shock, in the base currency.
+   * @throws Error - Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+   */
+  addCsrSecCtpCurvature(tranche: string, bucket: number, cvrUp: number, cvrDown: number): void;
+  /**
+   * Add a CSR securitisation (non-CTP) delta sensitivity.
+   * @param tranche - Tranche identifier.
+   * @param bucket - 1-based CSR securitisation non-CTP bucket (MAR21.64).
+   * @param tenor - Credit-spread tenor label such as `"5Y"`.
+   * @param basis - Spread curve identifier (bond or CDS) or commodity delivery location; equal labels identify the same basis for correlation.
+   * @param amount - Base-currency P&L per 1 percentage point of spread move (`100 * CS01`).
+   * @throws Error - Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+   */
+  addCsrSecNonctpDelta(tranche: string, bucket: number, tenor: string, basis: string, amount: number): void;
+  /**
+   * Add a CSR securitisation (non-CTP) vega sensitivity.
+   * @param tranche - Tranche identifier.
+   * @param bucket - 1-based CSR securitisation non-CTP bucket (MAR21.64).
+   * @param maturity - Option maturity label such as `"1Y"`.
+   * @param amount - Volatility-scaled vega (sigma times dV/dsigma) in the base currency.
+   * @throws Error - Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+   */
+  addCsrSecNonctpVega(tranche: string, bucket: number, maturity: string, amount: number): void;
+  /**
+   * Add a CSR securitisation (non-CTP) curvature pair.
+   * @param tranche - Tranche identifier.
+   * @param bucket - 1-based CSR securitisation non-CTP bucket (MAR21.64).
+   * @param cvrUp - Curvature risk position under the upward spread shock, in the base currency.
+   * @param cvrDown - Curvature risk position under the downward spread shock, in the base currency.
+   * @throws Error - Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+   */
+  addCsrSecNonctpCurvature(tranche: string, bucket: number, cvrUp: number, cvrDown: number): void;
+  /**
+   * Add an equity delta sensitivity.
+   * @param underlier - Equity underlier or index identifier.
+   * @param bucket - 1-based equity bucket (MAR21.72).
+   * @param amount - Base-currency P&L per 1 percentage point move in the underlier.
+   * @throws Error - Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+   */
+  addEquityDelta(underlier: string, bucket: number, amount: number): void;
+  /**
+   * Add an equity repo-rate delta sensitivity.
+   * @param underlier - Equity underlier or index identifier.
+   * @param bucket - 1-based equity bucket (MAR21.72).
+   * @param amount - Base-currency P&L per 1 percentage point parallel repo-rate shift.
+   * @throws Error - Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+   */
+  addEquityRepoDelta(underlier: string, bucket: number, amount: number): void;
+  /**
+   * Add an FX delta sensitivity for a currency pair.
+   * @param ccy1 - First ISO-4217 currency of the FX pair.
+   * @param ccy2 - Second ISO-4217 currency of the FX pair.
+   * @param amount - Base-currency P&L per 1 percentage point move in the exchange rate.
+   * @throws Error - Throws if `ccy1` or `ccy2` is not a known ISO-4217 code.
+   */
+  addFxDelta(ccy1: string, ccy2: string, amount: number): void;
+  /**
+   * Add a commodity delta sensitivity.
+   * @param name - Commodity identifier.
+   * @param bucket - 1-based commodity bucket (MAR21.82).
+   * @param tenor - Commodity tenor label such as `"1Y"`.
+   * @param basis - Spread curve identifier (bond or CDS) or commodity delivery location; equal labels identify the same basis for correlation.
+   * @param amount - Base-currency P&L per 1 percentage point move in the commodity price.
+   * @throws Error - Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+   */
+  addCommodityDelta(name: string, bucket: number, tenor: string, basis: string, amount: number): void;
+  /**
+   * Add a commodity vega sensitivity.
+   * @param name - Commodity identifier.
+   * @param bucket - 1-based commodity bucket (MAR21.82).
+   * @param maturity - Option maturity label such as `"1Y"`.
+   * @param amount - Volatility-scaled vega (sigma times dV/dsigma) in the base currency.
+   * @throws Error - Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+   */
+  addCommodityVega(name: string, bucket: number, maturity: string, amount: number): void;
+  /**
+   * Add a commodity curvature pair.
+   * @param name - Commodity identifier.
+   * @param bucket - 1-based commodity bucket (MAR21.82).
+   * @param cvrUp - Curvature risk position under the upward price shock, in the base currency.
+   * @param cvrDown - Curvature risk position under the downward price shock, in the base currency.
+   * @throws Error - Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+   */
+  addCommodityCurvature(name: string, bucket: number, cvrUp: number, cvrDown: number): void;
+  /**
+   * Add a GIRR vega sensitivity.
+   * @param optionMaturity - Option maturity label such as `"1Y"`.
+   * @param underlyingTenor - Underlying swap tenor label such as `"5Y"`.
+   * @param amount - Volatility-scaled vega (sigma times dV/dsigma) in the base currency.
+   * @param currency - ISO-4217 currency of the curve; omitted uses the base currency.
+   * @throws Error - Throws if a supplied currency is not a known ISO-4217 code.
+   */
+  addGirrVega(optionMaturity: string, underlyingTenor: string, amount: number, currency?: string | null): void;
+  /**
+   * Add an equity vega sensitivity.
+   * @param underlier - Equity underlier or index identifier.
+   * @param bucket - 1-based equity bucket (MAR21.72).
+   * @param maturity - Option maturity label such as `"1Y"`.
+   * @param amount - Volatility-scaled vega (sigma times dV/dsigma) in the base currency.
+   * @throws Error - Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+   */
+  addEquityVega(underlier: string, bucket: number, maturity: string, amount: number): void;
+  /**
+   * Add an FX vega sensitivity for a currency pair.
+   * @param ccy1 - First ISO-4217 currency of the FX pair.
+   * @param ccy2 - Second ISO-4217 currency of the FX pair.
+   * @param maturity - Option maturity label such as `"1Y"`.
+   * @param amount - Volatility-scaled vega (sigma times dV/dsigma) in the base currency.
+   * @throws Error - Throws if `ccy1` or `ccy2` is not a known ISO-4217 code.
+   */
+  addFxVega(ccy1: string, ccy2: string, maturity: string, amount: number): void;
+  /**
+   * Add a GIRR curvature pair.
+   * @param cvrUp - Curvature risk position under the upward rate shock, in the base currency.
+   * @param cvrDown - Curvature risk position under the downward rate shock, in the base currency.
+   * @param currency - ISO-4217 currency of the curve; omitted uses the base currency.
+   * @throws Error - Throws if a supplied currency is not a known ISO-4217 code.
+   */
+  addGirrCurvature(cvrUp: number, cvrDown: number, currency?: string | null): void;
+  /**
+   * Add an equity curvature pair.
+   * @param underlier - Equity underlier or index identifier.
+   * @param bucket - 1-based equity bucket (MAR21.72).
+   * @param cvrUp - Curvature risk position under the upward price shock, in the base currency.
+   * @param cvrDown - Curvature risk position under the downward price shock, in the base currency.
+   * @throws Error - Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
+   */
+  addEquityCurvature(underlier: string, bucket: number, cvrUp: number, cvrDown: number): void;
+  /**
+   * Add an FX curvature pair for a currency pair.
+   * @param ccy1 - First ISO-4217 currency of the FX pair.
+   * @param ccy2 - Second ISO-4217 currency of the FX pair.
+   * @param cvrUp - Curvature risk position under the upward FX shock, in the base currency.
+   * @param cvrDown - Curvature risk position under the downward FX shock, in the base currency.
+   * @throws Error - Throws if `ccy1` or `ccy2` is not a known ISO-4217 code.
+   */
+  addFxCurvature(ccy1: string, ccy2: string, cvrUp: number, cvrDown: number): void;
+  /**
+   * Add a Default Risk Charge position.
+   * @param issuer - Issuer identifier; long and short JTD net per issuer at charge time.
+   * @param jtdAmount - Signed jump-to-default notional in the base currency (positive long, negative short), before the seniority LGD.
+   * @param ratingBucket - Credit-rating bucket, 1 (AAA) to 9 (defaulted) per MAR22.24.
+   * @param sector - `"corporate"`, `"sovereign"` or `"local_government"`.
+   * @param seniority - `"senior_unsecured"`, `"subordinated"`, `"equity"` or `"covered_bond"`; selects the LGD.
+   * @param assetType - DRC asset type label such as `"corporate"`, `"sovereign"`, `"local_government"` or `"equity"`.
+   * @param maturityYears - Residual maturity in years, finite and non-negative; JTD scales by maturity clipped to `[0.25, 1.0]`.
+   * @param pnlAdjustment - Mark-to-market adjustment per MAR22.9 (negative for a long position carrying an unrealised loss); defaults to `0`.
+   * @throws Error - Throws if `sector`, `seniority` or `asset_type` is not a known label, or `rating_bucket` is not an integer in `0..=255`.
+   */
+  addDrcPosition(
+    issuer: string,
+    jtdAmount: number,
+    ratingBucket: number,
+    sector: DrcSector,
+    seniority: DrcSeniority,
+    assetType: DrcAssetType,
+    maturityYears: number,
+    pnlAdjustment?: number | null
+  ): void;
+  /**
+   * Add a Residual Risk Add-On position.
+   * @param instrumentId - Instrument identifier.
+   * @param notional - Gross notional in the base currency.
+   * @param isExotic - `true` for an exotic underlying (1.0% weight); `false` (the default) for other residual risk such as gap, correlation or behavioural risk (0.1% weight).
+   * @throws Error - Throws a `TypeError` for an argument of the wrong type.
+   */
+  addRraoPosition(instrumentId: string, notional: number, isExotic?: boolean | null): void;
+}
+
+/**
+ * FRTB sensitivity portfolio for the Sensitivity-Based Approach.
+ *
+ * Build up delta, vega, curvature, DRC and RRAO inputs with the `add*`
+ * methods, then pass the handle to `frtbSbaCharge` or
+ * `FrtbSbaEngine.calculate` to compute the capital charge under one or more
+ * correlation scenarios per BCBS d457.
+ *
+ * Units: GIRR deltas are base-currency P&L per 1 percentage point of curve
+ * shift (`100 * DV01`); CSR deltas are per 1 percentage point of spread;
+ * equity, commodity and FX deltas are per 1 percentage point of the
+ * underlying; vegas are volatility-scaled; curvature pairs are the up/down
+ * shocked P&L positions; DRC amounts are signed JTD notionals before LGD;
+ * RRAO amounts are gross notionals. Bucket numbers are 1-based FRTB buckets.
+ *
+ * @example
+ * ```javascript
+ * import init, { margin } from "finstack-quant-wasm";
+ * await init();
+ * const sens = new margin.FrtbSensitivities("USD");
+ * sens.addGirrDelta("5Y", 100_000);
+ * margin.frtbSbaCharge(sens).total; // capital charge in USD
+ * ```
+ */
+export interface FrtbSensitivitiesConstructor {
+  /**
+   * JavaScript prototype of `FrtbSensitivities`.
+   */
+  readonly prototype: FrtbSensitivities;
+  /**
+   * Create an empty FRTB sensitivity set in one reporting currency.
+   * @returns Returns a `FrtbSensitivities` handle.
+   * @param baseCurrency - ISO-4217 currency used for all SBA sensitivities and capital amounts.
+   * @throws Error - Throws if `base_currency` is not a known ISO-4217 code.
+   */
+  new (baseCurrency: string): FrtbSensitivities;
+  /**
+   * Deserialize sensitivities from the canonical Rust JSON shape.
+   * @param json - `FrtbSensitivities` JSON text or plain object.
+   * @returns A `FrtbSensitivities` handle.
+   * @throws Error - Throws if the JSON is malformed or has unknown fields.
+   */
+  fromJson(json: FrtbSensitivitiesWire | string): FrtbSensitivities;
+}
+
+/**
+ * FRTB SBA engine.
+ *
+ * Evaluates delta, vega and curvature under each configured correlation
+ * scenario, takes the maximum, then adds DRC and RRAO (BCBS d457).
+ *
+ * @example
+ * ```javascript
+ * import init, { margin } from "finstack-quant-wasm";
+ * await init();
+ * const engine = new margin.FrtbSbaEngine(["low", "high"], ["girr", "fx"]);
+ * engine.scenarios; // ["low", "high"]
+ * const sens = new margin.FrtbSensitivities("USD");
+ * sens.addGirrDelta("5Y", 100_000);
+ * engine.calculate(sens).binding_scenario;
+ * ```
+ */
+export interface FrtbSbaEngine extends WasmOwned {
+  /**
+   * Correlation scenario labels evaluated, in configured order.
+   * @throws Error - Throws if the labels cannot be converted to a JavaScript value.
+   */
+  readonly scenarios: CorrelationScenario[];
+  /**
+   * Risk-class labels included, in configured order.
+   * @throws Error - Throws if the labels cannot be converted to a JavaScript value.
+   */
+  readonly riskClasses: FrtbRiskClass[];
+  /**
+   * Calculate the FRTB SBA charge for a sensitivity portfolio.
+   * @param sensitivities - Portfolio of FRTB sensitivities (delta, vega, curvature, DRC, RRAO).
+   * @returns The `FrtbSbaResult` as a plain object: `total`, the per-risk-class delta, vega and curvature breakdown, `drc`, `rrao`, and the per-scenario charges with the binding one named.
+   * @throws Error - Throws if a sensitivity has an unsupported tenor or bucket, an empty required identifier, or a non-finite value.
+   */
+  calculate(sensitivities: FrtbSensitivities): FrtbSbaResult;
+}
+
+/**
+ * FRTB SBA engine.
+ *
+ * Evaluates delta, vega and curvature under each configured correlation
+ * scenario, takes the maximum, then adds DRC and RRAO (BCBS d457).
+ *
+ * @example
+ * ```javascript
+ * import init, { margin } from "finstack-quant-wasm";
+ * await init();
+ * const engine = new margin.FrtbSbaEngine(["low", "high"], ["girr", "fx"]);
+ * engine.scenarios; // ["low", "high"]
+ * const sens = new margin.FrtbSensitivities("USD");
+ * sens.addGirrDelta("5Y", 100_000);
+ * engine.calculate(sens).binding_scenario;
+ * ```
+ */
+export interface FrtbSbaEngineConstructor {
+  /**
+   * JavaScript prototype of `FrtbSbaEngine`.
+   */
+  readonly prototype: FrtbSbaEngine;
+  /**
+   * Select the correlation scenarios and risk classes the engine evaluates.
+   * @returns Returns a `FrtbSbaEngine` handle.
+   * @param scenarios - Lower-case scenario labels (`"low"`, `"medium"`, `"high"`); the charge is the maximum across them. Omitted evaluates all three.
+   * @param riskClasses - Lower-case risk-class labels to include (`"girr"`, `"csr_non_sec"`, `"csr_sec_ctp"`, `"csr_sec_non_ctp"`, `"equity"`, `"commodity"`, `"fx"`); omitted includes all seven.
+   * @throws Error - Throws if a label is unknown or either list is empty.
+   */
+  new (
+    scenarios?: readonly CorrelationScenario[] | null,
+    riskClasses?: readonly FrtbRiskClass[] | null
+  ): FrtbSbaEngine;
+}
+
+/**
+ * SA-CCR Exposure at Default engine (BCBS 279): `EAD = alpha * (RC + PFE)`.
+ *
+ * Monetary values in one calculation must already use one consistent
+ * currency; the engine performs no currency conversion.
+ *
+ * @example
+ * ```javascript
+ * import init, { margin } from "finstack-quant-wasm";
+ * await init();
+ * const config = margin.saCcrNettingSetConfigUnmargined(
+ *   margin.nettingSetIdBilateral("CPTY", "CSA"), 0, "2025-01-15");
+ * const trade = {
+ *   trade_id: "t1", asset_class: "interest_rate", notional: 1_000_000,
+ *   start_date: "2025-01-15", end_date: "2030-01-15", underlier: "USD",
+ *   hedging_set: "USD", direction: 1, supervisory_delta: 1, mtm: 0, is_option: false,
+ * };
+ * new margin.SaCcrEngine().calculateEad(config, [trade]).ead;
+ * ```
+ */
+export interface SaCcrEngine extends WasmOwned {
+  /**
+   * Alpha multiplier applied to `RC + PFE` (1.4 unless overridden).
+   */
+  readonly alpha: number;
+  /**
+   * Calculate SA-CCR EAD for a netting set and its trades.
+   * @param config - `SaCcrNettingSetConfig` (object or JSON) with the valuation date and collateral terms.
+   * @param trades - Array (or JSON) of `SaCcrTrade` objects in the netting set; empty gives zero EAD.
+   * @returns The `EadResult` as a plain object: `ead`, `rc`, `pfe`, `multiplier`, the aggregate and per-asset-class add-ons, `alpha` and `maturity_factor`.
+   * @throws Error - Throws if `config` or a trade is malformed or fails validation: a non-finite amount, a negative threshold or MTA, or inconsistent direction, supervisory delta and option type.
+   */
+  calculateEad(
+    config: SaCcrNettingSetConfig | string,
+    trades: readonly SaCcrTrade[] | string
+  ): EadResult;
+}
+
+/**
+ * SA-CCR Exposure at Default engine (BCBS 279): `EAD = alpha * (RC + PFE)`.
+ *
+ * Monetary values in one calculation must already use one consistent
+ * currency; the engine performs no currency conversion.
+ *
+ * @example
+ * ```javascript
+ * import init, { margin } from "finstack-quant-wasm";
+ * await init();
+ * const config = margin.saCcrNettingSetConfigUnmargined(
+ *   margin.nettingSetIdBilateral("CPTY", "CSA"), 0, "2025-01-15");
+ * const trade = {
+ *   trade_id: "t1", asset_class: "interest_rate", notional: 1_000_000,
+ *   start_date: "2025-01-15", end_date: "2030-01-15", underlier: "USD",
+ *   hedging_set: "USD", direction: 1, supervisory_delta: 1, mtm: 0, is_option: false,
+ * };
+ * new margin.SaCcrEngine().calculateEad(config, [trade]).ead;
+ * ```
+ */
+export interface SaCcrEngineConstructor {
+  /**
+   * JavaScript prototype of `SaCcrEngine`.
+   */
+  readonly prototype: SaCcrEngine;
+  /**
+   * Configure the supervisory multiplier for SA-CCR.
+   * @returns Returns a `SaCcrEngine` handle.
+   * @param alpha - Supervisory alpha multiplier, finite and at least `1.0`; omitted uses the regulatory `1.4`.
+   * @throws Error - Throws if a supplied `alpha` is non-finite or below `1.0`.
+   */
+  new (alpha?: number | null): SaCcrEngine;
+}
+
+/**
  * Namespaced TypeScript entry points for margin calculations and types.
  * @example
  * ```typescript
@@ -5357,6 +6697,693 @@ export interface MarginNamespace {
     ownRecoveryRate: number,
     fundingJson?: JsonInput | null
   ): XvaResult;
+  /**
+   * Simm sensitivities of this `Margin`.
+   */
+  SimmSensitivities: SimmSensitivitiesConstructor;
+  /**
+   * Simm calculator of this `Margin`.
+   */
+  SimmCalculator: SimmCalculatorConstructor;
+  /**
+   * Vm calculator of this `Margin`.
+   */
+  VmCalculator: VmCalculatorConstructor;
+  /**
+   * Schedule im calculator of this `Margin`.
+   */
+  ScheduleImCalculator: ScheduleImCalculatorConstructor;
+  /**
+   * Haircut im calculator of this `Margin`.
+   */
+  HaircutImCalculator: HaircutImCalculatorConstructor;
+  /**
+   * Frtb sensitivities of this `Margin`.
+   */
+  FrtbSensitivities: FrtbSensitivitiesConstructor;
+  /**
+   * Frtb sba engine of this `Margin`.
+   */
+  FrtbSbaEngine: FrtbSbaEngineConstructor;
+  /**
+   * Sa ccr engine of this `Margin`.
+   */
+  SaCcrEngine: SaCcrEngineConstructor;
+  /**
+   * Margin constants needed to interpret inputs and results.
+   *
+   * The Rust `MarginConstants::current()` value, the twin of Python
+   * `margin.CONSTANTS`: year basis, duration factor, one basis point, the SIMM
+   * tenor bucket boundaries and labels, the BCBS-IOSCO schedule id, the haircut
+   * margin period of risk and the SIMM commodity bucket count.
+   * @returns The `MarginConstants` value as a plain object.
+   * @throws Error - Throws if the value cannot be converted to a JavaScript value.
+   */
+  constants(): MarginConstants;
+  /**
+   * Margin valuation adjustment over an expected-IM profile.
+   *
+   * `MVA = sum_i s(t_i) * IM(t_i) * DF(t_i) * S(t_i) * dt_i` on the profile
+   * grid with a `t = 0` bucket edge; IM is flat before the first grid point.
+   * @param imProfile - `ImProfile` (object or JSON) of expected IM, for example from `imProfileFromSimm`.
+   * @param fundingSpreadCurve - Array of `[timeYears, spreadBp]` pairs, linearly interpolated with flat extrapolation; one pair is a flat spread.
+   * @param discountCurve - Risk-free discount curve handle.
+   * @param survivalCurve - The bank's own hazard curve handle; omitted treats survival as 1 for all times.
+   * @returns The `MvaResult` (`mva`, `average_im`, `im_profile`) as a plain object.
+   * @throws Error - Throws if the profile or spread curve is malformed or invalid, or a curve evaluation is non-finite.
+   */
+  computeMva(
+    imProfile: ImProfile | string,
+    fundingSpreadCurve: readonly (readonly [number, number])[] | string,
+    discountCurve: DiscountCurve,
+    survivalCurve?: HazardCurve | null
+  ): MvaResult;
+  /**
+   * Expected initial-margin profile from today's SIMM margin and a decay profile.
+   *
+   * `IM(t) = SIMM(sensitivities) * decay.factor(t)` on `time_grid`.
+   * @param calculator - SIMM calculator handle.
+   * @param sensitivities - SIMM sensitivities handle.
+   * @param currency - ISO-4217 currency the IM is reported in.
+   * @param decay - `ImDecayProfile` (object or JSON) shaping IM over time.
+   * @param timeGrid - Strictly increasing positive times in years.
+   * @returns The `ImProfile` (`times`, `im_values`) as a plain object.
+   * @throws Error - Throws for an unknown currency, an invalid decay profile or time grid, or sensitivities the SIMM calculator rejects.
+   */
+  imProfileFromSimm(
+    calculator: SimmCalculator,
+    sensitivities: SimmSensitivities,
+    currency: string,
+    decay: ImDecayProfile | string,
+    timeGrid: readonly number[] | Float64Array
+  ): ImProfile;
+  /**
+   * FRTB SBA capital charge for one sensitivity portfolio.
+   * @param sensitivities - Portfolio of FRTB sensitivities (delta, vega, curvature, DRC, RRAO).
+   * @param correlationScenario - `"low"`, `"medium"` or `"high"` to evaluate only that scenario; omitted runs all three and reports the binding (maximum) one per BCBS d457.
+   * @returns The `FrtbSbaResult` as a plain object: `total`, the per-risk-class delta, vega and curvature breakdown, `drc`, `rrao`, and the per-scenario charges with the binding one named.
+   * @throws Error - Throws if `correlation_scenario` is unknown, or a sensitivity has an unsupported tenor or bucket, an empty required identifier, or a non-finite value.
+   */
+  frtbSbaCharge(
+    sensitivities: FrtbSensitivities,
+    correlationScenario?: CorrelationScenario | null
+  ): FrtbSbaResult;
+  /**
+   * SA-CCR Exposure at Default for one netting set (BCBS 279).
+   * @param trades - Array (or JSON) of `SaCcrTrade` objects in the netting set; empty gives zero EAD.
+   * @param config - `SaCcrNettingSetConfig` (object or JSON): collateral, threshold, MTA, NICA, MPOR and valuation date.
+   * @param alpha - Supervisory alpha override, finite and at least `1.0`; omitted uses the regulatory `1.4`.
+   * @returns The `EadResult` as a plain object, after the unmargined cap for margined sets.
+   * @throws Error - Throws if `alpha` is invalid, or `config` or a trade is malformed or fails validation.
+   */
+  saccrEad(
+    trades: readonly SaCcrTrade[] | string,
+    config: SaCcrNettingSetConfig | string,
+    alpha?: number | null
+  ): EadResult;
+  /**
+   * Haircut-based initial margin methodology label (repos and securities financing).
+   * @returns The `ImMethodology` wire label `"haircut"`.
+   */
+  imMethodologyHaircut(): ImMethodology;
+  /**
+   * ISDA SIMM initial margin methodology label (sensitivities-based, OTC derivatives).
+   * @returns The `ImMethodology` wire label `"simm"`.
+   */
+  imMethodologySimm(): ImMethodology;
+  /**
+   * BCBS-IOSCO regulatory schedule initial margin methodology label.
+   * @returns The `ImMethodology` wire label `"schedule"`.
+   */
+  imMethodologySchedule(): ImMethodology;
+  /**
+   * Regulator-approved internal model initial margin methodology label.
+   * @returns The `ImMethodology` wire label `"internal_model"`.
+   */
+  imMethodologyInternalModel(): ImMethodology;
+  /**
+   * Clearing-house (CCP-specific) initial margin methodology label.
+   * @returns The `ImMethodology` wire label `"clearing_house"`.
+   */
+  imMethodologyClearingHouse(): ImMethodology;
+  /**
+   * Parse an initial margin methodology from its lower-case wire label.
+   * @param s - One of `"haircut"`, `"simm"`, `"schedule"`, `"internal_model"`, `"clearing_house"`.
+   * @returns The canonical `ImMethodology` wire label.
+   * @throws Error - Throws a validation error for any other spelling, including `"SIMM"`.
+   */
+  imMethodologyFromStr(s: string): ImMethodology;
+  /**
+   * Daily margin call frequency label (standard for OTC derivatives since 2016).
+   * @returns The `MarginTenor` wire label `"daily"`.
+   */
+  marginTenorDaily(): MarginTenor;
+  /**
+   * Weekly margin call frequency label.
+   * @returns The `MarginTenor` wire label `"weekly"`.
+   */
+  marginTenorWeekly(): MarginTenor;
+  /**
+   * Monthly margin call frequency label.
+   * @returns The `MarginTenor` wire label `"monthly"`.
+   */
+  marginTenorMonthly(): MarginTenor;
+  /**
+   * On-demand margin call frequency label.
+   * @returns The `MarginTenor` wire label `"on_demand"`.
+   */
+  marginTenorOnDemand(): MarginTenor;
+  /**
+   * Parse a margin call frequency from its lower-case wire label.
+   * @param s - One of `"daily"`, `"weekly"`, `"monthly"`, `"on_demand"`.
+   * @returns The canonical `MarginTenor` wire label.
+   * @throws Error - Throws a validation error for any other spelling.
+   */
+  marginTenorFromStr(s: string): MarginTenor;
+  /**
+   * Initial margin call type label.
+   * @returns The `MarginCallType` wire label `"initial_margin"`.
+   */
+  marginCallTypeInitialMargin(): MarginCallType;
+  /**
+   * Variation margin delivery (the desk posts) call type label.
+   * @returns The `MarginCallType` wire label `"variation_margin_post"`.
+   */
+  marginCallTypeVariationMarginPost(): MarginCallType;
+  /**
+   * Variation margin return (the desk collects) call type label.
+   * @returns The `MarginCallType` wire label `"variation_margin_collect"`.
+   */
+  marginCallTypeVariationMarginCollect(): MarginCallType;
+  /**
+   * Top-up call type label (additional margin after a threshold breach).
+   * @returns The `MarginCallType` wire label `"top_up"`.
+   */
+  marginCallTypeTopUp(): MarginCallType;
+  /**
+   * Collateral substitution call type label.
+   * @returns The `MarginCallType` wire label `"substitution"`.
+   */
+  marginCallTypeSubstitution(): MarginCallType;
+  /**
+   * Parse a margin call type from its lower-case wire label.
+   * @param s - One of `"initial_margin"`, `"variation_margin_post"`, `"variation_margin_collect"`, `"top_up"`, `"substitution"`.
+   * @returns The canonical `MarginCallType` wire label.
+   * @throws Error - Throws a validation error for any other spelling.
+   */
+  marginCallTypeFromStr(s: string): MarginCallType;
+  /**
+   * Bilateral (non-cleared) clearing status.
+   * @returns The `ClearingStatus` value `"bilateral"`.
+   * @throws Error - Throws if the value cannot be converted to a JavaScript value.
+   */
+  clearingStatusBilateral(): ClearingStatus;
+  /**
+   * Cleared status through a named central counterparty.
+   * @param ccp - CCP identifier, for example `"LCH"`, `"CME"`, `"ICE"` or `"JSCC"`.
+   * @returns The `ClearingStatus` value `{ cleared: { ccp } }`.
+   * @throws Error - Throws a `TypeError` when `ccp` is not a string.
+   */
+  clearingStatusCleared(ccp: string): ClearingStatus;
+  /**
+   * Cash collateral asset class label.
+   * @returns The `CollateralAssetClass` wire label `"cash"`.
+   */
+  collateralAssetClassCash(): CollateralAssetClass;
+  /**
+   * Sovereign government bond collateral asset class label.
+   * @returns The `CollateralAssetClass` wire label `"government_bonds"`.
+   */
+  collateralAssetClassGovernmentBonds(): CollateralAssetClass;
+  /**
+   * Agency bond collateral asset class label.
+   * @returns The `CollateralAssetClass` wire label `"agency_bonds"`.
+   */
+  collateralAssetClassAgencyBonds(): CollateralAssetClass;
+  /**
+   * Covered bond collateral asset class label.
+   * @returns The `CollateralAssetClass` wire label `"covered_bonds"`.
+   */
+  collateralAssetClassCoveredBonds(): CollateralAssetClass;
+  /**
+   * Investment-grade corporate bond collateral asset class label.
+   * @returns The `CollateralAssetClass` wire label `"corporate_bonds"`.
+   */
+  collateralAssetClassCorporateBonds(): CollateralAssetClass;
+  /**
+   * Listed equity collateral asset class label.
+   * @returns The `CollateralAssetClass` wire label `"equity"`.
+   */
+  collateralAssetClassEquity(): CollateralAssetClass;
+  /**
+   * Gold collateral asset class label.
+   * @returns The `CollateralAssetClass` wire label `"gold"`.
+   */
+  collateralAssetClassGold(): CollateralAssetClass;
+  /**
+   * Mutual fund / ETF collateral asset class label.
+   * @returns The `CollateralAssetClass` wire label `"mutual_funds"`.
+   */
+  collateralAssetClassMutualFunds(): CollateralAssetClass;
+  /**
+   * Parse a collateral asset class from its lower-case wire label.
+   * @param s - One of `"cash"`, `"government_bonds"`, `"agency_bonds"`, `"covered_bonds"`, `"corporate_bonds"`, `"equity"`, `"gold"`, `"mutual_funds"`.
+   * @returns The canonical `CollateralAssetClass` wire label.
+   * @throws Error - Throws a validation error for any other spelling.
+   */
+  collateralAssetClassFromStr(s: string): CollateralAssetClass;
+  /**
+   * BCBS-IOSCO standard haircut for a collateral asset class.
+   * @param assetClass - `CollateralAssetClass` wire label such as `"government_bonds"`.
+   * @returns The haircut as a decimal fraction of collateral value (0.02 is 2%).
+   * @throws Error - Throws a validation error for an unknown label, or if the embedded margin registry cannot be loaded.
+   */
+  collateralAssetClassStandardHaircut(assetClass: CollateralAssetClass): number;
+  /**
+   * Additional haircut applied when collateral and exposure currencies differ.
+   * @param assetClass - `CollateralAssetClass` wire label such as `"government_bonds"`.
+   * @returns The FX add-on as a decimal fraction of collateral value (0.08 is 8%).
+   * @throws Error - Throws a validation error for an unknown label, or if the embedded margin registry cannot be loaded.
+   */
+  collateralAssetClassFxAddon(assetClass: CollateralAssetClass): number;
+  /**
+   * Netting set identifier for a bilateral CSA relationship.
+   * @param counterpartyId - Counterparty identifier.
+   * @param csaId - CSA agreement identifier.
+   * @returns The `NettingSetId` value `{ kind: "bilateral", counterparty_id, csa_id }`.
+   * @throws Error - Throws a `TypeError` when an argument is not a string.
+   */
+  nettingSetIdBilateral(counterpartyId: string, csaId: string): NettingSetId;
+  /**
+   * Netting set identifier for trades cleared through one CCP.
+   * @param ccpId - CCP identifier; also used as the counterparty id.
+   * @returns The `NettingSetId` value `{ kind: "cleared", ccp_id }`.
+   * @throws Error - Throws a `TypeError` when `ccp_id` is not a string.
+   */
+  nettingSetIdCleared(ccpId: string): NettingSetId;
+  /**
+   * Standard USD regulatory CSA specification (BCBS-IOSCO terms, SIMM initial margin).
+   * @returns The canonical `CsaSpec` as a plain object.
+   * @throws Error - Throws if the embedded margin registry cannot be loaded.
+   */
+  csaSpecUsdRegulatory(): CsaSpec;
+  /**
+   * Standard EUR regulatory CSA specification (BCBS-IOSCO terms, SIMM initial margin).
+   * @returns The canonical `CsaSpec` as a plain object.
+   * @throws Error - Throws if the embedded margin registry cannot be loaded.
+   */
+  csaSpecEurRegulatory(): CsaSpec;
+  /**
+   * Regulatory CSA specification for any supported base currency.
+   * @param currency - ISO-4217 base currency of the agreement; every CSA amount is in it.
+   * @param id - Identifier stamped on the specification.
+   * @param collateralCurve - Curve id used to discount and accrue interest on collateral, for example `"USD-OIS"`.
+   * @returns The `CsaSpec` as a plain object.
+   * @throws Error - Throws for an unknown currency, or if the embedded margin registry has no regulatory terms for it or cannot be loaded.
+   */
+  csaSpecRegulatory(currency: string, id: string, collateralCurve: string): CsaSpec;
+  /**
+   * Copy of a CSA with new variation margin threshold terms.
+   * @param csa - `CsaSpec` (object or JSON) to copy.
+   * @param threshold - VM threshold in major units of the CSA base currency; exposure below it is uncollateralized.
+   * @param mta - Minimum transfer amount in major units of the CSA base currency.
+   * @param rounding - Optional rounding increment in major units of the base currency; omitted keeps the current one.
+   * @param independentAmount - Optional independent amount in major units of the base currency; omitted keeps the current one.
+   * @returns The updated `CsaSpec` as a plain object.
+   * @throws Error - Throws if `csa` is malformed or invalid, or an amount is non-finite, negative, or otherwise rejected by the CSA validation.
+   */
+  csaSpecWithVmThreshold(
+    csa: CsaSpec | string,
+    threshold: number,
+    mta: number,
+    rounding?: number | null,
+    independentAmount?: number | null
+  ): CsaSpec;
+  /**
+   * Copy of a CSA with initial margin terms.
+   * @param csa - `CsaSpec` (object or JSON) to copy.
+   * @param methodology - `ImMethodology` wire label such as `"simm"` or `"schedule"`.
+   * @param mporDays - Margin period of risk in business days.
+   * @param threshold - IM threshold in major units of the CSA base currency.
+   * @param mta - IM minimum transfer amount in major units of the CSA base currency.
+   * @param segregated - Whether posted IM is segregated and unavailable to meet VM; defaults to `true`.
+   * @returns The updated `CsaSpec` as a plain object.
+   * @throws Error - Throws if `csa` is malformed or invalid, the methodology label is unknown, `mpor_days` is not a non-negative integer, or an amount is rejected by the CSA validation.
+   */
+  csaSpecWithIm(
+    csa: CsaSpec | string,
+    methodology: ImMethodology,
+    mporDays: number,
+    threshold: number,
+    mta: number,
+    segregated?: boolean | null
+  ): CsaSpec;
+  /**
+   * Apply a CSA's initial margin terms to one gross IM figure.
+   *
+   * Turns gross model IM into the collateral target after the CSA threshold
+   * and the signed, MTA-filtered transfer against the current balance.
+   * @param csa - `CsaSpec` (object or JSON) carrying initial margin terms.
+   * @param grossInitialMargin - Gross model IM before contractual terms, in major units of the CSA base currency.
+   * @param currentCollateral - Existing balance of this one-way IM account, in major units of the CSA base currency.
+   * @returns The `ImCollateralResult` as a plain object (Money amounts as `{amount, currency}`).
+   * @throws Error - Throws if `csa` is malformed, invalid or has no initial margin terms, or an amount is non-finite or negative.
+   */
+  csaSpecApplyImTerms(
+    csa: CsaSpec | string,
+    grossInitialMargin: number,
+    currentCollateral: number
+  ): ImCollateralResult;
+  /**
+   * Validate a CSA specification: currencies, monetary bounds and calendar lookup.
+   * @param csa - `CsaSpec` (object or JSON) to check.
+   * @throws Error - Throws if `csa` is malformed, has unknown fields, mixes currencies, has a negative or non-finite amount, or names an unregistered calendar.
+   */
+  csaSpecValidate(csa: CsaSpec | string): void;
+  /**
+   * Eligible-collateral schedule that accepts cash only.
+   * @returns The `EligibleCollateralSchedule` as a plain object.
+   * @throws Error - Throws if the embedded margin registry cannot be loaded.
+   */
+  eligibleCollateralScheduleCashOnly(): EligibleCollateralSchedule;
+  /**
+   * BCBS-IOSCO standard eligible-collateral schedule with regulatory haircuts.
+   * @returns The `EligibleCollateralSchedule` as a plain object.
+   * @throws Error - Throws if the embedded margin registry cannot be loaded.
+   */
+  eligibleCollateralScheduleBcbsStandard(): EligibleCollateralSchedule;
+  /**
+   * Eligible-collateral schedule for US Treasury repo collateral.
+   * @returns The `EligibleCollateralSchedule` as a plain object.
+   * @throws Error - Throws if the embedded margin registry cannot be loaded.
+   */
+  eligibleCollateralScheduleUsTreasuries(): EligibleCollateralSchedule;
+  /**
+   * Whether a schedule accepts an asset class, by entry or through its default haircut.
+   * @param schedule - `EligibleCollateralSchedule` (object or JSON).
+   * @param assetClass - `CollateralAssetClass` wire label such as `"government_bonds"`.
+   * @returns `true` when the asset class is listed or the schedule has a default haircut.
+   * @throws Error - Throws if `schedule` is malformed or the asset class label is unknown.
+   */
+  eligibleCollateralScheduleIsEligible(
+    schedule: EligibleCollateralSchedule | string,
+    assetClass: CollateralAssetClass
+  ): boolean;
+  /**
+   * Haircut a schedule applies to an asset class.
+   * @param schedule - `EligibleCollateralSchedule` (object or JSON).
+   * @param assetClass - `CollateralAssetClass` wire label such as `"government_bonds"`.
+   * @returns The haircut as a decimal fraction, or `undefined` when the asset class is not eligible.
+   * @throws Error - Throws if `schedule` is malformed or the asset class label is unknown.
+   */
+  eligibleCollateralScheduleHaircutFor(
+    schedule: EligibleCollateralSchedule | string,
+    assetClass: CollateralAssetClass
+  ): number | undefined;
+  /**
+   * Haircut a schedule applies to an asset class at a given remaining maturity.
+   * @param schedule - `EligibleCollateralSchedule` (object or JSON).
+   * @param assetClass - `CollateralAssetClass` wire label such as `"government_bonds"`.
+   * @param remainingYears - Remaining maturity of the collateral in years.
+   * @returns The haircut as a decimal fraction, or `undefined` when no entry admits that maturity.
+   * @throws Error - Throws if `schedule` is malformed or the asset class label is unknown.
+   */
+  eligibleCollateralScheduleHaircutForMaturity(
+    schedule: EligibleCollateralSchedule | string,
+    assetClass: CollateralAssetClass,
+    remainingYears: number
+  ): number | undefined;
+  /**
+   * Check a proposed collateral portfolio against a schedule's concentration limits.
+   * @param schedule - `EligibleCollateralSchedule` (object or JSON).
+   * @param allocations - Array of `[assetClass, amount]` pairs: a `CollateralAssetClass` wire label and the proposed amount in one common currency.
+   * @returns One `ConcentrationBreach` (`asset_class`, `fraction`, `limit`, `excess`) per asset class over its limit; empty when the total is not positive.
+   * @throws Error - Throws if `schedule` is malformed, `allocations` is not an array of `[string, number]` pairs, or an asset class label is unknown.
+   */
+  eligibleCollateralScheduleCheckConcentrationLimits(
+    schedule: EligibleCollateralSchedule | string,
+    allocations: readonly (readonly [CollateralAssetClass, number])[] | string
+  ): ConcentrationBreach[];
+  /**
+   * Margin utilization: posted margin against required margin.
+   *
+   * The wire carries the two amounts; the ratio is derived from them (see
+   * `marginUtilizationRatio`).
+   * @param postedAmount - Margin posted, in major units of `currency`; finite and non-negative.
+   * @param requiredAmount - Margin required, in major units of `currency`; finite and non-negative.
+   * @param currency - ISO-4217 currency of both amounts.
+   * @returns The `MarginUtilization` (`posted`, `required`) as a plain object.
+   * @throws Error - Throws for an unknown currency or a non-finite or negative amount.
+   */
+  marginUtilization(
+    postedAmount: number,
+    requiredAmount: number,
+    currency: string
+  ): MarginUtilization;
+  /**
+   * Utilization ratio `posted / required`.
+   * @param utilization - `MarginUtilization` (object or JSON).
+   * @returns The ratio as a decimal; with nothing required it is `Infinity` when margin is posted and `1` otherwise.
+   * @throws Error - Throws if `utilization` is malformed, mixes currencies, or has a non-finite or negative amount.
+   */
+  marginUtilizationRatio(utilization: MarginUtilization | string): number;
+  /**
+   * Whether posted margin covers the requirement (`ratio >= 1`).
+   * @param utilization - `MarginUtilization` (object or JSON).
+   * @returns `true` when the posted margin is at least the required margin.
+   * @throws Error - Throws if `utilization` is malformed, mixes currencies, or has a non-finite or negative amount.
+   */
+  marginUtilizationIsAdequate(utilization: MarginUtilization | string): boolean;
+  /**
+   * Margin shortfall: `max(required - posted, 0)`.
+   * @param utilization - `MarginUtilization` (object or JSON).
+   * @returns The shortfall in major units of the utilization's currency; zero when adequately margined.
+   * @throws Error - Throws if `utilization` is malformed, mixes currencies, or has a non-finite or negative amount.
+   */
+  marginUtilizationShortfall(utilization: MarginUtilization | string): number;
+  /**
+   * Excess collateral: collateral value against the required value.
+   *
+   * `excess = collateral_value - required_value`; negative means a shortfall.
+   * @param collateralValue - Collateral market value, in major units of `currency`.
+   * @param requiredValue - Required collateral value, in major units of `currency`.
+   * @param currency - ISO-4217 currency of both amounts.
+   * @returns The `ExcessCollateral` (`collateral_value`, `required_value`, `excess`) as a plain object.
+   * @throws Error - Throws for an unknown currency or a non-finite amount.
+   */
+  excessCollateral(
+    collateralValue: number,
+    requiredValue: number,
+    currency: string
+  ): ExcessCollateral;
+  /**
+   * Whether collateral exceeds the requirement.
+   * @param excessCollateral - `ExcessCollateral` (object or JSON).
+   * @returns `true` when the excess amount is positive.
+   * @throws Error - Throws if `excess_collateral` is malformed.
+   */
+  excessCollateralHasExcess(excessCollateral: ExcessCollateral | string): boolean;
+  /**
+   * Whether collateral falls short of the requirement.
+   * @param excessCollateral - `ExcessCollateral` (object or JSON).
+   * @returns `true` when the excess amount is negative.
+   * @throws Error - Throws if `excess_collateral` is malformed.
+   */
+  excessCollateralHasShortfall(excessCollateral: ExcessCollateral | string): boolean;
+  /**
+   * Excess as a fraction of the required value.
+   * @param excessCollateral - `ExcessCollateral` (object or JSON).
+   * @returns `excess / required_value` as a decimal (0.05 is 5% over-collateralized); zero when nothing is required.
+   * @throws Error - Throws if `excess_collateral` is malformed.
+   */
+  excessCollateralExcessPercentage(excessCollateral: ExcessCollateral | string): number;
+  /**
+   * Annualized cost of funding posted margin.
+   *
+   * `annual_cost = margin_posted * (funding_rate - collateral_rate)`.
+   * @param marginPosted - Margin posted, in major units of `currency`.
+   * @param fundingRate - Unsecured funding rate as an annualized decimal (0.05 is 5%).
+   * @param collateralRate - Rate earned on posted collateral as an annualized decimal.
+   * @param currency - ISO-4217 currency of the posted margin.
+   * @returns The `MarginFundingCost` (`margin_posted`, `funding_rate`, `collateral_rate`, `annual_cost`) as a plain object.
+   * @throws Error - Throws for an unknown currency or a non-finite margin amount.
+   */
+  marginFundingCost(
+    marginPosted: number,
+    fundingRate: number,
+    collateralRate: number,
+    currency: string
+  ): MarginFundingCost;
+  /**
+   * Funding spread: funding rate minus collateral rate.
+   * @param fundingCost - `MarginFundingCost` (object or JSON).
+   * @returns The spread as an annualized decimal.
+   * @throws Error - Throws if `funding_cost` is malformed.
+   */
+  marginFundingCostSpread(fundingCost: MarginFundingCost | string): number;
+  /**
+   * Funding cost over a period: `annual_cost * year_fraction`.
+   * @param fundingCost - `MarginFundingCost` (object or JSON).
+   * @param yearFraction - Length of the period in years.
+   * @returns The cost in major units of the posted margin's currency.
+   * @throws Error - Throws if `funding_cost` is malformed.
+   */
+  marginFundingCostCostForPeriod(
+    fundingCost: MarginFundingCost | string,
+    yearFraction: number
+  ): number;
+  /**
+   * Haircut01: PV change for a one basis point increase in the haircut.
+   * @param collateralValue - Collateral market value, in major units of `currency`.
+   * @param currentHaircut - Current haircut as a decimal fraction (0.02 is 2%).
+   * @param currency - ISO-4217 currency of the collateral value.
+   * @returns The `Haircut01` (`collateral_value`, `current_haircut`, `pv_change`) as a plain object.
+   * @throws Error - Throws for an unknown currency or a non-finite collateral value.
+   */
+  haircut01(collateralValue: number, currentHaircut: number, currency: string): Haircut01;
+  /**
+   * Current haircut expressed in basis points.
+   * @param haircut01 - `Haircut01` (object or JSON).
+   * @returns `current_haircut * 10_000` (200 for a 2% haircut).
+   * @throws Error - Throws if `haircut01` is malformed.
+   */
+  haircut01HaircutBp(haircut01: Haircut01 | string): number;
+  /**
+   * Funding benefit spread applied to negative exposure.
+   *
+   * The configured `funding_benefit_bp`, or the funding spread when no
+   * separate benefit spread is set (symmetric funding).
+   * @param funding - `FundingConfig` (object or JSON).
+   * @returns The benefit spread in basis points.
+   * @throws Error - Throws if `funding` is malformed, has unknown fields, or fails validation.
+   */
+  fundingConfigEffectiveBenefitBp(funding: FundingConfig | string): number;
+  /**
+   * Funding spread applied to posted initial margin (the MVA spread).
+   *
+   * The configured `margin_funding_spread_bp`, or the funding spread when no
+   * separate margin spread is set.
+   * @param funding - `FundingConfig` (object or JSON).
+   * @returns The margin funding spread in basis points.
+   * @throws Error - Throws if `funding` is malformed, has unknown fields, or fails validation.
+   */
+  fundingConfigEffectiveMarginSpreadBp(funding: FundingConfig | string): number;
+  /**
+   * Validate an exposure profile: equal-length arrays on a strictly increasing time grid.
+   * @param exposureProfile - `ExposureProfile` (object or JSON) with `times`, `mtm_values`, `epe`, `ene` and optional `diagnostics`.
+   * @throws Error - Throws if the profile is malformed, has unknown fields, mismatched array lengths, a non-increasing or non-finite time grid, or invalid exposures.
+   */
+  exposureProfileValidate(exposureProfile: ExposureProfile | string): void;
+  /**
+   * Validate an expected initial-margin profile.
+   * @param imProfile - `ImProfile` (object or JSON) with `times` (years) and `im_values`.
+   * @throws Error - Throws if the profile is malformed, empty, has mismatched lengths, a non-positive or non-increasing time, or a negative or non-finite IM value.
+   */
+  imProfileValidate(imProfile: ImProfile | string): void;
+  /**
+   * Constant IM decay profile: IM stays at today's level for the whole horizon.
+   * @returns The `ImDecayProfile` value `"constant"`.
+   * @throws Error - Throws if the value cannot be converted to a JavaScript value.
+   */
+  imDecayProfileConstant(): ImDecayProfile;
+  /**
+   * Linear IM decay profile: `factor(t) = max(1 - t/T, 0)`.
+   * @param maturityYears - Portfolio maturity `T` in years; positive and finite.
+   * @returns The `ImDecayProfile` value `{ linear_to_maturity: { maturity_years } }`.
+   * @throws Error - Throws if `maturity_years` is non-positive or non-finite.
+   */
+  imDecayProfileLinearToMaturity(maturityYears: number): ImDecayProfile;
+  /**
+   * Square-root IM decay profile: `factor(t) = sqrt(max(1 - t/T, 0))`.
+   * @param maturityYears - Portfolio maturity `T` in years; positive and finite.
+   * @returns The `ImDecayProfile` value `{ sqrt_time: { maturity_years } }`.
+   * @throws Error - Throws if `maturity_years` is non-positive or non-finite.
+   */
+  imDecayProfileSqrtTime(maturityYears: number): ImDecayProfile;
+  /**
+   * Decay factor of an IM decay profile at time `t`.
+   * @param decay - `ImDecayProfile` (object or JSON), for example `"constant"` or `{ linear_to_maturity: { maturity_years: 5 } }`.
+   * @param t - Time from today in years.
+   * @returns The factor multiplying today's IM, in `[0, 1]` for `t >= 0`.
+   * @throws Error - Throws if `decay` is malformed or its maturity is non-positive or non-finite.
+   */
+  imDecayProfileFactor(decay: ImDecayProfile | string, t: number): number;
+  /**
+   * Component labels present in an initial margin result's breakdown.
+   *
+   * SIMM publishes `IR_Delta`, `IR_Vega`, `FX_Delta`, `Curvature`, …; the
+   * schedule calculator publishes the asset class (for example
+   * `interest_rate`).
+   * @param result - `ImResult` (object or JSON).
+   * @returns The breakdown labels in sorted order.
+   * @throws Error - Throws if `result` is malformed.
+   */
+  imResultBreakdownKeys(result: ImResult | string): string[];
+  /**
+   * Breakdown amount of an initial margin result for one component label.
+   * @param result - `ImResult` (object or JSON).
+   * @param key - Component label, for example `"IR_Delta"`.
+   * @returns The component amount in major units of the result currency, or `undefined` when the label is absent.
+   * @throws Error - Throws if `result` is malformed or `key` is not a string.
+   */
+  imResultBreakdownAmount(result: ImResult | string, key: string): number | undefined;
+  /**
+   * Net desk cash outflow of a variation margin result: post minus collect.
+   * @param result - `VmResult` (object or JSON).
+   * @returns The net margin in major units of the CSA base currency; positive means the desk posts.
+   * @throws Error - Throws if `result` is malformed.
+   */
+  vmResultNetMargin(result: VmResult | string): number;
+  /**
+   * Whether a variation margin result requires a margin call.
+   * @param result - `VmResult` (object or JSON).
+   * @returns `true` when a post or collect amount is non-zero.
+   * @throws Error - Throws if `result` is malformed.
+   */
+  vmResultRequiresCall(result: VmResult | string): boolean;
+  /**
+   * Unmargined SA-CCR netting-set configuration.
+   *
+   * Threshold, MTA and NICA are zero and `mpor_days` is the 10-business-day
+   * bilateral default (used only for the reporting maturity factor).
+   * @param nettingSetId - `NettingSetId` (object or JSON), bilateral or cleared.
+   * @param collateral - Net collateral held, in the reporting currency; positive means the bank holds collateral.
+   * @param asOf - ISO-8601 valuation date for forward-start and remaining-maturity calculations.
+   * @returns The `SaCcrNettingSetConfig` as a plain object.
+   * @throws Error - Throws if `netting_set_id` is malformed, `collateral` is non-finite, or the date is not ISO 8601.
+   */
+  saCcrNettingSetConfigUnmargined(
+    nettingSetId: NettingSetId | string,
+    collateral: number,
+    asOf: string
+  ): SaCcrNettingSetConfig;
+  /**
+   * Margined SA-CCR netting-set configuration.
+   * @param nettingSetId - `NettingSetId` (object or JSON), bilateral or cleared.
+   * @param collateral - Net collateral held, in the reporting currency; positive means the bank holds collateral.
+   * @param threshold - CSA threshold (TH), non-negative.
+   * @param mta - Minimum transfer amount, non-negative.
+   * @param nica - Net independent collateral amount, signed.
+   * @param mporDays - Margin period of risk in business days; at least 10 bilateral or 5 cleared.
+   * @param asOf - ISO-8601 valuation date for forward-start and remaining-maturity calculations.
+   * @returns The `SaCcrNettingSetConfig` as a plain object.
+   * @throws Error - Throws if `netting_set_id` is malformed, an amount is non-finite, the threshold or MTA is negative, `mpor_days` is below the applicable floor, or the date is not ISO 8601.
+   */
+  saCcrNettingSetConfigMargined(
+    nettingSetId: NettingSetId | string,
+    collateral: number,
+    threshold: number,
+    mta: number,
+    nica: number,
+    mporDays: number,
+    asOf: string
+  ): SaCcrNettingSetConfig;
+  /**
+   * Validate an SA-CCR netting-set configuration.
+   * @param config - `SaCcrNettingSetConfig` (object or JSON).
+   * @throws Error - Throws if `config` is malformed, an amount is non-finite, the threshold or MTA is negative, or a margined `mpor_days` is below the applicable floor.
+   */
+  saCcrNettingSetConfigValidate(config: SaCcrNettingSetConfig | string): void;
 }
 
 /**
@@ -8833,6 +10860,667 @@ export interface CalibrationNamespace {
    * @throws Error - Throws a `CalibrationEnvelopeError` if the result is malformed, exceeds the default load limits, its schema marker is missing or unsupported, or it contains a non-finite number.
    */
   calibrationResultContentHash(resultJson: CalibrationResultEnvelope | string): string;
+  /**
+   * Validate a calibration envelope and return it as a plain `CalibrationEnvelope` object.
+   *
+   * Typed twin of [`validate_calibration_json`]: the same strict load and
+   * fail-fast static validation, returning the envelope object instead of its
+   * pretty-printed JSON.
+   * @param envelope - `CalibrationEnvelope` (object or JSON) with schema marker `finstack_quant.calibration/1`.
+   * @returns The validated `CalibrationEnvelope` in canonical form.
+   * @throws Error - Throws a `CalibrationEnvelopeError` if the envelope is malformed, its schema marker is missing or unsupported, or static validation fails (fail-fast: first error; `dryRun` lists every static error).
+   */
+  validateCalibration(envelope: CalibrationEnvelope | string): CalibrationEnvelope;
+  /**
+   * Report of one calibration step, read from a calibration result.
+   *
+   * Free-function twin of Python `CalibrationResult.step_report` (Rust
+   * `CalibrationResult::step_report`).
+   * @param resultJson - `CalibrationResultEnvelope` returned by `calibrate` (object or JSON).
+   * @param stepId - Identifier of the calibration step, as given in the plan.
+   * @returns The step's `CalibrationReport`, with raw residuals keyed by quote id.
+   * @throws Error - Throws a `CalibrationEnvelopeError` if the result is malformed or exceeds the default load limits, and a `FinstackError` with `kind: "not_found"` naming the available step ids if no step has the given `stepId`.
+   */
+  calibrationResultStepReport(
+    resultJson: CalibrationResultEnvelope | string,
+    stepId: string
+  ): generated.calibration.CalibrationReport;
+  /**
+   * Report of one calibration step as a compact JSON string.
+   *
+   * JSON wire twin of [`calibration_result_step_report`] and free-function twin
+   * of Python `CalibrationResult.step_report_json`.
+   * @param resultJson - `CalibrationResultEnvelope` returned by `calibrate` (object or JSON).
+   * @param stepId - Identifier of the calibration step, as given in the plan.
+   * @returns Compact `CalibrationReport` JSON.
+   * @throws Error - Throws a `CalibrationEnvelopeError` if the result is malformed or exceeds the default load limits, and a `FinstackError` with `kind: "not_found"` if no step has the given `stepId` or with `kind: "validation"` if the report cannot be serialized.
+   */
+  calibrationResultStepReportJson(
+    resultJson: CalibrationResultEnvelope | string,
+    stepId: string
+  ): string;
+  /**
+   * Per-quote residual rows of one calibration step.
+   *
+   * Free-function twin of Python `CalibrationResult.residuals`, which returns
+   * the same rows (Rust `CalibrationReport::quote_rows`) as a pandas
+   * `DataFrame`. `target_value`, `fitted_value` and `sensitivity` are `NaN`
+   * unless `CalibrationConfig.compute_diagnostics` was enabled.
+   * @param resultJson - `CalibrationResultEnvelope` returned by `calibrate` (object or JSON).
+   * @param stepId - Identifier of the calibration step, as given in the plan.
+   * @returns One `QuoteQuality` row per quote: `quote_label`, `target_value`, `fitted_value`, `residual` (fitted minus target, in the quote's native units) and `sensitivity`.
+   * @throws Error - Throws a `CalibrationEnvelopeError` if the result is malformed or exceeds the default load limits, and a `FinstackError` with `kind: "not_found"` naming the available step ids if no step has the given `stepId`.
+   */
+  calibrationResultResiduals(
+    resultJson: CalibrationResultEnvelope | string,
+    stepId: string
+  ): generated.calibration.QuoteQuality[];
+  /**
+   * Build a money-market deposit rate quote.
+   *
+   * Free-function twin of Python `RateQuote.deposit` (Rust `RateQuote::from_wire_fields`).
+   * @param id - Unique quote identifier (the residual key in calibration reports).
+   * @param index - Rate index identifier (for example `"USD-SOFR-OIS"`).
+   * @param pillar - Maturity pillar: tenor string (`"3M"`, `"5Y"`), ISO-8601 date string, or a `{"tenor": {...}}` / `{"date": "..."}` object.
+   * @param rate - Simple deposit rate as a decimal (`0.0525` is 5.25%).
+   * @returns A validated `RateQuote` object with `type: "deposit"`.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if the pillar cannot be parsed or the rate is not finite.
+   */
+  rateQuoteDeposit(
+    id: string,
+    index: string,
+    pillar: string | generated.calibration.Pillar,
+    rate: number
+  ): generated.calibration.RateQuote;
+  /**
+   * Build a forward-rate-agreement quote.
+   *
+   * Free-function twin of Python `RateQuote.fra` (Rust `RateQuote::from_wire_fields`).
+   * @param id - Unique quote identifier (the residual key in calibration reports).
+   * @param index - Rate index identifier of the underlying floating rate.
+   * @param start - Accrual start pillar: tenor string, ISO-8601 date string, or pillar object.
+   * @param end - Accrual end pillar: tenor string, ISO-8601 date string, or pillar object.
+   * @param rate - FRA rate as a decimal.
+   * @returns A validated `RateQuote` object with `type: "fra"`.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if a pillar cannot be parsed or the rate is not finite.
+   */
+  rateQuoteFra(
+    id: string,
+    index: string,
+    start: string | generated.calibration.Pillar,
+    end: string | generated.calibration.Pillar,
+    rate: number
+  ): generated.calibration.RateQuote;
+  /**
+   * Build an interest-rate futures price quote.
+   *
+   * Free-function twin of Python `RateQuote.futures` (Rust `RateQuote::from_wire_fields`).
+   * @param id - Unique quote identifier (the residual key in calibration reports).
+   * @param contract - Futures contract identifier (for example `"CME:SR3"`).
+   * @param expiry - ISO-8601 last trading date of the contract.
+   * @param price - Futures price (for example `98.50`); the implied rate is `(100 - price) / 100`.
+   * @param convexityAdjustment - Convexity adjustment as a decimal rate subtracted from the futures-implied forward (Hull convention); defaults to `0.0`.
+   * @returns A validated `RateQuote` object with `type: "futures"`.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if the expiry is not an ISO-8601 date or the price is not finite.
+   */
+  rateQuoteFutures(
+    id: string,
+    contract: string,
+    expiry: string,
+    price: number,
+    convexityAdjustment?: number | null
+  ): generated.calibration.RateQuote;
+  /**
+   * Build a par swap rate quote.
+   *
+   * Free-function twin of Python `RateQuote.swap` (Rust `RateQuote::from_wire_fields`).
+   * @param id - Unique quote identifier (the residual key in calibration reports).
+   * @param index - Floating-leg index identifier (for example `"USD-SOFR-OIS"`).
+   * @param pillar - Swap maturity pillar: tenor string (`"5Y"`), ISO-8601 date string, or pillar object.
+   * @param rate - Fixed par rate as a decimal.
+   * @param spreadDecimal - Optional floating-leg spread as a decimal (`0.0010` is 10 bp); omitted means no spread.
+   * @returns A validated `RateQuote` object with `type: "swap"`.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if the pillar cannot be parsed or the rate is not finite.
+   */
+  rateQuoteSwap(
+    id: string,
+    index: string,
+    pillar: string | generated.calibration.Pillar,
+    rate: number,
+    spreadDecimal?: number | null
+  ): generated.calibration.RateQuote;
+  /**
+   * Build a running par-spread CDS quote.
+   *
+   * Free-function twin of Python `CdsQuote.par_spread` (Rust `CdsQuote::from_wire_fields`).
+   * @param id - Unique quote identifier.
+   * @param entity - Reference entity name.
+   * @param currency - ISO-4217 contract currency of the CDS convention.
+   * @param docClause - ISDA documentation clause: `"isda_na"`, `"isda_eu"`, `"cr14"`, `"mr14"`, `"mm14"` or `"xr14"`.
+   * @param pillar - Maturity pillar: tenor string (`"5Y"`), ISO-8601 date string, or pillar object.
+   * @param spreadBp - Par spread in basis points (`80.0` is 80 bp).
+   * @param recoveryRate - Assumed recovery rate as a decimal in `[0, 1)`.
+   * @returns A validated `CdsQuote` object with `type: "cds_par_spread"`.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if the convention, pillar or a numeric input is invalid.
+   */
+  cdsQuoteParSpread(
+    id: string,
+    entity: string,
+    currency: string,
+    docClause: string,
+    pillar: string | generated.calibration.Pillar,
+    spreadBp: number,
+    recoveryRate: number
+  ): generated.calibration.CdsQuote;
+  /**
+   * Build an upfront-plus-running-coupon CDS quote.
+   *
+   * Free-function twin of Python `CdsQuote.upfront` (Rust `CdsQuote::from_wire_fields`).
+   * @param id - Unique quote identifier.
+   * @param entity - Reference entity name.
+   * @param currency - ISO-4217 contract currency of the CDS convention.
+   * @param docClause - ISDA documentation clause: `"isda_na"`, `"isda_eu"`, `"cr14"`, `"mr14"`, `"mm14"` or `"xr14"`.
+   * @param pillar - Maturity pillar: tenor string (`"5Y"`), ISO-8601 date string, or pillar object.
+   * @param couponBp - Standard running coupon in basis points (for example `100.0`).
+   * @param upfrontPct - Upfront payment as a fraction of notional (`0.01` is 1%).
+   * @param recoveryRate - Assumed recovery rate as a decimal in `[0, 1)`.
+   * @returns A validated `CdsQuote` object with `type: "cds_upfront"`.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if the convention, pillar or a numeric input is invalid.
+   */
+  cdsQuoteUpfront(
+    id: string,
+    entity: string,
+    currency: string,
+    docClause: string,
+    pillar: string | generated.calibration.Pillar,
+    couponBp: number,
+    upfrontPct: number,
+    recoveryRate: number
+  ): generated.calibration.CdsQuote;
+  /**
+   * Build a listed equity or FX option implied-volatility quote.
+   *
+   * Free-function twin of Python `VolQuote.option_vol` (Rust `VolQuote::from_wire_fields`).
+   * @param id - Unique quote identifier.
+   * @param underlying - Underlying identifier (ticker) the surface is keyed by.
+   * @param expiry - ISO-8601 option expiry date.
+   * @param strike - Absolute strike in underlying price units.
+   * @param vol - Black implied volatility as an annualized decimal (`0.28` is 28%).
+   * @param optionType - `"call"` or `"put"`; defaults to `"call"`.
+   * @returns A validated `VolQuote` object tagged `option_vol`.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if the expiry is not an ISO-8601 date, the option type is unknown or a numeric input is invalid.
+   */
+  volQuoteOptionVol(
+    id: string,
+    underlying: string,
+    expiry: string,
+    strike: number,
+    vol: number,
+    optionType?: string | null
+  ): generated.calibration.VolQuote;
+  /**
+   * Build a swaption volatility quote.
+   *
+   * Free-function twin of Python `VolQuote.swaption_vol` (Rust `VolQuote::from_wire_fields`).
+   * @param id - Unique quote identifier.
+   * @param expiry - ISO-8601 option expiry date.
+   * @param maturity - ISO-8601 maturity date of the underlying swap.
+   * @param strike - Fixed strike rate as a decimal.
+   * @param vol - Volatility: absolute rate volatility for normal quotes (for example `0.0072`), annualized decimal for lognormal quotes.
+   * @param quoteType - `"normal"` or `"black_lognormal"`; defaults to `"normal"`.
+   * @param convention - Swaption market convention identifier; defaults to `"USD"`.
+   * @returns A validated `VolQuote` object tagged `swaption_vol`.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601, the quote type is unknown or a numeric input is invalid.
+   */
+  volQuoteSwaptionVol(
+    id: string,
+    expiry: string,
+    maturity: string,
+    strike: number,
+    vol: number,
+    quoteType?: string | null,
+    convention?: string | null
+  ): generated.calibration.VolQuote;
+  /**
+   * Build a cap or floor volatility quote.
+   *
+   * Free-function twin of Python `VolQuote.cap_floor_vol` (Rust `VolQuote::from_wire_fields`).
+   * @param id - Unique quote identifier.
+   * @param expiry - ISO-8601 cap/floor maturity date.
+   * @param strike - Strike rate as a decimal.
+   * @param vol - Volatility: absolute rate volatility for normal quotes, annualized decimal for lognormal quotes.
+   * @param quoteType - `"normal"` or `"black_lognormal"`; defaults to `"normal"`.
+   * @param isCap - `true` for a cap, `false` for a floor; defaults to `true`.
+   * @returns A validated `VolQuote` object tagged `cap_floor_vol`.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if the expiry is not an ISO-8601 date, the quote type is unknown or a numeric input is invalid.
+   */
+  volQuoteCapFloorVol(
+    id: string,
+    expiry: string,
+    strike: number,
+    vol: number,
+    quoteType?: string | null,
+    isCap?: boolean | null
+  ): generated.calibration.VolQuote;
+  /**
+   * Currency-appropriate default zero-rate bounds for curve calibration.
+   *
+   * Free-function twin of Python `RateBounds.for_currency` (Rust
+   * `RateBounds::for_currency`).
+   * @param currency - ISO-4217 currency code (for example `"USD"`).
+   * @returns A `RateBounds` object with `min_rate` and `max_rate` as decimal zero rates.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `currency` is not a string and a `FinstackError` (`kind: "validation"`) if it is not a valid ISO-4217 code.
+   */
+  rateBoundsForCurrency(currency: string): generated.calibration.RateBounds;
+  /**
+   * Wide zero-rate bounds suitable for emerging-market curves.
+   *
+   * Free-function twin of Python `RateBounds.emerging_markets` (Rust
+   * `RateBounds::emerging_markets`).
+   * @returns A `RateBounds` object with `min_rate` and `max_rate` as decimal zero rates.
+   * @throws Error - Throws a `FinstackError` only if the bounds cannot be converted to a JavaScript value.
+   */
+  rateBoundsEmergingMarkets(): generated.calibration.RateBounds;
+  /**
+   * Build a discount-curve bootstrap step.
+   *
+   * Free-function twin of Python `CalibrationStep.discount` (Rust
+   * `CalibrationStep::from_wire_fields`). Quotes are listed in the envelope's
+   * `market_data` and named in `plan.quote_sets` rather than attached to the step.
+   * @param id - Step identifier; also the default quote-set name and the default identifier of the produced object.
+   * @param currency - ISO-4217 currency code of the curve (for example `"USD"`).
+   * @param baseDate - ISO-8601 base (valuation) date.
+   * @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
+   * @param curveId - Identifier of the produced curve; defaults to `id`.
+   * @param params - Optional object (or JSON) of further wire fields: `method` (`"bootstrap"` or `"global"`), `interpolation` (default `"log_linear"`), `extrapolation`, `pricing_discount_id`, `pricing_forward_id`, `conventions`. An entry named like another argument is replaced by that argument.
+   * @returns A `CalibrationStep` object with `kind: "discount"`.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field (including a `params` entry) is unknown or has the wrong shape.
+   */
+  calibrationStepDiscount(
+    id: string,
+    currency: string,
+    baseDate: string,
+    quoteSet?: string | null,
+    curveId?: string | null,
+    params?: Record<string, unknown> | string | null
+  ): generated.calibration.CalibrationStep;
+  /**
+   * Build a forward (index projection) curve step discounted on an existing curve.
+   *
+   * Free-function twin of Python `CalibrationStep.forward` (Rust
+   * `CalibrationStep::from_wire_fields`). Quotes are listed in the envelope's
+   * `market_data` and named in `plan.quote_sets` rather than attached to the step.
+   * @param id - Step identifier; also the default quote-set name and the default identifier of the produced object.
+   * @param currency - ISO-4217 currency code of the curve (for example `"USD"`).
+   * @param baseDate - ISO-8601 base (valuation) date.
+   * @param tenorYears - Index accrual tenor in years (`0.25` for 3M).
+   * @param discountCurveId - Identifier of the discount curve used to price the quotes.
+   * @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
+   * @param curveId - Identifier of the produced curve; defaults to `id`.
+   * @param params - Optional object (or JSON) of further wire fields: `method`, `interpolation` (default `"monotone_convex"`), `conventions`. An entry named like another argument is replaced by that argument.
+   * @returns A `CalibrationStep` object with `kind: "forward"`.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field (including a `params` entry) is unknown or has the wrong shape.
+   */
+  calibrationStepForward(
+    id: string,
+    currency: string,
+    baseDate: string,
+    tenorYears: number,
+    discountCurveId: string,
+    quoteSet?: string | null,
+    curveId?: string | null,
+    params?: Record<string, unknown> | string | null
+  ): generated.calibration.CalibrationStep;
+  /**
+   * Build a hazard-curve bootstrap step from CDS quotes.
+   *
+   * Free-function twin of Python `CalibrationStep.hazard` (Rust
+   * `CalibrationStep::from_wire_fields`). Quotes are listed in the envelope's
+   * `market_data` and named in `plan.quote_sets` rather than attached to the step.
+   * @param id - Step identifier; also the default quote-set name and the default identifier of the produced object.
+   * @param entity - Reference entity name.
+   * @param currency - ISO-4217 currency code of the curve (for example `"USD"`).
+   * @param baseDate - ISO-8601 base (valuation) date.
+   * @param discountCurveId - Discount curve used for CDS present values.
+   * @param recoveryRate - Assumed recovery rate as a decimal.
+   * @param seniority - Debt seniority label (`"senior_secured"`, `"senior"`, `"subordinated"`, `"junior"`); defaults to `"senior"`.
+   * @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
+   * @param curveId - Identifier of the produced curve; defaults to `id`.
+   * @param params - Optional object (or JSON) of further wire fields: `notional`, `method`, `interpolation`, `par_interp`, `doc_clause`, `cds_valuation_convention`. An entry named like another argument is replaced by that argument.
+   * @returns A `CalibrationStep` object with `kind: "hazard"`.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field (including a `params` entry) is unknown or has the wrong shape.
+   */
+  calibrationStepHazard(
+    id: string,
+    entity: string,
+    currency: string,
+    baseDate: string,
+    discountCurveId: string,
+    recoveryRate: number,
+    seniority?: string | null,
+    quoteSet?: string | null,
+    curveId?: string | null,
+    params?: Record<string, unknown> | string | null
+  ): generated.calibration.CalibrationStep;
+  /**
+   * Build an inflation (CPI projection) curve step from inflation-swap quotes.
+   *
+   * Free-function twin of Python `CalibrationStep.inflation` (Rust
+   * `CalibrationStep::from_wire_fields`). Quotes are listed in the envelope's
+   * `market_data` and named in `plan.quote_sets` rather than attached to the step.
+   * @param id - Step identifier; also the default quote-set name and the default identifier of the produced object.
+   * @param currency - ISO-4217 currency code of the curve (for example `"USD"`).
+   * @param baseDate - ISO-8601 base (valuation) date.
+   * @param discountCurveId - Discount curve used for swap present values.
+   * @param index - Inflation index identifier (for example `"USA-CPI-U"`).
+   * @param observationLag - Observation lag tenor (for example `"3M"`).
+   * @param baseCpi - CPI index level at the base date.
+   * @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
+   * @param curveId - Identifier of the produced curve; defaults to `id`.
+   * @param params - Optional object (or JSON) of further wire fields: `notional`, `method`, `interpolation`, `seasonal_factors`. An entry named like another argument is replaced by that argument.
+   * @returns A `CalibrationStep` object with `kind: "inflation"`.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field (including a `params` entry) is unknown or has the wrong shape.
+   */
+  calibrationStepInflation(
+    id: string,
+    currency: string,
+    baseDate: string,
+    discountCurveId: string,
+    index: string,
+    observationLag: string,
+    baseCpi: number,
+    quoteSet?: string | null,
+    curveId?: string | null,
+    params?: Record<string, unknown> | string | null
+  ): generated.calibration.CalibrationStep;
+  /**
+   * Build an equity or FX volatility-surface (SABR) step from option vol quotes.
+   *
+   * Free-function twin of Python `CalibrationStep.vol_surface` (Rust
+   * `CalibrationStep::from_wire_fields`). Quotes are listed in the envelope's
+   * `market_data` and named in `plan.quote_sets` rather than attached to the step.
+   * @param id - Step identifier; also the default quote-set name and the default identifier of the produced object.
+   * @param baseDate - ISO-8601 surface base date.
+   * @param underlyingTicker - Underlying identifier the quotes reference.
+   * @param model - Surface model label; defaults to `"sabr"`.
+   * @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
+   * @param volSurfaceId - Identifier of the produced surface; defaults to `id`.
+   * @param params - Optional object (or JSON) of further wire fields: `discount_curve_id`, `beta`, `target_expiries`, `target_strikes`, `spot_override`, `dividend_yield_override`, `expiry_extrapolation`. An entry named like another argument is replaced by that argument.
+   * @returns A `CalibrationStep` object with `kind: "vol_surface"`.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field (including a `params` entry) is unknown or has the wrong shape.
+   */
+  calibrationStepVolSurface(
+    id: string,
+    baseDate: string,
+    underlyingTicker: string,
+    model?: string | null,
+    quoteSet?: string | null,
+    volSurfaceId?: string | null,
+    params?: Record<string, unknown> | string | null
+  ): generated.calibration.CalibrationStep;
+  /**
+   * Build a swaption volatility cube step from swaption vol quotes.
+   *
+   * Free-function twin of Python `CalibrationStep.swaption_vol` (Rust
+   * `CalibrationStep::from_wire_fields`). Quotes are listed in the envelope's
+   * `market_data` and named in `plan.quote_sets` rather than attached to the step.
+   * @param id - Step identifier; also the default quote-set name and the default identifier of the produced object.
+   * @param baseDate - ISO-8601 surface base date.
+   * @param discountCurveId - Discount curve for forward-swap-rate construction.
+   * @param currency - ISO-4217 currency code of the surface.
+   * @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
+   * @param volSurfaceId - Identifier of the produced surface; defaults to `id`.
+   * @param params - Optional object (or JSON) of further wire fields: `forward_id`, `vol_convention`, `sabr_beta`, `target_expiries`, `target_tenors`, `sabr_interpolation`, `calendar_id`, `fixed_day_count`, `swap_index`, `vol_tolerance`, `sabr_extrapolation`, `allow_sabr_missing_bucket_fallback`. An entry named like another argument is replaced by that argument.
+   * @returns A `CalibrationStep` object with `kind: "swaption_vol"`.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field (including a `params` entry) is unknown or has the wrong shape.
+   */
+  calibrationStepSwaptionVol(
+    id: string,
+    baseDate: string,
+    discountCurveId: string,
+    currency: string,
+    quoteSet?: string | null,
+    volSurfaceId?: string | null,
+    params?: Record<string, unknown> | string | null
+  ): generated.calibration.CalibrationStep;
+  /**
+   * Build an index-tranche base-correlation step.
+   *
+   * Free-function twin of Python `CalibrationStep.base_correlation` (Rust
+   * `CalibrationStep::from_wire_fields`). Quotes are listed in the envelope's
+   * `market_data` and named in `plan.quote_sets` rather than attached to the step.
+   * @param id - Step identifier; also the default quote-set name.
+   * @param indexId - Credit index identifier (the curve is written as `"{index_id}_CORR"`).
+   * @param series - Index series number (non-negative integer).
+   * @param maturityYears - Tranche maturity in years.
+   * @param baseDate - ISO-8601 valuation date.
+   * @param discountCurveId - Discount curve for tranche present values.
+   * @param currency - ISO-4217 currency code of the index.
+   * @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
+   * @param params - Optional object (or JSON) of further wire fields: `notional`, `frequency`, `day_count`, `business_day_convention`, `calendar_id`, `detachment_points`, `roll_rule`. An entry named like another argument is replaced by that argument.
+   * @returns A `CalibrationStep` object with `kind: "base_correlation"`.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field (including a `params` entry) is unknown or has the wrong shape.
+   */
+  calibrationStepBaseCorrelation(
+    id: string,
+    indexId: string,
+    series: number,
+    maturityYears: number,
+    baseDate: string,
+    discountCurveId: string,
+    currency: string,
+    quoteSet?: string | null,
+    params?: Record<string, unknown> | string | null
+  ): generated.calibration.CalibrationStep;
+  /**
+   * Build a Student-t copula degrees-of-freedom step for one tranche.
+   *
+   * Free-function twin of Python `CalibrationStep.student_t` (Rust
+   * `CalibrationStep::from_wire_fields`). Quotes are listed in the envelope's
+   * `market_data` and named in `plan.quote_sets` rather than attached to the step.
+   * @param id - Step identifier; also the default quote-set name.
+   * @param trancheInstrumentId - Tranche instrument whose `"{id}_STUDENT_T_DF"` scalar is written.
+   * @param baseCorrelationCurveId - Base-correlation curve the tranche is priced on.
+   * @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
+   * @param params - Optional object (or JSON) of further wire fields: `discount_curve_id`, `initial_df`, `df_bounds`, `correlation`. An entry named like another argument is replaced by that argument.
+   * @returns A `CalibrationStep` object with `kind: "student_t"`.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field (including a `params` entry) is unknown or has the wrong shape.
+   */
+  calibrationStepStudentT(
+    id: string,
+    trancheInstrumentId: string,
+    baseCorrelationCurveId: string,
+    quoteSet?: string | null,
+    params?: Record<string, unknown> | string | null
+  ): generated.calibration.CalibrationStep;
+  /**
+   * Build a Hull-White one-factor calibration step on ATM swaption quotes.
+   *
+   * Free-function twin of Python `CalibrationStep.hull_white` (Rust
+   * `CalibrationStep::from_wire_fields`). Quotes are listed in the envelope's
+   * `market_data` and named in `plan.quote_sets` rather than attached to the step.
+   * @param id - Step identifier; also the default quote-set name.
+   * @param curveId - Discount curve the model is calibrated on (scalars are written as `"{curve_id}_HW1F"`).
+   * @param currency - ISO-4217 currency code of the model.
+   * @param baseDate - ISO-8601 valuation date.
+   * @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
+   * @param params - Optional object (or JSON) of further wire fields: `initial_kappa`, `initial_sigma`. An entry named like another argument is replaced by that argument.
+   * @returns A `CalibrationStep` object with `kind: "hull_white"`.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field (including a `params` entry) is unknown or has the wrong shape.
+   */
+  calibrationStepHullWhite(
+    id: string,
+    curveId: string,
+    currency: string,
+    baseDate: string,
+    quoteSet?: string | null,
+    params?: Record<string, unknown> | string | null
+  ): generated.calibration.CalibrationStep;
+  /**
+   * Build a Hull-White one-factor calibration step on cap/floor quotes.
+   *
+   * Free-function twin of Python `CalibrationStep.cap_floor_hull_white` (Rust
+   * `CalibrationStep::from_wire_fields`). Quotes are listed in the envelope's
+   * `market_data` and named in `plan.quote_sets` rather than attached to the step.
+   * @param id - Step identifier; also the default quote-set name.
+   * @param discountCurveId - Discounting curve (scalars are written as `"{discount_curve_id}_CAPFLOOR_HW1F"`).
+   * @param forwardCurveId - Curve projecting the caplet forwards.
+   * @param currency - ISO-4217 currency code of the model.
+   * @param baseDate - ISO-8601 valuation date.
+   * @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
+   * @param params - Optional object (or JSON) of further wire fields: `fixed_kappa`, `initial_kappa`, `initial_sigma`, `payment_frequency`, `volatility_mode`. An entry named like another argument is replaced by that argument.
+   * @returns A `CalibrationStep` object with `kind: "cap_floor_hull_white"`.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field (including a `params` entry) is unknown or has the wrong shape.
+   */
+  calibrationStepCapFloorHullWhite(
+    id: string,
+    discountCurveId: string,
+    forwardCurveId: string,
+    currency: string,
+    baseDate: string,
+    quoteSet?: string | null,
+    params?: Record<string, unknown> | string | null
+  ): generated.calibration.CalibrationStep;
+  /**
+   * Build an SVI volatility-surface step from option vol quotes.
+   *
+   * Free-function twin of Python `CalibrationStep.svi_surface` (Rust
+   * `CalibrationStep::from_wire_fields`). Quotes are listed in the envelope's
+   * `market_data` and named in `plan.quote_sets` rather than attached to the step.
+   * @param id - Step identifier; also the default quote-set name and the default identifier of the produced object.
+   * @param baseDate - ISO-8601 surface base date.
+   * @param underlyingTicker - Underlying identifier the quotes reference.
+   * @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
+   * @param volSurfaceId - Identifier of the produced surface; defaults to `id`.
+   * @param params - Optional object (or JSON) of further wire fields: `discount_curve_id`, `target_expiries`, `target_strikes`, `spot_override`, `dividend_yield_override`. An entry named like another argument is replaced by that argument.
+   * @returns A `CalibrationStep` object with `kind: "svi_surface"`.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field (including a `params` entry) is unknown or has the wrong shape.
+   */
+  calibrationStepSviSurface(
+    id: string,
+    baseDate: string,
+    underlyingTicker: string,
+    quoteSet?: string | null,
+    volSurfaceId?: string | null,
+    params?: Record<string, unknown> | string | null
+  ): generated.calibration.CalibrationStep;
+  /**
+   * Build a cross-currency basis curve step.
+   *
+   * Free-function twin of Python `CalibrationStep.xccy_basis` (Rust
+   * `CalibrationStep::from_wire_fields`). Quotes are listed in the envelope's
+   * `market_data` and named in `plan.quote_sets` rather than attached to the step.
+   * @param id - Step identifier; also the default quote-set name and the default identifier of the produced object.
+   * @param currency - ISO-4217 foreign (collateral) currency of the produced discount curve.
+   * @param baseDate - ISO-8601 base (valuation) date.
+   * @param fxSpot - Spot FX rate used to translate the basis quotes.
+   * @param domesticDiscountId - Domestic discount curve the basis is measured against.
+   * @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
+   * @param curveId - Identifier of the produced curve; defaults to `id`.
+   * @param params - Optional object (or JSON) of further wire fields: `method`, `interpolation`, `extrapolation`, `conventions`, `basis_spread_curve_id`. An entry named like another argument is replaced by that argument.
+   * @returns A `CalibrationStep` object with `kind: "xccy_basis"`.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field (including a `params` entry) is unknown or has the wrong shape.
+   */
+  calibrationStepXccyBasis(
+    id: string,
+    currency: string,
+    baseDate: string,
+    fxSpot: number,
+    domesticDiscountId: string,
+    quoteSet?: string | null,
+    curveId?: string | null,
+    params?: Record<string, unknown> | string | null
+  ): generated.calibration.CalibrationStep;
+  /**
+   * Build a parametric (Nelson-Siegel or Svensson) curve fit step.
+   *
+   * Free-function twin of Python `CalibrationStep.parametric` (Rust
+   * `CalibrationStep::from_wire_fields`). Quotes are listed in the envelope's
+   * `market_data` and named in `plan.quote_sets` rather than attached to the step.
+   * @param id - Step identifier; also the default quote-set name and the default identifier of the produced object.
+   * @param baseDate - ISO-8601 base (valuation) date.
+   * @param model - Parametric family: `"ns"` (Nelson-Siegel) or `"nss"` (Svensson); defaults to `"ns"`.
+   * @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
+   * @param curveId - Identifier of the produced curve; defaults to `id`.
+   * @param params - Optional object (or JSON) of further wire fields: `initial_params`. An entry named like another argument is replaced by that argument.
+   * @returns A `CalibrationStep` object with `kind: "parametric"`.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601 or a field (including a `params` entry) is unknown or has the wrong shape.
+   */
+  calibrationStepParametric(
+    id: string,
+    baseDate: string,
+    model?: string | null,
+    quoteSet?: string | null,
+    curveId?: string | null,
+    params?: Record<string, unknown> | string | null
+  ): generated.calibration.CalibrationStep;
+  /**
+   * Fit scalar Hull-White `(kappa, sigma)` to at-the-money swaption quotes.
+   *
+   * Twin of Python `calibrate_hull_white_to_swaptions` (Rust
+   * `calibrate_hull_white_to_swaptions_from_curve`).
+   * @param discount - Discount curve the swap annuities and forward swap rates are read from; its base date is the valuation date.
+   * @param quotes - Array (or JSON) of at least two `SwaptionQuote` objects: `expiry` and `tenor` in years, `volatility` as a decimal, `is_normal_vol`.
+   * @param fitTolerance - Required positive maximum reconstructed quote error: decimal rate volatility for normal quotes, relative volatility for Black quotes.
+   * @param frequency - Fixed-leg payment frequency: `"annual"`, `"semi_annual"` or `"quarterly"`; defaults to `"semi_annual"`.
+   * @param initialGuess - Optional `HullWhiteCalibrationParams` solver seed (`kappa`, `sigma`); omitted uses the built-in starting point.
+   * @returns `[params, report]`: the fitted `HullWhiteCalibrationParams` and the `CalibrationReport` with per-quote residuals in volatility units.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` if fewer than two quotes are supplied, a quote or the frequency is invalid (`kind: "validation"`), or the solver fails to converge.
+   */
+  calibrateHullWhiteToSwaptions(
+    discount: DiscountCurve,
+    quotes: readonly generated.calibration.SwaptionQuote[] | string,
+    fitTolerance: number,
+    frequency?: generated.calibration.SwapFrequency | null,
+    initialGuess?: generated.models.HullWhiteCalibrationParams | string | null
+  ): [generated.models.HullWhiteCalibrationParams, generated.calibration.CalibrationReport];
+  /**
+   * Fit scalar Hull-White `(kappa, sigma)` to cap/floor quotes.
+   *
+   * Twin of Python `calibrate_hull_white_to_cap_floors` (Rust
+   * `calibrate_hull_white_to_cap_floors_from_curves`).
+   * @param discount - Discounting curve; its base date is the valuation date.
+   * @param quotes - Array (or JSON) of `CapFloorQuote` objects: `maturity` in years, `strike` and `volatility` as decimals, `is_cap`, `is_normal_vol`. A single quote requires `config.fixed_kappa`.
+   * @param config - `CapFloorCalibrationConfig` object: required `fit_tolerance` (normal-vol units), optional `frequency` (default `"semi_annual"`), `fixed_kappa` and `initial_guess`.
+   * @param forward - Curve projecting the caplet forwards; the published function defaults it to `discount`.
+   * @returns `[params, report]`: the fitted `HullWhiteCalibrationParams` and the `CalibrationReport`.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` if no quotes are supplied, a single quote is given without `fixed_kappa`, a quote or the config is invalid (`kind: "validation"`), or the solver fails to converge.
+   */
+  calibrateHullWhiteToCapFloors(
+    discount: DiscountCurve,
+    quotes: readonly generated.calibration.CapFloorQuote[] | string,
+    config: generated.calibration.CapFloorCalibrationConfig | string,
+    forward?: DiscountCurve | null
+  ): [generated.models.HullWhiteCalibrationParams, generated.calibration.CalibrationReport];
+  /**
+   * Bootstrap a piecewise-constant Hull-White sigma schedule to cap/floor quotes.
+   *
+   * Twin of Python `bootstrap_hull_white_sigma_schedule_to_cap_floors` (Rust
+   * `bootstrap_hull_white_sigma_schedule_to_cap_floors_from_curves`).
+   * @param discount - Discounting curve; its base date is the valuation date.
+   * @param quotes - Array (or JSON) of `CapFloorQuote` objects with distinct maturities in years; each maturity adds one constant-sigma interval.
+   * @param config - `PiecewiseSigmaCalibrationConfig` object: `fixed_kappa`, `sigma_min`, `sigma_max` (absolute rate volatility), `fit_tolerance` and optional `frequency` (default `"semi_annual"`).
+   * @param forward - Curve projecting the caplet forwards; the published function defaults it to `discount`.
+   * @returns `[params, report]`: the piecewise `HullWhiteParams` and the `CalibrationReport`.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` if no quotes are supplied, maturities repeat, the configuration bounds are invalid (`kind: "validation"`), or an interval's sigma cannot be bracketed or solved.
+   */
+  bootstrapHullWhiteSigmaScheduleToCapFloors(
+    discount: DiscountCurve,
+    quotes: readonly generated.calibration.CapFloorQuote[] | string,
+    config: generated.calibration.PiecewiseSigmaCalibrationConfig | string,
+    forward?: DiscountCurve | null
+  ): [generated.models.HullWhiteParams, generated.calibration.CalibrationReport];
+  /**
+   * Short-rate volatility of a piecewise Hull-White parameter set at a model time.
+   *
+   * Free-function twin of Python `HullWhiteParams.sigma_at` (Rust
+   * `HullWhiteParams::volatility` read with `PiecewiseConstantCurve::value_at`).
+   * @param params - `HullWhiteParams` object (or JSON): `kappa` and the piecewise `volatility` schedule (`times`, `values`).
+   * @param time - Year fraction at which the left-continuous piecewise sigma is read.
+   * @returns Sigma applying at `time`, in absolute rate units per square-root year.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if `params` is not a valid `HullWhiteParams` object.
+   */
+  hullWhiteParamsSigmaAt(params: generated.models.HullWhiteParams | string, time: number): number;
 }
 
 /**
@@ -10944,6 +13632,568 @@ export interface ScenariosNamespace {
     configJson?: JsonInput,
     calendarId?: string
   ): HorizonReport;
+  /**
+   * Build an FX spot percent shock operation.
+   *
+   * Free-function twin of Python `OperationSpec.market_fx_pct` (Rust
+   * `OperationSpec::MarketFxPct`).
+   * @param base - ISO-4217 code of the base currency being strengthened or weakened.
+   * @param quote - ISO-4217 code of the quote currency; must differ from `base` to validate.
+   * @param pct - Shock in percentage points (`5.0` = base +5% against quote); validation rejects `pct <= -100`.
+   * @returns The `market_fx_pct` operation object.
+   * @throws Error - Throws a `TypeError` for a non-string code or non-number `pct`, and a `validation` error for an unknown currency code.
+   */
+  operationSpecMarketFxPct(base: string, quote: string, pct: number): OperationSpec;
+  /**
+   * Build an equity price percent shock for a list of identifiers.
+   *
+   * Free-function twin of Python `OperationSpec.equity_price_pct` (Rust
+   * `OperationSpec::EquityPricePct`).
+   * @param ids - Equity price identifiers in the market context; every one receives the shock.
+   * @param pct - Shock in percentage points (`-10.0` = -10%); validation rejects `pct < -100`.
+   * @returns The `equity_price_pct` operation object.
+   * @throws Error - Throws a `TypeError` when `ids` is not an array of strings or `pct` is not a number.
+   */
+  operationSpecEquityPricePct(ids: string[], pct: number): OperationSpec;
+  /**
+   * Build an instrument price percent shock selected by exact attribute match.
+   *
+   * Free-function twin of Python `OperationSpec.instrument_price_pct_by_attr`
+   * (Rust `OperationSpec::InstrumentPricePctByAttr`). Applying it requires an
+   * instrument inventory.
+   * @param attrs - `{key: value}` object or array of `[key, value]` pairs; order is preserved and every pair must match the instrument's attributes.
+   * @param pct - Price shock in percentage points (`-5.0` = -5%).
+   * @returns The `instrument_price_pct_by_attr` operation object.
+   * @throws Error - Throws a `TypeError` for a non-object `attrs` or non-number `pct`, and a `validation` error when `attrs` is not a string-to-string mapping or pair list.
+   */
+  operationSpecInstrumentPricePctByAttr(
+    attrs: Record<string, string> | [string, string][],
+    pct: number
+  ): OperationSpec;
+  /**
+   * Build a parallel basis-point curve shift for one curve or several.
+   *
+   * Free-function twin of Python `OperationSpec.curve_parallel_bp`. A single
+   * identifier builds Rust `OperationSpec::CurveParallelBp`; an array expands
+   * through Rust `ScenarioSpec::parallel_bp_many` to one operation per
+   * identifier, in the given order.
+   * @param curveKind - Curve family label: `"discount"`, `"forward"`, `"par_cds"`, `"inflation"` or `"commodity"`.
+   * @param curveId - One curve identifier, or an array of identifiers to shift by the same amount.
+   * @param bp - Additive shift in basis points (1 bp = 1e-4); for `"commodity"` curves, percent of the forward.
+   * @param discountCurveId - Optional discount curve used when re-bootstrapping shocked ParCDS quotes.
+   * @returns One `curve_parallel_bp` operation object for a string `curveId`, an array of them for an array.
+   * @throws Error - Throws a `TypeError` when `curveId` is neither a string nor an array of strings or `bp` is not a number, and a `validation` error for an unknown `curveKind` label.
+   */
+  operationSpecCurveParallelBp(
+    curveKind: CurveKind,
+    curveId: string | string[],
+    bp: number,
+    discountCurveId?: string
+  ): OperationSpec | OperationSpec[];
+  /**
+   * Build node-level basis-point shifts on a curve.
+   *
+   * Free-function twin of Python `OperationSpec.curve_node_bp` (Rust
+   * `OperationSpec::CurveNodeBp`).
+   * @param curveKind - Curve family label: `"discount"`, `"forward"`, `"par_cds"`, `"inflation"` or `"commodity"`.
+   * @param curveId - Identifier of the curve whose pillars are shifted.
+   * @param nodes - Array of `[tenor, bp]` pairs, e.g. `[["2Y", 10], ["10Y", -5]]`; bp is additive basis points (percent of forward for commodity curves).
+   * @param matchMode - Optional pillar alignment label, `"exact"` or `"interpolate"`; omit for the Rust default (`TenorMatchMode::default()`, `"interpolate"`).
+   * @param discountCurveId - Optional discount curve used when re-bootstrapping shocked ParCDS quotes.
+   * @returns The `curve_node_bp` operation object.
+   * @throws Error - Throws a `TypeError` for wrongly typed arguments and a `validation` error for an unknown `curveKind` / `matchMode` label or `nodes` that are not `[string, number]` pairs.
+   */
+  operationSpecCurveNodeBp(
+    curveKind: CurveKind,
+    curveId: string,
+    nodes: [string, number][],
+    matchMode?: TenorMatchMode,
+    discountCurveId?: string
+  ): OperationSpec;
+  /**
+   * Build a parallel shock to a volatility-index curve.
+   *
+   * Free-function twin of Python `OperationSpec.vol_index_parallel_pts` (Rust
+   * `OperationSpec::VolIndexParallelPts`).
+   * @param curveId - Identifier of the volatility-index curve.
+   * @param points - Additive shift in absolute index points (`1.0` moves 18.5 to 19.5).
+   * @returns The `vol_index_parallel_pts` operation object.
+   * @throws Error - Throws a `TypeError` when `curveId` is not a string or `points` is not a number.
+   */
+  operationSpecVolIndexParallelPts(curveId: string, points: number): OperationSpec;
+  /**
+   * Build node-level shocks to a volatility-index curve.
+   *
+   * Free-function twin of Python `OperationSpec.vol_index_node_pts` (Rust
+   * `OperationSpec::VolIndexNodePts`).
+   * @param curveId - Identifier of the volatility-index curve.
+   * @param nodes - Array of `[tenor, points]` pairs; points are additive absolute index points.
+   * @param matchMode - Optional pillar alignment label, `"exact"` or `"interpolate"`; omit for the Rust default (`TenorMatchMode::default()`, `"interpolate"`).
+   * @returns The `vol_index_node_pts` operation object.
+   * @throws Error - Throws a `TypeError` for wrongly typed arguments and a `validation` error for an unknown `matchMode` label or `nodes` that are not `[string, number]` pairs.
+   */
+  operationSpecVolIndexNodePts(
+    curveId: string,
+    nodes: [string, number][],
+    matchMode?: TenorMatchMode
+  ): OperationSpec;
+  /**
+   * Build a parallel shift to a base-correlation surface.
+   *
+   * Free-function twin of Python `OperationSpec.base_corr_parallel_pts` (Rust
+   * `OperationSpec::BaseCorrParallelPts`).
+   * @param surfaceId - Identifier of the base-correlation surface.
+   * @param points - Additive shift in decimal correlation (`0.02` = +0.02, not percentage points).
+   * @returns The `base_corr_parallel_pts` operation object.
+   * @throws Error - Throws a `TypeError` when `surfaceId` is not a string or `points` is not a number.
+   */
+  operationSpecBaseCorrParallelPts(surfaceId: string, points: number): OperationSpec;
+  /**
+   * Build a bucketed shift to a base-correlation surface.
+   *
+   * Free-function twin of Python `OperationSpec.base_corr_bucket_pts` (Rust
+   * `OperationSpec::BaseCorrBucketPts`).
+   * @param surfaceId - Identifier of the base-correlation surface.
+   * @param points - Additive shift in decimal correlation (`0.02` = +0.02).
+   * @param detachmentBp - Optional detachment points to shift, as integer basis points of the capital structure (`300` = 3%); omit to shift every bucket.
+   * @returns The `base_corr_bucket_pts` operation object.
+   * @throws Error - Throws a `TypeError` for wrongly typed arguments and a `validation` error when `detachmentBp` is not an array of 32-bit integers.
+   */
+  operationSpecBaseCorrBucketPts(
+    surfaceId: string,
+    points: number,
+    detachmentBp?: number[]
+  ): OperationSpec;
+  /**
+   * Build a parallel percent shift to a volatility surface.
+   *
+   * Free-function twin of Python `OperationSpec.vol_surface_parallel_pct` (Rust
+   * `OperationSpec::VolSurfaceParallelPct`).
+   * @param volSurfaceId - Identifier of the volatility surface.
+   * @param pct - Relative shift in percentage points (`10.0` scales every vol by 1.10).
+   * @returns The `vol_surface_parallel_pct` operation object.
+   * @throws Error - Throws a `TypeError` when `volSurfaceId` is not a string or `pct` is not a number.
+   */
+  operationSpecVolSurfaceParallelPct(volSurfaceId: string, pct: number): OperationSpec;
+  /**
+   * Build a bucketed percent shock to a volatility surface.
+   *
+   * Free-function twin of Python `OperationSpec.vol_surface_bucket_pct` (Rust
+   * `OperationSpec::VolSurfaceBucketPct`).
+   * @param volSurfaceId - Identifier of the volatility surface.
+   * @param pct - Relative shift in percentage points applied to the selected buckets.
+   * @param tenors - Optional expiry tenors (e.g. `["1M", "1Y"]`) restricting the shock; omit for every expiry.
+   * @param strikes - Optional strikes, in the surface's own strike units, restricting the shock; omit for every strike.
+   * @returns The `vol_surface_bucket_pct` operation object.
+   * @throws Error - Throws a `TypeError` when an argument has the wrong JavaScript type (`tenors` must be an array of strings, `strikes` an array of numbers).
+   */
+  operationSpecVolSurfaceBucketPct(
+    volSurfaceId: string,
+    pct: number,
+    tenors?: string[],
+    strikes?: number[]
+  ): OperationSpec;
+  /**
+   * Build a statement forecast percent change on one node.
+   *
+   * Free-function twin of Python `OperationSpec.stmt_forecast_percent` (Rust
+   * `OperationSpec::StmtForecastPercent`).
+   * @param nodeId - Statement node identifier whose forecast values are scaled.
+   * @param pct - Change in percentage points (`-5.0` = -5%).
+   * @returns The `stmt_forecast_percent` operation object.
+   * @throws Error - Throws a `TypeError` when `nodeId` is not a string or `pct` is not a number.
+   */
+  operationSpecStmtForecastPercent(nodeId: string, pct: number): OperationSpec;
+  /**
+   * Build a statement forecast value assignment on one node.
+   *
+   * Free-function twin of Python `OperationSpec.stmt_forecast_assign` (Rust
+   * `OperationSpec::StmtForecastAssign`).
+   * @param nodeId - Statement node identifier whose forecast values are replaced.
+   * @param value - Replacement forecast value, in the node's own units.
+   * @returns The `stmt_forecast_assign` operation object.
+   * @throws Error - Throws a `TypeError` when `nodeId` is not a string or `value` is not a number.
+   */
+  operationSpecStmtForecastAssign(nodeId: string, value: number): OperationSpec;
+  /**
+   * Build an operation binding a statement rate node to a market curve.
+   *
+   * Free-function twin of Python `OperationSpec.rate_binding` (Rust
+   * `OperationSpec::RateBinding`).
+   * @param binding - `RateBindingSpec` object or JSON: `node_id`, `curve_id`, `tenor`, optional `compounding` (default `"continuous"`) and `day_count`.
+   * @returns The `rate_binding` operation object.
+   * @throws Error - Throws a `TypeError` when `binding` is not an object or JSON string and a `validation` error when it does not match the `RateBindingSpec` contract.
+   */
+  operationSpecRateBinding(binding: RateBindingSpec | string): OperationSpec;
+  /**
+   * Build an instrument spread shock selected by exact attribute match.
+   *
+   * Free-function twin of Python `OperationSpec.instrument_spread_bp_by_attr`
+   * (Rust `OperationSpec::InstrumentSpreadBpByAttr`). Applying it requires an
+   * instrument inventory.
+   * @param attrs - `{key: value}` object or array of `[key, value]` pairs; order is preserved and every pair must match the instrument's attributes.
+   * @param bp - Additive spread shock in basis points (1 bp = 1e-4).
+   * @returns The `instrument_spread_bp_by_attr` operation object.
+   * @throws Error - Throws a `TypeError` for a non-object `attrs` or non-number `bp`, and a `validation` error when `attrs` is not a string-to-string mapping or pair list.
+   */
+  operationSpecInstrumentSpreadBpByAttr(
+    attrs: Record<string, string> | [string, string][],
+    bp: number
+  ): OperationSpec;
+  /**
+   * Build an instrument price percent shock selected by instrument type.
+   *
+   * Free-function twin of Python `OperationSpec.instrument_price_pct_by_type`
+   * (Rust `OperationSpec::InstrumentPricePctByType`). Applying it requires an
+   * instrument inventory.
+   * @param instrumentTypes - Snake_case instrument type identifiers, e.g. `["bond", "cds_index"]`.
+   * @param pct - Price shock in percentage points (`-5.0` = -5%).
+   * @returns The `instrument_price_pct_by_type` operation object.
+   * @throws Error - Throws a `TypeError` for wrongly typed arguments and a `validation` error for an unknown instrument type.
+   */
+  operationSpecInstrumentPricePctByType(instrumentTypes: string[], pct: number): OperationSpec;
+  /**
+   * Build an instrument spread shock selected by instrument type.
+   *
+   * Free-function twin of Python `OperationSpec.instrument_spread_bp_by_type`
+   * (Rust `OperationSpec::InstrumentSpreadBpByType`). Applying it requires an
+   * instrument inventory.
+   * @param instrumentTypes - Snake_case instrument type identifiers, e.g. `["bond", "cds_index"]`.
+   * @param bp - Additive spread shock in basis points (1 bp = 1e-4).
+   * @returns The `instrument_spread_bp_by_type` operation object.
+   * @throws Error - Throws a `TypeError` for wrongly typed arguments and a `validation` error for an unknown instrument type.
+   */
+  operationSpecInstrumentSpreadBpByType(instrumentTypes: string[], bp: number): OperationSpec;
+  /**
+   * Build a structured-credit asset-correlation shock.
+   *
+   * Free-function twin of Python `OperationSpec.asset_correlation_pts` (Rust
+   * `OperationSpec::AssetCorrelationPts`).
+   * @param deltaPts - Additive shift in decimal correlation (`0.05` adds 0.05 to the asset correlation).
+   * @returns The `asset_correlation_pts` operation object.
+   * @throws Error - Throws a `TypeError` when `deltaPts` is not a number.
+   */
+  operationSpecAssetCorrelationPts(deltaPts: number): OperationSpec;
+  /**
+   * Build a structured-credit prepay/default correlation shock.
+   *
+   * Free-function twin of Python `OperationSpec.prepay_default_correlation_pts`
+   * (Rust `OperationSpec::PrepayDefaultCorrelationPts`).
+   * @param deltaPts - Additive shift in decimal correlation between prepayment and default.
+   * @returns The `prepay_default_correlation_pts` operation object.
+   * @throws Error - Throws a `TypeError` when `deltaPts` is not a number.
+   */
+  operationSpecPrepayDefaultCorrelationPts(deltaPts: number): OperationSpec;
+  /**
+   * Build a hierarchy-targeted parallel curve shift.
+   *
+   * Free-function twin of Python `OperationSpec.hierarchy_curve_parallel_bp`
+   * (Rust `OperationSpec::HierarchyCurveParallelBp`).
+   * @param curveKind - Curve family label: `"discount"`, `"forward"`, `"par_cds"`, `"inflation"` or `"commodity"`.
+   * @param target - `HierarchyTarget` object or JSON (`{path, tag_filter?}`) selecting the market-data subtree.
+   * @param bp - Additive shift in basis points (percent of forward for commodity curves).
+   * @param discountCurveId - Optional discount curve used when re-bootstrapping shocked ParCDS quotes.
+   * @returns The `hierarchy_curve_parallel_bp` operation object.
+   * @throws Error - Throws a `TypeError` for wrongly typed arguments and a `validation` error for an unknown `curveKind` label or a `target` that is not a `HierarchyTarget`.
+   */
+  operationSpecHierarchyCurveParallelBp(
+    curveKind: CurveKind,
+    target: HierarchyTarget | string,
+    bp: number,
+    discountCurveId?: string
+  ): OperationSpec;
+  /**
+   * Build a hierarchy-targeted volatility-surface percent shift.
+   *
+   * Free-function twin of Python
+   * `OperationSpec.hierarchy_vol_surface_parallel_pct` (Rust
+   * `OperationSpec::HierarchyVolSurfaceParallelPct`).
+   * @param target - `HierarchyTarget` object or JSON (`{path, tag_filter?}`) selecting the market-data subtree.
+   * @param pct - Relative shift in percentage points applied to every targeted surface.
+   * @returns The `hierarchy_vol_surface_parallel_pct` operation object.
+   * @throws Error - Throws a `TypeError` for wrongly typed arguments and a `validation` error when `target` is not a `HierarchyTarget`.
+   */
+  operationSpecHierarchyVolSurfaceParallelPct(
+    target: HierarchyTarget | string,
+    pct: number
+  ): OperationSpec;
+  /**
+   * Build a hierarchy-targeted equity price percent shift.
+   *
+   * Free-function twin of Python `OperationSpec.hierarchy_equity_price_pct`
+   * (Rust `OperationSpec::HierarchyEquityPricePct`).
+   * @param target - `HierarchyTarget` object or JSON (`{path, tag_filter?}`) selecting the market-data subtree.
+   * @param pct - Price shock in percentage points applied to every targeted equity.
+   * @returns The `hierarchy_equity_price_pct` operation object.
+   * @throws Error - Throws a `TypeError` for wrongly typed arguments and a `validation` error when `target` is not a `HierarchyTarget`.
+   */
+  operationSpecHierarchyEquityPricePct(
+    target: HierarchyTarget | string,
+    pct: number
+  ): OperationSpec;
+  /**
+   * Build a hierarchy-targeted base-correlation parallel shift.
+   *
+   * Free-function twin of Python
+   * `OperationSpec.hierarchy_base_corr_parallel_pts` (Rust
+   * `OperationSpec::HierarchyBaseCorrParallelPts`).
+   * @param target - `HierarchyTarget` object or JSON (`{path, tag_filter?}`) selecting the market-data subtree.
+   * @param points - Additive shift in decimal correlation (`0.02` = +0.02).
+   * @returns The `hierarchy_base_corr_parallel_pts` operation object.
+   * @throws Error - Throws a `TypeError` for wrongly typed arguments and a `validation` error when `target` is not a `HierarchyTarget`.
+   */
+  operationSpecHierarchyBaseCorrParallelPts(
+    target: HierarchyTarget | string,
+    points: number
+  ): OperationSpec;
+  /**
+   * Build a time-roll operation moving the valuation horizon forward.
+   *
+   * Free-function twin of Python `OperationSpec.time_roll_forward` (Rust
+   * `OperationSpec::time_roll_forward`).
+   * @param period - Tenor-style roll period such as `"1D"`, `"1W"`, `"1M"` or `"1Y"`; parsed when the operation is validated.
+   * @param applyShocks - Whether the remaining operations run after the roll; omit for the Rust default, `true`.
+   * @param rollMode - Optional roll semantics label: `"business_days"`, `"calendar_days"` or `"approximate"`; omit for the Rust default, `"business_days"`.
+   * @returns The `time_roll_forward` operation object.
+   * @throws Error - Throws a `TypeError` for wrongly typed arguments and a `validation` error for an unknown `rollMode` label.
+   */
+  operationSpecTimeRollForward(
+    period: string,
+    applyShocks?: boolean,
+    rollMode?: TimeRollMode
+  ): OperationSpec;
+  /**
+   * Validate one scenario operation with the canonical Rust rules.
+   *
+   * Free-function twin of Python `OperationSpec.validate` (Rust
+   * `OperationSpec::validate`): identifiers, finite numbers, variant-specific
+   * floors and tenor parsing. Returns `undefined` when valid.
+   * @returns nothing; failure is reported by throwing.
+   * @param operation - `OperationSpec` object or JSON to check.
+   * @throws Error - Throws a `TypeError` when `operation` is not an object or JSON string, and a `validation` error when it matches no `OperationSpec` variant or fails the variant's rules (blank identifier, non-finite number, FX `pct <= -100`, unparseable tenor).
+   */
+  operationSpecValidate(operation: OperationSpec | string): void;
+  /**
+   * Report whether an operation needs instruments in the execution context.
+   *
+   * Free-function twin of Python `OperationSpec.requires_instruments` (Rust
+   * `OperationSpec::requires_instruments`).
+   * @param operation - `OperationSpec` object or JSON to inspect.
+   * @returns `true` for instrument-scoped shocks and time rolls.
+   * @throws Error - Throws a `TypeError` when `operation` is not an object or JSON string, and a `validation` error when it matches no `OperationSpec` variant.
+   */
+  operationSpecRequiresInstruments(operation: OperationSpec | string): boolean;
+  /**
+   * Report whether an operation can replace or mutate instruments.
+   *
+   * Free-function twin of Python `OperationSpec.mutates_instruments` (Rust
+   * `OperationSpec::mutates_instruments`).
+   * @param operation - `OperationSpec` object or JSON to inspect.
+   * @returns `true` for price, spread and structured-credit correlation shocks; `false` for a time roll.
+   * @throws Error - Throws a `TypeError` when `operation` is not an object or JSON string, and a `validation` error when it matches no `OperationSpec` variant.
+   */
+  operationSpecMutatesInstruments(operation: OperationSpec | string): boolean;
+  /**
+   * Wire label of the discount-factor curve kind.
+   *
+   * Free-function twin of Python `CurveKind.discount` (Rust `CurveKind::Discount`).
+   * @returns `"discount"`, for operations that target a discount curve.
+   * @throws Error - Throws only if the label cannot be converted to a JavaScript value.
+   */
+  curveKindDiscount(): CurveKind;
+  /**
+   * Wire label of the forward-rate curve kind.
+   *
+   * Free-function twin of Python `CurveKind.forward` (Rust `CurveKind::Forward`).
+   * @returns `"forward"`, for operations that target a forward curve.
+   * @throws Error - Throws only if the label cannot be converted to a JavaScript value.
+   */
+  curveKindForward(): CurveKind;
+  /**
+   * Wire label of the par CDS spread curve kind.
+   *
+   * Free-function twin of Python `CurveKind.par_cds` (Rust `CurveKind::ParCDS`).
+   * @returns `"par_cds"`, for operations that shock par CDS spreads.
+   * @throws Error - Throws only if the label cannot be converted to a JavaScript value.
+   */
+  curveKindParCds(): CurveKind;
+  /**
+   * Wire label of the inflation index curve kind.
+   *
+   * Free-function twin of Python `CurveKind.inflation` (Rust `CurveKind::Inflation`).
+   * @returns `"inflation"`, for operations that target an inflation curve.
+   * @throws Error - Throws only if the label cannot be converted to a JavaScript value.
+   */
+  curveKindInflation(): CurveKind;
+  /**
+   * Wire label of the commodity forward price curve kind.
+   *
+   * Free-function twin of Python `CurveKind.commodity` (Rust `CurveKind::Commodity`).
+   * @returns `"commodity"`; basis-point shocks on this kind are percent of the forward, not additive bp.
+   * @throws Error - Throws only if the label cannot be converted to a JavaScript value.
+   */
+  curveKindCommodity(): CurveKind;
+  /**
+   * Wire label of exact tenor-pillar matching.
+   *
+   * Free-function twin of Python `TenorMatchMode.exact` (Rust `TenorMatchMode::Exact`).
+   * @returns `"exact"`: the requested tenor must be an existing pillar or the operation fails.
+   * @throws Error - Throws only if the label cannot be converted to a JavaScript value.
+   */
+  tenorMatchModeExact(): TenorMatchMode;
+  /**
+   * Wire label of interpolated tenor-pillar matching.
+   *
+   * Free-function twin of Python `TenorMatchMode.interpolate` (Rust `TenorMatchMode::Interpolate`).
+   * @returns `"interpolate"`: the bump is spread across the adjacent pillars (the Rust default).
+   * @throws Error - Throws only if the label cannot be converted to a JavaScript value.
+   */
+  tenorMatchModeInterpolate(): TenorMatchMode;
+  /**
+   * Wire label of the business-day-adjusted time roll.
+   *
+   * Free-function twin of Python `TimeRollMode.business_days` (Rust `TimeRollMode::BusinessDays`).
+   * @returns `"business_days"`: the roll target is adjusted ModifiedFollowing (the Rust default).
+   * @throws Error - Throws only if the label cannot be converted to a JavaScript value.
+   */
+  timeRollModeBusinessDays(): TimeRollMode;
+  /**
+   * Wire label of the pure calendar-day time roll.
+   *
+   * Free-function twin of Python `TimeRollMode.calendar_days` (Rust `TimeRollMode::CalendarDays`).
+   * @returns `"calendar_days"`: the tenor is added with no business-day adjustment.
+   * @throws Error - Throws only if the label cannot be converted to a JavaScript value.
+   */
+  timeRollModeCalendarDays(): TimeRollMode;
+  /**
+   * Wire label of the approximate fixed-day-count time roll.
+   *
+   * Free-function twin of Python `TimeRollMode.approximate` (Rust `TimeRollMode::Approximate`).
+   * @returns `"approximate"`: fixed day counts, not additive across successive rolls.
+   * @throws Error - Throws only if the label cannot be converted to a JavaScript value.
+   */
+  timeRollModeApproximate(): TimeRollMode;
+  /**
+   * Wire value of simple (non-compounded) interest.
+   *
+   * Free-function twin of Python `Compounding.simple` (Rust `Compounding::Simple`). The
+   * result is the serde value a `RateBindingSpec.compounding` field takes.
+   * @returns `"simple"`.
+   * @throws Error - Throws only if the value cannot be converted to a JavaScript value.
+   */
+  compoundingSimple(): Compounding;
+  /**
+   * Wire value of continuous compounding.
+   *
+   * Free-function twin of Python `Compounding.continuous` (Rust `Compounding::Continuous`). The
+   * result is the serde value a `RateBindingSpec.compounding` field takes.
+   * @returns `"continuous"`, the `RateBindingSpec` default.
+   * @throws Error - Throws only if the value cannot be converted to a JavaScript value.
+   */
+  compoundingContinuous(): Compounding;
+  /**
+   * Wire value of annual compounding.
+   *
+   * Free-function twin of Python `Compounding.annual` (Rust `Compounding::Annual`). The
+   * result is the serde value a `RateBindingSpec.compounding` field takes.
+   * @returns `"annual"`.
+   * @throws Error - Throws only if the value cannot be converted to a JavaScript value.
+   */
+  compoundingAnnual(): Compounding;
+  /**
+   * Wire value of semi-annual compounding.
+   *
+   * Free-function twin of Python `Compounding.semi_annual` (Rust `Compounding::SEMI_ANNUAL`). The
+   * result is the serde value a `RateBindingSpec.compounding` field takes.
+   * @returns `{periodic: 2}` (two compounding periods per year).
+   * @throws Error - Throws only if the value cannot be converted to a JavaScript value.
+   */
+  compoundingSemiAnnual(): Compounding;
+  /**
+   * Wire value of quarterly compounding.
+   *
+   * Free-function twin of Python `Compounding.quarterly` (Rust `Compounding::QUARTERLY`). The
+   * result is the serde value a `RateBindingSpec.compounding` field takes.
+   * @returns `{periodic: 4}` (four compounding periods per year).
+   * @throws Error - Throws only if the value cannot be converted to a JavaScript value.
+   */
+  compoundingQuarterly(): Compounding;
+  /**
+   * Wire value of monthly compounding.
+   *
+   * Free-function twin of Python `Compounding.monthly` (Rust `Compounding::MONTHLY`). The
+   * result is the serde value a `RateBindingSpec.compounding` field takes.
+   * @returns `{periodic: 12}` (twelve compounding periods per year).
+   * @throws Error - Throws only if the value cannot be converted to a JavaScript value.
+   */
+  compoundingMonthly(): Compounding;
+  /**
+   * Validate a rate binding's identifiers and tenor.
+   *
+   * Free-function twin of Python `RateBindingSpec.validate` (Rust
+   * `RateBindingSpec::validate`). Returns `undefined` when valid.
+   * @returns nothing; failure is reported by throwing.
+   * @param binding - `RateBindingSpec` object or JSON: `node_id`, `curve_id`, `tenor`, optional `compounding` and `day_count`.
+   * @throws Error - Throws a `TypeError` when `binding` is not an object or JSON string, and a `validation` error when it does not match the `RateBindingSpec` contract, `node_id` or `curve_id` is blank, or `tenor` is not a valid tenor string.
+   */
+  rateBindingSpecValidate(binding: RateBindingSpec | string): void;
+  /**
+   * Report whether applying a scenario needs instruments in the context.
+   *
+   * Free-function twin of Python `ScenarioSpec.requires_instruments` (Rust
+   * `ScenarioSpec::requires_instruments`).
+   * @param spec - `ScenarioSpec` object or JSON; it is validated first.
+   * @returns `true` when the scenario holds an instrument-scoped shock or a `time_roll_forward`.
+   * @throws Error - Throws a `TypeError` when `spec` is not an object or JSON string, and a `validation` error when it is not a valid `ScenarioSpec`.
+   */
+  scenarioSpecRequiresInstruments(spec: ScenarioSpec | string): boolean;
+  /**
+   * Report whether applying a scenario can replace or mutate instruments.
+   *
+   * Free-function twin of Python `ScenarioSpec.mutates_instruments` (Rust
+   * `ScenarioSpec::mutates_instruments`).
+   * @param spec - `ScenarioSpec` object or JSON; it is validated first.
+   * @returns `true` for instrument price, spread or structured-credit correlation shocks; a time roll alone is `false`.
+   * @throws Error - Throws a `TypeError` when `spec` is not an object or JSON string, and a `validation` error when it is not a valid `ScenarioSpec`.
+   */
+  scenarioSpecMutatesInstruments(spec: ScenarioSpec | string): boolean;
+  /**
+   * Copy a scenario with a different ParCDS hazard delivery mode.
+   *
+   * Free-function twin of Python `ScenarioSpec.with_hazard_bump_mode` (Rust
+   * `ScenarioSpec::with_hazard_bump_mode`). The input is not modified.
+   * @param spec - `ScenarioSpec` object or JSON; it is validated first.
+   * @param mode - `"solve_to_par"` (re-bootstrap hazard from shocked par spreads) or `"first_order_shift"` (shift hazard knots in place).
+   * @returns A new `ScenarioSpec` object with `hazard_bump_mode` replaced.
+   * @throws Error - Throws a `TypeError` for wrongly typed arguments, and a `validation` error when `spec` is not a valid `ScenarioSpec` or `mode` is not an accepted label.
+   */
+  scenarioSpecWithHazardBumpMode(spec: ScenarioSpec | string, mode: HazardBumpMode): ScenarioSpec;
+  /**
+   * Render a horizon result as a multi-line text summary.
+   *
+   * Free-function twin of Python `HorizonResult.explain` (Rust
+   * `Display for HorizonResult`): total and annualized return, horizon length,
+   * initial and terminal values, and the carry / rates / credit / residual
+   * legs of the attribution.
+   * @param result - Object returned by `computeHorizonReturn` (its `summary` is ignored), or a `HorizonResult` object or JSON.
+   * @returns Multi-line human-readable text.
+   * @throws Error - Throws a `TypeError` when `result` is not an object or JSON string, and a `validation` error when it is not a `HorizonResult`.
+   */
+  horizonResultExplainText(result: HorizonReport | HorizonResult | string): string;
+  /**
+   * One attribution factor's P&L as a fraction of the initial value.
+   *
+   * Free-function twin of Python `HorizonResult.factor_contribution` (Rust
+   * `HorizonResult::factor_contribution`).
+   * @param result - Object returned by `computeHorizonReturn` (its `summary` is ignored), or a `HorizonResult` object or JSON.
+   * @param factor - Attribution factor serde name: `"carry"`, `"rates_curves"`, `"credit_curves"`, `"inflation_curves"`, `"correlations"`, `"fx"`, `"volatility"`, `"market_scalars"` or `"model_parameters"`.
+   * @returns Factor P&L divided by the initial value, as a decimal fraction (`0.01` = 1%); `NaN` when the initial value is zero or negative or the currencies differ.
+   * @throws Error - Throws a `TypeError` for wrongly typed arguments, and a `validation` error when `result` is not a `HorizonResult` or `factor` is not an accepted name.
+   */
+  horizonResultFactorContribution(
+    result: HorizonReport | HorizonResult | string,
+    factor: AttributionFactor
+  ): number;
 }
 
 /**

@@ -935,6 +935,49 @@ pub enum OperationSpec {
 }
 
 impl OperationSpec {
+    /// Build a [`OperationSpec::TimeRollForward`] with the wire defaults for
+    /// omitted fields.
+    ///
+    /// The host bindings call this so an omitted `apply_shocks` / `roll_mode`
+    /// resolves exactly as it does when the field is absent from JSON.
+    ///
+    /// # Arguments
+    ///
+    /// * `period` - Tenor-style roll period such as `"1D"`, `"1W"`, `"1M"` or
+    ///   `"1Y"`. Stored verbatim; [`OperationSpec::validate`] parses it.
+    /// * `apply_shocks` - Whether the engine applies the scenario's remaining
+    ///   operations after the roll. `None` uses the serde default, `true`.
+    /// * `roll_mode` - Calendar-vs-business-day semantics of the roll. `None`
+    ///   uses [`TimeRollMode::default`] ([`TimeRollMode::BusinessDays`]).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_scenarios::{OperationSpec, TimeRollMode};
+    ///
+    /// let op = OperationSpec::time_roll_forward("1M", None, None);
+    /// assert_eq!(
+    ///     op,
+    ///     OperationSpec::TimeRollForward {
+    ///         period: "1M".into(),
+    ///         apply_shocks: true,
+    ///         roll_mode: TimeRollMode::BusinessDays,
+    ///     }
+    /// );
+    /// ```
+    #[must_use]
+    pub fn time_roll_forward(
+        period: impl Into<String>,
+        apply_shocks: Option<bool>,
+        roll_mode: Option<TimeRollMode>,
+    ) -> Self {
+        Self::TimeRollForward {
+            period: period.into(),
+            apply_shocks: apply_shocks.unwrap_or_else(default_true),
+            roll_mode: roll_mode.unwrap_or_default(),
+        }
+    }
+
     /// Whether this operation needs instrument access during application.
     ///
     /// # Returns

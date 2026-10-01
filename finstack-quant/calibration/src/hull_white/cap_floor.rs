@@ -456,7 +456,13 @@ pub(super) fn solve_cap_floor_sigma_for_fixed_kappa(
 }
 
 /// Fixed-κ settings for sequential piecewise HW1F volatility calibration.
-#[derive(Debug, Clone, Copy)]
+///
+/// On the wire an omitted `frequency` is [`SwapFrequency::default`]
+/// (semi-annual); every other field is required and unknown fields are
+/// rejected. Numeric bounds are validated when the bootstrap runs.
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct PiecewiseSigmaCalibrationConfig {
     /// Required positive maximum implied-quote error in quoted volatility units.
     /// Normal quotes use decimal rate volatility; Black quotes use relative volatility.
@@ -469,6 +475,7 @@ pub struct PiecewiseSigmaCalibrationConfig {
     /// Inclusive upper short-rate volatility search bound.
     pub sigma_max: f64,
     /// Coupon frequency used to decompose each market cap/floor quote.
+    #[serde(default)]
     pub frequency: SwapFrequency,
 }
 

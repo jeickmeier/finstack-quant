@@ -18,6 +18,14 @@
 //! document), JSON-string `details`, and a structured `cause` object. Absent
 //! optional properties are `undefined`.
 //!
+//! # Submodules
+//!
+//! - `quotes`, `steps`: free-function twins of the Python quote, rate-bound
+//!   and step constructors, returning the plain serde objects (`fields` holds
+//!   their shared argument marshalling).
+//! - `hull_white`: direct Hull-White one-factor calibrators on curve handles.
+//! - `result`: free-function twins of the Python `CalibrationResult` methods.
+//!
 //! # Native (non-wasm32) builds
 //!
 //! `JsValue` is opaque on native targets: every non-`const` constructor
@@ -35,14 +43,18 @@
 // allowance — keep the binding layer consistent.
 #![allow(clippy::result_large_err)]
 
+mod fields;
+mod hull_white;
+mod quotes;
+mod result;
+mod steps;
+
 use crate::utils::input::{js_string, json_text};
 #[cfg(target_arch = "wasm32")]
 use crate::utils::structured_js_error;
 use crate::utils::to_js_value;
 use finstack_quant_calibration::api::engine::{self, ExecuteError};
-#[cfg(test)]
-use finstack_quant_calibration::api::schema::CalibrationEnvelope;
-use finstack_quant_calibration::api::schema::CalibrationResultEnvelope;
+use finstack_quant_calibration::api::schema::{CalibrationEnvelope, CalibrationResultEnvelope};
 use finstack_quant_calibration::api::validate;
 use wasm_bindgen::prelude::*;
 
@@ -70,6 +82,34 @@ fn validate_calibration_json_inner(json: &str) -> Result<String, ExecuteError> {
 pub fn validate_calibration_json(json: JsValue) -> Result<String, JsValue> {
     let json: &str = &json_text(&json, "json")?;
     validate_calibration_json_inner(json).map_err(execute_error_to_js)
+}
+
+/// Native-testable core of [`validate_calibration`]: strict load, then
+/// fail-fast static validation, returning the typed envelope.
+fn validate_calibration_inner(json: &str) -> Result<CalibrationEnvelope, ExecuteError> {
+    let envelope = validate::parse_envelope(json)?;
+    validate::validate_fail_fast(&envelope)?;
+    Ok(envelope)
+}
+
+/// Validate a calibration envelope and return it as a plain `CalibrationEnvelope` object.
+///
+/// Typed twin of [`validate_calibration_json`]: the same strict load and
+/// fail-fast static validation, returning the envelope object instead of its
+/// pretty-printed JSON.
+/// @param envelope - `CalibrationEnvelope` (object or JSON) with schema marker `finstack_quant.calibration/1`.
+/// @returns The validated `CalibrationEnvelope` in canonical form.
+///
+/// # Errors
+///
+/// Throws a `CalibrationEnvelopeError` if the envelope is malformed, its
+/// schema marker is missing or unsupported, or static validation fails
+/// (fail-fast: first error; `dryRun` lists every static error).
+#[wasm_bindgen(js_name = validateCalibration)]
+pub fn validate_calibration(envelope: JsValue) -> Result<JsValue, JsValue> {
+    let envelope: &str = &json_text(&envelope, "envelope")?;
+    let envelope = validate_calibration_inner(envelope).map_err(execute_error_to_js)?;
+    to_js_value(&envelope)
 }
 
 /// Native-testable core of [`calibrate`].
@@ -109,18 +149,23 @@ fn calibration_envelope_content_hash_inner(json: &str) -> Result<String, Execute
     Ok(validate::parse_envelope(json)?.content_hash()?)
 }
 
-/// Native-testable core of [`calibration_result_content_hash`].
-fn calibration_result_content_hash_inner(json: &str) -> Result<String, ExecuteError> {
-    let (result, _report) = CalibrationResultEnvelope::from_slice_strict(
+/// Strict-load a calibration result envelope (default load limits).
+fn load_result(json: &str) -> Result<CalibrationResultEnvelope, ExecuteError> {
+    CalibrationResultEnvelope::from_slice_strict(
         json.as_bytes(),
         &finstack_quant_core::contract::LoadLimits::default(),
     )
+    .map(|(result, _report)| result)
     .map_err(|error| {
         ExecuteError::from(
             finstack_quant_calibration::api::errors::EnvelopeError::strict_load(&error),
         )
-    })?;
-    Ok(result.content_hash()?)
+    })
+}
+
+/// Native-testable core of [`calibration_result_content_hash`].
+fn calibration_result_content_hash_inner(json: &str) -> Result<String, ExecuteError> {
+    Ok(load_result(json)?.content_hash()?)
 }
 
 /// Canonical content hash of a calibration envelope.
@@ -339,6 +384,13 @@ mod tests {
         let parsed = serde_json::to_value(&result).expect("json");
         assert!(parsed.is_object());
         assert!(parsed.get("result").is_some());
+    }
+
+    #[test]
+    fn validate_calibration_inner_returns_the_typed_envelope() {
+        let envelope = validate_calibration_inner(&empty_envelope_json()).expect("validate");
+        assert_eq!(envelope.plan.id, "empty");
+        assert!(validate_calibration_inner("{ not json").is_err());
     }
 
     #[test]

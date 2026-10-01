@@ -749,6 +749,7 @@ run = [
     -p finstack-quant-analytics --bin gen_analytics_schemas \
     -p finstack-quant-statements-analytics --bin gen_statements_analytics_schemas \
     -p finstack-quant-covenants --bin gen_covenants_schemas \
+    -p finstack-quant-features --bin gen_features_schemas \
     -p finstack-quant-attribution --bin gen_attribution_schemas \
     -p finstack-quant-calibration --bin gen_calibration_schemas \
     -p finstack-quant-cashflows --bin gen_cashflow_schemas \
@@ -764,6 +765,7 @@ run = [
     gen_analytics_schemas \
     gen_statements_analytics_schemas \
     gen_covenants_schemas \
+    gen_features_schemas \
     gen_attribution_schemas \
     gen_calibration_schemas \
     gen_cashflow_schemas \
@@ -808,6 +810,7 @@ cargo build \
   -p finstack-quant-analytics --bin gen_analytics_schemas \
   -p finstack-quant-statements-analytics --bin gen_statements_analytics_schemas \
   -p finstack-quant-covenants --bin gen_covenants_schemas \
+  -p finstack-quant-features --bin gen_features_schemas \
   -p finstack-quant-attribution --bin gen_attribution_schemas \
   -p finstack-quant-calibration --bin gen_calibration_schemas \
   -p finstack-quant-cashflows --bin gen_cashflow_schemas \
@@ -823,6 +826,7 @@ for bin in \
   gen_analytics_schemas \
   gen_statements_analytics_schemas \
   gen_covenants_schemas \
+  gen_features_schemas \
   gen_attribution_schemas \
   gen_calibration_schemas \
   gen_cashflow_schemas \

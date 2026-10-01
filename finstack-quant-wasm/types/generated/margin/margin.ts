@@ -580,6 +580,27 @@ export interface MaturityConstraints {
   min_remaining_years?: number | null;
 }
 /**
+ * A breach of a collateral concentration limit.
+ */
+export interface ConcentrationBreach {
+  /**
+   * Asset class that breached
+   */
+  asset_class: CollateralAssetClass;
+  /**
+   * Excess fraction above limit
+   */
+  excess: number;
+  /**
+   * Actual fraction of total collateral
+   */
+  fraction: number;
+  /**
+   * Allowed concentration limit
+   */
+  limit: number;
+}
+/**
  * Credit Support Annex specification (ISDA standard).
  *
  * The CSA governs the exchange of collateral between counterparties
@@ -1477,6 +1498,88 @@ export interface MarginCall {
    * Threshold in effect at time of call
    */
   threshold: Money;
+}
+/**
+ * Margin constants a host needs to interpret inputs and results.
+ */
+export interface MarginConstants {
+  /**
+   * Registry id of the BCBS-IOSCO regulatory IM schedule.
+   */
+  BCBS_IOSCO_SCHEDULE_ID: string;
+  /**
+   * [`CALENDAR_DAYS_PER_YEAR`]: days per year for ACT/365 Fixed year fractions.
+   */
+  CALENDAR_DAYS_PER_YEAR: number;
+  /**
+   * [`DURATION_APPROXIMATION_FACTOR`]: modified duration per year to maturity.
+   */
+  DURATION_APPROXIMATION_FACTOR: number;
+  /**
+   * Margin period of risk, in business days, stamped on haircut-based IM results.
+   */
+  HAIRCUT_MPOR_DAYS: number;
+  /**
+   * [`ONE_BP`]: one basis point as a decimal.
+   */
+  ONE_BP: number;
+  /**
+   * Number of SIMM commodity buckets.
+   */
+  SIMM_COMMODITY_BUCKET_COUNT: number;
+  /**
+   * SIMM tenor bucket labels accepted by the sensitivity containers, shortest first.
+   */
+  SIMM_TENORS: string[];
+  /**
+   * [`STANDARD_CDS_MATURITY_YEARS`]: CDS tenor used for SIMM bucketing, in years.
+   */
+  STANDARD_CDS_MATURITY_YEARS: number;
+  /**
+   * SIMM tenor bucket boundaries in years, keyed by the [`tenor_buckets`] constant names.
+   */
+  tenor_buckets: TenorBucketYears;
+}
+/**
+ * SIMM tenor bucket boundaries in years (the [`tenor_buckets`] constants).
+ */
+export interface TenorBucketYears {
+  /**
+   * 10 year bucket threshold.
+   */
+  BUCKET_10Y: number;
+  /**
+   * 15 year bucket threshold.
+   */
+  BUCKET_15Y: number;
+  /**
+   * 1 year bucket threshold.
+   */
+  BUCKET_1Y: number;
+  /**
+   * 20 year bucket threshold.
+   */
+  BUCKET_20Y: number;
+  /**
+   * 2 year bucket threshold.
+   */
+  BUCKET_2Y: number;
+  /**
+   * 3 month bucket threshold.
+   */
+  BUCKET_3M: number;
+  /**
+   * 3 year bucket threshold.
+   */
+  BUCKET_3Y: number;
+  /**
+   * 5 year bucket threshold.
+   */
+  BUCKET_5Y: number;
+  /**
+   * 6 month bucket threshold.
+   */
+  BUCKET_6M: number;
 }
 /**
  * OTC derivative margin specification (ISDA CSA compliant).

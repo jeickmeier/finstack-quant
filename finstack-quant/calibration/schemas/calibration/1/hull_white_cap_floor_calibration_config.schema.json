@@ -1,0 +1,84 @@
+{
+  "$defs": {
+    "HullWhiteCalibrationParams": {
+      "description": "Validated constant-parameter Hull-White one-factor model.\n\n# Examples\n\n```rust\nuse finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;\n\nlet params = HullWhiteCalibrationParams::new(0.05, 0.01).unwrap();\nassert!(!params.is_uncalibrated_default());\n```",
+      "properties": {
+        "kappa": {
+          "format": "double",
+          "type": "number"
+        },
+        "sigma": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "kappa",
+        "sigma"
+      ],
+      "type": "object"
+    },
+    "SwapFrequency": {
+      "description": "Number of coupon payments per year for the underlying swap in HW1F calibration.\n\nUSD swaps are semi-annual (2), EUR swaps are annual (1).",
+      "oneOf": [
+        {
+          "const": "annual",
+          "description": "1 payment per year (EUR, GBP standard).",
+          "type": "string"
+        },
+        {
+          "const": "semi_annual",
+          "description": "2 payments per year (USD standard).",
+          "type": "string"
+        },
+        {
+          "const": "quarterly",
+          "description": "4 payments per year.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/calibration/1/hull_white_cap_floor_calibration_config.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Settings of the scalar Hull-White fit to cap/floor quotes.",
+  "properties": {
+    "fit_tolerance": {
+      "description": "Required positive maximum implied-quote error in quoted volatility units.\nNormal quotes use decimal rate volatility; Black quotes use relative volatility.\nThis acceptance budget is independent of the numerical solver tolerance.",
+      "format": "double",
+      "type": "number"
+    },
+    "fixed_kappa": {
+      "default": null,
+      "description": "Optional source mean reversion. Required when calibrating from a\nsingle cap/floor quote because one quote cannot identify both κ and σ.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "frequency": {
+      "$ref": "#/$defs/SwapFrequency",
+      "default": "semi_annual",
+      "description": "Payment frequency used to decompose full caps/floors into caplets."
+    },
+    "initial_guess": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/HullWhiteCalibrationParams"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Optional initial guess when solving both κ and σ."
+    }
+  },
+  "required": [
+    "fit_tolerance"
+  ],
+  "title": "Hull-White Cap/Floor Calibration Config",
+  "type": "object"
+}

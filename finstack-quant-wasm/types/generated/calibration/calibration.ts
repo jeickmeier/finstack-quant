@@ -6342,6 +6342,73 @@ export interface StrictLoadDiagnostic {
   [k: string]: unknown;
 }
 /**
+ * Settings of the scalar Hull-White fit to cap/floor quotes.
+ */
+export interface CapFloorCalibrationConfig {
+  /**
+   * Required positive maximum implied-quote error in quoted volatility units.
+   * Normal quotes use decimal rate volatility; Black quotes use relative volatility.
+   * This acceptance budget is independent of the numerical solver tolerance.
+   */
+  fit_tolerance: number;
+  /**
+   * Optional source mean reversion. Required when calibrating from a
+   * single cap/floor quote because one quote cannot identify both κ and σ.
+   */
+  fixed_kappa?: number | null;
+  /**
+   * Payment frequency used to decompose full caps/floors into caplets.
+   */
+  frequency?: SwapFrequency;
+  /**
+   * Optional initial guess when solving both κ and σ.
+   */
+  initial_guess?: HullWhiteCalibrationParams | null;
+}
+/**
+ * Validated constant-parameter Hull-White one-factor model.
+ *
+ * # Examples
+ *
+ * ```rust
+ * use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
+ *
+ * let params = HullWhiteCalibrationParams::new(0.05, 0.01).unwrap();
+ * assert!(!params.is_uncalibrated_default());
+ * ```
+ */
+export interface HullWhiteCalibrationParams {
+  kappa: number;
+  sigma: number;
+  [k: string]: unknown;
+}
+/**
+ * Cap or floor volatility quote in year fractions for the direct Hull-White calibrators.
+ */
+export interface CapFloorQuote {
+  /**
+   * `true` for a cap, `false` for a floor.
+   */
+  is_cap: boolean;
+  /**
+   * `true` for normal (Bachelier) vol. Lognormal cap/floor quotes are rejected.
+   */
+  is_normal_vol: boolean;
+  /**
+   * Cap/floor maturity in years from the curve base date; finite and positive.
+   */
+  maturity: number;
+  /**
+   * Strike rate as a decimal (for example `0.03` for 3%).
+   */
+  strike: number;
+  /**
+   * Market-quoted flat volatility; normal vols use decimal rate units
+   * (`0.0088` is 88 bp). Finite and positive.
+   */
+  volatility: number;
+}
+/**
  * Index tranche upfront quote.
  */
 export interface CdsTrancheQuote {
@@ -6381,6 +6448,55 @@ export interface CdsTrancheQuote {
    * Upfront payment as a decimal fraction of tranche notional (e.g., -0.025 for -2.5%).
    */
   upfront_pct: number;
+}
+/**
+ * Settings of the piecewise-constant Hull-White sigma bootstrap to cap/floor quotes.
+ */
+export interface PiecewiseSigmaCalibrationConfig {
+  /**
+   * Required positive maximum implied-quote error in quoted volatility units.
+   * Normal quotes use decimal rate volatility; Black quotes use relative volatility.
+   * This acceptance budget is independent of the numerical solver tolerance.
+   */
+  fit_tolerance: number;
+  /**
+   * Mean reversion held fixed while bootstrapping the volatility schedule.
+   */
+  fixed_kappa: number;
+  /**
+   * Coupon frequency used to decompose each market cap/floor quote.
+   */
+  frequency?: SwapFrequency;
+  /**
+   * Inclusive upper short-rate volatility search bound.
+   */
+  sigma_max: number;
+  /**
+   * Inclusive lower short-rate volatility search bound.
+   */
+  sigma_min: number;
+}
+/**
+ * ATM swaption volatility quote in year fractions for the direct Hull-White calibrator.
+ */
+export interface SwaptionQuote {
+  /**
+   * Swaption expiry in years (T₀); finite and positive.
+   */
+  expiry: number;
+  /**
+   * `true` for normal (Bachelier) vol, `false` for lognormal (Black-76) vol.
+   */
+  is_normal_vol: boolean;
+  /**
+   * Underlying swap tenor in years (e.g. 5.0 for a 5Y swap); finite and positive.
+   */
+  tenor: number;
+  /**
+   * Market-quoted volatility as a decimal: absolute rate volatility for
+   * normal quotes, Black volatility for lognormal quotes; finite and positive.
+   */
+  volatility: number;
 }
 /**
  * Cross-currency basis swap quote.

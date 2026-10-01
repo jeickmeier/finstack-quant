@@ -1,6 +1,6 @@
 //! `CalibrationResult`: calibrated market plus plan-level and per-step reports.
 
-use super::report::{quote_quality_dataframe, residual_rows, PyCalibrationReport};
+use super::report::{quote_quality_dataframe, PyCalibrationReport};
 use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::bindings::pickle_support::reduce_via_json;
@@ -9,7 +9,6 @@ use finstack_quant_calibration::api::schema::CalibrationResultEnvelope;
 use finstack_quant_core::contract::LoadLimits;
 use finstack_quant_core::market_data::context::MarketContext;
 use numpy::PyArray1;
-use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 use std::sync::OnceLock;
@@ -67,17 +66,7 @@ impl PyCalibrationResult {
         &self,
         step_id: &str,
     ) -> PyResult<&finstack_quant_calibration::CalibrationReport> {
-        self.inner.result.step_reports.get(step_id).ok_or_else(|| {
-            PyKeyError::new_err(format!(
-                "no calibration step '{step_id}'; available steps: {:?}",
-                self.inner
-                    .result
-                    .step_reports
-                    .keys()
-                    .cloned()
-                    .collect::<Vec<_>>()
-            ))
-        })
+        self.inner.result.step_report(step_id).map_err(core_to_py)
     }
 }
 
@@ -299,7 +288,7 @@ impl PyCalibrationResult {
     ///     If no step with the given ``step_id`` exists.
     #[pyo3(text_signature = "($self, step_id)")]
     fn residuals<'py>(&self, py: Python<'py>, step_id: &str) -> PyResult<Bound<'py, PyAny>> {
-        quote_quality_dataframe(py, &residual_rows(self.find_step_report(step_id)?))
+        quote_quality_dataframe(py, &self.find_step_report(step_id)?.quote_rows())
     }
 
     /// Export the per-step summary as a pandas ``DataFrame``.

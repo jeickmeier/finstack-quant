@@ -634,16 +634,14 @@ impl PyImDecayProfile {
     /// IM decays linearly to zero at ``maturity_years``.
     #[staticmethod]
     fn linear_to_maturity(maturity_years: f64) -> PyResult<Self> {
-        let inner = mva::ImDecayProfile::LinearToMaturity { maturity_years };
-        inner.validate().map_err(core_to_py)?;
+        let inner = mva::ImDecayProfile::linear_to_maturity(maturity_years).map_err(core_to_py)?;
         Ok(Self { inner })
     }
 
     /// IM decays like sqrt of remaining time to ``maturity_years``.
     #[staticmethod]
     fn sqrt_time(maturity_years: f64) -> PyResult<Self> {
-        let inner = mva::ImDecayProfile::SqrtTime { maturity_years };
-        inner.validate().map_err(core_to_py)?;
+        let inner = mva::ImDecayProfile::sqrt_time(maturity_years).map_err(core_to_py)?;
         Ok(Self { inner })
     }
 

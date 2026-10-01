@@ -11,6 +11,8 @@ use crate::utils::{to_js_err, to_js_value};
 use serde_json::Value;
 use wasm_bindgen::prelude::*;
 
+pub mod panel;
+
 /// Transform a time-series panel column per entity.
 ///
 /// `order` is lexicographic; temporal strings need a common timezone and fixed

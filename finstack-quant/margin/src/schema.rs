@@ -6,13 +6,14 @@ use serde_json::Value;
 
 #[cfg(feature = "json-schema")]
 use crate::{
-    calculators::CcpMethodology, metrics::ExcessCollateral, metrics::Haircut01,
-    metrics::MarginFundingCost, metrics::MarginUtilization, regulatory::EadResult,
-    regulatory::FrtbRiskClass, regulatory::FrtbSbaResult, regulatory::FrtbSensitivities,
-    regulatory::SaCcrNettingSetConfig, regulatory::SaCcrTrade, types::SimmSensitivitiesJson,
-    xva::mva::ImDecayProfile, xva::mva::MvaResult, xva::types::ExposureProfile,
-    xva::types::FundingConfig, xva::types::XvaResult, ImCollateralResult, ImResult, RepoMarginSpec,
-    ScheduleAssetClass, SimmSensitivities, SimmVersion, VmResult,
+    calculators::CcpMethodology, constants::MarginConstants, metrics::ExcessCollateral,
+    metrics::Haircut01, metrics::MarginFundingCost, metrics::MarginUtilization,
+    regulatory::EadResult, regulatory::FrtbRiskClass, regulatory::FrtbSbaResult,
+    regulatory::FrtbSensitivities, regulatory::SaCcrNettingSetConfig, regulatory::SaCcrTrade,
+    types::SimmSensitivitiesJson, xva::mva::ImDecayProfile, xva::mva::MvaResult,
+    xva::types::ExposureProfile, xva::types::FundingConfig, xva::types::XvaResult,
+    ConcentrationBreach, ImCollateralResult, ImResult, RepoMarginSpec, ScheduleAssetClass,
+    SimmSensitivities, SimmVersion, VmResult,
 };
 use crate::{CsaSpec, MarginCall, OtcMarginSpec};
 
@@ -182,6 +183,13 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         "CCP methodology type."
     ),
     finstack_quant_core::schema_artifact!(
+        ConcentrationBreach,
+        "margin",
+        "concentration_breach",
+        Output,
+        "A breach of a collateral concentration limit."
+    ),
+    finstack_quant_core::schema_artifact!(
         EadResult,
         "margin",
         "ead_result",
@@ -257,6 +265,13 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         "im_result",
         Output,
         "Initial margin calculation result."
+    ),
+    finstack_quant_core::schema_artifact!(
+        MarginConstants,
+        "margin",
+        "margin_constants",
+        Output,
+        "Margin constants a host needs to interpret inputs and results."
     ),
     finstack_quant_core::schema_artifact!(
         MarginFundingCost,

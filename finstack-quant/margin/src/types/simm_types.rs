@@ -897,12 +897,40 @@ impl SimmSensitivities {
 
     /// Merge another set of sensitivities into this one.
     ///
-    /// Sensitivities are added together, enabling risk offsetting within a netting set.
+    /// Sensitivities are added together, enabling risk offsetting within a
+    /// netting set. Both sets must share a base currency: amounts are summed
+    /// raw, so a set in another currency has to go through
+    /// [`scaled_to_currency`](Self::scaled_to_currency) first.
     ///
     /// # Arguments
     ///
-    /// * `other` - Second operand used by the binary arithmetic or merge operation
-    pub fn merge(&mut self, other: &SimmSensitivities) {
+    /// * `other` - Sensitivities to add into `self`; their
+    ///   [`base_currency`](Self::base_currency) must equal this set's.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error, leaving `self` unchanged, when the base
+    /// currencies differ.
+    pub fn merge(&mut self, other: &SimmSensitivities) -> finstack_quant_core::Result<()> {
+        if other.base_currency != self.base_currency {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "cannot merge SIMM sensitivities in {} into a {} container; call \
+                 scaled_to_currency first",
+                other.base_currency, self.base_currency
+            )));
+        }
+        self.merge_unchecked(other);
+        Ok(())
+    }
+
+    /// Merge another set of sensitivities without checking its base currency.
+    ///
+    /// For callers that have already expressed both sets in one currency.
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - Sensitivities whose raw amounts are added into `self`.
+    pub fn merge_unchecked(&mut self, other: &SimmSensitivities) {
         amount_maps!(merge self, other);
         self.curvature.extend(other.curvature.iter().cloned());
     }
@@ -1352,7 +1380,7 @@ mod tests {
 
         // Signed factor: a short flips every bucket so it nets an equal long.
         let mut net = long;
-        net.merge(&s.scaled(-10.0));
+        net.merge(&s.scaled(-10.0)).expect("same base currency");
         assert!(net.ir_delta[&(Currency::USD, "5Y".to_string())].abs() < 1e-9);
         assert!(net.equity_delta["AAPL"].abs() < 1e-9);
         assert!(net.fx_delta[&Currency::EUR].abs() < 1e-9);
@@ -1367,7 +1395,7 @@ mod tests {
         sens2.add_ir_delta(Currency::USD, "5Y", 50_000.0);
         sens2.add_ir_delta(Currency::USD, "10Y", 25_000.0);
 
-        sens1.merge(&sens2);
+        sens1.merge(&sens2).expect("same base currency");
 
         assert_eq!(
             sens1.ir_delta.get(&(Currency::USD, "5Y".to_string())),
@@ -1424,7 +1452,7 @@ mod tests {
         assert!(!left.is_empty());
 
         let mut right = left.clone();
-        right.merge(&left);
+        right.merge(&left).expect("same base currency");
         assert_eq!(
             right.credit_qualifying_vega[&(
                 SimmCreditSector::Sovereign,
@@ -1441,12 +1469,30 @@ mod tests {
 
         // A short position flips every new bucket so it nets an equal long.
         let mut net = left.clone();
-        net.merge(&left.scaled(-1.0));
+        net.merge(&left.scaled(-1.0)).expect("same base currency");
         assert!(net.credit_qualifying_vega.values().all(|v| v.abs() < 1e-12));
         assert!(net
             .credit_non_qualifying_vega
             .values()
             .all(|v| v.abs() < 1e-12));
         assert!(net.commodity_vega.values().all(|v| v.abs() < 1e-12));
+    }
+
+    #[test]
+    fn merge_rejects_a_different_base_currency_and_leaves_self_unchanged() {
+        let mut usd = SimmSensitivities::new(Currency::USD);
+        usd.add_equity_delta("AAPL", 10.0);
+        let mut eur = SimmSensitivities::new(Currency::EUR);
+        eur.add_equity_delta("AAPL", 5.0);
+
+        let error = usd.merge(&eur).expect_err("currency mismatch");
+        assert!(error
+            .to_string()
+            .contains("cannot merge SIMM sensitivities in EUR into a USD container"));
+        assert_eq!(usd.equity_delta["AAPL"], 10.0);
+
+        usd.merge(&eur.scaled_to_currency(Currency::USD, 1.1))
+            .expect("same base currency");
+        assert!((usd.equity_delta["AAPL"] - 15.5).abs() < 1e-12);
     }
 }

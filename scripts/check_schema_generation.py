@@ -34,6 +34,7 @@ GENERATORS = (
         "gen_statements_analytics_schemas",
     ),
     Generator(Path("finstack-quant/covenants"), "finstack-quant-covenants", "gen_covenants_schemas"),
+    Generator(Path("finstack-quant/features"), "finstack-quant-features", "gen_features_schemas"),
     Generator(Path("finstack-quant/attribution"), "finstack-quant-attribution", "gen_attribution_schemas"),
     Generator(
         Path("finstack-quant/calibration"),

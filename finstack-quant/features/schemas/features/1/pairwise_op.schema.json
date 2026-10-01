@@ -1,0 +1,23 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/features/1/pairwise_op.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Supported pairwise rolling time-series transform operation.",
+  "oneOf": [
+    {
+      "const": "rolling_cov",
+      "description": "Rolling sample covariance between `values` and `other`.",
+      "type": "string"
+    },
+    {
+      "const": "rolling_corr",
+      "description": "Rolling Pearson correlation between `values` and `other`.",
+      "type": "string"
+    },
+    {
+      "const": "rolling_beta",
+      "description": "Rolling beta of `values` to `other`.",
+      "type": "string"
+    }
+  ],
+  "title": "PairwiseOp"
+}

@@ -280,7 +280,7 @@ drawdown     = { python = "finstack_quant.analytics", status = "flattened", note
 lookback     = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via Performance.lookback_returns. Rust, Python, and WASM always expose LookbackReturns.fytd as a non-null per-ticker vector; the serialized field name is fytd." }
 performance  = { python = "finstack_quant.analytics", status = "flattened", note = "Performance class is the sole entry point on finstack_quant.analytics. Canonical Rust Performance::periodic_returns is shared as Python Performance.periodic_returns and WASM Performance.periodicReturns; Python additionally provides the pandas convenience exit to_periodic_returns_dataframe from the same Rust method. Rust returns PeriodicReturn {date, value} points: WASM emits them as plain `{date, value}` objects (TS `PeriodicReturn`), Python as `(date, value)` tuples. Rolling methods return Rust DatedSeries {values, dates, value_column} (value_column = Rust RollingMetric name): Python wraps it as the DatedSeries class (to_json is the same object), WASM returns it as a plain object with values as a Float64Array. Omitted arguments on both hosts resolve to the Rust `finstack_quant_analytics::DEFAULT_*` constants (DEFAULT_FREQUENCY, DEFAULT_PERIODIC_FREQUENCY, DEFAULT_ROLLING_WINDOW, DEFAULT_CONFIDENCE, DEFAULT_DRAWDOWN_COUNT, DEFAULT_ANNUALIZE, DEFAULT_RISK_FREE_RATE, DEFAULT_MAR — also the omega threshold), ReturnKind::default() (excess), CagrDayCount::default() (act365_25) and FiscalConfig::from_parts / FiscalConfig::default() (an omitted fiscal month is January, an omitted day the 1st, both omitted is the calendar year)." }
 regression   = { python = "finstack_quant.analytics", status = "flattened", note = "constrained_least_squares (Jeet & Partani 2023, Appendix A) exposed flat on finstack_quant.analytics; plain numeric list[float] API, no JSON envelope" }
-returns      = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via Performance constructors (prices) / Performance.from_returns. Naming exception: Python Performance.from_returns takes a DataFrame or a single-asset Series; the Rust-shaped (dates, returns, ticker_names) constructor is Performance.from_returns_arrays. Price-constructor asymmetry (parallel to the from_returns exception): Python Performance.new is DataFrame-first (a prices DataFrame) with the Rust-shaped (dates, prices, ticker_names) constructor as Performance.from_arrays; Rust and WASM expose only the array-shaped constructor (WASM `new Performance(dates, prices, tickerNames, ...)`)." }
+returns      = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via Performance constructors (prices) / Performance.from_returns. Naming exception: Python Performance.from_returns takes a DataFrame or a single-asset Series; the Rust-shaped (dates, returns, ticker_names) constructor is Performance.from_returns_arrays. Price-constructor asymmetry (parallel to the from_returns exception): Python Performance.new is DataFrame-first (a prices DataFrame) with the Rust-shaped (dates, prices, ticker_names) constructor as Performance.from_arrays; Rust and WASM expose only the array-shaped constructors; WASM publishes them as `new Performance(dates, prices, tickerNames, ...)` / `Performance.fromReturns(...)` and, under the Python names, as `Performance.fromArrays` / `Performance.fromReturnsArrays` (the same calls). `to_json` / `from_json` (WASM `toJson` / `fromJson`) are the serde round trip of the Rust Performance panel in both hosts." }
 risk_metrics = { python = "finstack_quant.analytics", status = "flattened", note = "Reachable via Performance scalar methods (CAGR/Sharpe/Sortino/VaR/etc.). CagrDayCount and ReturnKind parse via Rust FromStr (labels act365_25 / DayCount names; excess / total) — no binding-side parse tables. Python Performance.cagr(day_count=...) additionally accepts a core DayCount object; WASM Performance.cagr(dayCount) accepts labels only (pass dayCount.toString() to reuse a core.DayCount handle). Both resolve through Rust CagrDayCount (FromStr, or the DayCount variant directly)." }
 scalar       = { python = "finstack_quant.analytics", status = "flattened", note = "Rust scalar::{sharpe, sortino, volatility, max_drawdown} bound flat as analytics.sharpe / sortino / volatility / max_drawdown (WASM camelCase twins). Rust takes every argument explicitly; the hosts' omitted-argument defaults are the Rust constants DEFAULT_RISK_FREE_RATE (rf), DEFAULT_MAR (mar) and DEFAULT_PERIODS_PER_YEAR (= PeriodKind::Daily.annualization_factor(), 252)." }
 
@@ -721,7 +721,7 @@ status = "exists"
 
 [crates.calibration.modules]
 schema = { python = "finstack_quant.calibration.schema", status = "exists", note = "Registry-backed index/get/validate over calibration envelopes and raw market-quote schemas; the WASM twin is tracked in the [parity] ledger backlog." }
-hull_white = { python = "finstack_quant.calibration.hull_white", status = "exists", note = "Scalar and piecewise-sigma Hull-White fits to swaption and cap/floor quotes, with SwaptionQuote / CapFloorQuote / HullWhiteCalibrationParams / HullWhiteParams / CapFloorCalibrationConfig / PiecewiseSigmaCalibrationConfig. No WASM twin." }
+hull_white = { python = "finstack_quant.calibration.hull_white", status = "exists", note = "Scalar and piecewise-sigma Hull-White fits to swaption and cap/floor quotes, with SwaptionQuote / CapFloorQuote / HullWhiteCalibrationParams / HullWhiteParams / CapFloorCalibrationConfig / PiecewiseSigmaCalibrationConfig. Both hosts call the curve-input Rust entry points (calibrate_hull_white_to_swaptions_from_curve, calibrate_hull_white_to_cap_floors_from_curves, bootstrap_hull_white_sigma_schedule_to_cap_floors_from_curves), which adapt a DiscountCurve to the model clock; the closure-input solvers stay Rust-only. WASM binds the three functions on the calibration namespace with the quote, config and parameter types as plain objects, returns the (params, report) tuple as a two-element array, and exposes HullWhiteParams.sigma_at as hullWhiteParamsSigmaAt." }
 
 [crates.calibration.symbols]
 public = [
@@ -1474,13 +1474,15 @@ rust_lib   = "finstack-quant/features/src/lib.rs"
 python_package = "finstack_quant.features"
 visibility = "pub"
 status = "exists"
-# The string/JSON entry points are the shared Python/WASM surface. Python
-# additionally binds the typed panel twin (transform_panel / PanelTransformSpec /
-# PanelTransformResult) and the operation selectors (TimeSeriesOp,
-# CrossSectionalOp, PairwiseOp) as string-accepting enum classes; the Rust
-# *_with_op variants and the PanelOperation / PanelTransformColumn building
-# blocks stay Rust-only (the string entry points accept the same ops). The
-# WASM side is accounted in the [parity] ledger. Key columns: WASM accepts
+# The string/JSON entry points and the typed panel twin (transform_panel /
+# transformPanel) are the shared Python/WASM surface. Python binds
+# PanelTransformSpec / PanelTransformResult and the operation selectors
+# (TimeSeriesOp, CrossSectionalOp, PairwiseOp) as classes; WASM carries them as
+# plain objects / snake_case names typed by the schema-generated TypeScript
+# (finstack-quant/features/schemas, gen_features_schemas), with free functions for
+# their members (panelTransformResultGetColumn, <op>Values, <op>ParamKeys). The
+# Rust *_with_op variants stay Rust-only (the string entry points accept the
+# same ops). The WASM side is accounted in the [parity] ledger. Key columns: WASM accepts
 # strings only; Python also accepts date/datetime objects, formatted by the
 # Rust key policy (datetime_order_key / naive_datetime_order_key: aware -> UTC,
 # fixed nanosecond precision) and rejects every other non-string key with
@@ -1742,7 +1744,7 @@ status = "exists"
 engine    = { python = "finstack_quant.scenarios",           status = "flattened", note = "ApplicationReport (typed) plus apply_scenario / apply_scenario_to_market are exported flat on finstack_quant.scenarios; ScenarioEngine, ExecutionContext, ApplicationEnvelope, and RollForwardReport remain Rust-only (reports cross the boundary as ApplicationResult / structured objects). Both hosts build the engine with ScenarioEngine::with_config(config) (Python `config=`, WASM trailing `configJson` on applyScenario / applyScenarioToMarket / computeHorizonReturn; omitted means FinstackConfig::default()). Every Rust ScenarioEngine constructor attaches a fresh CachedRecalibrationProvider, so neither binding wires one; HorizonAnalysis carries the engine's provider into metrics_based pricing. Instrument inventories parse through valuations::pricer::json (parse_boxed_instrument_from_json per item in Python and for the horizon instrument, parse_boxed_instruments_from_json for the WASM array) and ApplicationResult.instruments encodes through scenarios::engine::instrument_envelopes" }
 envelope  = { python = "finstack_quant.scenarios.envelope",  status = "missing", note = "Versioned persistence envelope (ScenarioEnvelope, ScenarioSchema, SCENARIO_CONTRACT) is bound in no host; Rust-only" }
 error     = { python = "finstack_quant.scenarios.error",     status = "missing", note = "No typed exception classes are bound; errors map through errors::scenarios_to_py on scenarios::Error::kind() (lookup misses MarketDataNotFound/NodeNotFound/TenorNotFound/InstrumentNotFound -> KeyError, Internal -> RuntimeError, wrapped core/statements/valuations errors keep their own kind, everything else -> ValueError). From<scenarios::Error> for core::Error keeps the kind" }
-horizon   = { python = "finstack_quant.scenarios",           status = "flattened", note = "compute_horizon_return and the typed HorizonResult are exported flat on finstack_quant.scenarios; HorizonAnalysis (builder-style analyzer) remains Rust-only. Both hosts parse the attribution method through the canonical scenarios::horizon::attribution_method_from_str; an omitted method is AttributionMethod::default(). WASM computeHorizonReturn returns the Rust HorizonReport: the serde HorizonResult (Money as exact-decimal objects) plus `summary` (HorizonResult::summary), whose total_return / annualized_return / currency / factor_contributions[f] are the Python total_return / annualized_return / currency / factor_contribution(f) accessors; undefined returns are null in WASM and NaN in Python. explain() (Rust Display text) stays Python-only, so HorizonResult remains in the [parity] backlog." }
+horizon   = { python = "finstack_quant.scenarios",           status = "flattened", note = "compute_horizon_return and the typed HorizonResult are exported flat on finstack_quant.scenarios; HorizonAnalysis (builder-style analyzer) remains Rust-only. Both hosts parse the attribution method through the canonical scenarios::horizon::attribution_method_from_str; an omitted method is AttributionMethod::default(). WASM computeHorizonReturn returns the Rust HorizonReport: the serde HorizonResult (Money as exact-decimal objects) plus `summary` (HorizonResult::summary), whose total_return / annualized_return / currency / factor_contributions[f] are the Python total_return / annualized_return / currency / factor_contribution(f) accessors; undefined returns are null in WASM and NaN in Python. explain() (Rust Display text) and factor_contribution(f) are also the WASM free functions horizonResultExplainText / horizonResultFactorContribution, which accept the computeHorizonReturn object." }
 spec      = { python = "finstack_quant.scenarios",           status = "flattened", note = "ScenarioSpec, OperationSpec (typed classmethod constructors), RateBindingSpec, HierarchyTarget (core::market_data::hierarchy::HierarchyTarget, bound here because only hierarchy-targeted operations consume it), and the enums CurveKind/TenorMatchMode/TimeRollMode/Compounding are exported flat; every enum also constructs from its wire label (CurveKind('par_cds')) and OperationSpec constructors accept the wrapper or the label. ScenarioSpec.hazard_bump_mode is a shared string-literal field in both hosts (solve_to_par / first_order_shift), not a typed host enum. Construction is ScenarioSpec(...) / ScenarioSpec.from_json (the former build_scenario_spec / parse_scenario_spec free functions were removed as duplicates); compose_scenarios returns a typed ScenarioSpec and validate_scenario_spec accepts ScenarioSpec | str. OperationSpec.curve_parallel_bp(curve_id=list[str]) expands via Rust ScenarioSpec::parallel_bp_many." }
 templates = { python = "finstack_quant.scenarios",           status = "flattened", note = "TemplateMetadata plus registry access (list_builtin_templates, list_builtin_template_metadata, build_from_template, list_template_components, build_template_component) are exported flat; TemplateRegistry/RegisteredTemplate types remain Rust-only. WASM returns equivalent plain objects." }
 warning   = { python = "finstack_quant.scenarios.warning",   status = "missing", note = "The structured Warning enum has no typed host class; ApplicationReport.warnings / HorizonResult.warnings surface it as list[dict] via serde (each dict carries the `kind` tag plus variant fields), matching the WASM plain-object shape, with warnings_json as the JSON twin" }
@@ -1852,7 +1854,7 @@ js_rule_members = { free = "wasm ownership: releases the wasm-bindgen handle", t
 # Ratchet: remaining backlog sizes. Lower these as names are bound; never raise them.
 # S16 moved MarketContext from the module backlog to a bound WASM class: its 29
 # unbound methods now count as member backlog (a reclassification, not growth).
-backlog_ceiling = { modules = 819, members = 286 }
+backlog_ceiling = { modules = 748, members = 250 }
 
 [parity.modules."finstack_quant"]
 js = ""
@@ -1860,18 +1862,11 @@ excluded = { "__version__" = "dunder" }
 
 [parity.modules."finstack_quant.analytics"]
 js = "analytics"
-types = { BetaResult = "BetaResult", DatedSeries = "DatedSeries", DrawdownEpisode = "DrawdownEpisode", GreeksResult = "GreeksResult", LookbackReturns = "LookbackReturns", MultiFactorResult = "MultiFactorResult", PeriodStats = "PeriodStats" }
-backlog = [
-    "AnalyticsError",
-    "RollingGreeks",
-]
+types = { AnalyticsError = "FinstackError", BetaResult = "BetaResult", DatedSeries = "DatedSeries", DrawdownEpisode = "DrawdownEpisode", GreeksResult = "GreeksResult", LookbackReturns = "LookbackReturns", MultiFactorResult = "MultiFactorResult", PeriodStats = "PeriodStats", RollingGreeks = "RollingGreeks" }
 
 [parity.modules."finstack_quant.attribution"]
 js = "attribution"
-types = { AttributionResultEnvelope = "AttributionResultEnvelope", PnlAttribution = "PnlAttribution" }
-backlog = [
-    "ReturnContributionResult",
-]
+types = { AttributionResultEnvelope = "AttributionResultEnvelope", PnlAttribution = "PnlAttribution", ReturnContributionResult = "ReturnContributionResult" }
 
 [parity.modules."finstack_quant.attribution.schema"]
 js = "attribution"
@@ -1883,26 +1878,11 @@ backlog = [
 
 [parity.modules."finstack_quant.calibration"]
 js = "calibration"
-types = { CalibrationConfig = "CalibrationConfig", CalibrationDiagnostics = "CalibrationDiagnostics", CalibrationEnvelope = "CalibrationEnvelope", CalibrationPlan = "CalibrationPlan", CalibrationReport = "CalibrationReport", CalibrationResult = "CalibrationResult", CalibrationStep = "CalibrationStep", CalibrationValidationReport = "CalibrationValidationReport", CdsQuote = "CdsQuote", QuoteQuality = "QuoteQuality", RateBounds = "RateBounds", RateQuote = "RateQuote", SolverConfig = "SolverConfig", VolQuote = "VolQuote" }
-backlog = [
-    "CalibrationEnvelopeError",
-    "ValidationConfig",
-    "validate_calibration",
-]
+types = { CalibrationConfig = "CalibrationConfig", CalibrationDiagnostics = "CalibrationDiagnostics", CalibrationEnvelope = "CalibrationEnvelope", CalibrationEnvelopeError = "CalibrationEnvelopeError", CalibrationPlan = "CalibrationPlan", CalibrationReport = "CalibrationReport", CalibrationResult = "CalibrationResult", CalibrationStep = "CalibrationStep", CalibrationValidationReport = "CalibrationValidationReport", CdsQuote = "CdsQuote", QuoteQuality = "QuoteQuality", RateBounds = "RateBounds", RateQuote = "RateQuote", SolverConfig = "SolverConfig", ValidationConfig = "ValidationConfig", VolQuote = "VolQuote" }
 
 [parity.modules."finstack_quant.calibration.hull_white"]
 js = "calibration"
-backlog = [
-    "CapFloorCalibrationConfig",
-    "CapFloorQuote",
-    "HullWhiteCalibrationParams",
-    "HullWhiteParams",
-    "PiecewiseSigmaCalibrationConfig",
-    "SwaptionQuote",
-    "bootstrap_hull_white_sigma_schedule_to_cap_floors",
-    "calibrate_hull_white_to_cap_floors",
-    "calibrate_hull_white_to_swaptions",
-]
+types = { CapFloorCalibrationConfig = "CapFloorCalibrationConfig", CapFloorQuote = "CapFloorQuote", HullWhiteCalibrationParams = "HullWhiteCalibrationParams", HullWhiteParams = "HullWhiteParams", PiecewiseSigmaCalibrationConfig = "PiecewiseSigmaCalibrationConfig", SwaptionQuote = "SwaptionQuote" }
 
 [parity.modules."finstack_quant.calibration.schema"]
 js = "calibration"
@@ -2354,14 +2334,7 @@ backlog = [
 
 [parity.modules."finstack_quant.features"]
 js = "features"
-backlog = [
-    "CrossSectionalOp",
-    "PairwiseOp",
-    "PanelTransformResult",
-    "PanelTransformSpec",
-    "TimeSeriesOp",
-    "transform_panel",
-]
+types = { CrossSectionalOp = "CrossSectionalOp", PairwiseOp = "PairwiseOp", PanelTransformResult = "PanelTransformResult", PanelTransformSpec = "PanelTransformSpec", TimeSeriesOp = "TimeSeriesOp" }
 
 [parity.modules."finstack_quant.features.dataframe"]
 js = ""
@@ -2369,48 +2342,7 @@ excluded = { "cross_sectional" = "pandas", "grouped" = "pandas", "neutralize" = 
 
 [parity.modules."finstack_quant.margin"]
 js = "margin"
-backlog = [
-    "CONSTANTS",
-    "ClearingStatus",
-    "CollateralAssetClass",
-    "CsaSpec",
-    "EadResult",
-    "EligibleCollateralSchedule",
-    "ExcessCollateral",
-    "ExposureDiagnostics",
-    "ExposureProfile",
-    "FrtbSbaEngine",
-    "FrtbSbaResult",
-    "FrtbSensitivities",
-    "FundingConfig",
-    "Haircut01",
-    "HaircutImCalculator",
-    "ImCollateralResult",
-    "ImDecayProfile",
-    "ImMethodology",
-    "ImProfile",
-    "ImResult",
-    "MarginCallType",
-    "MarginFundingCost",
-    "MarginTenor",
-    "MarginUtilization",
-    "MvaResult",
-    "NettingSetId",
-    "SaCcrEngine",
-    "SaCcrNettingSetConfig",
-    "SaCcrTrade",
-    "ScheduleImCalculator",
-    "SimmCalculator",
-    "SimmCurvatureSensitivity",
-    "SimmSensitivities",
-    "VmCalculator",
-    "VmResult",
-    "XvaResult",
-    "compute_mva",
-    "frtb_sba_charge",
-    "im_profile_from_simm",
-    "saccr_ead",
-]
+types = { ClearingStatus = "ClearingStatus", CollateralAssetClass = "CollateralAssetClass", CsaSpec = "CsaSpec", EadResult = "EadResult", EligibleCollateralSchedule = "EligibleCollateralSchedule", ExcessCollateral = "ExcessCollateral", ExposureDiagnostics = "ExposureDiagnostics", ExposureProfile = "ExposureProfile", FrtbSbaResult = "FrtbSbaResult", FundingConfig = "FundingConfig", Haircut01 = "Haircut01", ImCollateralResult = "ImCollateralResult", ImDecayProfile = "ImDecayProfile", ImMethodology = "ImMethodology", ImProfile = "ImProfile", ImResult = "ImResult", MarginCallType = "MarginCallType", MarginFundingCost = "MarginFundingCost", MarginTenor = "MarginTenor", MarginUtilization = "MarginUtilization", MvaResult = "MvaResult", NettingSetId = "NettingSetId", SaCcrNettingSetConfig = "SaCcrNettingSetConfig", SaCcrTrade = "SaCcrTrade", SimmCurvatureSensitivity = "SimmCurvatureSensitivity", VmResult = "VmResult", XvaResult = "XvaResult" }
 
 [parity.modules."finstack_quant.margin.schema"]
 js = "margin"
@@ -2744,19 +2676,7 @@ excluded = { "INSTITUTIONAL" = "pure-python", "Theme" = "pure-python", "attribut
 
 [parity.modules."finstack_quant.scenarios"]
 js = "scenarios"
-types = { ScenarioSpec = "ScenarioSpec", TemplateMetadata = "TemplateMetadata" }
-backlog = [
-    "ApplicationReport",
-    "ApplicationResult",
-    "Compounding",
-    "CurveKind",
-    "HierarchyTarget",
-    "HorizonResult",
-    "OperationSpec",
-    "RateBindingSpec",
-    "TenorMatchMode",
-    "TimeRollMode",
-]
+types = { ApplicationReport = "ApplicationReport", ApplicationResult = "ApplicationEnvelope", Compounding = "Compounding", CurveKind = "CurveKind", HierarchyTarget = "HierarchyTarget", HorizonResult = "HorizonResult", OperationSpec = "OperationSpec", RateBindingSpec = "RateBindingSpec", ScenarioSpec = "ScenarioSpec", TemplateMetadata = "TemplateMetadata", TenorMatchMode = "TenorMatchMode", TimeRollMode = "TimeRollMode" }
 
 [parity.modules."finstack_quant.scenarios.schema"]
 js = "scenarios"
@@ -3038,6 +2958,34 @@ pnlAttributionValidateCurrencies = "free-function twin of Python PnlAttribution.
 [parity.js."calibration".wasm_only]
 calibrationEnvelopeContentHash = "free-function twin of Python CalibrationEnvelope.content_hash (member rename)"
 calibrationResultContentHash = "free-function twin of Python CalibrationResult.content_hash (member rename)"
+calibrationResultResiduals = "free-function twin of Python CalibrationResult.residuals (Rust CalibrationReport::quote_rows of the step report; member rename)"
+calibrationResultStepReport = "free-function twin of Python CalibrationResult.step_report (Rust CalibrationResult::step_report; member rename)"
+calibrationResultStepReportJson = "free-function twin of Python CalibrationResult.step_report_json (JSON wire twin of calibrationResultStepReport; member rename)"
+calibrationStepBaseCorrelation = "free-function twin of Python CalibrationStep.base_correlation (Rust CalibrationStep::from_wire_fields; member rename)"
+calibrationStepCapFloorHullWhite = "free-function twin of Python CalibrationStep.cap_floor_hull_white (Rust CalibrationStep::from_wire_fields; member rename)"
+calibrationStepDiscount = "free-function twin of Python CalibrationStep.discount (Rust CalibrationStep::from_wire_fields; member rename)"
+calibrationStepForward = "free-function twin of Python CalibrationStep.forward (Rust CalibrationStep::from_wire_fields; member rename)"
+calibrationStepHazard = "free-function twin of Python CalibrationStep.hazard (Rust CalibrationStep::from_wire_fields; member rename)"
+calibrationStepHullWhite = "free-function twin of Python CalibrationStep.hull_white (Rust CalibrationStep::from_wire_fields; member rename)"
+calibrationStepInflation = "free-function twin of Python CalibrationStep.inflation (Rust CalibrationStep::from_wire_fields; member rename)"
+calibrationStepParametric = "free-function twin of Python CalibrationStep.parametric (Rust CalibrationStep::from_wire_fields; member rename)"
+calibrationStepStudentT = "free-function twin of Python CalibrationStep.student_t (Rust CalibrationStep::from_wire_fields; member rename)"
+calibrationStepSviSurface = "free-function twin of Python CalibrationStep.svi_surface (Rust CalibrationStep::from_wire_fields; member rename)"
+calibrationStepSwaptionVol = "free-function twin of Python CalibrationStep.swaption_vol (Rust CalibrationStep::from_wire_fields; member rename)"
+calibrationStepVolSurface = "free-function twin of Python CalibrationStep.vol_surface (Rust CalibrationStep::from_wire_fields; member rename)"
+calibrationStepXccyBasis = "free-function twin of Python CalibrationStep.xccy_basis (Rust CalibrationStep::from_wire_fields; member rename)"
+cdsQuoteParSpread = "free-function twin of Python CdsQuote.par_spread (Rust CdsQuote::from_wire_fields; member rename)"
+cdsQuoteUpfront = "free-function twin of Python CdsQuote.upfront (Rust CdsQuote::from_wire_fields; member rename)"
+hullWhiteParamsSigmaAt = "free-function twin of Python HullWhiteParams.sigma_at (Rust HullWhiteParams::volatility value_at; member rename)"
+rateBoundsEmergingMarkets = "free-function twin of Python RateBounds.emerging_markets (Rust RateBounds::emerging_markets; member rename)"
+rateBoundsForCurrency = "free-function twin of Python RateBounds.for_currency (Rust RateBounds::for_currency; member rename)"
+rateQuoteDeposit = "free-function twin of Python RateQuote.deposit (Rust RateQuote::from_wire_fields; member rename)"
+rateQuoteFra = "free-function twin of Python RateQuote.fra (Rust RateQuote::from_wire_fields; member rename)"
+rateQuoteFutures = "free-function twin of Python RateQuote.futures (Rust RateQuote::from_wire_fields; member rename)"
+rateQuoteSwap = "free-function twin of Python RateQuote.swap (Rust RateQuote::from_wire_fields; member rename)"
+volQuoteCapFloorVol = "free-function twin of Python VolQuote.cap_floor_vol (Rust VolQuote::from_wire_fields; member rename)"
+volQuoteOptionVol = "free-function twin of Python VolQuote.option_vol (Rust VolQuote::from_wire_fields; member rename)"
+volQuoteSwaptionVol = "free-function twin of Python VolQuote.swaption_vol (Rust VolQuote::from_wire_fields; member rename)"
 
 [parity.js."cashflows".wasm_only]
 scheduleCalendarYearLadder = "JSON-first twin of Python CashFlowSchedule.calendar_year_ladder (Rust schedule_calendar_year_ladder); P2 binds CashFlowSchedule"
@@ -3047,11 +2995,94 @@ scheduleWal = "JSON-first twin of Python CashFlowSchedule.wal (Rust schedule_wal
 # WASM has no CsaSpec / VmCalculator class (P4 binds them); these JSON-first
 # free functions are the WASM authoring path. Each is a renamed twin of a Rust
 # method that Python binds under its Rust name, not a WASM-only capability.
+[parity.js."features".wasm_only]
+crossSectionalOpParamKeys = "free-function twin of the Python CrossSectionalOp.param_keys property (Rust CrossSectionalOp::param_keys)"
+crossSectionalOpValues = "free-function twin of Python CrossSectionalOp.values (Rust CrossSectionalOp::names)"
+pairwiseOpParamKeys = "free-function twin of the Python PairwiseOp.param_keys property (Rust PairwiseOp::param_keys)"
+pairwiseOpValues = "free-function twin of Python PairwiseOp.values (Rust PairwiseOp::names)"
+panelTransformResultGetColumn = "free-function twin of Python PanelTransformResult.get_column (Rust PanelTransformResult::get_column)"
+timeSeriesOpParamKeys = "free-function twin of the Python TimeSeriesOp.param_keys property (Rust TimeSeriesOp::param_keys)"
+timeSeriesOpValues = "free-function twin of Python TimeSeriesOp.values (Rust TimeSeriesOp::names)"
+
 [parity.js."margin".wasm_only]
-calculateVm = "twin of Rust VmCalculator::new(csa).calculate / Python VmCalculator(csa).calculate; returns the canonical VmResult serde (P4 binds the class)"
-csaEurRegulatoryJson = "JSON document twin of Rust CsaSpec::eur_regulatory / Python CsaSpec.eur_regulatory().to_json()"
-csaUsdRegulatoryJson = "JSON document twin of Rust CsaSpec::usd_regulatory / Python CsaSpec.usd_regulatory().to_json()"
-validateCsaJson = "JSON wire validation twin of serde CsaSpec + Rust CsaSpec::validate / Python CsaSpec.from_json(json).to_json()"
+calculateVm = "free-function form of Rust VmCalculator::new(csa).calculate (the VmCalculator class binds the same call); returns the canonical VmResult serde"
+clearingStatusBilateral = "free-function twin of Python ClearingStatus.bilateral (member rename)"
+clearingStatusCleared = "free-function twin of Python ClearingStatus.cleared (member rename)"
+collateralAssetClassAgencyBonds = "free-function twin of Python CollateralAssetClass.agency_bonds (member rename)"
+collateralAssetClassCash = "free-function twin of Python CollateralAssetClass.cash (member rename)"
+collateralAssetClassCorporateBonds = "free-function twin of Python CollateralAssetClass.corporate_bonds (member rename)"
+collateralAssetClassCoveredBonds = "free-function twin of Python CollateralAssetClass.covered_bonds (member rename)"
+collateralAssetClassEquity = "free-function twin of Python CollateralAssetClass.equity (member rename)"
+collateralAssetClassFromStr = "free-function twin of Python CollateralAssetClass.from_str (member rename)"
+collateralAssetClassFxAddon = "free-function twin of Python CollateralAssetClass.fx_addon (member rename)"
+collateralAssetClassGold = "free-function twin of Python CollateralAssetClass.gold (member rename)"
+collateralAssetClassGovernmentBonds = "free-function twin of Python CollateralAssetClass.government_bonds (member rename)"
+collateralAssetClassMutualFunds = "free-function twin of Python CollateralAssetClass.mutual_funds (member rename)"
+collateralAssetClassStandardHaircut = "free-function twin of Python CollateralAssetClass.standard_haircut (member rename)"
+csaEurRegulatoryJson = "JSON wire twin of csaSpecEurRegulatory (Rust CsaSpec::eur_regulatory / Python CsaSpec.eur_regulatory().to_json())"
+csaSpecApplyImTerms = "free-function twin of Python CsaSpec.apply_im_terms (member rename)"
+csaSpecEurRegulatory = "free-function twin of Python CsaSpec.eur_regulatory (member rename)"
+csaSpecRegulatory = "free-function twin of Python CsaSpec.regulatory (member rename)"
+csaSpecUsdRegulatory = "free-function twin of Python CsaSpec.usd_regulatory (member rename)"
+csaSpecValidate = "free-function twin of Python CsaSpec.validate (member rename)"
+csaSpecWithIm = "free-function twin of Python CsaSpec.with_im (member rename)"
+csaSpecWithVmThreshold = "free-function twin of Python CsaSpec.with_vm_threshold (member rename)"
+csaUsdRegulatoryJson = "JSON wire twin of csaSpecUsdRegulatory (Rust CsaSpec::usd_regulatory / Python CsaSpec.usd_regulatory().to_json())"
+eligibleCollateralScheduleBcbsStandard = "free-function twin of Python EligibleCollateralSchedule.bcbs_standard (member rename)"
+eligibleCollateralScheduleCashOnly = "free-function twin of Python EligibleCollateralSchedule.cash_only (member rename)"
+eligibleCollateralScheduleCheckConcentrationLimits = "free-function twin of Python EligibleCollateralSchedule.check_concentration_limits (member rename)"
+eligibleCollateralScheduleHaircutFor = "free-function twin of Python EligibleCollateralSchedule.haircut_for (member rename)"
+eligibleCollateralScheduleHaircutForMaturity = "free-function twin of Python EligibleCollateralSchedule.haircut_for_maturity (member rename)"
+eligibleCollateralScheduleIsEligible = "free-function twin of Python EligibleCollateralSchedule.is_eligible (member rename)"
+eligibleCollateralScheduleUsTreasuries = "free-function twin of Python EligibleCollateralSchedule.us_treasuries (member rename)"
+excessCollateral = "constructor twin of Python ExcessCollateral(...) (Rust ExcessCollateral::new)"
+excessCollateralExcessPercentage = "free-function twin of Python ExcessCollateral.excess_percentage (member rename)"
+excessCollateralHasExcess = "free-function twin of Python ExcessCollateral.has_excess (member rename)"
+excessCollateralHasShortfall = "free-function twin of Python ExcessCollateral.has_shortfall (member rename)"
+exposureProfileValidate = "free-function twin of Python ExposureProfile.validate (member rename)"
+fundingConfigEffectiveBenefitBp = "free-function twin of Python FundingConfig.effective_benefit_bp (member rename)"
+fundingConfigEffectiveMarginSpreadBp = "free-function twin of Python FundingConfig.effective_margin_spread_bp (member rename)"
+haircut01 = "constructor twin of Python Haircut01(...) (Rust Haircut01::calculate)"
+haircut01HaircutBp = "free-function twin of Python Haircut01.haircut_bp (member rename)"
+imDecayProfileConstant = "free-function twin of Python ImDecayProfile.constant (member rename)"
+imDecayProfileFactor = "free-function twin of Python ImDecayProfile.factor (member rename)"
+imDecayProfileLinearToMaturity = "free-function twin of Python ImDecayProfile.linear_to_maturity (member rename)"
+imDecayProfileSqrtTime = "free-function twin of Python ImDecayProfile.sqrt_time (member rename)"
+imMethodologyClearingHouse = "free-function twin of Python ImMethodology.clearing_house (member rename)"
+imMethodologyFromStr = "free-function twin of Python ImMethodology.from_str (member rename)"
+imMethodologyHaircut = "free-function twin of Python ImMethodology.haircut (member rename)"
+imMethodologyInternalModel = "free-function twin of Python ImMethodology.internal_model (member rename)"
+imMethodologySchedule = "free-function twin of Python ImMethodology.schedule (member rename)"
+imMethodologySimm = "free-function twin of Python ImMethodology.simm (member rename)"
+imProfileValidate = "free-function twin of Python ImProfile.validate (member rename)"
+imResultBreakdownAmount = "free-function twin of Python ImResult.breakdown_amount (member rename)"
+imResultBreakdownKeys = "free-function twin of Python ImResult.breakdown_keys (member rename)"
+marginCallTypeFromStr = "free-function twin of Python MarginCallType.from_str (member rename)"
+marginCallTypeInitialMargin = "free-function twin of Python MarginCallType.initial_margin (member rename)"
+marginCallTypeSubstitution = "free-function twin of Python MarginCallType.substitution (member rename)"
+marginCallTypeTopUp = "free-function twin of Python MarginCallType.top_up (member rename)"
+marginCallTypeVariationMarginCollect = "free-function twin of Python MarginCallType.variation_margin_collect (member rename)"
+marginCallTypeVariationMarginPost = "free-function twin of Python MarginCallType.variation_margin_post (member rename)"
+marginFundingCost = "constructor twin of Python MarginFundingCost(...) (Rust MarginFundingCost::calculate)"
+marginFundingCostCostForPeriod = "free-function twin of Python MarginFundingCost.cost_for_period (member rename)"
+marginFundingCostSpread = "free-function twin of Python MarginFundingCost.spread (member rename)"
+marginTenorDaily = "free-function twin of Python MarginTenor.daily (member rename)"
+marginTenorFromStr = "free-function twin of Python MarginTenor.from_str (member rename)"
+marginTenorMonthly = "free-function twin of Python MarginTenor.monthly (member rename)"
+marginTenorOnDemand = "free-function twin of Python MarginTenor.on_demand (member rename)"
+marginTenorWeekly = "free-function twin of Python MarginTenor.weekly (member rename)"
+marginUtilization = "constructor twin of Python MarginUtilization(...) (Rust MarginUtilization::new)"
+marginUtilizationIsAdequate = "free-function twin of Python MarginUtilization.is_adequate (member rename)"
+marginUtilizationRatio = "twin of the Python property MarginUtilization.ratio, which Rust derives and does not serialize"
+marginUtilizationShortfall = "free-function twin of Python MarginUtilization.shortfall (member rename)"
+nettingSetIdBilateral = "free-function twin of Python NettingSetId.bilateral (member rename)"
+nettingSetIdCleared = "free-function twin of Python NettingSetId.cleared (member rename)"
+saCcrNettingSetConfigMargined = "free-function twin of Python SaCcrNettingSetConfig.margined (member rename)"
+saCcrNettingSetConfigUnmargined = "free-function twin of Python SaCcrNettingSetConfig.unmargined (member rename)"
+saCcrNettingSetConfigValidate = "free-function twin of Python SaCcrNettingSetConfig.validate (member rename)"
+validateCsaJson = "JSON wire validation twin of csaSpecValidate (serde CsaSpec + Rust CsaSpec::validate / Python CsaSpec.from_json(json).to_json())"
+vmResultNetMargin = "twin of the Python property VmResult.net_margin (Rust VmResult::net_margin), which is not serialized"
+vmResultRequiresCall = "twin of the Python property VmResult.requires_call (Rust VmResult::requires_call), which is not serialized"
 
 [parity.js."models.credit".wasm_only]
 creditGradesModelJson = "JSON-first twin of a Python credit model constructor (P5 binds the class)"
@@ -3096,6 +3127,55 @@ valuePortfolioBuilt = "WASM handle variant: takes a built Portfolio so repeated 
 [parity.js."scenarios".wasm_only]
 buildScenarioSpec = "constructor twin of Python ScenarioSpec(...)"
 parseScenarioSpec = "twin of Python ScenarioSpec.from_json (Rust ScenarioSpec::from_json)"
+operationSpecAssetCorrelationPts = "free-function twin of Python OperationSpec.asset_correlation_pts (Rust OperationSpec::AssetCorrelationPts)"
+operationSpecBaseCorrBucketPts = "free-function twin of Python OperationSpec.base_corr_bucket_pts (Rust OperationSpec::BaseCorrBucketPts)"
+operationSpecBaseCorrParallelPts = "free-function twin of Python OperationSpec.base_corr_parallel_pts (Rust OperationSpec::BaseCorrParallelPts)"
+operationSpecCurveNodeBp = "free-function twin of Python OperationSpec.curve_node_bp (Rust OperationSpec::CurveNodeBp)"
+operationSpecCurveParallelBp = "free-function twin of Python OperationSpec.curve_parallel_bp (Rust OperationSpec::CurveParallelBp / ScenarioSpec::parallel_bp_many)"
+operationSpecEquityPricePct = "free-function twin of Python OperationSpec.equity_price_pct (Rust OperationSpec::EquityPricePct)"
+operationSpecHierarchyBaseCorrParallelPts = "free-function twin of Python OperationSpec.hierarchy_base_corr_parallel_pts (Rust OperationSpec::HierarchyBaseCorrParallelPts)"
+operationSpecHierarchyCurveParallelBp = "free-function twin of Python OperationSpec.hierarchy_curve_parallel_bp (Rust OperationSpec::HierarchyCurveParallelBp)"
+operationSpecHierarchyEquityPricePct = "free-function twin of Python OperationSpec.hierarchy_equity_price_pct (Rust OperationSpec::HierarchyEquityPricePct)"
+operationSpecHierarchyVolSurfaceParallelPct = "free-function twin of Python OperationSpec.hierarchy_vol_surface_parallel_pct (Rust OperationSpec::HierarchyVolSurfaceParallelPct)"
+operationSpecInstrumentPricePctByAttr = "free-function twin of Python OperationSpec.instrument_price_pct_by_attr (Rust OperationSpec::InstrumentPricePctByAttr)"
+operationSpecInstrumentPricePctByType = "free-function twin of Python OperationSpec.instrument_price_pct_by_type (Rust OperationSpec::InstrumentPricePctByType)"
+operationSpecInstrumentSpreadBpByAttr = "free-function twin of Python OperationSpec.instrument_spread_bp_by_attr (Rust OperationSpec::InstrumentSpreadBpByAttr)"
+operationSpecInstrumentSpreadBpByType = "free-function twin of Python OperationSpec.instrument_spread_bp_by_type (Rust OperationSpec::InstrumentSpreadBpByType)"
+operationSpecMarketFxPct = "free-function twin of Python OperationSpec.market_fx_pct (Rust OperationSpec::MarketFxPct)"
+operationSpecMutatesInstruments = "free-function twin of Python OperationSpec.mutates_instruments (Rust OperationSpec::mutates_instruments)"
+operationSpecPrepayDefaultCorrelationPts = "free-function twin of Python OperationSpec.prepay_default_correlation_pts (Rust OperationSpec::PrepayDefaultCorrelationPts)"
+operationSpecRateBinding = "free-function twin of Python OperationSpec.rate_binding (Rust OperationSpec::RateBinding)"
+operationSpecRequiresInstruments = "free-function twin of Python OperationSpec.requires_instruments (Rust OperationSpec::requires_instruments)"
+operationSpecStmtForecastAssign = "free-function twin of Python OperationSpec.stmt_forecast_assign (Rust OperationSpec::StmtForecastAssign)"
+operationSpecStmtForecastPercent = "free-function twin of Python OperationSpec.stmt_forecast_percent (Rust OperationSpec::StmtForecastPercent)"
+operationSpecTimeRollForward = "free-function twin of Python OperationSpec.time_roll_forward (Rust OperationSpec::time_roll_forward)"
+operationSpecValidate = "free-function twin of Python OperationSpec.validate (Rust OperationSpec::validate)"
+operationSpecVolIndexNodePts = "free-function twin of Python OperationSpec.vol_index_node_pts (Rust OperationSpec::VolIndexNodePts)"
+operationSpecVolIndexParallelPts = "free-function twin of Python OperationSpec.vol_index_parallel_pts (Rust OperationSpec::VolIndexParallelPts)"
+operationSpecVolSurfaceBucketPct = "free-function twin of Python OperationSpec.vol_surface_bucket_pct (Rust OperationSpec::VolSurfaceBucketPct)"
+operationSpecVolSurfaceParallelPct = "free-function twin of Python OperationSpec.vol_surface_parallel_pct (Rust OperationSpec::VolSurfaceParallelPct)"
+curveKindCommodity = "free-function twin of Python CurveKind.commodity (Rust CurveKind::Commodity)"
+curveKindDiscount = "free-function twin of Python CurveKind.discount (Rust CurveKind::Discount)"
+curveKindForward = "free-function twin of Python CurveKind.forward (Rust CurveKind::Forward)"
+curveKindInflation = "free-function twin of Python CurveKind.inflation (Rust CurveKind::Inflation)"
+curveKindParCds = "free-function twin of Python CurveKind.par_cds (Rust CurveKind::ParCDS)"
+tenorMatchModeExact = "free-function twin of Python TenorMatchMode.exact (Rust TenorMatchMode::Exact)"
+tenorMatchModeInterpolate = "free-function twin of Python TenorMatchMode.interpolate (Rust TenorMatchMode::Interpolate)"
+timeRollModeApproximate = "free-function twin of Python TimeRollMode.approximate (Rust TimeRollMode::Approximate)"
+timeRollModeBusinessDays = "free-function twin of Python TimeRollMode.business_days (Rust TimeRollMode::BusinessDays)"
+timeRollModeCalendarDays = "free-function twin of Python TimeRollMode.calendar_days (Rust TimeRollMode::CalendarDays)"
+compoundingAnnual = "free-function twin of Python Compounding.annual (Rust Compounding::Annual)"
+compoundingContinuous = "free-function twin of Python Compounding.continuous (Rust Compounding::Continuous)"
+compoundingMonthly = "free-function twin of Python Compounding.monthly (Rust Compounding::MONTHLY)"
+compoundingQuarterly = "free-function twin of Python Compounding.quarterly (Rust Compounding::QUARTERLY)"
+compoundingSemiAnnual = "free-function twin of Python Compounding.semi_annual (Rust Compounding::SEMI_ANNUAL)"
+compoundingSimple = "free-function twin of Python Compounding.simple (Rust Compounding::Simple)"
+rateBindingSpecValidate = "free-function twin of Python RateBindingSpec.validate (Rust RateBindingSpec::validate)"
+horizonResultExplainText = "free-function twin of Python HorizonResult.explain (Rust Display for HorizonResult)"
+horizonResultFactorContribution = "free-function twin of Python HorizonResult.factor_contribution (Rust HorizonResult::factor_contribution)"
+scenarioSpecMutatesInstruments = "free-function twin of Python ScenarioSpec.mutates_instruments (Rust ScenarioSpec::mutates_instruments)"
+scenarioSpecRequiresInstruments = "free-function twin of Python ScenarioSpec.requires_instruments (Rust ScenarioSpec::requires_instruments)"
+scenarioSpecWithHazardBumpMode = "free-function twin of Python ScenarioSpec.with_hazard_bump_mode (Rust ScenarioSpec::with_hazard_bump_mode)"
 
 [parity.js."statements".wasm_only]
 financialModelContentHash = "free-function twin of Python FinancialModelSpec.content_hash (Rust FinancialModelSpec::content_hash); P9 binds FinancialModelSpec"
@@ -3148,13 +3228,10 @@ instrumentCashflowsWithMarketJson = "WASM core.MarketContext-handle variant of i
 priceInstrumentWithMarket = "WASM core.MarketContext-handle variant of priceInstrument (Python price_instrument takes a MarketContext directly)"
 
 [parity.members."finstack_quant.analytics.Performance"]
-backlog = [
-    "from_arrays",
-    "from_json",
-    "from_returns_arrays",
-    "to_json",
-]
 wasm_only = { summary = "WASM twin of the pandas exit Performance.to_summary_dataframe, returned as a TableEnvelope" }
+
+[parity.members."finstack_quant.analytics.AnalyticsError"]
+excluded = { add_note = "dunder", with_traceback = "dunder" }
 
 [parity.members."finstack_quant.core.currency.Currency"]
 backlog = [
@@ -3476,62 +3553,43 @@ backlog = [
 renames = { explain = { js = "attribution.pnlAttributionExplainText", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::explain method is a free function taking the object" }, explain_verbose = { js = "attribution.pnlAttributionExplainVerboseText", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::explain_verbose method is a free function taking the object" }, required_metrics = { js = "attribution.pnlAttributionRequiredMetrics", reason = "WASM attribution results are plain objects; Rust AttributionMethod::required_metrics of meta.method is a free function taking the object" }, residual_within_tolerance = { js = "attribution.pnlAttributionResidualWithinTolerance", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::residual_within_tolerance method is a free function taking the object" }, validate_currencies = { js = "attribution.pnlAttributionValidateCurrencies", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::validate_currencies method is a free function taking the object" } }
 
 [parity.members."finstack_quant.calibration.CalibrationEnvelope"]
-renames = { content_hash = { js = "calibration.calibrationEnvelopeContentHash", reason = "WASM envelopes are plain objects; the Rust CalibrationEnvelope::content_hash method is a free function taking the envelope" } }
-backlog = [
-    "dry_run",
-]
+renames = { content_hash = { js = "calibration.calibrationEnvelopeContentHash", reason = "WASM envelopes are plain objects; the Rust CalibrationEnvelope::content_hash method is a free function taking the envelope" }, dry_run = { js = "calibration.dryRun", reason = "WASM envelopes are plain objects; the method is the module-level dryRun taking the envelope (Rust validate::validate after the same strict load)" } }
+
+[parity.members."finstack_quant.calibration.CalibrationEnvelopeError"]
+excluded = { add_note = "dunder", with_traceback = "dunder" }
 
 [parity.members."finstack_quant.calibration.CalibrationResult"]
-renames = { content_hash = { js = "calibration.calibrationResultContentHash", reason = "WASM calibration results are plain objects; the Rust CalibrationResultEnvelope::content_hash method is a free function taking the result" } }
-backlog = [
-    "residuals",
-    "step_report",
-    "step_report_json",
-]
+renames = { content_hash = { js = "calibration.calibrationResultContentHash", reason = "WASM calibration results are plain objects; the Rust CalibrationResultEnvelope::content_hash method is a free function taking the result" }, residuals = { js = "calibration.calibrationResultResiduals", reason = "WASM calibration results are plain objects; the free function returns the Rust CalibrationReport::quote_rows rows that Python frames as a pandas DataFrame" }, step_report = { js = "calibration.calibrationResultStepReport", reason = "WASM calibration results are plain objects; the Rust CalibrationResult::step_report method is a free function taking the result" }, step_report_json = { js = "calibration.calibrationResultStepReportJson", reason = "WASM calibration results are plain objects; JSON wire twin of calibrationResultStepReport" } }
 
-[parity.members."finstack_quant.calibration.CalibrationStep"]
-backlog = [
-    "base_correlation",
-    "cap_floor_hull_white",
-    "discount",
-    "forward",
-    "hazard",
-    "hull_white",
-    "inflation",
-    "parametric",
-    "student_t",
-    "svi_surface",
-    "swaption_vol",
-    "vol_surface",
-    "xccy_basis",
-]
+[parity.members."finstack_quant.calibration.CalibrationStep".renames]
+base_correlation = { js = "calibration.calibrationStepBaseCorrelation", reason = "WASM steps are plain objects; the constructor is a free function returning the CalibrationStep object (Rust CalibrationStep::from_wire_fields). It has no quotes argument: a plain step cannot carry attached quotes, which go in envelope.market_data and plan.quote_sets" }
+cap_floor_hull_white = { js = "calibration.calibrationStepCapFloorHullWhite", reason = "WASM steps are plain objects; the constructor is a free function returning the CalibrationStep object (Rust CalibrationStep::from_wire_fields). It has no quotes argument: a plain step cannot carry attached quotes, which go in envelope.market_data and plan.quote_sets" }
+discount = { js = "calibration.calibrationStepDiscount", reason = "WASM steps are plain objects; the constructor is a free function returning the CalibrationStep object (Rust CalibrationStep::from_wire_fields). It has no quotes argument: a plain step cannot carry attached quotes, which go in envelope.market_data and plan.quote_sets" }
+forward = { js = "calibration.calibrationStepForward", reason = "WASM steps are plain objects; the constructor is a free function returning the CalibrationStep object (Rust CalibrationStep::from_wire_fields). It has no quotes argument: a plain step cannot carry attached quotes, which go in envelope.market_data and plan.quote_sets" }
+hazard = { js = "calibration.calibrationStepHazard", reason = "WASM steps are plain objects; the constructor is a free function returning the CalibrationStep object (Rust CalibrationStep::from_wire_fields). It has no quotes argument: a plain step cannot carry attached quotes, which go in envelope.market_data and plan.quote_sets" }
+hull_white = { js = "calibration.calibrationStepHullWhite", reason = "WASM steps are plain objects; the constructor is a free function returning the CalibrationStep object (Rust CalibrationStep::from_wire_fields). It has no quotes argument: a plain step cannot carry attached quotes, which go in envelope.market_data and plan.quote_sets" }
+inflation = { js = "calibration.calibrationStepInflation", reason = "WASM steps are plain objects; the constructor is a free function returning the CalibrationStep object (Rust CalibrationStep::from_wire_fields). It has no quotes argument: a plain step cannot carry attached quotes, which go in envelope.market_data and plan.quote_sets" }
+parametric = { js = "calibration.calibrationStepParametric", reason = "WASM steps are plain objects; the constructor is a free function returning the CalibrationStep object (Rust CalibrationStep::from_wire_fields). It has no quotes argument: a plain step cannot carry attached quotes, which go in envelope.market_data and plan.quote_sets" }
+student_t = { js = "calibration.calibrationStepStudentT", reason = "WASM steps are plain objects; the constructor is a free function returning the CalibrationStep object (Rust CalibrationStep::from_wire_fields). It has no quotes argument: a plain step cannot carry attached quotes, which go in envelope.market_data and plan.quote_sets" }
+svi_surface = { js = "calibration.calibrationStepSviSurface", reason = "WASM steps are plain objects; the constructor is a free function returning the CalibrationStep object (Rust CalibrationStep::from_wire_fields). It has no quotes argument: a plain step cannot carry attached quotes, which go in envelope.market_data and plan.quote_sets" }
+swaption_vol = { js = "calibration.calibrationStepSwaptionVol", reason = "WASM steps are plain objects; the constructor is a free function returning the CalibrationStep object (Rust CalibrationStep::from_wire_fields). It has no quotes argument: a plain step cannot carry attached quotes, which go in envelope.market_data and plan.quote_sets" }
+vol_surface = { js = "calibration.calibrationStepVolSurface", reason = "WASM steps are plain objects; the constructor is a free function returning the CalibrationStep object (Rust CalibrationStep::from_wire_fields). It has no quotes argument: a plain step cannot carry attached quotes, which go in envelope.market_data and plan.quote_sets" }
+xccy_basis = { js = "calibration.calibrationStepXccyBasis", reason = "WASM steps are plain objects; the constructor is a free function returning the CalibrationStep object (Rust CalibrationStep::from_wire_fields). It has no quotes argument: a plain step cannot carry attached quotes, which go in envelope.market_data and plan.quote_sets" }
 
 [parity.members."finstack_quant.calibration.CdsQuote"]
-backlog = [
-    "par_spread",
-    "upfront",
-]
+renames = { par_spread = { js = "calibration.cdsQuoteParSpread", reason = "WASM quotes are plain objects; the constructor is a free function returning the CdsQuote object (Rust CdsQuote::from_wire_fields)" }, upfront = { js = "calibration.cdsQuoteUpfront", reason = "WASM quotes are plain objects; the constructor is a free function returning the CdsQuote object (Rust CdsQuote::from_wire_fields)" } }
 
 [parity.members."finstack_quant.calibration.RateBounds"]
-backlog = [
-    "emerging_markets",
-    "for_currency",
-]
+renames = { emerging_markets = { js = "calibration.rateBoundsEmergingMarkets", reason = "WASM rate bounds are plain objects; the Rust RateBounds::emerging_markets constructor is a free function returning the object" }, for_currency = { js = "calibration.rateBoundsForCurrency", reason = "WASM rate bounds are plain objects; the Rust RateBounds::for_currency constructor is a free function returning the object" } }
+
+[parity.members."finstack_quant.calibration.hull_white.HullWhiteParams"]
+renames = { sigma_at = { js = "calibration.hullWhiteParamsSigmaAt", reason = "WASM Hull-White parameters are plain objects; the piecewise sigma lookup (Rust HullWhiteParams::volatility value_at) is a free function taking the object" } }
 
 [parity.members."finstack_quant.calibration.RateQuote"]
-backlog = [
-    "deposit",
-    "fra",
-    "futures",
-    "swap",
-]
+renames = { deposit = { js = "calibration.rateQuoteDeposit", reason = "WASM quotes are plain objects; the constructor is a free function returning the RateQuote object (Rust RateQuote::from_wire_fields)" }, fra = { js = "calibration.rateQuoteFra", reason = "WASM quotes are plain objects; the constructor is a free function returning the RateQuote object (Rust RateQuote::from_wire_fields)" }, futures = { js = "calibration.rateQuoteFutures", reason = "WASM quotes are plain objects; the constructor is a free function returning the RateQuote object (Rust RateQuote::from_wire_fields)" }, swap = { js = "calibration.rateQuoteSwap", reason = "WASM quotes are plain objects; the constructor is a free function returning the RateQuote object (Rust RateQuote::from_wire_fields)" } }
 
 [parity.members."finstack_quant.calibration.VolQuote"]
-backlog = [
-    "cap_floor_vol",
-    "option_vol",
-    "swaption_vol",
-]
+renames = { cap_floor_vol = { js = "calibration.volQuoteCapFloorVol", reason = "WASM quotes are plain objects; the constructor is a free function returning the VolQuote object (Rust VolQuote::from_wire_fields)" }, option_vol = { js = "calibration.volQuoteOptionVol", reason = "WASM quotes are plain objects; the constructor is a free function returning the VolQuote object (Rust VolQuote::from_wire_fields)" }, swaption_vol = { js = "calibration.volQuoteSwaptionVol", reason = "WASM quotes are plain objects; the constructor is a free function returning the VolQuote object (Rust VolQuote::from_wire_fields)" } }
 
 [parity.members."finstack_quant.models.BsGreeks"]
 backlog = [
@@ -3571,13 +3629,44 @@ backlog = [
     "position_residual_contributions",
 ]
 
+[parity.members."finstack_quant.features.CrossSectionalOp"]
+renames = { values = { js = "features.crossSectionalOpValues", reason = "WASM CrossSectionalOp is its snake_case name; the Rust CrossSectionalOp::names list is a free function" } }
+
+[parity.members."finstack_quant.features.PairwiseOp"]
+renames = { values = { js = "features.pairwiseOpValues", reason = "WASM PairwiseOp is its snake_case name; the Rust PairwiseOp::names list is a free function" } }
+
+[parity.members."finstack_quant.features.PanelTransformResult"]
+renames = { get_column = { js = "features.panelTransformResultGetColumn", reason = "WASM panel results are plain objects; Rust PanelTransformResult::get_column is a free function taking the object" } }
+
+[parity.members."finstack_quant.features.TimeSeriesOp"]
+renames = { values = { js = "features.timeSeriesOpValues", reason = "WASM TimeSeriesOp is its snake_case name; the Rust TimeSeriesOp::names list is a free function" } }
+
+[parity.members."finstack_quant.scenarios.ApplicationReport"]
+excluded = { carry_to_dataframe = "pandas", changes_to_dataframe = "pandas" }
+
+[parity.members."finstack_quant.scenarios.Compounding"]
+renames = { annual = { js = "scenarios.compoundingAnnual", reason = "WASM Compounding is its serde wire value; Rust Compounding::Annual is a free function returning it" }, continuous = { js = "scenarios.compoundingContinuous", reason = "WASM Compounding is its serde wire value; Rust Compounding::Continuous is a free function returning it" }, monthly = { js = "scenarios.compoundingMonthly", reason = "WASM Compounding is its serde wire value; Rust Compounding::MONTHLY is a free function returning it" }, quarterly = { js = "scenarios.compoundingQuarterly", reason = "WASM Compounding is its serde wire value; Rust Compounding::QUARTERLY is a free function returning it" }, semi_annual = { js = "scenarios.compoundingSemiAnnual", reason = "WASM Compounding is its serde wire value; Rust Compounding::SEMI_ANNUAL is a free function returning it" }, simple = { js = "scenarios.compoundingSimple", reason = "WASM Compounding is its serde wire value; Rust Compounding::Simple is a free function returning it" } }
+
+[parity.members."finstack_quant.scenarios.CurveKind"]
+renames = { commodity = { js = "scenarios.curveKindCommodity", reason = "WASM CurveKind is its wire label; Rust CurveKind::Commodity is a free function returning it" }, discount = { js = "scenarios.curveKindDiscount", reason = "WASM CurveKind is its wire label; Rust CurveKind::Discount is a free function returning it" }, forward = { js = "scenarios.curveKindForward", reason = "WASM CurveKind is its wire label; Rust CurveKind::Forward is a free function returning it" }, inflation = { js = "scenarios.curveKindInflation", reason = "WASM CurveKind is its wire label; Rust CurveKind::Inflation is a free function returning it" }, par_cds = { js = "scenarios.curveKindParCds", reason = "WASM CurveKind is its wire label; Rust CurveKind::ParCDS is a free function returning it" } }
+
+[parity.members."finstack_quant.scenarios.HorizonResult"]
+renames = { explain = { js = "scenarios.horizonResultExplainText", reason = "WASM horizon results are plain objects; Rust Display for HorizonResult is a free function taking the object" }, factor_contribution = { js = "scenarios.horizonResultFactorContribution", reason = "WASM horizon results are plain objects; Rust HorizonResult::factor_contribution is a free function taking the object" } }
+
+[parity.members."finstack_quant.scenarios.OperationSpec"]
+renames = { asset_correlation_pts = { js = "scenarios.operationSpecAssetCorrelationPts", reason = "WASM operations are plain objects; Rust OperationSpec::AssetCorrelationPts is a free function returning it" }, base_corr_bucket_pts = { js = "scenarios.operationSpecBaseCorrBucketPts", reason = "WASM operations are plain objects; Rust OperationSpec::BaseCorrBucketPts is a free function returning it" }, base_corr_parallel_pts = { js = "scenarios.operationSpecBaseCorrParallelPts", reason = "WASM operations are plain objects; Rust OperationSpec::BaseCorrParallelPts is a free function returning it" }, curve_node_bp = { js = "scenarios.operationSpecCurveNodeBp", reason = "WASM operations are plain objects; Rust OperationSpec::CurveNodeBp is a free function returning it" }, curve_parallel_bp = { js = "scenarios.operationSpecCurveParallelBp", reason = "WASM operations are plain objects; Rust OperationSpec::CurveParallelBp / ScenarioSpec::parallel_bp_many is a free function returning it" }, equity_price_pct = { js = "scenarios.operationSpecEquityPricePct", reason = "WASM operations are plain objects; Rust OperationSpec::EquityPricePct is a free function returning it" }, hierarchy_base_corr_parallel_pts = { js = "scenarios.operationSpecHierarchyBaseCorrParallelPts", reason = "WASM operations are plain objects; Rust OperationSpec::HierarchyBaseCorrParallelPts is a free function returning it" }, hierarchy_curve_parallel_bp = { js = "scenarios.operationSpecHierarchyCurveParallelBp", reason = "WASM operations are plain objects; Rust OperationSpec::HierarchyCurveParallelBp is a free function returning it" }, hierarchy_equity_price_pct = { js = "scenarios.operationSpecHierarchyEquityPricePct", reason = "WASM operations are plain objects; Rust OperationSpec::HierarchyEquityPricePct is a free function returning it" }, hierarchy_vol_surface_parallel_pct = { js = "scenarios.operationSpecHierarchyVolSurfaceParallelPct", reason = "WASM operations are plain objects; Rust OperationSpec::HierarchyVolSurfaceParallelPct is a free function returning it" }, instrument_price_pct_by_attr = { js = "scenarios.operationSpecInstrumentPricePctByAttr", reason = "WASM operations are plain objects; Rust OperationSpec::InstrumentPricePctByAttr is a free function returning it" }, instrument_price_pct_by_type = { js = "scenarios.operationSpecInstrumentPricePctByType", reason = "WASM operations are plain objects; Rust OperationSpec::InstrumentPricePctByType is a free function returning it" }, instrument_spread_bp_by_attr = { js = "scenarios.operationSpecInstrumentSpreadBpByAttr", reason = "WASM operations are plain objects; Rust OperationSpec::InstrumentSpreadBpByAttr is a free function returning it" }, instrument_spread_bp_by_type = { js = "scenarios.operationSpecInstrumentSpreadBpByType", reason = "WASM operations are plain objects; Rust OperationSpec::InstrumentSpreadBpByType is a free function returning it" }, market_fx_pct = { js = "scenarios.operationSpecMarketFxPct", reason = "WASM operations are plain objects; Rust OperationSpec::MarketFxPct is a free function returning it" }, mutates_instruments = { js = "scenarios.operationSpecMutatesInstruments", reason = "WASM operations are plain objects; Rust OperationSpec::mutates_instruments is a free function taking the object" }, prepay_default_correlation_pts = { js = "scenarios.operationSpecPrepayDefaultCorrelationPts", reason = "WASM operations are plain objects; Rust OperationSpec::PrepayDefaultCorrelationPts is a free function returning it" }, rate_binding = { js = "scenarios.operationSpecRateBinding", reason = "WASM operations are plain objects; Rust OperationSpec::RateBinding is a free function returning it" }, requires_instruments = { js = "scenarios.operationSpecRequiresInstruments", reason = "WASM operations are plain objects; Rust OperationSpec::requires_instruments is a free function taking the object" }, stmt_forecast_assign = { js = "scenarios.operationSpecStmtForecastAssign", reason = "WASM operations are plain objects; Rust OperationSpec::StmtForecastAssign is a free function returning it" }, stmt_forecast_percent = { js = "scenarios.operationSpecStmtForecastPercent", reason = "WASM operations are plain objects; Rust OperationSpec::StmtForecastPercent is a free function returning it" }, time_roll_forward = { js = "scenarios.operationSpecTimeRollForward", reason = "WASM operations are plain objects; Rust OperationSpec::time_roll_forward is a free function returning it" }, validate = { js = "scenarios.operationSpecValidate", reason = "WASM operations are plain objects; Rust OperationSpec::validate is a free function taking the object" }, vol_index_node_pts = { js = "scenarios.operationSpecVolIndexNodePts", reason = "WASM operations are plain objects; Rust OperationSpec::VolIndexNodePts is a free function returning it" }, vol_index_parallel_pts = { js = "scenarios.operationSpecVolIndexParallelPts", reason = "WASM operations are plain objects; Rust OperationSpec::VolIndexParallelPts is a free function returning it" }, vol_surface_bucket_pct = { js = "scenarios.operationSpecVolSurfaceBucketPct", reason = "WASM operations are plain objects; Rust OperationSpec::VolSurfaceBucketPct is a free function returning it" }, vol_surface_parallel_pct = { js = "scenarios.operationSpecVolSurfaceParallelPct", reason = "WASM operations are plain objects; Rust OperationSpec::VolSurfaceParallelPct is a free function returning it" } }
+
+[parity.members."finstack_quant.scenarios.RateBindingSpec"]
+renames = { validate = { js = "scenarios.rateBindingSpecValidate", reason = "WASM rate bindings are plain objects; Rust RateBindingSpec::validate is a free function taking the object" } }
+
 [parity.members."finstack_quant.scenarios.ScenarioSpec"]
-backlog = [
-    "mutates_instruments",
-    "requires_instruments",
-    "validate",
-    "with_hazard_bump_mode",
-]
+renames = { mutates_instruments = { js = "scenarios.scenarioSpecMutatesInstruments", reason = "WASM scenario specs are plain objects; Rust ScenarioSpec::mutates_instruments is a free function taking the object" }, requires_instruments = { js = "scenarios.scenarioSpecRequiresInstruments", reason = "WASM scenario specs are plain objects; Rust ScenarioSpec::requires_instruments is a free function taking the object" }, with_hazard_bump_mode = { js = "scenarios.scenarioSpecWithHazardBumpMode", reason = "WASM scenario specs are plain objects; Rust ScenarioSpec::with_hazard_bump_mode is a free function taking the object" }, validate = { js = "scenarios.validateScenarioSpec", reason = "WASM scenario specs are plain objects; validateScenarioSpec runs the same Rust ScenarioSpec::validate on the object" } }
+
+[parity.members."finstack_quant.scenarios.TenorMatchMode"]
+renames = { exact = { js = "scenarios.tenorMatchModeExact", reason = "WASM TenorMatchMode is its wire label; Rust TenorMatchMode::Exact is a free function returning it" }, interpolate = { js = "scenarios.tenorMatchModeInterpolate", reason = "WASM TenorMatchMode is its wire label; Rust TenorMatchMode::Interpolate is a free function returning it" } }
+
+[parity.members."finstack_quant.scenarios.TimeRollMode"]
+renames = { approximate = { js = "scenarios.timeRollModeApproximate", reason = "WASM TimeRollMode is its wire label; Rust TimeRollMode::Approximate is a free function returning it" }, business_days = { js = "scenarios.timeRollModeBusinessDays", reason = "WASM TimeRollMode is its wire label; Rust TimeRollMode::BusinessDays is a free function returning it" }, calendar_days = { js = "scenarios.timeRollModeCalendarDays", reason = "WASM TimeRollMode is its wire label; Rust TimeRollMode::CalendarDays is a free function returning it" } }
 
 [parity.members."finstack_quant.statements.CheckReport"]
 backlog = [
@@ -3604,3 +3693,56 @@ backlog = [
     "cells",
 ]
 
+[parity.members."finstack_quant.margin.ClearingStatus"]
+renames = { bilateral = { js = "margin.clearingStatusBilateral", reason = "WASM ClearingStatus values are plain serde values typed by the generated TypeScript; the Rust ClearingStatus variant behind the Python factory is a free function returning that value" }, cleared = { js = "margin.clearingStatusCleared", reason = "WASM ClearingStatus values are plain serde values typed by the generated TypeScript; the Rust ClearingStatus variant behind the Python factory is a free function returning that value" } }
+
+[parity.members."finstack_quant.margin.CollateralAssetClass"]
+renames = { agency_bonds = { js = "margin.collateralAssetClassAgencyBonds", reason = "WASM CollateralAssetClass values are plain serde values typed by the generated TypeScript; the Rust CollateralAssetClass variant behind the Python factory is a free function returning that value" }, cash = { js = "margin.collateralAssetClassCash", reason = "WASM CollateralAssetClass values are plain serde values typed by the generated TypeScript; the Rust CollateralAssetClass variant behind the Python factory is a free function returning that value" }, corporate_bonds = { js = "margin.collateralAssetClassCorporateBonds", reason = "WASM CollateralAssetClass values are plain serde values typed by the generated TypeScript; the Rust CollateralAssetClass variant behind the Python factory is a free function returning that value" }, covered_bonds = { js = "margin.collateralAssetClassCoveredBonds", reason = "WASM CollateralAssetClass values are plain serde values typed by the generated TypeScript; the Rust CollateralAssetClass variant behind the Python factory is a free function returning that value" }, equity = { js = "margin.collateralAssetClassEquity", reason = "WASM CollateralAssetClass values are plain serde values typed by the generated TypeScript; the Rust CollateralAssetClass variant behind the Python factory is a free function returning that value" }, from_str = { js = "margin.collateralAssetClassFromStr", reason = "WASM CollateralAssetClass values are plain wire labels; Rust CollateralAssetClass::from_str is a free function returning the canonical label" }, fx_addon = { js = "margin.collateralAssetClassFxAddon", reason = "WASM CollateralAssetClass values are plain objects; the Rust CollateralAssetClass::fx_addon method is a free function taking the object" }, gold = { js = "margin.collateralAssetClassGold", reason = "WASM CollateralAssetClass values are plain serde values typed by the generated TypeScript; the Rust CollateralAssetClass variant behind the Python factory is a free function returning that value" }, government_bonds = { js = "margin.collateralAssetClassGovernmentBonds", reason = "WASM CollateralAssetClass values are plain serde values typed by the generated TypeScript; the Rust CollateralAssetClass variant behind the Python factory is a free function returning that value" }, mutual_funds = { js = "margin.collateralAssetClassMutualFunds", reason = "WASM CollateralAssetClass values are plain serde values typed by the generated TypeScript; the Rust CollateralAssetClass variant behind the Python factory is a free function returning that value" }, standard_haircut = { js = "margin.collateralAssetClassStandardHaircut", reason = "WASM CollateralAssetClass values are plain objects; the Rust CollateralAssetClass::standard_haircut method is a free function taking the object" } }
+
+[parity.members."finstack_quant.margin.CsaSpec"]
+renames = { apply_im_terms = { js = "margin.csaSpecApplyImTerms", reason = "WASM CsaSpec values are plain objects; the Rust CsaSpec::apply_im_terms method is a free function taking the object" }, eur_regulatory = { js = "margin.csaSpecEurRegulatory", reason = "WASM CsaSpec values are plain objects; the Rust CsaSpec::eur_regulatory constructor is a free function returning the object" }, regulatory = { js = "margin.csaSpecRegulatory", reason = "WASM CsaSpec values are plain objects; the Rust CsaSpec::regulatory_for_currency constructor is a free function returning the object" }, usd_regulatory = { js = "margin.csaSpecUsdRegulatory", reason = "WASM CsaSpec values are plain objects; the Rust CsaSpec::usd_regulatory constructor is a free function returning the object" }, validate = { js = "margin.csaSpecValidate", reason = "WASM CsaSpec values are plain objects; the Rust CsaSpec::validate method is a free function taking the object" }, with_im = { js = "margin.csaSpecWithIm", reason = "WASM CsaSpec values are plain objects; the Rust CsaSpec::with_im method is a free function taking the object" }, with_vm_threshold = { js = "margin.csaSpecWithVmThreshold", reason = "WASM CsaSpec values are plain objects; the Rust CsaSpec::with_vm_threshold method is a free function taking the object" } }
+
+[parity.members."finstack_quant.margin.EligibleCollateralSchedule"]
+renames = { bcbs_standard = { js = "margin.eligibleCollateralScheduleBcbsStandard", reason = "WASM EligibleCollateralSchedule values are plain objects; the Rust EligibleCollateralSchedule::bcbs_standard constructor is a free function returning the object" }, cash_only = { js = "margin.eligibleCollateralScheduleCashOnly", reason = "WASM EligibleCollateralSchedule values are plain objects; the Rust EligibleCollateralSchedule::cash_only constructor is a free function returning the object" }, check_concentration_limits = { js = "margin.eligibleCollateralScheduleCheckConcentrationLimits", reason = "WASM EligibleCollateralSchedule values are plain objects; the Rust EligibleCollateralSchedule::check_concentration_limits method is a free function taking the object" }, haircut_for = { js = "margin.eligibleCollateralScheduleHaircutFor", reason = "WASM EligibleCollateralSchedule values are plain objects; the Rust EligibleCollateralSchedule::haircut_for method is a free function taking the object" }, haircut_for_maturity = { js = "margin.eligibleCollateralScheduleHaircutForMaturity", reason = "WASM EligibleCollateralSchedule values are plain objects; the Rust EligibleCollateralSchedule::haircut_for_maturity method is a free function taking the object" }, is_eligible = { js = "margin.eligibleCollateralScheduleIsEligible", reason = "WASM EligibleCollateralSchedule values are plain objects; the Rust EligibleCollateralSchedule::is_eligible method is a free function taking the object" }, us_treasuries = { js = "margin.eligibleCollateralScheduleUsTreasuries", reason = "WASM EligibleCollateralSchedule values are plain objects; the Rust EligibleCollateralSchedule::us_treasuries constructor is a free function returning the object" } }
+
+[parity.members."finstack_quant.margin.ExcessCollateral"]
+renames = { excess_percentage = { js = "margin.excessCollateralExcessPercentage", reason = "WASM ExcessCollateral values are plain objects; the Rust ExcessCollateral::excess_percentage method is a free function taking the object" }, has_excess = { js = "margin.excessCollateralHasExcess", reason = "WASM ExcessCollateral values are plain objects; the Rust ExcessCollateral::has_excess method is a free function taking the object" }, has_shortfall = { js = "margin.excessCollateralHasShortfall", reason = "WASM ExcessCollateral values are plain objects; the Rust ExcessCollateral::has_shortfall method is a free function taking the object" } }
+
+[parity.members."finstack_quant.margin.ExposureProfile"]
+renames = { validate = { js = "margin.exposureProfileValidate", reason = "WASM ExposureProfile values are plain objects; the Rust ExposureProfile::validate method is a free function taking the object" } }
+
+[parity.members."finstack_quant.margin.FundingConfig"]
+renames = { effective_benefit_bp = { js = "margin.fundingConfigEffectiveBenefitBp", reason = "WASM FundingConfig values are plain objects; the Rust FundingConfig::effective_benefit_bp method is a free function taking the object" }, effective_margin_spread_bp = { js = "margin.fundingConfigEffectiveMarginSpreadBp", reason = "WASM FundingConfig values are plain objects; the Rust FundingConfig::effective_margin_spread_bp method is a free function taking the object" } }
+
+[parity.members."finstack_quant.margin.Haircut01"]
+renames = { haircut_bp = { js = "margin.haircut01HaircutBp", reason = "WASM Haircut01 values are plain objects; the Rust Haircut01::haircut_bp method is a free function taking the object" } }
+
+[parity.members."finstack_quant.margin.ImDecayProfile"]
+renames = { constant = { js = "margin.imDecayProfileConstant", reason = "WASM ImDecayProfile values are plain serde values typed by the generated TypeScript; the Rust ImDecayProfile variant behind the Python factory is a free function returning that value" }, factor = { js = "margin.imDecayProfileFactor", reason = "WASM ImDecayProfile values are plain objects; the Rust ImDecayProfile::factor method is a free function taking the object" }, linear_to_maturity = { js = "margin.imDecayProfileLinearToMaturity", reason = "WASM ImDecayProfile values are plain objects; the Rust ImDecayProfile::linear_to_maturity constructor is a free function returning the object" }, sqrt_time = { js = "margin.imDecayProfileSqrtTime", reason = "WASM ImDecayProfile values are plain objects; the Rust ImDecayProfile::sqrt_time constructor is a free function returning the object" } }
+
+[parity.members."finstack_quant.margin.ImMethodology"]
+renames = { clearing_house = { js = "margin.imMethodologyClearingHouse", reason = "WASM ImMethodology values are plain serde values typed by the generated TypeScript; the Rust ImMethodology variant behind the Python factory is a free function returning that value" }, from_str = { js = "margin.imMethodologyFromStr", reason = "WASM ImMethodology values are plain wire labels; Rust ImMethodology::from_str is a free function returning the canonical label" }, haircut = { js = "margin.imMethodologyHaircut", reason = "WASM ImMethodology values are plain serde values typed by the generated TypeScript; the Rust ImMethodology variant behind the Python factory is a free function returning that value" }, internal_model = { js = "margin.imMethodologyInternalModel", reason = "WASM ImMethodology values are plain serde values typed by the generated TypeScript; the Rust ImMethodology variant behind the Python factory is a free function returning that value" }, schedule = { js = "margin.imMethodologySchedule", reason = "WASM ImMethodology values are plain serde values typed by the generated TypeScript; the Rust ImMethodology variant behind the Python factory is a free function returning that value" }, simm = { js = "margin.imMethodologySimm", reason = "WASM ImMethodology values are plain serde values typed by the generated TypeScript; the Rust ImMethodology variant behind the Python factory is a free function returning that value" } }
+
+[parity.members."finstack_quant.margin.ImProfile"]
+renames = { validate = { js = "margin.imProfileValidate", reason = "WASM ImProfile values are plain objects; the Rust ImProfile::validate method is a free function taking the object" } }
+
+[parity.members."finstack_quant.margin.ImResult"]
+renames = { breakdown_amount = { js = "margin.imResultBreakdownAmount", reason = "WASM ImResult values are plain objects; the lookup over the Rust ImResult.breakdown map is a free function taking the object" }, breakdown_keys = { js = "margin.imResultBreakdownKeys", reason = "WASM ImResult values are plain objects; the lookup over the Rust ImResult.breakdown map is a free function taking the object" } }
+
+[parity.members."finstack_quant.margin.MarginCallType"]
+renames = { from_str = { js = "margin.marginCallTypeFromStr", reason = "WASM MarginCallType values are plain wire labels; Rust MarginCallType::from_str is a free function returning the canonical label" }, initial_margin = { js = "margin.marginCallTypeInitialMargin", reason = "WASM MarginCallType values are plain serde values typed by the generated TypeScript; the Rust MarginCallType variant behind the Python factory is a free function returning that value" }, substitution = { js = "margin.marginCallTypeSubstitution", reason = "WASM MarginCallType values are plain serde values typed by the generated TypeScript; the Rust MarginCallType variant behind the Python factory is a free function returning that value" }, top_up = { js = "margin.marginCallTypeTopUp", reason = "WASM MarginCallType values are plain serde values typed by the generated TypeScript; the Rust MarginCallType variant behind the Python factory is a free function returning that value" }, variation_margin_collect = { js = "margin.marginCallTypeVariationMarginCollect", reason = "WASM MarginCallType values are plain serde values typed by the generated TypeScript; the Rust MarginCallType variant behind the Python factory is a free function returning that value" }, variation_margin_post = { js = "margin.marginCallTypeVariationMarginPost", reason = "WASM MarginCallType values are plain serde values typed by the generated TypeScript; the Rust MarginCallType variant behind the Python factory is a free function returning that value" } }
+
+[parity.members."finstack_quant.margin.MarginFundingCost"]
+renames = { cost_for_period = { js = "margin.marginFundingCostCostForPeriod", reason = "WASM MarginFundingCost values are plain objects; the Rust MarginFundingCost::cost_for_period method is a free function taking the object" }, spread = { js = "margin.marginFundingCostSpread", reason = "WASM MarginFundingCost values are plain objects; the Rust MarginFundingCost::spread method is a free function taking the object" } }
+
+[parity.members."finstack_quant.margin.MarginTenor"]
+renames = { daily = { js = "margin.marginTenorDaily", reason = "WASM MarginTenor values are plain serde values typed by the generated TypeScript; the Rust MarginTenor variant behind the Python factory is a free function returning that value" }, from_str = { js = "margin.marginTenorFromStr", reason = "WASM MarginTenor values are plain wire labels; Rust MarginTenor::from_str is a free function returning the canonical label" }, monthly = { js = "margin.marginTenorMonthly", reason = "WASM MarginTenor values are plain serde values typed by the generated TypeScript; the Rust MarginTenor variant behind the Python factory is a free function returning that value" }, on_demand = { js = "margin.marginTenorOnDemand", reason = "WASM MarginTenor values are plain serde values typed by the generated TypeScript; the Rust MarginTenor variant behind the Python factory is a free function returning that value" }, weekly = { js = "margin.marginTenorWeekly", reason = "WASM MarginTenor values are plain serde values typed by the generated TypeScript; the Rust MarginTenor variant behind the Python factory is a free function returning that value" } }
+
+[parity.members."finstack_quant.margin.MarginUtilization"]
+renames = { is_adequate = { js = "margin.marginUtilizationIsAdequate", reason = "WASM MarginUtilization values are plain objects; the Rust MarginUtilization::is_adequate method is a free function taking the object" }, shortfall = { js = "margin.marginUtilizationShortfall", reason = "WASM MarginUtilization values are plain objects; the Rust MarginUtilization::shortfall method is a free function taking the object" } }
+
+[parity.members."finstack_quant.margin.NettingSetId"]
+renames = { bilateral = { js = "margin.nettingSetIdBilateral", reason = "WASM NettingSetId values are plain objects; the Rust NettingSetId::bilateral constructor is a free function returning the object" }, cleared = { js = "margin.nettingSetIdCleared", reason = "WASM NettingSetId values are plain objects; the Rust NettingSetId::cleared constructor is a free function returning the object" } }
+
+[parity.members."finstack_quant.margin.SaCcrNettingSetConfig"]
+renames = { margined = { js = "margin.saCcrNettingSetConfigMargined", reason = "WASM SaCcrNettingSetConfig values are plain objects; the Rust SaCcrNettingSetConfig::margined constructor is a free function returning the object" }, unmargined = { js = "margin.saCcrNettingSetConfigUnmargined", reason = "WASM SaCcrNettingSetConfig values are plain objects; the Rust SaCcrNettingSetConfig::unmargined constructor is a free function returning the object" }, validate = { js = "margin.saCcrNettingSetConfigValidate", reason = "WASM SaCcrNettingSetConfig values are plain objects; the Rust SaCcrNettingSetConfig::validate method is a free function taking the object" } }

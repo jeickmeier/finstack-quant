@@ -537,7 +537,9 @@ impl EligibleCollateralSchedule {
 }
 
 /// A breach of a collateral concentration limit.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct ConcentrationBreach {
     /// Asset class that breached
     pub asset_class: CollateralAssetClass,
