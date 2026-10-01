@@ -129,8 +129,8 @@ depends on a binding crate, and `core` never depends on `models`.
 
 No cargo feature selects financial behavior. Workspace features are
 `json-schema` and `jsonschema-validate` (default on most crates, including
-the umbrella), `extension-module` (PyO3 linking), and `console_panic_hook`
-(WASM panic hook). The WASM package's TypeScript contract types are generated
+the umbrella), `extension-module` (PyO3 linking), and `contract-generation`
+(the WASM `generate_contracts` example). The WASM package's TypeScript contract types are generated
 from the checked-in JSON Schemas, not from a cargo feature.
 
 ## Quick start

@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### WASM binding audit: executable examples and contributor docs (2026-10-01)
+
+#### Changed (BREAKING)
+
+- WASM cargo feature `console_panic_hook` is removed. The panic hook is always installed when the module is instantiated, so a Rust panic reports its message and location through `console.error`.
+- WASM `attribution.AttributionJsonInputs` validates `methodJson` in the constructor (it used to fail later, in `attributePnl`).
+
+#### Fixed
+
+- WASM enum arguments accept the bare variant name their type declares, as well as an object or JSON text: `method` of `portfolio.attributePortfolioPnl` and `methodJson` of `attribution.AttributionJsonInputs` (`'parallel'`, `'metrics_based'`), and `riskMeasureJson` of `portfolio.decomposeFactorRisk` and `FactorCovarianceForecast.factorModelAt` (`'variance'`, `'volatility'`). They parsed a string as JSON text, so the label needed its own quotes (`'"parallel"'`).
+- TypeScript `JsonInput` is `string | object`. A value typed as a generated interface (the `FinancialModelSpec` a `ModelBuilder` returns, a `MarketContextState`) no longer needs a cast to be passed back in.
+- 17 `index.d.ts` examples that did not run or did not type-check: the `Bond`, `TermLoan`, `AssetBackedFacility` and `RevolvingCredit` constructors (undefined `marketJson`; the revolver was priced on a date Rust rejects), `Performance.periodicReturns` (bound to the platform's global `Performance`), `ScheduleBuilder`, `SaCcrEngine`, `computeBilateralXva`, `StructuredCredit`, `MertonMcConfig`, `FxSpot`, `AlmgrenChrissModel`, `DayCountContext`, and the composite namespace (it called nothing). The README pricing and Node-initialisation snippets run as written.
+- The schema-generated TypeScript types (`finstack-quant-wasm/types`) no longer carry Rust code examples in their doc comments.
+
+#### Added
+
+- `npm run docs:check` (`mise run wasm-doc`) type-checks every `@example` in `index.d.ts` and every `js`/`ts` block in the package README and the WASM usage rules under `tsc --strict`; `tests/facade/doc_examples.test.mjs` (`mise run wasm-test`) executes them against the built package.
+
 ### WASM binding audit: execution tests and cross-host goldens (2026-10-01)
 
 #### Fixed

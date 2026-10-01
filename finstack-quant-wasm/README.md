@@ -130,13 +130,30 @@ copy.toDict().id; // 'IRS-COPY'
 
 ### Pricing against a market
 
-`calibration.calibrate` turns a quote envelope into a materialized market; the result's
-`result.final_market` is the MarketContext every pricing entry point accepts. When
-pricing many instruments, parse it once into a `core.MarketContext` handle.
+Every pricing entry point takes a market: either canonical MarketContext JSON or,
+when pricing many instruments, a `core.MarketContext` handle parsed once. Build one
+by inserting curves, or load the `result.final_market` of a calibration.
 
 ```javascript
-const calibrated = calibration.calibrate(envelope); // CalibrationResultEnvelope
-const market = core.MarketContext.fromJson(calibrated.result.final_market);
+import init, { core, valuations } from 'finstack-quant-wasm';
+
+await init();
+
+const market = new core.MarketContext();
+market.insert(core.DiscountCurve.flat('USD-OIS', '2025-06-15', 0.03));
+
+const usd = new core.Currency('USD');
+const instruments = ['2030-01-01', '2035-01-01'].map((maturity) =>
+  valuations.instruments.Bond.fixed(
+    `BOND-${maturity}`,
+    new core.Money(1_000_000, usd),
+    new core.Rate(0.05),
+    '2025-01-01',
+    maturity,
+    'none',
+    'USD-OIS'
+  ).toJson()
+);
 
 for (const instrumentJson of instruments) {
   const result = valuations.instruments.priceInstrumentWithMarket(
@@ -148,6 +165,8 @@ for (const instrumentJson of instruments) {
 }
 ```
 
+`calibration.calibrate(envelope)` turns a quote envelope into a materialized market:
+`core.MarketContext.fromJson(calibrated.result.final_market)` is the handle above.
 Always inspect `calibrated.result.step_reports` and `calibrated.result.report` before
 using a calibrated market downstream. `calibration.validateCalibrationJson` is the
 fast pre-flight that canonicalizes an envelope without solving.
@@ -163,8 +182,11 @@ import { readFileSync } from 'node:fs';
 import init, { core } from 'finstack-quant-wasm';
 
 await init({
-  module_or_path: readFileSync('node_modules/finstack-quant-wasm/pkg/finstack_quant_wasm_bg.wasm'),
+  module_or_path: readFileSync(
+    new URL(import.meta.resolve('finstack-quant-wasm/pkg/finstack_quant_wasm_bg.wasm'))
+  ),
 });
+new core.Currency('USD').numeric; // 840
 ```
 
 The `pkg-node/` build (`wasm-pack --target nodejs`) is also published and

@@ -304,6 +304,13 @@ test('factor handles and helpers follow the Rust accessors', () => {
   const forecast = new factorCredit.FactorCovarianceForecast(model);
   const covariance = forecast.covarianceAt(factorCredit.VolHorizon.oneStep().toString());
   assert.deepEqual(covariance.factor_ids, model.factorIds());
+  // A unit `RiskMeasure` variant is its bare wire label; the quoted JSON text
+  // of the same label is equivalent.
+  const oneStep = factorCredit.VolHorizon.oneStep().toString();
+  const atVolatility = forecast.factorModelAt(oneStep, 'volatility');
+  assert.equal(atVolatility.risk_measure, 'volatility');
+  assert.deepEqual(atVolatility, forecast.factorModelAt(oneStep, '"volatility"'));
+  assert.throws(() => forecast.factorModelAt(oneStep, 'nope'), kind('validation'));
   const firstFactor = model.factorIds()[0];
   assert.equal(
     factorCredit.factorVariance(covariance, firstFactor),

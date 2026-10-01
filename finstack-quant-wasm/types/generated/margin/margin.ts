@@ -253,23 +253,6 @@ export type Currency =
  * - Two `Id<T>` values are equal if their string values are equal
  * - IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared
  *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::types::{CurveId, InstrumentId};
- *
- * // Create IDs with different type tags
- * let curve = CurveId::from("USD-SOFR");
- * let bond = InstrumentId::from("ISIN:US912828XG60");
- *
- * // Can compare IDs of the same type
- * assert_eq!(curve, CurveId::from("USD-SOFR"));
- * assert_ne!(curve, CurveId::from("EUR-ESTR"));
- *
- * // Cannot compare IDs of different types (compile error):
- * // let _ = curve == bond;  // Error: mismatched types
- * ```
- *
  * # Thread Safety
  *
  * `Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can
@@ -320,15 +303,6 @@ export type DrcSeniority = "covered_bond" | "senior_unsecured" | "subordinated" 
  * Rounding modes supported by the library.
  *
  * The variants mirror the most common conventions found in pricing engines.
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::config::{FinstackConfig, RoundingMode};
- *
- * let mut cfg = FinstackConfig::default();
- * cfg.rounding.mode = RoundingMode::TowardZero;
- * assert!(matches!(cfg.rounding.mode, RoundingMode::TowardZero));
- * ```
  */
 export type RoundingMode = "bankers" | "away_from_zero" | "toward_zero" | "floor" | "ceil";
 /**
@@ -618,31 +592,6 @@ export interface ConcentrationBreach {
  * - ISDA 2016 VM CSA: `docs/REFERENCES.md#isda-vm-csa-2016`
  * - ISDA 2018 IM CSA: `docs/REFERENCES.md#isda-im-csa-2018`
  * - BCBS-IOSCO uncleared margin framework: `docs/REFERENCES.md#bcbs-iosco-uncleared-margin`
- *
- * # Example
- *
- * ```
- * use finstack_quant_margin::{
- *     CsaSpec, VmParameters, ImParameters, EligibleCollateralSchedule,
- *     MarginCallTiming, ImMethodology, MarginTenor,
- * };
- * use finstack_quant_core::currency::Currency;
- * use finstack_quant_core::money::Money;
- *
- * # fn main() -> finstack_quant_core::Result<()> {
- * let csa = CsaSpec {
- *     id: "USD-CSA-2024".to_string(),
- *     base_currency: Currency::USD,
- *     vm_params: VmParameters::regulatory_standard(Currency::USD)?,
- *     im_params: Some(ImParameters::simm_standard(Currency::USD)?),
- *     eligible_collateral: EligibleCollateralSchedule::bcbs_standard()?,
- *     call_timing: MarginCallTiming::regulatory_standard()?,
- *     collateral_curve_id: "USD-OIS".into(),
- *     calendar_id: "usny".into(),
- * };
- * # Ok(())
- * # }
- * ```
  */
 export interface CsaSpec {
   /**
@@ -720,17 +669,6 @@ export interface MarginCallTiming {
  *
  * Defines the complete set of collateral types accepted under a CSA
  * or margin agreement, along with associated haircuts and constraints.
- *
- * # Example
- *
- * ```
- * use finstack_quant_margin::{CollateralEligibility, EligibleCollateralSchedule};
- *
- * // Start from a standard schedule (BCBS-IOSCO compliant)
- * let schedule = EligibleCollateralSchedule::bcbs_standard()?;
- * # let _ = schedule;
- * # Ok::<(), finstack_quant_core::Error>(())
- * ```
  */
 export interface EligibleCollateralSchedule {
   /**
@@ -763,22 +701,6 @@ export interface EligibleCollateralSchedule {
  * The MPOR determines the horizon over which PFE is calculated:
  * - Standard: 10 business days for bilateral derivatives
  * - Reduced: 5 days for certain liquid products
- *
- * # Example
- *
- * ```
- * use finstack_quant_margin::{ImMethodology, ImParameters};
- * use finstack_quant_core::currency::Currency;
- * use finstack_quant_core::money::Money;
- *
- * let im_params = ImParameters {
- *     methodology: ImMethodology::Simm,
- *     mpor_days: 10,
- *     threshold: Money::from((50_000_000_i64, Currency::USD)),
- *     mta: Money::from((0_i64, Currency::USD)), // Combined with VM MTA
- *     segregated: true,
- * };
- * ```
  */
 export interface ImParameters {
   /**
@@ -821,16 +743,6 @@ export interface ImParameters {
  *
  * When you need configurable rounding during ingestion, use
  * [`Money::new_with_config`].
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::currency::Currency;
- *
- * let notional = Money::from((1_000_000_i64, Currency::EUR));
- * assert_eq!(notional.currency(), Currency::EUR);
- * assert_eq!(notional.amount(), 1_000_000.0);
- * ```
  */
 export interface Money {
   /**
@@ -857,23 +769,6 @@ export interface Money {
  * - Zero threshold for in-scope entities
  * - Daily exchange with T+1 settlement
  * - Cash or highly liquid securities as collateral
- *
- * # Example
- *
- * ```
- * use finstack_quant_margin::{MarginTenor, VmParameters};
- * use finstack_quant_core::currency::Currency;
- * use finstack_quant_core::money::Money;
- *
- * let vm_params = VmParameters {
- *     threshold: Money::from((10_000_000_i64, Currency::USD)),
- *     mta: Money::from((500_000_i64, Currency::USD)),
- *     rounding: Money::from((10_000_i64, Currency::USD)),
- *     independent_amount: Money::from((0_i64, Currency::USD)),
- *     frequency: MarginTenor::Daily,
- *     settlement_lag: 1,
- * };
- * ```
  */
 export interface VmParameters {
   /**
@@ -1026,15 +921,6 @@ export interface EadResult {
  *
  * The metadata is intentionally small so it can be attached to reports and
  * downstream data stores for reproducibility and audit trails.
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::config::{results_meta, FinstackConfig, NUMERIC_MODE_F64};
- *
- * let meta = results_meta(&FinstackConfig::default());
- * assert_eq!(meta.numeric_mode, NUMERIC_MODE_F64);
- * assert!(meta.timestamp.is_none()); // deterministic by default
- * ```
  */
 export interface ResultsMeta {
   /**
@@ -1109,17 +995,6 @@ export interface RoundingContext {
  * Provides configurable epsilon values for zero-checks in rate calculations
  * and generic floating-point comparisons. These defaults are chosen to balance
  * numerical stability with practical precision requirements.
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::config::ToleranceConfig;
- *
- * let mut tol = ToleranceConfig::default();
- * assert_eq!(tol.rate_epsilon, 1e-12);
- *
- * // Customize for stricter rate comparisons
- * tol.rate_epsilon = 1e-14;
- * ```
  */
 export interface ToleranceConfig {
   /**
@@ -1594,28 +1469,6 @@ export interface TenorBucketYears {
  * - Credit Default Swaps (CDS)
  * - CDS Indices
  * - Total Return Swaps (TRS)
- *
- * # Example
- *
- * ```
- * use finstack_quant_margin::{
- *     OtcMarginSpec, CsaSpec, SimmCreditClassification, SimmCreditSector,
- * };
- *
- * # fn main() -> finstack_quant_core::Result<()> {
- * // Bilateral (uncleared) derivative
- * let bilateral_spec = OtcMarginSpec::bilateral_simm(CsaSpec::usd_regulatory()?);
- * let credit_spec = bilateral_spec.with_simm_credit_classification(
- *     SimmCreditClassification::Qualifying {
- *         sector: SimmCreditSector::Financial,
- *     },
- * );
- *
- * // Cleared derivative
- * let cleared_spec = OtcMarginSpec::cleared("LCH", finstack_quant_core::currency::Currency::USD)?;
- * # Ok(())
- * # }
- * ```
  */
 export interface OtcMarginSpec {
   /**

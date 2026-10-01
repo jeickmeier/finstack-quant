@@ -6,12 +6,12 @@
 //! emitted by the macros below so each one is a single conversion plus one
 //! Rust call:
 //!
-//! - [`get`] converts a Rust field to its JavaScript value: `Money`,
+//! - `get` converts a Rust field to its JavaScript value: `Money`,
 //!   `Tenor`, `DayCount` and `Currency` become their WASM handles, dates
 //!   become ISO-8601 strings, identifiers and enums become their serde
 //!   strings, decimals become numbers, and nested specs become plain objects
 //!   (the schema-generated TypeScript types).
-//! - [`arg`] converts a JavaScript setter argument to the Rust setter type
+//! - `arg` converts a JavaScript setter argument to the Rust setter type
 //!   with the strict `utils::input` checks.
 
 #[macro_use]

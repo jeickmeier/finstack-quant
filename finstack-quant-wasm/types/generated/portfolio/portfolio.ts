@@ -82,23 +82,6 @@ export type ScenarioMarketTarget =
  * - Two `Id<T>` values are equal if their string values are equal
  * - IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared
  *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::types::{CurveId, InstrumentId};
- *
- * // Create IDs with different type tags
- * let curve = CurveId::from("USD-SOFR");
- * let bond = InstrumentId::from("ISIN:US912828XG60");
- *
- * // Can compare IDs of the same type
- * assert_eq!(curve, CurveId::from("USD-SOFR"));
- * assert_ne!(curve, CurveId::from("EUR-ESTR"));
- *
- * // Cannot compare IDs of different types (compile error):
- * // let _ = curve == bond;  // Error: mismatched types
- * ```
- *
  * # Thread Safety
  *
  * `Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can
@@ -112,14 +95,6 @@ export type Id = string;
  * `finstack_quant_core::market_data::context::MarketContext`.
  * They also determine which quoting and interpolation conventions apply when
  * downstream helpers extract rates or apply node shocks.
- *
- * # Examples
- * ```rust
- * use finstack_quant_scenarios::CurveKind;
- *
- * let kind = CurveKind::Discount;
- * assert_eq!(format!("{:?}", kind), "Discount");
- * ```
  */
 export type CurveKind = "discount" | "forward" | "par_cds" | "inflation" | "commodity";
 /**
@@ -289,15 +264,6 @@ export type Currency =
  * Rounding modes supported by the library.
  *
  * The variants mirror the most common conventions found in pricing engines.
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::config::{FinstackConfig, RoundingMode};
- *
- * let mut cfg = FinstackConfig::default();
- * cfg.rounding.mode = RoundingMode::TowardZero;
- * assert!(matches!(cfg.rounding.mode, RoundingMode::TowardZero));
- * ```
  */
 export type RoundingMode = "bankers" | "away_from_zero" | "toward_zero" | "floor" | "ceil";
 /**
@@ -1480,25 +1446,6 @@ export interface AllocationDiagnostics {
 }
 /**
  * Report describing what happened during [`super::ScenarioEngine::apply`].
- *
- * # Examples
- * ```rust
- * use finstack_quant_scenarios::engine::ApplicationReport;
- *
- * let report = ApplicationReport {
- *     operations_applied: 3,
- *     user_operations: 1,
- *     expanded_operations: 3,
- *     changes: Default::default(),
- *     warnings: vec![],
- *     meta: None,
- *     time_roll: None,
- * };
- *
- * assert_eq!(report.operations_applied, 3);
- * assert_eq!(report.user_operations, 1);
- * assert_eq!(report.expanded_operations, 3);
- * ```
  */
 export interface ApplicationReport {
   /**
@@ -1584,15 +1531,6 @@ export interface ScenarioChangeManifest {
  *
  * The metadata is intentionally small so it can be attached to reports and
  * downstream data stores for reproducibility and audit trails.
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::config::{results_meta, FinstackConfig, NUMERIC_MODE_F64};
- *
- * let meta = results_meta(&FinstackConfig::default());
- * assert_eq!(meta.numeric_mode, NUMERIC_MODE_F64);
- * assert!(meta.timestamp.is_none()); // deterministic by default
- * ```
  */
 export interface ResultsMeta {
   /**
@@ -1667,17 +1605,6 @@ export interface RoundingContext {
  * Provides configurable epsilon values for zero-checks in rate calculations
  * and generic floating-point comparisons. These defaults are chosen to balance
  * numerical stability with practical precision requirements.
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::config::ToleranceConfig;
- *
- * let mut tol = ToleranceConfig::default();
- * assert_eq!(tol.rate_epsilon, 1e-12);
- *
- * // Customize for stricter rate comparisons
- * tol.rate_epsilon = 1e-14;
- * ```
  */
 export interface ToleranceConfig {
   /**
@@ -1695,23 +1622,6 @@ export interface ToleranceConfig {
 }
 /**
  * Report from time roll-forward operation.
- *
- * # Examples
- * ```rust
- * use finstack_quant_scenarios::RollForwardReport;
- * use indexmap::IndexMap;
- * use time::macros::date;
- *
- * let report = RollForwardReport {
- *     old_date: date!(2025 - 01 - 01),
- *     new_date: date!(2025 - 02 - 01),
- *     days: 31,
- *     instrument_carry: vec![],
- *     total_carry: IndexMap::new(),
- *     failed_instruments: vec![],
- * };
- * assert_eq!(report.days, 31);
- * ```
  */
 export interface RollForwardReport {
   /**
@@ -1755,16 +1665,6 @@ export interface RollForwardReport {
  *
  * When you need configurable rounding during ingestion, use
  * [`Money::new_with_config`].
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::currency::Currency;
- *
- * let notional = Money::from((1_000_000_i64, Currency::EUR));
- * assert_eq!(notional.currency(), Currency::EUR);
- * assert_eq!(notional.amount(), 1_000_000.0);
- * ```
  */
 export interface Money {
   /**
@@ -4050,62 +3950,6 @@ export interface SimmCurvatureSensitivity {
  *
  * Decomposes total P&L into constituent factors with optional detailed
  * breakdowns by curve, tenor, FX pair, etc.
- *
- * # Examples
- *
- * ```no_run
- * use finstack_quant_attribution::{
- *     attribute_pnl, AttributionMethod, AttributionRequest, ExecutionPolicy,
- * };
- * use finstack_quant_valuations::instruments::Instrument;
- * use finstack_quant_valuations::instruments::rates::deposit::Deposit;
- * use finstack_quant_core::config::FinstackConfig;
- * use finstack_quant_core::currency::Currency;
- * use finstack_quant_core::market_data::context::MarketContext;
- * use finstack_quant_core::money::Money;
- * use std::sync::Arc;
- * use time::macros::date;
- *
- * # fn main() -> Result<(), Box<dyn std::error::Error>> {
- * let as_of_t0 = date!(2025-01-15);
- * let as_of_t1 = date!(2025-01-16);
- * let market_t0 = MarketContext::new();
- * let market_t1 = MarketContext::new();
- * let config = FinstackConfig::default();
- *
- * let instrument = Arc::new(
- *     Deposit::builder()
- *         .id("DEP-1D".into())
- *         .notional(Money::from((1_000_000_i64, Currency::USD)))
- *         .start_date(as_of_t0)
- *         .maturity(as_of_t1)
- *         .day_count(finstack_quant_core::dates::DayCount::Act360)
- *         .discount_curve_id("USD-OIS".into())
- *         .build()
- *         .expect("deposit builder should succeed"),
- * ) as Arc<dyn Instrument>;
- *
- * let request = AttributionRequest {
- *     execution_policy: ExecutionPolicy::Parallel,
- *     ..AttributionRequest::new(
- *         &instrument,
- *         &market_t0,
- *         &market_t1,
- *         as_of_t0,
- *         as_of_t1,
- *         &config,
- *     )
- * };
- * let attribution = attribute_pnl(&AttributionMethod::Parallel, &request)?;
- *
- * println!("Total P&L: {}", attribution.total_pnl);
- * println!("Carry: {} ({:.1}%)",
- *     attribution.carry,
- *     attribution.carry.amount() / attribution.total_pnl.amount() * 100.0
- * );
- * # Ok(())
- * # }
- * ```
  */
 export interface PnlAttribution {
   /**

@@ -35,24 +35,6 @@ export type CagrDayCount =
  * - **ISDA**: 2006 ISDA Definitions, Section 4.16
  * - **ICMA**: ICMA Rule Book, Rule 251
  * - **ISO**: ISO 20022 Day Count Fraction Codes
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
- * use time::Month;
- *
- * let start = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
- * let end = Date::from_calendar_date(2025, Month::July, 1).expect("Valid date");
- *
- * // Actual/360 - money market convention
- * let yf_360 = DayCount::Act360.year_fraction(start, end, DayCountContext::default()).expect("Year fraction calculation should succeed");
- *
- * // 30/360 - bond convention
- * let yf_30360 = DayCount::Thirty360.year_fraction(start, end, DayCountContext::default()).expect("Year fraction calculation should succeed");
- *
- * assert!(yf_360 > yf_30360); // Act/360 has larger denominator
- * ```
  */
 export type DayCount =
   | "one_one"

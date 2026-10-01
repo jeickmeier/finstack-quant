@@ -187,11 +187,12 @@ Document any places where divergence from the dominant pattern is intentional:
   `value_column` metric label that the Rust type does not, so it serializes
   through a private wire struct. Without this, `from_json` would silently
   relabel a rolling-Sharpe series.
-- **`SimmCalculator::calculate_from_sensitivities` keeps its `_result` twin**:
-  the base fn returns `(f64, HashMap<String, Money>)`, not a bare scalar, and
-  collapsing it would force an `as_of: Date` parameter onto the public
-  `im_profile_from_simm` and cascade into its binding, stub, and tests. The
-  other three margin pairs were collapsed.
+- **`SimmCalculator::calculate_from_sensitivities` keeps a `_parts` variant**:
+  `calculate_from_sensitivities` takes `as_of` and returns a typed, stamped
+  `ImResult`; `calculate_from_sensitivities_parts` returns the bare
+  `(f64, HashMap<String, Money>)` without result stamping, for callers that have
+  no `as_of` (`im_profile_from_simm`). The other three margin pairs were
+  collapsed.
 
 ### Error & Module Structure
 - `error/mod.rs` in core: Uses subdirectory because error module has `inputs.rs` and `suggestions.rs` submodules (justified by size). Valuations uses flat `error.rs` as a re-export facade.

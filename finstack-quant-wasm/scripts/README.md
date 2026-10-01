@@ -1,10 +1,12 @@
 # scripts
 
-The JSDoc / TypeScript documentation tooling for this package. Two of these are
+The JSDoc / TypeScript documentation tooling for this package. Three of these are
 checkers; two are generators that write documentation into
-[`../index.d.ts`](../index.d.ts); one is the shared JSDoc block parser they build
-on. Three can fail `mise run wasm-doc` — both checkers, plus
-`complete-facade-jsdoc.mjs` in its `--check` mode.
+[`../index.d.ts`](../index.d.ts); two are shared modules they build on (the JSDoc
+block parser and the code-sample extractor). Four can fail `mise run wasm-doc` —
+the checkers, plus `complete-facade-jsdoc.mjs` in its `--check` mode.
+(`generate-contract-types.mjs`, `build-web.mjs` and `measure-web.mjs` are build
+tooling, not documentation tooling.)
 
 These exist because `index.d.ts` is hand-maintained. `wasm-bindgen` emits
 declarations under `pkg/`, but they describe a flat module rather than the
@@ -17,14 +19,14 @@ emit.
 The repository-root [`../../scripts/README.md`](../../scripts/README.md) covers
 the Python-language gates, including `check_wasm_api_input_docs.py`, which
 polices the _Rust_ doc comments under `../src/api/` — the text wasm-bindgen copies
-into `pkg/`. That checker and these five are the two halves of `mise run wasm-doc`.
+into `pkg/`. That checker and these scripts are the two halves of `mise run wasm-doc`.
 
 Nothing here is published: `scripts` is absent from the `files` list in
 `package.json`.
 
 ## Running them
 
-All five are plain Node ESM, run from the package root and dependent only on
+All of them are plain Node ESM, run from the package root and dependent only on
 `typescript` (a devDependency) and `node:*`:
 
 ```bash
@@ -44,14 +46,21 @@ Exit codes are uniform: `0` clean, `1` contract violation, `2` usage error
 
 Run by `docs:check`, in this order.
 
-| Script                      | Enforces                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Options                                                                                                                                           |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `check-dts-docs.mjs`        | The WASM-ownership contract as _text_. `index.d.ts` must declare `export interface WasmOwned`, expose `free(): void;`, carry the package-level ownership note and the conditional-`Symbol.dispose` sentence, and must **not** declare `[Symbol.dispose](): void;` (that would force ES2020 consumers onto `esnext.disposable`). Eight named classes must each merge the contract as `export interface <Name> extends WasmOwned {}`. `../README.md` must carry the matching `## WASM Object Disposal` section.                                                                                                                                                                           | none — paths are fixed                                                                                                                            |
-| `check-typescript-docs.mjs` | Per-declaration JSDoc completeness, parsed with the TypeScript compiler API. Every exported interface, class, type alias, function and variable statement needs a summary of at least 16 characters. Callables need a `@param` per parameter and a `@returns` unless the return type is `void` or the node is a constructor. Exported functions and `*Namespace` / `*Constructor` interfaces additionally need an `@example`. It then rejects fabricated prose: the legacy catch-all `@throws`, non-executable placeholder `@example` blocks, 33 exact generic phrases, and two summary regexes (`Perform … for this \``,`Compute … for this \``). Members marked`private` are skipped. | `--declaration=<path>` (default `../index.d.ts`), `--max-errors=<n>` (default 200), `--summary` for a count-per-category tally before the listing |
+| Script                          | Enforces                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Options                                                                                                                                           |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `check-dts-docs.mjs`            | The WASM-ownership contract as _text_. `index.d.ts` must declare `export interface WasmOwned`, expose `free(): void;`, carry the package-level ownership note and the conditional-`Symbol.dispose` sentence, and must **not** declare `[Symbol.dispose](): void;` (that would force ES2020 consumers onto `esnext.disposable`). Eight named classes must each merge the contract as `export interface <Name> extends WasmOwned {}`. `../README.md` must carry the matching `## WASM Object Disposal` section.                                                                                                                                                                                     | none — paths are fixed                                                                                                                            |
+| `check-typescript-docs.mjs`     | Per-declaration JSDoc completeness, parsed with the TypeScript compiler API. Every exported interface, class, type alias, function and variable statement needs a summary of at least 16 characters. Callables need a `@param` per parameter and a `@returns` unless the return type is `void` or the node is a constructor. Exported functions and `*Namespace` / `*Constructor` interfaces additionally need an `@example`. It then rejects fabricated prose: the legacy catch-all `@throws`, non-executable placeholder `@example` blocks, 33 exact generic phrases, and two summary regexes (`Perform … for this \``,`Compute … for this \``). Members marked`private` are skipped.           | `--declaration=<path>` (default `../index.d.ts`), `--max-errors=<n>` (default 200), `--summary` for a count-per-category tally before the listing |
+| `check-typescript-examples.mjs` | Every documented code sample type-checks. The samples are each fenced `ts`/`js` block in an `index.d.ts` doc comment (the `@example` blocks), in `../README.md` and in `.agents/rules/wasm/javascript-usage-standards.md`. They are compiled as one TypeScript program under `strict` (`js` blocks with `checkJs`), each as a module inside this package so `finstack-quant-wasm` resolves to `index.d.ts` as it does for a consumer, with the DOM lib included so a sample that leans on a platform global the package also names (`Performance`) fails. Needs no build. `../tests/facade/doc_examples.test.mjs` executes the same samples against the built package under `mise run wasm-test`. |
 
-The eight classes hard-coded in `check-dts-docs.mjs` are `Performance`,
+A sample must be a complete program. A block with no `import` statement
+continues from the standard setup (every namespace imported and `await init()`
+done), which both gates put in front of it. A fence tagged `no-run`
+(` ```javascript no-run `) is skipped by both; use it only to show what not
+to write.
+
+The seven classes hard-coded in `check-dts-docs.mjs` are `Performance`,
 `CreditFactorModel`, `CreditCalibrator`, `LevelsAtDate`, `PeriodDecomposition`,
-`FactorCovarianceForecast`, `Market`, and `Portfolio`. A new wasm-bindgen class
+`FactorCovarianceForecast`, and `Portfolio`. A new wasm-bindgen class
 that owns heap memory is not covered until it is added to that list.
 
 The banned-phrase list in `check-typescript-docs.mjs` mirrors text
@@ -88,10 +97,13 @@ requires a `wasm-pack --target web` build (`npm run build`). That is why it is i
 runs it against the real `index.d.ts`, so the committed facade can drift from
 `pkg/` between manual `docs:sync` runs without a gate noticing.
 
-## Shared module
+## Shared modules
 
-`typescript-docs-shared.mjs` is the only importable module here; the other four
-are executables. It is `pub(crate)` in spirit — imported by
+`doc-examples.mjs` extracts the code samples (`collectExamples`, `fencedBlocks`,
+`PRELUDE`) for `check-typescript-examples.mjs` and
+`../tests/facade/doc_examples.test.mjs`.
+
+`typescript-docs-shared.mjs` is the JSDoc block parser. It is `pub(crate)` in spirit — imported by
 `check-typescript-docs.mjs`, `sync-facade-jsdoc.mjs`, and
 `complete-facade-jsdoc.mjs`, and by nothing outside this directory.
 
@@ -111,8 +123,9 @@ produce — keep the three in step when changing any of them.
 The tooling is tested like production code, because it edits the published
 contract. [`../tests/scripts/typescript_docs.test.mjs`](../tests/scripts/typescript_docs.test.mjs)
 covers the synchronizer in `--write` and `--check`, the completer's legacy-removal
-and no-residual-boilerplate behaviour, the checker's accept/reject pair, and the
-`--write`/`--check` exit-2 contract.
+and no-residual-boilerplate behaviour, the checker's accept/reject pair, the
+`--write`/`--check` exit-2 contract, and the sample extractor (comment and
+Markdown fences, `no-run`, the no-import prelude).
 
 Fixtures live in `../tests/scripts/fixtures/typescript-docs/`: `raw.d.ts` (a stand-in
 for wasm-bindgen output), `facade.stale.d.ts` and `facade.expected.d.ts` (the

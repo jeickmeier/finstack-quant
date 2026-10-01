@@ -493,7 +493,7 @@ impl JsFactorCovarianceForecast {
     /// rejects the assembled configuration.
     /// @returns Structured factor-model configuration ready for portfolio risk workflows.
     /// @param horizon_json - JSON-serialized forecast horizon defining the future covariance date or period.
-    /// @param risk_measure_json - Optional risk-measure JSON for the horizon factor model; omitted or `null` uses the Rust `RiskMeasure::default()` (`"variance"`).
+    /// @param risk_measure_json - Optional `RiskMeasure` wire value for the horizon factor model: `"variance"`, `"volatility"`, an object such as `{ var: { confidence: 0.99 } }`, or the same value as JSON text; omitted or `null` uses the Rust `RiskMeasure::default()` (`"variance"`).
     #[wasm_bindgen(js_name = factorModelAt)]
     pub fn factor_model_at(
         &self,
@@ -501,13 +501,12 @@ impl JsFactorCovarianceForecast {
         risk_measure_json: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         let horizon_json: &str = &json_text(&horizon_json, "horizonJson")?;
-        let risk_measure_json = opt_json_text(risk_measure_json.as_ref(), "riskMeasureJson")?;
         let h = parse_vol_horizon(horizon_json)?;
-        let measure: finstack_quant_models::factor::RiskMeasure = match risk_measure_json.as_deref()
-        {
-            Some(json) => serde_json::from_str(json).map_err(to_js_err)?,
-            None => Default::default(),
-        };
+        // `js_opt_wire`: the unit variants are bare wire strings (`"variance"`),
+        // which are not JSON text.
+        let measure: finstack_quant_models::factor::RiskMeasure =
+            crate::utils::wire::js_opt_wire(risk_measure_json.as_ref(), "riskMeasureJson")?
+                .unwrap_or_default();
         let forecast =
             finstack_quant_models::factor::credit::FactorCovarianceForecast::new(&self.model);
         let config = forecast

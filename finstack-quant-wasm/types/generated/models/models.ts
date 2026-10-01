@@ -330,23 +330,6 @@ export type VolModelChoice =
  * - Two `Id<T>` values are equal if their string values are equal
  * - IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared
  *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::types::{CurveId, InstrumentId};
- *
- * // Create IDs with different type tags
- * let curve = CurveId::from("USD-SOFR");
- * let bond = InstrumentId::from("ISIN:US912828XG60");
- *
- * // Can compare IDs of the same type
- * assert_eq!(curve, CurveId::from("USD-SOFR"));
- * assert_ne!(curve, CurveId::from("EUR-ESTR"));
- *
- * // Cannot compare IDs of different types (compile error):
- * // let _ = curve == bond;  // Error: mismatched types
- * ```
- *
  * # Thread Safety
  *
  * `Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can
@@ -3261,17 +3244,6 @@ export interface GeneratorMatrix {
  * States are identified by string labels for flexibility across rating
  * granularities (coarse, notched, with/without NR, or custom). The scale
  * defines which index is the absorbing default state (if any).
- *
- * # Examples
- *
- * ```
- * use finstack_quant_models::credit::migration::RatingScale;
- *
- * let scale = RatingScale::standard();
- * assert_eq!(scale.n_states(), 10);
- * assert_eq!(scale.index_of("BBB"), Some(3));
- * assert_eq!(scale.default_state(), Some(9)); // D
- * ```
  */
 export interface RatingScale {
   default_state?: number | null;
@@ -3828,16 +3800,6 @@ export interface MigrationSimulator {
  *
  * When you need configurable rounding during ingestion, use
  * [`Money::new_with_config`].
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::currency::Currency;
- *
- * let notional = Money::from((1_000_000_i64, Currency::EUR));
- * assert_eq!(notional.currency(), Currency::EUR);
- * assert_eq!(notional.amount(), 1_000_000.0);
- * ```
  */
 export interface Money {
   /**

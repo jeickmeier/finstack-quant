@@ -428,21 +428,6 @@ export type AssetDynamics =
  *
  * Controls per-coupon PIK behavior, either uniformly or as a step
  * function over time.
- *
- * # Examples
- *
- * ```
- * use finstack_quant_valuations::instruments::fixed_income::bond::pricing::engine::merton_mc::{PikMode, PikSchedule};
- *
- * // All coupons PIK
- * let uniform = PikSchedule::Uniform(PikMode::Pik);
- *
- * // PIK for first 2 years, then cash
- * let stepped = PikSchedule::Stepped(vec![(0.0, PikMode::Pik), (2.0, PikMode::Cash)]);
- *
- * // Toggle for 3 years, then mandatory cash
- * let toggle_window = PikSchedule::Stepped(vec![(0.0, PikMode::Toggle), (3.0, PikMode::Cash)]);
- * ```
  */
 export type PikSchedule =
   | {
@@ -1014,14 +999,6 @@ export type PrepaymentPenalty =
  * # Investment Grade
  *
  * Ratings of `BBBMinus` and above are considered "investment grade":
- *
- * ```rust
- * use finstack_quant_core::types::CreditRating;
- *
- * assert!(CreditRating::A.is_investment_grade());
- * assert!(CreditRating::BBBMinus.is_investment_grade());
- * assert!(!CreditRating::BBPlus.is_investment_grade());
- * ```
  */
 export type CreditRating =
   | "AAA"
@@ -1134,18 +1111,6 @@ export type CouponType =
  * - ISDA 2021 Definitions, compounded RFR conventions `docs/REFERENCES.md#isda-2021-definitions`
  * - ARRC (2020). "SOFR: A User's Guide." `docs/REFERENCES.md#arrc-sofr-users-guide`
  * - BoE SONIA conventions `docs/REFERENCES.md#boe-sonia-key-features`
- *
- * # Examples
- *
- * ```
- * use finstack_quant_cashflows::builder::FloatingLegCompounding;
- *
- * assert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);
- * assert_eq!(
- *     FloatingLegCompounding::sofr(),
- *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
- * );
- * ```
  */
 export type FloatingLegCompounding =
   | "simple"
@@ -1218,15 +1183,6 @@ export type OvernightIndexConstraintApplication = "daily" | "period";
  *   accrues from the roll date immediately **preceding** the start (standard
  *   front accrual per the ISDA Big Bang Protocol, April 2009).
  *
- * # Examples
- *
- * ```rust
- * use finstack_quant_cashflows::builder::specs::RollRule;
- *
- * let rule = RollRule::default();
- * assert_eq!(rule, RollRule::None);
- * ```
- *
  * # References
  *
  * - `docs/REFERENCES.md#isda-cds-standard-model`
@@ -1263,23 +1219,6 @@ export type RollRule = "none" | "imm" | "cds_imm";
  * - Interest accrual calculations (short/long first coupons)
  * - Cash flow present value computations
  * - Matching market conventions for specific instruments
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::dates::{ScheduleBuilder, Tenor, StubKind};
- * use time::{Date, Month};
- *
- * let start = Date::from_calendar_date(2025, Month::January, 10)?;
- * let end = Date::from_calendar_date(2025, Month::December, 15)?;
- *
- * // Short stub at front
- * let sched = ScheduleBuilder::new(start, end)?
- *     .frequency(Tenor::quarterly())
- *     .stub_rule(StubKind::ShortFront)
- *     .build()?;
- * # Ok::<(), Box<dyn std::error::Error>>(())
- * ```
  *
  * # See Also
  *
@@ -1531,15 +1470,6 @@ export type UpfrontFee =
  *
  * Shared by `TermLoan.rate`, `RevolvingCredit.rate`, `AssetBackedFacility.rate`
  * and structured-credit `Tranche.coupon`.
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
- *
- * let fixed = RateSpec::Fixed { rate: 0.06 }; // 6% all-in
- * assert!(matches!(fixed, RateSpec::Fixed { .. }));
- * ```
  */
 export type RateSpec =
   | {
@@ -1617,20 +1547,6 @@ export type CommitmentFeeBase = "undrawn" | "commitment_minus_outstanding";
  *   separately and not withheld
  * - `SeparateAmount`: Fixed facility-level amount tracked separately,
  *   pro-rated across draws by draw size
- *
- * # Examples
- *
- * ```text
- * use finstack_quant_valuations::instruments::fixed_income::term_loan::spec::OidPolicy;
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::currency::Currency;
- *
- * // 2% OID withheld from proceeds
- * let oid = OidPolicy::WithheldBp(dec!(200));  // 200 bp = 2%
- *
- * // $50,000 fixed OID
- * let oid_fixed = OidPolicy::WithheldAmount(Money::from((50_000_i64, Currency::USD)));
- * ```
  */
 export type OidPolicy =
   | {
@@ -2435,24 +2351,6 @@ export type InstrumentJson =
  * single ratio-accretion mechanism. Accretion composes multiplicatively on
  * top of any anti-dilution adjustments from
  * [`ConvertibleBond::effective_conversion_ratio`].
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::convertible::{
- *     AntiDilutionPolicy, ConversionPolicy, ConversionSpec, DividendAdjustment,
- * };
- *
- * let conversion = ConversionSpec {
- *     ratio: Some(25.0),
- *     price: None,
- *     policy: ConversionPolicy::Voluntary,
- *     anti_dilution: AntiDilutionPolicy::None,
- *     dividend_adjustment: DividendAdjustment::AdjustRatio,
- *     dilution_events: Vec::new(),
- * };
- * assert!(conversion.dividend_adjustment.is_protected());
- * ```
  */
 export type DividendAdjustment = "none" | "adjust_price" | "adjust_ratio";
 /**
@@ -2533,16 +2431,6 @@ export type IndexationMethod = "canadian" | "tips" | "uk" | "french" | "japanese
  * 1. Reference index is published before settlement
  * 2. Index value is known at coupon payment date
  * 3. No estimation or forecasting required for payment calculation
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::market_data::scalars::InflationLag;
- *
- * let tips_lag = InflationLag::Months(3);  // US TIPS standard
- * let gilt_lag = InflationLag::Months(3);  // UK modern gilts
- * let no_lag = InflationLag::None;         // Inflation swaps (forecast-based)
- * ```
  */
 export type InflationLag =
   | {
@@ -2693,15 +2581,6 @@ export type ResettingSide = "leg1" | "leg2";
  * - **US TIPS**: Linear interpolation (daily pro-rata)
  * - **UK Index-Linked Gilts**: Linear interpolation with 3-month lag
  * - **Euro inflation bonds**: Varies by issuer (typically linear)
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::market_data::scalars::InflationInterpolation;
- *
- * let linear = InflationInterpolation::Linear; // TIPS standard
- * let step = InflationInterpolation::Step;     // Conservative approach
- * ```
  */
 export type InflationInterpolation = "step" | "linear";
 /**
@@ -2935,14 +2814,6 @@ export type CdsConvention = "isda_na" | "isda_eu" | "isda_as" | "custom";
  * Represents the ISDA documentation clause used for CDS contracts. Different clauses
  * define different restructuring events and settlement procedures. Used as part of
  * [`CdsConventionKey`] to look up CDS conventions.
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_valuations::market::conventions::ids::CdsDocClause;
- *
- * let clause = CdsDocClause::Cr14; // Cum-Restructuring 2014
- * ```
  */
 export type CdsDocClause =
   "cr14" | "mr14" | "mm14" | "xr14" | "isda_na" | "isda_eu" | "isda_as" | "isda_au" | "isda_nz" | "custom";
@@ -2970,21 +2841,6 @@ export type ProtectionStartConvention = "spot" | "forward";
  *
  * Wire format: externally tagged JSON — `{"spread": "0.0325"}` or
  * `{"clean_price_pct": "107.0"}` — with no bare-decimal fallback.
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_valuations::instruments::credit_derivatives::cds_option::CdsOptionStrike;
- * use rust_decimal::Decimal;
- *
- * let spread = CdsOptionStrike::Spread(Decimal::new(325, 4)); // 0.0325 = 325 bp
- * assert!(spread.spread_decimal().is_some());
- * assert_eq!(spread.native_surface_coordinate().unwrap(), 0.0325);
- *
- * let price = CdsOptionStrike::CleanPricePct(Decimal::new(1070, 1)); // 107.0
- * assert_eq!(price.native_surface_coordinate().unwrap(), 107.0);
- * assert!((price.clean_price_fraction().unwrap() - 1.07).abs() < 1e-15);
- * ```
  */
 export type CdsOptionStrike =
   | {
@@ -3025,31 +2881,6 @@ export type RealizedVarMethod = "close_to_close" | "parkinson" | "garman_klass" 
  * | PHP | PHP BVAL | Bankers Association of the Philippines | USD T+1 |
  * | IDR | JISDOR | Bank Indonesia | USD T+2 |
  * | MYR | BNM | Bank Negara Malaysia | USD T+2 |
- *
- * # Example
- *
- * ```rust
- * use finstack_quant_valuations::instruments::fx::ndf::{Ndf, NdfFixingSource, NdfQuoteConvention};
- * use finstack_quant_core::currency::Currency;
- * use finstack_quant_core::dates::Date;
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::types::{CurveId, InstrumentId};
- * use time::Month;
- *
- * let ndf = Ndf::builder()
- *     .id(InstrumentId::new("USDCNY-NDF"))
- *     .base_currency(Currency::CNY)
- *     .settlement_currency(Currency::USD)
- *     .fixing_date(Date::from_calendar_date(2025, Month::March, 13).unwrap())
- *     .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())
- *     .notional(Money::from((10_000_000_i64, Currency::CNY)))
- *     .contract_rate(7.25)
- *     .domestic_discount_curve_id(CurveId::new("USD-OIS"))
- *     .quote_convention(NdfQuoteConvention::BasePerSettlement)
- *     .fixing_source_opt(Some(NdfFixingSource::Pboc))
- *     .build()
- *     .expect("Valid NDF");
- * ```
  */
 export type NdfFixingSource =
   "pboc" | "cnhfix" | "rbi" | "kftc" | "ptax" | "taifx" | "php_bval" | "jisdor" | "bnm" | "other";
@@ -3904,15 +3735,6 @@ export type CashflowType =
  * Rounding modes supported by the library.
  *
  * The variants mirror the most common conventions found in pricing engines.
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::config::{FinstackConfig, RoundingMode};
- *
- * let mut cfg = FinstackConfig::default();
- * cfg.rounding.mode = RoundingMode::TowardZero;
- * assert!(matches!(cfg.rounding.mode, RoundingMode::TowardZero));
- * ```
  */
 export type RoundingMode = "bankers" | "away_from_zero" | "toward_zero" | "floor" | "ceil";
 /**
@@ -3979,21 +3801,6 @@ export type ValuationDetails =
  * - [`BarrierBSContinuous`](Self::BarrierBSContinuous): Reiner-Rubinstein barriers
  * - [`AsianGeometricBS`](Self::AsianGeometricBS): Geometric Asian (exact)
  * - [`AsianTurnbullWakeman`](Self::AsianTurnbullWakeman): Arithmetic Asian (approx)
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_valuations::pricer::ModelKey;
- *
- * // Select appropriate model for instrument type
- * let model = ModelKey::Discounting;  // For bonds
- * let model = ModelKey::Black76;      // For caps/floors
- * let model = ModelKey::MonteCarloGBM; // For path-dependent exotics
- *
- * // Parse from string
- * let model: ModelKey = "black76".parse().unwrap();
- * assert_eq!(model, ModelKey::Black76);
- * ```
  */
 export type ModelKey =
   | "discounting"
@@ -4474,15 +4281,6 @@ export type MetricUnit = "currency" | "decimal" | "basis_points" | "years" | "pe
  *
  * Distinguishes between overnight risk-free rate (RFR) indices and term indices, which have
  * different conventions for compounding, payment frequencies, and reset lags.
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_valuations::market::conventions::RateIndexKind;
- *
- * let overnight = RateIndexKind::OvernightRfr;
- * let term = RateIndexKind::Term;
- * ```
  */
 export type RateIndexKind = "overnight_rfr" | "term";
 
@@ -4659,40 +4457,6 @@ export interface Attributes {
  * - FNMA / FHLMC (UMBS): ~55 days → payment on the 25th of M+1
  * - GNMA I: ~45 days → payment on the 15th of M+1
  * - GNMA II: ~50 days → payment on the 20th of M+1
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::{
- *     AgencyMbsPassthrough, AgencyProgram, PoolType,
- * };
- * use finstack_quant_cashflows::builder::specs::PrepaymentModelSpec;
- * use finstack_quant_core::currency::Currency;
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::dates::Date;
- * use finstack_quant_core::types::{CurveId, InstrumentId};
- * use time::Month;
- *
- * let mbs = AgencyMbsPassthrough::builder()
- *     .id(InstrumentId::new("FN-MA1234"))
- *     .pool_id("MA1234".into())
- *     .agency(AgencyProgram::Fnma)
- *     .pool_type(PoolType::Generic)
- *     .original_face(Money::from((1_000_000_i64, Currency::USD)))
- *     .current_face(Money::from((950_000_i64, Currency::USD)))
- *     .wac(0.045)
- *     .coupon(0.04)
- *     .servicing_fee_bp(25.0)
- *     .guarantee_fee_bp(25.0)
- *     .wam_months(348)
- *     .issue_date(Date::from_calendar_date(2022, Month::January, 1).unwrap())
- *     .maturity(Date::from_calendar_date(2052, Month::January, 1).unwrap())
- *     .prepayment_spec(PrepaymentModelSpec::psa(1.0))
- *     .discount_curve_id(CurveId::new("USD-OIS"))
- *     .day_count(finstack_quant_core::dates::DayCount::Thirty360)
- *     .build()
- *     .expect("Valid MBS");
- * ```
  */
 export interface AgencyMbsPassthrough {
   /**
@@ -5557,24 +5321,6 @@ export interface BumpConfig {
  *
  * Tenors are commonly used in financial markets to specify maturities,
  * payment frequencies, and rate fixing periods.
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::dates::{Tenor, TenorUnit};
- * # fn main() -> finstack_quant_core::Result<()> {
- *
- * let tenor = Tenor::new(3, TenorUnit::Months).expect("valid tenor fixture");
- * assert_eq!(tenor.count(), 3);
- * assert_eq!(tenor.unit(), TenorUnit::Months);
- *
- * // Parse from string
- * let parsed = Tenor::parse("6M")?;
- * assert_eq!(parsed.count(), 6);
- * assert_eq!(parsed.unit(), TenorUnit::Months);
- * # Ok(())
- * # }
- * ```
  */
 export interface Tenor {
   /**
@@ -5720,31 +5466,6 @@ export interface PacCollar {
  * TBA value is calculated as the difference between the forward value
  * of assumed pool characteristics and the trade price, discounted to
  * the valuation date.
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::tba::{AgencyTba, TbaTerm};
- * use finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::AgencyProgram;
- * use finstack_quant_core::currency::Currency;
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::dates::Date;
- * use finstack_quant_core::types::{CurveId, InstrumentId};
- * use time::Month;
- *
- * let tba = AgencyTba::builder()
- *     .id(InstrumentId::new("FN30-4.0-202703"))
- *     .agency(AgencyProgram::Fnma)
- *     .coupon(0.04)
- *     .term(TbaTerm::ThirtyYear)
- *     .settlement_year(2027)
- *     .settlement_month(3)
- *     .notional(Money::from((10_000_000_i64, Currency::USD)))
- *     .trade_price(98.5)
- *     .discount_curve_id(CurveId::new("USD-OIS"))
- *     .build()
- *     .expect("Valid TBA");
- * ```
  */
 export interface AgencyTba {
   /**
@@ -5984,17 +5705,6 @@ export interface AsianOption {
  * Rates are decimals (`rate`) or basis points (`*_bp`); `*_pct` fields are
  * percent values (`20.0` = 20%) and loss thresholds are decimal fractions
  * (`max_cumulative_loss`).
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AssetBackedFacility;
- *
- * let facility = AssetBackedFacility::example()?;
- * let report = facility.borrowing_base()?;
- * assert!(report.borrowing_base.amount() >= facility.drawn.amount());
- * # Ok::<(), finstack_quant_core::Error>(())
- * ```
  */
 export interface AssetBackedFacility {
   /**
@@ -6181,16 +5891,6 @@ export interface ConcentrationLimit {
 }
 /**
  * Portfolio assumptions for a credit-card master trust.
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::structured_credit::CardPortfolioSpec;
- *
- * // 15% monthly payment rate, 18% portfolio yield, 5% annual charge-offs.
- * let spec = CardPortfolioSpec::new(0.15, 0.18, 0.05);
- * assert!(spec.validate().is_ok());
- * ```
  */
 export interface CardPortfolioSpec {
   /**
@@ -6501,24 +6201,6 @@ export interface PoolAsset {
  * balloon. An extended level-pay balance keeps its schedule scaled by the
  * extended fraction; a fixed `extension_rate` on a floating loan replaces the
  * index and spread (an all-in modification rate).
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::structured_credit::BalloonSpec;
- *
- * // 30% of the balloon extends two years at 7%; 10% defaults at 40% severity
- * // with an 18-month workout.
- * let balloon = BalloonSpec {
- *     extension_prob: 0.3,
- *     extension_months: 24,
- *     extension_rate: Some(0.07),
- *     loss_prob: 0.1,
- *     severity_pct: 40.0,
- *     workout_months: 18,
- * };
- * assert!(balloon.validate().is_ok());
- * ```
  */
 export interface BalloonSpec {
   /**
@@ -6565,23 +6247,6 @@ export interface BalloonSpec {
  * performing loan on its original amortization terms at `modified_rate`
  * (the loan's coupon when `None`) from the following period on, with the
  * level payment recast on the re-performing balance.
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::structured_credit::LiquidationSpec;
- *
- * // Two-year workout: 55% gross proceeds less 5% carry, 20% re-performs at 4%.
- * let spec = LiquidationSpec {
- *     months_to_resolution: 24,
- *     proceeds_pct: 55.0,
- *     carry_cost_pct: 5.0,
- *     reperformance_prob: 0.2,
- *     modified_rate: Some(0.04),
- * };
- * assert!(spec.validate().is_ok());
- * assert!((spec.net_proceeds_fraction() - 0.5).abs() < 1e-12);
- * ```
  */
 export interface LiquidationSpec {
   /**
@@ -6789,22 +6454,6 @@ export interface Bond {
  *
  * Contains lists of call and put options that can be exercised during the bond's life.
  * Used for pricing callable/putable bonds and calculating yield-to-worst.
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::bond::{CallPut, CallPutSchedule};
- * use finstack_quant_core::dates::Date;
- * use time::Month;
- *
- * let mut schedule = CallPutSchedule::default();
- * schedule.calls.push(CallPut {
- *     start: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
- *     end: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
- *     price_pct_of_par: 102.0,
- *     make_whole: None,
- * });
- * ```
  */
 export interface CallPutSchedule {
   /**
@@ -6821,22 +6470,6 @@ export interface CallPutSchedule {
  *
  * Represents a single call or put option with an exercise period and redemption price.
  * Call options allow the issuer to redeem early; put options allow the holder to redeem early.
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::bond::CallPut;
- * use finstack_quant_core::dates::Date;
- * use time::Month;
- *
- * // Discrete call option: issuer can redeem at 102% of par on Jan 1, 2027
- * let call = CallPut {
- *     start: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
- *     end: Date::from_calendar_date(2027, Month::January, 1).unwrap(),
- *     price_pct_of_par: 102.0,
- *     make_whole: None,
- * };
- * ```
  */
 export interface CallPut {
   /**
@@ -7031,34 +6664,6 @@ export interface FloatingCouponSpec {
  * descriptive message naming the date, index, and expected series id;
  * `FixedRate(r)` uses `r` as the index rate for the affected coupon;
  * `SpreadOnly` projects spread-only.
- *
- * # Example
- *
- * ```rust
- * use finstack_quant_core::dates::Tenor;
- * use finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};
- * use rust_decimal_macros::dec;
- *
- * // 3M SOFR + 200bps with 0% floor
- * let spec = FloatingRateSpec {
- *     forward_curve_id: "USD-SOFR-3M".into(),
- *     spread_bp: dec!(200.0),
- *     gearing: dec!(1.0),
- *     gearing_includes_spread: true,
- *     index_floor_bp: Some(dec!(0.0)),
- *     all_in_floor_bp: None,
- *     all_in_cap_bp: None,
- *     index_cap_bp: None,
- *     overnight_index_constraints: OvernightIndexConstraintApplication::Daily,
- *     reset_frequency: Tenor::quarterly(),
- *     index_tenor: None,
- *     reset_lag_days: 2,
- *     fixing_calendar_id: None,
- *     compounding: None,
- *     overnight_basis: None,
- *     fallback: Default::default(),
- * };
- * ```
  */
 export interface FloatingRateSpec {
   /**
@@ -7185,35 +6790,6 @@ export interface FloatingRateSpec {
  * The rate for each coupon period is determined by the last step date
  * that falls on or before the period start date. If no step has occurred,
  * the initial rate is used.
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::dates::{Date, DayCount, Tenor, BusinessDayConvention, StubKind};
- * use finstack_quant_cashflows::builder::{CouponType, ScheduleParams, StepUpCouponSpec};
- * use rust_decimal_macros::dec;
- * use time::Month;
- *
- * let spec = StepUpCouponSpec {
- *     coupon_type: CouponType::Cash,
- *     initial_rate: dec!(0.03),
- *     step_schedule: vec![
- *         (Date::from_calendar_date(2027, Month::January, 1).unwrap(), dec!(0.04)),
- *         (Date::from_calendar_date(2029, Month::January, 1).unwrap(), dec!(0.05)),
- *     ],
- *     schedule: ScheduleParams {
- *         frequency: Tenor::semi_annual(),
- *         day_count: DayCount::Thirty360,
- *         business_day_convention: BusinessDayConvention::Following,
- *         calendar_id: "weekends_only".into(),
- *         stub: StubKind::None,
- *         end_of_month: false,
- *         payment_lag_days: 0,
- *         adjust_accrual_dates: false,
- *         roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
- *     },
- * };
- * ```
  */
 export interface StepUpCouponSpec {
   /**
@@ -7582,52 +7158,6 @@ export interface Notional {
  *   *The Handbook of Loan Syndications and Trading* (2nd ed.). Chapter on
  *   loan documentation and call protection.
  * - **Act/365F day count**: ISDA 2006 Definitions, Section 4.16(f). `docs/REFERENCES.md#isda-2006-definitions`
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::bond::{
- *     ReturnFloorSpec, IssuePrice,
- * };
- * use finstack_quant_core::types::Rate;
- *
- * // 1.20× MOIC floor at par, full protection window
- * let spec = ReturnFloorSpec::moic(1.20);
- * assert!(spec.validate().is_ok());
- *
- * // 10% XIRR floor with 98 OID, validated
- * let spec = ReturnFloorSpec::xirr(Rate::from_percent(10.0).expect("valid rate fixture"))
- *     .issue_price(IssuePrice::PctOfPar(98.0));
- * assert!(spec.validate().is_ok());
- * ```
- *
- * Attach to a bond using the fluent builder:
- *
- * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::bond::{
- *     Bond, ReturnFloorSpec, ProtectionWindow,
- * };
- * use finstack_quant_core::currency::Currency;
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::types::Rate;
- * use time::macros::date;
- *
- * // 5-year loan with 1.25× MOIC floor active after a 2-year no-call period.
- * let loan = Bond::fixed(
- *     "LOAN-001",
- *     Money::from((1_000_000_i64, Currency::USD)),
- *     Rate::from_percent(10.0).expect("valid rate fixture"),
- *     date!(2025 - 01 - 01),
- *     date!(2030 - 01 - 01),
- *     finstack_quant_core::dates::StubKind::None,
- *     "USD-OIS",
- * )?
- * .with_return_floor(
- *     ReturnFloorSpec::moic(1.25)
- *         .window(ProtectionWindow::From(date!(2027 - 01 - 01))),
- * );
- * # Ok::<(), Box<dyn std::error::Error>>(())
- * ```
  */
 export interface ReturnFloorSpec {
   /**
@@ -8242,14 +7772,6 @@ export interface ScheduledFee {
  * contract (dates, currencies, DDTL draws against the commitment in force,
  * covenant and call schedules):
  *
- * ```
- * use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
- *
- * let loan = TermLoan::example()?;
- * loan.validate()?;
- * # Ok::<(), finstack_quant_core::Error>(())
- * ```
- *
  * # Cashflow Generation
  *
  * Uses the [`CashflowProvider`](crate::cashflow::traits::CashflowProvider) trait:
@@ -8389,34 +7911,6 @@ export interface TermLoan {
  *
  * Aggregates all borrower call provisions, typically with step-down
  * premiums as the loan ages (e.g., 103% in year 1, 102% in year 2, par thereafter).
- *
- * # Examples
- *
- * ```text
- * use finstack_quant_valuations::instruments::fixed_income::term_loan::spec::{LoanCallSchedule, LoanCall};
- * use finstack_quant_core::dates::create_date;
- * use time::Month;
- *
- * # fn example() -> Result<(), Box<dyn std::error::Error>> {
- * let schedule = LoanCallSchedule {
- *     calls: vec![
- *         LoanCall {
- *             date: create_date(2027, Month::January, 15)?,
- *             price_pct_of_par: 103.0,  // 3% premium in year 2
- *         },
- *         LoanCall {
- *             date: create_date(2028, Month::January, 15)?,
- *             price_pct_of_par: 101.5,  // 1.5% premium in year 3
- *         },
- *         LoanCall {
- *             date: create_date(2029, Month::January, 15)?,
- *             price_pct_of_par: 100.0,  // At par thereafter
- *         },
- *     ],
- * };
- * # Ok(())
- * # }
- * ```
  */
 export interface LoanCallSchedule {
   /**
@@ -8539,31 +8033,6 @@ export interface PikToggle {
  * - **Commitment fee**: Paid on undrawn commitment (compensates lender for availability)
  * - **Usage fee**: Paid on drawn amounts (additive to interest margin)
  * - **OID**: May be withheld at each draw or tracked separately
- *
- * # Examples
- *
- * ```text
- * use finstack_quant_valuations::instruments::fixed_income::term_loan::spec::*;
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::currency::Currency;
- * use finstack_quant_core::dates::create_date;
- * use time::Month;
- *
- * # fn example() -> Result<(), Box<dyn std::error::Error>> {
- * let ddtl = DdtlSpec {
- *     commitment: Money::from((10_000_000_i64, Currency::USD)),
- *     availability_start: create_date(2025, Month::January, 1)?,
- *     availability_end: create_date(2026, Month::January, 1)?,
- *     draws: vec![],
- *     commitment_steps: vec![],
- *     usage_fee_bp: dec!(50),        // 50 bp usage fee
- *     commitment_fee_bp: dec!(25),   // 25 bp commitment fee
- *     fee_base: CommitmentFeeBase::Undrawn,
- *     oid_policy: None,
- * };
- * # Ok(())
- * # }
- * ```
  */
 export interface DdtlSpec {
   /**
@@ -8793,21 +8262,6 @@ export interface RepLine {
  * that neither rolls nor cures stays in its bucket. The roll out of the last
  * bucket is the charge-off, so a 30/60/90 model with charge-off at 120 days
  * has three entries.
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
- *     AdvancingPolicy, DelinquencyModel,
- * };
- *
- * let model = DelinquencyModel::new(vec![0.6, 0.7, 0.9], vec![0.3, 0.2, 0.05])
- *     .with_advancing(AdvancingPolicy::PrincipalAndInterest {
- *         recoverability_cap_pct: 100.0,
- *         reimburse_from_collections: false,
- *     });
- * assert_eq!(model.buckets(), 3);
- * ```
  */
 export interface DelinquencyModel {
   /**
@@ -9201,60 +8655,6 @@ export interface BarrierOption {
  *
  * **Important**: This implementation supports **single-currency** basis swaps only.
  * For cross-currency basis swaps, use `XccySwap` instead.
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::{dates::*, money::Money, currency::Currency, types::CurveId};
- * use finstack_quant_valuations::instruments::rates::basis_swap::BasisSwap;
- * use finstack_quant_valuations::instruments::FloatLegSpec;
- * use time::Month;
- *
- * let start = Date::from_calendar_date(2024, Month::January, 3).expect("valid date");
- * let end = Date::from_calendar_date(2025, Month::January, 3).expect("valid date");
- *
- * let primary_leg = FloatLegSpec {
- *     forward_curve_id: CurveId::new("3M-SOFR"),
- *     discount_curve_id: CurveId::new("OIS"),
- *     start,
- *     end,
- *     frequency: Tenor::quarterly(),
- *     day_count: DayCount::Act360,
- *     business_day_convention: BusinessDayConvention::ModifiedFollowing,
- *     calendar_id: None,
- *     fixing_calendar_id: None,
- *     end_of_month: false,
- *     stub: StubKind::ShortFront,
- *     spread_bp: rust_decimal::Decimal::from(5),
- *     payment_lag_days: 0,
- *     reset_lag_days: 0,
- *     compounding: Default::default(),
- * };
- *
- * let reference_leg = FloatLegSpec {
- *     forward_curve_id: CurveId::new("6M-SOFR"),
- *     discount_curve_id: CurveId::new("OIS"),
- *     start,
- *     end,
- *     frequency: Tenor::semi_annual(),
- *     day_count: DayCount::Act360,
- *     business_day_convention: BusinessDayConvention::ModifiedFollowing,
- *     calendar_id: None,
- *     fixing_calendar_id: None,
- *     end_of_month: false,
- *     stub: StubKind::ShortFront,
- *     spread_bp: rust_decimal::Decimal::ZERO,
- *     payment_lag_days: 0,
- *     reset_lag_days: 0,
- *     compounding: Default::default(),
- * };
- *
- * let swap = BasisSwap::new(
- *     "BASIS_SWAP_001",
- *     Money::from((1_000_000_i64, Currency::USD)),
- *     primary_leg,
- *     reference_leg,
- * );
- * ```
  */
 export interface BasisSwap {
   /**
@@ -9819,33 +9219,6 @@ export interface InflationLinkedBond {
  * - **Financing**: Implied repo rate is often cheaper than repo
  * - **Carry trades**: Profit from drop vs. expected prepayment
  * - **Roll specialness**: When roll drops exceed fair value
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::dollar_roll::DollarRoll;
- * use finstack_quant_valuations::instruments::fixed_income::tba::TbaTerm;
- * use finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::AgencyProgram;
- * use finstack_quant_core::currency::Currency;
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::types::{CurveId, InstrumentId};
- *
- * let roll = DollarRoll::builder()
- *     .id(InstrumentId::new("FN30-4.0-ROLL-0326-0426"))
- *     .agency(AgencyProgram::Fnma)
- *     .coupon(0.04)
- *     .term(TbaTerm::ThirtyYear)
- *     .notional(Money::from((10_000_000_i64, Currency::USD)))
- *     .front_settlement_year(2026)
- *     .front_settlement_month(3)
- *     .back_settlement_year(2026)
- *     .back_settlement_month(4)
- *     .front_price(98.5)
- *     .back_price(98.0)
- *     .discount_curve_id(CurveId::new("USD-OIS"))
- *     .build()
- *     .expect("Valid dollar roll");
- * ```
  */
 export interface DollarRoll {
   /**
@@ -10133,28 +9506,6 @@ export interface FixedLegSpec {
  * - Credit Default Swaps (CDS)
  * - CDS Indices
  * - Total Return Swaps (TRS)
- *
- * # Example
- *
- * ```
- * use finstack_quant_margin::{
- *     OtcMarginSpec, CsaSpec, SimmCreditClassification, SimmCreditSector,
- * };
- *
- * # fn main() -> finstack_quant_core::Result<()> {
- * // Bilateral (uncleared) derivative
- * let bilateral_spec = OtcMarginSpec::bilateral_simm(CsaSpec::usd_regulatory()?);
- * let credit_spec = bilateral_spec.with_simm_credit_classification(
- *     SimmCreditClassification::Qualifying {
- *         sector: SimmCreditSector::Financial,
- *     },
- * );
- *
- * // Cleared derivative
- * let cleared_spec = OtcMarginSpec::cleared("LCH", finstack_quant_core::currency::Currency::USD)?;
- * # Ok(())
- * # }
- * ```
  */
 export interface OtcMarginSpec {
   /**
@@ -10208,31 +9559,6 @@ export interface OtcMarginSpec {
  * - ISDA 2016 VM CSA: `docs/REFERENCES.md#isda-vm-csa-2016`
  * - ISDA 2018 IM CSA: `docs/REFERENCES.md#isda-im-csa-2018`
  * - BCBS-IOSCO uncleared margin framework: `docs/REFERENCES.md#bcbs-iosco-uncleared-margin`
- *
- * # Example
- *
- * ```
- * use finstack_quant_margin::{
- *     CsaSpec, VmParameters, ImParameters, EligibleCollateralSchedule,
- *     MarginCallTiming, ImMethodology, MarginTenor,
- * };
- * use finstack_quant_core::currency::Currency;
- * use finstack_quant_core::money::Money;
- *
- * # fn main() -> finstack_quant_core::Result<()> {
- * let csa = CsaSpec {
- *     id: "USD-CSA-2024".to_string(),
- *     base_currency: Currency::USD,
- *     vm_params: VmParameters::regulatory_standard(Currency::USD)?,
- *     im_params: Some(ImParameters::simm_standard(Currency::USD)?),
- *     eligible_collateral: EligibleCollateralSchedule::bcbs_standard()?,
- *     call_timing: MarginCallTiming::regulatory_standard()?,
- *     collateral_curve_id: "USD-OIS".into(),
- *     calendar_id: "usny".into(),
- * };
- * # Ok(())
- * # }
- * ```
  */
 export interface CsaSpec {
   /**
@@ -10310,17 +9636,6 @@ export interface MarginCallTiming {
  *
  * Defines the complete set of collateral types accepted under a CSA
  * or margin agreement, along with associated haircuts and constraints.
- *
- * # Example
- *
- * ```
- * use finstack_quant_margin::{CollateralEligibility, EligibleCollateralSchedule};
- *
- * // Start from a standard schedule (BCBS-IOSCO compliant)
- * let schedule = EligibleCollateralSchedule::bcbs_standard()?;
- * # let _ = schedule;
- * # Ok::<(), finstack_quant_core::Error>(())
- * ```
  */
 export interface EligibleCollateralSchedule {
   /**
@@ -10406,22 +9721,6 @@ export interface MaturityConstraints {
  * The MPOR determines the horizon over which PFE is calculated:
  * - Standard: 10 business days for bilateral derivatives
  * - Reduced: 5 days for certain liquid products
- *
- * # Example
- *
- * ```
- * use finstack_quant_margin::{ImMethodology, ImParameters};
- * use finstack_quant_core::currency::Currency;
- * use finstack_quant_core::money::Money;
- *
- * let im_params = ImParameters {
- *     methodology: ImMethodology::Simm,
- *     mpor_days: 10,
- *     threshold: Money::from((50_000_000_i64, Currency::USD)),
- *     mta: Money::from((0_i64, Currency::USD)), // Combined with VM MTA
- *     segregated: true,
- * };
- * ```
  */
 export interface ImParameters {
   /**
@@ -10469,23 +9768,6 @@ export interface ImParameters {
  * - Zero threshold for in-scope entities
  * - Daily exchange with T+1 settlement
  * - Cash or highly liquid securities as collateral
- *
- * # Example
- *
- * ```
- * use finstack_quant_margin::{MarginTenor, VmParameters};
- * use finstack_quant_core::currency::Currency;
- * use finstack_quant_core::money::Money;
- *
- * let vm_params = VmParameters {
- *     threshold: Money::from((10_000_000_i64, Currency::USD)),
- *     mta: Money::from((500_000_i64, Currency::USD)),
- *     rounding: Money::from((10_000_i64, Currency::USD)),
- *     independent_amount: Money::from((0_i64, Currency::USD)),
- *     frequency: MarginTenor::Daily,
- *     settlement_lag: 1,
- * };
- * ```
  */
 export interface VmParameters {
   /**
@@ -11108,18 +10390,6 @@ export interface SabrParameters {
  *   [`crate::pricer::ModelKey::MonteCarloHullWhite1F`].
  * - **LSMC**: Longstaff-Schwartz Monte Carlo, opt-in for path-dependent
  *   validation and model comparison.
- *
- * # Example
- *
- * ```
- * use finstack_quant_valuations::instruments::rates::swaption::{
- *     BermudanSwaption, BermudanSchedule, BermudanType,
- * };
- * use finstack_quant_valuations::instruments::SettlementType;
- *
- * // Create a 10NC2 (10-year swap, callable after 2 years)
- * let swaption = BermudanSwaption::example().expect("example");
- * ```
  */
 export interface BermudanSwaption {
   /**
@@ -12084,25 +11354,6 @@ export interface CollateralSpec {
  *
  * Defines margin maintenance parameters for repurchase agreements
  * following GMRA 2011 standards.
- *
- * # Example
- *
- * ```
- * use finstack_quant_margin::{EligibleCollateralSchedule, MarginTenor, RepoMarginSpec, RepoMarginType};
- *
- * let margin_spec = RepoMarginSpec {
- *     margin_type: RepoMarginType::MarkToMarket,
- *     margin_ratio: 1.02,           // 2% over-collateralization
- *     margin_call_threshold: 0.01,  // 1% deviation triggers call
- *     call_frequency: MarginTenor::Daily,
- *     settlement_lag: 1,
- *     pays_margin_interest: true,
- *     margin_interest_rate: Some(0.05),
- *     substitution_allowed: true,
- *     eligible_substitutes: Some(EligibleCollateralSchedule::us_treasuries()?),
- * };
- * # Ok::<(), finstack_quant_core::Error>(())
- * ```
  *
  * # GMRA 2011 References
  *
@@ -13317,37 +12568,6 @@ export interface VarianceSwap {
  * Position size, multiplier, entry price and lifecycle dates live in the
  * shared [`ListedFutureTerms`]; `terms.settlement_price` is the official
  * Special Opening Quotation (SOQ) in index points.
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_valuations::instruments::equity::vol_index_future::VolatilityIndexFuture;
- * use finstack_quant_valuations::instruments::{ListedFutureTerms, Position};
- * use finstack_quant_core::currency::Currency;
- * use finstack_quant_core::dates::Date;
- * use finstack_quant_core::types::{CurveId, InstrumentId};
- * use time::Month;
- *
- * let settlement = Date::from_calendar_date(2025, Month::March, 19).unwrap();
- * let future = VolatilityIndexFuture::builder()
- *     .id(InstrumentId::new("VIX-FUT-2025M03"))
- *     .terms(
- *         ListedFutureTerms::new(
- *             5.0,
- *             1_000.0,
- *             Currency::USD,
- *             21.50,
- *             settlement,
- *             settlement,
- *             Position::Long,
- *         )
- *         .unwrap(),
- *     )
- *     .discount_curve_id(CurveId::new("USD-OIS"))
- *     .vol_index_curve_id(CurveId::new("VIX"))
- *     .build()
- *     .expect("Valid future");
- * ```
  */
 export interface VolatilityIndexFuture {
   /**
@@ -13605,28 +12825,6 @@ export interface FxSwap {
  * - DF_foreign(T) = discount factor in base currency to maturity
  * - DF_domestic(T) = discount factor in quote currency to maturity
  * - F_contract = contract_rate (if provided, else F_market for at-market forward)
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_valuations::instruments::fx::fx_forward::FxForward;
- * use finstack_quant_core::currency::Currency;
- * use finstack_quant_core::dates::Date;
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::types::{CurveId, InstrumentId};
- * use time::Month;
- *
- * let forward = FxForward::builder()
- *     .id(InstrumentId::new("EURUSD-FWD-6M"))
- *     .base_currency(Currency::EUR)
- *     .quote_currency(Currency::USD)
- *     .maturity(Date::from_calendar_date(2025, Month::June, 15).unwrap())
- *     .notional(Money::from((1_000_000_i64, Currency::EUR)))
- *     .domestic_discount_curve_id(CurveId::new("USD-OIS"))
- *     .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
- *     .build()
- *     .expect("Valid forward");
- * ```
  */
 export interface FxForward {
   /**
@@ -13726,30 +12924,6 @@ export interface FxForward {
  * ```text
  * Settlement = Notional_base × (F_fixing - F_contract)
  * PV = Settlement × DF_settlement(T)
- * ```
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_valuations::instruments::fx::ndf::{Ndf, NdfQuoteConvention};
- * use finstack_quant_core::currency::Currency;
- * use finstack_quant_core::dates::Date;
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::types::{CurveId, InstrumentId};
- * use time::Month;
- *
- * let ndf = Ndf::builder()
- *     .id(InstrumentId::new("USDCNY-NDF-3M"))
- *     .base_currency(Currency::CNY)
- *     .settlement_currency(Currency::USD)
- *     .fixing_date(Date::from_calendar_date(2025, Month::March, 13).unwrap())
- *     .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())
- *     .notional(Money::from((10_000_000_i64, Currency::CNY)))
- *     .contract_rate(7.25)
- *     .domestic_discount_curve_id(CurveId::new("USD-OIS"))
- *     .quote_convention(NdfQuoteConvention::BasePerSettlement)
- *     .build()
- *     .expect("Valid NDF");
  * ```
  */
 export interface Ndf {
@@ -14763,45 +13937,6 @@ export interface CommodityAsianOption {
  *
  * - **At-market**: `contract_price = None` → NPV ≈ 0 (like entering a new futures position)
  * - **Off-market**: `contract_price = Some(K)` → NPV reflects mark-to-market vs K
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_valuations::instruments::commodity::commodity_forward::CommodityForward;
- * use finstack_quant_valuations::instruments::Position;
- * use finstack_quant_valuations::instruments::CommodityUnderlyingParams;
- * use finstack_quant_core::currency::Currency;
- * use finstack_quant_core::dates::Date;
- * use finstack_quant_core::types::{CurveId, InstrumentId};
- * use time::Month;
- *
- * // At-market long forward (NPV ≈ 0)
- * let at_market = CommodityForward::builder()
- *     .id(InstrumentId::new("WTI-FWD-2025M03"))
- *     .underlying(CommodityUnderlyingParams::new("Energy", "CL", "BBL", Currency::USD))
- *     .quantity(1000.0)
- *     .multiplier(1.0)
- *     .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())
- *     .position(Position::Long)
- *     .forward_curve_id(CurveId::new("WTI-FORWARD"))
- *     .discount_curve_id(CurveId::new("USD-OIS"))
- *     .build()
- *     .expect("Valid forward");
- *
- * // Off-market forward with specific contract price
- * let off_market = CommodityForward::builder()
- *     .id(InstrumentId::new("WTI-FWD-2025M03-TRADE"))
- *     .underlying(CommodityUnderlyingParams::new("Energy", "CL", "BBL", Currency::USD))
- *     .quantity(1000.0)
- *     .multiplier(1.0)
- *     .maturity(Date::from_calendar_date(2025, Month::March, 15).unwrap())
- *     .position(Position::Long)
- *     .contract_price_opt(Some(72.0)) // Entry price
- *     .forward_curve_id(CurveId::new("WTI-FORWARD"))
- *     .discount_curve_id(CurveId::new("USD-OIS"))
- *     .build()
- *     .expect("Valid forward");
- * ```
  */
 export interface CommodityForward {
   /**
@@ -14955,32 +14090,6 @@ export interface CommodityForward {
  *
  * For a payer of fixed:
  * NPV = Floating leg PV - Fixed leg PV
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_valuations::instruments::commodity::commodity_swap::CommoditySwap;
- * use finstack_quant_valuations::instruments::CommodityUnderlyingParams;
- * use finstack_quant_valuations::instruments::PayReceive;
- * use finstack_quant_core::currency::Currency;
- * use finstack_quant_core::dates::{Date, BusinessDayConvention, Tenor, TenorUnit};
- * use finstack_quant_core::types::{CurveId, InstrumentId};
- * use time::Month;
- *
- * let swap = CommoditySwap::builder()
- *     .id(InstrumentId::new("NG-SWAP-2025"))
- *     .underlying(CommodityUnderlyingParams::new("Energy", "NG", "MMBTU", Currency::USD))
- *     .quantity(10000.0)
- *     .fixed_price(3.50)
- *     .forward_curve_id(CurveId::new("NG-SPOT-AVG"))
- *     .side(PayReceive::Pay)
- *     .start_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
- *     .maturity(Date::from_calendar_date(2025, Month::December, 31).unwrap())
- *     .frequency(Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture"))
- *     .discount_curve_id(CurveId::new("USD-OIS"))
- *     .build()
- *     .expect("Valid swap");
- * ```
  */
 export interface CommoditySwap {
   /**
@@ -15092,34 +14201,6 @@ export interface CommoditySwap {
  * - Forward swap rate is the weighted average of forward commodity prices
  *   over the swap period
  * - Annuity factor captures the present value of a unit payment stream
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_valuations::instruments::commodity::commodity_swaption::CommoditySwaption;
- * use finstack_quant_valuations::instruments::CommodityUnderlyingParams;
- * use finstack_quant_valuations::instruments::OptionType;
- * use finstack_quant_core::currency::Currency;
- * use finstack_quant_core::dates::{Date, Tenor, TenorUnit};
- * use finstack_quant_core::types::{CurveId, InstrumentId};
- * use time::Month;
- *
- * let swaption = CommoditySwaption::builder()
- *     .id(InstrumentId::new("NG-SWAPTION-2025"))
- *     .underlying(CommodityUnderlyingParams::new("Energy", "NG", "MMBTU", Currency::USD))
- *     .option_type(OptionType::Call)
- *     .expiry(Date::from_calendar_date(2025, Month::June, 15).unwrap())
- *     .underlying_start_date(Date::from_calendar_date(2025, Month::July, 1).unwrap())
- *     .underlying_maturity(Date::from_calendar_date(2026, Month::June, 30).unwrap())
- *     .swap_frequency(Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture"))
- *     .fixed_price(3.50)
- *     .quantity(10000.0)
- *     .forward_curve_id(CurveId::new("NG-FORWARD"))
- *     .discount_curve_id(CurveId::new("USD-OIS"))
- *     .vol_surface_id(CurveId::new("NG-VOL"))
- *     .build()
- *     .expect("Valid swaption");
- * ```
  */
 export interface CommoditySwaption {
   /**
@@ -15234,31 +14315,6 @@ export interface CommoditySwaption {
  * The `correlation` parameter captures the co-movement between the two
  * commodity prices. Higher correlation reduces the effective spread volatility
  * and hence the option price. The correlation must be in [-1, 1].
- *
- * # Example
- *
- * ```
- * use finstack_quant_valuations::instruments::commodity::CommoditySpreadOption;
- * use finstack_quant_valuations::instruments::OptionType;
- * use finstack_quant_core::types::{CurveId, InstrumentId};
- * use time::macros::date;
- *
- * let spread_opt = CommoditySpreadOption::builder()
- *     .id(InstrumentId::new("WTI-RBOB-CRACK-SPREAD"))
- *     .currency(finstack_quant_core::currency::Currency::USD)
- *     .option_type(OptionType::Call)
- *     .expiry(date!(2025-06-15))
- *     .strike(10.0)           // $10/bbl crack spread strike
- *     .quantity(1000.0)
- *     .leg1_forward_curve_id(CurveId::new("RBOB-FORWARD"))
- *     .leg2_forward_curve_id(CurveId::new("WTI-FORWARD"))
- *     .leg1_vol_surface_id(CurveId::new("RBOB-VOL"))
- *     .leg2_vol_surface_id(CurveId::new("WTI-VOL"))
- *     .discount_curve_id(CurveId::new("USD-OIS"))
- *     .correlation(0.85)
- *     .build()
- *     .expect("Valid spread option");
- * ```
  */
 export interface CommoditySpreadOption {
   /**
@@ -16291,46 +15347,6 @@ export interface CmsSpreadOption {
  * `past_fixings`, except that `initial_level` may anchor the first period.
  *
  * # Construction
- *
- * ```
- * use finstack_quant_core::{
- *     currency::Currency, dates::DayCount, money::Money, types::InstrumentId,
- * };
- * use finstack_quant_cashflows::builder::ScheduleParams;
- * use finstack_quant_valuations::instruments::{
- *     Attributes, EquityUnderlyingParams, FinancingLegSpec, PayReceive,
- * };
- * use finstack_quant_valuations::instruments::equity::equity_trs::{
- *     EquityTotalReturnSwap, TrsDividendSettlement, TrsScheduleSpec,
- * };
- * use rust_decimal::Decimal;
- * use time::macros::date;
- *
- * # fn main() -> finstack_quant_core::Result<()> {
- * let trs = EquityTotalReturnSwap::builder()
- *     .id(InstrumentId::new("SPX-TRS"))
- *     .notional(Money::from((10_000_000_i64, Currency::USD)))
- *     .underlying(
- *         EquityUnderlyingParams::new("SPX", "SPX-SPOT", Currency::USD)
- *             .with_div_yield_id("SPX-DIV"),
- *     )
- *     .financing_leg(FinancingLegSpec::new(
- *         "USD-OIS", "USD-SOFR-3M", Decimal::from(50), DayCount::Act360,
- *     ))
- *     .schedule(TrsScheduleSpec::from_params(
- *         date!(2026 - 01 - 02),
- *         date!(2027 - 01 - 02),
- *         ScheduleParams::quarterly_act360(),
- *     ))
- *     .side(PayReceive::Receive)
- *     .dividend_settlement(TrsDividendSettlement::OnDividendDate)
- *     .initial_level_opt(None)
- *     .attributes(Attributes::new())
- *     .build()?;
- * assert_eq!(trs.notional.currency(), Currency::USD);
- * # Ok(())
- * # }
- * ```
  */
 export interface EquityTotalReturnSwap {
   /**
@@ -16463,30 +15479,6 @@ export interface FinancingLegSpec {
  *
  * Defines the payment schedule and frequency for both legs of the TRS.
  * This is shared between equity and fixed income TRS instruments.
- *
- * # Examples
- *
- * ```
- * use finstack_quant_valuations::instruments::TrsScheduleSpec;
- * use finstack_quant_cashflows::builder::ScheduleParams;
- * use finstack_quant_core::dates::{Date, Tenor, DayCount, BusinessDayConvention, StubKind};
- *
- * let schedule = TrsScheduleSpec::from_params(
- *     Date::from_calendar_date(2024, time::Month::January, 1).unwrap(),
- *     Date::from_calendar_date(2025, time::Month::January, 1).unwrap(),
- *     ScheduleParams {
- *         frequency: Tenor::quarterly(),
- *         day_count: DayCount::Act360,
- *         business_day_convention: BusinessDayConvention::Following,
- *         calendar_id: "weekends_only".into(),
- *         stub: StubKind::None,
- *         end_of_month: false,
- *         payment_lag_days: 0,
- *         adjust_accrual_dates: false,
- *         roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
- *     },
- * );
- * ```
  */
 export interface TrsScheduleSpec {
   /**
@@ -16552,47 +15544,6 @@ export interface EquityUnderlyingParams {
  * leg values.
  *
  * # Construction
- *
- * ```
- * use finstack_quant_core::{
- *     currency::Currency, dates::DayCount, money::Money, types::InstrumentId,
- * };
- * use finstack_quant_cashflows::builder::ScheduleParams;
- * use finstack_quant_valuations::instruments::{
- *     Attributes, FinancingLegSpec, IndexUnderlyingParams, PayReceive,
- * };
- * use finstack_quant_valuations::instruments::fixed_income::fi_trs::FiIndexTotalReturnSwap;
- * use finstack_quant_valuations::instruments::fixed_income::fi_trs::{
- *     TrsScheduleSpec,
- * };
- * use rust_decimal::Decimal;
- * use time::macros::date;
- *
- * # fn main() -> finstack_quant_core::Result<()> {
- * let trs = FiIndexTotalReturnSwap::builder()
- *     .id(InstrumentId::new("CORP-TRS"))
- *     .notional(Money::from((10_000_000_i64, Currency::USD)))
- *     .underlying(
- *         IndexUnderlyingParams::new("US-CORP", Currency::USD)
- *             .with_yield_id("US-CORP-YIELD")
- *             .with_duration_id("US-CORP-DURATION"),
- *     )
- *     .financing_leg(FinancingLegSpec::new(
- *         "USD-OIS", "USD-SOFR-3M", Decimal::from(35), DayCount::Act360,
- *     ))
- *     .schedule(TrsScheduleSpec::from_params(
- *         date!(2026 - 01 - 02),
- *         date!(2027 - 01 - 02),
- *         ScheduleParams::quarterly_act360(),
- *     ))
- *     .side(PayReceive::Receive)
- *     .initial_level_opt(None)
- *     .attributes(Attributes::new())
- *     .build()?;
- * assert_eq!(trs.notional.currency(), Currency::USD);
- * # Ok(())
- * # }
- * ```
  */
 export interface FiIndexTotalReturnSwap {
   /**
@@ -17280,44 +16231,6 @@ export interface RangeAccrualTerms {
  *   marks the caller-supplied CTD only; refresh it daily with
  *   [`Self::determine_ctd_by_implied_repo`] when the basket can switch.
  * - **Invoice price**: `(Futures Price × Conversion Factor) + Accrued Interest`.
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::currency::Currency;
- * use finstack_quant_core::types::{CurveId, InstrumentId};
- * use finstack_quant_valuations::instruments::fixed_income::bond_future::{
- *     BondFuture, BondFutureSpecs, DeliverableBond,
- * };
- * use finstack_quant_valuations::instruments::{Attributes, ListedFutureTerms, Position};
- * use time::macros::date;
- *
- * # fn main() -> finstack_quant_core::Result<()> {
- * // 10 UST 10Y contracts ($100,000 face each, $1,000 per price point).
- * let future = BondFuture::builder()
- *     .id(InstrumentId::new("TYH5"))
- *     .terms(ListedFutureTerms::new(
- *         10.0,
- *         1_000.0,
- *         Currency::USD,
- *         125.50,
- *         date!(2025 - 03 - 20),
- *         date!(2025 - 03 - 31),
- *         Position::Long,
- *     )?)
- *     .delivery_start(date!(2025 - 03 - 21))
- *     .contract_specs(BondFutureSpecs::ust_10y())
- *     .deliverable_basket(vec![DeliverableBond {
- *         bond_id: InstrumentId::new("US912828XG33"),
- *         conversion_factor: 0.8234,
- *     }])
- *     .discount_curve_id(CurveId::new("USD-TREASURY"))
- *     .attributes(Attributes::new())
- *     .build()?;
- * assert_eq!(future.deliverable_basket.len(), 1);
- * # Ok(())
- * # }
- * ```
  */
 export interface BondFuture {
   /**
@@ -17415,16 +16328,6 @@ export interface BondFuture {
  * Delivery timing is carried by the future's explicit `delivery_start` /
  * `terms.settlement_date` and the caller-supplied invoice settlement date, so
  * the spec holds no settlement lag or holiday calendar.
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_valuations::instruments::fixed_income::bond_future::BondFutureSpecs;
- *
- * // UST 10-year contract specs
- * let specs = BondFutureSpecs::default(); // UST 10Y defaults
- * assert_eq!(specs.standard_coupon, 0.06);
- * ```
  */
 export interface BondFutureSpecs {
   /**
@@ -17539,23 +16442,6 @@ export interface StructuredCredit {
    * [`Self::waterfall`] receives them the same way. Only cash ranked below
    * the test position can be diverted. Empty (the default) means no
    * coverage tests run.
-   *
-   * # Examples
-   *
-   * ```
-   * use finstack_quant_valuations::instruments::fixed_income::structured_credit::CoverageTestSpec;
-   *
-   * // Class B must maintain 120% OC (tested on A + B) and 115% IC.
-   * let tests = vec![
-   *     CoverageTestSpec::oc("CLASS_B", 1.20),
-   *     CoverageTestSpec::ic("CLASS_B", 1.15),
-   * ];
-   * assert_eq!(tests[0].id, "OC_CLASS_B");
-   * ```
-   *
-   * Distinct from the per-tranche [`Tranche::oc_trigger`] /
-   * [`Tranche::ic_trigger`] (`structured_credit::CoverageTrigger`), which
-   * carry breach/cure memory and non-diversion consequences.
    */
   coverage_triggers?: CoverageTestSpec[];
   /**
@@ -17756,20 +16642,6 @@ export interface StructuredCredit {
 }
 /**
  * Assumed optional redemption on a date at a price.
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::dates::Date;
- * use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
- *     CallAssumption, CallScope,
- * };
- * use time::Month;
- *
- * let date = Date::from_calendar_date(2027, Month::January, 15).unwrap();
- * let call = CallAssumption::new(date, 100.0);
- * assert_eq!(call.scope, CallScope::Deal);
- * ```
  */
 export interface CallAssumption {
   /**
@@ -18496,17 +17368,6 @@ export interface LeveredRealEstateEquity {
  *
  * Valuation and risk use `state` exactly as stored. Call [`Self::rebalance`]
  * to obtain a distinct instrument; this type does not mutate in place.
- *
- * # Examples
- *
- * ```
- * use finstack_quant_valuations::instruments::{CompositeInstrument, Instrument};
- *
- * let composite = CompositeInstrument::example()?;
- * assert_eq!(composite.id(), "COMPOSITE-EXAMPLE");
- * assert_eq!(composite.state.resolved_legs.len(), 2);
- * # Ok::<(), finstack_quant_core::Error>(())
- * ```
  */
 export interface CompositeInstrument {
   /**
@@ -19106,25 +17967,6 @@ export interface ValuationResult {
    *
    * For cross-currency instruments, this may be in a different currency than
    * the base calculation currency.
-   *
-   * # Example
-   * ```rust
-   * # use finstack_quant_valuations::results::ValuationResult;
-   * # use finstack_quant_core::currency::Currency;
-   * # use finstack_quant_core::money::Money;
-   * # use finstack_quant_core::dates::create_date;
-   * # use time::Month;
-   * # fn main() -> Result<(), Box<dyn std::error::Error>> {
-   * # let as_of = create_date(2025, Month::January, 15)?;
-   * # let pv = Money::from((1_000_000_i64, Currency::USD));
-   * # let result = ValuationResult::stamped("BOND-001", as_of, pv);
-   * // PV is always in result.value, not in measures
-   * let pv_money = result.value;  // Money type
-   * let pv_amount = result.value.amount();  // f64 value
-   * let currency = result.value.currency();  // Currency type
-   * # Ok(())
-   * # }
-   * ```
    */
   value: Money;
 }
@@ -19170,15 +18012,6 @@ export interface CovenantReport {
  *
  * The metadata is intentionally small so it can be attached to reports and
  * downstream data stores for reproducibility and audit trails.
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::config::{results_meta, FinstackConfig, NUMERIC_MODE_F64};
- *
- * let meta = results_meta(&FinstackConfig::default());
- * assert_eq!(meta.numeric_mode, NUMERIC_MODE_F64);
- * assert!(meta.timestamp.is_none()); // deterministic by default
- * ```
  */
 export interface ResultsMeta {
   /**
@@ -19253,17 +18086,6 @@ export interface RoundingContext {
  * Provides configurable epsilon values for zero-checks in rate calculations
  * and generic floating-point comparisons. These defaults are chosen to balance
  * numerical stability with practical precision requirements.
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::config::ToleranceConfig;
- *
- * let mut tol = ToleranceConfig::default();
- * assert_eq!(tol.rate_epsilon, 1e-12);
- *
- * // Customize for stricter rate comparisons
- * tol.rate_epsilon = 1e-14;
- * ```
  */
 export interface ToleranceConfig {
   /**

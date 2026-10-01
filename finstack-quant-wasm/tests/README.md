@@ -23,7 +23,8 @@ tests/
 
 ## Layer 1 — `wasm_*.rs` (wasm-bindgen-test, wasm32)
 
-Twenty-one suites, one per binding domain, compiled as modules of `tests/wasm.rs`.
+One suite per binding domain (every `wasm_*.rs` file), compiled as modules of
+`tests/wasm.rs`.
 Each is gated with `#![cfg(target_arch = "wasm32")]` and written with
 `#[wasm_bindgen_test]`. They
 call the Rust binding types directly (`finstack_quant_wasm::api::…`) and inspect
@@ -51,6 +52,7 @@ the bindings exercise the typed Rust helpers instead.
 | `wasm_models_correlation.rs`      | correlation-matrix validation and repair                                     |
 | `wasm_models_credit.rs`           | Merton, recovery, endogenous hazard and toggle-exercise models               |
 | `wasm_models_liquidity.rs`        | liquidity estimators                                                         |
+| `wasm_models_volatility.rs`       | SABR / SVI parameters, smile and surface helpers                             |
 | `wasm_portfolio.rs`               | every portfolio computation result, asserted to be a plain structured object |
 | `wasm_scenarios.rs`               | template listing and `apply_scenario` / `apply_scenario_to_market`           |
 | `wasm_statements.rs`              | node enumeration, evaluator, validator, DSL                                  |
@@ -77,14 +79,14 @@ properties of the _declaration_, which no runtime test can reach: a `.d.ts` that
 lies about a type is invisible to JS at runtime and fatal at compile time for a
 TypeScript consumer.
 
-- **`dts_contract.rs`** (33 tests) pins the declared signatures per namespace —
+- **`dts_contract.rs`** pins the declared signatures per namespace —
   argument lists, full-word parameter names, `Float64Array` returns on the
   numeric fast paths, structured (not string) valuation results, the
   `WasmOwned` / `[Symbol.dispose]` handle contract, and that the package
   documents the hand-written facade rather than the raw wasm-bindgen types. It
   also reads [`../benchmarks/bench.mjs`](../benchmarks/bench.mjs) so the
   benchmark script cannot drift from the declared API.
-- **`return_shapes.rs`** (6 tests) pins _shapes_: no binding bypasses the
+- **`return_shapes.rs`** pins _shapes_: no binding bypasses the
   JSON-compatible serializer, only `*Json`-suffixed exports return strings,
   computation results are structured rather than strings, prose-returning
   exports are named `*Text`, numeric vector exports declare `Float64Array`, and
@@ -121,6 +123,11 @@ silently exporting `undefined`. `plain_object_returns.test.mjs` is the one
 exception — it imports the generated Node module directly, because the bug it
 hunts lives below the facade (see below).
 
+The table lists representative suites, not every file: each namespace also has
+`<namespace>_parity.test.mjs` (goldens under `golden/`, shared with the Python
+twin test), and the `*_audit` / `*_rust_owned` suites pin individual audit
+regressions. `ls facade/` is the full list.
+
 | File                                                       | Asserts                                                                                                                                                                              |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `core_namespace.test.mjs`                                  | `Currency`, `Money` (including the lossless `amountDecimal` getter), `FxDeltaVolSurface`, `FxMatrix`, `FxRateResult` getters                                                         |
@@ -139,6 +146,8 @@ hunts lives below the facade (see below).
 | `core_rust_owned.test.mjs`                                 | core currency/money/date/curve behaviour owned by Rust; asserts the same values and messages as `finstack-quant-py/tests/test_core_rust_owned.py`                                    |
 | `contract_types.test.mjs`                                  | runtime calibration, materialization and valuation outputs type-check against the schema-generated TypeScript types under NodeNext                                                   |
 | `statements_parity.test.mjs`                               | `Evaluator`, `ModelBuilder`, `Registry` and the statements free-function twins; goldens shared with `test_statements_wasm_parity.py`                                                 |
+| `doc_examples.test.mjs`                                    | every runnable `@example` in `../index.d.ts` and every `js`/`ts` block in `../README.md` and `.agents/rules/wasm/javascript-usage-standards.md` executes against the built package   |
+| `surface.test.mjs`                                         | the facade export surface equals the checked-in `../facade-surface.json`                                                                                                             |
 | `statements_analytics_parity.test.mjs`                     | `DependencyTracer`, extensions, templates, ECL, DCF and twins; goldens shared with `test_statements_wasm_parity.py`                                                                  |
 
 **These need a build.** All of them except `plain_object_returns.test.mjs` load
@@ -189,12 +198,21 @@ the ban, `return_shapes.rs` asserts it, and this file proves it at runtime.
   are copied to a temp directory first, so the checks never mutate the
   repository.
 
-Both run under `npm run docs:check`, not under `npm run test`:
+- **`../scripts/check-typescript-examples.mjs`** type-checks every code sample
+  a consumer can copy — each `@example` in `../index.d.ts` and each `js`/`ts`
+  block in `../README.md` and `.agents/rules/wasm/javascript-usage-standards.md`
+  — with `tsc` under `strict` against `../index.d.ts`. It needs no build.
+  `facade/doc_examples.test.mjs` (Layer 3) executes the same blocks against the
+  built package. A block with no `import` continues from the standard setup
+  (every namespace imported, `await init()` done); a fence tagged `no-run` is
+  skipped by both and is reserved for a sample of what not to write.
+
+All three run under `npm run docs:check`, not under `npm run test`:
 
 ```bash
-npm --prefix finstack-quant-wasm run test:dts          # tsc, both tsconfigs
+npm --prefix finstack-quant-wasm run test:dts          # tsc, every tsconfig
 npm --prefix finstack-quant-wasm run test:docs-tools   # doc tooling
-npm --prefix finstack-quant-wasm run docs:check        # both, plus the doc checkers
+npm --prefix finstack-quant-wasm run docs:check        # all three, plus the doc checkers
 ```
 
 ## Running everything

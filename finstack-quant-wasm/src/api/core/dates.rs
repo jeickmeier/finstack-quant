@@ -68,7 +68,7 @@ impl JsDayCountContext {
     /// @example
     /// ```javascript
     /// const ctx = new core.DayCountContext("nyse", "3M", 252);
-    /// ctx.frequency.toString();  // "3M"
+    /// ctx.frequency?.toString();  // "3M"
     /// core.DayCountContext.fromJson(ctx.toJson()).busBasis;  // 252
     /// ```
     #[wasm_bindgen(constructor)]

@@ -13,13 +13,6 @@ import type * as valuations from '../valuations/index.js';
  *   independently based on the previous knots.
  * - `GlobalSolve`: Simultaneous optimization of all knots using Levenberg-Marquardt
  *   or Newton-Raphson.
- *
- * # Examples
- * ```rust
- * use finstack_quant_calibration::CalibrationMethod;
- *
- * let method = CalibrationMethod::GlobalSolve { use_analytical_jacobian: true };
- * ```
  */
 export type CalibrationMethod =
   | "bootstrap"
@@ -669,15 +662,6 @@ export type MarketDatum =
  * [`QuoteId::new`] is infallible, including for empty strings. Empty or
  * whitespace-only IDs are rejected when this type is deserialized from the
  * wire, and again by [`MarketQuote::validate`](super::market_quote::MarketQuote::validate).
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_calibration::quotes::ids::QuoteId;
- *
- * let id = QuoteId::new("USD-SOFR-DEP-1M");
- * assert_eq!(id.as_str(), "USD-SOFR-DEP-1M");
- * ```
  */
 export type QuoteId = string;
 /**
@@ -690,26 +674,6 @@ export type QuoteId = string;
  *
  * The JSON wire form is externally tagged: `{"tenor": {"count": 5, "unit": "years"}}`
  * or `{"date": "2029-06-20"}`. A bare string such as `"5Y"` is rejected.
- *
- * # Examples
- *
- * Using a tenor pillar:
- * ```rust
- * use finstack_quant_calibration::quotes::ids::Pillar;
- *
- * # fn example() -> finstack_quant_core::Result<()> {
- * let pillar = Pillar::Tenor("5Y".parse()?);
- * # Ok(())
- * # }
- * ```
- *
- * Using a date pillar:
- * ```rust
- * use finstack_quant_calibration::quotes::ids::Pillar;
- * use finstack_quant_core::dates::Date;
- *
- * let pillar = Pillar::Date(Date::from_calendar_date(2029, time::Month::June, 20).unwrap());
- * ```
  */
 export type Pillar =
   | {
@@ -731,14 +695,6 @@ export type IrFutureContractId = string;
  * Represents the ISDA documentation clause used for CDS contracts. Different clauses
  * define different restructuring events and settlement procedures. Used as part of
  * [`CdsConventionKey`] to look up CDS conventions.
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_valuations::market::conventions::ids::CdsDocClause;
- *
- * let clause = CdsDocClause::Cr14; // Cum-Restructuring 2014
- * ```
  */
 export type CdsDocClause =
   "cr14" | "mr14" | "mm14" | "xr14" | "isda_na" | "isda_eu" | "isda_as" | "isda_au" | "isda_nz" | "custom";
@@ -791,25 +747,6 @@ export type XccyConventionId = string;
  * - **Correlation parameters**: Equity-FX correlation, basis correlations
  * - **Spreads**: Credit spreads, basis spreads (unitless or monetary)
  * - **Multipliers**: Beta, vega notionals, adjustment factors
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::market_data::scalars::MarketScalar;
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::currency::Currency;
- *
- * // Equity beta (unitless)
- * let beta = MarketScalar::Unitless(1.2);
- *
- * // Spot price (with currency)
- * let spot = MarketScalar::Price(Money::new(152.75, Currency::USD).expect("valid money fixture"));
- *
- * assert!(matches!(beta, MarketScalar::Unitless(_)));
- * if let MarketScalar::Price(m) = spot {
- *     assert_eq!(m.currency(), Currency::USD);
- * }
- * ```
  */
 export type MarketScalar =
   | {
@@ -848,26 +785,6 @@ export type DividendKind =
     };
 /**
  * Interpolation strategy for [`ScalarTimeSeries`].
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::market_data::scalars::{ScalarTimeSeries, SeriesInterpolation};
- * use finstack_quant_core::dates::Date;
- * use time::Month;
- *
- * let series = ScalarTimeSeries::new(
- *     "TS",
- *     vec![
- *         (Date::from_calendar_date(2024, Month::January, 1).expect("Valid date"), 100.0),
- *         (Date::from_calendar_date(2024, Month::February, 1).expect("Valid date"), 105.0),
- *     ],
- *     None,
- * )
- * .expect("Series creation should succeed");
- * let stepped = series.clone().with_interpolation(SeriesInterpolation::Step);
- * let mid_date = Date::from_calendar_date(2024, Month::January, 15).expect("Valid date");
- * assert_eq!(stepped.value_on(mid_date).expect("Value lookup should succeed"), 100.0);
- * ```
  */
 export type SeriesInterpolation = "step" | "linear";
 /**
@@ -881,15 +798,6 @@ export type SeriesInterpolation = "step" | "linear";
  * - **US TIPS**: Linear interpolation (daily pro-rata)
  * - **UK Index-Linked Gilts**: Linear interpolation with 3-month lag
  * - **Euro inflation bonds**: Varies by issuer (typically linear)
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::market_data::scalars::InflationInterpolation;
- *
- * let linear = InflationInterpolation::Linear; // TIPS standard
- * let step = InflationInterpolation::Step;     // Conservative approach
- * ```
  */
 export type InflationInterpolation = "step" | "linear";
 /**
@@ -912,16 +820,6 @@ export type InflationInterpolation = "step" | "linear";
  * 1. Reference index is published before settlement
  * 2. Index value is known at coupon payment date
  * 3. No estimation or forecasting required for payment calculation
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::market_data::scalars::InflationLag;
- *
- * let tips_lag = InflationLag::Months(3);  // US TIPS standard
- * let gilt_lag = InflationLag::Months(3);  // UK modern gilts
- * let no_lag = InflationLag::None;         // Inflation swaps (forecast-based)
- * ```
  */
 export type InflationLag =
   | {
@@ -1708,18 +1606,6 @@ export type CalibrationStep =
  * - ISDA 2021 Definitions, compounded RFR conventions `docs/REFERENCES.md#isda-2021-definitions`
  * - ARRC (2020). "SOFR: A User's Guide." `docs/REFERENCES.md#arrc-sofr-users-guide`
  * - BoE SONIA conventions `docs/REFERENCES.md#boe-sonia-key-features`
- *
- * # Examples
- *
- * ```
- * use finstack_quant_cashflows::builder::FloatingLegCompounding;
- *
- * assert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);
- * assert_eq!(
- *     FloatingLegCompounding::sofr(),
- *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
- * );
- * ```
  */
 export type FloatingLegCompounding =
   | "simple"
@@ -1853,15 +1739,6 @@ export type SwaptionVolConvention =
  *   dates). When the start date is not itself a roll date, the first period
  *   accrues from the roll date immediately **preceding** the start (standard
  *   front accrual per the ISDA Big Bang Protocol, April 2009).
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_cashflows::builder::specs::RollRule;
- *
- * let rule = RollRule::default();
- * assert_eq!(rule, RollRule::None);
- * ```
  *
  * # References
  *
@@ -2594,15 +2471,6 @@ export type TraceEntry =
  * Rounding modes supported by the library.
  *
  * The variants mirror the most common conventions found in pricing engines.
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::config::{FinstackConfig, RoundingMode};
- *
- * let mut cfg = FinstackConfig::default();
- * cfg.rounding.mode = RoundingMode::TowardZero;
- * assert!(matches!(cfg.rounding.mode, RoundingMode::TowardZero));
- * ```
  */
 export type RoundingMode = "bankers" | "away_from_zero" | "toward_zero" | "floor" | "ceil";
 /**
@@ -4533,20 +4401,6 @@ export type VolQuote =
  * In other words, this struct provides default policy, but explicit plan steps
  * remain authoritative when both are supplied.
  *
- * # Examples
- *
- * ```rust
- * use finstack_quant_calibration::CalibrationConfig;
- *
- * // Create a default config
- * let config = CalibrationConfig::default();
- *
- * // Customize tolerance settings
- * let custom = CalibrationConfig::default()
- *     .with_tolerance(1e-14)  // Solver convergence tolerance
- *     .with_max_iterations(200);
- * ```
- *
  * # References
  *
  * - Multi-curve construction context: `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`
@@ -4657,17 +4511,6 @@ export interface CalibrationConfig {
  * # Invariants
  * - `df_hard_min` > 0
  * - `scan_grid_points` > 0
- *
- * # Examples
- * ```
- * use finstack_quant_calibration::DiscountCurveSolveConfig;
- *
- * let config = DiscountCurveSolveConfig {
- *     scan_grid_points: 64,
- *     df_hard_min: 1e-10,
- *     ..Default::default()
- * };
- * ```
  */
 export interface DiscountCurveSolveConfig {
   /**
@@ -4730,16 +4573,6 @@ export interface DiscountCurveSolveConfig {
  * Controls residual weighting and post-solve success tolerance for
  * projection-curve global solves. Defaults match the values previously
  * borrowed from [`DiscountCurveSolveConfig`].
- *
- * # Examples
- * ```
- * use finstack_quant_calibration::ForwardCurveSolveConfig;
- *
- * let config = ForwardCurveSolveConfig {
- *     validation_tolerance: 1e-6,
- *     ..Default::default()
- * };
- * ```
  */
 export interface ForwardCurveSolveConfig {
   /**
@@ -4796,17 +4629,6 @@ export interface FxConfig {
  * # Invariants
  * - `hazard_hard_min` >= 0 (hazard rates must be non-negative)
  * - `hazard_hard_max` > `hazard_hard_min`
- *
- * # Examples
- * ```
- * use finstack_quant_calibration::HazardCurveSolveConfig;
- *
- * // For distressed debt scenarios, increase the max hazard rate
- * let config = HazardCurveSolveConfig {
- *     hazard_hard_max: 100.0,  // Allow up to ~100% default probability per year
- *     ..Default::default()
- * };
- * ```
  */
 export interface HazardCurveSolveConfig {
   /**
@@ -4886,16 +4708,6 @@ export interface HierarchyNode {
  *
  * Controls the numerical stability and success criteria of inflation curve
  * bootstrapping or global solve for CPI curve calibration.
- *
- * # Examples
- * ```
- * use finstack_quant_calibration::InflationCurveSolveConfig;
- *
- * let config = InflationCurveSolveConfig {
- *     validation_tolerance: 1e-6,  // Relax for noisy inflation markets
- *     ..Default::default()
- * };
- * ```
  */
 export interface InflationCurveSolveConfig {
   /**
@@ -4954,21 +4766,6 @@ export interface MarketFreshnessPolicy {
  * - Developed markets (USD, EUR, GBP): typically [-2%, 50%]
  * - Negative rate environments (EUR, JPY, CHF): [-5%, 20%]
  * - Emerging markets (TRY, ARS, BRL): [-5%, 200%]
- *
- * # Examples
- *
- * ```
- * use finstack_quant_calibration::RateBounds;
- * use finstack_quant_core::currency::Currency;
- *
- * // Use currency-specific defaults
- * let usd_bounds = RateBounds::for_currency(Currency::USD);
- * assert!(usd_bounds.min_rate < 0.0);
- *
- * // Or customize for specific scenarios
- * let em_bounds = RateBounds::emerging_markets();
- * assert!(em_bounds.max_rate > 1.0);
- * ```
  */
 export interface RateBounds {
   /**
@@ -4988,18 +4785,6 @@ export interface RateBounds {
  *
  * Deserialization runs [`SolverConfig::validate`], so a wire document with a
  * non-positive tolerance or a zero iteration budget is rejected at parse time.
- *
- * # Examples
- *
- * ```
- * use finstack_quant_calibration::SolverConfig;
- * # fn main() -> Result<(), Box<dyn std::error::Error>> {
- * let config = SolverConfig::default().with_tolerance(1e-12).with_max_iterations(200);
- * let json = serde_json::to_string(&config)?;
- * # let _ = json;
- * # Ok(())
- * # }
- * ```
  */
 export interface SolverConfig {
   /**
@@ -5104,15 +4889,6 @@ export interface ValidationConfig {
  * Controls the success criterion for SABR and SVI surface calibration.
  * Residuals are in **decimal implied-vol units** (for example `0.001` is
  * 0.10 vol points), not PV-per-notional.
- *
- * # Examples
- * ```
- * use finstack_quant_calibration::VolSurfaceSolveConfig;
- *
- * let config = VolSurfaceSolveConfig {
- *     validation_tolerance: 2e-3, // 0.20 vol points
- * };
- * ```
  */
 export interface VolSurfaceSolveConfig {
   /**
@@ -5235,18 +5011,6 @@ export interface CalibrationEnvelope {
  * CDS conventions are identified by both currency and documentation clause, as different
  * clauses have different market conventions. Used to look up [`CdsConventionSpec`](crate::market::conventions::defs::CdsConventionSpec)
  * from the convention registry.
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
- * use finstack_quant_core::currency::Currency;
- *
- * let key = CdsConventionKey {
- *     currency: Currency::USD,
- *     doc_clause: CdsDocClause::Cr14,
- * };
- * ```
  */
 export interface CdsConventionKey {
   /**
@@ -5272,26 +5036,6 @@ export interface CdsConventionKey {
  * - **Ex-dividend adjustments**: Reduce forward price by dividend amount
  * - **Dividend futures**: Sum dividends in contract period
  * - **Total return**: Include dividend reinvestment in performance
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::market_data::dividends::DividendSchedule;
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::currency::Currency;
- * use finstack_quant_core::dates::Date;
- * use time::Month;
- *
- * let schedule = DividendSchedule::builder("AAPL-DIVS")
- *     .underlying("AAPL")
- *     .currency(Currency::USD)
- *     .cash(
- *         Date::from_calendar_date(2025, Month::March, 15).expect("Valid date"),
- *         Money::new(0.24, Currency::USD).expect("valid money fixture")
- *     ).build().expect("Valid dividends");
- *
- * assert_eq!(schedule.get_events().len(), 1);
- * ```
  */
 export interface DividendSchedule {
   /**
@@ -5499,19 +5243,6 @@ export interface HazardCalibrationInput {
  * Consolidates success status, residuals, convergence diagnostics, and optional
  * tracing information. Used by the calibration engine to return results and
  * by risk systems to audit calibration quality.
- *
- * # Examples
- * ```rust
- * use finstack_quant_calibration::CalibrationReport;
- * use std::collections::BTreeMap;
- *
- * let mut residuals = BTreeMap::new();
- * residuals.insert("1Y".to_string(), 1e-12);
- *
- * let report = CalibrationReport::new(residuals, 10, true, "Converged");
- * assert!(report.success);
- * assert!(report.max_residual <= 1e-12);
- * ```
  */
 export interface CalibrationReport {
   /**
@@ -5653,15 +5384,6 @@ export interface ExplanationTrace {
  *
  * The metadata is intentionally small so it can be attached to reports and
  * downstream data stores for reproducibility and audit trails.
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::config::{results_meta, FinstackConfig, NUMERIC_MODE_F64};
- *
- * let meta = results_meta(&FinstackConfig::default());
- * assert_eq!(meta.numeric_mode, NUMERIC_MODE_F64);
- * assert!(meta.timestamp.is_none()); // deterministic by default
- * ```
  */
 export interface ResultsMeta {
   /**
@@ -5736,17 +5458,6 @@ export interface RoundingContext {
  * Provides configurable epsilon values for zero-checks in rate calculations
  * and generic floating-point comparisons. These defaults are chosen to balance
  * numerical stability with practical precision requirements.
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::config::ToleranceConfig;
- *
- * let mut tol = ToleranceConfig::default();
- * assert_eq!(tol.rate_epsilon, 1e-12);
- *
- * // Customize for stricter rate comparisons
- * tol.rate_epsilon = 1e-14;
- * ```
  */
 export interface ToleranceConfig {
   /**
@@ -5933,25 +5644,6 @@ export interface FxMatrixState {
  * Stores market-standard FX vol quotes (ATM DNS, 25-delta risk-reversal,
  * 25-delta butterfly) across multiple expiries. Models-layer functions
  * perform delta conversion and volatility evaluation.
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::market_data::surfaces::FxDeltaVolSurface;
- *
- * let surface = FxDeltaVolSurface::new(
- *     "EURUSD-DELTA-VOL",
- *     vec![0.25, 0.5, 1.0],
- *     vec![0.08, 0.085, 0.09],
- *     vec![0.01, 0.012, 0.015],
- *     vec![0.005, 0.006, 0.007],
- *     None,
- *     None,
- * ).expect("surface should build");
- *
- * assert_eq!(surface.num_expiries(), 3);
- * assert!((surface.atm_vols()[0] - 0.08).abs() < 1e-12);
- * ```
  */
 export interface FxDeltaVolSurface {
   /**
@@ -6010,40 +5702,6 @@ export interface FxDeltaVolSurface {
  * 1. Reference date = T - 3 months
  * 2. Find bracketing CPI observations
  * 3. Interpolate linearly between them
- * ```
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::market_data::scalars::{
- *     InflationIndex, InflationInterpolation, InflationLag,
- * };
- * use finstack_quant_core::currency::Currency;
- * use finstack_quant_core::dates::Date;
- * use time::Month;
- *
- * // US CPI-U observations
- * let observations = vec![
- *     (Date::from_calendar_date(2023, Month::September, 30).expect("Valid date"), 296.8),
- *     (Date::from_calendar_date(2023, Month::October, 31).expect("Valid date"), 297.4),
- *     (Date::from_calendar_date(2023, Month::November, 30).expect("Valid date"), 298.1),
- *     (Date::from_calendar_date(2023, Month::December, 31).expect("Valid date"), 299.0),
- *     (Date::from_calendar_date(2024, Month::January, 31).expect("Valid date"), 300.5),
- *     (Date::from_calendar_date(2024, Month::February, 29).expect("Valid date"), 302.1),
- *     (Date::from_calendar_date(2024, Month::March, 31).expect("Valid date"), 303.8),
- *     (Date::from_calendar_date(2024, Month::April, 30).expect("Valid date"), 304.1),
- * ];
- *
- * let index = InflationIndex::new("US-CPI-U", observations, Currency::USD)
- *     .expect("Index creation should succeed")
- *     .with_interpolation(InflationInterpolation::Linear)
- *     .with_lag(InflationLag::Months(3)); // TIPS standard
- *
- * // Calculate inflation ratio for TIPS coupon indexation
- * let base_date = Date::from_calendar_date(2024, Month::January, 15).expect("Valid date");
- * let settle_date = Date::from_calendar_date(2024, Month::June, 15).expect("Valid date");
- * let ratio = index.ratio(base_date, settle_date).expect("Ratio calculation should succeed");
- * assert!(ratio >= 1.0); // Inflation adjustment factor
  * ```
  *
  * # Thread Safety
@@ -6117,29 +5775,6 @@ export interface InflationIndex {
  * - **Credit metrics**: Historical credit spreads, CDS levels
  * - **Commodity fundamentals**: Inventory levels, production data
  * - **Any sparse time series**: Where full curve infrastructure is overkill
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::market_data::scalars::{ScalarTimeSeries, SeriesInterpolation};
- * use finstack_quant_core::dates::Date;
- * use time::Month;
- *
- * let series = ScalarTimeSeries::new(
- *     "US-UNEMPLOYMENT",
- *     vec![
- *         (Date::from_calendar_date(2024, Month::January, 31).expect("Valid date"), 3.7),
- *         (Date::from_calendar_date(2024, Month::February, 29).expect("Valid date"), 3.9),
- *     ],
- *     None,
- * )
- * .expect("Series creation should succeed")
- * .with_interpolation(SeriesInterpolation::Linear);
- *
- * let mid = Date::from_calendar_date(2024, Month::February, 14).expect("Valid date");
- * let interpolated = series.value_on(mid).expect("Value lookup should succeed");
- * assert!(interpolated > 3.7 && interpolated < 3.9);
- * ```
  */
 export interface ScalarTimeSeries {
   /**
@@ -6367,15 +6002,6 @@ export interface CapFloorCalibrationConfig {
 }
 /**
  * Validated constant-parameter Hull-White one-factor model.
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
- *
- * let params = HullWhiteCalibrationParams::new(0.05, 0.01).unwrap();
- * assert!(!params.is_uncalibrated_default());
- * ```
  */
 export interface HullWhiteCalibrationParams {
   kappa: number;

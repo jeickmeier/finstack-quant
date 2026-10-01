@@ -178,3 +178,43 @@ test('write and check modes are mutually exclusive', () => {
   assert.equal(synchronized.status, 2);
   assert.match(synchronized.stderr, /mutually exclusive/);
 });
+
+test('sample extractor reads comment and Markdown fences and honours no-run', async () => {
+  const { PRELUDE, collectExamples, fencedBlocks } = await import(
+    join(scripts, 'doc-examples.mjs')
+  );
+  const declaration = [
+    '/**',
+    ' * Summary.',
+    ' * @example',
+    ' * ```typescript',
+    ' * const a: number = 1;',
+    ' * ```',
+    ' * ```text',
+    ' * not code',
+    ' * ```',
+    ' */',
+  ].join('\n');
+  assert.deepEqual(fencedBlocks(declaration, true), [
+    { line: 4, language: 'ts', code: 'const a: number = 1;' },
+  ]);
+  const markdown = [
+    '```javascript no-run',
+    'wrong();',
+    '```',
+    '```js',
+    'right();',
+    '```',
+    '```bash',
+    'ls',
+    '```',
+  ].join('\n');
+  assert.deepEqual(fencedBlocks(markdown, false), [{ line: 4, language: 'js', code: 'right();' }]);
+  assert.throws(() => fencedBlocks('```js\nopen();', false), /unterminated code fence/);
+
+  // A sample with no import continues from the standard setup.
+  const examples = collectExamples();
+  assert.ok(examples.every((example) => /^\s*import\s/m.test(example.code)));
+  assert.ok(examples.some((example) => example.code.startsWith(PRELUDE)));
+  assert.match(PRELUDE, /import init, \{ analytics, .*valuations \} from "finstack-quant-wasm";/);
+});

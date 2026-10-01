@@ -1,10 +1,11 @@
 //! Typed fixed-income instrument classes (`Bond`, `TermLoan`,
-//! `RevolvingCredit`).
+//! `RevolvingCredit`, `AssetBackedFacility`).
 //!
 //! Thin wrappers over the canonical Rust structs
 //! [`finstack_quant_valuations::instruments::Bond`],
-//! [`finstack_quant_valuations::instruments::TermLoan`] and
-//! [`finstack_quant_valuations::instruments::RevolvingCredit`]. Construction
+//! [`finstack_quant_valuations::instruments::TermLoan`],
+//! [`finstack_quant_valuations::instruments::RevolvingCredit`] and
+//! [`finstack_quant_valuations::instruments::AssetBackedFacility`]. Construction
 //! and validation stay in Rust; the wrappers convert to and from the canonical
 //! `finstack_quant.instrument/1` envelope accepted by the JSON loader.
 //!

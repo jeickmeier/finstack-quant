@@ -13,26 +13,6 @@
  * - **FpML**: BusinessDayConventionEnum
  * - **ISO 20022**: Business Day Convention codes
  *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::dates::{adjust, BusinessDayConvention, Date};
- * use finstack_quant_core::dates::calendar::TARGET2;
- * use time::Month;
- *
- * // Saturday, January 4, 2025
- * let weekend = Date::from_calendar_date(2025, Month::January, 4).expect("Valid date");
- *
- * // Following: moves to next Monday (Jan 6)
- * let adj = adjust(weekend, BusinessDayConvention::Following, &TARGET2)?;
- * assert_eq!(adj.day(), 6);
- *
- * // Preceding: moves to previous Friday (Jan 3)
- * let adj = adjust(weekend, BusinessDayConvention::Preceding, &TARGET2)?;
- * assert_eq!(adj.day(), 3);
- * # Ok::<(), finstack_quant_core::Error>(())
- * ```
- *
  * # Default
  *
  * `BusinessDayConvention::default()` is `ModifiedFollowing`, the ISDA 2006
@@ -539,24 +519,6 @@ export type DateWire = string;
  * - **ISDA**: 2006 ISDA Definitions, Section 4.16
  * - **ICMA**: ICMA Rule Book, Rule 251
  * - **ISO**: ISO 20022 Day Count Fraction Codes
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
- * use time::Month;
- *
- * let start = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
- * let end = Date::from_calendar_date(2025, Month::July, 1).expect("Valid date");
- *
- * // Actual/360 - money market convention
- * let yf_360 = DayCount::Act360.year_fraction(start, end, DayCountContext::default()).expect("Year fraction calculation should succeed");
- *
- * // 30/360 - bond convention
- * let yf_30360 = DayCount::Thirty360.year_fraction(start, end, DayCountContext::default()).expect("Year fraction calculation should succeed");
- *
- * assert!(yf_360 > yf_30360); // Act/360 has larger denominator
- * ```
  */
 export type DayCount =
   | "one_one"
@@ -756,23 +718,6 @@ export type RateCalibrationQuote =
  * - Two `Id<T>` values are equal if their string values are equal
  * - IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared
  *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::types::{CurveId, InstrumentId};
- *
- * // Create IDs with different type tags
- * let curve = CurveId::from("USD-SOFR");
- * let bond = InstrumentId::from("ISIN:US912828XG60");
- *
- * // Can compare IDs of the same type
- * assert_eq!(curve, CurveId::from("USD-SOFR"));
- * assert_ne!(curve, CurveId::from("EUR-ESTR"));
- *
- * // Cannot compare IDs of different types (compile error):
- * // let _ = curve == bond;  // Error: mismatched types
- * ```
- *
  * # Thread Safety
  *
  * `Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can
@@ -946,15 +891,6 @@ export type FxConversionPolicy = "cashflow_date" | "period_end" | "period_averag
  * - **US TIPS**: Linear interpolation (daily pro-rata)
  * - **UK Index-Linked Gilts**: Linear interpolation with 3-month lag
  * - **Euro inflation bonds**: Varies by issuer (typically linear)
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::market_data::scalars::InflationInterpolation;
- *
- * let linear = InflationInterpolation::Linear; // TIPS standard
- * let step = InflationInterpolation::Step;     // Conservative approach
- * ```
  */
 export type InflationInterpolation = "step" | "linear";
 /**
@@ -977,16 +913,6 @@ export type InflationInterpolation = "step" | "linear";
  * 1. Reference index is published before settlement
  * 2. Index value is known at coupon payment date
  * 3. No estimation or forecasting required for payment calculation
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::market_data::scalars::InflationLag;
- *
- * let tips_lag = InflationLag::Months(3);  // US TIPS standard
- * let gilt_lag = InflationLag::Months(3);  // UK modern gilts
- * let no_lag = InflationLag::None;         // Inflation swaps (forecast-based)
- * ```
  */
 export type InflationLag =
   | {
@@ -1010,25 +936,6 @@ export type InflationLag =
  * - **Correlation parameters**: Equity-FX correlation, basis correlations
  * - **Spreads**: Credit spreads, basis spreads (unitless or monetary)
  * - **Multipliers**: Beta, vega notionals, adjustment factors
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::market_data::scalars::MarketScalar;
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::currency::Currency;
- *
- * // Equity beta (unitless)
- * let beta = MarketScalar::Unitless(1.2);
- *
- * // Spot price (with currency)
- * let spot = MarketScalar::Price(Money::new(152.75, Currency::USD).expect("valid money fixture"));
- *
- * assert!(matches!(beta, MarketScalar::Unitless(_)));
- * if let MarketScalar::Price(m) = spot {
- *     assert_eq!(m.currency(), Currency::USD);
- * }
- * ```
  */
 export type MarketScalar =
   | {
@@ -1043,26 +950,6 @@ export type MarketScalar =
 export type SchemaVersion = number;
 /**
  * Interpolation strategy for [`ScalarTimeSeries`].
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::market_data::scalars::{ScalarTimeSeries, SeriesInterpolation};
- * use finstack_quant_core::dates::Date;
- * use time::Month;
- *
- * let series = ScalarTimeSeries::new(
- *     "TS",
- *     vec![
- *         (Date::from_calendar_date(2024, Month::January, 1).expect("Valid date"), 100.0),
- *         (Date::from_calendar_date(2024, Month::February, 1).expect("Valid date"), 105.0),
- *     ],
- *     None,
- * )
- * .expect("Series creation should succeed");
- * let stepped = series.clone().with_interpolation(SeriesInterpolation::Step);
- * let mid_date = Date::from_calendar_date(2024, Month::January, 15).expect("Valid date");
- * assert_eq!(stepped.value_on(mid_date).expect("Value lookup should succeed"), 100.0);
- * ```
  */
 export type SeriesInterpolation = "step" | "linear";
 /**
@@ -1108,22 +995,6 @@ export type PeriodId = string;
  * - **Graceful fallback**: When [`ScheduleErrorPolicy::GracefulEmpty`] is set and an error
  *   would normally occur, the builder returns an empty schedule with a warning
  *   describing the original error.
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::dates::{ScheduleBuilder, Tenor, ScheduleWarning};
- * use time::{Date, Month};
- *
- * let start = Date::from_calendar_date(2025, Month::December, 31)?;
- * let end = Date::from_calendar_date(2025, Month::January, 1)?; // Invalid: end before start
- *
- * // Invalid date ranges are rejected by new() before an error policy applies.
- * // rather than an error. Note: new() itself returns Result, so we handle the error
- * let result = ScheduleBuilder::new(start, end);
- * assert!(result.is_err()); // new() validates start <= end
- * # Ok::<(), Box<dyn std::error::Error>>(())
- * ```
  */
 export type ScheduleWarning =
   | {
@@ -1176,23 +1047,6 @@ export type ScheduleErrorPolicy = "strict" | "missing_calendar_warning" | "grace
  * - Interest accrual calculations (short/long first coupons)
  * - Cash flow present value computations
  * - Matching market conventions for specific instruments
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::dates::{ScheduleBuilder, Tenor, StubKind};
- * use time::{Date, Month};
- *
- * let start = Date::from_calendar_date(2025, Month::January, 10)?;
- * let end = Date::from_calendar_date(2025, Month::December, 15)?;
- *
- * // Short stub at front
- * let sched = ScheduleBuilder::new(start, end)?
- *     .frequency(Tenor::quarterly())
- *     .stub_rule(StubKind::ShortFront)
- *     .build()?;
- * # Ok::<(), Box<dyn std::error::Error>>(())
- * ```
  *
  * # See Also
  *
@@ -1328,24 +1182,6 @@ export interface RateCalibrationRecipe {
  *
  * Tenors are commonly used in financial markets to specify maturities,
  * payment frequencies, and rate fixing periods.
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::dates::{Tenor, TenorUnit};
- * # fn main() -> finstack_quant_core::Result<()> {
- *
- * let tenor = Tenor::new(3, TenorUnit::Months).expect("valid tenor fixture");
- * assert_eq!(tenor.count(), 3);
- * assert_eq!(tenor.unit(), TenorUnit::Months);
- *
- * // Parse from string
- * let parsed = Tenor::parse("6M")?;
- * assert_eq!(parsed.count(), 6);
- * assert_eq!(parsed.unit(), TenorUnit::Months);
- * # Ok(())
- * # }
- * ```
  */
 export interface Tenor {
   /**
@@ -1431,16 +1267,6 @@ export interface DividendEvent {
  *
  * When you need configurable rounding during ingestion, use
  * [`Money::new_with_config`].
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::currency::Currency;
- *
- * let notional = Money::from((1_000_000_i64, Currency::EUR));
- * assert_eq!(notional.currency(), Currency::EUR);
- * assert_eq!(notional.amount(), 1_000_000.0);
- * ```
  */
 export interface Money {
   /**
@@ -1468,26 +1294,6 @@ export interface Money {
  * - **Ex-dividend adjustments**: Reduce forward price by dividend amount
  * - **Dividend futures**: Sum dividends in contract period
  * - **Total return**: Include dividend reinvestment in performance
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::market_data::dividends::DividendSchedule;
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::currency::Currency;
- * use finstack_quant_core::dates::Date;
- * use time::Month;
- *
- * let schedule = DividendSchedule::builder("AAPL-DIVS")
- *     .underlying("AAPL")
- *     .currency(Currency::USD)
- *     .cash(
- *         Date::from_calendar_date(2025, Month::March, 15).expect("Valid date"),
- *         Money::new(0.24, Currency::USD).expect("valid money fixture")
- *     ).build().expect("Valid dividends");
- *
- * assert_eq!(schedule.get_events().len(), 1);
- * ```
  */
 export interface DividendSchedule {
   /**
@@ -1540,25 +1346,6 @@ export interface FxConfig {
  * Stores market-standard FX vol quotes (ATM DNS, 25-delta risk-reversal,
  * 25-delta butterfly) across multiple expiries. Models-layer functions
  * perform delta conversion and volatility evaluation.
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::market_data::surfaces::FxDeltaVolSurface;
- *
- * let surface = FxDeltaVolSurface::new(
- *     "EURUSD-DELTA-VOL",
- *     vec![0.25, 0.5, 1.0],
- *     vec![0.08, 0.085, 0.09],
- *     vec![0.01, 0.012, 0.015],
- *     vec![0.005, 0.006, 0.007],
- *     None,
- *     None,
- * ).expect("surface should build");
- *
- * assert_eq!(surface.num_expiries(), 3);
- * assert!((surface.atm_vols()[0] - 0.08).abs() < 1e-12);
- * ```
  */
 export interface FxDeltaVolSurface {
   /**
@@ -1671,40 +1458,6 @@ export interface HierarchyNode {
  * 1. Reference date = T - 3 months
  * 2. Find bracketing CPI observations
  * 3. Interpolate linearly between them
- * ```
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::market_data::scalars::{
- *     InflationIndex, InflationInterpolation, InflationLag,
- * };
- * use finstack_quant_core::currency::Currency;
- * use finstack_quant_core::dates::Date;
- * use time::Month;
- *
- * // US CPI-U observations
- * let observations = vec![
- *     (Date::from_calendar_date(2023, Month::September, 30).expect("Valid date"), 296.8),
- *     (Date::from_calendar_date(2023, Month::October, 31).expect("Valid date"), 297.4),
- *     (Date::from_calendar_date(2023, Month::November, 30).expect("Valid date"), 298.1),
- *     (Date::from_calendar_date(2023, Month::December, 31).expect("Valid date"), 299.0),
- *     (Date::from_calendar_date(2024, Month::January, 31).expect("Valid date"), 300.5),
- *     (Date::from_calendar_date(2024, Month::February, 29).expect("Valid date"), 302.1),
- *     (Date::from_calendar_date(2024, Month::March, 31).expect("Valid date"), 303.8),
- *     (Date::from_calendar_date(2024, Month::April, 30).expect("Valid date"), 304.1),
- * ];
- *
- * let index = InflationIndex::new("US-CPI-U", observations, Currency::USD)
- *     .expect("Index creation should succeed")
- *     .with_interpolation(InflationInterpolation::Linear)
- *     .with_lag(InflationLag::Months(3)); // TIPS standard
- *
- * // Calculate inflation ratio for TIPS coupon indexation
- * let base_date = Date::from_calendar_date(2024, Month::January, 15).expect("Valid date");
- * let settle_date = Date::from_calendar_date(2024, Month::June, 15).expect("Valid date");
- * let ratio = index.ratio(base_date, settle_date).expect("Ratio calculation should succeed");
- * assert!(ratio >= 1.0); // Inflation adjustment factor
  * ```
  *
  * # Thread Safety
@@ -1860,29 +1613,6 @@ export interface MarketDataHierarchy {
  * - **Credit metrics**: Historical credit spreads, CDS levels
  * - **Commodity fundamentals**: Inventory levels, production data
  * - **Any sparse time series**: Where full curve infrastructure is overkill
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::market_data::scalars::{ScalarTimeSeries, SeriesInterpolation};
- * use finstack_quant_core::dates::Date;
- * use time::Month;
- *
- * let series = ScalarTimeSeries::new(
- *     "US-UNEMPLOYMENT",
- *     vec![
- *         (Date::from_calendar_date(2024, Month::January, 31).expect("Valid date"), 3.7),
- *         (Date::from_calendar_date(2024, Month::February, 29).expect("Valid date"), 3.9),
- *     ],
- *     None,
- * )
- * .expect("Series creation should succeed")
- * .with_interpolation(SeriesInterpolation::Linear);
- *
- * let mid = Date::from_calendar_date(2024, Month::February, 14).expect("Valid date");
- * let interpolated = series.value_on(mid).expect("Value lookup should succeed");
- * assert!(interpolated > 3.7 && interpolated < 3.9);
- * ```
  */
 export interface ScalarTimeSeries {
   /**

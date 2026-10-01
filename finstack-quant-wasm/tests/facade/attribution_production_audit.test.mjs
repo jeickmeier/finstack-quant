@@ -72,6 +72,35 @@ test('metrics attribution reports gross carry and a separate funding overlay', (
     false
   );
   const result = attribution.attributePnl(params);
+  // A unit `AttributionMethod` variant is its bare wire label; the quoted
+  // JSON text above is equivalent.
+  assert.deepEqual(
+    attribution.attributePnl(
+      new attribution.AttributionJsonInputs(
+        JSON.stringify(bond),
+        JSON.stringify(market),
+        JSON.stringify(market),
+        '2025-06-17',
+        '2025-06-18',
+        'metrics_based',
+        JSON.stringify(config),
+        false
+      )
+    ),
+    result
+  );
+  assert.throws(
+    () =>
+      new attribution.AttributionJsonInputs(
+        JSON.stringify(bond),
+        JSON.stringify(market),
+        JSON.stringify(market),
+        '2025-06-17',
+        '2025-06-18',
+        'nope'
+      ),
+    (error) => error.kind === 'validation' && /methodJson/.test(error.message)
+  );
   const amount = (m) => Number(m.amount);
   const detail = result.carry_detail;
   assert.ok(amount(detail.funding_cost) > 0);

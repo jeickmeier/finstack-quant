@@ -240,7 +240,7 @@ pub fn compute_pnl_profiles_with_market(
 /// `RiskDecomposition.measure` getter returns the same value.
 /// @param sensitivities_json - Canonical sensitivity-matrix JSON `{ base_currency, position_ids, factor_ids, data }` with one `data` row per position and one entry per factor; unknown keys are rejected.
 /// @param covariance_json - Factor covariance-matrix JSON aligned with the supplied sensitivities.
-/// @param risk_measure_json - Risk-measure JSON selecting the decomposition metric; omit for `"variance"`.
+/// @param risk_measure_json - `RiskMeasure` wire value selecting the decomposition metric: `"variance"`, `"volatility"`, an object such as `{ var: { confidence: 0.99 } }`, or the same value as JSON text; omit for `"variance"`.
 ///
 /// # Errors
 ///
@@ -258,19 +258,17 @@ pub fn decompose_factor_risk(
 ) -> Result<JsValue, JsValue> {
     let sensitivities_json: &str = &json_text(&sensitivities_json, "sensitivitiesJson")?;
     let covariance_json: &str = &json_text(&covariance_json, "covarianceJson")?;
-    let risk_measure_json = opt_json_text(risk_measure_json.as_ref(), "riskMeasureJson")?;
     let wire: finstack_quant_portfolio::sensitivity::SensitivityMatrixJson =
         serde_json::from_str(sensitivities_json).map_err(to_js_err)?;
     let matrix = finstack_quant_portfolio::sensitivity::SensitivityMatrix::try_from(wire)
         .map_err(to_js_err)?;
     let covariance: finstack_quant_models::factor::FactorCovarianceMatrix =
         serde_json::from_str(covariance_json).map_err(to_js_err)?;
-    let measure: finstack_quant_models::factor::RiskMeasure = risk_measure_json
-        .as_deref()
-        .map(serde_json::from_str)
-        .transpose()
-        .map_err(to_js_err)?
-        .unwrap_or_default();
+    // `js_opt_wire`: the unit variants are bare wire strings (`"variance"`),
+    // which are not JSON text.
+    let measure: finstack_quant_models::factor::RiskMeasure =
+        crate::utils::wire::js_opt_wire(risk_measure_json.as_ref(), "riskMeasureJson")?
+            .unwrap_or_default();
     let result = finstack_quant_models::factor::risk::ParametricDecomposer
         .decompose(&matrix, &covariance, &measure)
         .map_err(to_js_err)?;

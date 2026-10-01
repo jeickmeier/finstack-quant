@@ -2826,7 +2826,7 @@ export interface DayCountContextConstructor {
    * @example
    * ```javascript
    * const ctx = new core.DayCountContext("nyse", "3M", 252);
-   * ctx.frequency.toString();  // "3M"
+   * ctx.frequency?.toString();  // "3M"
    * core.DayCountContext.fromJson(ctx.toJson()).busBasis;  // 252
    * ```
    * @param calendarId - Registered holiday-calendar identifier (for example `"nyse"`) used by Bus/252; resolved when the context is used.
@@ -5416,7 +5416,7 @@ export interface ScheduleConstructor {
  * const monthly = core.Schedule.builder(
  *   core.createDate(2025, 1, 15),
  *   core.createDate(2025, 7, 15),
- * ).frequency("1M");
+ * ).frequency("1M").adjustWith("modified_following", "nyse");
  * const schedule = monthly.paymentLagDays(2).build();
  * schedule.paymentDates.length; // 6
  * ```
@@ -5521,7 +5521,7 @@ export interface ScheduleBuilder extends WasmOwned {
  * const monthly = core.Schedule.builder(
  *   core.createDate(2025, 1, 15),
  *   core.createDate(2025, 7, 15),
- * ).frequency("1M");
+ * ).frequency("1M").adjustWith("modified_following", "nyse");
  * const schedule = monthly.paymentLagDays(2).build();
  * schedule.paymentDates.length; // 6
  * ```
@@ -9052,7 +9052,9 @@ declare class Performance {
    *
    * @example
    * ```ts
-   * const perf = Performance.fromReturns(
+   * import init, { analytics } from "finstack-quant-wasm";
+   * await init();
+   * const perf = analytics.Performance.fromReturns(
    *   ["2024-01-01", "2024-01-02"],
    *   [[0.01, 0.02]],
    *   ["FUND"],
@@ -9597,7 +9599,7 @@ declare class FactorCovarianceForecast {
    * measure. Omitting the risk measure uses the Rust `RiskMeasure::default()`
    * (`"variance"`), as Python's `factor_model_at` does.
    * @param horizonJson - JSON-serialized forecast horizon defining the future covariance date or period.
-   * @param riskMeasureJson - Optional risk-measure JSON for the horizon factor model; omitted or `null` uses the Rust `RiskMeasure::default()` (`"variance"`).
+   * @param riskMeasureJson - Optional `RiskMeasure` wire value for the horizon factor model: `"variance"`, `"volatility"`, an object such as `{ var: { confidence: 0.99 } }`, or the same value as JSON text; omitted or `null` uses the Rust `RiskMeasure::default()` (`"variance"`).
    * @returns Structured factor-model configuration ready for portfolio risk workflows.
    * @throws Error - Throws if the horizon or risk measure is invalid, or the model builder rejects the assembled configuration.
    */
@@ -12927,12 +12929,11 @@ export interface FrtbSbaEngineConstructor {
  * await init();
  * const config = margin.saCcrNettingSetConfigUnmargined(
  *   margin.nettingSetIdBilateral("CPTY", "CSA"), 0, "2025-01-15");
- * const trade = {
+ * new margin.SaCcrEngine().calculateEad(config, [{
  *   trade_id: "t1", asset_class: "interest_rate", notional: 1_000_000,
  *   start_date: "2025-01-15", end_date: "2030-01-15", underlier: "USD",
  *   hedging_set: "USD", direction: 1, supervisory_delta: 1, mtm: 0, is_option: false,
- * };
- * new margin.SaCcrEngine().calculateEad(config, [trade]).ead;
+ * }]).ead;
  * ```
  */
 export interface SaCcrEngine extends WasmOwned {
@@ -12965,12 +12966,11 @@ export interface SaCcrEngine extends WasmOwned {
  * await init();
  * const config = margin.saCcrNettingSetConfigUnmargined(
  *   margin.nettingSetIdBilateral("CPTY", "CSA"), 0, "2025-01-15");
- * const trade = {
+ * new margin.SaCcrEngine().calculateEad(config, [{
  *   trade_id: "t1", asset_class: "interest_rate", notional: 1_000_000,
  *   start_date: "2025-01-15", end_date: "2030-01-15", underlier: "USD",
  *   hedging_set: "USD", direction: 1, supervisory_delta: 1, mtm: 0, is_option: false,
- * };
- * new margin.SaCcrEngine().calculateEad(config, [trade]).ead;
+ * }]).ead;
  * ```
  */
 export interface SaCcrEngineConstructor {
@@ -13061,7 +13061,7 @@ export interface MarginNamespace {
    * ```javascript
    * import init, { core, margin } from "finstack-quant-wasm";
    * await init();
-   * const df = new core.DiscountCurve("USD-OIS", "2025-01-01", [0.0, 1.0, 5.0, 1.0], "log_linear");
+   * const df = core.DiscountCurve.flat("USD-OIS", "2025-01-01", 0.03);
    * const hz = core.HazardCurve.flat("CPTY", "2025-01-01", 0.02, 0.4);
    * const result = margin.computeBilateralXva(
    *   JSON.stringify({ times: [1, 2], mtm_values: [1e6, 1e6], epe: [1e6, 1e6], ene: [0, 0] }),
@@ -15935,7 +15935,10 @@ export interface Bond extends WasmOwned {
  *   "none",
  *   "USD-OIS"
  * );
- * const result = valuations.instruments.priceInstrument(bond.toJson(), marketJson, "2024-06-30", "default");
+ * const market = new core.MarketContext();
+ * market.insert(core.DiscountCurve.flat("USD-OIS", "2024-06-30", 0.03));
+ * const result = valuations.instruments.priceInstrument(bond.toJson(), market.toJson(), "2024-06-30", "default");
+ * console.log(result.value.amount, result.value.currency);
  * ```
  */
 export interface BondConstructor {
@@ -16308,10 +16311,13 @@ export interface TermLoan extends WasmOwned {
  * from `example()`.
  * @example
  * ```typescript
- * import init, { valuations } from "finstack-quant-wasm";
+ * import init, { core, valuations } from "finstack-quant-wasm";
  * await init();
  * const loan = valuations.instruments.TermLoan.example();
- * const result = valuations.instruments.priceInstrument(loan.toJson(), marketJson, "2024-06-30", "default");
+ * const market = new core.MarketContext();
+ * market.insert(core.DiscountCurve.flat("USD-OIS", "2024-06-30", 0.03));
+ * const result = valuations.instruments.priceInstrument(loan.toJson(), market.toJson(), "2024-06-30", "default");
+ * console.log(result.value.amount, result.value.currency);
  * ```
  */
 export interface TermLoanConstructor {
@@ -16605,11 +16611,14 @@ export interface AssetBackedFacility extends WasmOwned {
  * from `example()`.
  * @example
  * ```typescript
- * import init, { valuations } from "finstack-quant-wasm";
+ * import init, { core, valuations } from "finstack-quant-wasm";
  * await init();
  * const facility = valuations.instruments.AssetBackedFacility.example();
  * const base = facility.borrowingBase();
- * const result = valuations.instruments.priceInstrument(facility.toJson(), marketJson, "2024-01-15", "default");
+ * const market = new core.MarketContext();
+ * market.insert(core.DiscountCurve.flat("USD-OIS", "2024-01-15", 0.03));
+ * const result = valuations.instruments.priceInstrument(facility.toJson(), market.toJson(), "2024-01-15", "default");
+ * console.log(base.borrowing_base.amount, result.value.amount);
  * ```
  */
 export interface AssetBackedFacilityConstructor {
@@ -16874,10 +16883,17 @@ export interface RevolvingCredit extends WasmOwned {
  * from `example()`.
  * @example
  * ```typescript
- * import init, { valuations } from "finstack-quant-wasm";
+ * import init, { core, valuations } from "finstack-quant-wasm";
  * await init();
  * const facility = valuations.instruments.RevolvingCredit.example();
- * const result = valuations.instruments.priceInstrument(facility.toJson(), marketJson, "2024-06-30", "default");
+ * // The example facility commits on 2024-01-01 and draws on dated events after
+ * // that, so it is valued before the commitment date: a later date needs the
+ * // `FIXING:USD-SOFR-3M` history, and one past a draw event is rejected.
+ * const market = new core.MarketContext();
+ * market.insert(core.DiscountCurve.flat("USD-OIS", "2023-12-15", 0.03));
+ * market.insert(core.ForwardCurve.flat("USD-SOFR-3M", 0.25, "2023-12-15", 0.03));
+ * const result = valuations.instruments.priceInstrument(facility.toJson(), market.toJson(), "2023-12-15", "default");
+ * console.log(result.value.amount, result.value.currency);
  * ```
  */
 export interface RevolvingCreditConstructor {
@@ -21205,10 +21221,42 @@ export interface StructuredCredit extends WasmOwned {
  * Constructor surface for the typed `StructuredCredit` WebAssembly instrument.
  * @example
  * ```typescript
- * import init, { valuations } from "finstack-quant-wasm";
+ * import init, { core, valuations } from "finstack-quant-wasm";
  * await init();
- * const structuredCredit = valuations.instruments.StructuredCredit.example();
- * console.log(structuredCredit.id, structuredCredit.toDict());
+ * const tranche = valuations.instruments
+ *   .trancheBuilder()
+ *   .id("A")
+ *   .attachPct(0)
+ *   .detachPct(100)
+ *   .seniority("senior")
+ *   .originalBalance(new core.Money(100, new core.Currency("USD")))
+ *   .couponFixed(0.05)
+ *   .maturity("2029-01-01")
+ *   .build();
+ * const zero = { amount: "0", currency: "USD" as const };
+ * const structuredCredit = valuations.instruments.StructuredCredit.newClo(
+ *   "DEAL-1",
+ *   {
+ *     id: "POOL-1",
+ *     deal_type: "clo",
+ *     currency: "USD",
+ *     assets: [],
+ *     cumulative_defaults: zero,
+ *     cumulative_recoveries: zero,
+ *     cumulative_prepayments: zero,
+ *     cumulative_scheduled_amortization: zero,
+ *     collection_account: zero,
+ *     reserve_account: zero,
+ *     excess_spread_account: zero,
+ *     reserve_account_rate: 0,
+ *     reserve_interest_destination: { kind: "waterfall" },
+ *   },
+ *   valuations.instruments.trancheStructureFromBalances([tranche]),
+ *   "2024-01-01",
+ *   "2029-01-01",
+ *   "USD-OIS"
+ * );
+ * console.log(structuredCredit.id, structuredCredit.dealType); // "DEAL-1", "clo"
  * structuredCredit.free();
  * ```
  */
@@ -21853,10 +21901,11 @@ export interface MertonMcConfig extends WasmOwned {
  * Constructor surface for `MertonMcConfig`.
  * @example
  * ```typescript
- * import init, { valuations } from "finstack-quant-wasm";
+ * import init, { models, valuations } from "finstack-quant-wasm";
  * await init();
- * const config = valuations.instruments.MertonMcConfig.fromJson(configJson).stepsPerYear(24);
- * console.log(JSON.parse(config.toJson()).steps_per_year);
+ * const merton = new models.credit.MertonModel(100, 0.2, 80, 0.03);
+ * const config = new valuations.instruments.MertonMcConfig(merton.toJson(), 0.4).stepsPerYear(24);
+ * console.log(JSON.parse(config.toJson()).steps_per_year); // 24
  * config.free();
  * ```
  */
@@ -23332,7 +23381,7 @@ export interface FxBarrierOptionInstrument extends FxTouchOptionInstrument {
  *   id: "EURUSD-SPOT",
  *   base_currency: "EUR",
  *   quote_currency: "USD",
- *   settlement: "2025-01-17",
+ *   settlement_date: "2025-01-17",
  *   quoted_spot: 1.1,
  *   notional: { amount: "1000000", currency: "EUR" },
  *   attributes: {},
@@ -23484,7 +23533,7 @@ export interface FxOptionConstructor extends FxInstrumentConstructor<FxVanillaOp
  *   id: "EURUSD-SPOT",
  *   base_currency: "EUR",
  *   quote_currency: "USD",
- *   settlement: "2025-01-17",
+ *   settlement_date: "2025-01-17",
  *   quoted_spot: 1.1,
  *   notional: { amount: "1000000", currency: "EUR" },
  *   attributes: {},
@@ -26329,8 +26378,12 @@ export interface CreditDerivativesNamespace {
  * holes, functions, `Map`/`Date`/class instances and WASM handles throw a
  * `TypeError` with `kind: "invalid_type"`; `bigint` values are written as
  * exact integers and typed arrays as arrays.
+ *
+ * The object arm is `object`, not `Record<string, unknown>`, so a value typed
+ * as one of the generated interfaces (the `FinancialModelSpec` a builder
+ * returns, a `MarketContextState`) is accepted without a cast.
  */
-export type JsonInput = string | Record<string, unknown> | readonly unknown[];
+export type JsonInput = string | object;
 
 /**
  * Composite-instrument construction, decomposition, execution, and history.
@@ -26340,10 +26393,31 @@ export type JsonInput = string | Record<string, unknown> | readonly unknown[];
  * resolves `fixed_quantity` without history. Period return is `pnl / capital`.
  * @example
  * ```typescript
- * import init, { valuations } from "finstack-quant-wasm";
+ * import init, { core, valuations } from "finstack-quant-wasm";
  * await init();
- * const fixed = { kind: "fixed_quantity" };
- * console.log(fixed.kind === "fixed_quantity");
+ * const equity = (id: string, price: number) => ({
+ *   type: "equity",
+ *   spec: {
+ *     id, ticker: id, currency: "USD", quantity: 1, quoted_spot: price, spot_id: null,
+ *     div_yield_id: null, discrete_dividends: [], discount_curve_id: "USD", attributes: {},
+ *   },
+ * });
+ * const spec = {
+ *   id: "A-B",
+ *   reporting_currency: "USD",
+ *   capital: { amount: "100", currency: "USD" },
+ *   legs: [
+ *     { instrument_id: "A", instrument: equity("A", 100), score: 1 },
+ *     { instrument_id: "B", instrument: equity("B", 90), score: -1 },
+ *   ],
+ *   weighting_method: valuations.composite.weightingMethodFixedQuantity(),
+ *   rebalance_rule: valuations.composite.rebalanceRuleManual(),
+ *   attributes: {},
+ * };
+ * // Both legs carry a quoted spot, so an empty market is enough.
+ * const market = new core.MarketContext().toJson();
+ * const result = valuations.composite.initialize(spec, market, "2025-01-01");
+ * console.log(result.trades.map((trade) => [trade.instrument_id, trade.quantity_delta])); // [["A", 1], ["B", -1]]
  * ```
  */
 export interface CompositeNamespace {
@@ -27592,7 +27666,7 @@ export interface AlmgrenChrissModel extends WasmOwned {
  * await init();
  * const profile = {
  *   instrument_id: "ACME", mid: 100, bid: 99.95, ask: 100.05, avg_daily_volume: 1000000,
- *   avg_trade_size: 500, spread_volatility: 0.0002, spread_volatility_kind: "relative", observation_days: 20,
+ *   avg_trade_size: 500, spread_volatility: 0.0002, spread_volatility_kind: "relative" as const, observation_days: 20,
  * };
  * const model = new models.liquidity.AlmgrenChrissModel(1e-7, 1e-6, 1.0);
  * const params = { quantity: 50000, horizon_days: 5, daily_volatility: 0.02, profile, risk_aversion: 1e-6, reference_price: null };
@@ -29167,7 +29241,7 @@ export interface ValuationsNamespace {
    */
   composite: CompositeNamespace;
   /**
-   * CDS-family JSON wrappers and pricing helpers.
+   * CDS-family example instrument payload factories.
    */
   creditDerivatives: CreditDerivativesNamespace;
   /**
@@ -29441,6 +29515,12 @@ export interface AttributionJsonInputs extends WasmOwned {
 export interface AttributionNamespace {
   /**
    * Parameters constructor emitted by wasm-bindgen for attribution calls.
+   *
+   * `methodJson` is an `AttributionMethod` wire value: a unit variant name
+   * such as `"parallel"` or `"metrics_based"`, an object such as
+   * `{ waterfall: ["carry", "rates_curves"] }`, or the same value as JSON
+   * text. It is validated here; an unknown method throws with kind
+   * `validation`.
    *
    * `configJson` may include `{ "execution_policy": "parallel" }` to opt into
    * inner Rayon when the host is not already parallelizing attribution at the
@@ -33256,7 +33336,7 @@ export interface PortfolioNamespace {
    * @returns Returns a structured `RiskDecomposition` object.
    * @param sensitivitiesJson - Canonical sensitivity-matrix JSON `{ base_currency, position_ids, factor_ids, data }` with one `data` row per position and one entry per factor; unknown keys are rejected.
    * @param covarianceJson - Factor covariance-matrix JSON aligned with the supplied sensitivities.
-   * @param riskMeasureJson - Risk-measure JSON selecting the decomposition metric; omit for `"variance"`.
+   * @param riskMeasureJson - `RiskMeasure` wire value selecting the decomposition metric: `"variance"`, `"volatility"`, an object such as `{ var: { confidence: 0.99 } }`, or the same value as JSON text; omit for `"variance"`.
    * @throws Error - Throws a JavaScript exception (`kind` `validation`) if any JSON input is malformed or has unknown keys; `base_currency` is not an ISO-4217 code; the sensitivity rows do not match `position_ids` / `factor_ids`; sensitivity and covariance factor axes disagree; the covariance matrix or risk measure is invalid; or decomposition produces invalid variance or another non-finite value.
    */
   decomposeFactorRisk(
@@ -33388,7 +33468,7 @@ export interface PortfolioNamespace {
    * @param marketT1 - `core.MarketContext` handle for the closing snapshot.
    * @param asOfT0 - ISO-8601 date of the opening snapshot.
    * @param asOfT1 - ISO-8601 date of the closing snapshot.
-   * @param method - `AttributionMethod` JSON, e.g. `'"parallel"'`, `'"metrics_based"'` or `{ waterfall: ["carry", "rates_curves"] }` (a string argument is JSON text, so a bare variant name keeps its quotes).
+   * @param method - `AttributionMethod` wire value: a unit variant name such as `"parallel"` or `"metrics_based"`, an object such as `{ waterfall: ["carry", "rates_curves"] }`, or the same value as JSON text.
    * @param config - Optional `FinstackConfig` object or JSON; omit for the Rust default configuration.
    * @returns The `PortfolioAttribution`.
    * @throws Error - Throws a `TypeError` (kind `invalid_type`) for a mistyped argument, and a `FinstackError` if a date is not an ISO date or `method` / `config` is malformed (kind `validation`), a required FX rate or market datum is missing (kind `not_found`), or a position valuation or attribution fails.

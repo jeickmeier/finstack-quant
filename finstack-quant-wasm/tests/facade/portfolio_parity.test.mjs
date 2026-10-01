@@ -94,6 +94,21 @@ test('attributePortfolioPnl and its result methods match Python', () => {
     JSON.stringify(inputs.attribution_method)
   );
   assertClose(wire(attribution), expected.attribute_portfolio_pnl);
+  // The method is a wire value: a unit variant is its bare label, an object
+  // variant is a plain object, and JSON text of either is equivalent.
+  assert.deepEqual(
+    wire(
+      portfolio.attributePortfolioPnl(
+        book,
+        marketT0,
+        marketT1,
+        inputs.as_of_t0,
+        inputs.as_of_t1,
+        inputs.attribution_method
+      )
+    ),
+    wire(attribution)
+  );
   assert.equal(
     portfolio.portfolioAttributionExplainText(attribution),
     expected.attribution_explain

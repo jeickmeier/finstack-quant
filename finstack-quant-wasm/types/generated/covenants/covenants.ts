@@ -209,15 +209,6 @@ export type ThresholdSchedule = [unknown, unknown][];
  * Rounding modes supported by the library.
  *
  * The variants mirror the most common conventions found in pricing engines.
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::config::{FinstackConfig, RoundingMode};
- *
- * let mut cfg = FinstackConfig::default();
- * cfg.rounding.mode = RoundingMode::TowardZero;
- * assert!(matches!(cfg.rounding.mode, RoundingMode::TowardZero));
- * ```
  */
 export type RoundingMode = "bankers" | "away_from_zero" | "toward_zero" | "floor" | "ceil";
 /**
@@ -310,24 +301,6 @@ export interface SpringingCondition {
  *
  * Tenors are commonly used in financial markets to specify maturities,
  * payment frequencies, and rate fixing periods.
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::dates::{Tenor, TenorUnit};
- * # fn main() -> finstack_quant_core::Result<()> {
- *
- * let tenor = Tenor::new(3, TenorUnit::Months).expect("valid tenor fixture");
- * assert_eq!(tenor.count(), 3);
- * assert_eq!(tenor.unit(), TenorUnit::Months);
- *
- * // Parse from string
- * let parsed = Tenor::parse("6M")?;
- * assert_eq!(parsed.count(), 6);
- * assert_eq!(parsed.unit(), TenorUnit::Months);
- * # Ok(())
- * # }
- * ```
  */
 export interface Tenor {
   /**
@@ -634,15 +607,6 @@ export interface CovenantReport {
  *
  * The metadata is intentionally small so it can be attached to reports and
  * downstream data stores for reproducibility and audit trails.
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::config::{results_meta, FinstackConfig, NUMERIC_MODE_F64};
- *
- * let meta = results_meta(&FinstackConfig::default());
- * assert_eq!(meta.numeric_mode, NUMERIC_MODE_F64);
- * assert!(meta.timestamp.is_none()); // deterministic by default
- * ```
  */
 export interface ResultsMeta {
   /**
@@ -717,17 +681,6 @@ export interface RoundingContext {
  * Provides configurable epsilon values for zero-checks in rate calculations
  * and generic floating-point comparisons. These defaults are chosen to balance
  * numerical stability with practical precision requirements.
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::config::ToleranceConfig;
- *
- * let mut tol = ToleranceConfig::default();
- * assert_eq!(tol.rate_epsilon, 1e-12);
- *
- * // Customize for stricter rate comparisons
- * tol.rate_epsilon = 1e-14;
- * ```
  */
 export interface ToleranceConfig {
   /**

@@ -59,7 +59,7 @@ impl JsAttributionJsonInputs {
     /// @param market_t1_json - Canonical MarketContext JSON at the attribution end date.
     /// @param as_of_t0 - ISO-8601 valuation date for the start market snapshot.
     /// @param as_of_t1 - ISO-8601 valuation date for the end market snapshot.
-    /// @param method_json - Attribution-method configuration JSON selecting the P-and-L decomposition.
+    /// @param method_json - `AttributionMethod` wire value selecting the P-and-L decomposition: a unit variant name such as `"parallel"` or `"metrics_based"`, an object such as `{ waterfall: ["carry", "rates_curves"] }`, or the same value as JSON text.
     /// @param config_json - Optional attribution configuration JSON controlling calculation settings.
     /// @param full_cross_attribution - Whether to calculate all pairwise cross-factor attribution terms.
     #[wasm_bindgen(constructor)]
@@ -79,7 +79,11 @@ impl JsAttributionJsonInputs {
         let market_t1_json = json_text(&market_t1_json, "marketT1Json")?;
         let as_of_t0 = js_string(&as_of_t0, "asOfT0")?;
         let as_of_t1 = js_string(&as_of_t1, "asOfT1")?;
-        let method_json = json_text(&method_json, "methodJson")?;
+        // `js_wire`, not `json_text`: the unit variants are bare wire strings
+        // (`"parallel"`), which are not JSON text. Stored as canonical JSON.
+        let method: finstack_quant_attribution::AttributionMethod =
+            crate::utils::wire::js_wire(&method_json, "methodJson")?;
+        let method_json = serde_json::to_string(&method).map_err(to_js_err)?;
         let config_json = opt_json_text(config_json.as_ref(), "configJson")?;
         let full_cross_attribution =
             js_opt_bool(full_cross_attribution.as_ref(), "fullCrossAttribution")?;

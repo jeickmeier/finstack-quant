@@ -17,6 +17,10 @@
 // barrels (`<crate>/index.ts`, `index.ts`) are written by
 // `scripts/sync_generated_ts_index.py`.
 //
+// Schema descriptions are Rustdoc. Its Rust code examples mean nothing to a
+// TypeScript reader, so `stripRustdocExamples` removes them from every
+// description before the declarations are emitted (the schemas keep them).
+//
 // `--check` compares every output byte-for-byte and fails on stale files.
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { isDeepStrictEqual } from 'node:util';
@@ -45,8 +49,83 @@ const ANNOTATIONS = new Set([
 const stale = [];
 const expected = new Set();
 
+// Info strings rustdoc treats as Rust code (a bare fence is Rust too).
+const RUST_FENCE = /^(|rust|no_run|ignore|should_panic|compile_fail|edition\d+)$/;
+
+/**
+ * Remove Rust code from a Rustdoc description.
+ *
+ * A fenced block is Rust when its info string says so, or when it is a `text`
+ * block that imports a Rust path (`use a::b;`, the spelling of an example that
+ * is not a doctest). Rust blocks are dropped wherever they occur; other `text`
+ * and `json` blocks are kept. An `# Examples` section left without any code
+ * block is dropped whole, heading and lead-in prose included.
+ *
+ * @param {string} description - Rustdoc text of one schema node.
+ * @returns {string} The description without Rust code examples.
+ */
+function stripRustdocExamples(description) {
+  // Split into sections at Markdown headings that are outside code fences.
+  const sections = [{ heading: null, lines: [] }];
+  let fence = null;
+  for (const line of description.split('\n')) {
+    const section = sections.at(-1);
+    const mark = line.match(/^\s*```(.*)$/);
+    if (fence) {
+      fence.lines.push(line);
+      if (!mark) continue;
+      const tokens = fence.info.split(',').map((token) => token.trim());
+      const rust =
+        tokens.every((token) => RUST_FENCE.test(token)) ||
+        (fence.info.trim() === 'text' &&
+          fence.lines.some((body) => /^\s*use \w+(::[\w{}*, ]+)+;/.test(body)));
+      if (rust) section.dropped = true;
+      else section.lines.push(...fence.lines);
+      fence = null;
+    } else if (mark) {
+      fence = { info: mark[1], lines: [line] };
+    } else if (/^#+\s/.test(line)) {
+      sections.push({ heading: line, lines: [] });
+    } else {
+      section.lines.push(line);
+    }
+  }
+  if (fence) sections.at(-1).lines.push(...fence.lines);
+  return sections
+    .filter(
+      (section) =>
+        !(
+          section.dropped &&
+          /^#+\s*Examples?\s*$/.test(section.heading ?? '') &&
+          !section.lines.some((line) => /^\s*```/.test(line))
+        )
+    )
+    .flatMap((section) =>
+      section.heading === null ? section.lines : [section.heading, ...section.lines]
+    )
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+// Every `description` string of a schema, with Rust examples removed.
+function withoutRustExamples(value) {
+  if (Array.isArray(value)) return value.map(withoutRustExamples);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, child]) => [
+      key,
+      key === 'description' && typeof child === 'string'
+        ? stripRustdocExamples(child)
+        : withoutRustExamples(child),
+    ])
+  );
+}
+
 async function emit(url, text) {
   expected.add(url.href);
+  if (/^\s*\*\s*```rust\b/m.test(text))
+    throw new Error(`${url.pathname}: a Rust code example reached the TypeScript declarations`);
   if (CHECK) {
     const current = await readFile(url, 'utf8').catch(() => null);
     if (current !== text) stale.push(url.pathname);
@@ -84,7 +163,7 @@ const hostSchema = JSON.parse(
 );
 await emit(
   new URL('types/valuation-result.d.ts', PACKAGE),
-  await compile(hostTypes(hostSchema), 'ValuationResult', {
+  await compile(withoutRustExamples(hostTypes(hostSchema)), 'ValuationResult', {
     bannerComment:
       '// Generated from the Rust facade host schema by scripts/generate-contract-types.mjs. Do not edit.',
     unknownAny: true,
@@ -195,7 +274,7 @@ function bundle(crate) {
 const ROOT = '__FinstackContractBundle';
 for (const crate of crates) {
   const { schema, imports } = bundle(crate);
-  const compiled = await compile(schema, ROOT, {
+  const compiled = await compile(withoutRustExamples(schema), ROOT, {
     bannerComment: '',
     unknownAny: true,
     unreachableDefinitions: true,

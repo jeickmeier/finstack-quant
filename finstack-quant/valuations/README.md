@@ -173,15 +173,19 @@ their sources in rustdoc `# References` sections pointing at
 
 Reachable from both host languages under the `valuations` namespace:
 
-- Python: `finstack_quant.valuations` — `ValuationResult`, `calibrate`,
-  `CalibrationResult`, product-specific helpers, plus the
+- Python: `finstack_quant.valuations` — `ValuationResult`,
+  `instrument_cashflows`, the exotic-rates coupon helpers, plus the
   `valuations.instruments`, `valuations.credit_derivatives`,
   `valuations.composite`, `valuations.market`, and `valuations.schema`
-  submodules. Reusable engines live under `finstack_quant.models`.
-- WASM/JS: `valuations` from `finstack-quant-wasm` — `calibrate`,
-  `validateCalibrationJson`, `validateValuationResultJson`, and the
-  `instruments`, `creditDerivatives`, `composite`, `market`, and `fx`
-  namespaces. Reusable engines live under the sibling `models` namespace.
+  submodules. Reusable engines live under `finstack_quant.models`;
+  calibration (`calibrate`, `CalibrationResult`) is the sibling
+  `finstack_quant.calibration` package.
+- WASM/JS: `valuations` from `finstack-quant-wasm` —
+  `validateValuationResultJson`, the `valuationResult*` accessors, the
+  exotic-rates coupon helpers, and the `instruments`, `creditDerivatives`,
+  `composite`, `market`, `fx`, and `schema` namespaces. Reusable engines live
+  under the sibling `models` namespace, and `calibrate` /
+  `validateCalibrationJson` under the sibling `calibration` namespace.
 
 Bindings are thin wrappers — no pricing logic lives in them.
 

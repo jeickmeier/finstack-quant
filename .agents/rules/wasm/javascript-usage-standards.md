@@ -10,12 +10,19 @@ globs: "*.tsx,*.ts,*.js"
 
 Standards for JavaScript and TypeScript code that uses the finstack-quant-wasm module.
 
+Every `javascript` / `typescript` block in this file is type-checked against
+`index.d.ts` by `finstack-quant-wasm/scripts/check-typescript-examples.mjs`
+(`mise run wasm-doc`) and executed against the built package by
+`finstack-quant-wasm/tests/facade/doc_examples.test.mjs` (`mise run wasm-test`).
+A block with no `import` continues from the standard setup — all namespaces
+imported and `await init()` done.
+
 ## Setup and Initialization
 
 ### Browser Setup
 
 ```javascript
-import init, { core, analytics, valuations, margin } from "finstack-quant-wasm";
+import init, { core } from "finstack-quant-wasm";
 
 async function initialize() {
   await init();
@@ -23,39 +30,51 @@ async function initialize() {
   const usd = new core.Currency("USD");
   const amount = new core.Money(100.0, usd);
   const date = core.createDate(2024, 1, 15);
+  return { amount, date };
 }
 
 initialize().catch(console.error);
 ```
 
+### Node Setup
+
+`index.js` re-exports the **web** target, whose `init()` fetches the `.wasm` by
+URL. Node cannot fetch a file URL, so read the bytes and pass them in (see
+"Initialization: web vs Node" in `finstack-quant-wasm/README.md`):
+
+```javascript
+import { readFileSync } from "node:fs";
+import init, { core } from "finstack-quant-wasm";
+
+await init({
+  module_or_path: readFileSync(
+    new URL(import.meta.resolve("finstack-quant-wasm/pkg/finstack_quant_wasm_bg.wasm")),
+  ),
+});
+new core.Currency("USD").numeric; // 840
+```
+
 ### TypeScript Setup
 
 ```typescript
-import init, {
-  core,
-  analytics,
-  calibration,
-  margin,
-  models,
-  portfolio,
-  scenarios,
-  statements,
-  statements_analytics,
-  valuations,
-} from "finstack-quant-wasm";
+import init, { core } from "finstack-quant-wasm";
+import type { Money } from "finstack-quant-wasm";
 
-async function example(): Promise<void> {
+async function example(): Promise<Money> {
   await init();
   const usd = new core.Currency("USD");
-  const money = new core.Money(100.0, usd);
+  return new core.Money(100.0, usd);
 }
+
+await example();
 ```
 
 ## Import Patterns
 
 ### Namespaced Imports (Required)
 
-The public API is accessed through crate-domain namespaces, not flat imports:
+The public API is accessed through crate-domain namespaces, not flat imports.
+The default export is the initializer; the named exports are the namespaces:
 
 ```javascript
 import init, {
@@ -74,13 +93,13 @@ import init, {
   portfolio,
   scenarios,
 } from "finstack-quant-wasm";
+
+await init();
 ```
 
 ### Usage via Namespaces
 
 ```javascript
-await init();
-
 // Core types
 const usd = new core.Currency("USD");
 const money = new core.Money(1000.5, usd);
@@ -94,10 +113,21 @@ const perf = analytics.Performance.fromReturns(
   null,
   "daily",
 );
-const s = perf.sharpe(0.0);
+const s = perf.sharpe(0.0); // Float64Array, one value per ticker
 
-// Valuations
-const bond = valuations.instruments.Bond.builder().notional(1000000).build();
+// Valuations: typed instruments are built with their Rust constructors
+// (`Bond.fixed`, `Bond.floating`, `Bond.zeroCoupon`, `Bond.fromJson`) or the
+// fluent `Bond.builder()`. Handle-typed arguments take handles: a notional is
+// a `core.Money`, never a bare number.
+const bond = valuations.instruments.Bond.fixed(
+  "BOND-1",
+  new core.Money(1_000_000, usd),
+  new core.Rate(0.05),
+  "2024-01-01",
+  "2034-01-01",
+  "none",
+  "USD-OIS",
+);
 
 // Models (closed-form kernels; Monte Carlo lives under models.monteCarlo)
 const price = models.bsPrice(100, 100, 0.03, 0, 0.2, 1, true);
@@ -105,12 +135,18 @@ const price = models.bsPrice(100, 100, 0.03, 0, 0.2, 1, true);
 
 ### Do NOT import flat from pkg/
 
-```javascript
+`pkg/finstack_quant_wasm.js` is internal wasm-bindgen output: its flat names
+are not the public API and change without notice.
+
+```javascript no-run
 // WRONG: importing from internal raw output
 import { Currency, Money } from "./pkg/finstack_quant_wasm.js";
+```
 
+```javascript
 // CORRECT: import from the facade
 import init, { core } from "finstack-quant-wasm";
+await init();
 const usd = new core.Currency("USD");
 ```
 
@@ -123,7 +159,8 @@ const usd = new core.Currency("USD");
 const eur = new core.Currency("EUR");
 
 console.log(usd.code); // "USD"
-console.log(usd.numericCode); // 840
+console.log(usd.numeric); // 840
+console.log(eur.decimals); // 2
 
 const amount = new core.Money(1000.5, usd);
 console.log(amount.amount); // 1000.5
@@ -162,17 +199,28 @@ explicitly — for example `new Date(epochDays * 86_400_000)` for a UTC instant.
 
 ## Error Handling
 
+Bindings throw real `Error` objects. A Rust error arrives named `FinstackError`
+with `kind` set from the Rust error type (`validation`, `not_found`,
+`computation`, ...); a wrong argument type is a `TypeError` with
+`kind: "invalid_type"`. Branch on `kind`, never on the message text.
+
 ```javascript
-try {
-  const invalid = new core.Currency("XXX");
-} catch (error) {
-  console.error("Invalid currency:", error);
-}
+/** @typedef {import("finstack-quant-wasm").FinstackError} FinstackError */
 
 try {
-  const result = money1.add(money2);
-} catch (error) {
-  console.error("Operation failed:", error);
+  new core.Currency("XXX");
+} catch (caught) {
+  const error = /** @type {FinstackError} */ (caught);
+  console.error(error.name, error.kind); // "FinstackError", "validation"
+}
+
+const money1 = new core.Money(1, new core.Currency("USD"));
+const money2 = new core.Money(1, new core.Currency("EUR"));
+try {
+  money1.checkedAdd(money2);
+} catch (caught) {
+  const error = /** @type {FinstackError} */ (caught);
+  console.error("Operation failed:", error.message); // currency mismatch
 }
 ```
 
@@ -180,12 +228,22 @@ try {
 
 ### Node Test Runner
 
+Facade tests live in `finstack-quant-wasm/tests/facade/*.test.mjs` and run with
+`mise run wasm-test` (build + run) or `mise run wasm-test-built` (run only).
+They import `../../index.js` and read the bytes from `../../pkg/`; a consumer
+test resolves the same files through the package name:
+
 ```javascript
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import init, { core, analytics } from "finstack-quant-wasm";
 
-await init();
+await init({
+  module_or_path: readFileSync(
+    new URL(import.meta.resolve("finstack-quant-wasm/pkg/finstack_quant_wasm_bg.wasm")),
+  ),
+});
 
 test("core.Currency creation", () => {
   const usd = new core.Currency("USD");
@@ -210,18 +268,23 @@ test("analytics.Performance.sharpe returns a typed array", () => {
 - Reuse objects (Currency, DayCount) rather than recreating.
 - Batch operations to minimize JS↔WASM boundary crossings.
 - Avoid creating temporary objects in tight loops.
+- Every wasm-bindgen class instance owns WASM memory: call `free()` (or use
+  `using` where `Symbol.dispose` is available) on handles created in a loop.
 
 ## Documentation
 
-Use JSDoc with namespace paths:
+The namespaces (`core`, `analytics`, ...) are values. The handle types are
+top-level type exports of the package, so JSDoc names them through `import()`:
 
 ```javascript
 /**
- * @param {core.Currency} currency
+ * @param {import("finstack-quant-wasm").Currency} currency
  * @param {number} amount
- * @returns {core.Money}
+ * @returns {import("finstack-quant-wasm").Money}
  */
 function createMoney(currency, amount) {
   return new core.Money(amount, currency);
 }
+
+createMoney(new core.Currency("USD"), 100).amount; // 100
 ```

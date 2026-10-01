@@ -260,15 +260,6 @@ export type CouponType =
  *   accrues from the roll date immediately **preceding** the start (standard
  *   front accrual per the ISDA Big Bang Protocol, April 2009).
  *
- * # Examples
- *
- * ```rust
- * use finstack_quant_cashflows::builder::specs::RollRule;
- *
- * let rule = RollRule::default();
- * assert_eq!(rule, RollRule::None);
- * ```
- *
  * # References
  *
  * - `docs/REFERENCES.md#isda-cds-standard-model`
@@ -306,23 +297,6 @@ export type RollRule = "none" | "imm" | "cds_imm";
  * - Cash flow present value computations
  * - Matching market conventions for specific instruments
  *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::dates::{ScheduleBuilder, Tenor, StubKind};
- * use time::{Date, Month};
- *
- * let start = Date::from_calendar_date(2025, Month::January, 10)?;
- * let end = Date::from_calendar_date(2025, Month::December, 15)?;
- *
- * // Short stub at front
- * let sched = ScheduleBuilder::new(start, end)?
- *     .frequency(Tenor::quarterly())
- *     .stub_rule(StubKind::ShortFront)
- *     .build()?;
- * # Ok::<(), Box<dyn std::error::Error>>(())
- * ```
- *
  * # See Also
  *
  * - [`ScheduleBuilder::stub_rule`] to configure stub behavior
@@ -350,18 +324,6 @@ export type StubKind = "none" | "short_front" | "short_back" | "long_front" | "l
  * - ISDA 2021 Definitions, compounded RFR conventions `docs/REFERENCES.md#isda-2021-definitions`
  * - ARRC (2020). "SOFR: A User's Guide." `docs/REFERENCES.md#arrc-sofr-users-guide`
  * - BoE SONIA conventions `docs/REFERENCES.md#boe-sonia-key-features`
- *
- * # Examples
- *
- * ```
- * use finstack_quant_cashflows::builder::FloatingLegCompounding;
- *
- * assert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);
- * assert_eq!(
- *     FloatingLegCompounding::sofr(),
- *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
- * );
- * ```
  */
 export type FloatingLegCompounding =
   | "simple"
@@ -533,17 +495,6 @@ export type PaymentProgramSpec =
  *   redemption flows. Vanilla IRS and basis swaps use this.
  * - **`InitialAndFinal`** (default): emit issue funding and the maturity
  *   balloon on the lagged redemption date.
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_cashflows::builder::PrincipalExchange;
- *
- * assert_eq!(
- *     PrincipalExchange::default(),
- *     PrincipalExchange::InitialAndFinal
- * );
- * ```
  */
 export type PrincipalExchange = "none" | "initial_and_final";
 /**
@@ -1136,34 +1087,6 @@ export interface FloatingCouponSpec {
  * descriptive message naming the date, index, and expected series id;
  * `FixedRate(r)` uses `r` as the index rate for the affected coupon;
  * `SpreadOnly` projects spread-only.
- *
- * # Example
- *
- * ```rust
- * use finstack_quant_core::dates::Tenor;
- * use finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};
- * use rust_decimal_macros::dec;
- *
- * // 3M SOFR + 200bps with 0% floor
- * let spec = FloatingRateSpec {
- *     forward_curve_id: "USD-SOFR-3M".into(),
- *     spread_bp: dec!(200.0),
- *     gearing: dec!(1.0),
- *     gearing_includes_spread: true,
- *     index_floor_bp: Some(dec!(0.0)),
- *     all_in_floor_bp: None,
- *     all_in_cap_bp: None,
- *     index_cap_bp: None,
- *     overnight_index_constraints: OvernightIndexConstraintApplication::Daily,
- *     reset_frequency: Tenor::quarterly(),
- *     index_tenor: None,
- *     reset_lag_days: 2,
- *     fixing_calendar_id: None,
- *     compounding: None,
- *     overnight_basis: None,
- *     fallback: Default::default(),
- * };
- * ```
  */
 export interface FloatingRateSpec {
   /**
@@ -1290,35 +1213,6 @@ export interface FloatingRateSpec {
  * The rate for each coupon period is determined by the last step date
  * that falls on or before the period start date. If no step has occurred,
  * the initial rate is used.
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::dates::{Date, DayCount, Tenor, BusinessDayConvention, StubKind};
- * use finstack_quant_cashflows::builder::{CouponType, ScheduleParams, StepUpCouponSpec};
- * use rust_decimal_macros::dec;
- * use time::Month;
- *
- * let spec = StepUpCouponSpec {
- *     coupon_type: CouponType::Cash,
- *     initial_rate: dec!(0.03),
- *     step_schedule: vec![
- *         (Date::from_calendar_date(2027, Month::January, 1).unwrap(), dec!(0.04)),
- *         (Date::from_calendar_date(2029, Month::January, 1).unwrap(), dec!(0.05)),
- *     ],
- *     schedule: ScheduleParams {
- *         frequency: Tenor::semi_annual(),
- *         day_count: DayCount::Thirty360,
- *         business_day_convention: BusinessDayConvention::Following,
- *         calendar_id: "weekends_only".into(),
- *         stub: StubKind::None,
- *         end_of_month: false,
- *         payment_lag_days: 0,
- *         adjust_accrual_dates: false,
- *         roll_rule: finstack_quant_cashflows::builder::specs::RollRule::None,
- *     },
- * };
- * ```
  */
 export interface StepUpCouponSpec {
   /**

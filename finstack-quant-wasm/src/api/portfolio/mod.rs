@@ -1145,7 +1145,7 @@ pub fn scenario_pnl_batch(
 /// @param market_t1 - `core.MarketContext` handle for the closing snapshot.
 /// @param as_of_t0 - ISO-8601 date of the opening snapshot.
 /// @param as_of_t1 - ISO-8601 date of the closing snapshot.
-/// @param method - `AttributionMethod` JSON, e.g. `'"parallel"'`, `'"metrics_based"'` or `{ waterfall: ["carry", "rates_curves"] }` (a string argument is JSON text, so a bare variant name keeps its quotes).
+/// @param method - `AttributionMethod` wire value: a unit variant name such as `"parallel"` or `"metrics_based"`, an object such as `{ waterfall: ["carry", "rates_curves"] }`, or the same value as JSON text.
 /// @param config - Optional `FinstackConfig` object or JSON; omit for the Rust default configuration.
 /// @returns The `PortfolioAttribution`.
 ///
@@ -1167,8 +1167,10 @@ pub fn attribute_portfolio_pnl(
 ) -> Result<JsValue, JsValue> {
     let as_of_t0 = crate::utils::parse_iso_date(&js_string(&as_of_t0, "asOfT0")?)?;
     let as_of_t1 = crate::utils::parse_iso_date(&js_string(&as_of_t1, "asOfT1")?)?;
+    // `js_wire`, not `from_js_json`: the unit variants are bare wire strings
+    // (`"parallel"`), which `from_js_json` would parse as JSON text.
     let method: finstack_quant_portfolio::attribution::AttributionMethod =
-        from_js_json(&method, "method")?;
+        crate::utils::wire::js_wire(&method, "method")?;
     let config: finstack_quant_core::config::FinstackConfig =
         match opt_json_text(config.as_ref(), "config")? {
             Some(text) => serde_json::from_str(&text).map_err(to_js_err)?,

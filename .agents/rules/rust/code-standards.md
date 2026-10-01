@@ -187,7 +187,7 @@ The complete set of features across all crates (read from each `Cargo.toml`) is:
 | `analytics`, `covenants`, `features`, `margin`, `attribution`, `statements`, `statements-analytics`, `scenarios` | `json-schema` (default) |
 | `finstack-quant` (umbrella) | `json-schema` (default), `jsonschema-validate` (default) |
 | `finstack-quant-py` | `extension-module` (PyO3 requirement) |
-| `finstack-quant-wasm` | `console_panic_hook`, `contract-generation` (the `generate_contracts` example) |
+| `finstack-quant-wasm` | `contract-generation` (the `generate_contracts` example) |
 | `arrow-interchange`, `test-utils`, `valuations/macros` | none |
 
 `json-schema` gates every `schemars::JsonSchema` derive, `core::schema` and the

@@ -1154,6 +1154,16 @@ test('portfolio.decomposeFactorRisk reads the canonical wire and returns the Rus
     );
     assert.deepEqual(decomposition.measure, expected);
   }
+
+  // A unit variant is its bare wire label, as the declared type says.
+  assert.equal(
+    portfolio.decomposeFactorRisk(SENSITIVITY_WIRE, SENSITIVITY_COVARIANCE, 'volatility').measure,
+    'volatility'
+  );
+  assert.throws(
+    () => portfolio.decomposeFactorRisk(SENSITIVITY_WIRE, SENSITIVITY_COVARIANCE, 'nope'),
+    (error) => error.kind === 'validation' && /riskMeasureJson/.test(error.message)
+  );
 });
 
 test('portfolio.decomposeFactorRisk rejects malformed sensitivity wire with a validation error', () => {

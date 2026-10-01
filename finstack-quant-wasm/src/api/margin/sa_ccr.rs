@@ -114,12 +114,11 @@ pub fn sa_ccr_netting_set_config_validate(config: JsValue) -> Result<(), JsValue
 /// await init();
 /// const config = margin.saCcrNettingSetConfigUnmargined(
 ///   margin.nettingSetIdBilateral("CPTY", "CSA"), 0, "2025-01-15");
-/// const trade = {
+/// new margin.SaCcrEngine().calculateEad(config, [{
 ///   trade_id: "t1", asset_class: "interest_rate", notional: 1_000_000,
 ///   start_date: "2025-01-15", end_date: "2030-01-15", underlier: "USD",
 ///   hedging_set: "USD", direction: 1, supervisory_delta: 1, mtm: 0, is_option: false,
-/// };
-/// new margin.SaCcrEngine().calculateEad(config, [trade]).ead;
+/// }]).ead;
 /// ```
 #[wasm_bindgen(js_name = SaCcrEngine)]
 pub struct JsSaCcrEngine {

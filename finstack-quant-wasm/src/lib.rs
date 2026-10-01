@@ -24,10 +24,13 @@ use wasm_bindgen::prelude::*;
 pub mod api;
 pub mod utils;
 
+/// Module initializer: installs the panic hook.
+///
+/// wasm-bindgen runs this once when the module is instantiated, so a Rust
+/// panic is reported through `console.error` with its message and location
+/// instead of surfacing only as `RuntimeError: unreachable`.
 #[wasm_bindgen(start)]
-/// Module initializer: installs the panic hook when `console_panic_hook` is enabled.
 pub fn start() {
-    #[cfg(feature = "console_panic_hook")]
     console_error_panic_hook::set_once();
 }
 
