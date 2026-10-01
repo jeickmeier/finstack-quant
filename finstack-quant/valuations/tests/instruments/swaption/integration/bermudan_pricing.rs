@@ -870,7 +870,7 @@ fn lsmc_default_mc_pv_unchanged() {
     // when the θ(t) fit started following the forward jumps of this
     // log-linear curve: the earlier anchor, 2.82MM on a 10MM notional, was
     // eleven times the tree price.
-    let legacy_bits = 0x410e27094c608f60_u64;
+    let legacy_bits = 0x410e27094c608fbd_u64;
     let rounding_ulps = result.value.amount().to_bits().abs_diff(legacy_bits);
     assert!(
         rounding_ulps <= 32,

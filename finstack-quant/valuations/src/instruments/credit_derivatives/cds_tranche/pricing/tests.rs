@@ -2154,7 +2154,10 @@ fn realistic_base_correlation_skew_prices_every_tranche() {
         .expect("index data");
     let market_ctx = MarketContext::new()
         .insert(discount_curve)
-        .insert_credit_index("CDX.NA.IG.42", index_data);
+        .insert(Arc::clone(&index_data.index_credit_curve))
+        .insert(Arc::clone(&index_data.base_correlation_curve))
+        .insert_credit_index("CDX.NA.IG.42", index_data)
+        .expect("Credit index dependencies should be registered");
     let pricer = CdsTranchePricer::new();
 
     for &(attach, detach, coupon) in &[

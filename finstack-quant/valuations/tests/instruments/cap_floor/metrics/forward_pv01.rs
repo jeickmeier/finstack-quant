@@ -249,11 +249,10 @@ fn test_forward_pv01_keeps_the_forward_curve_interpolation() {
         (10.0, 0.048),
     ];
 
-    for style in [
-        InterpStyle::Linear,
-        InterpStyle::LogLinear,
-        InterpStyle::CubicHermite,
-    ] {
+    // Styles whose interpolant moves by exactly the shift when every knot
+    // does, so rebuilding the curve from shifted knots is an independent
+    // parallel revaluation.
+    for style in [InterpStyle::Linear, InterpStyle::CubicHermite] {
         let forward_curve = |shift: f64| {
             ForwardCurve::builder("USD_LIBOR_3M", 0.25)
                 .base_date(as_of)

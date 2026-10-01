@@ -337,7 +337,7 @@ impl InflationSwap {
         let Some(first) = periods.first() else {
             return Ok(0.0);
         };
-        let reference_start = first.accrual_end.add_months(-12);
+        let reference_start = first.accrual_end.add_months(-12)?;
         let first_fraction = if first.accrual_start <= reference_start {
             1.0
         } else {

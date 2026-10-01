@@ -585,8 +585,14 @@ mod tests {
             let terminal_df = discount
                 .df_between_dates(as_of, option.get_underlying_maturity())
                 .expect("terminal discount");
-            let expected = future_exercises
+            // An exercise date equal to the valuation date is still live
+            // that day, so it competes with the strictly future dates.
+            let live_exercises = option
+                .exercise_schedule
+                .effective_dates()
                 .into_iter()
+                .filter(|date| *date >= as_of);
+            let expected = live_exercises
                 .map(|exercise| {
                     let annuity: f64 = periods
                         .iter()
@@ -619,7 +625,13 @@ mod tests {
     #[test]
     fn lmm_without_remaining_exercises_is_zero_without_loading_override() {
         let (_, mut option, market) = supported_contract();
-        let as_of = option.last_exercise().expect("exercise date");
+        // The day after the last exercise date: the right is still live on
+        // the date itself.
+        let as_of = option
+            .last_exercise()
+            .expect("exercise date")
+            .next_day()
+            .expect("next day");
         option
             .instrument_pricing_overrides
             .model_config
