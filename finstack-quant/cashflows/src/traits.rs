@@ -16,11 +16,14 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 
 /// Schedule-level inputs shared by the canonical `schedule_from_*` constructors.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(default, deny_unknown_fields)]
 pub struct ScheduleBuildOpts {
     /// Optional notional amount to stamp on the resulting schedule. When
     /// `None`, the constructor uses a zero notional in the currency of the
     /// first supplied flow (or USD if the list is empty).
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub notional_hint: Option<Money>,
     /// Schedule-level metadata.
     pub meta: CashFlowMeta,
@@ -583,5 +586,33 @@ mod tests {
         assert_eq!(schedule.meta.issue_date, meta.issue_date);
         assert_eq!(schedule.meta.commitment, meta.commitment);
         assert_eq!(schedule.meta.calendar_ids, meta.calendar_ids);
+    }
+
+    #[test]
+    fn schedule_build_opts_wire_defaults_every_field_and_rejects_unknown_ones() {
+        let empty: ScheduleBuildOpts = serde_json::from_str("{}").expect("empty options parse");
+        assert!(empty.notional_hint.is_none());
+        assert_eq!(
+            empty.meta.representation,
+            CashflowRepresentation::Contractual
+        );
+        assert_eq!(
+            serde_json::to_value(&empty).expect("serialize")["meta"]["representation"],
+            "contractual"
+        );
+
+        let hinted: ScheduleBuildOpts =
+            serde_json::from_str(r#"{"notional_hint":{"amount":"250","currency":"USD"}}"#)
+                .expect("hint parses");
+        assert_eq!(
+            hinted.notional_hint,
+            Some(Money::from((250_i64, Currency::USD)))
+        );
+        let round_trip: ScheduleBuildOpts =
+            serde_json::from_value(serde_json::to_value(&hinted).expect("serialize"))
+                .expect("round trip");
+        assert_eq!(round_trip.notional_hint, hinted.notional_hint);
+
+        assert!(serde_json::from_str::<ScheduleBuildOpts>(r#"{"notional":1}"#).is_err());
     }
 }

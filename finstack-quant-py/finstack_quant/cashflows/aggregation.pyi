@@ -76,7 +76,7 @@ class PeriodAggregation:
         """
         ...
 
-    def get(self, period: str, currency: Currency | str) -> Money | None:
+    def get_amount(self, period: str, currency: Currency | str) -> Money | None:
         """
         Total for one ``(period, currency)`` cell.
 

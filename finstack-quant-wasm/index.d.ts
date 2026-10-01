@@ -5367,10 +5367,435 @@ export declare const margin: MarginNamespace;
 // --- cashflows -------------------------------------------------------------
 
 /**
- * JSON bridge to the Rust `finstack-quant-cashflows` crate.
+ * Canonical cashflow schedule: classified dated flows with their notional,
+ * day count and metadata.
  *
- * All methods accept and return JSON strings that mirror the canonical Rust
- * serde model. Cashflow JSON types are exported from `./types`.
+ * Obtain one from `CashFlowSchedule.builder()`, `buildCashflowSchedule`,
+ * `CashFlowSchedule.fromJson` or `CashFlowSchedule.fromParts`. Methods that
+ * return a schedule return a new handle and leave this one unchanged.
+ */
+export interface CashFlowSchedule extends WasmOwned {
+  /**
+   * Serialize the schedule to canonical JSON.
+   *
+   * @returns `CashFlowSchedule` JSON accepted by `fromJson` and by every `scheduleJson` argument.
+   * @throws If the schedule cannot be serialized.
+   */
+  toJson(): string;
+  /**
+   * Copy of the schedule tagged with a different representation.
+   *
+   * @param representation - `"contractual"`, `"projected"`, `"placeholder"` or `"no_residual"`: what the flows mean to pricing and waterfall policy.
+   * @returns A new `CashFlowSchedule` with `meta.representation` replaced.
+   * @throws If `representation` is not one of the listed strings (kind `validation`).
+   */
+  withRepresentation(representation: generated.cashflows.CashflowRepresentation): CashFlowSchedule;
+  /**
+   * Copy of the schedule with a different notional.
+   *
+   * @param notional - `Notional` wire object replacing the schedule's initial balance and amortization rule.
+   * @returns A new `CashFlowSchedule`; flows are unchanged.
+   * @throws If `notional` is not a `Notional` (kind `validation`).
+   */
+  withNotional(notional: generated.cashflows.Notional): CashFlowSchedule;
+  /**
+   * All flows in canonical schedule order.
+   *
+   * @returns `CashFlow` wire objects: coupons, fees, principal and state rows.
+   * @throws If the flows cannot be serialized.
+   */
+  getFlows(): generated.cashflows.CashFlow[];
+  /**
+   * Coupon flows only (fixed, floating, inflation and stub interest).
+   *
+   * @returns `CashFlow` wire objects of interest-like kinds, in schedule order.
+   * @throws If the flows cannot be serialized.
+   */
+  coupons(): generated.cashflows.CashFlow[];
+  /**
+   * Unique flow dates in ascending order.
+   *
+   * @returns ISO-8601 dates on which at least one flow falls.
+   * @throws If the dates cannot be serialized.
+   */
+  dates(): generated.core.DateWire[];
+  /**
+   * Notional of the schedule.
+   *
+   * @returns `Notional` wire object: initial balance and amortization rule.
+   * @throws If the notional cannot be serialized.
+   */
+  getNotional(): generated.cashflows.Notional;
+  /**
+   * Day count attached to the schedule.
+   *
+   * @returns `DayCount` wire string such as `"act_360"`.
+   * @throws If the day count cannot be serialized.
+   */
+  getDayCount(): generated.core.DayCount;
+  /**
+   * Schedule-level metadata.
+   *
+   * @returns `CashFlowMeta` wire object: representation, calendar ids, commitment, issue date, maturity and projected fixings.
+   * @throws If the metadata cannot be serialized.
+   */
+  getMeta(): generated.cashflows.CashFlowMeta;
+  /**
+   * Check the schedule's invariants.
+   *
+   * @throws If the notional or a flow is invalid, flow dates are out of order, or funding, outstanding balances, currencies and the schedule metadata do not reconcile (kind `validation`).
+   */
+  validate(): void;
+  /**
+   * Copy of the schedule with every flow amount multiplied by a factor.
+   *
+   * Scales principal, interest, fee and recovery amounts; the
+   * representative notional, flow kinds and dates are unchanged.
+   *
+   * @param scale - Finite multiplier applied to every flow amount (for example a position quantity; a negative value reverses the cashflow direction).
+   * @returns A new, scaled `CashFlowSchedule`.
+   * @throws If `scale` is not a number (kind `invalid_type`) or is NaN or infinite (kind `validation`).
+   */
+  scaleAmounts(scale: number): CashFlowSchedule;
+  /**
+   * Weighted average life in years from a date.
+   *
+   * WAL over the positive principal flows (amortization, notional and
+   * prepayment) dated after `asOf`, with time measured as actual days / 365
+   * (the SIFMA convention), not the schedule's accrual day count.
+   *
+   * @param asOf - ISO-8601 measurement date; only principal flows strictly after it count.
+   * @returns WAL in years; `0` when no principal flow falls after `asOf`.
+   * @throws If `asOf` is not an ISO-8601 string (kind `invalid_type` or `validation`) or a year fraction cannot be computed.
+   */
+  wal(asOf: string): number;
+  /**
+   * Outstanding principal balance after each unique balance date.
+   *
+   * Principal flows (amortization, PIK, draws and repayments) are replayed
+   * from the initial notional.
+   *
+   * @returns `{ date, amount }` entries in date order; `amount` is the outstanding balance after that date's flows.
+   * @throws If `meta.issue_date` is unset or principal flows mix currencies (kind `validation`).
+   */
+  outstandingByDate(): DatedFlowJson[];
+  /**
+   * Present value of the flows grouped by reporting period and currency.
+   *
+   * Each flow is discounted on the named curve from `base`; with a credit
+   * curve the flows are also weighted by survival and recovery.
+   *
+   * @param periods - `Period` wire objects (`{ id, start, end, is_actual }`) defining the reporting buckets.
+   * @param market - `MarketContext` handle holding the discount (and credit) curve.
+   * @param discCurveId - Identifier of the discount curve in `market`, for example `"USD-OIS"`.
+   * @param base - ISO-8601 valuation date that discounting starts from.
+   * @param dayCount - Optional `DayCount` wire string for discounting year fractions; omitted means `"act_365f"`.
+   * @param creditCurveId - Optional identifier of a hazard curve in `market`; omitted means no credit adjustment.
+   * @returns `PeriodAggregation`: `{ periodId: { currency: Money } }` of PV per period and currency.
+   * @throws If a curve is missing from `market` (kind `not_found`), or an argument is malformed or a discount factor cannot be computed (kind `invalid_type` or `validation`).
+   */
+  pvByPeriod(periods: readonly generated.statements.Period[], market: MarketContext, discCurveId: string, base: string, dayCount?: generated.core.DayCount | null, creditCurveId?: string | null): generated.cashflows.PeriodAggregation;
+  /**
+   * Calendar-year non-principal / principal / PV ladder.
+   *
+   * @param pvs - Present value of each flow, one per flow in schedule order, in flow-amount units.
+   * @returns `{ year, non_principal, principal, pv }` rows in ascending year order. (Python returns the same rows as a DataFrame.)
+   * @throws If `pvs` is not an array of numbers (kind `invalid_type`), does not have one entry per flow, or holds a non-finite value (kind `validation`).
+   */
+  calendarYearLadder(pvs: number[] | Float64Array): CalendarYearLadderRow[];
+}
+
+/**
+ * Static entry points of the `CashFlowSchedule` handle.
+ * @example
+ * ```typescript
+ * import init, { cashflows } from "finstack-quant-wasm";
+ * await init();
+ * const schedule = cashflows.CashFlowSchedule.builder()
+ *   .principal({ amount: "1000000", currency: "USD" }, "2025-01-15", "2027-01-15")
+ *   .fixedCf({ rate: "0.05", coupon_type: "cash", ...cashflows.scheduleParamsSemiannual30360() })
+ *   .build();
+ * console.log(schedule.wal("2025-01-15"), schedule.getFlows().length);
+ * schedule.free();
+ * ```
+ */
+export interface CashFlowScheduleConstructor {
+  /**
+   * JavaScript prototype of `CashFlowSchedule`; instances come from its static methods, not `new`.
+   */
+  readonly prototype: CashFlowSchedule;
+  /**
+   * Start an empty schedule builder.
+   *
+   * @returns A `CashFlowBuilder`; set the principal first, then add coupons, fees and principal events.
+   */
+  builder(): CashFlowBuilder;
+  /**
+   * Assemble a schedule from existing flows, notional, day count and metadata.
+   *
+   * Flows are put into the canonical schedule order; nothing is validated
+   * until `validate()` or an analytic runs.
+   *
+   * @param flows - `CashFlow` wire objects.
+   * @param notional - `Notional` wire object: initial balance and amortization rule.
+   * @param dayCount - `DayCount` wire string (for example `"act_360"`) used for accrual and year fractions.
+   * @param meta - `CashFlowMeta` wire object: representation, calendar ids, commitment, issue date and maturity.
+   * @returns The assembled `CashFlowSchedule`.
+   * @throws If an argument does not match its wire type (kind `validation`).
+   */
+  fromParts(flows: readonly generated.cashflows.CashFlow[], notional: generated.cashflows.Notional, dayCount: generated.core.DayCount, meta: generated.cashflows.CashFlowMeta): CashFlowSchedule;
+  /**
+   * Assemble a schedule from existing flows, with default metadata unless given.
+   *
+   * Same as `fromParts` with `meta` optional. (Python's `from_flows` also
+   * reads a pandas DataFrame; WASM takes the flow list.)
+   *
+   * @param flows - `CashFlow` wire objects.
+   * @param notional - `Notional` wire object: initial balance and amortization rule.
+   * @param dayCount - `DayCount` wire string used for accrual and year fractions.
+   * @param meta - Optional `CashFlowMeta` wire object; omitted means the default metadata (contractual representation, no issue date).
+   * @returns The assembled `CashFlowSchedule`.
+   * @throws If an argument does not match its wire type (kind `validation`).
+   */
+  fromFlows(flows: readonly generated.cashflows.CashFlow[], notional: generated.cashflows.Notional, dayCount: generated.core.DayCount, meta?: generated.cashflows.CashFlowMeta | null): CashFlowSchedule;
+  /**
+   * Parse a schedule from its canonical JSON.
+   *
+   * @param json - `CashFlowSchedule` JSON string or plain object; unknown fields are rejected.
+   * @returns The parsed `CashFlowSchedule`; it is not validated until `validate()` or an analytic runs.
+   * @throws If `json` is neither a string nor a plain object (kind `invalid_type`) or does not match the schedule schema (kind `validation`).
+   */
+  fromJson(json: JsonInput): CashFlowSchedule;
+}
+
+/**
+ * Fluent builder for a `CashFlowSchedule`.
+ *
+ * Created by `CashFlowSchedule.builder()`. Every setter consumes the builder
+ * and returns it, so calls chain; a call on a builder that was already
+ * consumed throws. Setter errors are recorded and reported by `build`.
+ */
+export interface CashFlowBuilder extends WasmOwned {
+  /**
+   * Set the initial principal and the issue and maturity dates.
+   *
+   * @param initial - `Money` wire object: initial outstanding balance; its currency is the schedule currency.
+   * @param issueDate - ISO-8601 issue date; accrual starts here.
+   * @param maturity - ISO-8601 maturity date; the final principal is repaid here.
+   * @returns The builder, for chaining.
+   * @throws If an argument does not match its wire type (kind `invalid_type` or `validation`).
+   */
+  principal(initial: MoneyValue, issueDate: string, maturity: string): CashFlowBuilder;
+  /**
+   * Choose whether the initial funding and final redemption are emitted as flows.
+   *
+   * @param exchange - `"none"` or `"initial_and_final"` (the default when never called).
+   * @returns The builder, for chaining.
+   * @throws If `exchange` is not one of the listed strings (kind `validation`).
+   */
+  principalExchange(exchange: generated.cashflows.PrincipalExchange): CashFlowBuilder;
+  /**
+   * Set the amortization rule of the principal.
+   *
+   * @param spec - `AmortizationSpec` wire value, for example `"none"` or `{ linear_to: { final_notional } }`.
+   * @returns The builder, for chaining.
+   * @throws If `spec` is not an `AmortizationSpec` (kind `validation`).
+   */
+  amortization(spec: generated.cashflows.AmortizationSpec): CashFlowBuilder;
+  /**
+   * Add a dated principal event (draw, repayment or other balance change).
+   *
+   * @param date - ISO-8601 economic date on which the outstanding balance changes.
+   * @param paymentDate - ISO-8601 cash settlement date of the event.
+   * @param delta - `Money` wire object: change in outstanding balance (positive increases it, negative repays).
+   * @param kind - `CFKind` wire string of the emitted flow, for example `"amortization"` or `"revolving_draw"`.
+   * @param cash - Optional `Money` wire object: cash paid or received when it differs from `delta` (OID, fees); omitted means equal to `delta`.
+   * @returns The builder, for chaining.
+   * @throws If an argument does not match its wire type (kind `invalid_type` or `validation`).
+   */
+  addPrincipalEvent(date: string, paymentDate: string, delta: MoneyValue, kind: generated.cashflows.CFKind, cash?: MoneyValue | null): CashFlowBuilder;
+  /**
+   * Add a fixed-rate coupon leg over the whole life.
+   *
+   * @param spec - `FixedCouponSpec` wire object: decimal `rate`, coupon type and schedule parameters.
+   * @returns The builder, for chaining.
+   * @throws If `spec` is not a `FixedCouponSpec` (kind `validation`).
+   */
+  fixedCf(spec: generated.cashflows.FixedCouponSpec): CashFlowBuilder;
+  /**
+   * Add a floating-rate coupon leg over the whole life.
+   *
+   * @param spec - `FloatingCouponSpec` wire object: rate specification, coupon type and schedule parameters.
+   * @returns The builder, for chaining.
+   * @throws If `spec` is not a `FloatingCouponSpec` (kind `validation`).
+   */
+  floatingCf(spec: generated.cashflows.FloatingCouponSpec): CashFlowBuilder;
+  /**
+   * Add a fixed coupon leg whose rate steps up on listed dates.
+   *
+   * @param spec - `StepUpCouponSpec` wire object: initial decimal rate, dated rate steps, coupon type and schedule parameters.
+   * @returns The builder, for chaining.
+   * @throws If `spec` is not a `StepUpCouponSpec` (kind `validation`).
+   */
+  stepUpCf(spec: generated.cashflows.StepUpCouponSpec): CashFlowBuilder;
+  /**
+   * Add a one-off or recurring fee.
+   *
+   * @param spec - `FeeSpec` wire value: `{ fixed: { date, amount } }` or `{ periodic_bp: { ... } }`.
+   * @returns The builder, for chaining.
+   * @throws If `spec` is not a `FeeSpec` (kind `validation`).
+   */
+  fee(spec: generated.cashflows.FeeSpec): CashFlowBuilder;
+  /**
+   * Add a fixed coupon leg that applies only inside a date window.
+   *
+   * @param start - ISO-8601 start of the window (inclusive).
+   * @param end - ISO-8601 end of the window (exclusive).
+   * @param spec - `FixedCouponSpec` wire object for the window.
+   * @returns The builder, for chaining.
+   * @throws If an argument does not match its wire type (kind `invalid_type` or `validation`).
+   */
+  addFixedWindow(start: string, end: string, spec: generated.cashflows.FixedCouponSpec): CashFlowBuilder;
+  /**
+   * Add a floating coupon leg that applies only inside a date window.
+   *
+   * @param start - ISO-8601 start of the window (inclusive).
+   * @param end - ISO-8601 end of the window (exclusive).
+   * @param spec - `FloatingCouponSpec` wire object for the window.
+   * @returns The builder, for chaining.
+   * @throws If an argument does not match its wire type (kind `invalid_type` or `validation`).
+   */
+  addFloatingWindow(start: string, end: string, spec: generated.cashflows.FloatingCouponSpec): CashFlowBuilder;
+  /**
+   * Set the cash/PIK split of coupons paid inside a date window.
+   *
+   * @param start - ISO-8601 start of the window (inclusive).
+   * @param end - ISO-8601 end of the window (exclusive).
+   * @param split - `CouponType` wire value: `"cash"`, `"pik"` or `{ split: { cash_fraction, pik_fraction } }`.
+   * @returns The builder, for chaining.
+   * @throws If an argument does not match its wire type (kind `invalid_type` or `validation`).
+   */
+  addPaymentWindow(start: string, end: string, split: generated.cashflows.CouponType): CashFlowBuilder;
+  /**
+   * Set a sequence of cash/PIK splits, each applying until its end date.
+   *
+   * @param steps - `[isoDate, CouponType]` pairs ordered by date: each split applies up to (not including) its date; periods after the last step pay cash.
+   * @returns The builder, for chaining.
+   * @throws If `steps` is not an array of `[isoDate, CouponType]` pairs (kind `validation`).
+   */
+  paymentSplitProgram(steps: readonly (readonly [string, generated.cashflows.CouponType])[]): CashFlowBuilder;
+  /**
+   * Pay a fixed coupon until a switch date, then a floating coupon.
+   *
+   * @param switchDate - ISO-8601 date on which the leg switches from fixed to floating (Rust and Python name it `switch`, a reserved word in JavaScript).
+   * @param fixed - `FixedCouponSpec` wire object used before the switch.
+   * @param floating - `FloatingCouponSpec` wire object used from the switch.
+   * @returns The builder, for chaining.
+   * @throws If an argument does not match its wire type (kind `invalid_type` or `validation`).
+   */
+  fixedToFloat(switchDate: string, fixed: generated.cashflows.FixedCouponSpec, floating: generated.cashflows.FloatingCouponSpec): CashFlowBuilder;
+  /**
+   * Add a floating leg whose margin steps on listed dates.
+   *
+   * @param steps - `[isoDate, decimalString]` pairs with strictly increasing dates: the spread in basis points in force from each date.
+   * @param baseSpec - `FloatingCouponSpec` wire object supplying index, schedule and conventions; its own spread applies before the first step.
+   * @returns The builder, for chaining.
+   * @throws If an argument does not match its wire type (kind `validation`).
+   */
+  floatMarginSteps(steps: readonly (readonly [string, string])[], baseSpec: generated.cashflows.FloatingCouponSpec): CashFlowBuilder;
+  /**
+   * Build the schedule, projecting floating coupons from market curves when a market is given.
+   *
+   * The builder is not consumed and can be built again.
+   *
+   * @param market - Optional `MarketContext` handle holding the forward curves and fixings the floating legs reference; omitted means floating coupons that need a forward curve use their fallback policy.
+   * @returns The built `CashFlowSchedule` handle; release it with free().
+   * @throws If a setter recorded an error, the principal is unset, a referenced curve or fixing is missing (kind `not_found`), or schedule generation fails (kind `validation`).
+   */
+  build(market?: MarketContext | null): CashFlowSchedule;
+}
+
+/**
+ * Static entry points of the `CashFlowBuilder` handle.
+ * @example
+ * ```typescript
+ * import init, { cashflows } from "finstack-quant-wasm";
+ * await init();
+ * const builder = cashflows.CashFlowSchedule.builder()
+ *   .principal({ amount: "1000000", currency: "USD" }, "2025-01-15", "2027-01-15")
+ *   .amortization(cashflows.amortizationSpecLinearTo({ amount: "500000", currency: "USD" }))
+ *   .fixedCf({ rate: "0.05", coupon_type: "cash", ...cashflows.scheduleParamsSemiannual30360() });
+ * const schedule = builder.build();
+ * console.log(schedule.outstandingByDate());
+ * schedule.free();
+ * builder.free();
+ * ```
+ */
+export interface CashFlowBuilderConstructor {
+  /**
+   * JavaScript prototype of `CashFlowBuilder`; instances come from `CashFlowSchedule.builder()`, not `new`.
+   */
+  readonly prototype: CashFlowBuilder;
+
+}
+
+/**
+ * Precomputed accrual state for repeated accrued-interest queries.
+ *
+ * Builds the coupon periods and outstanding path once for a schedule and
+ * accrual configuration; prefer it over `accruedInterestAmount` when accruing
+ * the same schedule on many dates.
+ */
+export interface AccrualIndex extends WasmOwned {
+  /**
+   * Accrued interest as of a date.
+   *
+   * @param asOf - ISO-8601 accrual snapshot date.
+   * @returns `Money` wire object in the schedule currency; negative inside an ex-coupon window.
+   * @throws If `asOf` is not an ISO-8601 string (kind `invalid_type` or `validation`), a day-count calculation fails, or the ex-coupon calendar cannot be resolved (kind `validation`).
+   */
+  accruedAt(asOf: string): MoneyValue;
+}
+
+/**
+ * Static entry points of the `AccrualIndex` handle.
+ * @example
+ * ```typescript
+ * import init, { cashflows } from "finstack-quant-wasm";
+ * await init();
+ * const schedule = cashflows.CashFlowSchedule.builder()
+ *   .principal({ amount: "1000000", currency: "USD" }, "2025-01-15", "2027-01-15")
+ *   .fixedCf({ rate: "0.05", coupon_type: "cash", ...cashflows.scheduleParamsSemiannual30360() })
+ *   .build();
+ * const index = cashflows.AccrualIndex.build(schedule);
+ * console.log(index.accruedAt("2025-04-15").amount);
+ * index.free();
+ * schedule.free();
+ * ```
+ */
+export interface AccrualIndexConstructor {
+  /**
+   * JavaScript prototype of `AccrualIndex`; instances come from its static methods, not `new`.
+   */
+  readonly prototype: AccrualIndex;
+  /**
+   * Build reusable accrual state for a schedule.
+   *
+   * @param schedule - `CashFlowSchedule` handle with coupon, PIK and notional flows.
+   * @param config - Optional `AccrualConfig` wire object bound into the index; omitted means linear accrual with the Rust defaults. Build another index to accrue under a different configuration.
+   * @returns An `AccrualIndex` handle; release it with free().
+   * @throws If the schedule fails validation or mixes coupon currencies, `config` is not an `AccrualConfig`, or the outstanding path or a day-count calculation fails (kind `validation`).
+   */
+  build(schedule: CashFlowSchedule, config?: generated.cashflows.AccrualConfig | null): AccrualIndex;
+}
+
+/**
+ * Cashflow schedules from the Rust `finstack-quant-cashflows` crate.
+ *
+ * `CashFlowSchedule`, `CashFlowBuilder` and `AccrualIndex` are handles. Specs,
+ * flows and aggregations cross as plain objects that mirror the canonical Rust
+ * serde model (types under `./types`), with their Rust constructors and
+ * methods as free functions. The `*Json` functions are the JSON-string bridge.
  * @example
  * ```typescript
  * import init, { cashflows } from "finstack-quant-wasm";
@@ -5521,6 +5946,734 @@ export interface CashflowsNamespace {
    * @throws If the schedule is malformed or fails validation, `pvs` does not have one entry per flow, or a value is non-finite (kind `validation`).
    */
   scheduleCalendarYearLadder(scheduleJson: JsonInput, pvs: number[] | Float64Array): CalendarYearLadderRow[];
+
+  /**
+   * `CashFlowSchedule` handle: canonical cashflow schedule: classified dated flows with their notional,
+   */
+  CashFlowSchedule: CashFlowScheduleConstructor;
+
+  /**
+   * `CashFlowBuilder` handle: fluent builder for a `CashFlowSchedule`.
+   */
+  CashFlowBuilder: CashFlowBuilderConstructor;
+
+  /**
+   * `AccrualIndex` handle: precomputed accrual state for repeated accrued-interest queries.
+   */
+  AccrualIndex: AccrualIndexConstructor;
+
+  /**
+   * Build a cashflow schedule from a build spec.
+   *
+   * Typed twin of `buildCashflowScheduleJson`: the same spec, returning a
+   * `CashFlowSchedule` handle.
+   *
+   * @param spec - `CashflowScheduleBuildSpec` wire object or JSON: notional, issue and maturity dates, coupon program, fees and principal events.
+   * @param market - Optional `MarketContext` handle holding the forward curves and fixings the floating legs reference; omitted means floating coupons that need a forward curve use their fallback policy.
+   * @returns The built `CashFlowSchedule` handle; release it with free().
+   * @throws If `spec` does not match the build-spec schema (kind `invalid_type` or `validation`), a referenced curve or fixing is missing (kind `not_found`), or schedule construction fails (kind `validation`).
+   */
+  buildCashflowSchedule(spec: generated.cashflows.CashflowScheduleBuildSpec | string, market?: MarketContext | null): CashFlowSchedule;
+
+  /**
+   * Settlement cash flows of a schedule as dated amounts.
+   *
+   * Validates the schedule and keeps only cash-settling rows (`pik` and
+   * `defaulted_notional` state rows are excluded), so the result is safe to
+   * sum per currency. Typed twin of `datedFlowsJson`.
+   *
+   * @param schedule - `CashFlowSchedule` handle.
+   * @returns `{ date, amount }` entries in schedule order. (Python returns `(date, Money)` tuples.)
+   * @throws If the schedule fails validation (kind `validation`).
+   */
+  datedFlows(schedule: CashFlowSchedule): DatedFlowJson[];
+
+  /**
+   * Build a schedule from dated amounts that all share one cashflow kind.
+   *
+   * @param flows - `{ date, amount }` entries: ISO-8601 date and `Money` amount of each flow.
+   * @param kind - `CFKind` wire string stamped on every flow, for example `"fixed"`.
+   * @param dayCount - `DayCount` wire string attached to the schedule for downstream accrual and yield calculations.
+   * @param opts - Optional `ScheduleBuildOpts` wire object (`{ notional_hint?, meta? }`); omitted means a zero notional in the first flow's currency and default metadata.
+   * @returns The `CashFlowSchedule` handle, flows in canonical order.
+   * @throws If an argument does not match its wire type (kind `validation`).
+   */
+  scheduleFromDatedFlows(flows: readonly DatedFlowJson[], kind: generated.cashflows.CFKind, dayCount: generated.core.DayCount, opts?: generated.cashflows.ScheduleBuildOpts | null): CashFlowSchedule;
+
+  /**
+   * Build a schedule from flows that already carry their cashflow kind.
+   *
+   * @param flows - `CashFlow` wire objects; each flow's kind is kept as is.
+   * @param dayCount - `DayCount` wire string attached to the schedule for downstream accrual and yield calculations.
+   * @param opts - Optional `ScheduleBuildOpts` wire object (`{ notional_hint?, meta? }`); omitted means a zero notional in the first flow's currency and default metadata.
+   * @returns The `CashFlowSchedule` handle, flows in canonical order.
+   * @throws If an argument does not match its wire type (kind `validation`).
+   */
+  scheduleFromClassifiedFlows(flows: readonly generated.cashflows.CashFlow[], dayCount: generated.core.DayCount, opts?: generated.cashflows.ScheduleBuildOpts | null): CashFlowSchedule;
+
+  /**
+   * Merge several schedules into one under a new notional and day count.
+   *
+   * Flows are concatenated and put into canonical order; calendar ids and
+   * projected fixings are merged.
+   *
+   * @param schedules - Schedules to merge: `CashFlowSchedule` handles (the facade passes them as JSON), canonical JSON strings or plain objects.
+   * @param notional - `Notional` wire object of the merged schedule.
+   * @param dayCount - `DayCount` wire string of the merged schedule.
+   * @returns The merged `CashFlowSchedule` handle.
+   * @throws If `schedules` is not an array (kind `invalid_type`) or an argument does not match its wire type (kind `validation`).
+   */
+  mergeCashflowSchedules(schedules: readonly (CashFlowSchedule | JsonInput)[], notional: generated.cashflows.Notional, dayCount: generated.core.DayCount): CashFlowSchedule;
+
+  /**
+   * Ex-coupon date for a coupon paid on a date.
+   *
+   * From the returned date (inclusive) until the payment date (exclusive) the
+   * bond trades ex-coupon and accrued interest is negative.
+   *
+   * @param rule - `ExCouponRule` wire object: `days_before_coupon` and an optional `calendar_id` (business days when set, calendar days otherwise).
+   * @param paymentDate - ISO-8601 coupon payment date the window is counted back from.
+   * @returns ISO-8601 ex-coupon date.
+   * @throws If `rule` is not an `ExCouponRule`, `days_before_coupon` exceeds 366, the calendar id cannot be resolved (kind `validation`), or `paymentDate` is not an ISO-8601 string (kind `invalid_type` or `validation`).
+   */
+  exCouponRuleExDate(rule: generated.cashflows.ExCouponRule, paymentDate: string): generated.core.DateWire;
+
+  /**
+   * Accrued interest of a schedule as of a date.
+   *
+   * Typed twin of `accruedInterest`, which takes schedule JSON and returns a
+   * number.
+   *
+   * @param schedule - `CashFlowSchedule` handle.
+   * @param asOf - ISO-8601 accrual snapshot date; interest accrues through accrual end and stays accrued until payment.
+   * @param config - Optional `AccrualConfig` wire object (`{ method, ex_coupon, include_pik, frequency }`); omitted means linear accrual with the Rust defaults.
+   * @returns `Money` wire object in the schedule currency; negative inside an ex-coupon window.
+   * @throws If the schedule fails validation or mixes coupon currencies, `config` is not an `AccrualConfig`, or a day-count calculation fails (kind `validation`).
+   */
+  accruedInterestAmount(schedule: CashFlowSchedule, asOf: string, config?: generated.cashflows.AccrualConfig | null): MoneyValue;
+
+  /**
+   * Sum dated amounts into reporting periods, keeping currencies separate.
+   *
+   * @param flows - `{ date, amount }` entries: ISO-8601 date and `Money` amount of each flow. A flow falls in the period whose `[start, end)` contains its date; flows outside every period are dropped.
+   * @param periods - `Period` wire objects (`{ id, start, end, is_actual }`), sorted by date and non-overlapping.
+   * @returns `PeriodAggregation`: `{ periodId: { currency: Money } }`, with only periods that received a flow.
+   * @throws If an argument does not match its wire type, the periods are unsorted, overlapping or repeat an id, or a period total is non-finite or out of range (kind `validation`).
+   */
+  aggregateByPeriod(flows: readonly DatedFlowJson[], periods: readonly generated.statements.Period[]): generated.cashflows.PeriodAggregation;
+
+  /**
+   * Sum dated amounts that must all be in one currency.
+   *
+   * @param flows - `{ date, amount }` entries: ISO-8601 date and `Money` amount of each flow.
+   * @param target - ISO-4217 currency code every flow must be in; no FX conversion is applied.
+   * @returns `Money` wire object: the compensated sum in `target`.
+   * @throws If a flow is in another currency or the sum cannot be represented (kind `validation`), or an argument does not match its wire type.
+   */
+  aggregateCashflowsChecked(flows: readonly DatedFlowJson[], target: generated.core.Currency): MoneyValue;
+
+  /**
+   * Group dated cashflows into a calendar-year non-principal / principal / PV ladder.
+   *
+   * The four arrays are parallel: entry `i` of each describes flow `i`.
+   *
+   * @param dates - ISO-8601 flow dates; the calendar year of each date is its bucket.
+   * @param kinds - Cashflow kind labels as Rust displays them (`"fixed"`, `"notional"`, `"prepayment"`; also `"coupon"` and `"principal"`), ASCII case ignored; principal-like kinds go to `principal`, all others to `non_principal`.
+   * @param amounts - Flow amounts in one currency's units.
+   * @param pvs - Present value of each flow, in the same units as `amounts`.
+   * @returns `{ year, non_principal, principal, pv }` rows in ascending year order.
+   * @throws If the arrays differ in length, a kind label is unknown, or an amount or PV is non-finite (kind `validation`), or an array has the wrong element type (kind `invalid_type`).
+   */
+  calendarYearLadder(dates: readonly string[], kinds: readonly string[], amounts: number[] | Float64Array, pvs: number[] | Float64Array): CalendarYearLadderRow[];
+
+  /**
+   * Amount aggregated for one period and currency.
+   *
+   * Mirrors Rust `PeriodAggregation::get_amount`; on a plain object this is
+   * `aggregation[period]?.[currency]`.
+   *
+   * @param aggregation - `PeriodAggregation` wire object, as returned by `aggregateByPeriod` or `CashFlowSchedule.pvByPeriod`.
+   * @param period - Period code exactly as the aggregation spells it, for example `"2025Q1"`.
+   * @param currency - ISO-4217 currency code of the bucket to read.
+   * @returns `Money` wire object, or `undefined` when the period has no flows in that currency.
+   * @throws If `aggregation` is not a `PeriodAggregation` or `currency` is not an ISO-4217 code (kind `validation`), or `period` is not a string (kind `invalid_type`).
+   */
+  periodAggregationGetAmount(aggregation: generated.cashflows.PeriodAggregation, period: string, currency: generated.core.Currency): MoneyValue | undefined;
+
+  /**
+   * Materialize the reset observations crossed by a realized-forward market roll.
+   *
+   * Every projected fixing recorded in the schedules' metadata with a date in
+   * `(oldDate, newDate]` is written into a copy of the market as an observed
+   * fixing; existing observations take precedence and are kept unchanged.
+   *
+   * @param market - `MarketContext` handle of the pre-roll market; it is not modified.
+   * @param schedules - Schedules projected on `market` at `oldDate`: `CashFlowSchedule` handles (the facade passes them as JSON), canonical JSON strings or plain objects.
+   * @param oldDate - ISO-8601 exclusive start of the fixing window.
+   * @param newDate - ISO-8601 inclusive end of the window; must be on or after `oldDate`.
+   * @returns A new `MarketContext` handle with the crossed fixings materialized; release it with free().
+   * @throws If the window runs backward, a fixing-series identifier is malformed, a crossed projection is unavailable or non-finite, or two schedules project the same index and date differently (kind `validation`).
+   */
+  materializeFixings(market: MarketContext, schedules: readonly (CashFlowSchedule | JsonInput)[], oldDate: string, newDate: string): MarketContext;
+
+  /**
+   * Parse a cashflow kind label into its `CFKind` wire string.
+   *
+   * The label is the kind as Rust displays it (Rust `CFKind::from_str`), which
+   * is the wire string except for prepayments: the label is `"prepayment"`
+   * and the wire string `"pre_payment"`.
+   *
+   * @param name - Kind label such as `"fixed"`, `"float_reset"` or `"prepayment"`.
+   * @returns The `CFKind` wire string, as used by the `kind` field of a `CashFlow`.
+   * @throws If `name` is not a string (kind `invalid_type`) or names no cashflow kind (kind `validation`).
+   */
+  cfKindParse(name: string): generated.cashflows.CFKind;
+
+  /**
+   * Whether a cashflow kind is interest-like (fixed, floating, inflation or stub coupon).
+   *
+   * @param kind - `CFKind` wire string.
+   * @returns `true` for coupon-type kinds; fees, principal and margin kinds are `false`.
+   * @throws If `kind` is not a `CFKind` wire string (kind `validation`).
+   */
+  cfKindIsInterestLike(kind: generated.cashflows.CFKind): boolean;
+
+  /**
+   * Whether a cashflow kind changes or returns principal.
+   *
+   * @param kind - `CFKind` wire string.
+   * @returns `true` for notional, PIK, amortization, prepayment, revolving draw/repayment and defaulted-notional kinds.
+   * @throws If `kind` is not a `CFKind` wire string (kind `validation`).
+   */
+  cfKindIsPrincipalLike(kind: generated.cashflows.CFKind): boolean;
+
+  /**
+   * Whether a cashflow kind settles in cash.
+   *
+   * Non-cash state rows (`pik`, `defaulted_notional`) are excluded from
+   * settlement sums such as `datedFlows`.
+   *
+   * @param kind - `CFKind` wire string.
+   * @returns `true` when flows of this kind are paid or received in cash.
+   * @throws If `kind` is not a `CFKind` wire string (kind `validation`).
+   */
+  isCashSettlementKind(kind: generated.cashflows.CFKind): boolean;
+
+  /**
+   * Date on which a cashflow changes the outstanding balance.
+   *
+   * Mirrors Rust `CashFlow::get_balance_date`: the flow's `principal_date`
+   * when set, otherwise its payment `date`.
+   *
+   * @param flow - `CashFlow` wire object.
+   * @returns ISO-8601 balance date.
+   * @throws If `flow` is not a `CashFlow` (kind `validation`).
+   */
+  cashFlowGetBalanceDate(flow: generated.cashflows.CashFlow): generated.core.DateWire;
+
+  /**
+   * Copy of a cashflow with an explicit economic principal date.
+   *
+   * @param flow - `CashFlow` wire object.
+   * @param date - ISO-8601 date on which the outstanding balance changes, independent of the cash payment date.
+   * @returns The updated `CashFlow`.
+   * @throws If `flow` is not a `CashFlow` or `date` is not an ISO date (kind `validation`).
+   */
+  cashFlowWithPrincipalDate(flow: generated.cashflows.CashFlow, date: string): generated.cashflows.CashFlow;
+
+  /**
+   * Copy of a cashflow carrying its accrual-period metadata.
+   *
+   * @param flow - `CashFlow` wire object.
+   * @param accrual - `CashFlowAccrual` wire object: accrual start and end dates, day count and optional projected index rate.
+   * @returns The updated `CashFlow`.
+   * @throws If either argument does not match its wire type (kind `validation`).
+   */
+  cashFlowWithAccrual(flow: generated.cashflows.CashFlow, accrual: generated.cashflows.CashFlowAccrual): generated.cashflows.CashFlow;
+
+  /**
+   * Copy of a cashflow with an explicit outstanding-balance change.
+   *
+   * @param flow - `CashFlow` wire object.
+   * @param delta - `Money` wire object: change in outstanding principal (positive increases the balance), which may differ from the cash amount.
+   * @returns The updated `CashFlow`.
+   * @throws If either argument does not match its wire type (kind `validation`).
+   */
+  cashFlowWithPrincipalDelta(flow: generated.cashflows.CashFlow, delta: MoneyValue): generated.cashflows.CashFlow;
+
+  /**
+   * Check a cashflow's invariants.
+   *
+   * @param flow - `CashFlow` wire object.
+   * @throws If `flow` is not a `CashFlow`, its amount, accrual factor or rate is non-finite, its accrual factor is negative, its reset date is after its payment date, or its principal delta is in another currency (kind `validation`).
+   */
+  cashFlowValidate(flow: generated.cashflows.CashFlow): void;
+
+  /**
+   * Straight-line amortization from the initial notional down to a final balance.
+   *
+   * @param finalNotional - `Money` wire object: outstanding balance left at maturity, in the notional currency.
+   * @returns `AmortizationSpec` wire value `{ linear_to: { final_notional } }`.
+   * @throws If `finalNotional` is not a `Money` wire object (kind `validation`).
+   */
+  amortizationSpecLinearTo(finalNotional: MoneyValue): generated.cashflows.AmortizationSpec;
+
+  /**
+   * Amortization to an explicit remaining balance on each listed date.
+   *
+   * @param schedule - `[isoDate, Money]` pairs: the outstanding balance after each date, in the notional currency.
+   * @returns `AmortizationSpec` wire value `{ step_remaining: { schedule } }`.
+   * @throws If `schedule` is not an array of `[isoDate, Money]` pairs (kind `validation`).
+   */
+  amortizationSpecStepRemaining(schedule: readonly (readonly [string, MoneyValue])[]): generated.cashflows.AmortizationSpec;
+
+  /**
+   * Amortization of a fixed share of the original notional each period.
+   *
+   * @param pct - Share of the original notional repaid per period as a decimal (`0.05` = 5%).
+   * @returns `AmortizationSpec` wire value `{ percent_of_original_per_period: { pct } }`.
+   * @throws If `pct` is not a number (kind `invalid_type`).
+   */
+  amortizationSpecPercentOfOriginalPerPeriod(pct: number): generated.cashflows.AmortizationSpec;
+
+  /**
+   * Amortization of a fixed share of the remaining balance each period.
+   *
+   * @param pct - Share of the then-outstanding balance repaid per period as a decimal (`0.05` = 5%).
+   * @returns `AmortizationSpec` wire value `{ percent_of_remaining_per_period: { pct } }`.
+   * @throws If `pct` is not a number (kind `invalid_type`).
+   */
+  amortizationSpecPercentOfRemainingPerPeriod(pct: number): generated.cashflows.AmortizationSpec;
+
+  /**
+   * Straight-line amortization to zero between two dates.
+   *
+   * @param start - ISO-8601 date on which amortization begins; the balance is flat before it.
+   * @param end - ISO-8601 date on which the balance reaches zero.
+   * @returns `AmortizationSpec` wire value `{ linear_between: { start, end } }`.
+   * @throws If either date is not an ISO-8601 string (kind `invalid_type` or `validation`).
+   */
+  amortizationSpecLinearBetween(start: string, end: string): generated.cashflows.AmortizationSpec;
+
+  /**
+   * Amortization by explicit principal payments on listed dates.
+   *
+   * @param items - `[isoDate, Money]` pairs: the principal repaid on each date, in the notional currency.
+   * @returns `AmortizationSpec` wire value `{ custom_principal: { items } }`.
+   * @throws If `items` is not an array of `[isoDate, Money]` pairs (kind `validation`).
+   */
+  amortizationSpecCustomPrincipal(items: readonly (readonly [string, MoneyValue])[]): generated.cashflows.AmortizationSpec;
+
+  /**
+   * Coupon paid partly in cash and partly in kind.
+   *
+   * @param cashFraction - Share of each coupon paid in cash, as an exact decimal string (`"0.6"`).
+   * @param pikFraction - Share of each coupon capitalized into principal, as an exact decimal string (`"0.4"`); the two shares must sum to one when the schedule is built.
+   * @returns `CouponType` wire value `{ split: { cash_fraction, pik_fraction } }`.
+   * @throws If a fraction is not a string (kind `invalid_type`) or not a decimal number (kind `validation`).
+   */
+  couponTypeSplit(cashFraction: string, pikFraction: string): generated.cashflows.CouponType;
+
+  /**
+   * Fee base equal to the undrawn part of a commitment.
+   *
+   * @param commitment - `Money` wire object: total facility commitment; the fee accrues on commitment minus drawn balance.
+   * @returns `FeeBase` wire value `{ undrawn: { commitment } }`.
+   * @throws If `commitment` is not a `Money` wire object (kind `validation`).
+   */
+  feeBaseUndrawn(commitment: MoneyValue): generated.cashflows.FeeBase;
+
+  /**
+   * One-off fee of a fixed amount on a date.
+   *
+   * @param date - ISO-8601 payment date of the fee.
+   * @param amount - `Money` wire object: fee amount in its own currency.
+   * @returns `FeeSpec` wire value `{ fixed: { date, amount } }`.
+   * @throws If `date` is not an ISO-8601 string or `amount` is not a `Money` wire object (kind `invalid_type` or `validation`).
+   */
+  feeSpecFixed(date: string, amount: MoneyValue): generated.cashflows.FeeSpec;
+
+  /**
+   * Recurring fee quoted in basis points of a drawn or undrawn balance.
+   *
+   * The argument is the `periodic_bp` payload of `FeeSpec`, parsed by the Rust
+   * serde contract: `stub` defaults to `"short_front"` and `accrual_basis` to
+   * `"point_in_time"`; every other field is required. (Python's
+   * `FeeSpec.periodic_bp` takes the same fields positionally.)
+   *
+   * @param fields - `{ base, bp, frequency, day_count, business_day_convention, calendar_id, stub?, accrual_basis? }`: `base` is a `FeeBase`, `bp` an exact decimal string in basis points per annum (`"25"` = 0.25%), `frequency` a `Tenor`.
+   * @returns Canonical `FeeSpec` wire value `{ periodic_bp: { ... } }` with defaults filled in.
+   * @throws If `fields` is missing a required field, has an unknown field or a field of the wrong shape (kind `validation`).
+   */
+  feeSpecPeriodicBp(fields: Record<string, unknown>): generated.cashflows.FeeSpec;
+
+  /**
+   * Fallback that uses a fixed index rate when a projection is unavailable.
+   *
+   * @param rate - Index rate used in place of the missing projection, as an exact decimal string (`"0.03"` = 3%), before spread and gearing.
+   * @returns `FloatingRateFallback` wire value `{ fixed_rate: rate }`.
+   * @throws If `rate` is not a string (kind `invalid_type`) or not a decimal number (kind `validation`).
+   */
+  floatingRateFallbackFixedRate(rate: string): generated.cashflows.FloatingRateFallback;
+
+  /**
+   * Overnight compounding in arrears with a lookback.
+   *
+   * @param lookbackDays - Business days each daily observation is shifted back (non-negative integer; `0` for none).
+   * @returns `FloatingLegCompounding` wire value `{ compounded_in_arrears: { lookback_days } }`.
+   * @throws If `lookbackDays` is not a non-negative integer (kind `invalid_type`).
+   */
+  floatingLegCompoundingCompoundedInArrears(lookbackDays: number): generated.cashflows.FloatingLegCompounding;
+
+  /**
+   * Overnight compounding with an observation-period shift.
+   *
+   * @param shiftDays - Business days the whole observation period (rates and weights) is shifted back (non-negative integer).
+   * @returns `FloatingLegCompounding` wire value `{ compounded_with_observation_shift: { shift_days } }`.
+   * @throws If `shiftDays` is not a non-negative integer (kind `invalid_type`).
+   */
+  floatingLegCompoundingCompoundedWithObservationShift(shiftDays: number): generated.cashflows.FloatingLegCompounding;
+
+  /**
+   * Overnight compounding with a rate cutoff before period end.
+   *
+   * @param cutoffDays - Business days before period end from which the last observed rate is repeated (non-negative integer).
+   * @returns `FloatingLegCompounding` wire value `{ compounded_with_rate_cutoff: { cutoff_days } }`.
+   * @throws If `cutoffDays` is not a non-negative integer (kind `invalid_type`).
+   */
+  floatingLegCompoundingCompoundedWithRateCutoff(cutoffDays: number): generated.cashflows.FloatingLegCompounding;
+
+  /**
+   * Check a floating-rate specification's reset lag, caps and floors.
+   *
+   * @param spec - `FloatingRateSpec` wire object.
+   * @throws If `spec` is not a `FloatingRateSpec`, its reset lag is negative, its index floor exceeds its index cap, or its all-in floor exceeds its all-in cap (kind `validation`).
+   */
+  floatingRateSpecValidate(spec: generated.cashflows.FloatingRateSpec): void;
+
+  /**
+   * USD SOFR floating-rate specification (curve `USD-SOFR`, compounded in arrears).
+   *
+   * @param spreadBp - Spread over the index in basis points, as an exact decimal string (`"150"` = 1.50%).
+   * @returns `FloatingRateSpec` wire object with the Rust SOFR conventions.
+   * @throws If `spreadBp` is not a string (kind `invalid_type`) or not a decimal number (kind `validation`).
+   */
+  floatingRateSpecSofr(spreadBp: string): generated.cashflows.FloatingRateSpec;
+
+  /**
+   * GBP SONIA floating-rate specification (curve `GBP-SONIA`, compounded in arrears).
+   *
+   * @param spreadBp - Spread over the index in basis points, as an exact decimal string (`"150"` = 1.50%).
+   * @returns `FloatingRateSpec` wire object with the Rust SONIA conventions.
+   * @throws If `spreadBp` is not a string (kind `invalid_type`) or not a decimal number (kind `validation`).
+   */
+  floatingRateSpecSonia(spreadBp: string): generated.cashflows.FloatingRateSpec;
+
+  /**
+   * EUR 3-month EURIBOR floating-rate specification (term rate set in advance).
+   *
+   * @param spreadBp - Spread over the index in basis points, as an exact decimal string (`"150"` = 1.50%).
+   * @returns `FloatingRateSpec` wire object with the Rust EURIBOR 3M conventions.
+   * @throws If `spreadBp` is not a string (kind `invalid_type`) or not a decimal number (kind `validation`).
+   */
+  floatingRateSpecEuribor3m(spreadBp: string): generated.cashflows.FloatingRateSpec;
+
+  /**
+   * Bullet notional of a given amount: no amortization.
+   *
+   * @param amount - Finite initial outstanding balance in major currency units.
+   * @param currency - ISO-4217 currency code such as `"USD"`.
+   * @returns `Notional` wire object `{ initial, amort: "none" }`.
+   * @throws If `amount` is not a finite number or `currency` is not an ISO-4217 code (kind `invalid_type` or `validation`).
+   */
+  notionalPar(amount: number, currency: generated.core.Currency): generated.cashflows.Notional;
+
+  /**
+   * Currency of a notional's initial balance.
+   *
+   * @param notional - `Notional` wire object.
+   * @returns ISO-4217 currency code.
+   * @throws If `notional` is not a `Notional` (kind `validation`).
+   */
+  notionalCurrency(notional: generated.cashflows.Notional): generated.core.Currency;
+
+  /**
+   * Check a notional and its amortization rule for consistency.
+   *
+   * @param notional - `Notional` wire object.
+   * @throws If `notional` is not a `Notional`, its initial balance is negative or non-finite, or its amortization rule mixes currencies, exceeds the initial balance, has a percentage outside `[0, 1]` or has dates out of order (kind `validation`).
+   */
+  notionalValidate(notional: generated.cashflows.Notional): void;
+
+  /**
+   * Constant annual default rate.
+   *
+   * @param cdr - Annual constant default rate as a decimal (`0.02` = 2% CDR).
+   * @returns `DefaultModelSpec` wire object with no seasoning curve.
+   * @throws If `cdr` is not a number (kind `invalid_type`).
+   */
+  defaultModelSpecConstantCdr(cdr: number): generated.cashflows.DefaultModelSpec;
+
+  /**
+   * PSA/BMA Standard Default Assumption curve.
+   *
+   * Annual CDR ramps 0.02% per month to a 0.60% peak at month 30, is flat to
+   * month 60, declines to 0.03% at month 120 and stays there.
+   *
+   * @param speedMultiplier - SDA speed, where `1.0` means 100% SDA and `2.0` means 200% SDA.
+   * @returns `DefaultModelSpec` wire object using the SDA curve.
+   * @throws If `speedMultiplier` is not a number (kind `invalid_type`).
+   */
+  defaultModelSpecSda(speedMultiplier: number): generated.cashflows.DefaultModelSpec;
+
+  /**
+   * Constant 2% CDR baseline.
+   *
+   * @returns `DefaultModelSpec` wire object equal to `defaultModelSpecConstantCdr(0.02)`.
+   * @throws If the model cannot be serialized.
+   */
+  defaultModelSpecCdr2pct(): generated.cashflows.DefaultModelSpec;
+
+  /**
+   * Explicit annual CDR for each month of seasoning.
+   *
+   * @param monthlyCdr - Annual CDR per seasoning month as decimals in `[0, 1]`, month 1 first; the last value is held. Must be non-empty.
+   * @returns `DefaultModelSpec` wire object using the vector curve.
+   * @throws If `monthlyCdr` is not an array of numbers (kind `invalid_type`).
+   */
+  defaultModelSpecVector(monthlyCdr: number[] | Float64Array): generated.cashflows.DefaultModelSpec;
+
+  /**
+   * Cumulative net-loss curve with a constant severity.
+   *
+   * @param cumulativeNetLossPct - Cumulative net loss in percent of the original balance per seasoning month (`1.5` = 1.5%), non-decreasing, month 1 first; the last value is held.
+   * @param severity - Loss severity as a decimal fraction of defaulted par in `(0, 1]`; defaults are loss divided by severity.
+   * @returns `DefaultModelSpec` wire object using the cumulative-loss curve.
+   * @throws If an argument is not a number or array of numbers (kind `invalid_type`).
+   */
+  defaultModelSpecCumulativeLoss(cumulativeNetLossPct: number[] | Float64Array, severity: number): generated.cashflows.DefaultModelSpec;
+
+  /**
+   * Rating-agency default timing over a lifetime cumulative default rate.
+   *
+   * @param cumulativeDefaultRate - Lifetime defaults as a decimal fraction of the original balance in `[0, 1]`.
+   * @param annualPct - Share of lifetime defaults in each year of seasoning, in percent (for example `[15, 30, 30, 15, 10]`), summing to 100.
+   * @returns `DefaultModelSpec` wire object using the timing curve.
+   * @throws If an argument is not a number or array of numbers (kind `invalid_type`).
+   */
+  defaultModelSpecTiming(cumulativeDefaultRate: number, annualPct: number[] | Float64Array): generated.cashflows.DefaultModelSpec;
+
+  /**
+   * Check a default model's curve parameters.
+   *
+   * @param spec - `DefaultModelSpec` wire object.
+   * @throws If `spec` is not a `DefaultModelSpec`, or its CDR, SDA multiplier, vector, cumulative-loss or timing parameters are out of range (kind `validation`).
+   */
+  defaultModelSpecValidate(spec: generated.cashflows.DefaultModelSpec): void;
+
+  /**
+   * Monthly default rate (MDR) of a default model at a seasoning month.
+   *
+   * @param spec - `DefaultModelSpec` wire object.
+   * @param seasoningMonths - Months since origination or pool start (non-negative integer).
+   * @returns Monthly default rate as a decimal; a constant CDR converts as `1 - (1 - CDR)^(1/12)`.
+   * @throws If `spec` is not a `DefaultModelSpec` or its curve parameters are invalid (kind `validation`), or `seasoningMonths` is not a non-negative integer (kind `invalid_type`).
+   */
+  defaultModelSpecMdr(spec: generated.cashflows.DefaultModelSpec, seasoningMonths: number): number;
+
+  /**
+   * Constant annual prepayment rate.
+   *
+   * @param cpr - Annual constant prepayment rate as a decimal (`0.06` = 6% CPR).
+   * @returns `PrepaymentModelSpec` wire object with no seasoning curve.
+   * @throws If `cpr` is not a number (kind `invalid_type`).
+   */
+  prepaymentModelSpecConstantCpr(cpr: number): generated.cashflows.PrepaymentModelSpec;
+
+  /**
+   * PSA prepayment curve: a 30-month ramp to a 6% annual CPR, then flat.
+   *
+   * @param speedMultiplier - PSA speed, where `1.0` means 100% PSA and `1.5` means 150% PSA.
+   * @returns `PrepaymentModelSpec` wire object using the PSA curve.
+   * @throws If `speedMultiplier` is not a number (kind `invalid_type`).
+   */
+  prepaymentModelSpecPsa(speedMultiplier: number): generated.cashflows.PrepaymentModelSpec;
+
+  /**
+   * 100% PSA, the standard prepayment assumption.
+   *
+   * @returns `PrepaymentModelSpec` wire object equal to `prepaymentModelSpecPsa(1.0)`.
+   * @throws If the model cannot be serialized.
+   */
+  prepaymentModelSpecPsa100(): generated.cashflows.PrepaymentModelSpec;
+
+  /**
+   * CMBS-style lockout: no prepayment during the lockout, then a constant CPR.
+   *
+   * @param lockoutMonths - Months with zero prepayment (non-negative integer; for example `60` for five years).
+   * @param postLockoutCpr - Annual CPR after the lockout as a decimal (`0.10` = 10%).
+   * @returns `PrepaymentModelSpec` wire object using the lockout curve.
+   * @throws If `lockoutMonths` is not a non-negative integer or `postLockoutCpr` is not a number (kind `invalid_type`).
+   */
+  prepaymentModelSpecCmbsWithLockout(lockoutMonths: number, postLockoutCpr: number): generated.cashflows.PrepaymentModelSpec;
+
+  /**
+   * ABS speed curve (auto-loan and consumer ABS convention).
+   *
+   * Each month the same share of the original balance prepays, so
+   * `SMM_t = speed / (1 − speed·(t − 1))`.
+   *
+   * @param speed - Monthly prepayment as a decimal fraction of the original balance (`0.015` = 1.5% ABS), in `[0, 1]`.
+   * @returns `PrepaymentModelSpec` wire object using the ABS curve.
+   * @throws If `speed` is not a number (kind `invalid_type`).
+   */
+  prepaymentModelSpecAbs(speed: number): generated.cashflows.PrepaymentModelSpec;
+
+  /**
+   * Explicit annual CPR for each month of seasoning.
+   *
+   * @param monthlyCpr - Annual CPR per seasoning month as decimals in `[0, 1]`, month 1 first; the last value is held. Must be non-empty.
+   * @returns `PrepaymentModelSpec` wire object using the vector curve.
+   * @throws If `monthlyCpr` is not an array of numbers (kind `invalid_type`).
+   */
+  prepaymentModelSpecVector(monthlyCpr: number[] | Float64Array): generated.cashflows.PrepaymentModelSpec;
+
+  /**
+   * Check a prepayment model's curve parameters.
+   *
+   * @param spec - `PrepaymentModelSpec` wire object.
+   * @throws If `spec` is not a `PrepaymentModelSpec`, or its CPR, PSA multiplier, ABS speed or vector is out of range (kind `validation`).
+   */
+  prepaymentModelSpecValidate(spec: generated.cashflows.PrepaymentModelSpec): void;
+
+  /**
+   * Single-month mortality (SMM) of a prepayment model at a seasoning month.
+   *
+   * @param spec - `PrepaymentModelSpec` wire object.
+   * @param seasoningMonths - Months since origination or pool start (non-negative integer).
+   * @returns Monthly prepayment rate as a decimal; a constant CPR converts as `1 - (1 - CPR)^(1/12)`.
+   * @throws If `spec` is not a `PrepaymentModelSpec` or its curve parameters are invalid (kind `validation`), or `seasoningMonths` is not a non-negative integer (kind `invalid_type`).
+   */
+  prepaymentModelSpecSmm(spec: generated.cashflows.PrepaymentModelSpec, seasoningMonths: number): number;
+
+  /**
+   * Copy of a recovery model with a loss-severity vector by month of default.
+   *
+   * @param spec - `RecoveryModelSpec` wire object.
+   * @param severityVector - Loss severity (`1 − recovery`) per seasoning month of the default as decimals in `[0, 1]`, month 1 first; the last value is held. Must be non-empty.
+   * @returns The `RecoveryModelSpec` with the vector attached; `rate` stays as the flat fallback but no longer drives recoveries.
+   * @throws If `spec` is not a `RecoveryModelSpec` (kind `validation`) or `severityVector` is not an array of numbers (kind `invalid_type`).
+   */
+  recoveryModelSpecWithSeverityVector(spec: generated.cashflows.RecoveryModelSpec, severityVector: number[] | Float64Array): generated.cashflows.RecoveryModelSpec;
+
+  /**
+   * Recovery rate of a recovery model for a default in a seasoning month.
+   *
+   * @param spec - `RecoveryModelSpec` wire object.
+   * @param seasoningMonths - Months since origination of the defaulting balance (non-negative integer).
+   * @returns Recovery as a decimal fraction of defaulted par: `1 − severity` for the month when a severity vector is set, otherwise the flat `rate`.
+   * @throws If `spec` is not a `RecoveryModelSpec` (kind `validation`) or `seasoningMonths` is not a non-negative integer (kind `invalid_type`).
+   */
+  recoveryModelSpecRecoveryRate(spec: generated.cashflows.RecoveryModelSpec, seasoningMonths: number): number;
+
+  /**
+   * Check a recovery model's rate and severity vector.
+   *
+   * @param spec - `RecoveryModelSpec` wire object.
+   * @throws If `spec` is not a `RecoveryModelSpec`, its rate is outside `[0, 1]`, or its severity vector is empty or holds a value outside `[0, 1]` (kind `validation`).
+   */
+  recoveryModelSpecValidate(spec: generated.cashflows.RecoveryModelSpec): void;
+
+  /**
+   * Quarterly Act/360 schedule with Modified Following on a weekends-only calendar.
+   *
+   * @returns `ScheduleParams` wire object: short-front stubs, no end-of-month roll, no payment lag.
+   * @throws If the parameters cannot be serialized.
+   */
+  scheduleParamsQuarterlyAct360(): generated.cashflows.ScheduleParams;
+
+  /**
+   * Semi-annual 30/360 schedule with Modified Following on a weekends-only calendar.
+   *
+   * @returns `ScheduleParams` wire object: short-front stubs, no end-of-month roll, no payment lag.
+   * @throws If the parameters cannot be serialized.
+   */
+  scheduleParamsSemiannual30360(): generated.cashflows.ScheduleParams;
+
+  /**
+   * Annual ISDA Act/Act schedule with Following on a weekends-only calendar.
+   *
+   * This is ISDA Actual/Actual, not ICMA; government bonds use
+   * `scheduleParamsEurGovBond` or `scheduleParamsUsdTreasury`.
+   *
+   * @returns `ScheduleParams` wire object: short-front stubs, no end-of-month roll, no payment lag.
+   * @throws If the parameters cannot be serialized.
+   */
+  scheduleParamsAnnualActact(): generated.cashflows.ScheduleParams;
+
+  /**
+   * USD SOFR swap leg: quarterly, Act/360, Modified Following, USNY, T+2 payment lag.
+   *
+   * @returns `ScheduleParams` wire object following ARRC SOFR conventions.
+   * @throws If the parameters cannot be serialized.
+   */
+  scheduleParamsUsdSofrSwap(): generated.cashflows.ScheduleParams;
+
+  /**
+   * USD corporate bond: semi-annual, 30/360, Following, USNY.
+   *
+   * @returns `ScheduleParams` wire object for a plain USD corporate coupon schedule.
+   * @throws If the parameters cannot be serialized.
+   */
+  scheduleParamsUsdCorporateBond(): generated.cashflows.ScheduleParams;
+
+  /**
+   * USD Treasury bond: semi-annual, Act/Act, Following, USNY.
+   *
+   * @returns `ScheduleParams` wire object for a Treasury-style coupon schedule.
+   * @throws If the parameters cannot be serialized.
+   */
+  scheduleParamsUsdTreasury(): generated.cashflows.ScheduleParams;
+
+  /**
+   * EUR €STR swap leg: annual, Act/360, Modified Following, TARGET2, T+2 payment lag (LCH template).
+   *
+   * @returns `ScheduleParams` wire object for a €STR-style floating leg.
+   * @throws If the parameters cannot be serialized.
+   */
+  scheduleParamsEurEstrSwap(): generated.cashflows.ScheduleParams;
+
+  /**
+   * EUR government bond: annual, Act/Act, Following, TARGET2.
+   *
+   * @returns `ScheduleParams` wire object for an annual EUR government coupon schedule.
+   * @throws If the parameters cannot be serialized.
+   */
+  scheduleParamsEurGovBond(): generated.cashflows.ScheduleParams;
+
+  /**
+   * GBP SONIA swap leg: annual, Act/365F, Modified Following, GBLO, no payment lag.
+   *
+   * @returns `ScheduleParams` wire object for a SONIA-style floating leg.
+   * @throws If the parameters cannot be serialized.
+   */
+  scheduleParamsGbpSoniaSwap(): generated.cashflows.ScheduleParams;
+
+  /**
+   * JPY TONA swap leg: annual, Act/365F, Modified Following, JPTO, T+2 payment lag.
+   *
+   * @returns `ScheduleParams` wire object for a TONA-style floating leg.
+   * @throws If the parameters cannot be serialized.
+   */
+  scheduleParamsJpyTonaSwap(): generated.cashflows.ScheduleParams;
+
+  /**
+   * Check schedule conventions before building a schedule.
+   *
+   * @param params - `ScheduleParams` wire object.
+   * @throws If `params` is not a `ScheduleParams`, its `calendar_id` names no registered holiday calendar (other than `"weekends_only"`), or its payment lag is negative (kind `validation`).
+   */
+  scheduleParamsValidate(params: generated.cashflows.ScheduleParams): void;
 }
 
 /**
@@ -5531,10 +6684,144 @@ export declare const cashflows: CashflowsNamespace;
 // --- covenants -------------------------------------------------------------
 
 /**
- * Namespaced TypeScript entry points for covenants calculations and types.
+ * Covenant package: specifications, waivers and the breach history.
+ *
+ * Add specifications and waivers, then evaluate metric values on a test
+ * date. `evaluate` is read-only; `evaluateAndTrack` also records breaches and
+ * cures.
  */
+export interface CovenantEngine extends WasmOwned {
+  /**
+   * Serialize the engine, including its breach history, to canonical JSON.
+   *
+   * @returns `CovenantEngine` JSON accepted by `fromJson` and by `evaluateEngine`.
+   * @throws If the engine cannot be serialized.
+   */
+  toJson(): string;
+  /**
+   * Add a covenant specification in place.
+   *
+   * @param spec - `CovenantSpec` wire object. Its covenant label is the report key and must be unique among specifications applicable on a test date.
+   * @throws If `spec` is not a `CovenantSpec` (kind `validation`).
+   */
+  addSpec(spec: generated.covenants.CovenantSpec): void;
+  /**
+   * Add a waiver or threshold amendment in place.
+   *
+   * @param waiver - `CovenantWaiver` wire object: covenant id, effective and optional expiry dates, and an optional amended threshold (omitted means a full waiver).
+   * @throws If `waiver` is not a `CovenantWaiver` (kind `validation`).
+   */
+  addWaiver(waiver: generated.covenants.CovenantWaiver): void;
+  /**
+   * Check the engine configuration without evaluating.
+   *
+   * @throws If a specification, window, waiver or breach record is invalid (kind `validation`).
+   */
+  validate(): void;
+  /**
+   * Evaluate every applicable covenant on a test date.
+   *
+   * Read-only: the breach history is not updated.
+   *
+   * @param metrics - Metric values keyed by covenant metric identifier (plain object or JSON), in the units the tests expect: ratios in turns (`4.5` means 4.5x), amounts in the reporting currency.
+   * @param asOf - ISO-8601 test date; it selects the active window, waivers, threshold schedule and cure-period state.
+   * @returns Covenant reports keyed by stable covenant instance key, in engine order.
+   * @throws If the engine is invalid, two applicable specifications share an instance key, a metric value is not a number (kind `validation`), or a required metric is missing (kind `not_found`).
+   */
+  evaluate(metrics: Record<string, number> | string, asOf: string): Record<string, CovenantReport>;
+  /**
+   * Evaluate like `evaluate` and update the breach history.
+   *
+   * A failing covenant without an active breach gains a breach record with
+   * its cure deadline; a later pass inside the cure period marks it cured.
+   * On error the history is left untouched.
+   *
+   * @param metrics - Metric values keyed by covenant metric identifier (plain object or JSON), in the units the tests expect.
+   * @param asOf - ISO-8601 test date; it also stamps new breach records.
+   * @param scope - `"maintenance"` for scheduled testing, or `"incurrence"` only for a completed action assessed with its pro forma metrics.
+   * @returns Covenant reports keyed by stable covenant instance key, in engine order.
+   * @throws If `scope` is not one of the listed strings, the engine is invalid, a metric value is not a number (kind `validation`), or a required metric is missing (kind `not_found`).
+   */
+  evaluateAndTrack(metrics: Record<string, number> | string, asOf: string, scope: generated.covenants.CovenantScope): Record<string, CovenantReport>;
+  /**
+   * Evaluate the engine on each dated row of metric values.
+   *
+   * Each row is evaluated independently; the breach history is not updated.
+   *
+   * @param metrics - `DatedMetrics` rows (`{ date, metrics }`): metric values per ISO-8601 test date, evaluated in the order given. (Python takes a date-indexed DataFrame.)
+   * @returns `DatedCovenantReports` rows (`{ as_of, reports }`), one per input row in input order. (Python returns the same reports as a long DataFrame.)
+   * @throws If `metrics` is not an array of `DatedMetrics`, the engine is invalid (kind `validation`), or a required metric is missing on a date (kind `not_found`).
+   */
+  evaluateSeries(metrics: readonly generated.covenants.DatedMetrics[]): generated.covenants.DatedCovenantReports[];
+  /**
+   * Covenant specifications, in the order they were added.
+   * @returns `CovenantSpec` wire objects.
+   * @throws If the specifications cannot be serialized.
+   */
+  readonly specs: generated.covenants.CovenantSpec[];
+  /**
+   * Waivers and threshold amendments.
+   * @returns `CovenantWaiver` wire objects.
+   * @throws If the waivers cannot be serialized.
+   */
+  readonly waivers: generated.covenants.CovenantWaiver[];
+  /**
+   * Breach records written by `evaluateAndTrack`.
+   * @returns `CovenantBreach` wire objects, oldest first; each keeps its original consequences and cure state.
+   * @throws If the breach history cannot be serialized.
+   */
+  readonly breachHistory: generated.covenants.CovenantBreach[];
+}
+
 /**
- * JSON bridge to the Rust `finstack-quant-covenants` crate.
+ * Static entry points of the `CovenantEngine` handle.
+ * @example
+ * ```typescript
+ * import init, { covenants } from "finstack-quant-wasm";
+ * await init();
+ * const engine = covenants.CovenantEngine.fromSpecs(covenants.covLite(7.0, 4.5));
+ * const reports = engine.evaluate({ total_leverage: 5.0, senior_leverage: 3.0 }, "2026-03-31");
+ * console.log(reports.max_total_leverage.passed);
+ * engine.free();
+ * ```
+ */
+export interface CovenantEngineConstructor {
+  /**
+   * JavaScript prototype of `CovenantEngine`; instances come from `new CovenantEngine()`.
+   */
+  readonly prototype: CovenantEngine;
+  /**
+   * Create an empty engine.
+   *
+   * @returns An engine with no specifications, waivers or breach history.
+   */
+  new (): CovenantEngine;
+  /**
+   * Build an engine from covenant specifications.
+   *
+   * @param specs - `CovenantSpec` wire objects, for example the result of `covLite` or `lboStandard`; they are added in order.
+   * @returns A `CovenantEngine` holding the specifications; it is validated when evaluated.
+   * @throws If `specs` is not an array of `CovenantSpec` (kind `validation`).
+   */
+  fromSpecs(specs: readonly generated.covenants.CovenantSpec[]): CovenantEngine;
+  /**
+   * Parse an engine from its canonical JSON.
+   *
+   * @param json - `CovenantEngine` JSON string or plain object; only `specs` is required and unknown fields are rejected.
+   * @returns The parsed `CovenantEngine`; it is validated when evaluated.
+   * @throws If `json` is neither a string nor a plain object (kind `invalid_type`) or does not match the engine schema (kind `validation`).
+   */
+  fromJson(json: JsonInput): CovenantEngine;
+}
+
+/**
+ * Covenant definitions, evaluation and forecasting from the Rust
+ * `finstack-quant-covenants` crate.
+ *
+ * `CovenantEngine` is a handle. Covenant definitions, reports and forecasts
+ * cross as plain objects that mirror the canonical Rust serde model (types
+ * under `./types`), with their Rust constructors and methods as free
+ * functions. The `*Json` functions are the JSON-string bridge.
  * @example
  * ```typescript
  * import init, { covenants } from "finstack-quant-wasm";
@@ -5625,6 +6912,387 @@ export interface CovenantsNamespace {
     minLiquidity: number,
     maxNetLeverage: number
   ): string;
+
+  /**
+   * `CovenantEngine` handle: covenant package: specifications, waivers and the breach history.
+   */
+  CovenantEngine: CovenantEngineConstructor;
+
+  /**
+   * Standard leveraged-buyout covenant package.
+   *
+   * Typed twin of `lboStandardJson`: quarterly maximum Debt / EBITDA, minimum
+   * interest coverage and minimum fixed-charge coverage tests plus an annual
+   * maximum-capex test.
+   *
+   * @param initialLeverage - Maximum debt-to-EBITDA threshold in turns (`5.0` means 5.0x).
+   * @param interestCoverage - Minimum interest-coverage threshold in turns.
+   * @param fixedChargeCoverage - Minimum fixed-charge-coverage threshold in turns.
+   * @param maxCapex - Maximum annual capital expenditure in the reporting currency.
+   * @returns `CovenantSpec` wire objects, ready for `CovenantEngine.fromSpecs`.
+   * @throws If a threshold is not a number (kind `invalid_type`), or is NaN, infinite or negative (kind `validation`).
+   */
+  lboStandard(initialLeverage: number, interestCoverage: number, fixedChargeCoverage: number, maxCapex: number): generated.covenants.CovenantSpec[];
+
+  /**
+   * Covenant-lite package: incurrence-style total and senior leverage tests.
+   *
+   * Typed twin of `covLiteJson`.
+   *
+   * @param maxLeverage - Maximum total debt-to-EBITDA leverage in turns.
+   * @param maxSeniorLeverage - Maximum senior-debt-to-EBITDA leverage in turns.
+   * @returns `CovenantSpec` wire objects, ready for `CovenantEngine.fromSpecs`.
+   * @throws If a threshold is not a number (kind `invalid_type`), or is NaN, infinite or negative (kind `validation`).
+   */
+  covLite(maxLeverage: number, maxSeniorLeverage: number): generated.covenants.CovenantSpec[];
+
+  /**
+   * Real-estate covenant package: DSCR, debt yield and loan-to-value tests.
+   *
+   * Typed twin of `realEstateJson`.
+   *
+   * @param minDscr - Minimum debt-service coverage ratio in turns.
+   * @param minDebtYield - Minimum net-operating-income debt yield as a decimal (`0.08` = 8%).
+   * @param maxLtv - Maximum loan-to-value ratio as a decimal (`0.65` = 65%).
+   * @returns `CovenantSpec` wire objects, ready for `CovenantEngine.fromSpecs`.
+   * @throws If a threshold is not a number (kind `invalid_type`), or is NaN, infinite or negative (kind `validation`).
+   */
+  realEstate(minDscr: number, minDebtYield: number, maxLtv: number): generated.covenants.CovenantSpec[];
+
+  /**
+   * Project-finance covenant package: DSCR, distribution lock-up, liquidity and net leverage tests.
+   *
+   * Typed twin of `projectFinanceJson`.
+   *
+   * @param minDscr - Minimum debt-service coverage ratio in turns.
+   * @param distributionLockupDscr - DSCR below which distributions are locked up, in turns.
+   * @param minLiquidity - Minimum liquidity reserve in the reporting currency.
+   * @param maxNetLeverage - Maximum net-debt-to-EBITDA leverage in turns.
+   * @returns `CovenantSpec` wire objects, ready for `CovenantEngine.fromSpecs`.
+   * @throws If a threshold is not a number (kind `invalid_type`), or is NaN, infinite or negative (kind `validation`).
+   */
+  projectFinance(minDscr: number, distributionLockupDscr: number, minLiquidity: number, maxNetLeverage: number): generated.covenants.CovenantSpec[];
+
+  /**
+   * Forecast one numeric covenant over dated metric projections.
+   *
+   * Deterministic by default: breach probability is `0` for a pass and `1` for
+   * a breach. With `config.stochastic` a lognormal overlay on the metric gives
+   * probabilities, analytic when `num_paths` is `0` and Monte Carlo otherwise.
+   *
+   * @param spec - `CovenantSpec` wire object of a numeric covenant.
+   * @param metrics - `DatedMetrics` rows (`{ date, metrics }`): projected metric values per ISO-8601 test date, in any order with unique dates. (Python takes a date-indexed DataFrame.)
+   * @param config - Optional `CovenantForecastConfig` wire object; omitted means the deterministic Rust default.
+   * @returns `CovenantForecast` wire object: per-date projected values, thresholds, headroom and breach probabilities, with the first breach date and minimum headroom.
+   * @throws If `metrics` is empty or repeats a date, the covenant is not numeric, the configuration is invalid or an observation is non-finite (kind `validation`), or the covenant's metric is missing on a date (kind `not_found`).
+   */
+  forecastCovenant(spec: generated.covenants.CovenantSpec, metrics: readonly generated.covenants.DatedMetrics[], config?: generated.covenants.CovenantForecastConfig | null): generated.covenants.CovenantForecast;
+
+  /**
+   * Forecast every breach of an engine's covenants over dated metric projections.
+   *
+   * Effective windows, waivers and threshold schedules are honored;
+   * non-numeric covenants are skipped. Deterministic breaches are always
+   * listed; in stochastic mode dates whose breach probability reaches
+   * `config.breach_probability_threshold` are listed too.
+   *
+   * @param engine - `CovenantEngine` handle.
+   * @param metrics - `DatedMetrics` rows (`{ date, metrics }`): projected metric values per ISO-8601 test date, in any order with unique dates. (Python takes a date-indexed DataFrame.)
+   * @param config - Optional `CovenantForecastConfig` wire object; omitted means deterministic maintenance-scope forecasting.
+   * @returns `FutureBreach` wire objects sorted by breach date, then covenant id.
+   * @throws If `metrics` is empty or repeats a date, the engine or configuration is invalid or an observation is non-finite (kind `validation`), or a required metric is missing on a date (kind `not_found`).
+   */
+  forecastBreaches(engine: CovenantEngine, metrics: readonly generated.covenants.DatedMetrics[], config?: generated.covenants.CovenantForecastConfig | null): generated.covenants.FutureBreach[];
+
+  /**
+   * Copy of a forecast configuration with a different covenant scope.
+   *
+   * @param config - `CovenantForecastConfig` wire object.
+   * @param scope - `"maintenance"` (scheduled tests) or `"incurrence"` (hypothetical capacity for a contemplated action).
+   * @returns The updated `CovenantForecastConfig`.
+   * @throws If `config` is not a `CovenantForecastConfig` or `scope` is not one of the listed strings (kind `validation`).
+   */
+  covenantForecastConfigWithScope(config: generated.covenants.CovenantForecastConfig, scope: generated.covenants.CovenantScope): generated.covenants.CovenantForecastConfig;
+
+  /**
+   * Maximum total debt / EBITDA covenant.
+   *
+   * @param threshold - Maximum allowed ratio in turns (`4.5` means 4.5x).
+   * @returns `CovenantType` wire value `{ max_debt_to_ebitda: { threshold } }`.
+   * @throws If `threshold` is not a number (kind `invalid_type`).
+   */
+  covenantTypeMaxDebtToEbitda(threshold: number): generated.covenants.CovenantType;
+
+  /**
+   * Minimum interest coverage (EBIT / interest) covenant.
+   *
+   * @param threshold - Minimum required ratio in turns.
+   * @returns `CovenantType` wire value `{ min_interest_coverage: { threshold } }`.
+   * @throws If `threshold` is not a number (kind `invalid_type`).
+   */
+  covenantTypeMinInterestCoverage(threshold: number): generated.covenants.CovenantType;
+
+  /**
+   * Minimum fixed-charge coverage covenant.
+   *
+   * @param threshold - Minimum required ratio in turns.
+   * @returns `CovenantType` wire value `{ min_fixed_charge_coverage: { threshold } }`.
+   * @throws If `threshold` is not a number (kind `invalid_type`).
+   */
+  covenantTypeMinFixedChargeCoverage(threshold: number): generated.covenants.CovenantType;
+
+  /**
+   * Maximum total leverage covenant.
+   *
+   * @param threshold - Maximum allowed total debt / EBITDA in turns.
+   * @returns `CovenantType` wire value `{ max_total_leverage: { threshold } }`.
+   * @throws If `threshold` is not a number (kind `invalid_type`).
+   */
+  covenantTypeMaxTotalLeverage(threshold: number): generated.covenants.CovenantType;
+
+  /**
+   * Maximum senior leverage covenant.
+   *
+   * @param threshold - Maximum allowed senior debt / EBITDA in turns.
+   * @returns `CovenantType` wire value `{ max_senior_leverage: { threshold } }`.
+   * @throws If `threshold` is not a number (kind `invalid_type`).
+   */
+  covenantTypeMaxSeniorLeverage(threshold: number): generated.covenants.CovenantType;
+
+  /**
+   * Minimum asset coverage covenant.
+   *
+   * @param threshold - Minimum required asset coverage ratio in turns.
+   * @returns `CovenantType` wire value `{ min_asset_coverage: { threshold } }`.
+   * @throws If `threshold` is not a number (kind `invalid_type`).
+   */
+  covenantTypeMinAssetCoverage(threshold: number): generated.covenants.CovenantType;
+
+  /**
+   * Minimum debt-service coverage ratio covenant.
+   *
+   * @param threshold - Minimum required DSCR in turns.
+   * @returns `CovenantType` wire value `{ min_dscr: { threshold } }`.
+   * @throws If `threshold` is not a number (kind `invalid_type`).
+   */
+  covenantTypeMinDscr(threshold: number): generated.covenants.CovenantType;
+
+  /**
+   * Maximum net debt / EBITDA covenant.
+   *
+   * @param threshold - Maximum allowed net debt / EBITDA in turns; the specification needs an earnings denominator metric.
+   * @returns `CovenantType` wire value `{ max_net_debt_to_ebitda: { threshold } }`.
+   * @throws If `threshold` is not a number (kind `invalid_type`).
+   */
+  covenantTypeMaxNetDebtToEbitda(threshold: number): generated.covenants.CovenantType;
+
+  /**
+   * Maximum capital expenditure covenant.
+   *
+   * @param threshold - Maximum allowed capex amount in the reporting currency.
+   * @returns `CovenantType` wire value `{ max_capex: { threshold } }`.
+   * @throws If `threshold` is not a number (kind `invalid_type`).
+   */
+  covenantTypeMaxCapex(threshold: number): generated.covenants.CovenantType;
+
+  /**
+   * Minimum liquidity covenant.
+   *
+   * @param threshold - Minimum required liquidity amount in the reporting currency.
+   * @returns `CovenantType` wire value `{ min_liquidity: { threshold } }`.
+   * @throws If `threshold` is not a number (kind `invalid_type`).
+   */
+  covenantTypeMinLiquidity(threshold: number): generated.covenants.CovenantType;
+
+  /**
+   * Negative (restrictive) covenant described in words.
+   *
+   * @param restriction - Description of the restricted action, for example `"no additional senior debt"`.
+   * @returns `CovenantType` wire value `{ negative: { restriction } }`; it has no numeric test.
+   * @throws If `restriction` is not a string (kind `invalid_type`).
+   */
+  covenantTypeNegative(restriction: string): generated.covenants.CovenantType;
+
+  /**
+   * Affirmative covenant described in words.
+   *
+   * @param requirement - Description of the required action, for example `"deliver audited financials within 90 days"`.
+   * @returns `CovenantType` wire value `{ affirmative: { requirement } }`; it has no numeric test.
+   * @throws If `requirement` is not a string (kind `invalid_type`).
+   */
+  covenantTypeAffirmative(requirement: string): generated.covenants.CovenantType;
+
+  /**
+   * Custom covenant on a caller-named metric.
+   *
+   * @param metric - Metric identifier the test reads, for example `"net_working_capital"`.
+   * @param test - `"maximum"` (the metric must not exceed `value`) or `"minimum"` (the metric must reach `value`).
+   * @param value - Finite threshold in the metric's own units.
+   * @returns `CovenantType` wire value `{ custom: { metric, test } }`.
+   * @throws If `metric` or `test` is not a string or `value` is not a number (kind `invalid_type`), or `test` is not one of the listed strings or `value` is non-finite (kind `validation`).
+   */
+  covenantTypeCustom(metric: string, test: 'maximum' | 'minimum', value: number): generated.covenants.CovenantType;
+
+  /**
+   * Basket covenant: a capped amount for a named category.
+   *
+   * @param name - Basket name, for example `"restricted_payments"`.
+   * @param limit - Maximum basket usage in the reporting currency.
+   * @returns `CovenantType` wire value `{ basket: { name, limit } }`.
+   * @throws If `name` is not a string or `limit` is not a number (kind `invalid_type`).
+   */
+  covenantTypeBasket(name: string, limit: number): generated.covenants.CovenantType;
+
+  /**
+   * Breach consequence: event of default.
+   *
+   * @returns `CovenantConsequence` wire value `"default"`.
+   * @throws If the value cannot be serialized.
+   */
+  covenantConsequenceDefault(): generated.covenants.CovenantConsequence;
+
+  /**
+   * Breach consequence: the borrowing rate steps up.
+   *
+   * @param bpIncrease - Rate increase in basis points per annum (`200` = +2.00%); must be finite and non-negative when the covenant is validated.
+   * @returns `CovenantConsequence` wire value `{ rate_increase: { bp_increase } }`.
+   * @throws If `bpIncrease` is not a number (kind `invalid_type`).
+   */
+  covenantConsequenceRateIncrease(bpIncrease: number): generated.covenants.CovenantConsequence;
+
+  /**
+   * Breach consequence: excess cash is swept to repay debt.
+   *
+   * @param sweepPercentage - Share of excess cash swept, as a decimal in `[0, 1]` (`0.5` = 50%).
+   * @returns `CovenantConsequence` wire value `{ cash_sweep: { sweep_percentage } }`.
+   * @throws If `sweepPercentage` is not a number (kind `invalid_type`).
+   */
+  covenantConsequenceCashSweep(sweepPercentage: number): generated.covenants.CovenantConsequence;
+
+  /**
+   * Breach consequence: distributions to equity are blocked.
+   *
+   * @returns `CovenantConsequence` wire value `"block_distributions"`.
+   * @throws If the value cannot be serialized.
+   */
+  covenantConsequenceBlockDistributions(): generated.covenants.CovenantConsequence;
+
+  /**
+   * Breach consequence: additional collateral must be posted.
+   *
+   * @param description - Non-empty description of the required collateral.
+   * @returns `CovenantConsequence` wire value `{ require_collateral: { description } }`.
+   * @throws If `description` is not a string (kind `invalid_type`).
+   */
+  covenantConsequenceRequireCollateral(description: string): generated.covenants.CovenantConsequence;
+
+  /**
+   * Breach consequence: the maturity is accelerated to a new date.
+   *
+   * @param newMaturity - ISO-8601 accelerated maturity date.
+   * @returns `CovenantConsequence` wire value `{ accelerate_maturity: { new_maturity } }`.
+   * @throws If `newMaturity` is not an ISO-8601 string (kind `invalid_type` or `validation`).
+   */
+  covenantConsequenceAccelerateMaturity(newMaturity: string): generated.covenants.CovenantConsequence;
+
+  /**
+   * Create a covenant with the Rust defaults.
+   *
+   * Mirrors Rust `Covenant::new` (the Python `Covenant(...)` constructor): an
+   * active maintenance covenant with no cure period, consequences or
+   * springing condition.
+   *
+   * @param covenantType - `CovenantType` wire value, for example `{ max_debt_to_ebitda: { threshold: 4.5 } }`.
+   * @param testFrequency - `Tenor` wire object (`{ count, unit }`) recording how often the covenant is tested; it is metadata, the caller chooses each test date.
+   * @param label - Instance label; it is the report key and must be unique within an engine on a test date.
+   * @returns `Covenant` wire object.
+   * @throws If an argument does not match its wire type (kind `invalid_type` or `validation`).
+   */
+  covenantNew(covenantType: generated.covenants.CovenantType, testFrequency: generated.covenants.Tenor, label: string): generated.covenants.Covenant;
+
+  /**
+   * Copy of a covenant with a cure period.
+   *
+   * @param covenant - `Covenant` wire object.
+   * @param days - Calendar days the borrower has to cure a breach (integer); omitted or `null` means no cure period.
+   * @returns The updated `Covenant`.
+   * @throws If `covenant` is not a `Covenant` (kind `validation`) or `days` is not an integer (kind `invalid_type`).
+   */
+  covenantWithCurePeriod(covenant: generated.covenants.Covenant, days?: number | null): generated.covenants.Covenant;
+
+  /**
+   * Copy of a covenant with one more breach consequence.
+   *
+   * @param covenant - `Covenant` wire object.
+   * @param consequence - `CovenantConsequence` wire value appended to the covenant's consequences.
+   * @returns The updated `Covenant`.
+   * @throws If either argument does not match its wire type (kind `validation`).
+   */
+  covenantWithConsequence(covenant: generated.covenants.Covenant, consequence: generated.covenants.CovenantConsequence): generated.covenants.Covenant;
+
+  /**
+   * Copy of a covenant with a different scope.
+   *
+   * @param covenant - `Covenant` wire object.
+   * @param scope - `"maintenance"` (tested on a schedule) or `"incurrence"` (tested only when an action is taken).
+   * @returns The updated `Covenant`.
+   * @throws If `covenant` is not a `Covenant` or `scope` is not one of the listed strings (kind `validation`).
+   */
+  covenantWithScope(covenant: generated.covenants.Covenant, scope: generated.covenants.CovenantScope): generated.covenants.Covenant;
+
+  /**
+   * Copy of a covenant that is tested only while a springing condition holds.
+   *
+   * @param covenant - `Covenant` wire object.
+   * @param condition - `SpringingCondition` wire object (`{ metric_id, test }`), for example revolver utilization above a level; the covenant is inactive while the condition is unmet.
+   * @returns The updated `Covenant`.
+   * @throws If either argument does not match its wire type (kind `validation`).
+   */
+  covenantWithSpringingCondition(covenant: generated.covenants.Covenant, condition: generated.covenants.SpringingCondition): generated.covenants.Covenant;
+
+  /**
+   * Covenant specification that reads its test value from a named metric.
+   *
+   * Mirrors Rust `CovenantSpec::with_metric` (the Python `CovenantSpec(...)`
+   * constructor with a metric id): a net debt / EBITDA covenant also gets the
+   * default `"ebitda"` earnings denominator.
+   *
+   * @param covenant - `Covenant` wire object.
+   * @param metricId - Identifier of the metric the covenant tests, as supplied in the metric map, for example `"debt_to_ebitda"`.
+   * @returns `CovenantSpec` wire object.
+   * @throws If `covenant` is not a `Covenant` (kind `validation`) or `metricId` is not a string (kind `invalid_type`).
+   */
+  covenantSpecWithMetric(covenant: generated.covenants.Covenant, metricId: string): generated.covenants.CovenantSpec;
+
+  /**
+   * Copy of a specification with an explicit earnings denominator metric.
+   *
+   * @param spec - `CovenantSpec` wire object of a built-in leverage covenant.
+   * @param metricId - Identifier of the earnings metric the leverage ratio divides by, for example `"adjusted_ebitda"`.
+   * @returns The updated `CovenantSpec`.
+   * @throws If `spec` is not a `CovenantSpec` (kind `validation`) or `metricId` is not a string (kind `invalid_type`).
+   */
+  covenantSpecWithDenominatorMetric(spec: generated.covenants.CovenantSpec, metricId: string): generated.covenants.CovenantSpec;
+
+  /**
+   * Copy of a specification with step-down (or step-up) thresholds.
+   *
+   * @param spec - `CovenantSpec` wire object.
+   * @param schedule - `ThresholdSchedule` wire value: `[isoDate, threshold]` pairs; from each date that threshold replaces the covenant's static one.
+   * @returns The updated `CovenantSpec`.
+   * @throws If `spec` is not a `CovenantSpec`, or `schedule` has a non-finite threshold or repeats a date (kind `validation`).
+   */
+  covenantSpecWithThresholdSchedule(spec: generated.covenants.CovenantSpec, schedule: generated.covenants.ThresholdSchedule): generated.covenants.CovenantSpec;
+
+  /**
+   * Threshold in force on a test date.
+   *
+   * @param schedule - `ThresholdSchedule` wire value: `[isoDate, threshold]` pairs.
+   * @param testDate - ISO-8601 covenant test date.
+   * @returns The threshold of the latest entry effective on or before `testDate`, or `undefined` when the schedule starts later.
+   * @throws If `schedule` has a non-finite threshold or repeats a date (kind `validation`), or `testDate` is not an ISO-8601 string (kind `invalid_type` or `validation`).
+   */
+  thresholdScheduleThresholdFor(schedule: generated.covenants.ThresholdSchedule, testDate: string): number | undefined;
 }
 
 /**

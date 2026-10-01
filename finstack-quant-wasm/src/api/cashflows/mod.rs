@@ -1,4 +1,16 @@
 //! WASM bindings for the `finstack-quant-cashflows` crate.
+//!
+//! This module holds the JSON-first bridge (`*Json` functions and the
+//! schedule-JSON analytics). The typed surface lives in the submodules: the
+//! `CashFlowSchedule` / `CashFlowBuilder` / `AccrualIndex` handles, and free
+//! functions over wire-shaped spec, primitive and aggregation values.
+
+pub mod accrual;
+pub mod aggregation;
+pub mod fixings;
+pub mod primitives;
+pub mod schedule;
+pub mod specs;
 
 use crate::utils::input::{js_f64, js_f64_seq, js_string, js_uint, json_text, opt_json_text};
 use crate::utils::to_js_err;

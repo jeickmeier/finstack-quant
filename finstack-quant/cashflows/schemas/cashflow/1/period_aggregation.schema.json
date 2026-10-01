@@ -1,0 +1,13 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/cashflow/1/period_aggregation.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": {
+    "additionalProperties": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+    },
+    "type": "object"
+  },
+  "description": "Currency-preserving cashflow totals by reporting period.",
+  "title": "PeriodAggregation",
+  "type": "object"
+}

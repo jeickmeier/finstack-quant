@@ -5,6 +5,7 @@
 
 pub mod date;
 pub mod input;
+pub mod wire;
 
 pub use date::{date_to_iso, parse_iso_date, parse_iso_dates};
 

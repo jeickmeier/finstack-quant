@@ -1313,8 +1313,8 @@ class TestTypedTwinsAndWire:
 
         agg = aggregate_by_period([(dt.date(2025, 3, 15), Money(100.0, "USD"))], build_periods("2025Q1..Q4").periods)
         assert isinstance(agg, PeriodAggregation)
-        assert agg.get("2025Q1", "USD").amount == pytest.approx(100.0)
-        assert agg.get("2025Q1", "EUR") is None
+        assert agg.get_amount("2025Q1", "USD").amount == pytest.approx(100.0)
+        assert agg.get_amount("2025Q1", "EUR") is None
         assert len(agg) == 1
         restored = pickle.loads(pickle.dumps(agg))  # noqa: S301 - trusted in-process round trip
         assert restored.to_json() == agg.to_json()

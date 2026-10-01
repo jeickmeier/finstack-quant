@@ -542,3 +542,44 @@ fn complex_covenant_package_roundtrip() {
         assert_eq!(original.metric_id, restored.metric_id);
     }
 }
+
+#[test]
+fn forecast_config_wire_defaults_every_field_and_rejects_unknown_ones() {
+    let empty: CovenantForecastConfig = serde_json::from_str("{}").expect("empty config parses");
+    assert_eq!(empty, CovenantForecastConfig::default());
+
+    let partial: CovenantForecastConfig =
+        serde_json::from_str(r#"{"stochastic":true,"volatility":0.2}"#).expect("partial parses");
+    assert_eq!(
+        partial,
+        CovenantForecastConfig {
+            stochastic: true,
+            volatility: Some(0.2),
+            ..CovenantForecastConfig::default()
+        }
+    );
+
+    assert!(serde_json::from_str::<CovenantForecastConfig>(r#"{"paths":10}"#).is_err());
+}
+
+#[test]
+fn dated_metrics_and_reports_round_trip_with_iso_dates() {
+    use finstack_quant_covenants::{DatedCovenantReports, DatedMetrics};
+
+    let row: DatedMetrics =
+        serde_json::from_str(r#"{"date":"2026-03-31","metrics":{"debt_to_ebitda":4.0}}"#)
+            .expect("row parses");
+    assert_eq!(row.metrics["debt_to_ebitda"], 4.0);
+    assert_eq!(
+        serde_json::to_string(&row).expect("serialize"),
+        r#"{"date":"2026-03-31","metrics":{"debt_to_ebitda":4.0}}"#
+    );
+    assert!(
+        serde_json::from_str::<DatedMetrics>(r#"{"date":"2026-03-31","metrics":{},"x":1}"#)
+            .is_err()
+    );
+
+    let reports: DatedCovenantReports =
+        serde_json::from_str(r#"{"as_of":"2026-03-31","reports":{}}"#).expect("reports parse");
+    assert_eq!(reports.as_of.to_string(), "2026-03-31");
+}

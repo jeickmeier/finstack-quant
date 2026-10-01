@@ -1,0 +1,179 @@
+{
+  "$defs": {
+    "CouponType": {
+      "description": "Coupon cashflow type for fixed/floating coupons.\n\n- `Cash`: 100% paid in cash.\n- `PIK`: 100% capitalized into principal.\n- `Split { cash_fraction, pik_fraction }`: decimal shares (summing to 1) of\n  the coupon amount paid in cash and capitalized.",
+      "oneOf": [
+        {
+          "const": "cash",
+          "description": "Entire coupon paid in cash.",
+          "type": "string"
+        },
+        {
+          "const": "pik",
+          "description": "Entire coupon capitalized into principal.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Coupon split between cash and PIK.",
+          "properties": {
+            "split": {
+              "additionalProperties": false,
+              "properties": {
+                "cash_fraction": {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+                  "description": "Fraction of the coupon paid in cash, expressed as a decimal share in\n`[0, 1]`."
+                },
+                "pik_fraction": {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+                  "description": "Fraction of the coupon capitalized as PIK, expressed as a decimal\nshare in `[0, 1]`."
+                }
+              },
+              "required": [
+                "cash_fraction",
+                "pik_fraction"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "split"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "RollRule": {
+      "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode. The IMM modes\nforce a quarterly grid: the schedule frequency and stub rule configured on\n[`ScheduleParams`] are overridden with quarterly / short-back, matching\n`ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates\n  for rate, currency, and equity index futures).\n- **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll\n  dates). When the start date is not itself a roll date, the first period\n  accrues from the roll date immediately **preceding** the start (standard\n  front accrual per the ISDA Big Bang Protocol, April 2009).\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::specs::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)",
+      "oneOf": [
+        {
+          "const": "none",
+          "description": "Plain tenor stepping from the schedule boundaries (no roll-date grid).",
+          "type": "string"
+        },
+        {
+          "const": "imm",
+          "description": "Standard IMM dates: third Wednesday of Mar/Jun/Sep/Dec.",
+          "type": "string"
+        },
+        {
+          "const": "cds_imm",
+          "description": "CDS IMM dates: 20th of Mar/Jun/Sep/Dec with post-Big-Bang front accrual.",
+          "type": "string"
+        }
+      ]
+    },
+    "StubKind": {
+      "description": "Stub period handling when start/end dates don't align with payment frequency.\n\nControls how schedules are generated when the start and end dates don't\ndivide evenly by the payment frequency, resulting in an irregular period\n(stub) at the beginning or end of the schedule.\n\n# Variants\n\n- **`None`**: No stub allowed (default). Generates regular periods from\n  start to end and returns an error\n  ([`InputError::NonIntegerScheduleTenor`]) when the dates don't divide\n  evenly by the frequency. Use a stub variant for misaligned schedules.\n\n[`InputError::NonIntegerScheduleTenor`]: crate::error::InputError::NonIntegerScheduleTenor\n- **`ShortFront`**: Short stub period at the start. Schedule is built\n  backward from the end date, creating a short first period.\n- **`ShortBack`**: Short stub period at the end. Schedule is built forward\n  from the start date, creating a short final period.\n- **`LongFront`**: Long stub period at the start. Combines the first two\n  periods into a single longer period.\n- **`LongBack`**: Long stub period at the end. Combines the last two periods\n  into a single longer period.\n\n# Financial Context\n\nStub conventions are important for:\n- Interest accrual calculations (short/long first coupons)\n- Cash flow present value computations\n- Matching market conventions for specific instruments\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{ScheduleBuilder, Tenor, StubKind};\nuse time::{Date, Month};\n\nlet start = Date::from_calendar_date(2025, Month::January, 10)?;\nlet end = Date::from_calendar_date(2025, Month::December, 15)?;\n\n// Short stub at front\nlet sched = ScheduleBuilder::new(start, end)?\n    .frequency(Tenor::quarterly())\n    .stub_rule(StubKind::ShortFront)\n    .build()?;\n# Ok::<(), Box<dyn std::error::Error>>(())\n```\n\n# See Also\n\n- [`ScheduleBuilder::stub_rule`] to configure stub behavior",
+      "oneOf": [
+        {
+          "const": "none",
+          "description": "No stub allowed: start/end must align exactly with the frequency,\notherwise schedule generation returns an error.",
+          "type": "string"
+        },
+        {
+          "const": "short_front",
+          "description": "Short stub period at the beginning of the schedule.",
+          "type": "string"
+        },
+        {
+          "const": "short_back",
+          "description": "Short stub period at the end of the schedule (final step truncated to maturity).",
+          "type": "string"
+        },
+        {
+          "const": "long_front",
+          "description": "Long stub period at the beginning of the schedule.",
+          "type": "string"
+        },
+        {
+          "const": "long_back",
+          "description": "Long stub period at the end of the schedule (merges final two periods).",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/cashflow/1/step_up_coupon_spec.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Step-up fixed coupon specification.",
+  "properties": {
+    "adjust_accrual_dates": {
+      "description": "Whether accrual-period boundaries are business-day adjusted with\n`business_day_convention`.\n\n- `false` (default, bond convention): accrual periods run between the\n  unadjusted schedule anchors; only payment dates roll.\n- `true` (swap convention, ISDA 2006 §4.10 / ARRC SOFR conventions):\n  both accrual-period boundaries are rolled with `business_day_convention` before year\n  fractions and overnight observation windows are computed. The swap\n  presets ([`Self::usd_sofr_swap`], [`Self::eur_estr_swap`],\n  [`Self::gbp_sonia_swap`], [`Self::jpy_tona_swap`]) set this to\n  `true`.\n\nSerialized only when `true`, so existing wire payloads are unchanged.",
+      "type": "boolean"
+    },
+    "business_day_convention": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
+      "default": "modified_following",
+      "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention)."
+    },
+    "calendar_id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Holiday calendar identifier used together with `business_day_convention`.\n\nUse `\"weekends_only\"` when only Saturday/Sunday adjustment is needed."
+    },
+    "coupon_type": {
+      "$ref": "#/$defs/CouponType",
+      "default": "cash",
+      "description": "Coupon type (Cash/PIK/Split)."
+    },
+    "day_count": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+      "description": "Day-count convention used to convert each generated accrual period into a\nyear fraction."
+    },
+    "end_of_month": {
+      "default": false,
+      "description": "Whether end-of-month rolling should be preserved when generating the\nschedule.",
+      "type": "boolean"
+    },
+    "frequency": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+      "description": "Accrual and payment frequency used to generate the schedule boundaries."
+    },
+    "initial_rate": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+      "description": "Initial coupon rate (annual, decimal). Used until the first step date."
+    },
+    "payment_lag_days": {
+      "default": 0,
+      "description": "Payment lag in business days after the adjusted accrual end date.",
+      "format": "int32",
+      "type": "integer"
+    },
+    "roll_rule": {
+      "$ref": "#/$defs/RollRule",
+      "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping. The IMM modes\noverride `frequency`/`stub` with quarterly / short-back; see [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged."
+    },
+    "step_schedule": {
+      "description": "Step schedule: (effective_date, new_rate). Must be sorted by date.\nEach entry sets the rate from that date forward until the next step.\n\n**Date convention:** `effective_date` is compared against each\naccrual period's *unadjusted* `accrual_start`. Specify dates as\nunadjusted accrual-period boundaries (typically the issue date plus\ninteger multiples of `frequency`); business-day adjustment is not\napplied here. The rate is set at accrual start (per market\nconvention for step-up bonds).",
+      "items": {
+        "maxItems": 2,
+        "minItems": 2,
+        "prefixItems": [
+          {
+            "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+          },
+          {
+            "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json"
+          }
+        ],
+        "type": "array"
+      },
+      "type": "array"
+    },
+    "stub": {
+      "$ref": "#/$defs/StubKind",
+      "default": "short_front",
+      "description": "Stub-handling rule used when the start/end dates do not fit an exact\nwhole number of periods."
+    }
+  },
+  "required": [
+    "initial_rate",
+    "step_schedule",
+    "frequency",
+    "day_count",
+    "calendar_id"
+  ],
+  "title": "StepUpCouponSpec",
+  "type": "object"
+}

@@ -562,7 +562,7 @@ export interface CovenantForecastConfig {
    * count is rounded up to a whole number of pairs. Ignored when
    * `stochastic` is `false`.
    */
-  num_paths: number;
+  num_paths?: number;
   /**
    * RNG seed for Monte Carlo mode (`num_paths > 0`).
    *
@@ -582,11 +582,11 @@ export interface CovenantForecastConfig {
    * Scope selected by batch forecasts: maintenance by default. Incurrence
    * forecasts are hypothetical capacity checks, not actual breach events.
    */
-  scope: CovenantScope;
+  scope?: CovenantScope;
   /**
    * Whether to use stochastic (as opposed to deterministic) breach probabilities.
    */
-  stochastic: boolean;
+  stochastic?: boolean;
   /**
    * Volatility for stochastic scenarios (annualized).
    */
@@ -742,6 +742,38 @@ export interface ToleranceConfig {
    * Used when comparing interest rates, yields, and other small ratios.
    */
   rate_epsilon?: PositiveF64Wire;
+}
+/**
+ * Covenant reports produced for one test date of a series evaluation.
+ */
+export interface DatedCovenantReports {
+  /**
+   * Test date the covenants were evaluated on.
+   */
+  as_of: DateWire;
+  /**
+   * Reports keyed by stable covenant instance key, in engine order.
+   */
+  reports: {
+    [k: string]: CovenantReport;
+  };
+}
+/**
+ * Covenant metric values observed on one date.
+ */
+export interface DatedMetrics {
+  /**
+   * Covenant test date the metric values belong to.
+   */
+  date: DateWire;
+  /**
+   * Metric values keyed by covenant metric identifier (for example
+   * `debt_to_ebitda`), in the units the covenant tests expect: ratios in
+   * turns (`4.5` means 4.5x), amounts in the reporting currency.
+   */
+  metrics: {
+    [k: string]: number;
+  };
 }
 /**
  * A projected covenant breach.

@@ -217,19 +217,146 @@
   "cashflows": {
     "kind": "namespace",
     "keys": [
+      "AccrualIndex",
+      "CashFlowBuilder",
+      "CashFlowSchedule",
       "absToSmm",
       "accruedInterest",
+      "accruedInterestAmount",
+      "aggregateByPeriod",
+      "aggregateCashflowsChecked",
+      "amortizationSpecCustomPrincipal",
+      "amortizationSpecLinearBetween",
+      "amortizationSpecLinearTo",
+      "amortizationSpecPercentOfOriginalPerPeriod",
+      "amortizationSpecPercentOfRemainingPerPeriod",
+      "amortizationSpecStepRemaining",
+      "buildCashflowSchedule",
       "buildCashflowScheduleJson",
+      "calendarYearLadder",
+      "cashFlowGetBalanceDate",
+      "cashFlowValidate",
+      "cashFlowWithAccrual",
+      "cashFlowWithPrincipalDate",
+      "cashFlowWithPrincipalDelta",
       "cdrToMdr",
+      "cfKindIsInterestLike",
+      "cfKindIsPrincipalLike",
+      "cfKindParse",
+      "couponTypeSplit",
       "cprToSmm",
+      "datedFlows",
       "datedFlowsJson",
+      "defaultModelSpecCdr2pct",
+      "defaultModelSpecConstantCdr",
+      "defaultModelSpecCumulativeLoss",
+      "defaultModelSpecMdr",
+      "defaultModelSpecSda",
+      "defaultModelSpecTiming",
+      "defaultModelSpecValidate",
+      "defaultModelSpecVector",
+      "exCouponRuleExDate",
+      "feeBaseUndrawn",
+      "feeSpecFixed",
+      "feeSpecPeriodicBp",
+      "floatingLegCompoundingCompoundedInArrears",
+      "floatingLegCompoundingCompoundedWithObservationShift",
+      "floatingLegCompoundingCompoundedWithRateCutoff",
+      "floatingRateFallbackFixedRate",
+      "floatingRateSpecEuribor3m",
+      "floatingRateSpecSofr",
+      "floatingRateSpecSonia",
+      "floatingRateSpecValidate",
+      "isCashSettlementKind",
+      "materializeFixings",
       "mdrToCdr",
+      "mergeCashflowSchedules",
+      "notionalCurrency",
+      "notionalPar",
+      "notionalValidate",
+      "periodAggregationGetAmount",
+      "prepaymentModelSpecAbs",
+      "prepaymentModelSpecCmbsWithLockout",
+      "prepaymentModelSpecConstantCpr",
+      "prepaymentModelSpecPsa",
+      "prepaymentModelSpecPsa100",
+      "prepaymentModelSpecSmm",
+      "prepaymentModelSpecValidate",
+      "prepaymentModelSpecVector",
+      "recoveryModelSpecRecoveryRate",
+      "recoveryModelSpecValidate",
+      "recoveryModelSpecWithSeverityVector",
       "scheduleCalendarYearLadder",
+      "scheduleFromClassifiedFlows",
+      "scheduleFromDatedFlows",
       "scheduleOutstandingByDate",
+      "scheduleParamsAnnualActact",
+      "scheduleParamsEurEstrSwap",
+      "scheduleParamsEurGovBond",
+      "scheduleParamsGbpSoniaSwap",
+      "scheduleParamsJpyTonaSwap",
+      "scheduleParamsQuarterlyAct360",
+      "scheduleParamsSemiannual30360",
+      "scheduleParamsUsdCorporateBond",
+      "scheduleParamsUsdSofrSwap",
+      "scheduleParamsUsdTreasury",
+      "scheduleParamsValidate",
       "scheduleWal",
       "smmToCpr",
       "validateCashflowScheduleJson"
     ]
+  },
+  "cashflows.AccrualIndex": {
+    "kind": "class",
+    "statics": ["build"],
+    "methods": ["accruedAt", "free"],
+    "getters": []
+  },
+  "cashflows.CashFlowBuilder": {
+    "kind": "class",
+    "statics": [],
+    "methods": [
+      "addFixedWindow",
+      "addFloatingWindow",
+      "addPaymentWindow",
+      "addPrincipalEvent",
+      "amortization",
+      "build",
+      "fee",
+      "fixedCf",
+      "fixedToFloat",
+      "floatMarginSteps",
+      "floatingCf",
+      "free",
+      "paymentSplitProgram",
+      "principal",
+      "principalExchange",
+      "stepUpCf"
+    ],
+    "getters": []
+  },
+  "cashflows.CashFlowSchedule": {
+    "kind": "class",
+    "statics": ["builder", "fromFlows", "fromJson", "fromParts"],
+    "methods": [
+      "calendarYearLadder",
+      "coupons",
+      "dates",
+      "free",
+      "getDayCount",
+      "getFlows",
+      "getMeta",
+      "getNotional",
+      "outstandingByDate",
+      "pvByPeriod",
+      "scaleAmounts",
+      "toJson",
+      "validate",
+      "wal",
+      "withNotional",
+      "withRepresentation"
+    ],
+    "getters": []
   },
   "cashflows.absToSmm": {
     "kind": "function"
@@ -237,25 +364,241 @@
   "cashflows.accruedInterest": {
     "kind": "function"
   },
+  "cashflows.accruedInterestAmount": {
+    "kind": "function"
+  },
+  "cashflows.aggregateByPeriod": {
+    "kind": "function"
+  },
+  "cashflows.aggregateCashflowsChecked": {
+    "kind": "function"
+  },
+  "cashflows.amortizationSpecCustomPrincipal": {
+    "kind": "function"
+  },
+  "cashflows.amortizationSpecLinearBetween": {
+    "kind": "function"
+  },
+  "cashflows.amortizationSpecLinearTo": {
+    "kind": "function"
+  },
+  "cashflows.amortizationSpecPercentOfOriginalPerPeriod": {
+    "kind": "function"
+  },
+  "cashflows.amortizationSpecPercentOfRemainingPerPeriod": {
+    "kind": "function"
+  },
+  "cashflows.amortizationSpecStepRemaining": {
+    "kind": "function"
+  },
+  "cashflows.buildCashflowSchedule": {
+    "kind": "function"
+  },
   "cashflows.buildCashflowScheduleJson": {
+    "kind": "function"
+  },
+  "cashflows.calendarYearLadder": {
+    "kind": "function"
+  },
+  "cashflows.cashFlowGetBalanceDate": {
+    "kind": "function"
+  },
+  "cashflows.cashFlowValidate": {
+    "kind": "function"
+  },
+  "cashflows.cashFlowWithAccrual": {
+    "kind": "function"
+  },
+  "cashflows.cashFlowWithPrincipalDate": {
+    "kind": "function"
+  },
+  "cashflows.cashFlowWithPrincipalDelta": {
     "kind": "function"
   },
   "cashflows.cdrToMdr": {
     "kind": "function"
   },
+  "cashflows.cfKindIsInterestLike": {
+    "kind": "function"
+  },
+  "cashflows.cfKindIsPrincipalLike": {
+    "kind": "function"
+  },
+  "cashflows.cfKindParse": {
+    "kind": "function"
+  },
+  "cashflows.couponTypeSplit": {
+    "kind": "function"
+  },
   "cashflows.cprToSmm": {
+    "kind": "function"
+  },
+  "cashflows.datedFlows": {
     "kind": "function"
   },
   "cashflows.datedFlowsJson": {
     "kind": "function"
   },
+  "cashflows.defaultModelSpecCdr2pct": {
+    "kind": "function"
+  },
+  "cashflows.defaultModelSpecConstantCdr": {
+    "kind": "function"
+  },
+  "cashflows.defaultModelSpecCumulativeLoss": {
+    "kind": "function"
+  },
+  "cashflows.defaultModelSpecMdr": {
+    "kind": "function"
+  },
+  "cashflows.defaultModelSpecSda": {
+    "kind": "function"
+  },
+  "cashflows.defaultModelSpecTiming": {
+    "kind": "function"
+  },
+  "cashflows.defaultModelSpecValidate": {
+    "kind": "function"
+  },
+  "cashflows.defaultModelSpecVector": {
+    "kind": "function"
+  },
+  "cashflows.exCouponRuleExDate": {
+    "kind": "function"
+  },
+  "cashflows.feeBaseUndrawn": {
+    "kind": "function"
+  },
+  "cashflows.feeSpecFixed": {
+    "kind": "function"
+  },
+  "cashflows.feeSpecPeriodicBp": {
+    "kind": "function"
+  },
+  "cashflows.floatingLegCompoundingCompoundedInArrears": {
+    "kind": "function"
+  },
+  "cashflows.floatingLegCompoundingCompoundedWithObservationShift": {
+    "kind": "function"
+  },
+  "cashflows.floatingLegCompoundingCompoundedWithRateCutoff": {
+    "kind": "function"
+  },
+  "cashflows.floatingRateFallbackFixedRate": {
+    "kind": "function"
+  },
+  "cashflows.floatingRateSpecEuribor3m": {
+    "kind": "function"
+  },
+  "cashflows.floatingRateSpecSofr": {
+    "kind": "function"
+  },
+  "cashflows.floatingRateSpecSonia": {
+    "kind": "function"
+  },
+  "cashflows.floatingRateSpecValidate": {
+    "kind": "function"
+  },
+  "cashflows.isCashSettlementKind": {
+    "kind": "function"
+  },
+  "cashflows.materializeFixings": {
+    "kind": "function"
+  },
   "cashflows.mdrToCdr": {
+    "kind": "function"
+  },
+  "cashflows.mergeCashflowSchedules": {
+    "kind": "function"
+  },
+  "cashflows.notionalCurrency": {
+    "kind": "function"
+  },
+  "cashflows.notionalPar": {
+    "kind": "function"
+  },
+  "cashflows.notionalValidate": {
+    "kind": "function"
+  },
+  "cashflows.periodAggregationGetAmount": {
+    "kind": "function"
+  },
+  "cashflows.prepaymentModelSpecAbs": {
+    "kind": "function"
+  },
+  "cashflows.prepaymentModelSpecCmbsWithLockout": {
+    "kind": "function"
+  },
+  "cashflows.prepaymentModelSpecConstantCpr": {
+    "kind": "function"
+  },
+  "cashflows.prepaymentModelSpecPsa": {
+    "kind": "function"
+  },
+  "cashflows.prepaymentModelSpecPsa100": {
+    "kind": "function"
+  },
+  "cashflows.prepaymentModelSpecSmm": {
+    "kind": "function"
+  },
+  "cashflows.prepaymentModelSpecValidate": {
+    "kind": "function"
+  },
+  "cashflows.prepaymentModelSpecVector": {
+    "kind": "function"
+  },
+  "cashflows.recoveryModelSpecRecoveryRate": {
+    "kind": "function"
+  },
+  "cashflows.recoveryModelSpecValidate": {
+    "kind": "function"
+  },
+  "cashflows.recoveryModelSpecWithSeverityVector": {
     "kind": "function"
   },
   "cashflows.scheduleCalendarYearLadder": {
     "kind": "function"
   },
+  "cashflows.scheduleFromClassifiedFlows": {
+    "kind": "function"
+  },
+  "cashflows.scheduleFromDatedFlows": {
+    "kind": "function"
+  },
   "cashflows.scheduleOutstandingByDate": {
+    "kind": "function"
+  },
+  "cashflows.scheduleParamsAnnualActact": {
+    "kind": "function"
+  },
+  "cashflows.scheduleParamsEurEstrSwap": {
+    "kind": "function"
+  },
+  "cashflows.scheduleParamsEurGovBond": {
+    "kind": "function"
+  },
+  "cashflows.scheduleParamsGbpSoniaSwap": {
+    "kind": "function"
+  },
+  "cashflows.scheduleParamsJpyTonaSwap": {
+    "kind": "function"
+  },
+  "cashflows.scheduleParamsQuarterlyAct360": {
+    "kind": "function"
+  },
+  "cashflows.scheduleParamsSemiannual30360": {
+    "kind": "function"
+  },
+  "cashflows.scheduleParamsUsdCorporateBond": {
+    "kind": "function"
+  },
+  "cashflows.scheduleParamsUsdSofrSwap": {
+    "kind": "function"
+  },
+  "cashflows.scheduleParamsUsdTreasury": {
+    "kind": "function"
+  },
+  "cashflows.scheduleParamsValidate": {
     "kind": "function"
   },
   "cashflows.scheduleWal": {
@@ -597,38 +940,198 @@
   "covenants": {
     "kind": "namespace",
     "keys": [
+      "CovenantEngine",
+      "covLite",
       "covLiteJson",
+      "covenantConsequenceAccelerateMaturity",
+      "covenantConsequenceBlockDistributions",
+      "covenantConsequenceCashSweep",
+      "covenantConsequenceDefault",
+      "covenantConsequenceRateIncrease",
+      "covenantConsequenceRequireCollateral",
+      "covenantForecastConfigWithScope",
+      "covenantNew",
+      "covenantSpecWithDenominatorMetric",
+      "covenantSpecWithMetric",
+      "covenantSpecWithThresholdSchedule",
+      "covenantTypeAffirmative",
+      "covenantTypeBasket",
+      "covenantTypeCustom",
+      "covenantTypeMaxCapex",
+      "covenantTypeMaxDebtToEbitda",
+      "covenantTypeMaxNetDebtToEbitda",
+      "covenantTypeMaxSeniorLeverage",
+      "covenantTypeMaxTotalLeverage",
+      "covenantTypeMinAssetCoverage",
+      "covenantTypeMinDscr",
+      "covenantTypeMinFixedChargeCoverage",
+      "covenantTypeMinInterestCoverage",
+      "covenantTypeMinLiquidity",
+      "covenantTypeNegative",
+      "covenantWithConsequence",
+      "covenantWithCurePeriod",
+      "covenantWithScope",
+      "covenantWithSpringingCondition",
       "evaluateEngine",
+      "forecastBreaches",
+      "forecastCovenant",
+      "lboStandard",
       "lboStandardJson",
+      "projectFinance",
       "projectFinanceJson",
+      "realEstate",
       "realEstateJson",
+      "thresholdScheduleThresholdFor",
       "validateCovenantEngineJson",
       "validateCovenantReportJson",
       "validateCovenantSpecJson"
     ]
   },
-  "covenants.validateCovenantSpecJson": {
-    "kind": "function"
+  "covenants.CovenantEngine": {
+    "kind": "class",
+    "statics": ["fromJson", "fromSpecs"],
+    "methods": [
+      "addSpec",
+      "addWaiver",
+      "evaluate",
+      "evaluateAndTrack",
+      "evaluateSeries",
+      "free",
+      "toJson",
+      "validate"
+    ],
+    "getters": ["breachHistory", "specs", "waivers"]
   },
-  "covenants.validateCovenantReportJson": {
-    "kind": "function"
-  },
-  "covenants.validateCovenantEngineJson": {
-    "kind": "function"
-  },
-  "covenants.evaluateEngine": {
-    "kind": "function"
-  },
-  "covenants.lboStandardJson": {
+  "covenants.covLite": {
     "kind": "function"
   },
   "covenants.covLiteJson": {
     "kind": "function"
   },
-  "covenants.realEstateJson": {
+  "covenants.covenantConsequenceAccelerateMaturity": {
+    "kind": "function"
+  },
+  "covenants.covenantConsequenceBlockDistributions": {
+    "kind": "function"
+  },
+  "covenants.covenantConsequenceCashSweep": {
+    "kind": "function"
+  },
+  "covenants.covenantConsequenceDefault": {
+    "kind": "function"
+  },
+  "covenants.covenantConsequenceRateIncrease": {
+    "kind": "function"
+  },
+  "covenants.covenantConsequenceRequireCollateral": {
+    "kind": "function"
+  },
+  "covenants.covenantForecastConfigWithScope": {
+    "kind": "function"
+  },
+  "covenants.covenantNew": {
+    "kind": "function"
+  },
+  "covenants.covenantSpecWithDenominatorMetric": {
+    "kind": "function"
+  },
+  "covenants.covenantSpecWithMetric": {
+    "kind": "function"
+  },
+  "covenants.covenantSpecWithThresholdSchedule": {
+    "kind": "function"
+  },
+  "covenants.covenantTypeAffirmative": {
+    "kind": "function"
+  },
+  "covenants.covenantTypeBasket": {
+    "kind": "function"
+  },
+  "covenants.covenantTypeCustom": {
+    "kind": "function"
+  },
+  "covenants.covenantTypeMaxCapex": {
+    "kind": "function"
+  },
+  "covenants.covenantTypeMaxDebtToEbitda": {
+    "kind": "function"
+  },
+  "covenants.covenantTypeMaxNetDebtToEbitda": {
+    "kind": "function"
+  },
+  "covenants.covenantTypeMaxSeniorLeverage": {
+    "kind": "function"
+  },
+  "covenants.covenantTypeMaxTotalLeverage": {
+    "kind": "function"
+  },
+  "covenants.covenantTypeMinAssetCoverage": {
+    "kind": "function"
+  },
+  "covenants.covenantTypeMinDscr": {
+    "kind": "function"
+  },
+  "covenants.covenantTypeMinFixedChargeCoverage": {
+    "kind": "function"
+  },
+  "covenants.covenantTypeMinInterestCoverage": {
+    "kind": "function"
+  },
+  "covenants.covenantTypeMinLiquidity": {
+    "kind": "function"
+  },
+  "covenants.covenantTypeNegative": {
+    "kind": "function"
+  },
+  "covenants.covenantWithConsequence": {
+    "kind": "function"
+  },
+  "covenants.covenantWithCurePeriod": {
+    "kind": "function"
+  },
+  "covenants.covenantWithScope": {
+    "kind": "function"
+  },
+  "covenants.covenantWithSpringingCondition": {
+    "kind": "function"
+  },
+  "covenants.evaluateEngine": {
+    "kind": "function"
+  },
+  "covenants.forecastBreaches": {
+    "kind": "function"
+  },
+  "covenants.forecastCovenant": {
+    "kind": "function"
+  },
+  "covenants.lboStandard": {
+    "kind": "function"
+  },
+  "covenants.lboStandardJson": {
+    "kind": "function"
+  },
+  "covenants.projectFinance": {
     "kind": "function"
   },
   "covenants.projectFinanceJson": {
+    "kind": "function"
+  },
+  "covenants.realEstate": {
+    "kind": "function"
+  },
+  "covenants.realEstateJson": {
+    "kind": "function"
+  },
+  "covenants.thresholdScheduleThresholdFor": {
+    "kind": "function"
+  },
+  "covenants.validateCovenantEngineJson": {
+    "kind": "function"
+  },
+  "covenants.validateCovenantReportJson": {
+    "kind": "function"
+  },
+  "covenants.validateCovenantSpecJson": {
     "kind": "function"
   },
   "features": {

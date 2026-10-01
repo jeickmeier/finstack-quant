@@ -103,14 +103,12 @@ impl PyPeriodAggregation {
     /// ValueError
     ///     If ``currency`` is not a valid ISO 4217 code.
     #[pyo3(text_signature = "(self, period, currency)")]
-    fn get(&self, period: &str, currency: &Bound<'_, PyAny>) -> PyResult<Option<PyMoney>> {
+    fn get_amount(&self, period: &str, currency: &Bound<'_, PyAny>) -> PyResult<Option<PyMoney>> {
         let currency = extract_currency(currency)?;
         Ok(self
             .inner
-            .iter()
-            .find(|(id, _)| id.to_string() == period)
-            .and_then(|(_, per_currency)| per_currency.get(&currency))
-            .map(|amount| PyMoney::from_inner(*amount)))
+            .get_amount(period, currency)
+            .map(PyMoney::from_inner))
     }
 
     /// Nested ``{period_id_label: {currency_code: Money}}`` dictionary.

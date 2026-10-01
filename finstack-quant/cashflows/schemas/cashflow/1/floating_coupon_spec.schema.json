@@ -1,0 +1,438 @@
+{
+  "$defs": {
+    "CouponType": {
+      "description": "Coupon cashflow type for fixed/floating coupons.\n\n- `Cash`: 100% paid in cash.\n- `PIK`: 100% capitalized into principal.\n- `Split { cash_fraction, pik_fraction }`: decimal shares (summing to 1) of\n  the coupon amount paid in cash and capitalized.",
+      "oneOf": [
+        {
+          "const": "cash",
+          "description": "Entire coupon paid in cash.",
+          "type": "string"
+        },
+        {
+          "const": "pik",
+          "description": "Entire coupon capitalized into principal.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Coupon split between cash and PIK.",
+          "properties": {
+            "split": {
+              "additionalProperties": false,
+              "properties": {
+                "cash_fraction": {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+                  "description": "Fraction of the coupon paid in cash, expressed as a decimal share in\n`[0, 1]`."
+                },
+                "pik_fraction": {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+                  "description": "Fraction of the coupon capitalized as PIK, expressed as a decimal\nshare in `[0, 1]`."
+                }
+              },
+              "required": [
+                "cash_fraction",
+                "pik_fraction"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "split"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "FloatingLegCompounding": {
+      "description": "How the fixings of one accrual period combine into the period rate.\n\nOne canonical enum for every floating leg and coupon: swaps, basis and\ncross-currency legs, TRS financing, IR futures, FRN / loan / structured\ncredit coupons.\n\n| Variant | Period rate | Typical use |\n|---------|-------------|-------------|\n| `simple` | One term fixing / forward over the period | EURIBOR, Term SOFR, legacy IBOR |\n| `simple_average` | `(Σ rᵢ·dᵢ) / D` of daily overnight fixings | Averaged overnight loans, Fed-Funds futures |\n| `compounded_in_arrears` | `[∏(1 + rᵢ·dᵢ/B) − 1]·B/D` | SOFR / SONIA / €STR / TONA OIS (lookback 0) |\n| `compounded_with_observation_shift` | as above, observations and weights shifted | ISDA 2021 observation shift |\n| `compounded_with_rate_cutoff` | as above, last fixings frozen | ARRC lockout / SWPM \"Rate Cut-Off Days\" |\n\nDay counts are business days and must be non-negative.\n\n# References\n\n- ISDA 2021 Definitions, compounded RFR conventions `docs/REFERENCES.md#isda-2021-definitions`\n- ARRC (2020). \"SOFR: A User's Guide.\" `docs/REFERENCES.md#arrc-sofr-users-guide`\n- BoE SONIA conventions `docs/REFERENCES.md#boe-sonia-key-features`\n\n# Examples\n\n```\nuse finstack_quant_cashflows::builder::FloatingLegCompounding;\n\nassert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);\nassert_eq!(\n    FloatingLegCompounding::sofr(),\n    FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }\n);\n```",
+      "oneOf": [
+        {
+          "const": "simple",
+          "description": "Simple term-rate projection: one fixing or forward over the period.\n\n`Coupon = Notional × (Forward_Rate + Spread) × DCF`. This is the\ndefault; a registered overnight RFR index rejects it.",
+          "type": "string"
+        },
+        {
+          "const": "simple_average",
+          "description": "Arithmetic average of daily overnight fixings weighted by accrual days,\n`Rate = (Σ rᵢ·dᵢ) / D`, for instruments that contractually specify a\nsimple-average overnight index.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Compounded in arrears (overnight RFR rates).\n\n`Coupon = Notional × [∏(1 + rᵢ·dᵢ/B) − 1]` over the daily observations\nof the accrual period.",
+          "properties": {
+            "compounded_in_arrears": {
+              "additionalProperties": false,
+              "properties": {
+                "lookback_days": {
+                  "description": "Business days by which observation dates move backward while the\nday-count weights stay on the original accrual dates (\"lookback\nwithout observation shift\", ISDA 2021 / ARRC). `0` is plain\nin-arrears, the cleared-OIS convention.",
+                  "format": "uint32",
+                  "maximum": 31,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "lookback_days"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "compounded_in_arrears"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Compounded in arrears with ISDA 2021 observation shift: both the\nobservation dates and their day-count weights move back\n(ISDA 2021 Definitions Section 4.5(c)).",
+          "properties": {
+            "compounded_with_observation_shift": {
+              "additionalProperties": false,
+              "properties": {
+                "shift_days": {
+                  "description": "Business days to shift both observation dates and weights.",
+                  "format": "uint32",
+                  "maximum": 31,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "shift_days"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "compounded_with_observation_shift"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Compounded in arrears with a rate cut-off near the period end.\n\nThe last `cutoff_days` business-day observations are frozen at the\nfixing immediately preceding them: for fixings `b_1..b_n` the source is\n`b_{n-cutoff}`, so a positive cut-off must leave a preceding fixing.\nReference: ARRC, December 3, 2021 Statement, Appendix A (\"Lockout\").",
+          "properties": {
+            "compounded_with_rate_cutoff": {
+              "additionalProperties": false,
+              "properties": {
+                "cutoff_days": {
+                  "description": "Business days before period end over which the rate is frozen.",
+                  "format": "uint32",
+                  "maximum": 31,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "cutoff_days"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "compounded_with_rate_cutoff"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "FloatingRateFallback": {
+      "description": "Policy for handling floating rate projection failures.\n\nControls what happens when a forward curve lookup fails during\ncashflow emission. The default (`Error`) surfaces failures explicitly;\nthe other variants are explicit opt-in degradation modes for callers\nthat intentionally want a projected schedule without a forward curve.\n\n# References\n\n- `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`\n- `docs/REFERENCES.md#hull-options-futures`",
+      "oneOf": [
+        {
+          "const": "error",
+          "description": "Return an error with curve ID and reset date (strictest, safest).",
+          "type": "string"
+        },
+        {
+          "const": "spread_only",
+          "description": "Treat the index component as zero, so the coupon rate is the spread\n(plus any floors/caps/gearing). An explicit opt-in for spread-only\nprojection when no forward curve is available; emits `warn!`.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Use a fixed rate as the index component. Emits `info!`.\n\nThe value is a **decimal annual rate**, not basis points: `0.045`\nmeans 4.5%. This differs from the bp-denominated spread/floor/cap\nfields on [`FloatingRateSpec`] because it substitutes directly for\nthe projected index rate.",
+          "properties": {
+            "fixed_rate": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json"
+            }
+          },
+          "required": [
+            "fixed_rate"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "FloatingRateSpec": {
+      "additionalProperties": false,
+      "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `forward_curve_id` curve for the accrual period\n2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread\n3. Add `spread_bp` to get base rate\n4. Multiply by `gearing` (typically 1.0)\n5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing\n\nFormula: `cap(gearing * (floor(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see\n`finstack_quant_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the forward curve base\ndate then resolve from that series instead of the curve:\n\n- **Overnight observations** (compounded/averaged paths) use LOCF lookup\n  (last observation carried forward), matching RFR publication\n  conventions where a fixing carries over non-publication days\n  (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 §7.1(g)). A partially\n  seasoned compounding window seamlessly mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date — a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the curve base date prefers a published\nsame-day fixing when the series has one, otherwise projects from `t = 0`.\n\nThe [`FloatingRateFallback`] policy applies only when **no** fixing\nseries is provided: `Error` (the default) fails the build with a\ndescriptive message naming the date, index, and expected series id;\n`FixedRate(r)` uses `r` as the index rate for the affected coupon;\n`SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    forward_curve_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: OvernightIndexConstraintApplication::Daily,\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```",
+      "properties": {
+        "all_in_cap_bp": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Cap on all-in rate in basis points (applied after spread and gearing).\n\nExample: all_in_cap_bp = Some(1000.0) ensures all-in rate <= 10%."
+        },
+        "all_in_floor_bp": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Floor on all-in rate in basis points (Min Coupon).\n\nApplied to the final calculated rate after gearing and spread."
+        },
+        "compounding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FloatingLegCompounding"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How each accrual period's fixings combine into the period rate.\n\nAn overnight variant (anything but `simple`) computes the period rate\nfrom daily overnight fixings. `simple` projects one term forward over\nthe period. `None` leaves the choice to the instrument: pricers that\nknow the index resolve it from the rate-index convention registry, and\nthe bare cashflow builder treats it as `simple`."
+        },
+        "fallback": {
+          "$ref": "#/$defs/FloatingRateFallback",
+          "description": "Policy when forward curve lookup fails during emission.\n\nDefaults to `Error`, which surfaces curve lookup failures.\nSet to `SpreadOnly` for spread-only projection, or `FixedRate(r)`\nto use a fixed index rate."
+        },
+        "fixing_calendar_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional calendar for rate fixing (reset lag).\n\nIf not provided, defaults to the coupon schedule calendar."
+        },
+        "forward_curve_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Forward curve identifier (e.g., \"USD-SOFR-3M\", \"EUR-EURIBOR-6M\")."
+        },
+        "gearing": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+          "default": "1",
+          "description": "Gearing/leverage multiplier applied to the all-in rate (default: 1.0).\n\nExample: gearing = 2.0 means the rate is doubled.\n\n**Restriction:** gearing must be strictly positive (`gearing > 0`);\nprojection rejects zero or negative gearing, so inverse floaters\n(negative gearing) are not currently expressible with this field."
+        },
+        "gearing_includes_spread": {
+          "default": true,
+          "description": "Whether gearing includes the spread (default: true).\n\n- `true`: `rate = (index + spread) * gearing`\n- `false`: `rate = (index * gearing) + spread` (Affine model)",
+          "type": "boolean"
+        },
+        "index_cap_bp": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Cap on index rate in basis points (applied to index component)."
+        },
+        "index_floor_bp": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Floor on index rate in basis points (applied to index component).\n\nExample: index_floor_bp = Some(0.0) ensures index rate >= 0%."
+        },
+        "index_tenor": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Diagnostic tenor for term-index projection error context.\n\nThe named forward curve is already the term index (for example a 3M\nEURIBOR curve). Projection is `fwd.rate(reset_date)`, not a FRA-style\naverage over `[reset, reset + tenor]`. This field (or\n[`Self::reset_frequency`] when `None`) is used only to compute\n`index_maturity` for error messages. Ignored for overnight-compounded\nlegs. When set, the builder warns at build time if it disagrees with\nthe resolved curve's tenor by more than 10% — the curve remains\nauthoritative."
+        },
+        "overnight_basis": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Day-count basis for the overnight compounding denominator.\n\nThis controls the annualization factor used when compounding daily\novernight fixings (e.g., 360 for SOFR/€STR/TONA, 365 for SONIA).\nIt is independent of the leg's accrual day count when set explicitly.\n\nWhen `None` and `compounding` is an overnight variant, the coupon\n`schedule.day_count` is used if it is `Act360` or `Act365F`. Other\ncoupon day counts (for example `Thirty360`) error unless an explicit\n`Act360` or `Act365F` basis is supplied. Ignored when\n`compounding` is not an overnight variant."
+        },
+        "overnight_index_constraints": {
+          "$ref": "#/$defs/OvernightIndexConstraintApplication",
+          "description": "Index floor/cap application policy for overnight-compounded coupons."
+        },
+        "reset_frequency": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+          "description": "Reset frequency for rate fixings.\n\nThis is the cadence at which the rate refixes. When\n[`Self::index_tenor`] is `None`, it is also the tenor used only to\nbuild the diagnostic index-maturity date in projection error context."
+        },
+        "reset_lag_days": {
+          "default": 2,
+          "description": "Reset lag in business days (e.g., 2 for T-2 SOFR convention).",
+          "format": "int32",
+          "type": "integer"
+        },
+        "spread_bp": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+          "description": "Spread/margin over index in basis points. Uses Decimal for exact representation."
+        }
+      },
+      "required": [
+        "forward_curve_id",
+        "spread_bp",
+        "reset_frequency"
+      ],
+      "type": "object"
+    },
+    "OvernightIndexConstraintApplication": {
+      "description": "Where overnight index floors/caps are applied for daily-compounded rates.",
+      "oneOf": [
+        {
+          "const": "daily",
+          "description": "Apply index floors/caps to each sampled daily fixing before compounding.\n\nThis matches common floored SOFR loan conventions.",
+          "type": "string"
+        },
+        {
+          "const": "period",
+          "description": "Apply index floors/caps once to the compounded period index rate.\n\nThis preserves the historical period-level behavior for contracts that\nexplicitly define floors/caps on the period index rate.",
+          "type": "string"
+        }
+      ]
+    },
+    "RollRule": {
+      "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode. The IMM modes\nforce a quarterly grid: the schedule frequency and stub rule configured on\n[`ScheduleParams`] are overridden with quarterly / short-back, matching\n`ScheduleBuilder::imm` and `ScheduleBuilder::cds_imm`.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: quarterly third Wednesdays of Mar/Jun/Sep/Dec (CME IMM dates\n  for rate, currency, and equity index futures).\n- **`CdsImm`**: 20th of Mar/Jun/Sep/Dec (post-Big-Bang standard CDS roll\n  dates). When the start date is not itself a roll date, the first period\n  accrues from the roll date immediately **preceding** the start (standard\n  front accrual per the ISDA Big Bang Protocol, April 2009).\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::specs::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)",
+      "oneOf": [
+        {
+          "const": "none",
+          "description": "Plain tenor stepping from the schedule boundaries (no roll-date grid).",
+          "type": "string"
+        },
+        {
+          "const": "imm",
+          "description": "Standard IMM dates: third Wednesday of Mar/Jun/Sep/Dec.",
+          "type": "string"
+        },
+        {
+          "const": "cds_imm",
+          "description": "CDS IMM dates: 20th of Mar/Jun/Sep/Dec with post-Big-Bang front accrual.",
+          "type": "string"
+        }
+      ]
+    },
+    "StubKind": {
+      "description": "Stub period handling when start/end dates don't align with payment frequency.\n\nControls how schedules are generated when the start and end dates don't\ndivide evenly by the payment frequency, resulting in an irregular period\n(stub) at the beginning or end of the schedule.\n\n# Variants\n\n- **`None`**: No stub allowed (default). Generates regular periods from\n  start to end and returns an error\n  ([`InputError::NonIntegerScheduleTenor`]) when the dates don't divide\n  evenly by the frequency. Use a stub variant for misaligned schedules.\n\n[`InputError::NonIntegerScheduleTenor`]: crate::error::InputError::NonIntegerScheduleTenor\n- **`ShortFront`**: Short stub period at the start. Schedule is built\n  backward from the end date, creating a short first period.\n- **`ShortBack`**: Short stub period at the end. Schedule is built forward\n  from the start date, creating a short final period.\n- **`LongFront`**: Long stub period at the start. Combines the first two\n  periods into a single longer period.\n- **`LongBack`**: Long stub period at the end. Combines the last two periods\n  into a single longer period.\n\n# Financial Context\n\nStub conventions are important for:\n- Interest accrual calculations (short/long first coupons)\n- Cash flow present value computations\n- Matching market conventions for specific instruments\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{ScheduleBuilder, Tenor, StubKind};\nuse time::{Date, Month};\n\nlet start = Date::from_calendar_date(2025, Month::January, 10)?;\nlet end = Date::from_calendar_date(2025, Month::December, 15)?;\n\n// Short stub at front\nlet sched = ScheduleBuilder::new(start, end)?\n    .frequency(Tenor::quarterly())\n    .stub_rule(StubKind::ShortFront)\n    .build()?;\n# Ok::<(), Box<dyn std::error::Error>>(())\n```\n\n# See Also\n\n- [`ScheduleBuilder::stub_rule`] to configure stub behavior",
+      "oneOf": [
+        {
+          "const": "none",
+          "description": "No stub allowed: start/end must align exactly with the frequency,\notherwise schedule generation returns an error.",
+          "type": "string"
+        },
+        {
+          "const": "short_front",
+          "description": "Short stub period at the beginning of the schedule.",
+          "type": "string"
+        },
+        {
+          "const": "short_back",
+          "description": "Short stub period at the end of the schedule (final step truncated to maturity).",
+          "type": "string"
+        },
+        {
+          "const": "long_front",
+          "description": "Long stub period at the beginning of the schedule.",
+          "type": "string"
+        },
+        {
+          "const": "long_back",
+          "description": "Long stub period at the end of the schedule (merges final two periods).",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/cashflow/1/floating_coupon_spec.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Floating coupon specification.",
+  "properties": {
+    "adjust_accrual_dates": {
+      "description": "Whether accrual-period boundaries are business-day adjusted with\n`business_day_convention`.\n\n- `false` (default, bond convention): accrual periods run between the\n  unadjusted schedule anchors; only payment dates roll.\n- `true` (swap convention, ISDA 2006 §4.10 / ARRC SOFR conventions):\n  both accrual-period boundaries are rolled with `business_day_convention` before year\n  fractions and overnight observation windows are computed. The swap\n  presets ([`Self::usd_sofr_swap`], [`Self::eur_estr_swap`],\n  [`Self::gbp_sonia_swap`], [`Self::jpy_tona_swap`]) set this to\n  `true`.\n\nSerialized only when `true`, so existing wire payloads are unchanged.",
+      "type": "boolean"
+    },
+    "business_day_convention": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
+      "default": "modified_following",
+      "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention)."
+    },
+    "calendar_id": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+      "description": "Holiday calendar identifier used together with `business_day_convention`.\n\nUse `\"weekends_only\"` when only Saturday/Sunday adjustment is needed."
+    },
+    "coupon_type": {
+      "$ref": "#/$defs/CouponType",
+      "default": "cash",
+      "description": "Coupon type (Cash/PIK/Split)."
+    },
+    "day_count": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+      "description": "Day-count convention used to convert each generated accrual period into a\nyear fraction."
+    },
+    "end_of_month": {
+      "default": false,
+      "description": "Whether end-of-month rolling should be preserved when generating the\nschedule.",
+      "type": "boolean"
+    },
+    "frequency": {
+      "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+      "description": "Accrual and payment frequency used to generate the schedule boundaries."
+    },
+    "payment_lag_days": {
+      "default": 0,
+      "description": "Payment lag in business days after the adjusted accrual end date.",
+      "format": "int32",
+      "type": "integer"
+    },
+    "rate_spec": {
+      "$ref": "#/$defs/FloatingRateSpec",
+      "description": "Floating rate specification (contains index, spread, floor, cap, etc)."
+    },
+    "roll_rule": {
+      "$ref": "#/$defs/RollRule",
+      "description": "Roll-date rule for schedule anchors (standard IMM or CDS IMM grids).\n\n[`RollRule::None`] (default) keeps plain tenor stepping. The IMM modes\noverride `frequency`/`stub` with quarterly / short-back; see [`RollRule`].\n\nSerialized only when not `None`, so existing wire payloads are\nunchanged."
+    },
+    "stub": {
+      "$ref": "#/$defs/StubKind",
+      "default": "short_front",
+      "description": "Stub-handling rule used when the start/end dates do not fit an exact\nwhole number of periods."
+    }
+  },
+  "required": [
+    "rate_spec",
+    "frequency",
+    "day_count",
+    "calendar_id"
+  ],
+  "title": "FloatingCouponSpec",
+  "type": "object"
+}
