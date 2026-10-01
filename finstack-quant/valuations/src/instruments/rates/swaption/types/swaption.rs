@@ -779,7 +779,10 @@ impl Swaption {
                 | CashSettlementMethod::IsdaParPar => self.swap_annuity(disc, as_of),
                 CashSettlementMethod::ParYield => {
                     use crate::instruments::common_impl::pricing::time::relative_df_discounting;
-                    let df = relative_df_discounting(disc, as_of, self.expiry)?;
+                    // The cash amount is paid on the settlement date, which is
+                    // the underlying swap's effective date.
+                    let df =
+                        relative_df_discounting(disc, as_of, self.get_underlying_start_date())?;
                     Ok(self.cash_annuity_par_yield(forward_rate)? * df)
                 }
                 CashSettlementMethod::ZeroCoupon => self.cash_annuity_zero_coupon(disc, as_of),
@@ -826,50 +829,49 @@ impl Swaption {
         )
     }
 
-    /// Cash settlement annuity using par yield approximation.
+    /// Cash settlement annuity using the par-yield method.
     ///
-    /// Returns the **undiscounted at-expiry** cash annuity. Callers pricing as of
-    /// an earlier date must discount by `DF(as_of → expiry)`; [`Self::annuity`]
+    /// Returns the **undiscounted** cash annuity as of the settlement date
+    /// (the underlying swap's effective date). Callers pricing as of an earlier
+    /// date must discount by `DF(as_of → settlement)`; [`Self::annuity`]
     /// applies that discounting in the `ParYield` arm.
     ///
     /// # Formula
     ///
     /// ```text
-    /// A = (1 - (1 + S/m)^(-N)) / S
+    /// A(S) = Σᵢ₌₁ⁿ (1/m) / (1 + S/m)ⁱ = (1 − (1 + S/m)^{−n}) / S
     /// ```
     ///
-    /// where:
-    /// - S = forward swap rate (settlement rate)
-    /// - m = payment frequency per year
-    /// - N = total number of payment periods
+    /// where `S` is the settlement swap rate, `m` the fixed-leg payments per
+    /// year and `n` the number of payment periods of the underlying fixed
+    /// leg's schedule. `n` is counted from the schedule, not derived from a
+    /// day-count year fraction: an annual ACT/360 leg over five years has five
+    /// periods although its accruals sum to 5.07.
     ///
-    /// # Approximation Notes
+    /// The swap rate is used as a flat discount rate across all periods, which
+    /// is the contractual definition of the method rather than a curve
+    /// valuation. Confirmations that specify collateralized cash price should
+    /// use [`CashSettlementMethod::CollateralizedCashPrice`].
     ///
-    /// This formula assumes:
-    /// 1. **Flat forward rate**: The swap rate S is used as a constant discount rate
-    ///    across all periods. This is an approximation when the yield curve is not flat.
-    /// 2. **Equal periods**: All accrual periods are assumed equal (no stubs).
+    /// When `forward_rate ≈ 0` the annuity is `n/m`. Payments per year follow
+    /// [`Tenor::payments_per_year`].
     ///
-    /// This is a legacy approximation. Current confirmations that specify
-    /// collateralized cash price should use
-    /// [`CashSettlementMethod::CollateralizedCashPrice`].
+    /// # Arguments
     ///
-    /// # Edge Cases
+    /// * `forward_rate` - Settlement swap rate `S` as a decimal.
     ///
-    /// When `forward_rate ≈ 0`, uses L'Hôpital's limit: `A → N/m` (sum of accruals).
-    /// Payments per year follow [`Tenor::payments_per_year`] (day tenors on a
-    /// 365-day year).
+    /// # Errors
+    ///
+    /// Returns an error when the fixed schedule cannot be built.
     pub fn cash_annuity_par_yield(&self, forward_rate: f64) -> Result<f64> {
-        let tenor_years = year_fraction(
-            self.get_fixed_day_count(),
-            self.get_underlying_start_date(),
-            self.get_underlying_maturity(),
-        )?;
-        Ok(crate::instruments::rates::cms_common::par_annuity(
-            forward_rate,
-            tenor_years,
-            self.get_fixed_frequency().payments_per_year(),
-        ))
+        let periods = self.fixed_schedule_periods()?;
+        Ok(
+            crate::instruments::rates::swaption::pricing::hw_cashflows::par_yield_annuity(
+                periods.len(),
+                self.get_fixed_frequency().payments_per_year(),
+                forward_rate,
+            ),
+        )
     }
 
     /// Cash settlement annuity using zero coupon method.

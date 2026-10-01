@@ -9,6 +9,7 @@ use crate::instruments::common_impl::parameters::SettlementType;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::hw1f::RateExoticMcConfig;
 use crate::instruments::rates::irs::FloatingLegCompounding;
+use crate::instruments::rates::swaption::bermudan::apply_exercise_today;
 use crate::instruments::rates::swaption::pricing::lmm_bermudan::price_bermudan_lmm;
 use crate::instruments::rates::swaption::BermudanSwaption;
 use crate::instruments::rates::swaption::BermudanType;
@@ -354,11 +355,13 @@ impl Pricer for BermudanSwaptionLmmPricer {
                 )
             })?;
         if exercise_times.is_empty() {
-            return Ok(ValuationResult::stamped(
+            let mut result = ValuationResult::stamped(
                 swaption.id.as_str(),
                 as_of,
                 Money::from((0_i64, swaption.notional.currency())),
-            ));
+            );
+            apply_exercise_today(swaption, market, as_of, &mut result)?;
+            return Ok(result);
         }
 
         let base_vol = swaption
@@ -419,6 +422,7 @@ impl Pricer for BermudanSwaptionLmmPricer {
                 estimate.stderr,
             );
         }
+        apply_exercise_today(swaption, market, as_of, &mut result)?;
         Ok(result)
     }
 }

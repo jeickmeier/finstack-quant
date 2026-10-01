@@ -320,3 +320,91 @@ fn theta_repricing_error_converges_with_grid() {
         "fine-grid calibrated-θ residual {fine_err_bp:.2}bp exceeds the 12bp MC floor"
     );
 }
+
+/// CURVE-SHAPE REGRESSION — the fitted θ(t) follows forward jumps.
+///
+/// Log-linear and linear discount curves have forwards that jump at every
+/// pillar and are flat (or smooth) in between. A θ(t) built from the forward
+/// *slope* misses those jumps, so the simulated rate relaxes toward each new
+/// forward at speed κ instead of following it; on this curve that leaves
+/// zero-coupon bonds off by hundreds of basis points. The production fit works
+/// from forward levels and must reprice every interpolation style.
+///
+/// The path is deterministic (zero shocks, σ = 1e-8), so the only residual is
+/// the trapezoidal `∫r dt` across a simulation step that contains a forward
+/// jump: at most `jump × step / 2` per pillar, about 1 bp of notional here
+/// against the hundreds of basis points a slope-based θ(t) loses.
+#[test]
+fn fitted_theta_reprices_every_interpolation_style() {
+    use finstack_quant_core::math::interp::InterpStyle;
+
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+    let pillars = [
+        (0.0_f64, 0.030_f64),
+        (0.25, 0.031),
+        (0.5, 0.032),
+        (1.0, 0.034),
+        (2.0, 0.037),
+        (3.0, 0.039),
+        (5.0, 0.042),
+        (7.0, 0.044),
+        (10.0, 0.045),
+    ];
+    let hw = finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams::new(0.03, 1e-8)
+        .expect("valid HW params");
+    let maturities = [1.0_f64, 2.0, 3.0, 5.0, 7.0, 10.0];
+
+    for style in [
+        InterpStyle::LogLinear,
+        InterpStyle::Linear,
+        InterpStyle::MonotoneConvex,
+    ] {
+        let curve = DiscountCurve::builder("SHAPE-OIS")
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .knots(pillars.map(|(t, zero)| (t, (-zero * t).exp())))
+            .interp(style)
+            .build()
+            .expect("discount curve");
+        let params = prepare_hw1f_params(hw, &curve, as_of, 10.0).expect("θ(t) preparation");
+        let r0 = initial_short_rate_from_curve(&curve, as_of).expect("r0 = f(0,0)");
+
+        let process = HullWhite1FProcess::new(params);
+        let disc = ExactHullWhite1F::new();
+        // 52 steps a year: deliberately not aligned with the monthly θ grid.
+        let steps_per_year = 52_usize;
+        let dt = 1.0 / steps_per_year as f64;
+        let mut rate = r0;
+        let mut integral = 0.0_f64;
+        let mut next = 0_usize;
+        for step in 0..(10 * steps_per_year) {
+            let previous = rate;
+            disc.step(
+                &process,
+                step as f64 * dt,
+                dt,
+                core::slice::from_mut(&mut rate),
+                &[0.0],
+                &mut [],
+            );
+            integral += 0.5 * (previous + rate) * dt;
+            let t = (step + 1) as f64 * dt;
+            if next < maturities.len() && (t - maturities[next]).abs() < 1e-9 {
+                let (_, zero) = pillars
+                    .iter()
+                    .find(|(pillar, _)| (pillar - maturities[next]).abs() < 1e-12)
+                    .expect("maturity is a pillar");
+                let curve_df = (-zero * maturities[next]).exp();
+                let bias_bp = ((-integral).exp() - curve_df).abs() * 10_000.0;
+                println!("{style:?} T={}: bias={bias_bp:.3}bp", maturities[next]);
+                assert!(
+                    bias_bp < 2.0,
+                    "{style:?} curve mispriced at T={}: |Δ|={bias_bp:.3}bp",
+                    maturities[next]
+                );
+                next += 1;
+            }
+        }
+        assert_eq!(next, maturities.len(), "every maturity was checked");
+    }
+}

@@ -21,6 +21,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use finstack_quant_models::monte_carlo::traits::{PathState, Payoff, StateKey};
+use finstack_quant_models::rates::clock::model_time;
 use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
 use std::sync::Arc;
 
@@ -356,9 +357,7 @@ impl TarnPricer {
                 // simulated short rate at the period start `t_fix`; the index
                 // is the `[start, end]`-tenor simple forward. `t_fix` is the
                 // event time the simulation fires `on_event` at.
-                let fixing_time =
-                    inst.day_count
-                        .year_fraction(as_of, start, DayCountContext::default())?;
+                let fixing_time = model_time(as_of, start);
                 if !fixing_time.is_finite() || fixing_time <= 0.0 {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "TARN {} has invalid fixing time {fixing_time} for period start {start}",
@@ -366,17 +365,9 @@ impl TarnPricer {
                     )));
                 }
                 event_times.push(fixing_time);
-                let coeffs = term_forward.period_coeffs(fixing_time, inst.index_tenor.to_years());
-                let discount_time = discount_curve.day_count().signed_year_fraction(
-                    discount_curve.base_date(),
-                    start,
-                    DayCountContext::default(),
-                )?;
                 let tenor = inst.index_tenor.to_years();
-                let discount_forward = (discount_curve.df(discount_time)
-                    / discount_curve.df(discount_time + tenor)
-                    - 1.0)
-                    / tenor;
+                let coeffs = term_forward.period_coeffs(fixing_time, tenor);
+                let discount_forward = term_forward.curve_forward(fixing_time, tenor);
                 let basis = crate::instruments::rates::hw1f::forward_swap_rate::term_fixing_on_date(
                     forward_curve.as_ref(),
                     start,
@@ -435,10 +426,7 @@ impl TarnPricer {
                 inst.id.as_str()
             ))
         })?;
-        let maturity_time =
-            inst.day_count
-                .year_fraction(as_of, maturity_date, DayCountContext::default())?;
-        event_times.push(maturity_time);
+        event_times.push(model_time(as_of, maturity_date));
 
         // Bootstrap a time-dependent θ(t) from the discount curve so the
         // simulated short rate reprices the initial curve (HW1F, not Vasicek).
@@ -826,6 +814,37 @@ mod tests {
             estimate.mean.amount(),
             expected
         );
+    }
+
+    /// Simulation times run on the ACT/365F model clock whatever the coupon
+    /// day count. With a zero fixed rate the note pays no coupon and redeems at
+    /// maturity, so at σ → 0 its PV is `N·P(0,T)` for every accrual basis. An
+    /// Act/360 clock would place maturity 1.4% further out in model time and
+    /// discount about $700 too much on this 18-month note.
+    #[test]
+    fn simulation_clock_is_independent_of_the_coupon_day_count() {
+        let as_of = date(2025, Month::January, 1);
+        let market = market(as_of, 0.02, 0.03);
+        let disc = market.get_discount("USD-OIS").expect("discount");
+
+        for day_count in [DayCount::Act365F, DayCount::Act360, DayCount::Thirty360] {
+            let mut tarn = test_tarn(1.0);
+            tarn.fixed_rate = rust_decimal::Decimal::ZERO;
+            tarn.day_count = day_count;
+            let maturity = *tarn.payment_dates.last().expect("maturity");
+            let expected = tarn.notional.amount()
+                * relative_df_discount_curve(disc.as_ref(), as_of, maturity).expect("df");
+
+            let pv = deterministic_pricer(4)
+                .price_estimate(&tarn, &market, as_of)
+                .expect("price")
+                .mean
+                .amount();
+            assert!(
+                (pv - expected).abs() < 50.0,
+                "{day_count:?}: zero-coupon TARN PV {pv} should equal N·P(0,T) = {expected}"
+            );
+        }
     }
 
     #[test]

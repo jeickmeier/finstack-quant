@@ -45,14 +45,12 @@ use finstack_quant_models::rates::hull_white::{
     fd_instantaneous_forward, hw_b, hw_ln_a, HullWhiteCalibrationParams, HullWhiteParams,
 };
 
-/// Spacing (years) of the piecewise-constant θ(t) bootstrap grid.
+/// Spacing (years) of the piecewise-constant θ(t) grid.
 ///
-/// θ(t) is piecewise-constant on intervals of this width, each interval
-/// carrying the θ value sampled at its **midpoint** (see [`prepare_hw1f_params`]).
-/// The midpoint rule makes the curve-repricing error O(spacing²) rather than
-/// O(spacing) of a left-endpoint rule, so a monthly grid reprices even a
-/// steeply-sloped curve to a few bp. Monthly is also fine enough to resolve
-/// realistic intra-quarter curve features (e.g. a turn-of-year forward jump).
+/// θ(t) is fitted so the simulated short-rate mean equals the curve-implied
+/// level at every grid boundary (see [`prepare_hw1f_params`]). Monthly spacing
+/// resolves realistic intra-quarter curve features (e.g. a turn-of-year
+/// forward jump) to within one month.
 const THETA_GRID_SPACING_YEARS: f64 = 1.0 / 12.0;
 
 /// Build a `P(as_of, as_of + t)` discount closure from a [`Discounting`] curve.
@@ -81,20 +79,12 @@ fn rebased_discount_fn<'a>(
 
 /// Prepare time-dependent HW1F parameters θ(t) from a discount curve.
 ///
-/// Bootstraps a piecewise-constant θ(t) (defect M6 fix) so the simulated short
-/// rate reprices the initial curve. The θ(t) formula itself is the canonical
-/// `finstack_quant_models::monte_carlo::process::ou::calibrate_theta_from_curve` bootstrap —
-/// this does **not** reinvent it.
-///
-/// # Midpoint rule
-///
-/// `calibrate_theta_from_curve` evaluates θ exactly at the breakpoints it is
-/// given, and the resulting [`HullWhite1FParams::theta_at_time`] is *left*-
-/// continuous: the value at breakpoint `tᵢ` applies on `[tᵢ, tᵢ₊₁)`. Sampling
-/// θ at the *left* edge of each interval biases the drift by O(spacing) on a
-/// sloped curve. Instead this function samples θ at each interval's **midpoint**
-/// and re-pairs those values with the interval *boundaries*, yielding the
-/// piecewise-constant midpoint rule (curve-repricing error O(spacing²)).
+/// Fits a piecewise-constant θ(t) on a monthly grid so the simulated short
+/// rate follows the initial curve. The fit is the canonical
+/// `finstack_quant_models::monte_carlo::process::ou::calibrate_theta_from_curve`,
+/// which matches the curve-implied short-rate mean at every grid boundary
+/// from forward levels alone, so it holds for log-linear and linear discount
+/// curves whose forwards jump at knots as well as for smooth curves.
 ///
 /// # Arguments
 ///
@@ -114,34 +104,20 @@ pub fn prepare_hw1f_params(
     horizon: f64,
 ) -> Result<HullWhite1FParams> {
     let discount_fn = rebased_discount_fn(discount_curve, as_of)?;
-
-    // Piecewise-constant θ(t) on `n_steps` intervals of width
-    // `THETA_GRID_SPACING_YEARS` covering `[0, horizon]` (one extra interval so
-    // `theta_at_time` never extrapolates past its last knot at the horizon).
-    let n_steps = (horizon / THETA_GRID_SPACING_YEARS).ceil().max(1.0) as usize;
-
-    // Interval midpoints — where θ is sampled for the O(spacing²) midpoint rule.
-    let midpoints: Vec<f64> = (0..n_steps)
-        .map(|i| (i as f64 + 0.5) * THETA_GRID_SPACING_YEARS)
-        .collect();
-    // Interval left boundaries — the breakpoints the piecewise-constant θ
-    // actually switches on (`theta_at_time` is left-continuous).
-    let boundaries: Vec<f64> = (0..n_steps)
-        .map(|i| i as f64 * THETA_GRID_SPACING_YEARS)
-        .collect();
-
-    // `calibrate_theta_from_curve` evaluates θ at the times it is handed, so
-    // passing the midpoints yields the midpoint-sampled θ *values*; re-pair
-    // them with the interval boundaries to realise the midpoint rule.
-    let midpoint_fit =
-        calibrate_theta_from_curve(hw_params.kappa, hw_params.sigma, discount_fn, &midpoints)?;
-
-    HullWhite1FParams::with_time_dependent_theta(
+    calibrate_theta_from_curve(
         hw_params.kappa,
         hw_params.sigma,
-        midpoint_fit.theta_values().to_vec(),
-        boundaries,
+        discount_fn,
+        &theta_grid(horizon),
     )
+}
+
+/// Monthly θ(t) boundaries covering `[0, horizon]`, starting at time zero.
+fn theta_grid(horizon: f64) -> Vec<f64> {
+    let n_steps = (horizon / THETA_GRID_SPACING_YEARS).ceil().max(1.0) as usize;
+    (0..n_steps)
+        .map(|i| i as f64 * THETA_GRID_SPACING_YEARS)
+        .collect()
 }
 
 /// Prepare a simulation-ready HW1F process from scheduled model parameters.
@@ -158,8 +134,8 @@ pub fn prepare_hw1f_params(
 ///   drift; its date convention is rebased at `as_of`.
 /// * `as_of` - Valuation date from which the process and discount curve are
 ///   rebased.
-/// * `horizon` - Positive simulation horizon in years used to build the θ(t)
-///   midpoint grid.
+/// * `horizon` - Positive simulation horizon in years covered by the θ(t)
+///   grid.
 pub fn prepare_hw1f_model_params(
     model: &HullWhiteParams,
     discount_curve: &dyn Discounting,
@@ -167,26 +143,12 @@ pub fn prepare_hw1f_model_params(
     horizon: f64,
 ) -> Result<HullWhite1FParams> {
     let discount_fn = rebased_discount_fn(discount_curve, as_of)?;
-    let n_steps = (horizon / THETA_GRID_SPACING_YEARS).ceil().max(1.0) as usize;
-    let midpoints: Vec<f64> = (0..n_steps)
-        .map(|index| (index as f64 + 0.5) * THETA_GRID_SPACING_YEARS)
-        .collect();
-    let boundaries: Vec<f64> = (0..n_steps)
-        .map(|index| index as f64 * THETA_GRID_SPACING_YEARS)
-        .collect();
-    let midpoint_fit = calibrate_theta_from_curve_with_piecewise_sigma(
+    calibrate_theta_from_curve_with_piecewise_sigma(
         model.kappa,
         model.volatility.times().to_vec(),
         model.volatility.values().to_vec(),
         discount_fn,
-        &midpoints,
-    )?;
-    HullWhite1FParams::with_piecewise_sigma(
-        model.kappa,
-        model.volatility.times().to_vec(),
-        model.volatility.values().to_vec(),
-        midpoint_fit.theta_values().to_vec(),
-        boundaries,
+        &theta_grid(horizon),
     )
 }
 
@@ -202,9 +164,8 @@ pub fn prepare_hw1f_model_params(
 ///
 /// `f(0,0)` is taken by an instantaneous-forward finite difference of `−ln P`
 /// on the `as_of`-rebased curve — a one-sided forward difference at `t = 0`.
-/// This is the *same kind* of estimator the θ-bootstrap relies on, so `r(0)`
-/// and the bootstrapped θ(t) are consistent in construction; the finite-
-/// difference step sizes are chosen independently and need not coincide.
+/// This is the same estimator the θ fit starts its mean recursion from, so
+/// `r(0)` and the fitted θ(t) are consistent by construction.
 ///
 /// # Errors
 ///
@@ -251,6 +212,19 @@ impl PeriodForwardCoeffs {
         }
         let inv_p = (self.b * short_rate - self.ln_a).exp();
         (inv_p - 1.0) / self.tau + self.spread
+    }
+
+    /// Zero-coupon bond price `P(t, t+τ) = A·exp(−B·r)` implied by a
+    /// simulated short rate, i.e. the path discount factor over the period.
+    ///
+    /// # Arguments
+    ///
+    /// * `short_rate` - Simulated instantaneous short rate at the period
+    ///   start, as a decimal annual rate.
+    #[inline]
+    #[must_use]
+    pub fn discount_factor(&self, short_rate: f64) -> f64 {
+        (self.ln_a - self.b * short_rate).exp()
     }
 
     /// Degenerate coefficients that reproduce a *fixed* simple forward `rate`
@@ -334,6 +308,24 @@ impl<'a> Hw1fTermForward<'a> {
             tau,
             spread: 0.0,
         }
+    }
+
+    /// Time-zero simple forward of the discount curve over
+    /// `[fixing_t, fixing_t + tau]`, on the same model clock and re-based
+    /// curve as [`Self::period_coeffs`].
+    ///
+    /// This is the rate the reconstruction returns in expectation, so a
+    /// projection-curve basis must be measured against it.
+    ///
+    /// # Arguments
+    ///
+    /// * `fixing_t` - Fixing time in ACT/365F years from `as_of`; negative
+    ///   values are clamped to 0.
+    /// * `tau` - Positive rate tenor in years.
+    #[must_use]
+    pub fn curve_forward(&self, fixing_t: f64, tau: f64) -> f64 {
+        let t = fixing_t.max(0.0);
+        ((self.discount_fn)(t) / (self.discount_fn)(t + tau) - 1.0) / tau
     }
 }
 

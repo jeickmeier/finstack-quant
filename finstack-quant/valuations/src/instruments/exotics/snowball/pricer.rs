@@ -21,6 +21,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use finstack_quant_models::monte_carlo::traits::{PathState, Payoff, StateKey};
+use finstack_quant_models::rates::clock::model_time;
 use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
 
 /// Path-local snowball coupon accumulator.
@@ -491,11 +492,8 @@ impl SnowballHw1fMcPricer {
         let maturity_date = *inst.payment_dates.last().ok_or_else(|| {
             finstack_quant_core::Error::Validation("Snowball requires payment dates".to_string())
         })?;
-        let maturity_time =
-            inst.day_count
-                .year_fraction(as_of, maturity_date, DayCountContext::default())?;
         let mut event_times = event_times;
-        event_times.push(maturity_time);
+        event_times.push(model_time(as_of, maturity_date));
 
         // Bootstrap a time-dependent θ(t) from the discount curve so the
         // simulated short rate reprices the initial curve (HW1F, not Vasicek).
@@ -660,19 +658,10 @@ fn coupon_events(
             // simulated short rate at the period start `t_fix`. The bond
             // tenor for the HW1F reconstruction is the contractual floating
             // index tenor, not the coupon accrual period.
-            let fixing_time =
-                inst.day_count
-                    .year_fraction(as_of, start, DayCountContext::default())?;
-            let coeffs = term_forward.period_coeffs(fixing_time, inst.index_tenor.to_years());
-            let discount_time = discount_curve.day_count().signed_year_fraction(
-                discount_curve.base_date(),
-                start,
-                DayCountContext::default(),
-            )?;
+            let fixing_time = model_time(as_of, start);
             let tenor = inst.index_tenor.to_years();
-            let discount_forward =
-                (discount_curve.df(discount_time) / discount_curve.df(discount_time + tenor) - 1.0)
-                    / tenor;
+            let coeffs = term_forward.period_coeffs(fixing_time, tenor);
+            let discount_forward = term_forward.curve_forward(fixing_time, tenor);
             let basis = crate::instruments::rates::hw1f::forward_swap_rate::term_fixing_on_date(
                 forward_curve.as_ref(),
                 start,
@@ -714,9 +703,7 @@ fn event_times(inst: &Snowball, as_of: Date) -> Result<Vec<f64>> {
         if end <= as_of || start <= as_of {
             continue;
         }
-        let t = inst
-            .day_count
-            .year_fraction(as_of, start, DayCountContext::default())?;
+        let t = model_time(as_of, start);
         if t > 0.0 {
             times.push(t);
         }

@@ -16,6 +16,7 @@ use finstack_quant_models::trees::HullWhiteTree;
 
 pub(crate) struct HwSwaptionCashflows {
     fixed: Vec<(f64, f64)>,
+    fixed_payments_per_year: f64,
     float: Vec<(f64, f64, f64, f64, f64)>,
     spread: f64,
     compounded: bool,
@@ -54,6 +55,7 @@ impl HwSwaptionCashflows {
             adjust_accrual_dates: false,
             roll_rule: RollRule::None,
         };
+        let fixed_payments_per_year = fixed.frequency.payments_per_year();
         let fixed = build_periods(fixed_params)?
             .iter()
             .filter(|p| p.accrual_end > exercise && p.payment_date > exercise)
@@ -107,6 +109,7 @@ impl HwSwaptionCashflows {
             .collect::<Result<Vec<_>>>()?;
         Ok(Self {
             fixed,
+            fixed_payments_per_year,
             float,
             spread,
             compounded,
@@ -174,18 +177,7 @@ impl HwSwaptionCashflows {
         let swap_rate = floating / annuity;
         let payoff_annuity = match (terms.settlement, terms.cash_method) {
             (SettlementType::Cash, CashSettlementMethod::ParYield) => {
-                let mut discount = 1.0;
-                self.fixed
-                    .iter()
-                    .map(|&(_, tau)| {
-                        let base = 1.0 + swap_rate * tau;
-                        if !base.is_finite() || base <= 0.0 {
-                            return f64::NAN;
-                        }
-                        discount /= base;
-                        tau * discount
-                    })
-                    .sum()
+                par_yield_annuity(self.fixed.len(), self.fixed_payments_per_year, swap_rate)
             }
             (SettlementType::Cash, CashSettlementMethod::ZeroCoupon) => {
                 self.fixed.iter().map(|&(_, tau)| tau).sum::<f64>() * bond(self.horizon())
@@ -209,6 +201,89 @@ pub(crate) struct HwExerciseNode<'a> {
     pub step: usize,
     pub index: usize,
     pub discount: &'a dyn Discounting,
+}
+
+/// Par-yield cash-settlement annuity of a fixed leg, valued on the settlement
+/// date.
+///
+/// The ISDA par-yield cash price discounts a level annuity of `1/m` per
+/// period at the settlement swap rate itself, compounded at the fixed-leg
+/// frequency:
+///
+/// ```text
+/// A(S) = Σᵢ₌₁ⁿ (1/m) / (1 + S/m)ⁱ = (1 − (1 + S/m)^{−n}) / S
+/// ```
+///
+/// `n` is the number of fixed-leg payment periods, not a day-count year
+/// fraction times `m`: an annual ACT/360 leg over five years has five
+/// periods, although its accruals sum to 5.07.
+///
+/// # Arguments
+///
+/// * `periods` - Number of fixed-leg payment periods `n`.
+/// * `payments_per_year` - Fixed-leg payment frequency `m`.
+/// * `swap_rate` - Settlement swap rate `S` as a decimal.
+pub(crate) fn par_yield_annuity(periods: usize, payments_per_year: f64, swap_rate: f64) -> f64 {
+    crate::instruments::rates::cms_common::par_annuity(
+        swap_rate,
+        periods as f64 / payments_per_year,
+        payments_per_year,
+    )
+}
+
+/// Lift a Bermudan engine value to at least the value of exercising today.
+///
+/// The exercise engines model strictly future decision dates. When `as_of` is
+/// itself a live exercise date the holder can still exercise that day, so the
+/// option is worth the larger of exercising now and continuing. Exercising at
+/// model time zero is deterministic: every bond price is a discount factor of
+/// today's curve, so no model volatility enters and all engines agree.
+///
+/// # Arguments
+///
+/// * `swaption` - Bermudan swaption whose lockout-filtered exercise schedule
+///   and underlying legs define the exercise.
+/// * `discount` - Discount curve of the single-curve valuation.
+/// * `as_of` - Valuation date; only an exercise date equal to it matters.
+/// * `continuation` - Engine value of the remaining, strictly future exercise
+///   rights in the swaption's currency.
+///
+/// # Errors
+///
+/// Returns an error when the underlying legs cannot be scheduled or the curve
+/// cannot be re-based to `as_of`.
+pub(crate) fn value_with_exercise_today(
+    swaption: &crate::instruments::rates::swaption::BermudanSwaption,
+    discount: &dyn Discounting,
+    as_of: Date,
+    continuation: f64,
+) -> Result<f64> {
+    if !swaption
+        .exercise_schedule
+        .effective_dates()
+        .contains(&as_of)
+    {
+        return Ok(continuation);
+    }
+    let flows = HwSwaptionCashflows::new(
+        &swaption.underlying_fixed_leg,
+        &swaption.underlying_float_leg,
+        as_of,
+        as_of,
+    )?;
+    let curve = finstack_quant_models::rates::clock::ModelDiscountCurve::new(discount, as_of)?;
+    let terms = HwExerciseTerms {
+        strike: swaption.strike_f64()?,
+        notional: swaption.notional.amount(),
+        option_type: swaption.option_type,
+        settlement: swaption.settlement,
+        cash_method: CashSettlementMethod::default(),
+    };
+    // Zero volatility switches every convexity adjustment off; the
+    // mean-reversion argument is then irrelevant.
+    let (_, _, exercise_today) =
+        flows.evaluate(0.0, 1.0, 0.0, |maturity| curve.df(maturity), terms);
+    Ok(continuation.max(exercise_today))
 }
 
 #[derive(Clone, Copy)]
@@ -242,6 +317,7 @@ mod tests {
         for compounded in [false, true] {
             let flows = HwSwaptionCashflows {
                 fixed: vec![(pay, 1.0)],
+                fixed_payments_per_year: 1.0,
                 float: vec![(start, end, pay, 1.0, start)],
                 spread: 0.001,
                 compounded,

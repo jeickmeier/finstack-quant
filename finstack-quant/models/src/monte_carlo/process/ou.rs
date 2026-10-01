@@ -389,35 +389,57 @@ impl StochasticProcess for HullWhite1FProcess {
     }
 }
 
-/// Build Hull-White 1F parameters with θ(t) derived from a discount curve.
+/// Build Hull-White 1F parameters with θ(t) fitted to a discount curve.
 ///
 /// This crate uses the **Vasicek-style mean-reversion-level convention**
 /// for θ: the drift is `κ·(θ(t) - r)`, so θ(t) is the time-dependent
-/// stationary level the short rate is pulled toward. Under this
-/// convention the calibrated θ(t) for a market-consistent HW1F is
+/// stationary level the short rate is pulled toward.
+///
+/// # Fit
+///
+/// A market-consistent HW1F short rate is `r(t) = x(t) + α(t)`, where `x` is
+/// a zero-mean Ornstein-Uhlenbeck state and the deterministic shift is
+/// (Brigo–Mercurio 2006, §3.3.1, eq. 3.36)
 ///
 /// ```text
-/// θ(t) = f(0,t) + (1/κ)·∂f/∂t(0,t) + σ²/(2κ²)·(1 − e^{−2κt})
+/// α(t) = f(0,t) + σ²/(2κ²)·(1 − e^{−κt})²
 /// ```
 ///
-/// where `f(0,t) = -d/dt ln P(0,t)` is the market instantaneous forward.
+/// with `f(0,t) = -d/dt ln P(0,t)` the market instantaneous forward. The
+/// returned θ is piecewise-constant on the intervals between consecutive
+/// `theta_times` and is chosen so the exact OU mean recursion
 ///
-/// This is algebraically equivalent to the more commonly-cited
-/// Brigo–Mercurio form `θ_HW(t) = ∂f/∂t + κ·f(0,t) + σ²/(2κ)·(1-e^{-2κt})`
-/// used with the drift form `(θ_HW(t) - κ·r)dt`, via `θ_Vas = θ_HW / κ`.
-/// The two forms give identical dynamics when θ is interpreted
-/// consistently with the drift; mixing them produces a stationary mean
-/// off by a factor of κ.
+/// ```text
+/// E[r(b)] = E[r(a)]·e^{−κ(b−a)} + θ·(1 − e^{−κ(b−a)})
+/// ```
 ///
-/// For a flat curve at rate `r_flat`: ∂f/∂t = 0 and f(0,t) = r_flat, so
-/// θ(t) = r_flat + σ²/(2κ²)·(1 − e^{−2κt}) ≈ r_flat.
+/// reproduces `α` at every boundary, starting from `r(0) = f(0,0)`:
+///
+/// ```text
+/// θ_i = [α(t_{i+1}) − α(t_i)·e^{−κΔ_i}] / (1 − e^{−κΔ_i})
+/// ```
+///
+/// Only forward *levels* enter, never the forward slope `∂f/∂t`. The
+/// differential form `θ = f + (1/κ)·∂f/∂t + …` is exact for a smooth curve but
+/// loses every forward jump of a log-linear or linear discount curve, whose
+/// slope is zero between knots: the simulated rate then relaxes toward each
+/// new forward at speed κ instead of following it.
+///
+/// The first interval starts at time zero whatever `theta_times[0]` is, and
+/// the last θ is fitted over one more interval of the preceding width.
+/// Simulation steps that end on a θ boundary carry the exact mean; a step
+/// that ends inside an interval carries the exponential interpolation of
+/// `α` between the surrounding boundaries.
+///
+/// For a flat curve at rate `r_flat`, `α(t) ≈ r_flat` and so is θ.
 ///
 /// # Arguments
 ///
 /// * `kappa` - Positive finite mean-reversion speed in inverse years.
 /// * `sigma` - Positive finite short-rate volatility per square-root year.
 /// * `discount_curve_fn` - Function mapping time in years to `P(0,t)`.
-/// * `theta_times` - Strictly increasing non-negative θ(t) sample times.
+/// * `theta_times` - Strictly increasing non-negative θ(t) boundary times in
+///   years; empty produces a single level equal to `f(0,0)`.
 ///
 /// # Errors
 ///
@@ -445,25 +467,33 @@ where
         return HullWhite1FParams::new(kappa, sigma, f_0);
     }
 
-    let theta_curve = theta_times
-        .iter()
-        .map(|&t| compute_theta_at_time(kappa, sigma, &discount_curve_fn, t))
-        .collect();
-    HullWhite1FParams::with_time_dependent_theta(kappa, sigma, theta_curve, theta_times.to_vec())
+    let model = HullWhiteParams::constant(kappa, sigma)?;
+    let theta_curve = fit_theta_levels(kappa, theta_times, |t| {
+        let decay = -(-kappa * t).exp_m1();
+        Ok(instantaneous_forward(&discount_curve_fn, t)
+            + sigma * sigma / (2.0 * kappa * kappa) * decay * decay)
+    })?;
+    HullWhite1FParams::from_parts(model, theta_curve, theta_times.to_vec())
 }
 
-/// Calibrate θ(t) against a discount curve under a piecewise-constant HW
-/// short-rate volatility schedule.
+/// Fit θ(t) to a discount curve under a piecewise-constant HW short-rate
+/// volatility schedule.
 ///
-/// The curve-fit correction is `Var[x(t)] / κ`, which reduces exactly to
-/// `σ²(1 - exp(-2κt)) / (2κ²)` for a constant σ.
+/// This is [`calibrate_theta_from_curve`] with the deterministic shift
+/// generalised to a volatility schedule:
+///
+/// ```text
+/// α(t) = f(0,t) + (1/κ)·∫₀ᵗ σ(s)²·(e^{−κ(t−s)} − e^{−2κ(t−s)}) ds
+/// ```
+///
+/// which reduces to `f(0,t) + σ²/(2κ²)·(1 − e^{−κt})²` for a constant σ.
 ///
 /// `sigma_times` and `sigma_values` define the piecewise-constant annualized
-/// short-rate-volatility curve. `theta_times` gives the requested year-fraction
-/// knots for the returned piecewise-constant mean-reversion-level curve; an
-/// empty slice produces one value at time zero. `discount_curve_fn(t)` must
-/// return the discount factor `P(0,t)` on the same time basis. The forward rate
-/// and derivative are obtained with finite differences of width `1e-4` years.
+/// short-rate-volatility curve. `theta_times` gives the year-fraction
+/// boundaries of the returned piecewise-constant mean-reversion-level curve;
+/// an empty slice produces one value at time zero. `discount_curve_fn(t)` must
+/// return the discount factor `P(0,t)` on the same time basis. The forward
+/// rate is obtained with a finite difference of width `1e-4` years.
 ///
 /// If a sampled discount factor is non-positive, the finite-difference helper
 /// logs a warning and substitutes a zero forward contribution rather than
@@ -479,8 +509,8 @@ where
 ///   `sigma_times` according to [`PiecewiseConstantCurve`] semantics.
 /// * `discount_curve_fn` - Function returning the discount factor `P(0,t)` for
 ///   a year-fraction input `t` on the same time basis as the schedules.
-/// * `theta_times` - Requested theta-curve knot times in years; empty produces
-///   a single time-zero theta value.
+/// * `theta_times` - Requested theta-curve boundary times in years; empty
+///   produces a single time-zero theta value.
 ///
 /// # Errors
 ///
@@ -507,83 +537,62 @@ where
     } else {
         theta_times.to_vec()
     };
-    let theta_curve: Result<Vec<f64>> = theta_boundaries
-        .iter()
-        .copied()
-        .map(|time| {
-            let variance = sigma_curve.integrate_squared_exp_weight(kappa, time, 0.0, time)?;
-            Ok(compute_theta_at_time_with_variance(
-                kappa,
-                variance,
-                &discount_curve_fn,
-                time,
-            ))
-        })
-        .collect();
+    let theta_curve = fit_theta_levels(kappa, &theta_boundaries, |t| {
+        // ∫σ²·e^{−κ(t−s)} ds is the variance kernel evaluated at κ/2.
+        let single_decay = sigma_curve.integrate_squared_exp_weight(0.5 * kappa, t, 0.0, t)?;
+        let double_decay = sigma_curve.integrate_squared_exp_weight(kappa, t, 0.0, t)?;
+        Ok(instantaneous_forward(&discount_curve_fn, t) + (single_decay - double_decay) / kappa)
+    })?;
     HullWhite1FParams::with_piecewise_sigma(
         kappa,
         sigma_curve.times().to_vec(),
         sigma_curve.values().to_vec(),
-        theta_curve?,
+        theta_curve,
         theta_boundaries,
     )
 }
 
-/// Compute θ(t) at a specific time in the Vasicek-style mean-reversion-level
-/// convention used by this crate's HW1F drift `κ·(θ(t) - r)`.
+/// Piecewise-constant θ levels whose exact OU mean equals `alpha` at every
+/// interval boundary.
 ///
-/// ```text
-/// θ(t) = f(0,t) + (1/κ)·∂f/∂t(0,t) + σ²/(2κ²)·(1 − e^{−2κt})
-/// ```
-///
-/// Derivation: the Brigo–Mercurio (2006) eq. 3.35 form
-///   θ_HW(t) = ∂f/∂t(0,t) + κ·f(0,t) + σ²/(2κ)·(1 − e^{−2κt})
-/// is meant to be consumed by a drift of the form `θ_HW(t) - κ·r`.
-/// Dividing by κ converts it to the Vasicek-style mean-reversion level
-/// θ_Vas = θ_HW / κ that the drift `κ·(θ - r)` expects.
-///
-/// Reference: Brigo & Mercurio (2006) *Interest Rate Models* §3.3.1 eq. 3.35;
-/// Hull & White (1990).
-fn compute_theta_at_time<F>(kappa: f64, sigma: f64, discount_curve_fn: &F, t: f64) -> f64
-where
-    F: Fn(f64) -> f64,
-{
-    // For near-zero κ the Vasicek-form θ diverges (as ∂f/∂t / κ and
-    // σ²/(2κ²)). Callers near κ = 0 should be using a driftless process;
-    // here we fall back to the constant level f(0,t) which at least keeps
-    // the simulator bounded.
-    const KAPPA_EPS: f64 = 1e-10;
-    if kappa.abs() < KAPPA_EPS {
-        return instantaneous_forward(discount_curve_fn, t);
-    }
-
-    // f(0,t) = instantaneous forward rate
-    let f_t = instantaneous_forward(discount_curve_fn, t);
-
-    // ∂f/∂t via finite difference
-    let df_dt = forward_derivative(discount_curve_fn, t);
-
-    // Vol-correction term in the Vasicek convention: σ²/(2κ²)·(1 − e^{−2κt}).
-    // This is the O(σ²/κ²) gap between the stationary level and the market
-    // instantaneous forward that arises from the HW1F drift-and-diffusion
-    // balance. See Brigo–Mercurio §3.3.1 eq. 3.35 divided by κ.
-    let vol_term = (sigma * sigma) / (2.0 * kappa * kappa) * (1.0 - (-2.0 * kappa * t).exp());
-
-    f_t + df_dt / kappa + vol_term
-}
-
-fn compute_theta_at_time_with_variance<F>(
+/// Interval `i` runs from boundary `i` to boundary `i + 1`. The first boundary
+/// is time zero, because [`HullWhite1FParams::theta_at_time`] applies the
+/// first level from the start of the simulation. The last level has no
+/// following knot, so it is fitted over one more interval as wide as the
+/// preceding one (one year when there is a single knot at zero).
+fn fit_theta_levels(
     kappa: f64,
-    state_variance: f64,
-    discount_curve_fn: &F,
-    t: f64,
-) -> f64
-where
-    F: Fn(f64) -> f64,
-{
-    let f_t = instantaneous_forward(discount_curve_fn, t);
-    let df_dt = forward_derivative(discount_curve_fn, t);
-    f_t + df_dt / kappa + state_variance / kappa
+    theta_times: &[f64],
+    alpha: impl Fn(f64) -> Result<f64>,
+) -> Result<Vec<f64>> {
+    let mut boundaries = Vec::with_capacity(theta_times.len() + 1);
+    boundaries.push(0.0);
+    boundaries.extend_from_slice(&theta_times[1..]);
+    let last = boundaries[boundaries.len() - 1];
+    let last_width = match boundaries.len() {
+        1 if theta_times[0] > 0.0 => theta_times[0],
+        1 => 1.0,
+        n => last - boundaries[n - 2],
+    };
+    boundaries.push(last + last_width);
+
+    let mut alpha_start = alpha(0.0)?;
+    boundaries
+        .windows(2)
+        .map(|interval| {
+            let width = interval[1] - interval[0];
+            if width.is_nan() || width <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(
+                    "Hull-White theta times must increase strictly".into(),
+                ));
+            }
+            let alpha_end = alpha(interval[1])?;
+            let decay = (-kappa * width).exp();
+            let theta = (alpha_end - alpha_start * decay) / (1.0 - decay);
+            alpha_start = alpha_end;
+            Ok(theta)
+        })
+        .collect()
 }
 
 /// Instantaneous forward `f(0,t)` via [`fd_instantaneous_forward`], falling
@@ -599,44 +608,6 @@ where
         );
         0.0
     })
-}
-
-/// Compute ∂f/∂t via the second derivative of ln P(0,t).
-///
-/// Since f(0,t) = -d/dt ln P(0,t), we have ∂f/∂t = -d²/dt² ln P(0,t).
-/// Computing this directly from P avoids the double finite-difference
-/// (differentiating a finite-difference approximation of f), which would
-/// amplify curve noise.
-fn forward_derivative<F>(discount_curve_fn: &F, t: f64) -> f64
-where
-    F: Fn(f64) -> f64,
-{
-    let eps = 1e-4;
-
-    if t < eps {
-        // Near t=0, use forward difference on f
-        let f_0 = instantaneous_forward(discount_curve_fn, 0.0);
-        let f_eps = instantaneous_forward(discount_curve_fn, eps);
-        (f_eps - f_0) / eps
-    } else {
-        // Central second derivative of ln P:
-        // ∂f/∂t = -[ln P(t+ε) - 2·ln P(t) + ln P(t-ε)] / ε²
-        let p_plus = discount_curve_fn(t + eps);
-        let p_mid = discount_curve_fn(t);
-        let p_minus = discount_curve_fn((t - eps).max(0.0));
-
-        let dt_actual = (t + eps) - (t - eps).max(0.0);
-        let half_dt = dt_actual / 2.0;
-
-        if p_plus > 0.0 && p_mid > 0.0 && p_minus > 0.0 {
-            -(p_plus.ln() - 2.0 * p_mid.ln() + p_minus.ln()) / (half_dt * half_dt)
-        } else {
-            // Fallback to differentiating instantaneous forwards
-            let f_plus = instantaneous_forward(discount_curve_fn, t + eps);
-            let f_minus = instantaneous_forward(discount_curve_fn, (t - eps).max(0.0));
-            (f_plus - f_minus) / dt_actual
-        }
-    }
 }
 
 #[cfg(test)]
@@ -761,60 +732,81 @@ mod tests {
         assert!((f_5 - 0.05).abs() < 0.01, "f(0,5) ≈ 0.05, got {}", f_5);
     }
 
-    /// Verify that calibrated θ(t) matches the analytical HW1F formula.
+    /// The fitted θ makes the exact OU mean equal the curve-implied shift
+    /// `α(t) = f(0,t) + σ²/(2κ²)·(1 − e^{−κt})²` (Brigo & Mercurio 2006,
+    /// eq. 3.36) at every θ boundary, including across forward jumps.
     ///
-    /// For a flat yield curve at rate r_flat:
-    ///   f(0,t) = r_flat,  ∂f/∂t = 0
-    ///
-    /// The HW1F formula (Brigo & Mercurio 2006, eq. 3.35) gives:
-    ///   θ(t) = ∂f/∂t + κ·f(0,t) + σ²/(2κ)·(1 - e^{-2κt})
-    ///         = κ·r_flat + σ²/(2κ)·(1 - e^{-2κt})
-    ///
-    /// This test validates that `calibrate_theta_from_curve` produces θ values
-    /// matching this formula to numerical precision (the only error is from the
-    /// finite-difference approximation of the instantaneous forward rate).
+    /// The kinked curve has piecewise-flat forwards (2% → 4% → 3%), the shape
+    /// a log-linear discount curve produces. A slope-based θ sees `∂f/∂t = 0`
+    /// between knots and leaves the rate near 2%.
     #[test]
-    fn test_calibrate_theta_matches_analytical_formula_flat_curve() {
-        let r_flat = 0.05_f64;
-        let kappa = 0.2_f64;
+    fn fitted_theta_follows_the_curve_shift_across_forward_jumps() {
+        use super::super::super::discretization::exact_hw1f::ExactHullWhite1F;
+        use super::super::super::traits::Discretization;
+
+        let kappa = 0.03_f64;
         let sigma = 0.01_f64;
+        let flat = |t: f64| (-0.05 * t).exp();
+        let kinked = |t: f64| {
+            let integral =
+                0.02 * t.min(1.0) + 0.04 * (t.min(3.0) - 1.0).max(0.0) + 0.03 * (t - 3.0).max(0.0);
+            (-integral).exp()
+        };
+        let times: Vec<f64> = (0..60).map(|i| f64::from(i) / 12.0).collect();
+        let shift = |discount: &dyn Fn(f64) -> f64, t: f64| {
+            let decay = 1.0 - (-kappa * t).exp();
+            instantaneous_forward(&discount, t)
+                + sigma * sigma / (2.0 * kappa * kappa) * decay * decay
+        };
 
-        // Flat discount curve: P(0,t) = exp(-r_flat * t)
-        let discount_fn = |t: f64| (-r_flat * t).exp();
-
-        let times: Vec<f64> = vec![0.5, 1.0, 2.0, 3.0, 5.0, 10.0];
-        let params = calibrate_theta_from_curve(kappa, sigma, discount_fn, &times)
-            .expect("valid theta calibration");
-
-        // Check each calibrated θ(t) against the analytical formula in the
-        // *Vasicek-style mean-reversion-level* convention, which is what the
-        // HW1F drift `κ·(θ - r)` consumes. Under this convention,
-        //
-        //   θ_Vas(t) = θ_HW(t) / κ
-        //            = (∂f/∂t)/κ + f(0,t) + σ²/(2κ²)·(1 - e^{−2κt}).
-        //
-        // For a flat curve ∂f/∂t = 0 and f(0,t) = r_flat, so
-        //
-        //   θ_Vas(t) = r_flat + σ²/(2κ²)·(1 - e^{−2κt}).
-        //
-        // The BM 3.35 θ_HW formula used directly with the Vasicek-style
-        // `κ·(θ - r)` drift form produces a stationary mean of κ·r_flat
-        // instead of r_flat — the two θ conventions must not be mixed.
-        for &t in &times {
-            if t < 1e-8 {
-                continue; // Skip t=0 where FD approximation is poorest
+        let curves: [&dyn Fn(f64) -> f64; 2] = [&flat, &kinked];
+        for discount in curves {
+            let params = calibrate_theta_from_curve(kappa, sigma, discount, &times)
+                .expect("valid theta calibration");
+            let process = HullWhite1FProcess::new(params);
+            let disc = ExactHullWhite1F::new();
+            let mut work = vec![0.0_f64; disc.work_size(&process)];
+            let mut rate = vec![instantaneous_forward(&discount, 0.0)];
+            for pair in times.windows(2) {
+                disc.step(
+                    &process,
+                    pair[0],
+                    pair[1] - pair[0],
+                    &mut rate,
+                    &[0.0],
+                    &mut work,
+                );
+                let expected = shift(discount, pair[1]);
+                assert!(
+                    (rate[0] - expected).abs() < 1e-12,
+                    "mean short rate {} at t={} should equal the curve shift {expected}",
+                    rate[0],
+                    pair[1],
+                );
             }
-            let theta_calibrated = params.theta_at_time(t);
+        }
 
-            let theta_analytical =
-                r_flat + (sigma * sigma) / (2.0 * kappa * kappa) * (1.0 - (-2.0 * kappa * t).exp());
-
-            let abs_err = (theta_calibrated - theta_analytical).abs();
-            assert!(
-                abs_err < 1e-4,
-                "θ mismatch at t={t}: calibrated={theta_calibrated:.8}, analytical={theta_analytical:.8}, err={abs_err:.2e}"
+        // Mid-way through the 4% segment the mean rate has followed the jump.
+        let params = calibrate_theta_from_curve(kappa, sigma, kinked, &times).expect("fit");
+        let process = HullWhite1FProcess::new(params);
+        let disc = ExactHullWhite1F::new();
+        let mut work = vec![0.0_f64; disc.work_size(&process)];
+        let mut rate = vec![0.02];
+        for pair in times.windows(2).take(24) {
+            disc.step(
+                &process,
+                pair[0],
+                pair[1] - pair[0],
+                &mut rate,
+                &[0.0],
+                &mut work,
             );
         }
+        assert!(
+            (rate[0] - 0.04).abs() < 1e-3,
+            "mean short rate at t=2 should sit on the 4% forward, got {}",
+            rate[0]
+        );
     }
 
     // Hull-White drift initial-curve fit

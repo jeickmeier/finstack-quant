@@ -467,43 +467,18 @@ fn test_lsmc_vs_tree_sanity() {
         lsmc_pv
     );
 
-    // Note: LSMC and Tree may produce materially different values due to:
-    // 1. Different θ(t) calibration approaches. LSMC uses the MC-crate
-    //    `calibrate_theta_from_curve` which returns θ in the
-    //    Vasicek-style mean-reversion-level convention;
-    //    the tree pricer uses its own forward-induction calibration in
-    //    finstack-quant-valuations whose σ normalization differs. For the
-    //    uncalibrated `HullWhiteCalibrationParams::default()` (κ = 3%, σ = 1%)
-    //    used here, the resulting stationary short-rate std is ~4%,
-    //    which produces substantially wider swap-rate dispersion under
-    //    MC than under the tree's narrower grid.
-    // 2. MC noise with limited paths (10k here).
-    // 3. Different time / rate discretization.
-    //
-    // The test's intent is to verify the infrastructure works (both
-    // pricers return positive, finite numbers on a realistic swaption)
-    // rather than numerical agreement. For exact-agreement regressions,
-    // see the forthcoming per-calibration golden tests. The tolerance
-    // is deliberately loose — 2 orders of magnitude — because
-    // uncalibrated default HW parameters are themselves known-bad
-    // and no two pricers with independent calibration implementations
-    // are required to agree here.
-    let max_pv = tree_pv.max(lsmc_pv);
-    let min_pv = tree_pv.min(lsmc_pv);
-    if max_pv > 1.0 {
-        let ratio = min_pv / max_pv;
-        assert!(
-            ratio > 0.01,
-            "LSMC ({}) and Tree ({}) prices should be within 2 orders of \
-             magnitude on the uncalibrated defaults (ratio: {}). A ratio \
-             outside this band indicates one of the two pricers is \
-             producing a near-zero or blow-up result, not a calibration \
-             disagreement.",
-            lsmc_pv,
-            tree_pv,
-            ratio
-        );
-    }
+    // Both engines price the same Hull-White model on the same log-linear
+    // curve, so they must agree up to Monte-Carlo noise and the tree's
+    // discretization: four standard errors plus 3% of the tree value.
+    let stderr = lsmc_result
+        .measures
+        .get("mc_stderr")
+        .copied()
+        .expect("LSMC stderr");
+    assert!(
+        (lsmc_pv - tree_pv).abs() < 4.0 * stderr + 0.03 * tree_pv,
+        "LSMC ({lsmc_pv}) and tree ({tree_pv}) must agree within MC noise (stderr {stderr})"
+    );
 
     eprintln!(
         "Tree PV: {:.2}, LSMC PV: {:.2}, stderr: {:.2}",
@@ -890,10 +865,12 @@ fn lsmc_default_mc_pv_unchanged() {
     assert_eq!(result.measures["lsmc_num_paths"], 50_000.0);
     assert_eq!(result.measures["lsmc_seed"], 42.0);
 
-    // Retain the pre-pairing value instead of replacing it with today's result.
-    // At this price 32 ULPs is less than USD 0.00000002; the observed paired
-    // versus unpaired reduction differs by 6 ULPs (about USD 0.000000003).
-    let legacy_bits = 0x414581642ecba44e_u64;
+    // Numerical anchor, allowing only floating-point reduction-order noise
+    // (32 ULPs is far below USD 0.000001 at this price). It was re-captured
+    // when the θ(t) fit started following the forward jumps of this
+    // log-linear curve: the earlier anchor, 2.82MM on a 10MM notional, was
+    // eleven times the tree price.
+    let legacy_bits = 0x410e27094c608f60_u64;
     let rounding_ulps = result.value.amount().to_bits().abs_diff(legacy_bits);
     assert!(
         rounding_ulps <= 32,
@@ -901,4 +878,65 @@ fn lsmc_default_mc_pv_unchanged() {
         result.value.amount(),
         f64::from_bits(legacy_bits),
     );
+}
+
+/// On an exercise date the holder can still exercise that day, so the value
+/// is continuous across the date instead of dropping to the value of the
+/// remaining rights (zero when it is the last one).
+#[test]
+fn test_bermudan_keeps_exercise_right_on_exercise_date() {
+    let swap_start = Date::from_calendar_date(2025, Month::January, 1).expect("valid");
+    let swap_end = Date::from_calendar_date(2030, Month::January, 1).expect("valid");
+    let exercise = Date::from_calendar_date(2026, Month::January, 1).expect("valid");
+    let day_before = Date::from_calendar_date(2025, Month::December, 31).expect("valid");
+    let market = build_market_context();
+
+    let pricers = [
+        (
+            "tree",
+            BermudanSwaptionPricer::tree_with_config(BermudanSwaptionPricerConfig {
+                tree_steps: 100,
+                ..Default::default()
+            }),
+        ),
+        (
+            "lsmc",
+            BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
+                mc: RateExoticMcConfig {
+                    num_paths: 2000,
+                    seed: 42,
+                    ..BermudanSwaptionPricerConfig::DEFAULT_MC
+                },
+                ..Default::default()
+            }),
+        ),
+    ];
+
+    // Deep in-the-money payer: almost all of the value is intrinsic.
+    let mut single = test_bermudan_swaption(swap_start, swap_end, exercise, 0.01, OptionType::Call);
+    single.exercise_schedule = BermudanSchedule::new(vec![exercise]);
+    let multiple = test_bermudan_swaption(swap_start, swap_end, exercise, 0.01, OptionType::Call);
+
+    for (name, pricer) in &pricers {
+        for (label, swaption) in [("single", &single), ("multiple", &multiple)] {
+            let price = |as_of: Date| {
+                pricer
+                    .price_dyn(swaption, &market, as_of)
+                    .unwrap_or_else(|e| panic!("{name} {label} pricing at {as_of}: {e:?}"))
+                    .value
+                    .amount()
+            };
+            let before = price(day_before);
+            let on_date = price(exercise);
+            assert!(
+                before > 100_000.0,
+                "{name} {label}: fixture must be deep in the money, got {before}"
+            );
+            assert!(
+                (on_date - before).abs() < 0.01 * before,
+                "{name} {label}: value must be continuous across the exercise date, \
+                 {before} the day before vs {on_date} on the date"
+            );
+        }
+    }
 }

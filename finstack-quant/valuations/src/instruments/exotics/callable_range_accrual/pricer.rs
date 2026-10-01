@@ -13,12 +13,13 @@ use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
-use finstack_quant_core::dates::{Date, DayCountContext};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use finstack_quant_models::monte_carlo::traits::{PathState, Payoff, StateKey};
+use finstack_quant_models::rates::clock::model_time;
 use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
 use std::collections::BTreeMap;
 
@@ -34,15 +35,23 @@ struct CallableRangeAccrualEvent {
     /// that term rate via the HW1F affine bond formula. Call-only events
     /// (`is_observation == false`) carry an unused passthrough.
     forward_coeffs: PeriodForwardCoeffs,
+    /// Index of the call date this event falls on, if any.
+    exercise_slot: Option<usize>,
+    /// HW1F bond from this event to the final payment date. On a call date it
+    /// prices the gain from receiving the accrued coupon at the call rather
+    /// than at the final payment.
+    to_final_payment: PeriodForwardCoeffs,
 }
 
 impl Default for CallableRangeAccrualEvent {
     fn default() -> Self {
         Self {
             is_observation: false,
-            // Replaced with a real reconstruction for observation events in
-            // `build_schedule`; harmless passthrough for call-only events.
+            // Replaced with real reconstructions in `build_schedule`; harmless
+            // passthroughs for events that do not need them.
             forward_coeffs: PeriodForwardCoeffs::from_flat_rate(0.0, 0.0),
+            exercise_slot: None,
+            to_final_payment: PeriodForwardCoeffs::from_flat_rate(0.0, 0.0),
         }
     }
 }
@@ -76,6 +85,11 @@ struct CallableRangeAccrualPayoff {
     days_in_range: usize,
     observations_seen: usize,
     next_event: usize,
+    /// Simulated in-range observation count as of each call date (indexed by
+    /// exercise slot), recorded as the path passes it.
+    in_range_at_exercise: Vec<usize>,
+    /// Path discount factor from each call date to the final payment date.
+    bond_to_final_at_exercise: Vec<f64>,
     /// Pathwise bank-account numeraire observed at the final payment event;
     /// 0.0 until recorded.
     bank_at_final_payment: f64,
@@ -100,6 +114,7 @@ impl CallableRangeAccrualPayoff {
         future_observations: usize,
         basis_degree: usize,
     ) -> Self {
+        let call_prices_len = call_prices.len();
         Self {
             lower_bound,
             upper_bound,
@@ -115,8 +130,34 @@ impl CallableRangeAccrualPayoff {
             days_in_range: 0,
             observations_seen: 0,
             next_event: 0,
+            in_range_at_exercise: vec![0; call_prices_len],
+            bond_to_final_at_exercise: vec![1.0; call_prices_len],
             bank_at_final_payment: 0.0,
             basis_degree,
+        }
+    }
+
+    /// Range coupon earned on `simulated_in_range` path observations plus the
+    /// historical ones: the full-life coupon times the share of all
+    /// observations that fell in range.
+    fn accrued_coupon(&self, simulated_in_range: usize) -> f64 {
+        let total_observations = self.total_past_observations + self.future_observations;
+        if total_observations == 0 {
+            return 0.0;
+        }
+        let in_range = self.past_in_range + simulated_in_range;
+        self.coupon_rate * self.notional * in_range as f64 / total_observations as f64
+    }
+
+    /// Time-0 path discount factor of a cashflow on the final payment date.
+    fn final_payment_discount(&self) -> f64 {
+        // Pathwise bank-account numeraire observed at the final payment
+        // event; the deterministic curve DF only when the simulation never
+        // reached that event.
+        if self.bank_at_final_payment > 0.0 {
+            1.0 / self.bank_at_final_payment
+        } else {
+            self.final_payment_discount_factor
         }
     }
 
@@ -129,31 +170,10 @@ impl CallableRangeAccrualPayoff {
     /// fraction of observations in range) plus redemption of principal, both at
     /// the final payment date.
     ///
-    /// Principal is included so this continuation value is on the same basis as
-    /// the par call price returned by [`Self::intrinsic_at`]. With a coupon-only
-    /// value (a few percent of notional) the continuation is always far below par,
-    /// so `exercise_value < continuation` never holds, the issuer call never
-    /// fires, and the callable note is mispriced identically to a non-callable
-    /// bullet. Because the coupon is modelled as a single payment at the final
-    /// date, calling early correctly forfeits it (the holder receives par via
-    /// `intrinsic_at`).
+    /// Principal is included so this continuation value is on the same basis
+    /// as the call amount returned by [`Self::intrinsic_at`].
     fn note_value(&self) -> f64 {
-        let total_observations = self.total_past_observations + self.future_observations;
-        let accrual_fraction = if total_observations == 0 {
-            0.0
-        } else {
-            let total_in_range = self.past_in_range + self.days_in_range;
-            total_in_range as f64 / total_observations as f64
-        };
-        let coupon = self.coupon_rate * accrual_fraction * self.notional;
-        // Discount with the pathwise bank-account numeraire observed at the
-        // final payment event; fall back to the deterministic curve DF only
-        // when the simulation never reached that event.
-        if self.bank_at_final_payment > 0.0 {
-            (coupon + self.notional) / self.bank_at_final_payment
-        } else {
-            (coupon + self.notional) * self.final_payment_discount_factor
-        }
+        (self.accrued_coupon(self.days_in_range) + self.notional) * self.final_payment_discount()
     }
 }
 
@@ -179,6 +199,12 @@ impl Payoff for CallableRangeAccrualPayoff {
             }
             self.observations_seen += 1;
         }
+        if let Some(slot) = event.exercise_slot {
+            let short_rate = state.get_key(StateKey::ShortRate).unwrap_or(0.0);
+            self.in_range_at_exercise[slot] = self.days_in_range;
+            self.bond_to_final_at_exercise[slot] =
+                event.to_final_payment.discount_factor(short_rate);
+        }
         self.next_event += 1;
         Ok(())
     }
@@ -194,6 +220,8 @@ impl Payoff for CallableRangeAccrualPayoff {
         self.days_in_range = 0;
         self.observations_seen = 0;
         self.next_event = 0;
+        self.in_range_at_exercise.fill(0);
+        self.bond_to_final_at_exercise.fill(1.0);
         self.bank_at_final_payment = 0.0;
     }
 }
@@ -207,8 +235,45 @@ impl ExerciseBoundaryPayoff for CallableRangeAccrualPayoff {
     ) -> finstack_quant_core::Result<Money> {
         // Undiscounted at-exercise call amount; the LSMC harness discounts it
         // to time 0 with the pathwise bank-account numeraire B(t_exercise).
+        //
+        // A call redeems the note at the call price and pays the range coupon
+        // accrued to the call date. The harness already keeps that accrued
+        // coupon as a pre-exercise cashflow valued on the final payment date
+        // (see `value_after`), so the call amount adds only what is gained by
+        // receiving it at the call date instead: `accrued · (1 − P(t, T))`.
+        // The issuer therefore calls exactly when
+        // `call price + accrued < accrued · P(t, T) + remaining note value`.
         let call_price = self.call_prices.get(exercise_idx).copied().unwrap_or(0.0);
-        Money::new(call_price * self.notional, currency)
+        let accrued = self.accrued_coupon(self.days_in_range);
+        let bond_to_final = self
+            .bond_to_final_at_exercise
+            .get(exercise_idx)
+            .copied()
+            .unwrap_or(1.0);
+        Money::new(
+            call_price * self.notional + accrued * (1.0 - bond_to_final),
+            currency,
+        )
+    }
+
+    /// Note value excluding the coupon accrued up to the call date: that
+    /// coupon is owed whether or not the issuer calls, so it is neither
+    /// regressed as continuation value nor replaced on exercise.
+    fn value_after(
+        &self,
+        exercise_idx: usize,
+        currency: finstack_quant_core::currency::Currency,
+    ) -> finstack_quant_core::Result<Money> {
+        let in_range_at_call = self
+            .in_range_at_exercise
+            .get(exercise_idx)
+            .copied()
+            .unwrap_or(0);
+        Money::new(
+            self.note_value()
+                - self.accrued_coupon(in_range_at_call) * self.final_payment_discount(),
+            currency,
+        )
     }
 
     fn continuation_basis(&self, _exercise_idx: usize, t_years: f64, short_rate: f64) -> Vec<f64> {
@@ -509,6 +574,15 @@ fn build_schedule(
     }
 
     let eligible_call_dates = inst.call_provision.eligible_call_dates();
+    if let Some(late) = eligible_call_dates
+        .iter()
+        .find(|date| **date > final_payment_date)
+    {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "CallableRangeAccrual '{}' call date {late} is after the final payment date              {final_payment_date}; the note has already redeemed",
+            inst.id
+        )));
+    }
     for &date in &eligible_call_dates {
         if date > as_of {
             event_dates.entry(date).or_default();
@@ -521,17 +595,22 @@ fn build_schedule(
         event_dates.entry(final_payment_date).or_default();
     }
 
+    let final_payment_time = model_time(as_of, final_payment_date);
     let mut events = Vec::with_capacity(event_dates.len());
     let mut event_times = Vec::with_capacity(event_dates.len());
     let mut final_payment_event_idx = None;
+    let mut next_exercise_slot = 0_usize;
     for (date, mut event) in event_dates {
-        let t = range
-            .day_count
-            .year_fraction(as_of, date, DayCountContext::default())?;
+        let t = model_time(as_of, date);
         if t > 0.0 {
             if event.is_observation {
                 // Term reference rate over [t, t + index_tenor].
                 event.forward_coeffs = term_forward.period_coeffs(t, index_tenor);
+            }
+            if eligible_call_dates.contains(&date) {
+                event.exercise_slot = Some(next_exercise_slot);
+                event.to_final_payment = term_forward.period_coeffs(t, final_payment_time - t);
+                next_exercise_slot += 1;
             }
             if date == final_payment_date {
                 final_payment_event_idx = Some(events.len());
@@ -544,9 +623,7 @@ fn build_schedule(
     let mut exercise_times = Vec::new();
     let mut call_prices = Vec::new();
     for date in eligible_call_dates.into_iter().filter(|d| *d > as_of) {
-        let t = range
-            .day_count
-            .year_fraction(as_of, date, DayCountContext::default())?;
+        let t = model_time(as_of, date);
         if t <= 0.0 {
             continue;
         }

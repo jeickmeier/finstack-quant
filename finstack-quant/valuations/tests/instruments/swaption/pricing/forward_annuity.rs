@@ -187,9 +187,12 @@ fn test_annuity_dispatch_matches_selected_settlement_method() {
         .with_settlement(SettlementType::Cash)
         .with_cash_settlement_method(CashSettlementMethod::ParYield);
     let par_yield_annuity = par_yield.annuity(disc.as_ref(), as_of, forward).unwrap();
-    // ParYield is the at-expiry cash annuity discounted from expiry to as_of.
-    let df_expiry = disc.df_between_dates(as_of, par_yield.expiry).unwrap();
-    let expected_par_yield = par_yield.cash_annuity_par_yield(forward).unwrap() * df_expiry;
+    // ParYield is the settlement-date cash annuity discounted from the swap
+    // effective date (the cash settlement date) to as_of.
+    let df_settlement = disc
+        .df_between_dates(as_of, par_yield.get_underlying_start_date())
+        .unwrap();
+    let expected_par_yield = par_yield.cash_annuity_par_yield(forward).unwrap() * df_settlement;
     assert_approx_eq(
         par_yield_annuity,
         expected_par_yield,
@@ -313,5 +316,38 @@ fn test_single_curve_forward_honors_explicit_fixed_leg_payment_cashflows() {
         expected,
         1e-10,
         "single-curve forward should match explicit underlier par rate",
+    );
+}
+
+/// Hand-computed par-yield annuity for an annual ACT/360 fixed leg.
+///
+/// The par-yield cash price is a level annuity of `1/m` per period discounted
+/// at the swap rate over the leg's `n` payment periods. This leg has five
+/// annual periods; its ACT/360 accruals sum to 5.07 years, and treating that
+/// year fraction as the period count adds 1.3% of annuity.
+#[test]
+fn test_par_yield_cash_annuity_counts_schedule_periods() {
+    let (_, expiry, swap_start, swap_end) = standard_dates();
+    let mut swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.04)
+        .with_settlement(SettlementType::Cash)
+        .with_cash_settlement_method(CashSettlementMethod::ParYield);
+    swaption.underlying_fixed_leg.frequency = Tenor::annual();
+    swaption.underlying_fixed_leg.day_count = DayCount::Act360;
+    let swap_rate = 0.04_f64;
+
+    let expected: f64 = (1..=5).map(|i| 1.0 / (1.0 + swap_rate).powi(i)).sum();
+    let actual = swaption.cash_annuity_par_yield(swap_rate).unwrap();
+    assert_approx_eq(
+        actual,
+        expected,
+        1e-12,
+        "par-yield annuity over five annual periods",
+    );
+
+    let act360_years = (swap_end - swap_start).whole_days() as f64 / 360.0;
+    let year_fraction_form = (1.0 - (1.0 + swap_rate).powf(-act360_years)) / swap_rate;
+    assert!(
+        (year_fraction_form - actual) / actual > 0.01,
+        "the year-fraction-as-period-count form {year_fraction_form} overstates the annuity {actual}"
     );
 }

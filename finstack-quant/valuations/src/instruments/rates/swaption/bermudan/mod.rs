@@ -13,7 +13,9 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::rates::clock::ModelDiscountCurve;
-use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
+use finstack_quant_models::rates::hull_white::{
+    fd_instantaneous_forward, HullWhiteCalibrationParams,
+};
 use finstack_quant_models::trees::HullWhiteTree;
 use finstack_quant_models::trees::HullWhiteTreeConfig;
 use std::sync::Arc;
@@ -22,7 +24,7 @@ use std::sync::Arc;
 use crate::instruments::rates::hw1f::hw1f_mc::build_event_aligned_grid;
 use crate::instruments::rates::hw1f::RateExoticMcConfig;
 use crate::instruments::rates::swaption::pricing::hw_cashflows::{
-    HwExerciseTerms, HwSwaptionCashflows,
+    value_with_exercise_today, HwExerciseTerms, HwSwaptionCashflows,
 };
 use crate::instruments::rates::swaption::pricing::monte_carlo_lsmc::SwaptionLsmcPricer as SharedSwaptionLsmcPricer;
 use crate::instruments::rates::swaption::pricing::swap_rate_utils::HullWhiteBondPrice;
@@ -632,14 +634,15 @@ impl BermudanSwaptionPricer {
                     )
                 })?;
 
-        // Initial short rate from the `as_of`-rebased curve: a one-sided
-        // forward difference f(0) = −ln P(as_of, as_of+dt) / dt.
-        let dt_small = 0.01; // Small time step for initial rate
-        let initial_rate = if dt_small > 0.0 {
-            -discount_fn(dt_small).ln() / dt_small
-        } else {
-            0.03
-        };
+        // Initial short rate f(0,0) of the `as_of`-rebased curve: the same
+        // estimator the θ fit starts its mean recursion from.
+        let initial_rate = fd_instantaneous_forward(&discount_fn, 0.0).ok_or_else(|| {
+            PricingError::model_failure_with_context(
+                "discount curve has a non-positive discount factor at the valuation date"
+                    .to_string(),
+                PricingErrorContext::default(),
+            )
+        })?;
 
         let exercise_value = |step: usize, short_rate: f64| {
             let slot = exercise_indices.binary_search(&step).map_err(|_| {
@@ -829,11 +832,56 @@ impl Pricer for BermudanSwaptionPricer {
             InstrumentType::BermudanSwaption,
         )?;
 
-        match self.method {
+        let mut result = match self.method {
             BermudanPricingMethod::HullWhiteTree => self.price_tree(swaption, market, as_of),
             BermudanPricingMethod::Lsmc => self.price_lsmc(swaption, market, as_of),
-        }
+        }?;
+        apply_exercise_today(swaption, market, as_of, &mut result)?;
+        Ok(result)
     }
+}
+
+/// Raise an engine result to the value of exercising on `as_of` when that
+/// date is a live exercise date (see [`value_with_exercise_today`]).
+///
+/// # Arguments
+///
+/// * `swaption` - Bermudan swaption being priced.
+/// * `market` - Market holding the swaption's discount curve.
+/// * `as_of` - Valuation date.
+/// * `result` - Engine result whose present value is updated in place.
+///
+/// # Errors
+///
+/// Returns a pricing error when the discount curve is missing or the
+/// exercise-today value cannot be computed.
+pub(crate) fn apply_exercise_today(
+    swaption: &BermudanSwaption,
+    market: &MarketContext,
+    as_of: Date,
+    result: &mut ValuationResult,
+) -> std::result::Result<(), PricingError> {
+    if !swaption
+        .exercise_schedule
+        .effective_dates()
+        .contains(&as_of)
+    {
+        return Ok(());
+    }
+    let discount = market
+        .get_discount(swaption.get_discount_curve_id().as_str())
+        .map_err(|e| {
+            PricingError::missing_market_data_with_context(
+                e.to_string(),
+                PricingErrorContext::default(),
+            )
+        })?;
+    let value =
+        value_with_exercise_today(swaption, discount.as_ref(), as_of, result.value.amount())
+            .map_err(|e| PricingError::from_core(e, PricingErrorContext::default()))?;
+    result.value = Money::new(value, swaption.notional.currency())
+        .map_err(|e| PricingError::from_core(e, PricingErrorContext::default()))?;
+    Ok(())
 }
 
 #[cfg(test)]
