@@ -469,12 +469,7 @@ def test_portfolio_attribution_of_an_empty_book_is_all_zero() -> None:
 
 
 def test_risk_decomposition_to_factor_dataframe() -> None:
-    """One row per factor contribution, with the pinned column order.
-
-    The column list is deliberately identical to
-    ``FactorRiskDecomposition.to_factor_dataframe`` — both wrappers render the
-    same Rust ``RiskDecomposition``, so they must not diverge.
-    """
+    """One row per factor contribution, with the pinned column order."""
     df = _risk_decomposition().to_factor_dataframe()
 
     assert isinstance(df, pd.DataFrame)

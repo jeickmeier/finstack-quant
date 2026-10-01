@@ -169,7 +169,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "mwr_xirr",
         "SensitivityMatrix",
         "FactorPnlProfile",
-        "FactorRiskDecomposition",
         "compute_factor_sensitivities",
         "compute_pnl_profiles",
         "decompose_factor_risk",

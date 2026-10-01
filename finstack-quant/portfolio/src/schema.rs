@@ -7,17 +7,18 @@
 
 use crate::{
     attribution::ReconciliationReport, cashflows::CashflowAggregationOptions,
-    cashflows::PortfolioCashflows, factor_model::FactorAssignmentReport,
-    factor_model::PositionChange, factor_model::StressPnl, factor_model::StressResult,
-    factor_model::WhatIfResult, optimization::PortfolioOptimizationSpec,
-    primitive::PortfolioPrimitiveExposureReport, replay::ReplayConfig, replay::ReplayResult,
-    scenarios::ScenarioPnlBatchItem, scenarios::ScenarioPnlView, scenarios::ScenarioRevalueView,
-    sensitivity::FactorPnlProfile, sensitivity::SensitivityMatrixJson, CarinoLinkedAttribution,
-    CellConfig, DatedCashflow, DurationCellTable, ExcessReturnPosition, ExcessReturnResult,
-    FactorBrinsonInput, FactorBrinsonResult, FiAttributionConfig, FiCarinoLinkedResult,
-    FiPeriodInput, FiReconciliationReport, GridCarinoLinkedResult, GridPosition, LinkedReturn,
-    MarketFactorKey, PortfolioMarginResult, PortfolioResult, ReferenceReturn, SectorPeriod,
-    TwrrPeriod, WeightAllocationResult, WeightAllocationSpec,
+    cashflows::PortfolioCashflows, factor_model::CreditVolReport,
+    factor_model::FactorAssignmentReport, factor_model::PositionChange, factor_model::StressPnl,
+    factor_model::StressResult, factor_model::WhatIfResult,
+    optimization::PortfolioOptimizationSpec, primitive::PortfolioPrimitiveExposureReport,
+    replay::ReplayConfig, replay::ReplayResult, scenarios::ScenarioPnlBatchItem,
+    scenarios::ScenarioPnlView, scenarios::ScenarioRevalueView, sensitivity::FactorPnlProfile,
+    sensitivity::SensitivityMatrixJson, CarinoLinkedAttribution, CellConfig, DatedCashflow,
+    DurationCellTable, ExcessReturnPosition, ExcessReturnResult, FactorBrinsonInput,
+    FactorBrinsonResult, FiAttributionConfig, FiCarinoLinkedResult, FiPeriodInput,
+    FiReconciliationReport, GridCarinoLinkedResult, GridPosition, LinkedReturn, MarketFactorKey,
+    PortfolioMarginResult, PortfolioResult, ReferenceReturn, SectorPeriod, TwrrPeriod,
+    WeightAllocationResult, WeightAllocationSpec,
 };
 use finstack_quant_core::schema::{
     externalize_schema_definitions, ExternalSchemaDefinition, SchemaArtifact, SchemaKind,
@@ -234,6 +235,14 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "cell_config",
         Input,
         "Configuration for `cell_returns_from_reference`."
+    )
+    .with_packager(package_materialization_schema),
+    finstack_quant_core::schema_artifact!(
+        CreditVolReport,
+        "portfolio",
+        "credit_vol_report",
+        Output,
+        "Aggregated credit risk grouped by hierarchy level."
     )
     .with_packager(package_materialization_schema),
     finstack_quant_core::schema_artifact!(

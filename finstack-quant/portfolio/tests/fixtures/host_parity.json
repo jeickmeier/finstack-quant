@@ -1,0 +1,1012 @@
+{
+  "inputs": {
+    "as_of_t0": "2025-01-15",
+    "as_of_t1": "2025-01-16",
+    "portfolio_spec": {
+      "id": "HOST-PARITY",
+      "as_of": "2025-01-15",
+      "base_currency": "USD",
+      "entities": {
+        "FUND": {
+          "id": "FUND"
+        }
+      },
+      "positions": [
+        {
+          "position_id": "POS-0",
+          "entity_id": "FUND",
+          "instrument_id": "DEP-0",
+          "instrument_spec": {
+            "type": "deposit",
+            "spec": {
+              "id": "DEP-0",
+              "notional": {
+                "amount": "1000000",
+                "currency": "USD"
+              },
+              "start_date": "2025-01-15",
+              "maturity": "2025-07-15",
+              "day_count": "act_360",
+              "fixed_rate": "0.04",
+              "discount_curve_id": "USD-OIS",
+              "attributes": {}
+            }
+          },
+          "quantity": 1.0,
+          "unit": "units"
+        },
+        {
+          "position_id": "POS-1",
+          "entity_id": "FUND",
+          "instrument_id": "DEP-1",
+          "instrument_spec": {
+            "type": "deposit",
+            "spec": {
+              "id": "DEP-1",
+              "notional": {
+                "amount": "2000000",
+                "currency": "USD"
+              },
+              "start_date": "2025-01-15",
+              "maturity": "2025-07-15",
+              "day_count": "act_360",
+              "fixed_rate": "0.04",
+              "discount_curve_id": "USD-OIS",
+              "attributes": {}
+            }
+          },
+          "quantity": 1.0,
+          "unit": "units"
+        }
+      ]
+    },
+    "market_t0": {
+      "schema_version": 1,
+      "curves": [
+        {
+          "type": "discount",
+          "id": "USD-OIS",
+          "base": "2025-01-15",
+          "day_count": "act_365f",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.5,
+              0.9801986733067553
+            ],
+            [
+              1.0,
+              0.9607894391523232
+            ],
+            [
+              2.0,
+              0.9231163463866358
+            ]
+          ],
+          "interp_style": "monotone_convex",
+          "extrapolation": "flat_forward",
+          "min_forward_rate": -0.005,
+          "allow_non_monotonic": false,
+          "min_forward_tenor": 1e-06,
+          "rate_calibration": null,
+          "calibration_ois_cutoff_days": null,
+          "fx_policy": null
+        }
+      ],
+      "fx": null,
+      "surfaces": [],
+      "prices": {},
+      "series": [],
+      "inflation_indices": [],
+      "dividends": [],
+      "credit_indices": [],
+      "fx_delta_vol_surfaces": [],
+      "vol_cubes": [],
+      "collateral": {},
+      "hierarchy": null
+    },
+    "market_t1": {
+      "schema_version": 1,
+      "curves": [
+        {
+          "type": "discount",
+          "id": "USD-OIS",
+          "base": "2025-01-16",
+          "day_count": "act_365f",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.5,
+              0.9797086964745179
+            ],
+            [
+              1.0,
+              0.9598291299477989
+            ],
+            [
+              2.0,
+              0.9212719586963487
+            ]
+          ],
+          "interp_style": "monotone_convex",
+          "extrapolation": "flat_forward",
+          "min_forward_rate": -0.005,
+          "allow_non_monotonic": false,
+          "min_forward_tenor": 1e-06,
+          "rate_calibration": null,
+          "calibration_ois_cutoff_days": null,
+          "fx_policy": null
+        }
+      ],
+      "fx": null,
+      "surfaces": [],
+      "prices": {},
+      "series": [],
+      "inflation_indices": [],
+      "dividends": [],
+      "credit_indices": [],
+      "fx_delta_vol_surfaces": [],
+      "vol_cubes": [],
+      "collateral": {},
+      "hierarchy": null
+    },
+    "attribution_method": "parallel",
+    "reconciliation_tolerance": 1e-06,
+    "factor_model_config": {
+      "factors": [
+        {
+          "id": "usd_rates",
+          "factor_type": "rates",
+          "market_mapping": {
+            "curve_parallel": {
+              "curve_ids": [
+                "USD-OIS"
+              ],
+              "units": "rate_bp"
+            }
+          },
+          "description": "Parallel USD rates shift"
+        }
+      ],
+      "covariance": {
+        "factor_ids": [
+          "usd_rates"
+        ],
+        "n": 1,
+        "data": [
+          0.0001
+        ]
+      },
+      "matching": {
+        "mapping_table": [
+          {
+            "dependency_filter": {},
+            "attribute_filter": {},
+            "factor_id": "usd_rates"
+          }
+        ]
+      },
+      "pricing_mode": "full_repricing",
+      "risk_measure": "variance"
+    },
+    "stresses": [
+      [
+        "usd_rates",
+        1.0
+      ]
+    ],
+    "changes": [
+      {
+        "kind": "remove",
+        "position_id": "POS-1"
+      }
+    ],
+    "scenarios": [
+      {
+        "id": "up_10bp",
+        "operations": [
+          {
+            "kind": "curve_parallel_bp",
+            "curve_kind": "discount",
+            "curve_id": "USD-OIS",
+            "discount_curve_id": null,
+            "bp": 10.0
+          }
+        ]
+      },
+      {
+        "id": "down_15bp",
+        "operations": [
+          {
+            "kind": "curve_parallel_bp",
+            "curve_kind": "discount",
+            "curve_id": "USD-OIS",
+            "discount_curve_id": null,
+            "bp": -15.0
+          }
+        ]
+      }
+    ],
+    "allocation_spec": {
+      "scheme": "inverse_volatility",
+      "total_capital": 1000000.0,
+      "strategies": [
+        {
+          "id": "S1",
+          "fixed_weight": null,
+          "returns": [
+            0.01,
+            -0.02,
+            0.015,
+            0.005
+          ],
+          "risk_budget": null
+        },
+        {
+          "id": "S2",
+          "fixed_weight": null,
+          "returns": [
+            0.002,
+            -0.001,
+            0.003,
+            0.001
+          ],
+          "risk_budget": null
+        }
+      ],
+      "covariance": null
+    },
+    "credit_model": {
+      "schema": "finstack_quant.credit_factor_model/1",
+      "as_of": "2024-03-29",
+      "calibration_window": {
+        "start": "2022-03-29",
+        "end": "2024-03-29"
+      },
+      "policy": "globally_off",
+      "generic_factor": {
+        "name": "CDX IG",
+        "series_id": "cdx.ig.5y"
+      },
+      "hierarchy": {
+        "levels": [
+          "rating",
+          "region"
+        ]
+      },
+      "panel_frequency": "monthly",
+      "use_returns_or_levels": "returns",
+      "bucket_weighting": "equal",
+      "config": {
+        "factors": [],
+        "covariance": {
+          "n": 0,
+          "factor_ids": [],
+          "data": []
+        },
+        "matching": {
+          "mapping_table": []
+        },
+        "pricing_mode": "delta_based"
+      },
+      "issuer_betas": [],
+      "anchor_state": {
+        "pc": 0.0,
+        "by_level": []
+      },
+      "static_correlation": {
+        "factor_ids": [],
+        "data": []
+      },
+      "vol_state": {
+        "factors": {},
+        "idiosyncratic": {}
+      },
+      "factor_histories": null,
+      "diagnostics": {
+        "mode_counts": {},
+        "bucket_sizes_per_level": [],
+        "fold_ups": [],
+        "r_squared_histogram": null,
+        "tag_taxonomy": {}
+      }
+    },
+    "credit_decomposition": {
+      "total_risk": 1.0,
+      "measure": "variance",
+      "factor_contributions": [
+        {
+          "factor_id": "credit::generic",
+          "absolute_risk": 0.1,
+          "relative_risk": 0.1,
+          "marginal_risk": 0.0
+        },
+        {
+          "factor_id": "credit::level0::rating::IG",
+          "absolute_risk": 0.2,
+          "relative_risk": 0.2,
+          "marginal_risk": 0.0
+        },
+        {
+          "factor_id": "credit::level1::rating.region::IG.EU",
+          "absolute_risk": 0.3,
+          "relative_risk": 0.3,
+          "marginal_risk": 0.0
+        }
+      ],
+      "residual_risk": 0.4,
+      "position_factor_contributions": [
+        {
+          "position_id": "POS1",
+          "factor_id": "credit::generic",
+          "risk_contribution": 0.1
+        },
+        {
+          "position_id": "POS1",
+          "factor_id": "credit::level0::rating::IG",
+          "risk_contribution": 0.2
+        }
+      ],
+      "position_residual_contributions": []
+    }
+  },
+  "expected": {
+    "allocate_weights": {
+      "scheme": "inverse_volatility",
+      "allocations": [
+        {
+          "id": "S1",
+          "weight": 0.09898451882774165,
+          "capital": 98984.5188277417,
+          "volatility": 0.015545631755148025
+        },
+        {
+          "id": "S2",
+          "weight": 0.9010154811722583,
+          "capital": 901015.4811722582,
+          "volatility": 0.0017078251276599332
+        }
+      ],
+      "diagnostics": {
+        "weights_sum": 0.9999999999999999,
+        "leverage": 0.9999999999999999
+      }
+    },
+    "validate_allocation_json": {
+      "scheme": "inverse_volatility",
+      "total_capital": 1000000.0,
+      "strategies": [
+        {
+          "id": "S1",
+          "fixed_weight": null,
+          "returns": [
+            0.01,
+            -0.02,
+            0.015,
+            0.005
+          ],
+          "risk_budget": null
+        },
+        {
+          "id": "S2",
+          "fixed_weight": null,
+          "returns": [
+            0.002,
+            -0.001,
+            0.003,
+            0.001
+          ],
+          "risk_budget": null
+        }
+      ],
+      "covariance": null,
+      "money_decimal_places": 10
+    },
+    "scenario_pnl_batch": [
+      {
+        "scenario_id": "up_10bp",
+        "pnl": {
+          "total": {
+            "amount": "-1487.415379039",
+            "currency": "USD"
+          },
+          "by_position": {
+            "POS-0": {
+              "amount": "-495.805126346",
+              "currency": "USD"
+            },
+            "POS-1": {
+              "amount": "-991.610252693",
+              "currency": "USD"
+            }
+          }
+        },
+        "report": {
+          "operations_applied": 1,
+          "user_operations": 1,
+          "expanded_operations": 1,
+          "changes": {
+            "market_targets": [
+              {
+                "kind": "curve",
+                "curve_kind": "discount",
+                "curve_id": "USD-OIS"
+              }
+            ],
+            "changed_instrument_indices": [],
+            "as_of_changed": false,
+            "portfolio_shape_changed": false,
+            "all_dirty": false
+          },
+          "warnings": [],
+          "meta": {
+            "numeric_mode": "f64",
+            "rounding": {
+              "mode": "bankers",
+              "ingest_scale_by_currency": {},
+              "output_scale_by_currency": {},
+              "tolerances": {
+                "rate_epsilon": 1e-12,
+                "generic_epsilon": 1e-10
+              },
+              "version": 1
+            },
+            "fx_policy_applied": null,
+            "version": "0.9.0"
+          }
+        }
+      },
+      {
+        "scenario_id": "down_15bp",
+        "pnl": {
+          "total": {
+            "amount": "2232.506516544",
+            "currency": "USD"
+          },
+          "by_position": {
+            "POS-0": {
+              "amount": "744.168838848",
+              "currency": "USD"
+            },
+            "POS-1": {
+              "amount": "1488.337677696",
+              "currency": "USD"
+            }
+          }
+        },
+        "report": {
+          "operations_applied": 1,
+          "user_operations": 1,
+          "expanded_operations": 1,
+          "changes": {
+            "market_targets": [
+              {
+                "kind": "curve",
+                "curve_kind": "discount",
+                "curve_id": "USD-OIS"
+              }
+            ],
+            "changed_instrument_indices": [],
+            "as_of_changed": false,
+            "portfolio_shape_changed": false,
+            "all_dirty": false
+          },
+          "warnings": [],
+          "meta": {
+            "numeric_mode": "f64",
+            "rounding": {
+              "mode": "bankers",
+              "ingest_scale_by_currency": {},
+              "output_scale_by_currency": {},
+              "tolerances": {
+                "rate_epsilon": 1e-12,
+                "generic_epsilon": 1e-10
+              },
+              "version": 1
+            },
+            "fx_policy_applied": null,
+            "version": "0.9.0"
+          }
+        }
+      }
+    ],
+    "attribute_portfolio_pnl": {
+      "total_pnl": {
+        "amount": "-1150.551646983676",
+        "currency": "USD"
+      },
+      "carry": {
+        "amount": "328.8101066154543",
+        "currency": "USD"
+      },
+      "rates_curves_pnl": {
+        "amount": "-1479.361753599131",
+        "currency": "USD"
+      },
+      "credit_curves_pnl": {
+        "amount": "0",
+        "currency": "USD"
+      },
+      "inflation_curves_pnl": {
+        "amount": "0",
+        "currency": "USD"
+      },
+      "correlations_pnl": {
+        "amount": "0",
+        "currency": "USD"
+      },
+      "fx_pnl": {
+        "amount": "0",
+        "currency": "USD"
+      },
+      "fx_translation_pnl": {
+        "amount": "0",
+        "currency": "USD"
+      },
+      "cross_factor_pnl": {
+        "amount": "0",
+        "currency": "USD"
+      },
+      "vol_pnl": {
+        "amount": "0",
+        "currency": "USD"
+      },
+      "model_params_pnl": {
+        "amount": "0",
+        "currency": "USD"
+      },
+      "market_scalars_pnl": {
+        "amount": "0",
+        "currency": "USD"
+      },
+      "residual": {
+        "amount": "0",
+        "currency": "USD"
+      },
+      "by_position": {
+        "POS-0": {
+          "total_pnl": {
+            "amount": "-383.5172156612254026715204",
+            "currency": "USD"
+          },
+          "mark_to_market_pnl": {
+            "amount": "-383.5172156612254026715204",
+            "currency": "USD"
+          },
+          "carry": {
+            "amount": "109.6033688718180991730467",
+            "currency": "USD"
+          },
+          "rates_curves_pnl": {
+            "amount": "-493.1205845330435018445671",
+            "currency": "USD"
+          },
+          "credit_curves_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "inflation_curves_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "correlations_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "fx_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "fx_translation_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "vol_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "cross_factor_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "model_params_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "market_scalars_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "residual": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "carry_detail": {
+            "total": {
+              "amount": "109.6033688718180991730467",
+              "currency": "USD"
+            },
+            "coupon_income": {
+              "total": {
+                "amount": "0",
+                "currency": "USD"
+              }
+            },
+            "roll_down": {
+              "total": {
+                "amount": "109.6033688718180991730467",
+                "currency": "USD"
+              }
+            }
+          },
+          "rates_detail": null,
+          "credit_detail": null,
+          "inflation_detail": null,
+          "correlations_detail": null,
+          "fx_detail": null,
+          "vol_detail": null,
+          "cross_factor_detail": null,
+          "model_params_detail": null,
+          "scalars_detail": null,
+          "meta": {
+            "method": "parallel",
+            "t0": "2025-01-15",
+            "t1": "2025-01-16",
+            "instrument_id": "DEP-0",
+            "num_repricings": 5,
+            "tolerance_abs": 1.0,
+            "tolerance_pct": 0.1,
+            "residual_pct": -0.0,
+            "rounding": {
+              "mode": "bankers",
+              "ingest_scale_by_currency": {},
+              "output_scale_by_currency": {},
+              "tolerances": {
+                "rate_epsilon": 1e-12,
+                "generic_epsilon": 1e-10
+              },
+              "version": 1
+            },
+            "execution_policy": "serial",
+            "notes": []
+          },
+          "result_invalid": false
+        },
+        "POS-1": {
+          "total_pnl": {
+            "amount": "-767.0344313224508053430408",
+            "currency": "USD"
+          },
+          "mark_to_market_pnl": {
+            "amount": "-767.0344313224508053430408",
+            "currency": "USD"
+          },
+          "carry": {
+            "amount": "219.2067377436361983460935",
+            "currency": "USD"
+          },
+          "rates_curves_pnl": {
+            "amount": "-986.2411690660870036891343",
+            "currency": "USD"
+          },
+          "credit_curves_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "inflation_curves_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "correlations_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "fx_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "fx_translation_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "vol_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "cross_factor_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "model_params_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "market_scalars_pnl": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "residual": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "carry_detail": {
+            "total": {
+              "amount": "219.2067377436361983460935",
+              "currency": "USD"
+            },
+            "coupon_income": {
+              "total": {
+                "amount": "0",
+                "currency": "USD"
+              }
+            },
+            "roll_down": {
+              "total": {
+                "amount": "219.2067377436361983460935",
+                "currency": "USD"
+              }
+            }
+          },
+          "rates_detail": null,
+          "credit_detail": null,
+          "inflation_detail": null,
+          "correlations_detail": null,
+          "fx_detail": null,
+          "vol_detail": null,
+          "cross_factor_detail": null,
+          "model_params_detail": null,
+          "scalars_detail": null,
+          "meta": {
+            "method": "parallel",
+            "t0": "2025-01-15",
+            "t1": "2025-01-16",
+            "instrument_id": "DEP-1",
+            "num_repricings": 5,
+            "tolerance_abs": 1.0,
+            "tolerance_pct": 0.1,
+            "residual_pct": -0.0,
+            "rounding": {
+              "mode": "bankers",
+              "ingest_scale_by_currency": {},
+              "output_scale_by_currency": {},
+              "tolerances": {
+                "rate_epsilon": 1e-12,
+                "generic_epsilon": 1e-10
+              },
+              "version": 1
+            },
+            "execution_policy": "serial",
+            "notes": []
+          },
+          "result_invalid": false
+        }
+      },
+      "rates_detail": null,
+      "credit_detail": null,
+      "inflation_detail": null,
+      "correlations_detail": null,
+      "fx_detail": null,
+      "vol_detail": null,
+      "scalars_detail": null,
+      "result_invalid": false
+    },
+    "attribution_explain": "Portfolio P&L: USD -1150.55\n  \u251c\u2500 Carry: USD 328.81 (-28.6%)\n  \u251c\u2500 Rates Curves: USD -1479.36 (128.6%)\n  \u251c\u2500 Credit Curves: USD 0.00 (-0.0%)\n  \u251c\u2500 Inflation: USD 0.00 (-0.0%)\n  \u251c\u2500 Correlations: USD 0.00 (-0.0%)\n  \u251c\u2500 FX: USD 0.00 (-0.0%)\n  \u251c\u2500 FX Translation: USD 0.00 (-0.0%)\n  \u251c\u2500 Cross Factor: USD 0.00 (-0.0%)\n  \u251c\u2500 Vol: USD 0.00 (-0.0%)\n  \u251c\u2500 Model Params: USD 0.00 (-0.0%)\n  \u251c\u2500 Market Scalars: USD 0.00 (-0.0%)\n  \u2514\u2500 Residual: USD 0.00 (-0.0%)",
+    "attribution_reconciliation_check": {
+      "total_residual": 6.821210263296962e-13,
+      "is_reconciled": true,
+      "tolerance": 1e-06
+    },
+    "factor_stress": {
+      "total_pnl": -148.7747318749316,
+      "position_pnl": [
+        [
+          "POS-0",
+          -49.59157729195431
+        ],
+        [
+          "POS-1",
+          -99.1831545829773
+        ]
+      ],
+      "stressed_decomposition": {
+        "total_risk": 2.2132823285304326,
+        "measure": "variance",
+        "factor_contributions": [
+          {
+            "factor_id": "usd_rates",
+            "absolute_risk": 2.2132823285304326,
+            "relative_risk": 1.0,
+            "marginal_risk": -0.029754208633606324
+          }
+        ],
+        "residual_risk": 0.0,
+        "position_factor_contributions": [
+          {
+            "position_id": "POS-0",
+            "factor_id": "usd_rates",
+            "risk_contribution": 0.7377607761814293
+          },
+          {
+            "position_id": "POS-1",
+            "factor_id": "usd_rates",
+            "risk_contribution": 1.4755215523490033
+          }
+        ],
+        "position_residual_contributions": []
+      }
+    },
+    "position_what_if": {
+      "before": {
+        "total_risk": 2.2135018485192126,
+        "measure": "variance",
+        "factor_contributions": [
+          {
+            "factor_id": "usd_rates",
+            "absolute_risk": 2.2135018485192126,
+            "relative_risk": 1.0,
+            "marginal_risk": -0.02975568415290909
+          }
+        ],
+        "residual_risk": 0.0,
+        "position_factor_contributions": [
+          {
+            "position_id": "POS-0",
+            "factor_id": "usd_rates",
+            "risk_contribution": 0.7378339495064042
+          },
+          {
+            "position_id": "POS-1",
+            "factor_id": "usd_rates",
+            "risk_contribution": 1.4756678990128085
+          }
+        ],
+        "position_residual_contributions": []
+      },
+      "after": {
+        "total_risk": 0.24594464983546807,
+        "measure": "variance",
+        "factor_contributions": [
+          {
+            "factor_id": "usd_rates",
+            "absolute_risk": 0.24594464983546807,
+            "relative_risk": 1.0,
+            "marginal_risk": -0.00991856138430303
+          }
+        ],
+        "residual_risk": 0.0,
+        "position_factor_contributions": [
+          {
+            "position_id": "POS-0",
+            "factor_id": "usd_rates",
+            "risk_contribution": 0.24594464983546807
+          },
+          {
+            "position_id": "POS-1",
+            "factor_id": "usd_rates",
+            "risk_contribution": -0.0
+          }
+        ],
+        "position_residual_contributions": []
+      },
+      "delta": [
+        {
+          "factor_id": "usd_rates",
+          "absolute_change": -1.9675571986837446,
+          "relative_change": 0.0
+        }
+      ]
+    },
+    "build_credit_vol_report": {
+      "total": 1.0,
+      "measure": "variance",
+      "generic": 0.1,
+      "by_level": [
+        {
+          "level_name": "Rating",
+          "total": 0.2,
+          "by_bucket": {
+            "IG": 0.2
+          }
+        },
+        {
+          "level_name": "Region",
+          "total": 0.3,
+          "by_bucket": {
+            "IG.EU": 0.3
+          }
+        }
+      ],
+      "idiosyncratic_total": 0.4,
+      "by_position_optional": [
+        {
+          "position_id": "POS1",
+          "factor_total": 0.30000000000000004,
+          "idiosyncratic": 0.0,
+          "total": 0.30000000000000004
+        }
+      ]
+    },
+    "valuation_position_value_base": 2000151.880540607,
+    "valuation_entity_value": 3000227.82081091,
+    "metrics_total_dv01": -148.7784207641962,
+    "metrics_position_dv01": -99.18561384279747,
+    "builder_spec": {
+      "id": "HOST-PARITY",
+      "name": "Desk book",
+      "base_currency": "USD",
+      "as_of": "2025-01-15",
+      "entities": {
+        "FUND": {
+          "id": "FUND",
+          "name": null
+        }
+      },
+      "positions": [
+        {
+          "position_id": "POS-0",
+          "entity_id": "FUND",
+          "instrument_id": "DEP-0",
+          "instrument_spec": {
+            "type": "deposit",
+            "spec": {
+              "id": "DEP-0",
+              "notional": {
+                "amount": "1000000",
+                "currency": "USD"
+              },
+              "start_date": "2025-01-15",
+              "maturity": "2025-07-15",
+              "day_count": "act_360",
+              "fixed_rate": "0.04",
+              "discount_curve_id": "USD-OIS",
+              "attributes": {},
+              "business_day_convention": "modified_following",
+              "calendar_id": null
+            }
+          },
+          "quantity": 1.0,
+          "unit": "units"
+        },
+        {
+          "position_id": "POS-1",
+          "entity_id": "FUND",
+          "instrument_id": "DEP-1",
+          "instrument_spec": {
+            "type": "deposit",
+            "spec": {
+              "id": "DEP-1",
+              "notional": {
+                "amount": "2000000",
+                "currency": "USD"
+              },
+              "start_date": "2025-01-15",
+              "maturity": "2025-07-15",
+              "day_count": "act_360",
+              "fixed_rate": "0.04",
+              "discount_curve_id": "USD-OIS",
+              "attributes": {},
+              "business_day_convention": "modified_following",
+              "calendar_id": null
+            }
+          },
+          "quantity": 1.0,
+          "unit": "units"
+        }
+      ],
+      "tags": {
+        "desk": "rates"
+      },
+      "meta": {
+        "owner": {
+          "team": "rates"
+        }
+      }
+    }
+  }
+}

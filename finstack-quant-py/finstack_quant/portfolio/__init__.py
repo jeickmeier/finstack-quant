@@ -143,7 +143,6 @@ twrr_linked_json = _portfolio.twrr_linked_json
 mwr_xirr = _portfolio.mwr_xirr
 
 # Portfolio factor-model workflow results
-FactorRiskDecomposition = _portfolio.FactorRiskDecomposition
 SensitivityMatrix = _portfolio.SensitivityMatrix
 FactorPnlProfile = _portfolio.FactorPnlProfile
 compute_factor_sensitivities = _portfolio.compute_factor_sensitivities
@@ -200,7 +199,6 @@ __all__ = [
     "FactorBrinsonResult",
     "FactorContributionDelta",
     "FactorPnlProfile",
-    "FactorRiskDecomposition",
     "FiAttributionResult",
     "FiCarinoLinkedResult",
     "FiReconciliationReport",

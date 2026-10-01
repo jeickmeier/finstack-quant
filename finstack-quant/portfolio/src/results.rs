@@ -72,6 +72,30 @@ impl PortfolioResult {
     pub fn get_metric(&self, metric_id: &str) -> Option<f64> {
         self.metrics.get_total(metric_id)
     }
+
+    /// Get a specific aggregated metric, failing when it was not produced.
+    ///
+    /// # Arguments
+    ///
+    /// * `metric_id` - Fully qualified identifier of the metric to retrieve
+    ///   (for example `dv01` or `bucketed_dv01::USD-OIS::10y`).
+    ///
+    /// # Returns
+    ///
+    /// The aggregated metric total.
+    ///
+    /// # Errors
+    ///
+    /// Returns a not-found [`crate::Error`] naming `metric_id` when the result
+    /// carries no aggregate for it.
+    pub fn require_metric(&self, metric_id: &str) -> crate::Result<f64> {
+        self.get_metric(metric_id).ok_or_else(|| {
+            finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound {
+                id: format!("metric '{metric_id}'"),
+            })
+            .into()
+        })
+    }
 }
 
 #[cfg(test)]
@@ -137,5 +161,21 @@ mod tests {
 
         // Note: With flat curve, deposit PV is small but portfolio results should be present
         assert!(results.total_value().amount().abs() >= 0.0);
+
+        assert_eq!(results.get_metric("absent"), None);
+        let missing = results
+            .require_metric("absent")
+            .expect_err("an absent metric is an error");
+        assert_eq!(
+            missing.kind(),
+            finstack_quant_core::error::ErrorKind::NotFound
+        );
+        assert!(missing.to_string().contains("metric 'absent'"));
+        for (metric_id, aggregate) in &results.metrics.aggregated {
+            let required = results
+                .require_metric(metric_id.as_str())
+                .expect("present metric");
+            assert_eq!(required.to_bits(), aggregate.total.to_bits());
+        }
     }
 }

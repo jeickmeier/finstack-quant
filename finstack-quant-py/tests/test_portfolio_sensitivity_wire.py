@@ -34,8 +34,8 @@ def test_wire_round_trips_exactly_and_decomposes_like_wasm() -> None:
     # exposures e = [4, 1]; e' S e = 16*0.04 + 2*4*0.01 + 0.09 = 0.81
     assert variance.total_risk == pytest.approx(0.81, abs=1e-12)
     assert variance.measure == "variance"
-    assert len(variance.position_factor_contributions()) == 4
-    assert variance.position_residual_contributions() == []
+    assert len(variance.position_factor_contributions) == 4
+    assert variance.position_residual_contributions == []
 
 
 @pytest.mark.parametrize(

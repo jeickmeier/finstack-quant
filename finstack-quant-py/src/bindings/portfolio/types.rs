@@ -959,8 +959,8 @@ impl PyPortfolioResult {
     #[pyo3(text_signature = "(self, metric_id)")]
     fn require_metric(&self, metric_id: &str) -> PyResult<f64> {
         self.inner
-            .get_metric(metric_id)
-            .ok_or_else(|| PyKeyError::new_err(format!("metric '{metric_id}' not present")))
+            .require_metric(metric_id)
+            .map_err(portfolio_to_py)
     }
 
     fn __repr__(&self) -> String {

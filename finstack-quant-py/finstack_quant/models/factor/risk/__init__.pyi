@@ -855,9 +855,7 @@ class RiskDecomposition:
         Export factor contributions as a pandas DataFrame.
 
         Columns: ``factor_id``, ``absolute_risk``, ``relative_risk``,
-        ``marginal_risk`` — identical to
-        :meth:`FactorRiskDecomposition.to_factor_dataframe`, which renders the
-        same Rust type reached through the sensitivity engine.
+        ``marginal_risk``.
 
         Returns
         -------
@@ -875,9 +873,7 @@ class RiskDecomposition:
         """
         Export position x factor contributions as a pandas DataFrame.
 
-        Columns: ``position_id``, ``factor_id``, ``risk_contribution`` —
-        identical to
-        :meth:`FactorRiskDecomposition.to_position_factor_dataframe`.
+        Columns: ``position_id``, ``factor_id``, ``risk_contribution``.
 
         Returns
         -------

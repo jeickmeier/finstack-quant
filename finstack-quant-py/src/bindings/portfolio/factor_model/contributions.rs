@@ -296,12 +296,12 @@ impl PyPositionResidualContribution {
     from_py_object
 )]
 #[derive(Clone)]
-pub(super) struct PyRiskDecomposition {
+pub(crate) struct PyRiskDecomposition {
     pub(crate) inner: RiskDecomposition,
 }
 
 impl PyRiskDecomposition {
-    pub(super) fn from_inner(inner: RiskDecomposition) -> Self {
+    pub(crate) fn from_inner(inner: RiskDecomposition) -> Self {
         Self { inner }
     }
 }
@@ -420,9 +420,7 @@ impl PyRiskDecomposition {
     /// Export factor contributions as a pandas ``DataFrame``.
     ///
     /// Columns: ``factor_id``, ``absolute_risk``, ``relative_risk``,
-    /// ``marginal_risk`` — identical to
-    /// :meth:`FactorRiskDecomposition.to_factor_dataframe`, which renders the
-    /// same Rust type reached through the sensitivity engine.
+    /// ``marginal_risk``.
     #[pyo3(text_signature = "(self)")]
     fn to_factor_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let rows = &self.inner.factor_contributions;
@@ -440,8 +438,7 @@ impl PyRiskDecomposition {
 
     /// Export position × factor contributions as a pandas ``DataFrame``.
     ///
-    /// Columns: ``position_id``, ``factor_id``, ``risk_contribution`` —
-    /// identical to :meth:`FactorRiskDecomposition.to_position_factor_dataframe`.
+    /// Columns: ``position_id``, ``factor_id``, ``risk_contribution``.
     #[pyo3(text_signature = "(self)")]
     fn to_position_factor_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let rows = &self.inner.position_factor_contributions;

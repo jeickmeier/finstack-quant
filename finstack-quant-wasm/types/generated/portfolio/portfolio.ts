@@ -1032,6 +1032,30 @@ export type MetricId = string;
  */
 export type Inequality = "le" | "ge" | "eq";
 /**
+ * Risk measure used when aggregating factor exposures.
+ */
+export type RiskMeasure =
+  | "variance"
+  | "volatility"
+  | {
+      var: {
+        /**
+         * Confidence level in the open interval `(0.5, 1)`.
+         */
+        confidence: number;
+        [k: string]: unknown;
+      };
+    }
+  | {
+      expected_shortfall: {
+        /**
+         * Confidence level in the open interval `(0.5, 1)`.
+         */
+        confidence: number;
+        [k: string]: unknown;
+      };
+    };
+/**
  * Classification of a curve dependency's role.
  */
 export type CurveType = "discount" | "forward" | "hazard" | "inflation" | "base_correlation";
@@ -1381,30 +1405,6 @@ export type ReplayMode = "pv_only" | "pv_and_pnl" | "full_attribution";
  * What to do when a single snapshot fails to revalue.
  */
 export type ReplayErrorPolicy = "strict" | "best_effort";
-/**
- * Risk measure used when aggregating factor exposures.
- */
-export type RiskMeasure =
-  | "variance"
-  | "volatility"
-  | {
-      var: {
-        /**
-         * Confidence level in the open interval `(0.5, 1)`.
-         */
-        confidence: number;
-        [k: string]: unknown;
-      };
-    }
-  | {
-      expected_shortfall: {
-        /**
-         * Confidence level in the open interval `(0.5, 1)`.
-         */
-        confidence: number;
-        [k: string]: unknown;
-      };
-    };
 /**
  * SIMM credit sector for bucket assignment.
  *
@@ -2506,6 +2506,78 @@ export interface LevelPnl {
    * Aggregate P&L for this level across all buckets.
    */
   total: Money;
+  [k: string]: unknown;
+}
+/**
+ * Aggregated credit risk grouped by hierarchy level.
+ */
+export interface CreditVolReport {
+  /**
+   * Per-hierarchy-level rollups.
+   */
+  by_level: LevelVolContribution[];
+  /**
+   * Optional position-level breakdown.
+   */
+  by_position_optional?: PositionVolContribution[] | null;
+  /**
+   * Contribution from the generic credit factor.
+   */
+  generic: number;
+  /**
+   * Portfolio idiosyncratic contribution.
+   */
+  idiosyncratic_total: number;
+  /**
+   * Risk measure used by the underlying decomposition.
+   */
+  measure: RiskMeasure;
+  /**
+   * Total risk under the selected measure.
+   */
+  total: number;
+  [k: string]: unknown;
+}
+/**
+ * Aggregated risk contribution for one hierarchy level.
+ */
+export interface LevelVolContribution {
+  /**
+   * Contributions keyed by canonical bucket path.
+   */
+  by_bucket: {
+    [k: string]: number;
+  };
+  /**
+   * Human-readable hierarchy level name.
+   */
+  level_name: string;
+  /**
+   * Total contribution across the level's buckets.
+   */
+  total: number;
+  [k: string]: unknown;
+}
+/**
+ * Position-level credit risk breakdown.
+ */
+export interface PositionVolContribution {
+  /**
+   * Systematic factor contribution.
+   */
+  factor_total: number;
+  /**
+   * Idiosyncratic contribution.
+   */
+  idiosyncratic: number;
+  /**
+   * Portfolio position identifier.
+   */
+  position_id: PositionId;
+  /**
+   * Sum of systematic and idiosyncratic contributions.
+   */
+  total: number;
   [k: string]: unknown;
 }
 /**

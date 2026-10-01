@@ -485,6 +485,38 @@ mod tests {
     }
 
     #[test]
+    fn model_position_what_if_matches_the_engine_on_its_own_baseline() {
+        let (model, portfolio, market) = build_test_model().expect("setup");
+        let as_of = date!(2024 - 01 - 01);
+        let changes = [PositionChange::Remove {
+            position_id: PositionId::new("pos-1"),
+        }];
+        let (base, sensitivities) = model
+            .analyze_with_sensitivities(&portfolio, &market, as_of)
+            .expect("baseline");
+        let expected = model
+            .what_if(&base, &sensitivities, &portfolio, &market, as_of)
+            .position_what_if(&changes)
+            .expect("engine what-if");
+
+        let actual = model
+            .position_what_if(&portfolio, &market, as_of, &changes)
+            .expect("model what-if");
+
+        assert_eq!(actual, expected);
+        assert!(model
+            .position_what_if(
+                &portfolio,
+                &market,
+                as_of,
+                &[PositionChange::Remove {
+                    position_id: PositionId::new("missing"),
+                }],
+            )
+            .is_err());
+    }
+
+    #[test]
     fn unsupported_position_add_is_rejected_at_deserialization() {
         let error = serde_json::from_value::<PositionChange>(serde_json::json!({
             "kind": "add", "position": {}

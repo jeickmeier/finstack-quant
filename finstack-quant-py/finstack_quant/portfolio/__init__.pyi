@@ -42,7 +42,6 @@ __all__ = [
     "FactorBrinsonResult",
     "FactorContributionDelta",
     "FactorPnlProfile",
-    "FactorRiskDecomposition",
     "FiAttributionResult",
     "FiCarinoLinkedResult",
     "FiReconciliationReport",
@@ -9343,6 +9342,59 @@ class CreditVolReport:
     cannot create 'finstack_quant.portfolio.CreditVolReport' instances
     """
 
+    @staticmethod
+    def from_json(json: str) -> CreditVolReport:
+        """
+        Deserialize from the canonical ``CreditVolReport`` JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON emitted by :meth:`to_json`, or the object the WASM
+            ``buildCreditVolReport`` returns, serialized: ``total``,
+            ``measure``, ``generic``, ``by_level``, ``idiosyncratic_total``
+            and ``by_position_optional``.
+
+        Returns
+        -------
+        CreditVolReport
+            The reconstructed report.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed or does not match the report schema.
+
+        Examples
+        --------
+        >>> from finstack_quant.portfolio import CreditVolReport
+        >>> report = CreditVolReport.from_json(
+        ...     '{"total":1.0,"measure":"variance","generic":0.25,"by_level":[],'
+        ...     '"idiosyncratic_total":0.75,"by_position_optional":null}'
+        ... )
+        >>> (report.total, report.generic, report.by_position)
+        (1.0, 0.25, None)
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize to canonical ``CreditVolReport`` JSON.
+
+        Returns
+        -------
+        str
+            Compact JSON with ``total``, ``measure``, ``generic``,
+            ``by_level``, ``idiosyncratic_total`` and ``by_position_optional``;
+            the same shape the WASM ``buildCreditVolReport`` returns.
+
+        Raises
+        ------
+        ValueError
+            If the report cannot be serialized.
+        """
+        ...
+
     @property
     def total(self) -> float:
         """
@@ -13765,251 +13817,11 @@ def compute_pnl_profiles(
 
 # Risk Decomposition
 
-class FactorRiskDecomposition:
-    """
-    Portfolio-level decomposition of total risk across factors and positions.
-
-    Obtain via :func:`decompose_factor_risk`.  The decomposition expresses
-    forecasted portfolio risk (variance, volatility, VaR, or ES) as a sum of
-    Euler-allocated factor-level contributions, each drillable to per-position
-    detail.
-
-    Examples
-    --------
-    >>> from finstack_quant.core.market_data import MarketContext
-    >>> from finstack_quant.portfolio import compute_factor_sensitivities, decompose_factor_risk
-    >>> matrix = compute_factor_sensitivities("[]", "[]", MarketContext(), "2025-01-15", "USD")
-    >>> decompose_factor_risk(matrix, '{"factor_ids":[],"n":0,"data":[]}').total_risk
-    0.0
-    """
-
-    @staticmethod
-    def from_json(json: str) -> FactorRiskDecomposition:
-        """
-        Parse from canonical JSON produced by :meth:`to_json`.
-
-        Parameters
-        ----------
-        json : str
-            Canonical payload.
-
-        Returns
-        -------
-        FactorRiskDecomposition
-            Reconstructed value.
-
-        Raises
-        ------
-        ValueError
-            If the payload is malformed.
-
-        Examples
-        --------
-        >>> from finstack_quant.portfolio import FactorRiskDecomposition
-        >>> try:
-        ...     FactorRiskDecomposition.from_json("{}")
-        ... except ValueError:
-        ...     print("missing fields")
-        missing fields
-        """
-        ...
-
-    def to_json(self) -> str:
-        """
-        Serialize to canonical JSON.
-
-        Returns
-        -------
-        str
-            JSON accepted by :meth:`from_json`; also backs ``pickle``.
-
-        Notes
-        -----
-        This method does not raise for a well-formed value.
-        """
-        ...
-
-    @property
-    def total_risk(self) -> float:
-        """
-        Total portfolio risk under the selected measure.
-
-        Returns
-        -------
-        float
-            Total portfolio risk under the selected measure.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def measure(self) -> str | dict[str, dict[str, float]]:
-        """
-        Risk measure in its canonical serde form.
-
-        The same value :meth:`to_json` and the WASM ``decomposeFactorRisk``
-        output carry, and the same shape as the ``risk_measure`` input.
-
-        Returns
-        -------
-        str | dict[str, dict[str, float]]
-            ``"variance"`` or ``"volatility"``, or ``{"var": {"confidence":
-            c}}`` / ``{"expected_shortfall": {"confidence": c}}``.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def residual_risk(self) -> float:
-        """
-        Residual (idiosyncratic) risk not attributed to any factor.
-
-        Returns
-        -------
-        float
-            Residual (idiosyncratic) risk not attributed to any factor.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    def factor_contributions(self) -> list[dict[str, object]]:
-        """
-        Factor-level contributions as a list of dicts.
-
-        Each dict contains ``factor_id``, ``absolute_risk``, ``relative_risk``,
-        and ``marginal_risk``.
-
-        Returns
-        -------
-        list[dict[str, object]]
-            List of per-factor contribution dicts.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
-        """
-        ...
-
-    def position_factor_contributions(self) -> list[dict[str, object]]:
-        """
-        Position x factor contributions as a list of dicts.
-
-        Each dict contains ``position_id``, ``factor_id``, and
-        ``risk_contribution``.
-
-        Returns
-        -------
-        list[dict[str, object]]
-            List of per-position, per-factor contribution dicts.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
-        """
-        ...
-
-    def position_residual_contributions(self) -> list[dict[str, Any]]:
-        """
-        Per-position residual (idiosyncratic) variance contributions.
-
-        Each dict contains ``position_id``, ``residual_variance`` (annualized
-        variance units), and a ``source`` object tagged by ``kind``. Empty for
-        the parametric decomposer used by :func:`decompose_factor_risk` —
-        populated only by credit-aware position decomposers.
-
-        Returns
-        -------
-        list[dict[str, Any]]
-            List of per-position residual contribution dicts.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
-        """
-        ...
-
-    def to_dataframe(self) -> pd.DataFrame:
-        """
-        Primary table: the factor-level risk decomposition.
-
-        Alias of :meth:`to_factor_dataframe`. Every tabular result type in the library
-        answers ``to_dataframe()``; the position-level views stay on :meth:`to_position_factor_dataframe`
-        and :meth:`to_position_residual_dataframe`.
-
-        Returns
-        -------
-        pd.DataFrame
-            The same frame :meth:`to_factor_dataframe` returns.
-
-        Examples
-        --------
-        >>> frame = result.to_dataframe()  # doctest: +SKIP
-
-        Notes
-        -----
-        This alias does not raise; it delegates to the method named above.
-        """
-        ...
-
-    def to_factor_dataframe(self) -> pd.DataFrame:
-        """
-        Export factor contributions as a pandas DataFrame.
-
-        Columns: ``factor_id``, ``absolute_risk``, ``relative_risk``,
-        ``marginal_risk``.
-
-        Returns
-        -------
-        pd.DataFrame
-            DataFrame with one row per factor.
-
-        Raises
-        ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
-        """
-        ...
-
-    def to_position_factor_dataframe(self) -> pd.DataFrame:
-        """
-        Export position x factor contributions as a pandas DataFrame.
-
-        Columns: ``position_id``, ``factor_id``, ``risk_contribution``.
-
-        Returns
-        -------
-        pd.DataFrame
-            DataFrame with one row per position-factor pair.
-
-        Raises
-        ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
-        """
-        ...
-
-    def __repr__(self) -> str:
-        """Return a concise debug representation.
-        Returns
-        -------
-        str
-        """
-        ...
-
 def decompose_factor_risk(
     sensitivities: SensitivityMatrix,
     covariance_json: str,
     risk_measure: str | dict[str, Any] | None = None,
-) -> FactorRiskDecomposition:
+) -> RiskDecomposition:
     """
     Decompose portfolio risk into factor and position contributions.
 
@@ -14032,7 +13844,7 @@ def decompose_factor_risk(
 
     Returns
     -------
-    FactorRiskDecomposition
+    finstack_quant.models.factor.risk.RiskDecomposition
         Portfolio-level risk decomposition with factor and position detail.
 
     Raises

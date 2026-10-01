@@ -1178,12 +1178,17 @@
     "keys": [
       "InstrumentArtifactCache",
       "Portfolio",
+      "PortfolioBuilder",
       "aggregateFullCashflows",
       "aggregateFullCashflowsBuilt",
       "aggregateMetrics",
+      "allocateWeights",
+      "allocateWeightsJson",
       "applyScenarioAndRevalue",
       "applyScenarioAndRevalueBuilt",
+      "attributePortfolioPnl",
       "brinsonFachler",
+      "buildCreditVolReport",
       "buildPortfolioFromSpecJson",
       "campisiAttribution",
       "campisiCarinoLink",
@@ -1201,19 +1206,32 @@
       "decomposeFactorRisk",
       "excessReturns",
       "factorBrinsonAttribution",
+      "factorStress",
       "gridAttribution",
       "gridCarinoLink",
       "mwrXirr",
       "netInCurrencyByDate",
       "optimizePortfolio",
       "parsePortfolioSpecJson",
+      "portfolioAttributionExplainText",
+      "portfolioAttributionReconciliationCheck",
+      "portfolioMetricsGetMetric",
+      "portfolioMetricsGetPositionMetrics",
+      "portfolioMetricsGetTotal",
       "portfolioMetricsSeries",
+      "portfolioOptimizationResultBindingConstraints",
+      "portfolioOptimizationResultNewPositionTrades",
+      "portfolioValuationGetEntityValue",
+      "portfolioValuationGetPositionValue",
+      "positionWhatIf",
       "rebalanceFromSpec",
       "replayPortfolio",
       "scenarioPnl",
+      "scenarioPnlBatch",
       "scenarioPnlBuilt",
       "twrrLinked",
       "twrrModifiedDietz",
+      "validateAllocationJson",
       "valuePortfolio",
       "valuePortfolioBuilt"
     ]
@@ -1226,7 +1244,7 @@
   },
   "portfolio.Portfolio": {
     "kind": "class",
-    "statics": ["fromMaterialization", "fromSpec", "validateMaterialization"],
+    "statics": ["builder", "fromMaterialization", "fromSpec", "validateMaterialization"],
     "methods": ["free", "numPositions", "toJson"],
     "getters": ["asOf", "baseCurrency", "entityIds", "id", "meta", "name", "positionIds", "tags"]
   },
@@ -1342,6 +1360,63 @@
     "kind": "function"
   },
   "portfolio.decomposeFactorRisk": {
+    "kind": "function"
+  },
+  "portfolio.PortfolioBuilder": {
+    "kind": "class",
+    "statics": [],
+    "methods": ["build", "entity", "free", "meta", "name", "position", "tag"],
+    "getters": []
+  },
+  "portfolio.allocateWeights": {
+    "kind": "function"
+  },
+  "portfolio.allocateWeightsJson": {
+    "kind": "function"
+  },
+  "portfolio.validateAllocationJson": {
+    "kind": "function"
+  },
+  "portfolio.factorStress": {
+    "kind": "function"
+  },
+  "portfolio.positionWhatIf": {
+    "kind": "function"
+  },
+  "portfolio.buildCreditVolReport": {
+    "kind": "function"
+  },
+  "portfolio.scenarioPnlBatch": {
+    "kind": "function"
+  },
+  "portfolio.attributePortfolioPnl": {
+    "kind": "function"
+  },
+  "portfolio.portfolioAttributionExplainText": {
+    "kind": "function"
+  },
+  "portfolio.portfolioAttributionReconciliationCheck": {
+    "kind": "function"
+  },
+  "portfolio.portfolioValuationGetPositionValue": {
+    "kind": "function"
+  },
+  "portfolio.portfolioValuationGetEntityValue": {
+    "kind": "function"
+  },
+  "portfolio.portfolioMetricsGetMetric": {
+    "kind": "function"
+  },
+  "portfolio.portfolioMetricsGetPositionMetrics": {
+    "kind": "function"
+  },
+  "portfolio.portfolioMetricsGetTotal": {
+    "kind": "function"
+  },
+  "portfolio.portfolioOptimizationResultNewPositionTrades": {
+    "kind": "function"
+  },
+  "portfolio.portfolioOptimizationResultBindingConstraints": {
     "kind": "function"
   },
   "scenarios": {

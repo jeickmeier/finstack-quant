@@ -1,0 +1,182 @@
+{
+  "$defs": {
+    "LevelVolContribution": {
+      "description": "Aggregated risk contribution for one hierarchy level.",
+      "properties": {
+        "by_bucket": {
+          "additionalProperties": {
+            "format": "double",
+            "type": "number"
+          },
+          "description": "Contributions keyed by canonical bucket path.",
+          "type": "object"
+        },
+        "level_name": {
+          "description": "Human-readable hierarchy level name.",
+          "type": "string"
+        },
+        "total": {
+          "description": "Total contribution across the level's buckets.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "level_name",
+        "total",
+        "by_bucket"
+      ],
+      "type": "object"
+    },
+    "PositionId": {
+      "description": "Position identifier.",
+      "type": "string"
+    },
+    "PositionVolContribution": {
+      "description": "Position-level credit risk breakdown.",
+      "properties": {
+        "factor_total": {
+          "description": "Systematic factor contribution.",
+          "format": "double",
+          "type": "number"
+        },
+        "idiosyncratic": {
+          "description": "Idiosyncratic contribution.",
+          "format": "double",
+          "type": "number"
+        },
+        "position_id": {
+          "$ref": "#/$defs/PositionId",
+          "description": "Portfolio position identifier."
+        },
+        "total": {
+          "description": "Sum of systematic and idiosyncratic contributions.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "position_id",
+        "factor_total",
+        "idiosyncratic",
+        "total"
+      ],
+      "type": "object"
+    },
+    "RiskMeasure": {
+      "description": "Risk measure used when aggregating factor exposures.",
+      "oneOf": [
+        {
+          "const": "variance",
+          "description": "Aggregate exposures using factor covariance and portfolio variance.",
+          "type": "string"
+        },
+        {
+          "const": "volatility",
+          "description": "Aggregate exposures using portfolio volatility.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Aggregate exposures using Value at Risk at a fixed one-sided loss confidence level.\n\nThis assumes the downstream aggregation engine is interpreting the factor\nmodel as a parametric, one-period loss distribution rather than a full\nhistorical or Monte Carlo simulation.\n\n# Sign convention\n\nVaR is reported as a **negative** number on the P&L axis: for a long-risk\nportfolio, `total_risk` at 99% is approximately `-sigma * z_{0.99}`.\nFactor contributions carry the same sign as the total. Downstream\naggregators and visualizations rely on this convention.",
+          "properties": {
+            "var": {
+              "properties": {
+                "confidence": {
+                  "description": "Confidence level in the open interval `(0.5, 1)`.",
+                  "exclusiveMaximum": 1.0,
+                  "exclusiveMinimum": 0.5,
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "confidence"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "var"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Aggregate exposures using expected shortfall at a fixed one-sided loss confidence level.\n\nAs with [`Self::VaR`], this is intended for parametric factor-model\naggregation rather than full-path simulation, and ES is reported as a\n**negative** number using the P&L sign convention.",
+          "properties": {
+            "expected_shortfall": {
+              "properties": {
+                "confidence": {
+                  "description": "Confidence level in the open interval `(0.5, 1)`.",
+                  "exclusiveMaximum": 1.0,
+                  "exclusiveMinimum": 0.5,
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "confidence"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "expected_shortfall"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/credit_vol_report.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Aggregated credit risk grouped by hierarchy level.",
+  "properties": {
+    "by_level": {
+      "description": "Per-hierarchy-level rollups.",
+      "items": {
+        "$ref": "#/$defs/LevelVolContribution"
+      },
+      "type": "array"
+    },
+    "by_position_optional": {
+      "description": "Optional position-level breakdown.",
+      "items": {
+        "$ref": "#/$defs/PositionVolContribution"
+      },
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "generic": {
+      "description": "Contribution from the generic credit factor.",
+      "format": "double",
+      "type": "number"
+    },
+    "idiosyncratic_total": {
+      "description": "Portfolio idiosyncratic contribution.",
+      "format": "double",
+      "type": "number"
+    },
+    "measure": {
+      "$ref": "#/$defs/RiskMeasure",
+      "description": "Risk measure used by the underlying decomposition."
+    },
+    "total": {
+      "description": "Total risk under the selected measure.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "total",
+    "measure",
+    "generic",
+    "by_level",
+    "idiosyncratic_total"
+  ],
+  "title": "CreditVolReport",
+  "type": "object"
+}

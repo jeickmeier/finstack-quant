@@ -170,12 +170,12 @@ def test_decompose_factor_risk_measure_is_canonical_serde_form() -> None:
     assert json.loads(decomp.to_json())["measure"] == decomp.measure
 
 
-# MD5: position_residual_contributions exposed on FactorRiskDecomposition
+# MD5: position_residual_contributions exposed on RiskDecomposition
 
 
 def test_decompose_factor_risk_exposes_position_residual_contributions() -> None:
     decomp = _variance_decomposition()
-    assert decomp.position_residual_contributions() == []
+    assert decomp.position_residual_contributions == []
 
 
 # MD9: models liquidity errors use the canonical validation taxonomy

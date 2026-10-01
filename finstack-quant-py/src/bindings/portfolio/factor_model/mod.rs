@@ -29,10 +29,10 @@ use budget_whatif::{
     PyRiskBudgetResult, PyWhatIfResult,
 };
 use config::{PyDecompositionConfig, PyVolHorizon};
+pub(crate) use contributions::PyRiskDecomposition;
 use contributions::{
     PyFactorContribution, PyPositionEsContribution, PyPositionFactorContribution,
     PyPositionResidualContribution, PyPositionRiskDecomposition, PyPositionVarContribution,
-    PyRiskDecomposition,
 };
 use credit_vol::{
     build_credit_vol_report, PyCreditVolReport, PyLevelVolContribution, PyPositionVolContribution,

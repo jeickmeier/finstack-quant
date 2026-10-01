@@ -101,8 +101,8 @@ def test_decompose_factor_risk_zero_factors_returns_zero_risk() -> None:
 
     assert decomposition.total_risk == 0.0
     assert decomposition.residual_risk == 0.0
-    assert decomposition.factor_contributions() == []
-    assert decomposition.position_factor_contributions() == []
+    assert decomposition.factor_contributions == []
+    assert decomposition.position_factor_contributions == []
 
 
 def test_sensitivity_reporting_currency_is_required_and_survives_round_trip() -> None:

@@ -78,4 +78,24 @@ export const portfolio = {
   // Takes the computeFactorSensitivities wire object; malformed dimensions
   // throw a validation Error.
   decomposeFactorRisk: wasm.decomposeFactorRisk,
+  PortfolioBuilder: wasm.PortfolioBuilder,
+  allocateWeights: wasm.allocateWeights,
+  allocateWeightsJson: wasm.allocateWeightsJson,
+  validateAllocationJson: wasm.validateAllocationJson,
+  factorStress: wasm.factorStress,
+  positionWhatIf: wasm.positionWhatIf,
+  buildCreditVolReport: wasm.buildCreditVolReport,
+  scenarioPnlBatch: wasm.scenarioPnlBatch,
+  attributePortfolioPnl: wasm.attributePortfolioPnl,
+  // Rust methods on result types; WASM results are plain objects, so each
+  // takes the object (or its JSON) as the first argument.
+  portfolioAttributionExplainText: wasm.portfolioAttributionExplainText,
+  portfolioAttributionReconciliationCheck: wasm.portfolioAttributionReconciliationCheck,
+  portfolioValuationGetPositionValue: wasm.portfolioValuationGetPositionValue,
+  portfolioValuationGetEntityValue: wasm.portfolioValuationGetEntityValue,
+  portfolioMetricsGetMetric: wasm.portfolioMetricsGetMetric,
+  portfolioMetricsGetPositionMetrics: wasm.portfolioMetricsGetPositionMetrics,
+  portfolioMetricsGetTotal: wasm.portfolioMetricsGetTotal,
+  portfolioOptimizationResultNewPositionTrades: wasm.portfolioOptimizationResultNewPositionTrades,
+  portfolioOptimizationResultBindingConstraints: wasm.portfolioOptimizationResultBindingConstraints,
 };

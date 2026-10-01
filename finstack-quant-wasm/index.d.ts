@@ -180,9 +180,12 @@ import type {
   VarianceReport,
 } from './types/generated/statements_analytics/index.js';
 import type {
+  AggregatedMetric,
   BrinsonPeriodResult,
   CarinoLinkedAttribution,
+  CreditVolReport,
   DurationCellTable,
+  Entity,
   ExcessReturnResult,
   FactorBrinsonResult,
   FactorPnlProfile,
@@ -193,10 +196,21 @@ import type {
   GridCarinoLinkedResult,
   LinkedReturn,
   MaterializationReport,
+  PortfolioAttribution,
   PortfolioCashflows,
   PortfolioMetrics,
+  PositionChange,
+  PositionMetrics,
+  PositionSpec,
+  ReconciliationReport,
+  ScenarioPnlBatchItem,
   ScenarioPnlView,
   SensitivityMatrixJson,
+  StressResult,
+  TradeSpec,
+  WeightAllocationResult,
+  WeightAllocationSpec,
+  WhatIfResult,
 } from './types/generated/portfolio/index.js';
 import type {
   ApplicationEnvelope,
@@ -305,9 +319,12 @@ export type {
   VarianceReport,
 };
 export type {
+  AggregatedMetric,
   BrinsonPeriodResult,
   CarinoLinkedAttribution,
+  CreditVolReport,
   DurationCellTable,
+  Entity,
   ExcessReturnResult,
   FactorBrinsonResult,
   FactorPnlProfile,
@@ -318,10 +335,21 @@ export type {
   GridCarinoLinkedResult,
   LinkedReturn,
   MaterializationReport,
+  PortfolioAttribution,
   PortfolioCashflows,
   PortfolioMetrics,
+  PositionChange,
+  PositionMetrics,
+  PositionSpec,
+  ReconciliationReport,
+  ScenarioPnlBatchItem,
   ScenarioPnlView,
   SensitivityMatrixJson,
+  StressResult,
+  TradeSpec,
+  WeightAllocationResult,
+  WeightAllocationSpec,
+  WhatIfResult,
 };
 export type { MaterializationPhases } from './types/generated/portfolio/index.js';
 export type {
@@ -608,6 +636,7 @@ export type {
   Performance,
   PeriodDecomposition,
   Portfolio,
+  PortfolioBuilder,
 };
 
 // --- core -----------------------------------------------------------------
@@ -10026,12 +10055,90 @@ declare class InstrumentArtifactCache {
 }
 
 /**
+ * Fluent builder returned by `Portfolio.builder(id, baseCurrency, asOf)` (Rust `PortfolioBuilder`).
+ *
+ * Every setter consumes the handle it is called on and returns the builder,
+ * so chain the calls or reassign the returned handle; `build()` validates the
+ * portfolio and returns a reusable `Portfolio`.
+ *
+ * @example
+ * ```typescript
+ * const book = portfolio.Portfolio.builder("book", "USD", "2025-01-01")
+ *   .name("Desk book")
+ *   .entity({ id: "ACME", name: null })
+ *   .tag("desk", "rates")
+ *   .build();
+ * console.log(book.entityIds);
+ * book.free();
+ * ```
+ */
+declare class PortfolioBuilder {
+  private constructor();
+  /**
+   * Set the human-readable portfolio name.
+   * @param name - Display name stored alongside the portfolio identifier.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `name` is not a string.
+   */
+  name(name: string): PortfolioBuilder;
+  /**
+   * Register an entity that positions can reference.
+   * @param entity - `Entity` object or JSON: `{ id, name, tags?, meta? }` (`name` may be `null`).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `entity` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the `Entity` schema.
+   */
+  entity(entity: Entity | string): PortfolioBuilder;
+  /**
+   * Add a position from its serializable specification.
+   * @param position - `PositionSpec` object or JSON: `position_id`, `entity_id`, `instrument_id`, `instrument_spec` (the tagged instrument JSON), signed `quantity`, `unit`, and optional `book_id`, `attributes` and `meta`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `position` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the `PositionSpec` schema, carries no `instrument_spec`, the instrument cannot be built, or `quantity` is not finite.
+   */
+  position(position: PositionSpec | string): PortfolioBuilder;
+  /**
+   * Attach a portfolio-level tag.
+   * @param key - Tag name used for grouping and filtering, such as `desk`; a repeated key replaces the earlier value.
+   * @param value - Text stored under `key`, such as `rates`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if either argument is not a string.
+   */
+  tag(key: string, value: string): PortfolioBuilder;
+  /**
+   * Attach a JSON-shaped metadata entry.
+   * @param key - Name the metadata entry is stored under; a repeated key replaces the earlier entry.
+   * @param value - Any JSON value (object, array, string, number, boolean or `null`), or a JSON string encoding one.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `key` is not a string or `value` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if a string `value` is not valid JSON.
+   */
+  meta(key: string, value: JsonInput): PortfolioBuilder;
+  /**
+   * Validate and build the portfolio, consuming the builder.
+   * @returns The validated, reusable `Portfolio` handle.
+   * @throws Error - Throws a `FinstackError` (kind `validation`) if a position references an unregistered entity, an identifier is duplicated, or another structural invariant fails.
+   */
+  build(): Portfolio;
+  /**
+   * Release the underlying wasm heap allocation. Do not use this handle after calling `free()`.
+   */
+  free(): void;
+}
+
+/**
  * Typed handle to a built portfolio. Construct once via
  * `Portfolio.fromSpec` and reuse it across cashflow / valuation calls to
  * skip the per-call `PortfolioSpec` parse + rebuild cost.
  */
 declare class Portfolio {
   private constructor();
+  /**
+   * Start a fluent portfolio builder (Rust `PortfolioBuilder`).
+   * @param id - Portfolio identifier.
+   * @param baseCurrency - ISO-4217 reporting currency used for every base-currency rollup.
+   * @param asOf - ISO-8601 valuation date.
+   * @returns A `PortfolioBuilder`; chain `.entity(...)` / `.position(...)` / `.tag(...)` and finish with `.build()`.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if an argument is not a string, and a `FinstackError` (kind `validation`) if `baseCurrency` is not an ISO-4217 code or `asOf` is not an ISO date.
+   */
+  static builder(id: string, baseCurrency: string, asOf: string): PortfolioBuilder;
   /**
    * Build a runtime portfolio from a portable embedded specification.
    * @returns A reusable portfolio handle.
@@ -10757,6 +10864,264 @@ export interface PortfolioNamespace {
     covarianceJson: JsonInput,
     riskMeasureJson?: JsonInput
   ): RiskDecomposition;
+  /**
+   * Fluent portfolio builder class; instances come from `Portfolio.builder`.
+   */
+  PortfolioBuilder: typeof PortfolioBuilder;
+  /**
+   * Allocate strategy weights from a `WeightAllocationSpec`.
+   *
+   * Returns the `WeightAllocationResult` object (`scheme`, per-strategy
+   * `allocations` and portfolio `diagnostics`); `allocateWeightsJson` returns
+   * the same result as a JSON string.
+   * @param spec - `WeightAllocationSpec` object or JSON selecting the allocation scheme, the strategy inputs and any covariance data the scheme needs.
+   * @returns The `WeightAllocationResult`.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `spec` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the `WeightAllocationSpec` schema or violates a scheme invariant.
+   */
+  allocateWeights(spec: WeightAllocationSpec | string): WeightAllocationResult;
+  /**
+   * Allocate strategy weights and return the result as wire JSON.
+   *
+   * Wire twin of `allocateWeights` (Rust `allocate_weights_json`).
+   * @param specJson - `WeightAllocationSpec` object or JSON.
+   * @returns Compact JSON of the `WeightAllocationResult`.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `specJson` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the `WeightAllocationSpec` schema or violates a scheme invariant.
+   */
+  allocateWeightsJson(specJson: WeightAllocationSpec | string): string;
+  /**
+   * Validate a strategy allocation specification and return its canonical JSON.
+   *
+   * The spec is parsed and executed solely for validation; the allocation
+   * itself is discarded (Rust `validate_allocation_json`).
+   * @param specJson - `WeightAllocationSpec` object or JSON.
+   * @returns The canonical compact JSON of the accepted spec.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `specJson` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the `WeightAllocationSpec` schema or violates a scheme invariant.
+   */
+  validateAllocationJson(specJson: WeightAllocationSpec | string): string;
+  /**
+   * Run a factor-stress scenario and revalue the portfolio under the stressed market.
+   *
+   * Each stress shifts one configured factor by an absolute amount in that
+   * factor's own bump units. Returns the `StressResult`: base-currency
+   * `total_pnl`, per-position `position_pnl`, and the `stressed_decomposition`
+   * of risk under the stressed market.
+   * @param portfolio - Built portfolio whose positions are revalued.
+   * @param market - `core.MarketContext` handle holding the unstressed curves, quotes and FX data.
+   * @param factorModelConfig - `FactorModelConfig` object or JSON: factor definitions, matching rules, covariance and risk measure.
+   * @param asOf - ISO-8601 valuation date.
+   * @param stresses - Array of `[factorId, shift]` pairs; every `factorId` must be a factor of the configured model.
+   * @returns The `StressResult`.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) for a mistyped argument, and a `FinstackError` if the config or stresses are malformed, `asOf` is not an ISO date, a stress names an unknown factor, or the market bump, valuation, sensitivity or decomposition step fails.
+   */
+  factorStress(
+    portfolio: Portfolio,
+    market: MarketContext,
+    factorModelConfig: FactorModelConfig | string,
+    asOf: string,
+    stresses: [string, number][] | string
+  ): StressResult;
+  /**
+   * Run a position remove/resize what-if analysis against a factor model.
+   *
+   * Decomposes the portfolio's baseline risk, applies the changes and
+   * decomposes again. Returns the `WhatIfResult`: the `before` and `after`
+   * risk decompositions and the per-factor `delta`.
+   * @param portfolio - Built portfolio the changes are applied to.
+   * @param market - `core.MarketContext` handle holding the curves, quotes and FX data.
+   * @param factorModelConfig - `FactorModelConfig` object or JSON: factor definitions, matching rules, covariance and risk measure.
+   * @param asOf - ISO-8601 valuation date.
+   * @param changes - Array of `PositionChange` objects: `{ kind: "remove", position_id }` or `{ kind: "resize", position_id, new_quantity }`.
+   * @returns The `WhatIfResult`.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) for a mistyped argument, and a `FinstackError` if the config or changes are malformed, `asOf` is not an ISO date, a change names an unknown position, or factor assignment, sensitivity or decomposition fails.
+   */
+  positionWhatIf(
+    portfolio: Portfolio,
+    market: MarketContext,
+    factorModelConfig: FactorModelConfig | string,
+    asOf: string,
+    changes: PositionChange[] | string
+  ): WhatIfResult;
+  /**
+   * Build a credit volatility report from a risk decomposition and a credit factor model.
+   *
+   * Rolls the decomposition's factor contributions up by credit-hierarchy
+   * level. Returns the `CreditVolReport`: `total`, `measure`, the `generic`
+   * credit-factor contribution, `by_level` rollups, `idiosyncratic_total` and,
+   * when requested, `by_position_optional` rows.
+   * @param decomposition - `RiskDecomposition` object or JSON, e.g. the output of `decomposeFactorRisk`.
+   * @param model - `models.factor.credit.CreditFactorModel` handle whose hierarchy names the levels.
+   * @param byPosition - `true` to include the per-position breakdown; `false` leaves `by_position_optional` `null`.
+   * @returns The `CreditVolReport`.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `decomposition` is not a JSON string or plain object or `byPosition` is not a boolean, and a `FinstackError` (kind `validation`) if `decomposition` does not match the `RiskDecomposition` schema.
+   */
+  buildCreditVolReport(
+    decomposition: RiskDecomposition | string,
+    model: CreditFactorModel,
+    byPosition: boolean
+  ): CreditVolReport;
+  /**
+   * Compute ordered portfolio P&L for a batch of scenarios.
+   *
+   * The Rust batch engine values the unstressed base leg once for the whole
+   * request, then applies and revalues each scenario independently. Returns one
+   * `ScenarioPnlBatchItem` (`scenario_id`, `pnl`, `report`) per input scenario,
+   * in input order; an empty batch returns `[]` without a valuation.
+   * @param portfolio - Built portfolio valued for the shared base and every scenario.
+   * @param scenarios - Array of `ScenarioSpec` objects, or its JSON.
+   * @param market - `core.MarketContext` handle holding the unshocked market snapshot.
+   * @returns The ordered `ScenarioPnlBatchItem` array.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `scenarios` is not a JSON string or array, and a `FinstackError` if a scenario is malformed or inconsistent (kind `validation`), or scenario application, valuation or base-currency differencing fails; the error is the earliest failing scenario's.
+   */
+  scenarioPnlBatch(
+    portfolio: Portfolio,
+    scenarios: ScenarioSpec[] | string,
+    market: MarketContext
+  ): ScenarioPnlBatchItem[];
+  /**
+   * Attribute portfolio P&L between two market snapshots.
+   *
+   * Returns the `PortfolioAttribution`: base-currency `total_pnl`, one bucket
+   * per factor (`carry`, `rates_curves_pnl`, `credit_curves_pnl`, `fx_pnl`,
+   * `vol_pnl`, ..., `residual`) and the per-position `by_position` detail.
+   * @param portfolio - Built portfolio whose positions are attributed.
+   * @param marketT0 - `core.MarketContext` handle for the opening snapshot.
+   * @param marketT1 - `core.MarketContext` handle for the closing snapshot.
+   * @param asOfT0 - ISO-8601 date of the opening snapshot.
+   * @param asOfT1 - ISO-8601 date of the closing snapshot.
+   * @param method - `AttributionMethod` JSON, e.g. `'"parallel"'`, `'"metrics_based"'` or `{ waterfall: ["carry", "rates_curves"] }` (a string argument is JSON text, so a bare variant name keeps its quotes).
+   * @param config - Optional `FinstackConfig` object or JSON; omit for the Rust default configuration.
+   * @returns The `PortfolioAttribution`.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) for a mistyped argument, and a `FinstackError` if a date is not an ISO date or `method` / `config` is malformed (kind `validation`), a required FX rate or market datum is missing (kind `not_found`), or a position valuation or attribution fails.
+   */
+  attributePortfolioPnl(
+    portfolio: Portfolio,
+    marketT0: MarketContext,
+    marketT1: MarketContext,
+    asOfT0: string,
+    asOfT1: string,
+    method: JsonInput,
+    config?: JsonInput
+  ): PortfolioAttribution;
+  /**
+   * Render a portfolio P&L attribution as an indented text tree.
+   *
+   * Twin of Python `PortfolioAttribution.explain` (Rust
+   * `PortfolioAttribution::explain`): the total followed by one line per factor
+   * bucket with its share of the total.
+   * @param attribution - `PortfolioAttribution` object or JSON from `attributePortfolioPnl`.
+   * @returns The multi-line explanation.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `attribution` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the `PortfolioAttribution` schema.
+   */
+  portfolioAttributionExplainText(attribution: PortfolioAttribution | string): string;
+  /**
+   * Check that a portfolio attribution's factor buckets sum to its total P&L.
+   *
+   * Twin of Python `PortfolioAttribution.reconciliation_check` (Rust
+   * `PortfolioAttribution::reconciliation_check`).
+   * @param attribution - `PortfolioAttribution` object or JSON from `attributePortfolioPnl`.
+   * @param tolerance - Largest absolute residual, in base-currency units, still reported as reconciled.
+   * @returns The `ReconciliationReport`: `total_residual`, `is_reconciled` and the `tolerance` applied.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `attribution` is not a JSON string or plain object or `tolerance` is not a number, and a `FinstackError` (kind `validation`) if `attribution` does not match the `PortfolioAttribution` schema.
+   */
+  portfolioAttributionReconciliationCheck(
+    attribution: PortfolioAttribution | string,
+    tolerance: number
+  ): ReconciliationReport;
+  /**
+   * Look up one position's value in a portfolio valuation.
+   *
+   * Twin of Python `PortfolioValuation.get_position_value` (Rust
+   * `PortfolioValuation::get_position_value`). The returned
+   * `valuation_result` keeps 64-bit fields as `BigInt`, as `valuePortfolio`
+   * does.
+   * @param valuation - `PortfolioValuation` object or JSON from `valuePortfolio`.
+   * @param positionId - Position identifier to look up.
+   * @returns The `PositionValue`, or `undefined` when the valuation has no such position.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `valuation` is not a JSON string or plain object or `positionId` is not a string, and a `FinstackError` (kind `validation`) if `valuation` does not match the `PortfolioValuation` schema.
+   */
+  portfolioValuationGetPositionValue(
+    valuation: PortfolioValuation | string,
+    positionId: string
+  ): PositionValue | undefined;
+  /**
+   * Look up one entity's aggregated base-currency value in a portfolio valuation.
+   *
+   * Twin of Python `PortfolioValuation.get_entity_value` (Rust
+   * `PortfolioValuation::get_entity_value`).
+   * @param valuation - `PortfolioValuation` object or JSON from `valuePortfolio`.
+   * @param entityId - Entity identifier to look up.
+   * @returns The entity total as `Money`, or `undefined` when the valuation has no such entity.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `valuation` is not a JSON string or plain object or `entityId` is not a string, and a `FinstackError` (kind `validation`) if `valuation` does not match the `PortfolioValuation` schema.
+   */
+  portfolioValuationGetEntityValue(
+    valuation: PortfolioValuation | string,
+    entityId: string
+  ): MoneyValue | undefined;
+  /**
+   * Look up one aggregated metric in portfolio metrics.
+   *
+   * Twin of Python `PortfolioMetrics.get_metric` (Rust
+   * `PortfolioMetrics::get_metric`).
+   * @param metrics - `PortfolioMetrics` object or JSON from `aggregateMetrics`.
+   * @param metricId - Fully qualified metric key.
+   * @returns The `AggregatedMetric` (`total` plus `by_entity`), or `undefined` when the metric was not aggregated.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `metrics` is not a JSON string or plain object or `metricId` is not a string, and a `FinstackError` (kind `validation`) if `metrics` does not match the `PortfolioMetrics` schema.
+   */
+  portfolioMetricsGetMetric(
+    metrics: PortfolioMetrics | string,
+    metricId: string
+  ): AggregatedMetric | undefined;
+  /**
+   * Look up one position's raw metric values in portfolio metrics.
+   *
+   * Twin of Python `PortfolioMetrics.get_position_metrics` (Rust
+   * `PortfolioMetrics::get_position_metrics`).
+   * @param metrics - `PortfolioMetrics` object or JSON from `aggregateMetrics`.
+   * @param positionId - Position identifier to look up.
+   * @returns The position's `{ metricId: value }` map, or `undefined` when the position has no metrics.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `metrics` is not a JSON string or plain object or `positionId` is not a string, and a `FinstackError` (kind `validation`) if `metrics` does not match the `PortfolioMetrics` schema.
+   */
+  portfolioMetricsGetPositionMetrics(
+    metrics: PortfolioMetrics | string,
+    positionId: string
+  ): PositionMetrics | undefined;
+  /**
+   * Look up one metric's portfolio-wide total in portfolio metrics.
+   *
+   * Twin of Python `PortfolioMetrics.get_total` (Rust
+   * `PortfolioMetrics::get_total`).
+   * @param metrics - `PortfolioMetrics` object or JSON from `aggregateMetrics`.
+   * @param metricId - Fully qualified metric key.
+   * @returns The total, or `undefined` when the metric was not aggregated.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `metrics` is not a JSON string or plain object or `metricId` is not a string, and a `FinstackError` (kind `validation`) if `metrics` does not match the `PortfolioMetrics` schema.
+   */
+  portfolioMetricsGetTotal(metrics: PortfolioMetrics | string, metricId: string): number | undefined;
+  /**
+   * Trades of an optimization result that open a new position.
+   *
+   * Twin of Python `PortfolioOptimizationResult.new_position_trades` (Rust
+   * `PortfolioOptimizationResultWire::new_position_trades`): the entries of
+   * `trades` whose `trade_type` is `new_position`, in trade-list order.
+   * @param result - `PortfolioOptimizationResult` object or JSON from `optimizePortfolio`.
+   * @returns The matching `TradeSpec` rows; empty for an infeasible solve.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `result` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the optimization-result schema.
+   */
+  portfolioOptimizationResultNewPositionTrades(
+    result: PortfolioOptimizationResult | string
+  ): TradeSpec[];
+  /**
+   * Approximately binding constraints of an optimization result.
+   *
+   * Twin of Python `PortfolioOptimizationResult.binding_constraints` (Rust
+   * `PortfolioOptimizationResultWire::binding_constraints`): the constraints
+   * whose slack is zero within the solver tolerance.
+   * @param result - `PortfolioOptimizationResult` object or JSON from `optimizePortfolio`.
+   * @returns `[label, slack]` pairs in slack order; empty for an infeasible solve.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `result` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the optimization-result schema.
+   */
+  portfolioOptimizationResultBindingConstraints(
+    result: PortfolioOptimizationResult | string
+  ): [string, number][];
 }
 
 /**

@@ -539,11 +539,7 @@ pub(super) fn position_what_if(
     let result = py
         .detach(move || {
             let model = fm::FactorModelBuilder::new().config(config).build()?;
-            let (base, sensitivities) =
-                model.analyze_with_sensitivities(portfolio_ref, market_ref, as_of)?;
-            model
-                .what_if(&base, &sensitivities, portfolio_ref, market_ref, as_of)
-                .position_what_if(&changes)
+            model.position_what_if(portfolio_ref, market_ref, as_of, &changes)
         })
         .map_err(portfolio_to_py)?;
 

@@ -309,7 +309,6 @@ class TestPortfolioNamespace:
         """Portfolio should export parsing, building, metric functions, and typed wrappers."""
         from finstack_quant.portfolio import (  # noqa: F401
             FactorPnlProfile,
-            FactorRiskDecomposition,
             Portfolio,
             PortfolioError,
             PortfolioResult,
