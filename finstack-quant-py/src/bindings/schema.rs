@@ -163,10 +163,7 @@ fn validate(selector: &str, payload: &str) -> PyResult<String> {
 ///     Sorted domain names, each of which is also a ``domain`` value in
 ///     :func:`index` and a ``finstack_quant.<domain>.schema`` namespace.
 ///
-/// Raises
-/// ------
-/// ValueError
-///     If the registry cannot be read.
+///     This function does not raise; the domain list is compiled in.
 ///
 /// Examples
 /// --------
