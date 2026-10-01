@@ -395,7 +395,7 @@ fn structured_credit_pricing_conveniences_validate_before_market_access() {
         sc.price_with_metrics_standalone(&market, closing_date(), &[])
             .expect_err("invalid metric pricing")
             .to_string(),
-        sc.price_stochastic(&market, closing_date())
+        sc.price_stochastic(&market, closing_date(), None, None)
             .expect_err("invalid stochastic pricing")
             .to_string(),
         sc.price_stochastic_with_mode(
@@ -1162,7 +1162,7 @@ fn default_monte_carlo_pv_is_bit_identical_under_estimator_semantics() {
     let market = MarketContext::new().insert(discount_curve(closing_date()));
 
     let result = sc
-        .price_stochastic(&market, closing_date())
+        .price_stochastic(&market, closing_date(), None, None)
         .expect("default stochastic price");
     assert_eq!(
         result.pricing_mode,

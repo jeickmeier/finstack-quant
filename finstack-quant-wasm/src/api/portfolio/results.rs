@@ -1,13 +1,17 @@
 //! Free-function twins of the Rust methods on portfolio result types.
 //!
 //! WASM results are plain objects, so a Rust method on a result type is a
-//! function that takes the object (or its JSON) as the first argument.
+//! function that takes the object (or its JSON) as the first argument. The
+//! validating `Constraint` constructors return the constraint's wire object.
 
-use crate::utils::input::{from_js_json, js_f64, js_string};
-use crate::utils::{to_js_value, to_js_value_with_bigints};
+use crate::utils::input::{from_js_json, js_f64, js_json_value, js_opt_string, js_string, js_uint};
+use crate::utils::{to_js_err, to_js_value, to_js_value_with_bigints};
 use finstack_quant_portfolio::attribution::PortfolioAttribution;
 use finstack_quant_portfolio::metrics::PortfolioMetrics;
-use finstack_quant_portfolio::optimization::PortfolioOptimizationResultWire;
+use finstack_quant_portfolio::optimization::{
+    Constraint, PortfolioOptimizationResultWire, PositionFilter,
+};
+use finstack_quant_portfolio::sensitivity::{SensitivityMatrix, SensitivityMatrixJson};
 use finstack_quant_portfolio::valuation::PortfolioValuation;
 use wasm_bindgen::prelude::*;
 
@@ -228,4 +232,272 @@ pub fn portfolio_optimization_result_binding_constraints(
 ) -> Result<JsValue, JsValue> {
     let result: PortfolioOptimizationResultWire = from_js_json(&result, "result")?;
     to_js_value(&result.binding_constraints())
+}
+
+/// Look up one metric's portfolio-wide total, failing when it was not aggregated.
+///
+/// Twin of Python `PortfolioResult.require_metric` (Rust
+/// `PortfolioMetrics::require_total`, which `PortfolioResult::require_metric`
+/// calls on its metrics).
+/// @param metrics - `PortfolioMetrics` object or JSON from `aggregateMetrics`.
+/// @param metric_id - Fully qualified metric key (for example `dv01` or `bucketed_dv01::USD-OIS::10y`).
+/// @returns The aggregated total in base-currency metric units.
+///
+/// # Errors
+///
+/// Throws a `TypeError` (kind `invalid_type`) if `metrics` is not a JSON
+/// string or plain object or `metricId` is not a string, a `FinstackError`
+/// (kind `validation`) if `metrics` does not match the `PortfolioMetrics`
+/// schema, and a `FinstackError` (kind `not_found`) naming the metric when it
+/// was not aggregated.
+#[wasm_bindgen(js_name = portfolioMetricsRequireTotal)]
+pub fn portfolio_metrics_require_total(
+    metrics: JsValue,
+    metric_id: JsValue,
+) -> Result<f64, JsValue> {
+    let metrics: PortfolioMetrics = from_js_json(&metrics, "metrics")?;
+    let metric_id = js_string(&metric_id, "metricId")?;
+    metrics.require_total(&metric_id).map_err(to_js_err)
+}
+
+/// Executable trade list of an optimization result.
+///
+/// Twin of Python `PortfolioOptimizationResult.to_trade_list` (Rust
+/// `PortfolioOptimizationResultWire::to_trade_list`): the trades from current
+/// to target quantities, largest absolute quantity change first.
+/// @param result - `PortfolioOptimizationResult` object or JSON from `optimizePortfolio`.
+/// @returns The `TradeSpec` rows; empty for an infeasible solve (check `is_feasible`).
+///
+/// # Errors
+///
+/// Throws a `TypeError` (kind `invalid_type`) if `result` is not a JSON string
+/// or plain object, and a `FinstackError` (kind `validation`) if it does not
+/// match the optimization-result schema.
+#[wasm_bindgen(js_name = portfolioOptimizationResultToTradeList)]
+pub fn portfolio_optimization_result_to_trade_list(result: JsValue) -> Result<JsValue, JsValue> {
+    let result: PortfolioOptimizationResultWire = from_js_json(&result, "result")?;
+    to_js_value(&result.to_trade_list())
+}
+
+/// Rebuild the dense matrix from its wire object, validating its dimensions.
+fn sensitivity_matrix(matrix: &JsValue) -> Result<SensitivityMatrix, JsValue> {
+    let wire: SensitivityMatrixJson = from_js_json(matrix, "matrix")?;
+    SensitivityMatrix::try_from(wire).map_err(to_js_err)
+}
+
+/// Read one position-by-factor sensitivity.
+///
+/// Twin of Python `SensitivityMatrix.delta` (Rust `SensitivityMatrix::try_delta`).
+/// @param matrix - Sensitivity-matrix object or JSON `{ base_currency, position_ids, factor_ids, data }` from `computeFactorSensitivities`.
+/// @param position_idx - Zero-based row index into `position_ids`.
+/// @param factor_idx - Zero-based column index into `factor_ids`.
+/// @returns The sensitivity in base-currency PV change per factor bump.
+///
+/// # Errors
+///
+/// Throws a `TypeError` (kind `invalid_type`) if `matrix` is not a JSON string
+/// or plain object or an index is not a non-negative integer, and a
+/// `FinstackError` (kind `validation`) if `matrix` does not match the schema,
+/// its rows do not match its axes, or an index is out of bounds.
+#[wasm_bindgen(js_name = sensitivityMatrixDelta)]
+pub fn sensitivity_matrix_delta(
+    matrix: JsValue,
+    position_idx: JsValue,
+    factor_idx: JsValue,
+) -> Result<f64, JsValue> {
+    let position_idx: usize = js_uint(&position_idx, "positionIdx")?;
+    let factor_idx: usize = js_uint(&factor_idx, "factorIdx")?;
+    sensitivity_matrix(&matrix)?
+        .try_delta(position_idx, factor_idx)
+        .map_err(to_js_err)
+}
+
+/// Sensitivities of one position to every factor.
+///
+/// Twin of Python `SensitivityMatrix.position_deltas` (Rust
+/// `SensitivityMatrix::try_position_deltas`).
+/// @param matrix - Sensitivity-matrix object or JSON from `computeFactorSensitivities`.
+/// @param position_idx - Zero-based row index into `position_ids`.
+/// @returns One value per factor, in `factor_ids` order.
+///
+/// # Errors
+///
+/// Throws a `TypeError` (kind `invalid_type`) if `matrix` is not a JSON string
+/// or plain object or `positionIdx` is not a non-negative integer, and a
+/// `FinstackError` (kind `validation`) if `matrix` does not match the schema,
+/// its rows do not match its axes, or `positionIdx` is out of bounds.
+#[wasm_bindgen(js_name = sensitivityMatrixPositionDeltas)]
+pub fn sensitivity_matrix_position_deltas(
+    matrix: JsValue,
+    position_idx: JsValue,
+) -> Result<Vec<f64>, JsValue> {
+    let position_idx: usize = js_uint(&position_idx, "positionIdx")?;
+    sensitivity_matrix(&matrix)?
+        .try_position_deltas(position_idx)
+        .map(<[f64]>::to_vec)
+        .map_err(to_js_err)
+}
+
+/// Sensitivities of every position to one factor.
+///
+/// Twin of Python `SensitivityMatrix.factor_deltas` (Rust
+/// `SensitivityMatrix::try_factor_deltas`).
+/// @param matrix - Sensitivity-matrix object or JSON from `computeFactorSensitivities`.
+/// @param factor_idx - Zero-based column index into `factor_ids`.
+/// @returns One value per position, in `position_ids` order.
+///
+/// # Errors
+///
+/// Throws a `TypeError` (kind `invalid_type`) if `matrix` is not a JSON string
+/// or plain object or `factorIdx` is not a non-negative integer, and a
+/// `FinstackError` (kind `validation`) if `matrix` does not match the schema,
+/// its rows do not match its axes, or `factorIdx` is out of bounds.
+#[wasm_bindgen(js_name = sensitivityMatrixFactorDeltas)]
+pub fn sensitivity_matrix_factor_deltas(
+    matrix: JsValue,
+    factor_idx: JsValue,
+) -> Result<Vec<f64>, JsValue> {
+    let factor_idx: usize = js_uint(&factor_idx, "factorIdx")?;
+    sensitivity_matrix(&matrix)?
+        .try_factor_deltas(factor_idx)
+        .map_err(to_js_err)
+}
+
+/// Apply the optional label and convert a validated constraint to its wire object.
+fn constraint_value(
+    constraint: finstack_quant_portfolio::Result<Constraint>,
+    label: Option<&JsValue>,
+) -> Result<JsValue, JsValue> {
+    let constraint = constraint.map_err(to_js_err)?;
+    to_js_value(&match js_opt_string(label, "label")? {
+        Some(label) => constraint.with_label(label),
+        None => constraint,
+    })
+}
+
+/// Build a budget (weight-sum) constraint.
+///
+/// Twin of Python `Constraint.budget` (Rust `Constraint::budget`).
+/// @param rhs - Target sum of weights as a decimal (`1.0` is fully invested); finite and non-negative.
+/// @returns The `Constraint` object `{ budget: { rhs } }`.
+///
+/// # Errors
+///
+/// Throws a `TypeError` (kind `invalid_type`) if `rhs` is not a number, and a
+/// `FinstackError` (kind `validation`) if it is negative or not finite.
+#[wasm_bindgen(js_name = constraintBudget)]
+pub fn constraint_budget(rhs: JsValue) -> Result<JsValue, JsValue> {
+    constraint_value(Constraint::budget(js_f64(&rhs, "rhs")?), None)
+}
+
+/// Build per-position weight bounds for the positions a filter selects.
+///
+/// Twin of Python `Constraint.weight_bounds` (Rust `Constraint::weight_bounds`).
+/// @param filter - `PositionFilter` value selecting the bounded positions: `"all"` or a filter object such as `{ by_entity_id: "FUND" }`.
+/// @param min - Inclusive minimum weight as a decimal fraction of portfolio value.
+/// @param max - Inclusive maximum weight as a decimal fraction of portfolio value.
+/// @param label - Optional label reported in constraint slacks.
+/// @returns The `weight_bounds` `Constraint` object.
+///
+/// # Errors
+///
+/// Throws a `TypeError` (kind `invalid_type`) for a wrong argument type, and a
+/// `FinstackError` (kind `validation`) if `filter` does not match the schema
+/// or `min > max`.
+#[wasm_bindgen(js_name = constraintWeightBounds)]
+pub fn constraint_weight_bounds(
+    filter: JsValue,
+    min: JsValue,
+    max: JsValue,
+    label: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    // A filter is `"all"` or an object, so the argument is the value itself
+    // (a string is the wire label, not JSON text to parse).
+    let filter: PositionFilter = serde_json::from_value(js_json_value(&filter, "filter")?)
+        .map_err(|error| {
+            to_js_err(finstack_quant_core::Error::Validation(format!(
+                "filter: {error}"
+            )))
+        })?;
+    let min = js_f64(&min, "min")?;
+    let max = js_f64(&max, "max")?;
+    constraint_value(Constraint::weight_bounds(filter, min, max), label.as_ref())
+}
+
+/// Build a maximum-turnover constraint: `sum |w_new - w_current| <= maxTurnover`.
+///
+/// Twin of Python `Constraint.max_turnover` (Rust `Constraint::max_turnover`).
+/// @param max_turnover - Largest allowed gross turnover as a decimal fraction of portfolio value; non-negative.
+/// @param label - Optional label reported in constraint slacks.
+/// @returns The `max_turnover` `Constraint` object.
+///
+/// # Errors
+///
+/// Throws a `TypeError` (kind `invalid_type`) for a wrong argument type, and a
+/// `FinstackError` (kind `validation`) if `maxTurnover` is negative.
+#[wasm_bindgen(js_name = constraintMaxTurnover)]
+pub fn constraint_max_turnover(
+    max_turnover: JsValue,
+    label: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    let max_turnover = js_f64(&max_turnover, "maxTurnover")?;
+    constraint_value(Constraint::max_turnover(max_turnover), label.as_ref())
+}
+
+/// Build an attribute exposure cap: `sum w_i * I[attr == value] <= maxShare`.
+///
+/// Twin of Python `Constraint.exposure_limit` (Rust `Constraint::exposure_limit`).
+/// @param key - Position attribute key (for example `"rating"`).
+/// @param value - Text value the attribute must equal to count toward the exposure.
+/// @param max_share - Largest allowed share of portfolio weight as a decimal in `[0, 1]`.
+/// @param label - Optional label reported in constraint slacks.
+/// @returns The `metric_bound` `Constraint` object with operator `le`.
+///
+/// # Errors
+///
+/// Throws a `TypeError` (kind `invalid_type`) for a wrong argument type, and a
+/// `FinstackError` (kind `validation`) if `maxShare` is outside `[0, 1]`.
+#[wasm_bindgen(js_name = constraintExposureLimit)]
+pub fn constraint_exposure_limit(
+    key: JsValue,
+    value: JsValue,
+    max_share: JsValue,
+    label: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    let key = js_string(&key, "key")?;
+    let value = js_string(&value, "value")?;
+    let max_share = js_f64(&max_share, "maxShare")?;
+    constraint_value(
+        Constraint::exposure_limit(key, value, max_share),
+        label.as_ref(),
+    )
+}
+
+/// Build an attribute exposure floor: `sum w_i * I[attr == value] >= minShare`.
+///
+/// Twin of Python `Constraint.exposure_minimum` (Rust `Constraint::exposure_minimum`).
+/// @param key - Position attribute key (for example `"sector"`).
+/// @param value - Text value the attribute must equal to count toward the exposure.
+/// @param min_share - Smallest required share of portfolio weight as a decimal in `[0, 1]`.
+/// @param label - Optional label reported in constraint slacks.
+/// @returns The `metric_bound` `Constraint` object with operator `ge`.
+///
+/// # Errors
+///
+/// Throws a `TypeError` (kind `invalid_type`) for a wrong argument type, and a
+/// `FinstackError` (kind `validation`) if `minShare` is outside `[0, 1]`.
+#[wasm_bindgen(js_name = constraintExposureMinimum)]
+pub fn constraint_exposure_minimum(
+    key: JsValue,
+    value: JsValue,
+    min_share: JsValue,
+    label: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    let key = js_string(&key, "key")?;
+    let value = js_string(&value, "value")?;
+    let min_share = js_f64(&min_share, "minShare")?;
+    constraint_value(
+        Constraint::exposure_minimum(key, value, min_share),
+        label.as_ref(),
+    )
 }

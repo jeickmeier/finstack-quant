@@ -130,38 +130,39 @@ test('operationSpecValidate rejects what Python OperationSpec.validate rejects',
   }
 });
 
-test('scenario enum functions return the Python wire values', () => {
-  for (const [type, variants] of Object.entries(GOLDEN.enums)) {
+test('scenario enum literals are the Python wire values', () => {
+  // Python `CurveKind.par_cds()` and friends have no WASM function: the
+  // TypeScript literal of the generated type is the twin, and it is the value
+  // the constructors and rate bindings consume.
+  const enums = GOLDEN.enums;
+  for (const [type, variants] of Object.entries(enums)) {
     const prefix = type[0].toLowerCase() + type.slice(1);
-    for (const [variant, wire] of Object.entries(variants)) {
-      assert.deepEqual(scenarios[`${prefix}${pascal(variant)}`](), wire, `${type}.${variant}`);
+    for (const variant of Object.keys(variants)) {
+      assert.equal(scenarios[`${prefix}${pascal(variant)}`], undefined, `${type}.${variant}`);
     }
   }
-  // The wire values are what the constructors and rate bindings consume.
-  assert.equal(
-    scenarios.operationSpecCurveParallelBp(scenarios.curveKindParCds(), 'ACME', 1).curve_kind,
-    'par_cds'
-  );
-  assert.equal(
-    scenarios.operationSpecTimeRollForward('1M', false, scenarios.timeRollModeApproximate())
-      .roll_mode,
-    'approximate'
-  );
-  assert.equal(
-    scenarios.operationSpecVolIndexNodePts('VIX', [['1M', 1]], scenarios.tenorMatchModeExact())
-      .match_mode,
-    'exact'
-  );
-  const binding = {
-    node_id: 'rate',
-    curve_id: 'USD-OIS',
-    tenor: '1Y',
-    compounding: scenarios.compoundingQuarterly(),
-  };
-  assert.equal(scenarios.rateBindingSpecValidate(binding), undefined);
-  assert.deepEqual(scenarios.operationSpecRateBinding(binding).binding.compounding, {
-    periodic: 4,
-  });
+  assert.equal(enums.CurveKind.par_cds, 'par_cds');
+  assert.deepEqual(enums.Compounding.quarterly, { periodic: 4 });
+  for (const curveKind of Object.values(enums.CurveKind)) {
+    assert.equal(
+      scenarios.operationSpecCurveParallelBp(curveKind, 'ACME', 1).curve_kind,
+      curveKind
+    );
+  }
+  for (const rollMode of Object.values(enums.TimeRollMode)) {
+    assert.equal(scenarios.operationSpecTimeRollForward('1M', false, rollMode).roll_mode, rollMode);
+  }
+  for (const matchMode of Object.values(enums.TenorMatchMode)) {
+    assert.equal(
+      scenarios.operationSpecVolIndexNodePts('VIX', [['1M', 1]], matchMode).match_mode,
+      matchMode
+    );
+  }
+  for (const compounding of Object.values(enums.Compounding)) {
+    const binding = { node_id: 'rate', curve_id: 'USD-OIS', tenor: '1Y', compounding };
+    assert.equal(scenarios.rateBindingSpecValidate(binding), undefined);
+    assert.deepEqual(scenarios.operationSpecRateBinding(binding).binding.compounding, compounding);
+  }
 });
 
 test('rateBindingSpecValidate matches Python RateBindingSpec.validate', () => {

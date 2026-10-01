@@ -26,7 +26,7 @@ use super::*;
 ///   frequency and standard caplet fixing-date convention.
 /// * `config` - Frequency plus fixed-mean-reversion or initial-parameter
 ///   settings. A one-quote calibration requires `config.fixed_kappa`.
-pub fn calibrate_hull_white_to_cap_floors(
+pub fn calibrate_hull_white_to_cap_floors_with_fn(
     discount_df: &(dyn Fn(f64) -> f64 + Sync),
     forward_df: &(dyn Fn(f64) -> f64 + Sync),
     quotes: &[CapFloorQuote],
@@ -522,7 +522,7 @@ impl PiecewiseSigmaCalibrationConfig {
 ///   quoted maturity.
 /// * `config` - Fixed mean-reversion, sigma search bounds, and coupon
 ///   frequency used while sequentially solving the volatility schedule.
-pub fn bootstrap_hull_white_sigma_schedule_to_cap_floors(
+pub fn bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn(
     discount_df: &(dyn Fn(f64) -> f64 + Sync),
     forward_df: &(dyn Fn(f64) -> f64 + Sync),
     quotes: &[CapFloorQuote],

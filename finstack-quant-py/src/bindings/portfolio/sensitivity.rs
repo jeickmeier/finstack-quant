@@ -128,28 +128,24 @@ impl PySensitivityMatrix {
     /// float
     #[pyo3(text_signature = "(self, position_idx, factor_idx)")]
     fn delta(&self, position_idx: usize, factor_idx: usize) -> PyResult<f64> {
-        if position_idx >= self.inner.n_positions() || factor_idx >= self.inner.n_factors() {
-            return Err(crate::errors::value_error("index out of bounds"));
-        }
-        Ok(self.inner.delta(position_idx, factor_idx))
+        self.inner
+            .try_delta(position_idx, factor_idx)
+            .map_err(core_to_py)
     }
 
     /// Sensitivity row for a single position across all factors.
     #[pyo3(text_signature = "(self, position_idx)")]
     fn position_deltas(&self, position_idx: usize) -> PyResult<Vec<f64>> {
-        if position_idx >= self.inner.n_positions() {
-            return Err(crate::errors::value_error("position index out of bounds"));
-        }
-        Ok(self.inner.position_deltas(position_idx).to_vec())
+        self.inner
+            .try_position_deltas(position_idx)
+            .map(<[f64]>::to_vec)
+            .map_err(core_to_py)
     }
 
     /// Sensitivity column for a single factor across all positions.
     #[pyo3(text_signature = "(self, factor_idx)")]
     fn factor_deltas(&self, factor_idx: usize) -> PyResult<Vec<f64>> {
-        if factor_idx >= self.inner.n_factors() {
-            return Err(crate::errors::value_error("factor index out of bounds"));
-        }
-        Ok(self.inner.factor_deltas(factor_idx))
+        self.inner.try_factor_deltas(factor_idx).map_err(core_to_py)
     }
 
     /// Export as a pandas ``DataFrame`` with positions as rows and factors as columns.

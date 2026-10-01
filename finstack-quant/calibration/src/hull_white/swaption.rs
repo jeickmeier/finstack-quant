@@ -72,7 +72,7 @@ use finstack_quant_models::rates::hull_white::{hw_b, hw_bond_vol, hw_ln_a};
 /// HW1F swaption calibration treats every leg as a vanilla fixed-vs-IBOR
 /// swap. For OIS swaptions the daily compounding inside each accrual period
 /// is approximated by a single forward rate.
-pub fn calibrate_hull_white_to_swaptions(
+pub fn calibrate_hull_white_to_swaptions_with_fn(
     df: &(dyn Fn(f64) -> f64 + Sync),
     quotes: &[SwaptionQuote],
     frequency: SwapFrequency,
@@ -297,7 +297,7 @@ fn validate_model_price_sanity(
 /// quote (Bachelier σ for normal vol, Black-76 σ for lognormal).
 ///
 /// Used as the per-quote weight in the vega-weighted price residual; see
-/// the module-level note in `calibrate_hull_white_to_swaptions`.
+/// the module-level note in `calibrate_hull_white_to_swaptions_with_fn`.
 fn swaption_atm_vega(annuity: f64, fwd_rate: f64, expiry: f64, vol: f64, is_normal: bool) -> f64 {
     if is_normal {
         annuity
@@ -470,7 +470,7 @@ pub(super) fn compute_swaption_market_price(
 /// 3. Sum the individual zero-coupon bond put prices.
 ///
 /// Uses a synthetic constant-`dt` schedule. The production HW1F calibrator
-/// (`calibrate_hull_white_to_swaptions` with contractual schedules) drives
+/// (`calibrate_hull_white_to_swaptions_with_fn` with contractual schedules) drives
 /// [`hw1f_swaption_price_inner`] directly with real accrual fractions, so
 /// this scalar-time wrapper exists only as a stable test harness.
 #[cfg(test)]

@@ -17,6 +17,15 @@ CONSTANT_CASE) name. Everything else is recorded explicitly:
 
 The same partition applies to the members of every class bound in both hosts.
 
+One exclusion reason, ``literal``, is for members only: the member just
+constructs or rebuilds a plain data value (an enum-variant constructor, a
+``with_*`` setter or constructor of a data class, an enum ``from_str`` /
+``value`` / ``as_str`` label accessor, or a single-field ``*_json`` view of a
+field already on the wire object), and the TypeScript object or string literal
+of the class's schema-generated type is its WASM twin. It is valid only on a
+class recorded in a ``types`` map, never for a member that computes, validates
+or applies defaults in Rust -- those need a WASM function.
+
 A module entry may also name ``constants_on``: a WASM class whose static
 factories are the twins of that module's ``CONSTANT_CASE`` values (Python
 ``core.currency.USD`` is WASM ``core.Currency.usd()``). Those constants pair by
@@ -270,6 +279,31 @@ def data_class_methods(cls: Any) -> set[str]:
         if isinstance(raw, (staticmethod, classmethod)) or inspect.isroutine(raw) or inspect.ismethoddescriptor(raw):
             methods.add(name)
     return methods
+
+
+LITERAL = "literal"
+
+
+def test_literal_exclusions_are_members_of_typescript_data_classes() -> None:
+    """``literal`` says the TypeScript literal is the twin, so the class must be a declared TypeScript type."""
+    assert LITERAL in REASONS
+    problems = [
+        f"{path}.{name}: 'literal' is a member-only reason (record the class in `types`)"
+        for path, entry in MODULES.items()
+        for name, reason in entry.get("excluded", {}).items()
+        if reason == LITERAL
+    ]
+    for qualified, entry in MEMBERS.items():
+        literal = sorted(name for name, reason in entry.get("excluded", {}).items() if reason == LITERAL)
+        if not literal:
+            continue
+        path, _, name = qualified.rpartition(".")
+        ts_type = MODULES.get(path, {}).get("types", {}).get(name)
+        if qualified in SHARED or ts_type is None:
+            problems.append(f"{qualified}: {literal} are 'literal' but the class is not recorded in a `types` map")
+        elif ts_type not in TS_TYPES:
+            problems.append(f"{qualified}: {literal} are 'literal' but TypeScript type {ts_type!r} is not declared")
+    assert problems == []
 
 
 def test_member_ledger_names_only_bound_classes() -> None:

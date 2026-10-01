@@ -203,11 +203,106 @@ impl SensitivityMatrix {
     }
 
     /// Return a materialized column for a factor.
+    ///
+    /// # Arguments
+    ///
+    /// * `factor_idx` - Zero-based column index into [`Self::factor_ids`]. Must
+    ///   be strictly less than [`Self::n_factors`].
+    ///
+    /// # Panics
+    ///
+    /// Panics when `factor_idx` is out of bounds (hard assert; see
+    /// [`Self::delta`]).
     #[must_use]
     pub fn factor_deltas(&self, factor_idx: usize) -> Vec<f64> {
         (0..self.n_positions())
             .map(|position_idx| self.delta(position_idx, factor_idx))
             .collect()
+    }
+
+    fn check_position(&self, position_idx: usize) -> finstack_quant_core::Result<()> {
+        if position_idx < self.n_positions() {
+            return Ok(());
+        }
+        Err(finstack_quant_core::Error::Validation(format!(
+            "position_idx {position_idx} out of bounds for {} positions",
+            self.n_positions()
+        )))
+    }
+
+    fn check_factor(&self, factor_idx: usize) -> finstack_quant_core::Result<()> {
+        if factor_idx < self.n_factors {
+            return Ok(());
+        }
+        Err(finstack_quant_core::Error::Validation(format!(
+            "factor_idx {factor_idx} out of bounds for {} factors",
+            self.n_factors
+        )))
+    }
+
+    /// Read a matrix element, rejecting an out-of-range index.
+    ///
+    /// Fallible form of [`Self::delta`] for callers that take indices from
+    /// outside (the Python and WASM bindings).
+    ///
+    /// # Arguments
+    ///
+    /// * `position_idx` - Zero-based row index into [`Self::position_ids`].
+    /// * `factor_idx` - Zero-based column index into [`Self::factor_ids`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] naming the index and
+    /// the axis length when either index is out of bounds.
+    pub fn try_delta(
+        &self,
+        position_idx: usize,
+        factor_idx: usize,
+    ) -> finstack_quant_core::Result<f64> {
+        self.check_position(position_idx)?;
+        self.check_factor(factor_idx)?;
+        Ok(self.data[position_idx * self.n_factors + factor_idx])
+    }
+
+    /// Return one position's row across all factors, rejecting an out-of-range index.
+    ///
+    /// Fallible form of [`Self::position_deltas`].
+    ///
+    /// # Arguments
+    ///
+    /// * `position_idx` - Zero-based row index into [`Self::position_ids`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when `position_idx`
+    /// is out of bounds.
+    pub fn try_position_deltas(&self, position_idx: usize) -> finstack_quant_core::Result<&[f64]> {
+        self.check_position(position_idx)?;
+        let start = position_idx * self.n_factors;
+        Ok(&self.data[start..start + self.n_factors])
+    }
+
+    /// Return one factor's column across all positions, rejecting an out-of-range index.
+    ///
+    /// Fallible form of [`Self::factor_deltas`].
+    ///
+    /// # Arguments
+    ///
+    /// * `factor_idx` - Zero-based column index into [`Self::factor_ids`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when `factor_idx` is
+    /// out of bounds.
+    pub fn try_factor_deltas(&self, factor_idx: usize) -> finstack_quant_core::Result<Vec<f64>> {
+        self.check_factor(factor_idx)?;
+        Ok(self
+            .data
+            .iter()
+            .skip(factor_idx)
+            .step_by(self.n_factors)
+            .copied()
+            .collect())
     }
 
     /// Return the underlying row-major storage.
@@ -335,6 +430,46 @@ mod tests {
             );
             assert!(message.contains("2 factor(s)"), "{message}");
         }
+    }
+
+    #[test]
+    fn try_accessors_reject_out_of_range_indices_and_match_the_panicking_forms() {
+        let matrix = SensitivityMatrix::from_rows(
+            vec!["A".into(), "B".into()],
+            vec![
+                FactorId::new("F1"),
+                FactorId::new("F2"),
+                FactorId::new("F3"),
+            ],
+            vec![vec![1.0, 2.0, 3.0], vec![4.0, 5.0, 6.0]],
+        )
+        .expect("matrix");
+        assert_eq!(matrix.try_delta(1, 2).expect("in range"), 6.0);
+        assert_eq!(
+            matrix.try_position_deltas(1).expect("row"),
+            &[4.0, 5.0, 6.0]
+        );
+        assert_eq!(matrix.try_factor_deltas(1).expect("column"), vec![2.0, 5.0]);
+        assert_eq!(
+            matrix.try_factor_deltas(2).expect("column"),
+            matrix.factor_deltas(2)
+        );
+
+        // Row-major storage: (0, 3) would silently read (1, 0) without the check.
+        let err = matrix.try_delta(0, 3).expect_err("factor out of range");
+        assert!(err
+            .to_string()
+            .contains("factor_idx 3 out of bounds for 3 factors"));
+        let err = matrix.try_delta(2, 0).expect_err("position out of range");
+        assert!(err
+            .to_string()
+            .contains("position_idx 2 out of bounds for 2 positions"));
+        assert!(matrix.try_position_deltas(2).is_err());
+        assert!(matrix.try_factor_deltas(3).is_err());
+
+        let empty = SensitivityMatrix::zeros(vec![], vec![]);
+        assert!(empty.try_position_deltas(0).is_err());
+        assert!(empty.try_factor_deltas(0).is_err());
     }
 
     /// The zero-factor edge case is exactly where a `debug_assert!` would

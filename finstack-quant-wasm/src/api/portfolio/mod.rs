@@ -206,7 +206,20 @@ impl JsPortfolio {
         self.inner.positions().len()
     }
 
-    /// Serialise the canonical spec back to JSON.
+    /// Canonical `PortfolioSpec` of the portfolio (Rust `Portfolio::to_spec`).
+    ///
+    /// @returns Plain `PortfolioSpec` object accepted by `Portfolio.fromSpec`.
+    ///
+    /// # Errors
+    ///
+    /// Throws a JavaScript exception if the specification cannot be converted
+    /// to a JavaScript value.
+    #[wasm_bindgen(js_name = toSpec)]
+    pub fn to_spec(&self) -> Result<JsValue, JsValue> {
+        to_js_value(&self.inner.to_spec())
+    }
+
+    /// Serialise the canonical spec (Rust `Portfolio::to_spec`) back to JSON.
     ///
     /// # Errors
     ///

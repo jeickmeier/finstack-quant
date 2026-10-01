@@ -421,6 +421,17 @@ fn binding_from_slacks(slacks: &IndexMap<String, f64>) -> Vec<(&str, f64)> {
 }
 
 impl PortfolioOptimizationResultWire {
+    /// Executable trade list, largest absolute quantity change first.
+    ///
+    /// The wire form of [`PortfolioOptimizationResult::to_trade_list`]: the
+    /// list was computed when the result was converted to its wire contract
+    /// and is stored in `trades`. Empty for an infeasible solve, which is not
+    /// the same as "nothing to trade"; check `is_feasible` first.
+    #[must_use]
+    pub fn to_trade_list(&self) -> &[TradeSpec] {
+        &self.trades
+    }
+
     /// Trades whose `trade_type` is [`TradeType::NewPosition`], in trade-list
     /// order.
     ///

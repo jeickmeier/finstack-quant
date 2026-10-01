@@ -123,12 +123,12 @@ impl PyPortfolio {
 
     /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
     ///
-    /// Reconstruction goes through ``to_spec_json`` / ``from_spec`` — the same
+    /// Reconstruction goes through ``to_json`` / ``from_spec`` — the same
     /// strict serde round-trip as the wire format — so an unpickled portfolio
     /// is rebuilt (positions materialized, indices rebuilt) exactly as if it
     /// had been loaded from its canonical ``PortfolioSpec``.
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let payload = self.to_spec_json(py)?;
+        let payload = self.to_json(py)?;
         let from_spec = py.get_type::<Self>().getattr("from_spec")?;
         crate::bindings::pickle_support::reduce_via_json(from_spec, payload)
     }
@@ -143,7 +143,7 @@ impl PyPortfolio {
         if Arc::ptr_eq(&self.inner, &other.inner) {
             return Ok(true);
         }
-        Ok(self.to_spec_json(py)? == other.to_spec_json(py)?)
+        Ok(self.to_json(py)? == other.to_json(py)?)
     }
 
     /// Portfolio identifier.
@@ -212,9 +212,18 @@ impl PyPortfolio {
         self.inner.positions().len()
     }
 
-    /// Round-trip the portfolio back to its JSON spec form.
+    /// Canonical ``PortfolioSpec`` of the portfolio as a plain dict (Rust
+    /// ``Portfolio::to_spec``), the input accepted by ``from_spec``.
+    #[allow(clippy::wrong_self_convention)]
     #[pyo3(text_signature = "(self)")]
-    fn to_spec_json(&self, py: Python<'_>) -> PyResult<String> {
+    fn to_spec<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.to_spec())
+    }
+
+    /// Serialize the canonical ``PortfolioSpec`` (Rust ``Portfolio::to_spec``)
+    /// to a JSON string accepted by ``from_spec``.
+    #[pyo3(text_signature = "(self)")]
+    fn to_json(&self, py: Python<'_>) -> PyResult<String> {
         let portfolio = self.inner.as_ref();
         py.detach(|| serde_json::to_string(&portfolio.to_spec()))
             .map_err(display_to_py)

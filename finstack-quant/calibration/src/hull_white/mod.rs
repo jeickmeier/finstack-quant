@@ -63,12 +63,12 @@ mod swaption;
 mod targets;
 
 pub use cap_floor::{
-    bootstrap_hull_white_sigma_schedule_to_cap_floors, calibrate_hull_white_to_cap_floors,
-    PiecewiseSigmaCalibrationConfig,
+    bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn,
+    calibrate_hull_white_to_cap_floors_with_fn, PiecewiseSigmaCalibrationConfig,
 };
 pub use curves::{
-    bootstrap_hull_white_sigma_schedule_to_cap_floors_from_curves,
-    calibrate_hull_white_to_cap_floors_from_curves, calibrate_hull_white_to_swaptions_from_curve,
+    bootstrap_hull_white_sigma_schedule_to_cap_floors, calibrate_hull_white_to_cap_floors,
+    calibrate_hull_white_to_swaptions,
 };
 pub use finstack_quant_models::rates::hull_white::{
     capfloor_hw1f_scalar_keys, capfloor_hw1f_sigma_schedule_key, hw1f_scalar_keys,
@@ -77,7 +77,7 @@ pub use finstack_quant_models::rates::hull_white::{
 pub use quotes::{
     CapFloorCalibrationConfig, CapFloorQuote, SwapFrequency, SwaptionQuote, SwaptionSchedule,
 };
-pub use swaption::calibrate_hull_white_to_swaptions;
+pub use swaption::calibrate_hull_white_to_swaptions_with_fn;
 
 #[cfg(test)]
 pub(crate) use pricing::hw1f_cap_floor_implied_normal_vol;

@@ -755,7 +755,6 @@ fn scenarios_dts_matches_structured_surface() {
         "scenarioSpecWithHazardBumpMode(spec: ScenarioSpec | string, mode: HazardBumpMode): ScenarioSpec;",
         "horizonResultExplainText(result: HorizonReport | HorizonResult | string): string;",
         "horizonResultFactorContribution(result: HorizonReport | HorizonResult | string, factor: AttributionFactor): number;",
-        "compoundingSemiAnnual(): Compounding;",
     ] {
         assert!(contains_ignoring_ws(&dts, signature), "{signature}");
     }

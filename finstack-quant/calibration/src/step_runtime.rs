@@ -3,10 +3,11 @@
 use crate::api::schema::{CalibrationStep, HullWhiteVolatilityMode, StepParams};
 use crate::config::CalibrationConfig;
 use crate::hull_white::{
-    bootstrap_hull_white_sigma_schedule_to_cap_floors, calibrate_hull_white_to_cap_floors,
-    calibrate_hull_white_to_swaptions, capfloor_hw1f_scalar_keys, capfloor_hw1f_sigma_schedule_key,
-    hw1f_scalar_keys, CapFloorCalibrationConfig, CapFloorQuote, PiecewiseSigmaCalibrationConfig,
-    SwapFrequency, SwaptionQuote, SwaptionSchedule,
+    bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn,
+    calibrate_hull_white_to_cap_floors_with_fn, calibrate_hull_white_to_swaptions_with_fn,
+    capfloor_hw1f_scalar_keys, capfloor_hw1f_sigma_schedule_key, hw1f_scalar_keys,
+    CapFloorCalibrationConfig, CapFloorQuote, PiecewiseSigmaCalibrationConfig, SwapFrequency,
+    SwaptionQuote, SwaptionSchedule,
 };
 use crate::quotes::market_quote::MarketQuote;
 use crate::quotes::vol::VolQuote;
@@ -398,7 +399,7 @@ pub(crate) fn execute_params(
                     ))
                 }
             };
-            let (hw_params, report) = calibrate_hull_white_to_swaptions(
+            let (hw_params, report) = calibrate_hull_white_to_swaptions_with_fn(
                 &df,
                 &hw_quotes,
                 SwapFrequency::Annual,
@@ -501,7 +502,7 @@ pub(crate) fn execute_params(
             let (kappa_key, sigma_key) = capfloor_hw1f_scalar_keys(p.discount_curve_id.as_str());
             match p.volatility_mode {
                 HullWhiteVolatilityMode::Scalar => {
-                    let (hw_params, report) = calibrate_hull_white_to_cap_floors(
+                    let (hw_params, report) = calibrate_hull_white_to_cap_floors_with_fn(
                         &discount_df,
                         &forward_df,
                         &cap_floor_quotes,
@@ -527,18 +528,19 @@ pub(crate) fn execute_params(
                             "piecewise cap/floor HW1F calibration requires fixed_kappa".into(),
                         )
                     })?;
-                    let (model, report) = bootstrap_hull_white_sigma_schedule_to_cap_floors(
-                        &discount_df,
-                        &forward_df,
-                        &cap_floor_quotes,
-                        PiecewiseSigmaCalibrationConfig {
-                            fit_tolerance: p.fit_tolerance,
-                            fixed_kappa,
-                            sigma_min: 1.0e-5,
-                            sigma_max: 2.0,
-                            frequency: p.payment_frequency,
-                        },
-                    )?;
+                    let (model, report) =
+                        bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn(
+                            &discount_df,
+                            &forward_df,
+                            &cap_floor_quotes,
+                            PiecewiseSigmaCalibrationConfig {
+                                fit_tolerance: p.fit_tolerance,
+                                fixed_kappa,
+                                sigma_min: 1.0e-5,
+                                sigma_max: 2.0,
+                                frequency: p.payment_frequency,
+                            },
+                        )?;
                     let observations = model
                         .volatility
                         .times()

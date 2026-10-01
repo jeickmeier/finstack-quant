@@ -760,7 +760,7 @@ fn calibrate_hull_white_to_swaptions(
     let initial_guess = initial_guess.map(|p| p.inner);
     let (params, report) = py
         .detach(move || {
-            rust_hw::calibrate_hull_white_to_swaptions_from_curve(
+            rust_hw::calibrate_hull_white_to_swaptions(
                 curve.as_ref(),
                 &quotes,
                 frequency,
@@ -819,7 +819,7 @@ fn calibrate_hull_white_to_cap_floors(
     let config = config.inner;
     let (params, report) = py
         .detach(move || {
-            rust_hw::calibrate_hull_white_to_cap_floors_from_curves(
+            rust_hw::calibrate_hull_white_to_cap_floors(
                 discount.as_ref(),
                 forward.as_deref(),
                 &quotes,
@@ -878,7 +878,7 @@ fn bootstrap_hull_white_sigma_schedule_to_cap_floors(
     let config = config.inner;
     let (params, report) = py
         .detach(move || {
-            rust_hw::bootstrap_hull_white_sigma_schedule_to_cap_floors_from_curves(
+            rust_hw::bootstrap_hull_white_sigma_schedule_to_cap_floors(
                 discount.as_ref(),
                 forward.as_deref(),
                 &quotes,

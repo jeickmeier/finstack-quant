@@ -66,17 +66,40 @@ fn tranche_cost(result: &StochasticPricingResult, id: &str) -> f64 {
 /// The Monte Carlo entry point is the explicit mode with the same estimator
 /// count and pairing.
 #[test]
-fn price_stochastic_monte_carlo_matches_the_explicit_mode() {
+fn price_stochastic_matches_the_explicit_mode() {
     let deal = pool_of(Vec::new(), CreditSpreadProcessSpec::Constant(0.025), 0.25);
     let explicit = deal
         .price_stochastic_with_mode(&market(), CLOSING, monte_carlo(4))
         .expect("explicit mode");
     let paths = deal
-        .price_stochastic_monte_carlo(&market(), CLOSING, Some(4), true)
+        .price_stochastic(&market(), CLOSING, Some(4), Some(true))
         .expect("monte carlo");
     assert_eq!(paths.npv, explicit.npv);
     assert_eq!(paths.num_paths, explicit.num_paths);
     assert_eq!(paths.pricing_mode, monte_carlo(4));
+}
+
+/// An omitted override falls back to the deal's `model_config`, so a deal
+/// configured without antithetic pairing is priced that way by every caller.
+#[test]
+fn price_stochastic_omitted_overrides_use_the_deal_model_config() {
+    let mut deal = pool_of(Vec::new(), CreditSpreadProcessSpec::Constant(0.025), 0.25);
+    deal.instrument_pricing_overrides.model_config.mc_paths = Some(3);
+    deal.instrument_pricing_overrides.model_config.mc_antithetic = Some(false);
+    let configured = deal
+        .price_stochastic(&market(), CLOSING, None, None)
+        .expect("configured");
+    assert_eq!(
+        configured.pricing_mode,
+        StructuredCreditPricingMode::MonteCarlo {
+            num_paths: 3,
+            antithetic: false,
+        }
+    );
+    let overridden = deal
+        .price_stochastic(&market(), CLOSING, Some(4), Some(true))
+        .expect("overridden");
+    assert_eq!(overridden.pricing_mode, monte_carlo(4));
 }
 
 /// A constant spread equal to the contractual margin: the counterfactual

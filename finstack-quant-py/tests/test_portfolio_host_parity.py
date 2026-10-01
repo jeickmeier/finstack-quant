@@ -229,7 +229,7 @@ def _compute(inputs: dict[str, Any]) -> dict[str, Any]:
         "valuation_entity_value": valuation.get_entity_value("FUND").amount,
         "metrics_total_dv01": metrics.get_total("dv01"),
         "metrics_position_dv01": None if position_metrics is None else position_metrics["metrics"]["dv01"],
-        "builder_spec": json.loads(_built_portfolio(inputs).to_spec_json()),
+        "builder_spec": json.loads(_built_portfolio(inputs).to_json()),
     }
 
 

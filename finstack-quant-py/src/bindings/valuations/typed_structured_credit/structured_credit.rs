@@ -348,8 +348,9 @@ impl PyStructuredCredit {
     ///     Number of independent Monte Carlo estimators; defaults to the deal's
     ///     configured ``mc_paths`` override or 5,000. With ``antithetic`` each
     ///     estimator simulates a mirrored pair, so ``2 * num_paths`` paths run.
-    /// antithetic : bool, default True
-    ///     Pair each estimator's path with its sign-flipped mirror.
+    /// antithetic : bool, optional
+    ///     Pair each estimator's path with its sign-flipped mirror; defaults
+    ///     to the deal's configured ``mc_antithetic`` override or ``True``.
     ///
     /// Returns
     /// -------
@@ -365,23 +366,21 @@ impl PyStructuredCredit {
     ///     If a required curve is missing from ``market``.
     /// RuntimeError
     ///     If the simulation fails.
-    #[pyo3(signature = (market, as_of, num_paths=None, antithetic=true))]
-    #[pyo3(text_signature = "($self, market, as_of, num_paths=None, antithetic=True)")]
+    #[pyo3(signature = (market, as_of, num_paths=None, antithetic=None))]
+    #[pyo3(text_signature = "($self, market, as_of, num_paths=None, antithetic=None)")]
     fn price_stochastic(
         &self,
         py: Python<'_>,
         market: &Bound<'_, PyAny>,
         as_of: &Bound<'_, PyAny>,
         num_paths: Option<usize>,
-        antithetic: bool,
+        antithetic: Option<bool>,
     ) -> PyResult<PyStochasticPricingResult> {
         let market = extract_market(py, market)?;
         let as_of = extract_date(as_of)?;
         let deal = self.inner.clone();
         let inner = py
-            .detach(move || {
-                deal.price_stochastic_monte_carlo(&market, as_of, num_paths, antithetic)
-            })
+            .detach(move || deal.price_stochastic(&market, as_of, num_paths, antithetic))
             .map_err(core_to_py)?;
         Ok(PyStochasticPricingResult { inner })
     }

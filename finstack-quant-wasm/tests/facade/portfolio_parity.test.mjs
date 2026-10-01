@@ -225,6 +225,11 @@ test('Portfolio.builder builds the same portfolio as Python', () => {
   for (const position of spec.positions) builder = builder.position(position);
   const built = builder.tag('desk', 'rates').meta('owner', { team: 'rates' }).build();
   assertClose(JSON.parse(built.toJson()), expected.builder_spec);
+  // `toSpec` is the plain-object form of the same Rust `Portfolio::to_spec`.
+  assert.deepEqual(built.toSpec(), JSON.parse(built.toJson()));
+  const rebuilt = portfolio.Portfolio.fromSpec(built.toSpec());
+  assert.equal(rebuilt.toJson(), built.toJson());
+  rebuilt.free();
   assert.equal(built.name, 'Desk book');
   assert.deepEqual(built.positionIds, ['POS-0', 'POS-1']);
   built.free();
@@ -260,6 +265,16 @@ test('optimization result methods read the wire result', () => {
     inputs.market_t0
   );
   assert.deepEqual(portfolio.portfolioOptimizationResultNewPositionTrades(optimized), []);
+  // The trade list is the wire `trades` field, computed once by Rust.
+  assert.deepEqual(portfolio.portfolioOptimizationResultToTradeList(optimized), optimized.trades);
+  assert.deepEqual(
+    portfolio.portfolioOptimizationResultToTradeList(JSON.stringify(optimized)),
+    optimized.trades
+  );
+  assert.throws(
+    () => portfolio.portfolioOptimizationResultToTradeList({ nope: 1 }),
+    (error) => error.kind === 'validation'
+  );
   const binding = portfolio.portfolioOptimizationResultBindingConstraints(optimized);
   assert.ok(binding.length >= 1, 'the budget constraint binds');
   for (const [label, slack] of binding) {

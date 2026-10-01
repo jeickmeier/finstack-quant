@@ -197,6 +197,8 @@ impl JsMarketContext {
     ///
     /// * `fx` - FX matrix to attach; it replaces any matrix already attached
     ///   and is shared, so later `setQuote` calls on it are visible here.
+    ///
+    /// @returns This context, updated in place, so calls can be chained.
     #[wasm_bindgen(js_name = insertFx)]
     pub fn insert_fx(&mut self, fx: &JsFxMatrix) {
         self.context_mut().insert_fx_mut(Arc::clone(&fx.inner));
@@ -213,6 +215,7 @@ impl JsMarketContext {
     /// * `currency` - ISO-4217 code that makes the scalar a monetary price;
     ///   omitted stores a unitless number.
     ///
+    /// @returns This context, updated in place, so calls can be chained.
     /// @throws `TypeError` (kind `invalid_type`) for a mistyped argument;
     /// `FinstackError` (kind `validation`) for an unknown currency or a
     /// monetary value that is not finite.
@@ -244,6 +247,7 @@ impl JsMarketContext {
     /// * `data` - Constituent count, recovery, index hazard curve and
     ///   base-correlation curve of the index.
     ///
+    /// @returns This context, updated in place, so calls can be chained.
     /// @throws `TypeError` if `id` is not a string.
     #[wasm_bindgen(js_name = insertCreditIndex)]
     pub fn insert_credit_index(
@@ -262,6 +266,8 @@ impl JsMarketContext {
     /// # Arguments
     ///
     /// * `series` - Series to store; one with the same id is replaced.
+    ///
+    /// @returns This context, updated in place, so calls can be chained.
     #[wasm_bindgen(js_name = insertSeries)]
     pub fn insert_series(&mut self, series: &JsScalarTimeSeries) {
         self.context_mut().insert_series_mut(series.inner.clone());
@@ -273,6 +279,8 @@ impl JsMarketContext {
     /// # Arguments
     ///
     /// * `index` - Inflation index to store; one with the same id is replaced.
+    ///
+    /// @returns This context, updated in place, so calls can be chained.
     #[wasm_bindgen(js_name = insertInflationIndex)]
     pub fn insert_inflation_index(&mut self, index: &JsInflationIndex) {
         let id = index.inner.id.clone();
@@ -289,6 +297,7 @@ impl JsMarketContext {
     /// * `discount_id` - Identifier of the discount curve to use for that
     ///   CSA; it is resolved when a collateral curve is requested.
     ///
+    /// @returns This context, updated in place, so calls can be chained.
     /// @throws `TypeError` if an argument is not a string.
     #[wasm_bindgen(js_name = mapCollateral)]
     pub fn map_collateral(

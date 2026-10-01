@@ -2070,18 +2070,9 @@
       "SimmSensitivities",
       "VmCalculator",
       "calculateVm",
-      "clearingStatusBilateral",
       "clearingStatusCleared",
-      "collateralAssetClassAgencyBonds",
-      "collateralAssetClassCash",
-      "collateralAssetClassCorporateBonds",
-      "collateralAssetClassCoveredBonds",
-      "collateralAssetClassEquity",
       "collateralAssetClassFromStr",
       "collateralAssetClassFxAddon",
-      "collateralAssetClassGold",
-      "collateralAssetClassGovernmentBonds",
-      "collateralAssetClassMutualFunds",
       "collateralAssetClassStandardHaircut",
       "computeBilateralXva",
       "computeMva",
@@ -2112,34 +2103,19 @@
       "fundingConfigEffectiveMarginSpreadBp",
       "haircut01",
       "haircut01HaircutBp",
-      "imDecayProfileConstant",
       "imDecayProfileFactor",
       "imDecayProfileLinearToMaturity",
       "imDecayProfileSqrtTime",
-      "imMethodologyClearingHouse",
       "imMethodologyFromStr",
-      "imMethodologyHaircut",
-      "imMethodologyInternalModel",
-      "imMethodologySchedule",
-      "imMethodologySimm",
       "imProfileFromSimm",
       "imProfileValidate",
       "imResultBreakdownAmount",
       "imResultBreakdownKeys",
       "marginCallTypeFromStr",
-      "marginCallTypeInitialMargin",
-      "marginCallTypeSubstitution",
-      "marginCallTypeTopUp",
-      "marginCallTypeVariationMarginCollect",
-      "marginCallTypeVariationMarginPost",
       "marginFundingCost",
       "marginFundingCostCostForPeriod",
       "marginFundingCostSpread",
-      "marginTenorDaily",
       "marginTenorFromStr",
-      "marginTenorMonthly",
-      "marginTenorOnDemand",
-      "marginTenorWeekly",
       "marginUtilization",
       "marginUtilizationIsAdequate",
       "marginUtilizationRatio",
@@ -2291,40 +2267,13 @@
   "margin.computeMva": {
     "kind": "function"
   },
-  "margin.clearingStatusBilateral": {
-    "kind": "function"
-  },
   "margin.clearingStatusCleared": {
-    "kind": "function"
-  },
-  "margin.collateralAssetClassAgencyBonds": {
-    "kind": "function"
-  },
-  "margin.collateralAssetClassCash": {
-    "kind": "function"
-  },
-  "margin.collateralAssetClassCorporateBonds": {
-    "kind": "function"
-  },
-  "margin.collateralAssetClassCoveredBonds": {
-    "kind": "function"
-  },
-  "margin.collateralAssetClassEquity": {
     "kind": "function"
   },
   "margin.collateralAssetClassFromStr": {
     "kind": "function"
   },
   "margin.collateralAssetClassFxAddon": {
-    "kind": "function"
-  },
-  "margin.collateralAssetClassGold": {
-    "kind": "function"
-  },
-  "margin.collateralAssetClassGovernmentBonds": {
-    "kind": "function"
-  },
-  "margin.collateralAssetClassMutualFunds": {
     "kind": "function"
   },
   "margin.collateralAssetClassStandardHaircut": {
@@ -2402,9 +2351,6 @@
   "margin.haircut01HaircutBp": {
     "kind": "function"
   },
-  "margin.imDecayProfileConstant": {
-    "kind": "function"
-  },
   "margin.imDecayProfileFactor": {
     "kind": "function"
   },
@@ -2414,22 +2360,7 @@
   "margin.imDecayProfileSqrtTime": {
     "kind": "function"
   },
-  "margin.imMethodologyClearingHouse": {
-    "kind": "function"
-  },
   "margin.imMethodologyFromStr": {
-    "kind": "function"
-  },
-  "margin.imMethodologyHaircut": {
-    "kind": "function"
-  },
-  "margin.imMethodologyInternalModel": {
-    "kind": "function"
-  },
-  "margin.imMethodologySchedule": {
-    "kind": "function"
-  },
-  "margin.imMethodologySimm": {
     "kind": "function"
   },
   "margin.imProfileFromSimm": {
@@ -2447,21 +2378,6 @@
   "margin.marginCallTypeFromStr": {
     "kind": "function"
   },
-  "margin.marginCallTypeInitialMargin": {
-    "kind": "function"
-  },
-  "margin.marginCallTypeSubstitution": {
-    "kind": "function"
-  },
-  "margin.marginCallTypeTopUp": {
-    "kind": "function"
-  },
-  "margin.marginCallTypeVariationMarginCollect": {
-    "kind": "function"
-  },
-  "margin.marginCallTypeVariationMarginPost": {
-    "kind": "function"
-  },
   "margin.marginFundingCost": {
     "kind": "function"
   },
@@ -2471,19 +2387,7 @@
   "margin.marginFundingCostSpread": {
     "kind": "function"
   },
-  "margin.marginTenorDaily": {
-    "kind": "function"
-  },
   "margin.marginTenorFromStr": {
-    "kind": "function"
-  },
-  "margin.marginTenorMonthly": {
-    "kind": "function"
-  },
-  "margin.marginTenorOnDemand": {
-    "kind": "function"
-  },
-  "margin.marginTenorWeekly": {
     "kind": "function"
   },
   "margin.marginUtilization": {
@@ -3596,6 +3500,11 @@
       "computeFactorSensitivitiesWithMarket",
       "computePnlProfiles",
       "computePnlProfilesWithMarket",
+      "constraintBudget",
+      "constraintExposureLimit",
+      "constraintExposureMinimum",
+      "constraintMaxTurnover",
+      "constraintWeightBounds",
       "decomposeFactorRisk",
       "excessReturns",
       "factorBrinsonAttribution",
@@ -3611,9 +3520,11 @@
       "portfolioMetricsGetMetric",
       "portfolioMetricsGetPositionMetrics",
       "portfolioMetricsGetTotal",
+      "portfolioMetricsRequireTotal",
       "portfolioMetricsSeries",
       "portfolioOptimizationResultBindingConstraints",
       "portfolioOptimizationResultNewPositionTrades",
+      "portfolioOptimizationResultToTradeList",
       "portfolioValuationGetEntityValue",
       "portfolioValuationGetPositionValue",
       "positionWhatIf",
@@ -3622,6 +3533,9 @@
       "scenarioPnl",
       "scenarioPnlBatch",
       "scenarioPnlBuilt",
+      "sensitivityMatrixDelta",
+      "sensitivityMatrixFactorDeltas",
+      "sensitivityMatrixPositionDeltas",
       "twrrLinked",
       "twrrModifiedDietz",
       "validateAllocationJson",
@@ -3638,7 +3552,7 @@
   "portfolio.Portfolio": {
     "kind": "class",
     "statics": ["builder", "fromMaterialization", "fromSpec", "validateMaterialization"],
-    "methods": ["free", "numPositions", "toJson"],
+    "methods": ["free", "numPositions", "toJson", "toSpec"],
     "getters": ["asOf", "baseCurrency", "entityIds", "id", "meta", "name", "positionIds", "tags"]
   },
   "portfolio.parsePortfolioSpecJson": {
@@ -3812,6 +3726,36 @@
   "portfolio.portfolioOptimizationResultBindingConstraints": {
     "kind": "function"
   },
+  "portfolio.portfolioOptimizationResultToTradeList": {
+    "kind": "function"
+  },
+  "portfolio.portfolioMetricsRequireTotal": {
+    "kind": "function"
+  },
+  "portfolio.sensitivityMatrixDelta": {
+    "kind": "function"
+  },
+  "portfolio.sensitivityMatrixPositionDeltas": {
+    "kind": "function"
+  },
+  "portfolio.sensitivityMatrixFactorDeltas": {
+    "kind": "function"
+  },
+  "portfolio.constraintBudget": {
+    "kind": "function"
+  },
+  "portfolio.constraintWeightBounds": {
+    "kind": "function"
+  },
+  "portfolio.constraintMaxTurnover": {
+    "kind": "function"
+  },
+  "portfolio.constraintExposureLimit": {
+    "kind": "function"
+  },
+  "portfolio.constraintExposureMinimum": {
+    "kind": "function"
+  },
   "scenarios": {
     "kind": "namespace",
     "keys": [
@@ -3821,18 +3765,7 @@
       "buildScenarioSpec",
       "buildTemplateComponent",
       "composeScenarios",
-      "compoundingAnnual",
-      "compoundingContinuous",
-      "compoundingMonthly",
-      "compoundingQuarterly",
-      "compoundingSemiAnnual",
-      "compoundingSimple",
       "computeHorizonReturn",
-      "curveKindCommodity",
-      "curveKindDiscount",
-      "curveKindForward",
-      "curveKindInflation",
-      "curveKindParCds",
       "horizonResultExplainText",
       "horizonResultFactorContribution",
       "listBuiltinTemplateMetadata",
@@ -3870,11 +3803,6 @@
       "scenarioSpecMutatesInstruments",
       "scenarioSpecRequiresInstruments",
       "scenarioSpecWithHazardBumpMode",
-      "tenorMatchModeExact",
-      "tenorMatchModeInterpolate",
-      "timeRollModeApproximate",
-      "timeRollModeBusinessDays",
-      "timeRollModeCalendarDays",
       "validateScenarioSpec"
     ]
   },
@@ -3993,54 +3921,6 @@
     "kind": "function"
   },
   "scenarios.operationSpecMutatesInstruments": {
-    "kind": "function"
-  },
-  "scenarios.curveKindDiscount": {
-    "kind": "function"
-  },
-  "scenarios.curveKindForward": {
-    "kind": "function"
-  },
-  "scenarios.curveKindParCds": {
-    "kind": "function"
-  },
-  "scenarios.curveKindInflation": {
-    "kind": "function"
-  },
-  "scenarios.curveKindCommodity": {
-    "kind": "function"
-  },
-  "scenarios.tenorMatchModeExact": {
-    "kind": "function"
-  },
-  "scenarios.tenorMatchModeInterpolate": {
-    "kind": "function"
-  },
-  "scenarios.timeRollModeBusinessDays": {
-    "kind": "function"
-  },
-  "scenarios.timeRollModeCalendarDays": {
-    "kind": "function"
-  },
-  "scenarios.timeRollModeApproximate": {
-    "kind": "function"
-  },
-  "scenarios.compoundingSimple": {
-    "kind": "function"
-  },
-  "scenarios.compoundingContinuous": {
-    "kind": "function"
-  },
-  "scenarios.compoundingAnnual": {
-    "kind": "function"
-  },
-  "scenarios.compoundingSemiAnnual": {
-    "kind": "function"
-  },
-  "scenarios.compoundingQuarterly": {
-    "kind": "function"
-  },
-  "scenarios.compoundingMonthly": {
     "kind": "function"
   },
   "scenarios.rateBindingSpecValidate": {
