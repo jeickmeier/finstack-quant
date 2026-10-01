@@ -57,7 +57,6 @@
 #### Changed (BREAKING)
 
 - An unknown instrument type in the valuations schema accessors is a not-found error (Python `KeyError`, WASM kind `not_found`).
-- Python structured-credit, facility and tranche builders and `StructuredCredit.tranche_cashflows` / `price_stochastic` call the Rust methods; the binding copies are deleted.
 
 #### Added
 
@@ -83,7 +82,7 @@
   - `toggleExerciseThresholdJson` / `toggleExerciseOptimalJson` → `ToggleExerciseModel`.
 - `TransitionMatrix.probability_by_index` raises `ValueError` for an index outside the rating scale in Python (was `IndexError`), through the new Rust `TransitionMatrix::try_probability_by_index`.
 - Python migration and PD-calibration errors take their exception type from the Rust error kind.
-- Python `ToggleExerciseModel.should_pik` runs the nested simulation for optimal-exercise rules, seeded from the draw `u` (it returned `False`).
+- Python `ToggleExerciseModel.should_pik_with_uniform` runs the nested simulation for optimal-exercise rules, seeded from the draw `u` (it returned `False`).
 
 #### Added
 
