@@ -2,7 +2,7 @@
 //!
 //! The cashflows crate does not publish one schema per accessor. It publishes
 //! a single `resources()` call returning `(canonical URI, jsonschema::Resource)`
-//! pairs for the seven embedded component schemas, which the valuations
+//! pairs for every embedded cashflow schema, which the valuations
 //! validator feeds to its `$ref` resolver. The binding below preserves that
 //! shape as a `dict[str, str]` keyed by the same canonical URI.
 //!
@@ -20,12 +20,13 @@ use finstack_quant_cashflows::schema as canonical;
 use crate::errors::{core_to_py, serde_json_to_py};
 
 /// Docstring for the `finstack_quant.cashflows.schema` Python namespace.
-const MODULE_DOC: &str = r#"Compiled-in JSON Schemas for the cashflow component wire format.
+const MODULE_DOC: &str = r#"Compiled-in JSON Schemas for the cashflow wire format.
 
-The seven cashflow component schemas (amortization, coupon, default,
-fee, prepayment, recovery, and schedule specifications) are embedded in the
-extension module, so they always match the installed version and cannot drift
-from the wheel that ships them. These are the documents that resolve the
+Every cashflow schema (the amortization, coupon, default, fee, prepayment,
+recovery and schedule specifications, plus the schedule, build-spec, accrual
+and aggregation contracts) is embedded in the extension module, so they always
+match the installed version and cannot drift from the wheel that ships them.
+These are the documents that resolve the
 ``https://finstack_quant.dev/schemas/cashflow/1/...`` references appearing
 inside instrument schemas.
 
@@ -45,7 +46,7 @@ fn schema_json(value: &Value) -> PyResult<String> {
         .map_err(|err| serde_json_to_py(err, "failed to serialize schema"))
 }
 
-/// Return every embedded cashflow component schema, keyed by canonical URI.
+/// Return every embedded cashflow schema, keyed by canonical URI.
 ///
 /// The keys are the published ``$id`` URIs used by ``$ref`` targets in
 /// instrument and cashflow payload schemas, so the mapping can be handed
@@ -55,19 +56,19 @@ fn schema_json(value: &Value) -> PyResult<String> {
 /// -------
 /// dict of str to str
 ///     Mapping from canonical schema URI to pretty-printed JSON Schema text,
-///     one entry per embedded cashflow component schema.
+///     one entry per embedded cashflow schema.
 ///
 /// Raises
 /// ------
 /// ValueError
-///     If a compiled-in component schema is malformed or cannot be serialized
+///     If a compiled-in schema is malformed or cannot be serialized
 ///     back to JSON text.
 ///
 /// Examples
 /// --------
 /// >>> from finstack_quant.cashflows import schema
 /// >>> sorted(uri.rsplit("/", 1)[-1] for uri in schema.resources())[:2]
-/// ['amortization_spec.schema.json', 'coupon_specs.schema.json']
+/// ['accrual_config.schema.json', 'amortization_spec.schema.json']
 #[pyfunction]
 #[pyo3(text_signature = "()")]
 fn resources<'py>(py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {

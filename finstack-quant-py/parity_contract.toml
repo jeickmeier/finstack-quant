@@ -312,7 +312,7 @@ status = "exists"
 note = "Typed submodules (primitives/builder/accrual/aggregation) plus the JSON schedule bridge and its typed twins (build_cashflow_schedule / dated_flows). Rust-only (deliberately unbound): rate_helpers::project_index_rate (cross-crate term coupon projection kernel; raw observations are exposed through fixings.ProjectedFixing), the JSON-bridge spec types CashflowScheduleBuildSpec / CouponLegSpec / PaymentProgramSpec / DatedFlowJson (host callers pass dict/JSON to build_cashflow_schedule), the DatedFlow(s) tuple aliases (Python uses list[tuple[date, Money]]), the CashflowProvider / CashflowScheduleSource traits, and the pub(crate)-facing CashFlowSchedule mutators update_flows / try_update_flows / retain_flows / push_flow / into_flows (wrappers are frozen; rebuild via from_flows / scale_amounts instead). serde_defaults is pub so binding constructor defaults call the same helpers as the wire format."
 
 [crates.cashflows.modules]
-fixings = { python = "finstack_quant.cashflows.fixings", status = "exists", note = "Typed raw rate/FX observations and atomic crossed-fixing materialization. Scenario rolls invoke the same Rust helper; WASM exposes metadata through its existing JSON schedule/scenario facade." }
+fixings = { python = "finstack_quant.cashflows.fixings", status = "exists", note = "Typed raw rate/FX observations and atomic crossed-fixing materialization. Scenario rolls invoke the same Rust helper; WASM binds it as cashflows.materializeFixings over CashFlowSchedule handles or schedule JSON." }
 json        = { python = "finstack_quant.cashflows",             status = "exists", note = "JSON bridge exposes the canonical coupon_program and payment_program builder surface. Naming note: the free function validate_cashflow_schedule_json binds Rust json::validate_cashflow_schedule_json 1:1; its typed twin is CashFlowSchedule.validate() on the builder surface." }
 accrual     = { python = "finstack_quant.cashflows.accrual",     status = "exists", note = "Typed accrual engine; accrued_interest remains on the JSON bridge" }
 aggregation = { python = "finstack_quant.cashflows.aggregation", status = "exists", note = "Typed period rollups and currency-checked totals. Rust-only (deliberately unbound): credit_adjusted_cashflow_pv, RecoveryTiming, and DateContext — a borrow-parameterized PV kernel consumed by valuations pricers, not a host-facing API." }
@@ -348,7 +348,7 @@ python_package = "finstack_quant.cashflows.builder"
 # carried inside schedule JSON); evaluate_fee_tiers / FeeTier / DefaultCurve /
 # PrepaymentCurve (spec internals reachable through the spec types); and the
 # credit-rate helpers psa_cpr / PSA_RAMP_MONTHS / PSA_TERMINAL_CPR.
-note = "abs_to_smm/cdr_to_mdr/cpr_to_smm/mdr_to_cdr/smm_to_cpr are also re-exported at the Rust crate root and bound flat on finstack_quant.cashflows (their WASM twins are accounted in the [parity] ledger). Typed CashFlowBuilder matches the Rust coupon-program methods (including fixed_to_float and float_margin_steps); WASM remains JSON-only via CouponLegSpec."
+note = "abs_to_smm/cdr_to_mdr/cpr_to_smm/mdr_to_cdr/smm_to_cpr are also re-exported at the Rust crate root and bound flat on finstack_quant.cashflows (their WASM twins are accounted in the [parity] ledger). Typed CashFlowBuilder matches the Rust coupon-program methods (including fixed_to_float and float_margin_steps); WASM binds CashFlowSchedule / CashFlowBuilder as classes, and the spec types cross as plain objects whose constructors and methods are free functions (see the [parity] ledger)."
 public = [
     "AmortizationSpec", "CashFlowBuilder", "CashFlowMeta", "CashFlowSchedule", "CouponType",
     "DefaultModelSpec", "FeeAccrualBasis", "FeeBase",
@@ -383,13 +383,13 @@ rust_lib   = "finstack-quant/covenants/src/lib.rs"
 python_package = "finstack_quant.covenants"
 visibility = "pub"
 status = "exists"
-note = "Python binds the typed engine surface flat on finstack_quant.covenants (Covenant, CovenantType, CovenantSpec (with_denominator_metric selects required net-leverage earnings), ThresholdSchedule, CovenantWaiver, SpringingCondition, CovenantConsequence, CovenantEngine, CovenantBreach), the typed templates, DataFrame-backed forecasting, and keeps the JSON wire surface (`_json` twins + validators + evaluate_engine) shared with WASM. WASM binds only the JSON surface."
+note = "Python binds the typed engine surface flat on finstack_quant.covenants (Covenant, CovenantType, CovenantSpec (with_denominator_metric selects required net-leverage earnings), ThresholdSchedule, CovenantWaiver, SpringingCondition, CovenantConsequence, CovenantEngine, CovenantBreach), the typed templates, DataFrame-backed forecasting, and keeps the JSON wire surface (`_json` twins + validators + evaluate_engine) shared with WASM. WASM binds CovenantEngine as a class; the definition types cross as plain objects whose constructors and methods are free functions (see the [parity] ledger)."
 
 [crates.covenants.modules]
 json = { python = "finstack_quant.covenants", status = "exists", note = "validate_covenant_spec_json, validate_covenant_report_json, validate_covenant_engine_json, and the covenant template builders (lbo_standard_json, cov_lite_json, real_estate_json, project_finance_json) exposed flat on finstack_quant.covenants, matching the Rust `json` module names. Each `_json` template has a typed twin (lbo_standard, cov_lite, real_estate, project_finance -> list[CovenantSpec]). Rust `evaluate_engine` is bound as Python `evaluate_engine` / WASM `evaluateEngine` and returns dict[str, CovenantReport] in spec (IndexMap) order. Documented host-ergonomics deviation: Python takes `metrics` (dict[str, float] or a JSON string passed through unchanged; only a dict is serialised in the binding) where Rust/WASM take `metrics_json`. A JSON metric map is parsed only by Rust `HashMapMetricSource::from_json`, so both hosts report identical errors." }
 report = { python = "finstack_quant.covenants", status = "flattened", note = "CovenantReport wrapper exposed flat on finstack_quant.covenants (frozen, `__eq__` via Rust PartialEq, Python-style `__repr__`); `evaluate_engine` and `CovenantEngine.evaluate` return dict[str, CovenantReport]. Python-only ergonomic helper `reports_to_dataframe(dict) -> DataFrame` flattens that dict. WASM `evaluateEngine` returns a typed plain-object map (keyed by covenant instance key) from the same evaluate_engine kernel — NOT a JSON string; the dts_contract gate pins this. Rust-only: CovenantReport::passed/::failed builder constructors are not bound in Python because the constructor names collide with the `passed` boolean property on the wrapper; construct reports via evaluate_engine or from_json." }
-engine    = { python = "finstack_quant.covenants", status = "flattened", note = "Typed Covenant / CovenantType (one staticmethod per Rust variant; ThresholdTest is spelled as the string pair (\"maximum\"|\"minimum\", value) in CovenantType.custom and SpringingCondition) / CovenantSpec / CovenantWaiver / SpringingCondition / CovenantConsequence / CovenantEngine (evaluate_and_track requires explicit scope; breaches retain original consequences; new, from_specs, add_spec, add_waiver, validate, evaluate, evaluate_and_track, evaluate_series (Python-only DataFrame loop), specs, waivers, breach_history, to_json/from_json) / CovenantBreach exposed flat. `CovenantScope` and `BoundKind` are spelled as strings (\"maintenance\"|\"incurrence\", \"at_most\"|\"at_least\"). Rust-only: CovenantWindow / add_window (reachable through engine JSON only), InstrumentMutator, ConsequenceApplication and apply_consequences (instrument mutation is a Rust trait seam). Python-only DataFrame-backed CovenantEngine.evaluate_series. WASM: JSON bridge only." }
-forward   = { python = "finstack_quant.covenants", status = "flattened", note = "CovenantForecastConfig, CovenantForecast (to_dataframe) and FutureBreach exposed flat; `forecast_covenant(spec, metrics: DataFrame, config)` and `forecast_breaches(engine, metrics: DataFrame, config)` are the host names of forecast_covenant_generic / forecast_breaches_generic, batch forecasts default to maintenance and with_scope selects incurrence; missing required observations fail and duplicate columns are rejected; driven by a binding-side DataFrame adapter implementing the Rust ModelTimeSeries trait (each index date becomes a daily PeriodId whose period end is the date). ModelTimeSeries itself is a Rust trait and stays Rust-only. Python-only helper: breaches_to_dataframe. statements-analytics keeps its statement-model adapter. WASM: not bound." }
+engine    = { python = "finstack_quant.covenants", status = "flattened", note = "Typed Covenant / CovenantType (one staticmethod per Rust variant; ThresholdTest is spelled as the string pair (\"maximum\"|\"minimum\", value) in CovenantType.custom and SpringingCondition) / CovenantSpec / CovenantWaiver / SpringingCondition / CovenantConsequence / CovenantEngine (evaluate_and_track requires explicit scope; breaches retain original consequences; new, from_specs, add_spec, add_waiver, validate, evaluate, evaluate_and_track, evaluate_series (Rust CovenantEngine::evaluate_series over DatedMetrics rows; Python reads a date-indexed DataFrame and returns a long DataFrame), specs, waivers, breach_history, to_json/from_json) / CovenantBreach exposed flat. `CovenantScope` and `BoundKind` are spelled as strings (\"maintenance\"|\"incurrence\", \"at_most\"|\"at_least\"). Rust-only: CovenantWindow / add_window (reachable through engine JSON only), InstrumentMutator, ConsequenceApplication and apply_consequences (instrument mutation is a Rust trait seam). WASM: CovenantEngine class with the same members; add_spec / add_waiver mutate in place and return nothing." }
+forward   = { python = "finstack_quant.covenants", status = "flattened", note = "CovenantForecastConfig, CovenantForecast (to_dataframe) and FutureBreach exposed flat; `forecast_covenant(spec, metrics: DataFrame, config)` and `forecast_breaches(engine, metrics: DataFrame, config)` bind Rust forecast_covenant / forecast_breaches, which run forecast_covenant_generic / forecast_breaches_generic over a Rust DatedMetricSeries (each date becomes a daily PeriodId whose period end is the date; empty input and duplicate dates are rejected in Rust). Batch forecasts default to maintenance and with_scope selects incurrence; missing required observations fail. Python reads the series from a date-indexed DataFrame (duplicate columns are rejected in the binding); WASM takes DatedMetrics rows (`forecastCovenant` / `forecastBreaches`). ModelTimeSeries itself is a Rust trait and stays Rust-only. Python-only helper: breaches_to_dataframe. statements-analytics keeps its statement-model adapter." }
 metric    = { python = "finstack_quant.covenants.metric",    status = "missing", note = "CovenantMetricId/CovenantMetricSource/HashMapMetricSource are Rust trait plumbing; hosts pass metrics as a dict / JSON map to CovenantEngine.evaluate or evaluate_engine (a JSON map is parsed by HashMapMetricSource::from_json)" }
 schedule  = { python = "finstack_quant.covenants", status = "flattened", note = "ThresholdSchedule (step-down limits) exposed flat: constructor from (date, value) pairs, `entries`, `threshold_for(date)`, to_json/from_json." }
 templates = { python = "finstack_quant.covenants", status = "flattened", note = "Typed template constructors lbo_standard, cov_lite, real_estate, project_finance exposed flat returning list[CovenantSpec]; the flat *_json builders remain as their JSON twins (shared with WASM). All template thresholds are validated finite and non-negative in Rust (ValueError)." }
@@ -1855,7 +1855,7 @@ js_rule_members = { free = "wasm ownership: releases the wasm-bindgen handle", t
 # now recorded as TypeScript types, so their 68 unbound methods (variant
 # constructors, `with_*` setters, single-field `*_json` exits) moved to the
 # member backlog; 7 portfolio member entries were cleared (286 - 7 + 68).
-backlog_ceiling = { modules = 740, members = 347 }
+backlog_ceiling = { modules = 676, members = 347 }
 
 [parity.modules."finstack_quant"]
 js = ""
@@ -1917,79 +1917,33 @@ backlog = [
 
 [parity.modules."finstack_quant.cashflows"]
 js = "cashflows"
-backlog = [
-    "ScheduleBuildOpts",
-    "build_cashflow_schedule",
-    "dated_flows",
-    "schedule_from_classified_flows",
-    "schedule_from_dated_flows",
-]
+types = { ScheduleBuildOpts = "ScheduleBuildOpts" }
 
 [parity.modules."finstack_quant.cashflows.accrual"]
 js = "cashflows"
-backlog = [
-    "AccrualConfig",
-    "AccrualIndex",
-    "AccrualMethod",
-    "ExCouponRule",
-    "accrued_interest_amount",
-]
+types = { AccrualConfig = "AccrualConfig", AccrualMethod = "AccrualMethod", ExCouponRule = "ExCouponRule" }
 
 [parity.modules."finstack_quant.cashflows.aggregation"]
 js = "cashflows"
-backlog = [
-    "PeriodAggregation",
-    "aggregate_by_period",
-    "aggregate_cashflows_checked",
-    "calendar_year_ladder",
-]
+types = { PeriodAggregation = "PeriodAggregation" }
 
 [parity.modules."finstack_quant.cashflows.builder"]
 js = "cashflows"
-backlog = [
-    "AmortizationSpec",
-    "CashFlowBuilder",
-    "CashFlowMeta",
-    "CashFlowSchedule",
-    "CouponType",
-    "DefaultModelSpec",
-    "FeeAccrualBasis",
-    "FeeBase",
-    "FeeSpec",
-    "FixedCouponSpec",
-    "FloatingCouponSpec",
-    "FloatingLegCompounding",
-    "FloatingRateFallback",
-    "FloatingRateSpec",
-    "Notional",
-    "OvernightIndexConstraintApplication",
-    "PrepaymentModelSpec",
-    "PrincipalEvent",
-    "PrincipalExchange",
-    "RecoveryModelSpec",
-    "RollRule",
-    "ScheduleParams",
-    "StepUpCouponSpec",
-    "merge_cashflow_schedules",
-]
+# PrincipalEvent crosses as the build-spec row type (optional `cash`).
+types = { AmortizationSpec = "AmortizationSpec", CashFlowMeta = "CashFlowMeta", CouponType = "CouponType", DefaultModelSpec = "DefaultModelSpec", FeeAccrualBasis = "FeeAccrualBasis", FeeBase = "FeeBase", FeeSpec = "FeeSpec", FixedCouponSpec = "FixedCouponSpec", FloatingCouponSpec = "FloatingCouponSpec", FloatingLegCompounding = "FloatingLegCompounding", FloatingRateFallback = "FloatingRateFallback", FloatingRateSpec = "FloatingRateSpec", Notional = "Notional", OvernightIndexConstraintApplication = "OvernightIndexConstraintApplication", PrepaymentModelSpec = "PrepaymentModelSpec", PrincipalEvent = "PrincipalEventSpec", PrincipalExchange = "PrincipalExchange", RecoveryModelSpec = "RecoveryModelSpec", RollRule = "RollRule", ScheduleParams = "ScheduleParams", StepUpCouponSpec = "StepUpCouponSpec" }
 
 [parity.modules."finstack_quant.cashflows.fixings"]
 js = "cashflows"
-backlog = [
-    "ProjectedFixing",
-    "materialize_fixings",
-]
+types = { ProjectedFixing = "ProjectedFixing" }
 
 [parity.modules."finstack_quant.cashflows.primitives"]
 js = "cashflows"
-backlog = [
-    "CFKind",
-    "CashFlow",
-    "CashFlowAccrual",
-    "is_cash_settlement_kind",
-]
+types = { CFKind = "CFKind", CashFlow = "CashFlow", CashFlowAccrual = "CashFlowAccrual" }
 
 [parity.modules."finstack_quant.cashflows.schema"]
+# The schema accessors render from the crate's `ARTIFACTS` registry, which needs the
+# `json-schema` / `jsonschema-validate` features; the WASM crate builds every domain
+# crate without them. Enabling them is a package-size decision for all crates (P10).
 js = "cashflows"
 backlog = [
     "get",
@@ -2331,29 +2285,8 @@ backlog = [
 
 [parity.modules."finstack_quant.covenants"]
 js = "covenants"
-types = { CovenantReport = "CovenantReport" }
-backlog = [
-    "Covenant",
-    "CovenantBreach",
-    "CovenantConsequence",
-    "CovenantEngine",
-    "CovenantForecast",
-    "CovenantForecastConfig",
-    "CovenantSpec",
-    "CovenantType",
-    "CovenantWaiver",
-    "FutureBreach",
-    "SpringingCondition",
-    "ThresholdSchedule",
-    "breaches_to_dataframe",
-    "cov_lite",
-    "forecast_breaches",
-    "forecast_covenant",
-    "lbo_standard",
-    "project_finance",
-    "real_estate",
-    "reports_to_dataframe",
-]
+types = { Covenant = "Covenant", CovenantBreach = "CovenantBreach", CovenantConsequence = "CovenantConsequence", CovenantForecast = "CovenantForecast", CovenantForecastConfig = "CovenantForecastConfig", CovenantReport = "CovenantReport", CovenantSpec = "CovenantSpec", CovenantType = "CovenantType", CovenantWaiver = "CovenantWaiver", FutureBreach = "FutureBreach", SpringingCondition = "SpringingCondition", ThresholdSchedule = "ThresholdSchedule" }
+excluded = { breaches_to_dataframe = "pandas", reports_to_dataframe = "pandas" }
 
 [parity.modules."finstack_quant.features"]
 js = "features"
@@ -2966,9 +2899,102 @@ calibrationEnvelopeContentHash = "free-function twin of Python CalibrationEnvelo
 calibrationResultContentHash = "free-function twin of Python CalibrationResult.content_hash (member rename)"
 
 [parity.js."cashflows".wasm_only]
-scheduleCalendarYearLadder = "JSON-first twin of Python CashFlowSchedule.calendar_year_ladder (Rust schedule_calendar_year_ladder); P2 binds CashFlowSchedule"
-scheduleOutstandingByDate = "JSON-first twin of Python CashFlowSchedule.outstanding_by_date (Rust schedule_outstanding_by_date); P2 binds CashFlowSchedule"
-scheduleWal = "JSON-first twin of Python CashFlowSchedule.wal (Rust schedule_wal); P2 binds CashFlowSchedule"
+amortizationSpecCustomPrincipal = "twin of Python AmortizationSpec.custom_principal (Rust AmortizationSpec::CustomPrincipal); recorded as a member rename of finstack_quant.cashflows.builder.AmortizationSpec"
+amortizationSpecLinearBetween = "twin of Python AmortizationSpec.linear_between (Rust AmortizationSpec::LinearBetween); recorded as a member rename of finstack_quant.cashflows.builder.AmortizationSpec"
+amortizationSpecLinearTo = "twin of Python AmortizationSpec.linear_to (Rust AmortizationSpec::LinearTo); recorded as a member rename of finstack_quant.cashflows.builder.AmortizationSpec"
+amortizationSpecPercentOfOriginalPerPeriod = "twin of Python AmortizationSpec.percent_of_original_per_period (Rust AmortizationSpec::PercentOfOriginalPerPeriod); recorded as a member rename of finstack_quant.cashflows.builder.AmortizationSpec"
+amortizationSpecPercentOfRemainingPerPeriod = "twin of Python AmortizationSpec.percent_of_remaining_per_period (Rust AmortizationSpec::PercentOfRemainingPerPeriod); recorded as a member rename of finstack_quant.cashflows.builder.AmortizationSpec"
+amortizationSpecStepRemaining = "twin of Python AmortizationSpec.step_remaining (Rust AmortizationSpec::StepRemaining); recorded as a member rename of finstack_quant.cashflows.builder.AmortizationSpec"
+cashFlowGetBalanceDate = "twin of Python CashFlow.get_balance_date (Rust CashFlow::get_balance_date); recorded as a member rename of finstack_quant.cashflows.primitives.CashFlow"
+cashFlowValidate = "twin of Python CashFlow.validate (Rust CashFlow::validate); recorded as a member rename of finstack_quant.cashflows.primitives.CashFlow"
+cashFlowWithAccrual = "twin of Python CashFlow.with_accrual (Rust CashFlow::with_accrual); recorded as a member rename of finstack_quant.cashflows.primitives.CashFlow"
+cashFlowWithPrincipalDate = "twin of Python CashFlow.with_principal_date (Rust CashFlow::with_principal_date); recorded as a member rename of finstack_quant.cashflows.primitives.CashFlow"
+cashFlowWithPrincipalDelta = "twin of Python CashFlow.with_principal_delta (Rust CashFlow::with_principal_delta); recorded as a member rename of finstack_quant.cashflows.primitives.CashFlow"
+cfKindIsInterestLike = "twin of Python CFKind.is_interest_like (Rust CFKind::is_interest_like); recorded as a member rename of finstack_quant.cashflows.primitives.CFKind"
+cfKindIsPrincipalLike = "twin of Python CFKind.is_principal_like (Rust CFKind::is_principal_like); recorded as a member rename of finstack_quant.cashflows.primitives.CFKind"
+cfKindParse = "twin of Python CFKind.parse (Rust CFKind::parse); recorded as a member rename of finstack_quant.cashflows.primitives.CFKind"
+couponTypeSplit = "twin of Python CouponType.split (Rust CouponType::Split); recorded as a member rename of finstack_quant.cashflows.builder.CouponType"
+defaultModelSpecCdr2pct = "twin of Python DefaultModelSpec.cdr_2pct (Rust DefaultModelSpec::cdr_2pct); recorded as a member rename of finstack_quant.cashflows.builder.DefaultModelSpec"
+defaultModelSpecConstantCdr = "twin of Python DefaultModelSpec.constant_cdr (Rust DefaultModelSpec::constant_cdr); recorded as a member rename of finstack_quant.cashflows.builder.DefaultModelSpec"
+defaultModelSpecCumulativeLoss = "twin of Python DefaultModelSpec.cumulative_loss (Rust DefaultModelSpec::cumulative_loss); recorded as a member rename of finstack_quant.cashflows.builder.DefaultModelSpec"
+defaultModelSpecMdr = "twin of Python DefaultModelSpec.mdr (Rust DefaultModelSpec::mdr); recorded as a member rename of finstack_quant.cashflows.builder.DefaultModelSpec"
+defaultModelSpecSda = "twin of Python DefaultModelSpec.sda (Rust DefaultModelSpec::sda); recorded as a member rename of finstack_quant.cashflows.builder.DefaultModelSpec"
+defaultModelSpecTiming = "twin of Python DefaultModelSpec.timing (Rust DefaultModelSpec::timing); recorded as a member rename of finstack_quant.cashflows.builder.DefaultModelSpec"
+defaultModelSpecValidate = "twin of Python DefaultModelSpec.validate (Rust DefaultModelSpec::validate); recorded as a member rename of finstack_quant.cashflows.builder.DefaultModelSpec"
+defaultModelSpecVector = "twin of Python DefaultModelSpec.vector (Rust DefaultModelSpec::vector); recorded as a member rename of finstack_quant.cashflows.builder.DefaultModelSpec"
+exCouponRuleExDate = "twin of Python ExCouponRule.ex_date (Rust ExCouponRule::ex_date); recorded as a member rename of finstack_quant.cashflows.accrual.ExCouponRule"
+feeBaseUndrawn = "twin of Python FeeBase.undrawn (Rust FeeBase::Undrawn); recorded as a member rename of finstack_quant.cashflows.builder.FeeBase"
+feeSpecFixed = "twin of Python FeeSpec.fixed (Rust FeeSpec::Fixed); recorded as a member rename of finstack_quant.cashflows.builder.FeeSpec"
+feeSpecPeriodicBp = "twin of Python FeeSpec.periodic_bp (Rust FeeSpec::PeriodicBp); recorded as a member rename of finstack_quant.cashflows.builder.FeeSpec"
+floatingLegCompoundingCompoundedInArrears = "twin of Python FloatingLegCompounding.compounded_in_arrears (Rust FloatingLegCompounding::CompoundedInArrears); recorded as a member rename of finstack_quant.cashflows.builder.FloatingLegCompounding"
+floatingLegCompoundingCompoundedWithObservationShift = "twin of Python FloatingLegCompounding.compounded_with_observation_shift (Rust FloatingLegCompounding::CompoundedWithObservationShift); recorded as a member rename of finstack_quant.cashflows.builder.FloatingLegCompounding"
+floatingLegCompoundingCompoundedWithRateCutoff = "twin of Python FloatingLegCompounding.compounded_with_rate_cutoff (Rust FloatingLegCompounding::CompoundedWithRateCutoff); recorded as a member rename of finstack_quant.cashflows.builder.FloatingLegCompounding"
+floatingRateFallbackFixedRate = "twin of Python FloatingRateFallback.fixed_rate (Rust FloatingRateFallback::FixedRate); recorded as a member rename of finstack_quant.cashflows.builder.FloatingRateFallback"
+floatingRateSpecEuribor3m = "twin of Python FloatingRateSpec.euribor_3m (Rust FloatingRateSpec::euribor_3m); recorded as a member rename of finstack_quant.cashflows.builder.FloatingRateSpec"
+floatingRateSpecSofr = "twin of Python FloatingRateSpec.sofr (Rust FloatingRateSpec::sofr); recorded as a member rename of finstack_quant.cashflows.builder.FloatingRateSpec"
+floatingRateSpecSonia = "twin of Python FloatingRateSpec.sonia (Rust FloatingRateSpec::sonia); recorded as a member rename of finstack_quant.cashflows.builder.FloatingRateSpec"
+floatingRateSpecValidate = "twin of Python FloatingRateSpec.validate (Rust FloatingRateSpec::validate); recorded as a member rename of finstack_quant.cashflows.builder.FloatingRateSpec"
+notionalCurrency = "twin of Python Notional.currency (Rust Notional::currency); recorded as a member rename of finstack_quant.cashflows.builder.Notional"
+notionalPar = "twin of Python Notional.par (Rust Notional::par); recorded as a member rename of finstack_quant.cashflows.builder.Notional"
+notionalValidate = "twin of Python Notional.validate (Rust Notional::validate); recorded as a member rename of finstack_quant.cashflows.builder.Notional"
+periodAggregationGetAmount = "twin of Python PeriodAggregation.get_amount (Rust PeriodAggregation::get_amount); recorded as a member rename of finstack_quant.cashflows.aggregation.PeriodAggregation"
+prepaymentModelSpecAbs = "twin of Python PrepaymentModelSpec.abs (Rust PrepaymentModelSpec::abs); recorded as a member rename of finstack_quant.cashflows.builder.PrepaymentModelSpec"
+prepaymentModelSpecCmbsWithLockout = "twin of Python PrepaymentModelSpec.cmbs_with_lockout (Rust PrepaymentModelSpec::cmbs_with_lockout); recorded as a member rename of finstack_quant.cashflows.builder.PrepaymentModelSpec"
+prepaymentModelSpecConstantCpr = "twin of Python PrepaymentModelSpec.constant_cpr (Rust PrepaymentModelSpec::constant_cpr); recorded as a member rename of finstack_quant.cashflows.builder.PrepaymentModelSpec"
+prepaymentModelSpecPsa = "twin of Python PrepaymentModelSpec.psa (Rust PrepaymentModelSpec::psa); recorded as a member rename of finstack_quant.cashflows.builder.PrepaymentModelSpec"
+prepaymentModelSpecPsa100 = "twin of Python PrepaymentModelSpec.psa_100 (Rust PrepaymentModelSpec::psa_100); recorded as a member rename of finstack_quant.cashflows.builder.PrepaymentModelSpec"
+prepaymentModelSpecSmm = "twin of Python PrepaymentModelSpec.smm (Rust PrepaymentModelSpec::smm); recorded as a member rename of finstack_quant.cashflows.builder.PrepaymentModelSpec"
+prepaymentModelSpecValidate = "twin of Python PrepaymentModelSpec.validate (Rust PrepaymentModelSpec::validate); recorded as a member rename of finstack_quant.cashflows.builder.PrepaymentModelSpec"
+prepaymentModelSpecVector = "twin of Python PrepaymentModelSpec.vector (Rust PrepaymentModelSpec::vector); recorded as a member rename of finstack_quant.cashflows.builder.PrepaymentModelSpec"
+recoveryModelSpecRecoveryRate = "twin of Python RecoveryModelSpec.recovery_rate (Rust RecoveryModelSpec::recovery_rate); recorded as a member rename of finstack_quant.cashflows.builder.RecoveryModelSpec"
+recoveryModelSpecValidate = "twin of Python RecoveryModelSpec.validate (Rust RecoveryModelSpec::validate); recorded as a member rename of finstack_quant.cashflows.builder.RecoveryModelSpec"
+recoveryModelSpecWithSeverityVector = "twin of Python RecoveryModelSpec.with_severity_vector (Rust RecoveryModelSpec::with_severity_vector); recorded as a member rename of finstack_quant.cashflows.builder.RecoveryModelSpec"
+scheduleCalendarYearLadder = "JSON-first twin of CashFlowSchedule.calendarYearLadder (Rust schedule_calendar_year_ladder): takes schedule JSON instead of a handle"
+scheduleOutstandingByDate = "JSON-first twin of CashFlowSchedule.outstandingByDate (Rust schedule_outstanding_by_date): takes schedule JSON instead of a handle"
+scheduleParamsAnnualActact = "twin of Python ScheduleParams.annual_actact (Rust ScheduleParams::annual_actact); recorded as a member rename of finstack_quant.cashflows.builder.ScheduleParams"
+scheduleParamsEurEstrSwap = "twin of Python ScheduleParams.eur_estr_swap (Rust ScheduleParams::eur_estr_swap); recorded as a member rename of finstack_quant.cashflows.builder.ScheduleParams"
+scheduleParamsEurGovBond = "twin of Python ScheduleParams.eur_gov_bond (Rust ScheduleParams::eur_gov_bond); recorded as a member rename of finstack_quant.cashflows.builder.ScheduleParams"
+scheduleParamsGbpSoniaSwap = "twin of Python ScheduleParams.gbp_sonia_swap (Rust ScheduleParams::gbp_sonia_swap); recorded as a member rename of finstack_quant.cashflows.builder.ScheduleParams"
+scheduleParamsJpyTonaSwap = "twin of Python ScheduleParams.jpy_tona_swap (Rust ScheduleParams::jpy_tona_swap); recorded as a member rename of finstack_quant.cashflows.builder.ScheduleParams"
+scheduleParamsQuarterlyAct360 = "twin of Python ScheduleParams.quarterly_act360 (Rust ScheduleParams::quarterly_act360); recorded as a member rename of finstack_quant.cashflows.builder.ScheduleParams"
+scheduleParamsSemiannual30360 = "twin of Python ScheduleParams.semiannual_30360 (Rust ScheduleParams::semiannual_30360); recorded as a member rename of finstack_quant.cashflows.builder.ScheduleParams"
+scheduleParamsUsdCorporateBond = "twin of Python ScheduleParams.usd_corporate_bond (Rust ScheduleParams::usd_corporate_bond); recorded as a member rename of finstack_quant.cashflows.builder.ScheduleParams"
+scheduleParamsUsdSofrSwap = "twin of Python ScheduleParams.usd_sofr_swap (Rust ScheduleParams::usd_sofr_swap); recorded as a member rename of finstack_quant.cashflows.builder.ScheduleParams"
+scheduleParamsUsdTreasury = "twin of Python ScheduleParams.usd_treasury (Rust ScheduleParams::usd_treasury); recorded as a member rename of finstack_quant.cashflows.builder.ScheduleParams"
+scheduleParamsValidate = "twin of Python ScheduleParams.validate (Rust ScheduleParams::validate); recorded as a member rename of finstack_quant.cashflows.builder.ScheduleParams"
+scheduleWal = "JSON-first twin of CashFlowSchedule.wal (Rust schedule_wal): takes schedule JSON instead of a handle"
+
+[parity.js."covenants".wasm_only]
+covenantConsequenceAccelerateMaturity = "twin of Python CovenantConsequence.accelerate_maturity (Rust CovenantConsequence::AccelerateMaturity); recorded as a member rename of finstack_quant.covenants.CovenantConsequence"
+covenantConsequenceBlockDistributions = "twin of Python CovenantConsequence.block_distributions (Rust CovenantConsequence::BlockDistributions); recorded as a member rename of finstack_quant.covenants.CovenantConsequence"
+covenantConsequenceCashSweep = "twin of Python CovenantConsequence.cash_sweep (Rust CovenantConsequence::CashSweep); recorded as a member rename of finstack_quant.covenants.CovenantConsequence"
+covenantConsequenceDefault = "twin of Python CovenantConsequence.default (Rust CovenantConsequence::Default); recorded as a member rename of finstack_quant.covenants.CovenantConsequence"
+covenantConsequenceRateIncrease = "twin of Python CovenantConsequence.rate_increase (Rust CovenantConsequence::RateIncrease); recorded as a member rename of finstack_quant.covenants.CovenantConsequence"
+covenantConsequenceRequireCollateral = "twin of Python CovenantConsequence.require_collateral (Rust CovenantConsequence::RequireCollateral); recorded as a member rename of finstack_quant.covenants.CovenantConsequence"
+covenantForecastConfigWithScope = "twin of Python CovenantForecastConfig.with_scope (Rust CovenantForecastConfig::with_scope); recorded as a member rename of finstack_quant.covenants.CovenantForecastConfig"
+covenantNew = "twin of the Python Covenant(covenant_type, test_frequency, label) constructor (Rust Covenant::new); WASM Covenant values are plain objects"
+covenantSpecWithDenominatorMetric = "twin of Python CovenantSpec.with_denominator_metric (Rust CovenantSpec::with_denominator_metric); recorded as a member rename of finstack_quant.covenants.CovenantSpec"
+covenantSpecWithMetric = "twin of the Python CovenantSpec(covenant, metric_id) constructor (Rust CovenantSpec::with_metric); WASM CovenantSpec values are plain objects"
+covenantSpecWithThresholdSchedule = "twin of Python CovenantSpec.with_threshold_schedule (Rust CovenantSpec::with_threshold_schedule); recorded as a member rename of finstack_quant.covenants.CovenantSpec"
+covenantTypeAffirmative = "twin of Python CovenantType.affirmative (Rust CovenantType::Affirmative); recorded as a member rename of finstack_quant.covenants.CovenantType"
+covenantTypeBasket = "twin of Python CovenantType.basket (Rust CovenantType::Basket); recorded as a member rename of finstack_quant.covenants.CovenantType"
+covenantTypeCustom = "twin of Python CovenantType.custom (Rust CovenantType::Custom); recorded as a member rename of finstack_quant.covenants.CovenantType"
+covenantTypeMaxCapex = "twin of Python CovenantType.max_capex (Rust CovenantType::MaxCapex); recorded as a member rename of finstack_quant.covenants.CovenantType"
+covenantTypeMaxDebtToEbitda = "twin of Python CovenantType.max_debt_to_ebitda (Rust CovenantType::MaxDebtToEbitda); recorded as a member rename of finstack_quant.covenants.CovenantType"
+covenantTypeMaxNetDebtToEbitda = "twin of Python CovenantType.max_net_debt_to_ebitda (Rust CovenantType::MaxNetDebtToEbitda); recorded as a member rename of finstack_quant.covenants.CovenantType"
+covenantTypeMaxSeniorLeverage = "twin of Python CovenantType.max_senior_leverage (Rust CovenantType::MaxSeniorLeverage); recorded as a member rename of finstack_quant.covenants.CovenantType"
+covenantTypeMaxTotalLeverage = "twin of Python CovenantType.max_total_leverage (Rust CovenantType::MaxTotalLeverage); recorded as a member rename of finstack_quant.covenants.CovenantType"
+covenantTypeMinAssetCoverage = "twin of Python CovenantType.min_asset_coverage (Rust CovenantType::MinAssetCoverage); recorded as a member rename of finstack_quant.covenants.CovenantType"
+covenantTypeMinDscr = "twin of Python CovenantType.min_dscr (Rust CovenantType::MinDscr); recorded as a member rename of finstack_quant.covenants.CovenantType"
+covenantTypeMinFixedChargeCoverage = "twin of Python CovenantType.min_fixed_charge_coverage (Rust CovenantType::MinFixedChargeCoverage); recorded as a member rename of finstack_quant.covenants.CovenantType"
+covenantTypeMinInterestCoverage = "twin of Python CovenantType.min_interest_coverage (Rust CovenantType::MinInterestCoverage); recorded as a member rename of finstack_quant.covenants.CovenantType"
+covenantTypeMinLiquidity = "twin of Python CovenantType.min_liquidity (Rust CovenantType::MinLiquidity); recorded as a member rename of finstack_quant.covenants.CovenantType"
+covenantTypeNegative = "twin of Python CovenantType.negative (Rust CovenantType::Negative); recorded as a member rename of finstack_quant.covenants.CovenantType"
+covenantWithConsequence = "twin of Python Covenant.with_consequence (Rust Covenant::with_consequence); recorded as a member rename of finstack_quant.covenants.Covenant"
+covenantWithCurePeriod = "twin of Python Covenant.with_cure_period (Rust Covenant::with_cure_period); recorded as a member rename of finstack_quant.covenants.Covenant"
+covenantWithScope = "twin of Python Covenant.with_scope (Rust Covenant::with_scope); recorded as a member rename of finstack_quant.covenants.Covenant"
+covenantWithSpringingCondition = "twin of Python Covenant.with_springing_condition (Rust Covenant::with_springing_condition); recorded as a member rename of finstack_quant.covenants.Covenant"
+thresholdScheduleThresholdFor = "twin of Python ThresholdSchedule.threshold_for (Rust ThresholdSchedule::threshold_for); recorded as a member rename of finstack_quant.covenants.ThresholdSchedule"
 
 # WASM has no CsaSpec / VmCalculator class (P4 binds them); these JSON-first
 # free functions are the WASM authoring path. Each is a renamed twin of a Rust
@@ -3398,6 +3424,73 @@ backlog = [
     "to_dict",
     "upfront_fee",
 ]
+
+# cashflows / covenants data classes: methods bound as free functions over wire values.
+[parity.members."finstack_quant.cashflows.accrual.ExCouponRule"]
+renames = { ex_date = { js = "cashflows.exCouponRuleExDate", reason = "WASM ExCouponRule values are plain objects; the Rust ExCouponRule::ex_date function is a free function over the wire value" } }
+
+[parity.members."finstack_quant.cashflows.aggregation.PeriodAggregation"]
+renames = { get_amount = { js = "cashflows.periodAggregationGetAmount", reason = "WASM PeriodAggregation values are plain objects; the Rust PeriodAggregation::get_amount function is a free function over the wire value" } }
+
+[parity.members."finstack_quant.cashflows.builder.AmortizationSpec"]
+renames = { custom_principal = { js = "cashflows.amortizationSpecCustomPrincipal", reason = "WASM AmortizationSpec values are plain objects; the Rust AmortizationSpec::CustomPrincipal variant is built by a free function returning the wire value" }, linear_between = { js = "cashflows.amortizationSpecLinearBetween", reason = "WASM AmortizationSpec values are plain objects; the Rust AmortizationSpec::LinearBetween variant is built by a free function returning the wire value" }, linear_to = { js = "cashflows.amortizationSpecLinearTo", reason = "WASM AmortizationSpec values are plain objects; the Rust AmortizationSpec::LinearTo variant is built by a free function returning the wire value" }, percent_of_original_per_period = { js = "cashflows.amortizationSpecPercentOfOriginalPerPeriod", reason = "WASM AmortizationSpec values are plain objects; the Rust AmortizationSpec::PercentOfOriginalPerPeriod variant is built by a free function returning the wire value" }, percent_of_remaining_per_period = { js = "cashflows.amortizationSpecPercentOfRemainingPerPeriod", reason = "WASM AmortizationSpec values are plain objects; the Rust AmortizationSpec::PercentOfRemainingPerPeriod variant is built by a free function returning the wire value" }, step_remaining = { js = "cashflows.amortizationSpecStepRemaining", reason = "WASM AmortizationSpec values are plain objects; the Rust AmortizationSpec::StepRemaining variant is built by a free function returning the wire value" } }
+
+[parity.members."finstack_quant.cashflows.builder.CouponType"]
+renames = { split = { js = "cashflows.couponTypeSplit", reason = "WASM CouponType values are plain objects; the Rust CouponType::Split variant is built by a free function returning the wire value" } }
+
+[parity.members."finstack_quant.cashflows.builder.DefaultModelSpec"]
+renames = { cdr_2pct = { js = "cashflows.defaultModelSpecCdr2pct", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::cdr_2pct function is a free function over the wire value" }, constant_cdr = { js = "cashflows.defaultModelSpecConstantCdr", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::constant_cdr function is a free function over the wire value" }, cumulative_loss = { js = "cashflows.defaultModelSpecCumulativeLoss", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::cumulative_loss function is a free function over the wire value" }, mdr = { js = "cashflows.defaultModelSpecMdr", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::mdr function is a free function over the wire value" }, sda = { js = "cashflows.defaultModelSpecSda", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::sda function is a free function over the wire value" }, timing = { js = "cashflows.defaultModelSpecTiming", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::timing function is a free function over the wire value" }, validate = { js = "cashflows.defaultModelSpecValidate", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::validate function is a free function over the wire value" }, vector = { js = "cashflows.defaultModelSpecVector", reason = "WASM DefaultModelSpec values are plain objects; the Rust DefaultModelSpec::vector function is a free function over the wire value" } }
+
+[parity.members."finstack_quant.cashflows.builder.FeeBase"]
+renames = { undrawn = { js = "cashflows.feeBaseUndrawn", reason = "WASM FeeBase values are plain objects; the Rust FeeBase::Undrawn variant is built by a free function returning the wire value" } }
+
+[parity.members."finstack_quant.cashflows.builder.FeeSpec"]
+renames = { fixed = { js = "cashflows.feeSpecFixed", reason = "WASM FeeSpec values are plain objects; the Rust FeeSpec::Fixed variant is built by a free function returning the wire value" }, periodic_bp = { js = "cashflows.feeSpecPeriodicBp", reason = "WASM FeeSpec values are plain objects; the Rust FeeSpec::PeriodicBp variant is built by a free function returning the wire value" } }
+
+[parity.members."finstack_quant.cashflows.builder.FloatingLegCompounding"]
+renames = { compounded_in_arrears = { js = "cashflows.floatingLegCompoundingCompoundedInArrears", reason = "WASM FloatingLegCompounding values are plain objects; the Rust FloatingLegCompounding::CompoundedInArrears variant is built by a free function returning the wire value" }, compounded_with_observation_shift = { js = "cashflows.floatingLegCompoundingCompoundedWithObservationShift", reason = "WASM FloatingLegCompounding values are plain objects; the Rust FloatingLegCompounding::CompoundedWithObservationShift variant is built by a free function returning the wire value" }, compounded_with_rate_cutoff = { js = "cashflows.floatingLegCompoundingCompoundedWithRateCutoff", reason = "WASM FloatingLegCompounding values are plain objects; the Rust FloatingLegCompounding::CompoundedWithRateCutoff variant is built by a free function returning the wire value" } }
+
+[parity.members."finstack_quant.cashflows.builder.FloatingRateFallback"]
+renames = { fixed_rate = { js = "cashflows.floatingRateFallbackFixedRate", reason = "WASM FloatingRateFallback values are plain objects; the Rust FloatingRateFallback::FixedRate variant is built by a free function returning the wire value" } }
+
+[parity.members."finstack_quant.cashflows.builder.FloatingRateSpec"]
+renames = { euribor_3m = { js = "cashflows.floatingRateSpecEuribor3m", reason = "WASM FloatingRateSpec values are plain objects; the Rust FloatingRateSpec::euribor_3m function is a free function over the wire value" }, sofr = { js = "cashflows.floatingRateSpecSofr", reason = "WASM FloatingRateSpec values are plain objects; the Rust FloatingRateSpec::sofr function is a free function over the wire value" }, sonia = { js = "cashflows.floatingRateSpecSonia", reason = "WASM FloatingRateSpec values are plain objects; the Rust FloatingRateSpec::sonia function is a free function over the wire value" }, validate = { js = "cashflows.floatingRateSpecValidate", reason = "WASM FloatingRateSpec values are plain objects; the Rust FloatingRateSpec::validate function is a free function over the wire value" } }
+
+[parity.members."finstack_quant.cashflows.builder.Notional"]
+renames = { currency = { js = "cashflows.notionalCurrency", reason = "WASM Notional values are plain objects; the Rust Notional::currency function is a free function over the wire value" }, par = { js = "cashflows.notionalPar", reason = "WASM Notional values are plain objects; the Rust Notional::par function is a free function over the wire value" }, validate = { js = "cashflows.notionalValidate", reason = "WASM Notional values are plain objects; the Rust Notional::validate function is a free function over the wire value" } }
+
+[parity.members."finstack_quant.cashflows.builder.PrepaymentModelSpec"]
+renames = { abs = { js = "cashflows.prepaymentModelSpecAbs", reason = "WASM PrepaymentModelSpec values are plain objects; the Rust PrepaymentModelSpec::abs function is a free function over the wire value" }, cmbs_with_lockout = { js = "cashflows.prepaymentModelSpecCmbsWithLockout", reason = "WASM PrepaymentModelSpec values are plain objects; the Rust PrepaymentModelSpec::cmbs_with_lockout function is a free function over the wire value" }, constant_cpr = { js = "cashflows.prepaymentModelSpecConstantCpr", reason = "WASM PrepaymentModelSpec values are plain objects; the Rust PrepaymentModelSpec::constant_cpr function is a free function over the wire value" }, psa = { js = "cashflows.prepaymentModelSpecPsa", reason = "WASM PrepaymentModelSpec values are plain objects; the Rust PrepaymentModelSpec::psa function is a free function over the wire value" }, psa_100 = { js = "cashflows.prepaymentModelSpecPsa100", reason = "WASM PrepaymentModelSpec values are plain objects; the Rust PrepaymentModelSpec::psa_100 function is a free function over the wire value" }, smm = { js = "cashflows.prepaymentModelSpecSmm", reason = "WASM PrepaymentModelSpec values are plain objects; the Rust PrepaymentModelSpec::smm function is a free function over the wire value" }, validate = { js = "cashflows.prepaymentModelSpecValidate", reason = "WASM PrepaymentModelSpec values are plain objects; the Rust PrepaymentModelSpec::validate function is a free function over the wire value" }, vector = { js = "cashflows.prepaymentModelSpecVector", reason = "WASM PrepaymentModelSpec values are plain objects; the Rust PrepaymentModelSpec::vector function is a free function over the wire value" } }
+
+[parity.members."finstack_quant.cashflows.builder.RecoveryModelSpec"]
+renames = { recovery_rate = { js = "cashflows.recoveryModelSpecRecoveryRate", reason = "WASM RecoveryModelSpec values are plain objects; the Rust RecoveryModelSpec::recovery_rate function is a free function over the wire value" }, validate = { js = "cashflows.recoveryModelSpecValidate", reason = "WASM RecoveryModelSpec values are plain objects; the Rust RecoveryModelSpec::validate function is a free function over the wire value" }, with_severity_vector = { js = "cashflows.recoveryModelSpecWithSeverityVector", reason = "WASM RecoveryModelSpec values are plain objects; the Rust RecoveryModelSpec::with_severity_vector function is a free function over the wire value" } }
+
+[parity.members."finstack_quant.cashflows.builder.ScheduleParams"]
+renames = { annual_actact = { js = "cashflows.scheduleParamsAnnualActact", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::annual_actact function is a free function over the wire value" }, eur_estr_swap = { js = "cashflows.scheduleParamsEurEstrSwap", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::eur_estr_swap function is a free function over the wire value" }, eur_gov_bond = { js = "cashflows.scheduleParamsEurGovBond", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::eur_gov_bond function is a free function over the wire value" }, gbp_sonia_swap = { js = "cashflows.scheduleParamsGbpSoniaSwap", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::gbp_sonia_swap function is a free function over the wire value" }, jpy_tona_swap = { js = "cashflows.scheduleParamsJpyTonaSwap", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::jpy_tona_swap function is a free function over the wire value" }, quarterly_act360 = { js = "cashflows.scheduleParamsQuarterlyAct360", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::quarterly_act360 function is a free function over the wire value" }, semiannual_30360 = { js = "cashflows.scheduleParamsSemiannual30360", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::semiannual_30360 function is a free function over the wire value" }, usd_corporate_bond = { js = "cashflows.scheduleParamsUsdCorporateBond", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::usd_corporate_bond function is a free function over the wire value" }, usd_sofr_swap = { js = "cashflows.scheduleParamsUsdSofrSwap", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::usd_sofr_swap function is a free function over the wire value" }, usd_treasury = { js = "cashflows.scheduleParamsUsdTreasury", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::usd_treasury function is a free function over the wire value" }, validate = { js = "cashflows.scheduleParamsValidate", reason = "WASM ScheduleParams values are plain objects; the Rust ScheduleParams::validate function is a free function over the wire value" } }
+
+[parity.members."finstack_quant.cashflows.primitives.CFKind"]
+renames = { is_interest_like = { js = "cashflows.cfKindIsInterestLike", reason = "WASM CFKind values are plain objects; the Rust CFKind::is_interest_like function is a free function over the wire value" }, is_principal_like = { js = "cashflows.cfKindIsPrincipalLike", reason = "WASM CFKind values are plain objects; the Rust CFKind::is_principal_like function is a free function over the wire value" }, parse = { js = "cashflows.cfKindParse", reason = "WASM CFKind values are plain objects; the Rust CFKind::parse function is a free function over the wire value" } }
+
+[parity.members."finstack_quant.cashflows.primitives.CashFlow"]
+renames = { get_balance_date = { js = "cashflows.cashFlowGetBalanceDate", reason = "WASM CashFlow values are plain objects; the Rust CashFlow::get_balance_date function is a free function over the wire value" }, validate = { js = "cashflows.cashFlowValidate", reason = "WASM CashFlow values are plain objects; the Rust CashFlow::validate function is a free function over the wire value" }, with_accrual = { js = "cashflows.cashFlowWithAccrual", reason = "WASM CashFlow values are plain objects; the Rust CashFlow::with_accrual function is a free function over the wire value" }, with_principal_date = { js = "cashflows.cashFlowWithPrincipalDate", reason = "WASM CashFlow values are plain objects; the Rust CashFlow::with_principal_date function is a free function over the wire value" }, with_principal_delta = { js = "cashflows.cashFlowWithPrincipalDelta", reason = "WASM CashFlow values are plain objects; the Rust CashFlow::with_principal_delta function is a free function over the wire value" } }
+
+[parity.members."finstack_quant.covenants.Covenant"]
+renames = { with_consequence = { js = "covenants.covenantWithConsequence", reason = "WASM Covenant values are plain objects; the Rust Covenant::with_consequence function is a free function over the wire value" }, with_cure_period = { js = "covenants.covenantWithCurePeriod", reason = "WASM Covenant values are plain objects; the Rust Covenant::with_cure_period function is a free function over the wire value" }, with_scope = { js = "covenants.covenantWithScope", reason = "WASM Covenant values are plain objects; the Rust Covenant::with_scope function is a free function over the wire value" }, with_springing_condition = { js = "covenants.covenantWithSpringingCondition", reason = "WASM Covenant values are plain objects; the Rust Covenant::with_springing_condition function is a free function over the wire value" } }
+
+[parity.members."finstack_quant.covenants.CovenantConsequence"]
+renames = { accelerate_maturity = { js = "covenants.covenantConsequenceAccelerateMaturity", reason = "WASM CovenantConsequence values are plain objects; the Rust CovenantConsequence::AccelerateMaturity variant is built by a free function returning the wire value" }, block_distributions = { js = "covenants.covenantConsequenceBlockDistributions", reason = "WASM CovenantConsequence values are plain objects; the Rust CovenantConsequence::BlockDistributions variant is built by a free function returning the wire value" }, cash_sweep = { js = "covenants.covenantConsequenceCashSweep", reason = "WASM CovenantConsequence values are plain objects; the Rust CovenantConsequence::CashSweep variant is built by a free function returning the wire value" }, default = { js = "covenants.covenantConsequenceDefault", reason = "WASM CovenantConsequence values are plain objects; the Rust CovenantConsequence::Default variant is built by a free function returning the wire value" }, rate_increase = { js = "covenants.covenantConsequenceRateIncrease", reason = "WASM CovenantConsequence values are plain objects; the Rust CovenantConsequence::RateIncrease variant is built by a free function returning the wire value" }, require_collateral = { js = "covenants.covenantConsequenceRequireCollateral", reason = "WASM CovenantConsequence values are plain objects; the Rust CovenantConsequence::RequireCollateral variant is built by a free function returning the wire value" } }
+
+[parity.members."finstack_quant.covenants.CovenantForecastConfig"]
+renames = { with_scope = { js = "covenants.covenantForecastConfigWithScope", reason = "WASM CovenantForecastConfig values are plain objects; the Rust CovenantForecastConfig::with_scope function is a free function over the wire value" } }
+
+[parity.members."finstack_quant.covenants.CovenantSpec"]
+renames = { with_denominator_metric = { js = "covenants.covenantSpecWithDenominatorMetric", reason = "WASM CovenantSpec values are plain objects; the Rust CovenantSpec::with_denominator_metric function is a free function over the wire value" }, with_threshold_schedule = { js = "covenants.covenantSpecWithThresholdSchedule", reason = "WASM CovenantSpec values are plain objects; the Rust CovenantSpec::with_threshold_schedule function is a free function over the wire value" } }
+
+[parity.members."finstack_quant.covenants.CovenantType"]
+renames = { affirmative = { js = "covenants.covenantTypeAffirmative", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::Affirmative variant is built by a free function returning the wire value" }, basket = { js = "covenants.covenantTypeBasket", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::Basket variant is built by a free function returning the wire value" }, custom = { js = "covenants.covenantTypeCustom", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::Custom variant is built by a free function returning the wire value" }, max_capex = { js = "covenants.covenantTypeMaxCapex", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MaxCapex variant is built by a free function returning the wire value" }, max_debt_to_ebitda = { js = "covenants.covenantTypeMaxDebtToEbitda", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MaxDebtToEbitda variant is built by a free function returning the wire value" }, max_net_debt_to_ebitda = { js = "covenants.covenantTypeMaxNetDebtToEbitda", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MaxNetDebtToEbitda variant is built by a free function returning the wire value" }, max_senior_leverage = { js = "covenants.covenantTypeMaxSeniorLeverage", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MaxSeniorLeverage variant is built by a free function returning the wire value" }, max_total_leverage = { js = "covenants.covenantTypeMaxTotalLeverage", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MaxTotalLeverage variant is built by a free function returning the wire value" }, min_asset_coverage = { js = "covenants.covenantTypeMinAssetCoverage", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MinAssetCoverage variant is built by a free function returning the wire value" }, min_dscr = { js = "covenants.covenantTypeMinDscr", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MinDscr variant is built by a free function returning the wire value" }, min_fixed_charge_coverage = { js = "covenants.covenantTypeMinFixedChargeCoverage", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MinFixedChargeCoverage variant is built by a free function returning the wire value" }, min_interest_coverage = { js = "covenants.covenantTypeMinInterestCoverage", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MinInterestCoverage variant is built by a free function returning the wire value" }, min_liquidity = { js = "covenants.covenantTypeMinLiquidity", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::MinLiquidity variant is built by a free function returning the wire value" }, negative = { js = "covenants.covenantTypeNegative", reason = "WASM CovenantType values are plain objects; the Rust CovenantType::Negative variant is built by a free function returning the wire value" } }
+
+[parity.members."finstack_quant.covenants.ThresholdSchedule"]
+renames = { threshold_for = { js = "covenants.thresholdScheduleThresholdFor", reason = "WASM ThresholdSchedule values are plain objects; the Rust ThresholdSchedule::threshold_for function is a free function over the wire value" } }
 
 [parity.members."finstack_quant.attribution.PnlAttribution"]
 renames = { explain = { js = "attribution.pnlAttributionExplainText", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::explain method is a free function taking the object" }, explain_verbose = { js = "attribution.pnlAttributionExplainVerboseText", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::explain_verbose method is a free function taking the object" }, required_metrics = { js = "attribution.pnlAttributionRequiredMetrics", reason = "WASM attribution results are plain objects; Rust AttributionMethod::required_metrics of meta.method is a free function taking the object" }, residual_within_tolerance = { js = "attribution.pnlAttributionResidualWithinTolerance", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::residual_within_tolerance method is a free function taking the object" }, validate_currencies = { js = "attribution.pnlAttributionValidateCurrencies", reason = "WASM attribution results are plain objects; the Rust PnlAttribution::validate_currencies method is a free function taking the object" } }

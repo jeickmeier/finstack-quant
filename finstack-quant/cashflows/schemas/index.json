@@ -1,6 +1,15 @@
 {
   "artifacts": [
     {
+      "$id": "https://finstack_quant.dev/schemas/cashflow/1/accrual_config.schema.json",
+      "bytes": 3880,
+      "kind": "input",
+      "path": "schemas/cashflow/1/accrual_config.schema.json",
+      "summary": "Accrual method, ex-coupon rule, PIK inclusion and coupon frequency for accrued interest.",
+      "title": "AccrualConfig",
+      "type_name": "AccrualConfig"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/amortization_spec.schema.json",
       "bytes": 6141,
       "kind": "component",
@@ -8,6 +17,24 @@
       "summary": "How principal is repaid over the schedule.",
       "title": "AmortizationSpec",
       "type_name": "AmortizationSpec"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/cashflow/1/cashflow_schedule.schema.json",
+      "bytes": 28396,
+      "kind": "output",
+      "path": "schemas/cashflow/1/cashflow_schedule.schema.json",
+      "summary": "Ordered classified cashflows with their notional, day count and schedule metadata.",
+      "title": "CashFlowSchedule",
+      "type_name": "CashFlowSchedule"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/cashflow/1/cashflow_schedule_build_spec.schema.json",
+      "bytes": 74356,
+      "kind": "input",
+      "path": "schemas/cashflow/1/cashflow_schedule_build_spec.schema.json",
+      "summary": "Notional, dates, coupon program, fees and principal events that build a schedule.",
+      "title": "CashflowScheduleBuildSpec",
+      "type_name": "CashflowScheduleBuildSpec"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json",
@@ -37,6 +64,24 @@
       "type_name": "FeeSpec"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/cashflow/1/floating_coupon_spec.schema.json",
+      "bytes": 28080,
+      "kind": "component",
+      "path": "schemas/cashflow/1/floating_coupon_spec.schema.json",
+      "summary": "Index, spread, caps and floors, reset rules and schedule for one floating leg.",
+      "title": "FloatingCouponSpec",
+      "type_name": "FloatingCouponSpec"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/cashflow/1/period_aggregation.schema.json",
+      "bytes": 451,
+      "kind": "output",
+      "path": "schemas/cashflow/1/period_aggregation.schema.json",
+      "summary": "Per-period, per-currency cashflow totals keyed by period code.",
+      "title": "PeriodAggregation",
+      "type_name": "PeriodAggregation"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json",
       "bytes": 4361,
       "kind": "component",
@@ -55,6 +100,15 @@
       "type_name": "RecoveryModelSpec"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/cashflow/1/schedule_build_opts.schema.json",
+      "bytes": 5410,
+      "kind": "input",
+      "path": "schemas/cashflow/1/schedule_build_opts.schema.json",
+      "summary": "Notional hint and metadata stamped on a schedule built from dated or classified flows.",
+      "title": "ScheduleBuildOpts",
+      "type_name": "ScheduleBuildOpts"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/schedule_params.schema.json",
       "bytes": 8210,
       "kind": "component",
@@ -62,6 +116,15 @@
       "summary": "Start, end, frequency, calendar and roll rules for a payment schedule.",
       "title": "ScheduleParams",
       "type_name": "ScheduleParams"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/cashflow/1/step_up_coupon_spec.schema.json",
+      "bytes": 10867,
+      "kind": "component",
+      "path": "schemas/cashflow/1/step_up_coupon_spec.schema.json",
+      "summary": "Initial coupon rate, dated rate steps and schedule for one step-up leg.",
+      "title": "StepUpCouponSpec",
+      "type_name": "StepUpCouponSpec"
     }
   ],
   "schema_index_version": 1

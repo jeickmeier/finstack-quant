@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/covenants/1/covenant_forecast_config.schema.json",
-      "bytes": 3766,
+      "bytes": 3820,
       "kind": "input",
       "path": "schemas/covenants/1/covenant_forecast_config.schema.json",
       "summary": "Covenant forecast configuration.",
@@ -44,6 +44,24 @@
       "summary": "Covenant check result.",
       "title": "CovenantReport",
       "type_name": "CovenantReport"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/covenants/1/dated_covenant_reports.schema.json",
+      "bytes": 9183,
+      "kind": "output",
+      "path": "schemas/covenants/1/dated_covenant_reports.schema.json",
+      "summary": "Covenant reports produced for one test date of a series evaluation.",
+      "title": "DatedCovenantReports",
+      "type_name": "DatedCovenantReports"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/covenants/1/dated_metrics.schema.json",
+      "bytes": 1024,
+      "kind": "input",
+      "path": "schemas/covenants/1/dated_metrics.schema.json",
+      "summary": "Covenant metric values observed on one date.",
+      "title": "DatedMetrics",
+      "type_name": "DatedMetrics"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/covenants/1/future_breach.schema.json",

@@ -11,7 +11,7 @@ use finstack_quant_core::schema::SchemaArtifact;
 
 use crate::{
     ConsequenceApplication, CovenantEngine, CovenantForecast, CovenantForecastConfig,
-    CovenantReport, FutureBreach, HashMapMetricSource,
+    CovenantReport, DatedCovenantReports, DatedMetrics, FutureBreach, HashMapMetricSource,
 };
 
 /// The crate's complete schema registry.
@@ -50,6 +50,20 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "covenant_report",
         Output,
         "Covenant check result."
+    ),
+    finstack_quant_core::schema_artifact!(
+        DatedCovenantReports,
+        "covenants",
+        "dated_covenant_reports",
+        Output,
+        "Covenant reports produced for one test date of a series evaluation."
+    ),
+    finstack_quant_core::schema_artifact!(
+        DatedMetrics,
+        "covenants",
+        "dated_metrics",
+        Input,
+        "Covenant metric values observed on one date."
     ),
     finstack_quant_core::schema_artifact!(
         FutureBreach,

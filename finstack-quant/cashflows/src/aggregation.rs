@@ -62,10 +62,33 @@ use indexmap::IndexMap;
 /// # }
 /// ```
 #[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(transparent)]
 pub struct PeriodAggregation(IndexMap<PeriodId, IndexMap<Currency, Money>>);
 
 impl PeriodAggregation {
+    /// Amount aggregated for one period code and currency.
+    ///
+    /// # Arguments
+    ///
+    /// * `period` - Period code exactly as the aggregation spells it (the
+    ///   `Display` form of [`PeriodId`], for example `"2025Q1"`). An unknown
+    ///   or malformed code is a miss, not an error.
+    /// * `currency` - Currency bucket to read inside that period.
+    ///
+    /// # Returns
+    ///
+    /// The aggregated amount, or `None` when the period has no flows or no
+    /// flows in `currency`.
+    #[must_use]
+    pub fn get_amount(&self, period: &str, currency: Currency) -> Option<Money> {
+        self.0
+            .iter()
+            .find(|(id, _)| id.to_string() == period)
+            .and_then(|(_, per_currency)| per_currency.get(&currency))
+            .copied()
+    }
+
     /// Flatten into `(period, currency, amount)` rows in map order.
     #[must_use]
     pub fn rows(&self) -> Vec<(PeriodId, Currency, Money)> {
@@ -1168,6 +1191,29 @@ mod period_contract_tests {
     fn d(y: i32, m: u8, day: u8) -> Date {
         Date::from_calendar_date(y, Month::try_from(m).expect("valid month"), day)
             .expect("valid date")
+    }
+
+    #[test]
+    fn get_amount_reads_one_period_and_currency_and_misses_quietly() {
+        let periods = vec![Period {
+            id: PeriodId::quarter(2025, 1).expect("valid period"),
+            start: d(2025, 1, 1),
+            end: d(2025, 4, 1),
+            is_actual: true,
+        }];
+        let flows = vec![
+            (d(2025, 2, 15), Money::from((100_i64, Currency::USD))),
+            (d(2025, 3, 15), Money::from((40_i64, Currency::USD))),
+        ];
+        let aggregation = aggregate_by_period(&flows, &periods).expect("aggregates");
+
+        assert_eq!(
+            aggregation.get_amount("2025Q1", Currency::USD),
+            Some(Money::from((140_i64, Currency::USD)))
+        );
+        assert_eq!(aggregation.get_amount("2025Q1", Currency::EUR), None);
+        assert_eq!(aggregation.get_amount("2025Q2", Currency::USD), None);
+        assert_eq!(aggregation.get_amount("not a period", Currency::USD), None);
     }
 
     fn period(id: PeriodId, start: Date, end: Date) -> Period {

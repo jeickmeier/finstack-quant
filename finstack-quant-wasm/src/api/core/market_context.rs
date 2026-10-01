@@ -64,3 +64,12 @@ impl JsMarketContext {
         self.inner.as_ref()
     }
 }
+
+impl JsMarketContext {
+    /// Wrap a Rust `MarketContext` produced by a binding (crate-internal).
+    pub(crate) fn from_inner(inner: MarketContext) -> Self {
+        Self {
+            inner: Arc::new(inner),
+        }
+    }
+}

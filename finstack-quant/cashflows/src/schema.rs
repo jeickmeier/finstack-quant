@@ -55,10 +55,22 @@ pub fn package_cashflow_schema(schema: &mut Value) -> Result<()> {
 }
 
 #[cfg(feature = "jsonschema-validate")]
-const SCHEMAS: [(&str, &str); 7] = [
+const SCHEMAS: [(&str, &str); 14] = [
+    (
+        "accrual_config.schema.json",
+        include_str!("../schemas/cashflow/1/accrual_config.schema.json"),
+    ),
     (
         "amortization_spec.schema.json",
         include_str!("../schemas/cashflow/1/amortization_spec.schema.json"),
+    ),
+    (
+        "cashflow_schedule.schema.json",
+        include_str!("../schemas/cashflow/1/cashflow_schedule.schema.json"),
+    ),
+    (
+        "cashflow_schedule_build_spec.schema.json",
+        include_str!("../schemas/cashflow/1/cashflow_schedule_build_spec.schema.json"),
     ),
     (
         "coupon_specs.schema.json",
@@ -73,6 +85,14 @@ const SCHEMAS: [(&str, &str); 7] = [
         include_str!("../schemas/cashflow/1/fee_specs.schema.json"),
     ),
     (
+        "floating_coupon_spec.schema.json",
+        include_str!("../schemas/cashflow/1/floating_coupon_spec.schema.json"),
+    ),
+    (
+        "period_aggregation.schema.json",
+        include_str!("../schemas/cashflow/1/period_aggregation.schema.json"),
+    ),
+    (
         "prepayment_model_spec.schema.json",
         include_str!("../schemas/cashflow/1/prepayment_model_spec.schema.json"),
     ),
@@ -81,8 +101,16 @@ const SCHEMAS: [(&str, &str); 7] = [
         include_str!("../schemas/cashflow/1/recovery_model_spec.schema.json"),
     ),
     (
+        "schedule_build_opts.schema.json",
+        include_str!("../schemas/cashflow/1/schedule_build_opts.schema.json"),
+    ),
+    (
         "schedule_params.schema.json",
         include_str!("../schemas/cashflow/1/schedule_params.schema.json"),
+    ),
+    (
+        "step_up_coupon_spec.schema.json",
+        include_str!("../schemas/cashflow/1/step_up_coupon_spec.schema.json"),
     ),
 ];
 
@@ -233,6 +261,17 @@ fn serialize_example<T: serde::Serialize>(
 /// contract tests and the bindings all render from one definition. Render an
 /// entry with [`finstack_quant_core::schema::SchemaArtifact::generate`].
 pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
+    finstack_quant_core::schema::SchemaArtifact::new::<crate::accrual::AccrualConfig>(
+        "schemas/cashflow/1/accrual_config.schema.json",
+        "https://finstack_quant.dev/schemas/cashflow/1/accrual_config.schema.json",
+        "AccrualConfig",
+        "Schedule-driven accrued-interest configuration.",
+    )
+    .with_kind(finstack_quant_core::schema::SchemaKind::Input)
+    .with_packager(package_cashflow_schema)
+    .with_summary(
+        "Accrual method, ex-coupon rule, PIK inclusion and coupon frequency for accrued interest.",
+    ),
     finstack_quant_core::schema::SchemaArtifact::new::<crate::builder::AmortizationSpec>(
         "schemas/cashflow/1/amortization_spec.schema.json",
         "https://finstack_quant.dev/schemas/cashflow/1/amortization_spec.schema.json",
@@ -242,6 +281,28 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
     .with_packager(package_cashflow_schema)
     .with_summary("How principal is repaid over the schedule.")
     .with_examples(amortization_examples),
+    finstack_quant_core::schema::SchemaArtifact::new::<crate::builder::CashFlowSchedule>(
+        "schemas/cashflow/1/cashflow_schedule.schema.json",
+        "https://finstack_quant.dev/schemas/cashflow/1/cashflow_schedule.schema.json",
+        "CashFlowSchedule",
+        "Canonical cashflow schedule.",
+    )
+    .with_kind(finstack_quant_core::schema::SchemaKind::Output)
+    .with_packager(package_cashflow_schema)
+    .with_summary(
+        "Ordered classified cashflows with their notional, day count and schedule metadata.",
+    ),
+    finstack_quant_core::schema::SchemaArtifact::new::<crate::json::CashflowScheduleBuildSpec>(
+        "schemas/cashflow/1/cashflow_schedule_build_spec.schema.json",
+        "https://finstack_quant.dev/schemas/cashflow/1/cashflow_schedule_build_spec.schema.json",
+        "CashflowScheduleBuildSpec",
+        "Cashflow schedule build specification.",
+    )
+    .with_kind(finstack_quant_core::schema::SchemaKind::Input)
+    .with_packager(package_cashflow_schema)
+    .with_summary(
+        "Notional, dates, coupon program, fees and principal events that build a schedule.",
+    ),
     finstack_quant_core::schema::SchemaArtifact::new::<crate::builder::FixedCouponSpec>(
         "schemas/cashflow/1/coupon_specs.schema.json",
         "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json",
@@ -269,6 +330,24 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
     .with_packager(package_cashflow_schema)
     .with_summary("Recurring or one-off fees attached to a schedule.")
     .with_examples(fee_examples),
+    finstack_quant_core::schema::SchemaArtifact::new::<crate::builder::FloatingCouponSpec>(
+        "schemas/cashflow/1/floating_coupon_spec.schema.json",
+        "https://finstack_quant.dev/schemas/cashflow/1/floating_coupon_spec.schema.json",
+        "FloatingCouponSpec",
+        "Floating coupon specification.",
+    )
+    .with_kind(finstack_quant_core::schema::SchemaKind::Component)
+    .with_packager(package_cashflow_schema)
+    .with_summary("Index, spread, caps and floors, reset rules and schedule for one floating leg."),
+    finstack_quant_core::schema::SchemaArtifact::new::<crate::aggregation::PeriodAggregation>(
+        "schemas/cashflow/1/period_aggregation.schema.json",
+        "https://finstack_quant.dev/schemas/cashflow/1/period_aggregation.schema.json",
+        "PeriodAggregation",
+        "Currency-preserving cashflow totals by reporting period.",
+    )
+    .with_kind(finstack_quant_core::schema::SchemaKind::Output)
+    .with_packager(package_cashflow_schema)
+    .with_summary("Per-period, per-currency cashflow totals keyed by period code."),
     finstack_quant_core::schema::SchemaArtifact::new::<crate::builder::PrepaymentModelSpec>(
         "schemas/cashflow/1/prepayment_model_spec.schema.json",
         "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json",
@@ -287,6 +366,17 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
     .with_packager(package_cashflow_schema)
     .with_summary("Recovery rate and lag applied to defaulted balances.")
     .with_examples(recovery_model_examples),
+    finstack_quant_core::schema::SchemaArtifact::new::<crate::traits::ScheduleBuildOpts>(
+        "schemas/cashflow/1/schedule_build_opts.schema.json",
+        "https://finstack_quant.dev/schemas/cashflow/1/schedule_build_opts.schema.json",
+        "ScheduleBuildOpts",
+        "Schedule-level inputs for building a schedule from existing flows.",
+    )
+    .with_kind(finstack_quant_core::schema::SchemaKind::Input)
+    .with_packager(package_cashflow_schema)
+    .with_summary(
+        "Notional hint and metadata stamped on a schedule built from dated or classified flows.",
+    ),
     finstack_quant_core::schema::SchemaArtifact::new::<crate::builder::ScheduleParams>(
         "schemas/cashflow/1/schedule_params.schema.json",
         "https://finstack_quant.dev/schemas/cashflow/1/schedule_params.schema.json",
@@ -296,4 +386,13 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
     .with_packager(package_cashflow_schema)
     .with_summary("Start, end, frequency, calendar and roll rules for a payment schedule.")
     .with_examples(schedule_params_examples),
+    finstack_quant_core::schema::SchemaArtifact::new::<crate::builder::StepUpCouponSpec>(
+        "schemas/cashflow/1/step_up_coupon_spec.schema.json",
+        "https://finstack_quant.dev/schemas/cashflow/1/step_up_coupon_spec.schema.json",
+        "StepUpCouponSpec",
+        "Step-up fixed coupon specification.",
+    )
+    .with_kind(finstack_quant_core::schema::SchemaKind::Component)
+    .with_packager(package_cashflow_schema)
+    .with_summary("Initial coupon rate, dated rate steps and schedule for one step-up leg."),
 ];

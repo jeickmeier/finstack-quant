@@ -1821,3 +1821,43 @@ fn rust_computation_twins_are_declared() {
         assert!(contains_signature(&dts, sig), "index.d.ts is missing `{sig}`");
     }
 }
+
+/// P2: the typed cashflows and covenants surface is declared with handles for
+/// the stateful types, wire types for data, and optional arguments where Rust
+/// takes an `Option`.
+#[test]
+fn typed_cashflows_and_covenants_surface_is_declared() {
+    let dts = index_dts();
+    for sig in [
+        "CashFlowSchedule: CashFlowScheduleConstructor;",
+        "CashFlowBuilder: CashFlowBuilderConstructor;",
+        "AccrualIndex: AccrualIndexConstructor;",
+        "CovenantEngine: CovenantEngineConstructor;",
+        "builder(): CashFlowBuilder;",
+        "build(market?: MarketContext | null): CashFlowSchedule;",
+        "buildCashflowSchedule(spec: generated.cashflows.CashflowScheduleBuildSpec | string, market?: MarketContext | null): CashFlowSchedule;",
+        "scaleAmounts(scale: number): CashFlowSchedule;",
+        "pvByPeriod(periods: readonly generated.statements.Period[], market: MarketContext, discCurveId: string, base: string, dayCount?: generated.core.DayCount | null, creditCurveId?: string | null): generated.cashflows.PeriodAggregation;",
+        "fixedToFloat(switchDate: string, fixed: generated.cashflows.FixedCouponSpec, floating: generated.cashflows.FloatingCouponSpec): CashFlowBuilder;",
+        "accruedInterestAmount(schedule: CashFlowSchedule, asOf: string, config?: generated.cashflows.AccrualConfig | null): MoneyValue;",
+        "accruedAt(asOf: string): MoneyValue;",
+        "periodAggregationGetAmount(aggregation: generated.cashflows.PeriodAggregation, period: string, currency: generated.core.Currency): MoneyValue | undefined;",
+        "mergeCashflowSchedules(schedules: readonly (CashFlowSchedule | JsonInput)[], notional: generated.cashflows.Notional, dayCount: generated.core.DayCount): CashFlowSchedule;",
+        "materializeFixings(market: MarketContext, schedules: readonly (CashFlowSchedule | JsonInput)[], oldDate: string, newDate: string): MarketContext;",
+        "cashFlowGetBalanceDate(flow: generated.cashflows.CashFlow): generated.core.DateWire;",
+        "scheduleParamsUsdSofrSwap(): generated.cashflows.ScheduleParams;",
+        "covLite(maxLeverage: number, maxSeniorLeverage: number): generated.covenants.CovenantSpec[];",
+        "evaluate(metrics: Record<string, number> | string, asOf: string): Record<string, CovenantReport>;",
+        "evaluateSeries(metrics: readonly generated.covenants.DatedMetrics[]): generated.covenants.DatedCovenantReports[];",
+        "readonly breachHistory: generated.covenants.CovenantBreach[];",
+        "forecastCovenant(spec: generated.covenants.CovenantSpec, metrics: readonly generated.covenants.DatedMetrics[], config?: generated.covenants.CovenantForecastConfig | null): generated.covenants.CovenantForecast;",
+        "forecastBreaches(engine: CovenantEngine, metrics: readonly generated.covenants.DatedMetrics[], config?: generated.covenants.CovenantForecastConfig | null): generated.covenants.FutureBreach[];",
+        "covenantTypeCustom(metric: string, test: 'maximum' | 'minimum', value: number): generated.covenants.CovenantType;",
+        "thresholdScheduleThresholdFor(schedule: generated.covenants.ThresholdSchedule, testDate: string): number | undefined;",
+    ] {
+        assert!(contains_signature(&dts, sig), "index.d.ts is missing `{sig}`");
+    }
+    // The facade joins the market / no-market twins; the raw twins are not published.
+    assert!(!dts.contains("buildWithMarket("));
+    assert!(!dts.contains("buildCashflowScheduleWithMarket("));
+}

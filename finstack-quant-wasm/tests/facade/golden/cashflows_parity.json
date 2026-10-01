@@ -1,0 +1,3632 @@
+{
+  "builder.fixed_bond": {
+    "flows": [
+      {
+        "date": "2025-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "-1000000",
+          "currency": "USD"
+        },
+        "kind": "notional",
+        "accrual_factor": 0
+      },
+      {
+        "date": "2025-07-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "30000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2025-01-15",
+          "end": "2025-07-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-01-15", "2025-07-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "30000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2025-07-15",
+          "end": "2026-01-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-07-15", "2026-01-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-07-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "30000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2026-01-15",
+          "end": "2026-07-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-01-15", "2026-07-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2027-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "30000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2026-07-15",
+          "end": "2027-01-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-07-15", "2027-01-15"],
+          "end_is_termination_date": true
+        }
+      },
+      {
+        "date": "2027-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "1000000",
+          "currency": "USD"
+        },
+        "kind": "notional",
+        "accrual_factor": 0,
+        "principal_date": "2027-01-15"
+      }
+    ],
+    "notional": {
+      "initial": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "amort": "none"
+    },
+    "day_count": "30_360",
+    "meta": {
+      "representation": "contractual",
+      "calendar_ids": ["weekends_only"],
+      "commitment": null,
+      "issue_date": "2025-01-15",
+      "maturity": "2027-01-15"
+    }
+  },
+  "builder.amortizing_with_fee_and_event": {
+    "flows": [
+      {
+        "date": "2025-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "-1000000",
+          "currency": "USD"
+        },
+        "kind": "notional",
+        "accrual_factor": 0
+      },
+      {
+        "date": "2025-07-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "30000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2025-01-15",
+          "end": "2025-07-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-01-15", "2025-07-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2025-07-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "2500",
+          "currency": "USD"
+        },
+        "kind": "fee",
+        "accrual_factor": 0
+      },
+      {
+        "date": "2025-07-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "150000",
+          "currency": "USD"
+        },
+        "kind": "amortization",
+        "accrual_factor": 0,
+        "principal_date": "2025-07-15"
+      },
+      {
+        "date": "2025-10-17",
+        "reset_date": null,
+        "amount": {
+          "amount": "100000",
+          "currency": "USD"
+        },
+        "kind": "amortization",
+        "accrual_factor": 0,
+        "principal_delta": {
+          "amount": "-100000",
+          "currency": "USD"
+        },
+        "principal_date": "2025-10-15"
+      },
+      {
+        "date": "2026-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "11250",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.25,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2025-10-15",
+          "end": "2026-01-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-07-15", "2026-01-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "12750",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.25,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2025-07-15",
+          "end": "2025-10-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-07-15", "2026-01-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "150000",
+          "currency": "USD"
+        },
+        "kind": "amortization",
+        "accrual_factor": 0,
+        "principal_date": "2026-01-15"
+      },
+      {
+        "date": "2026-07-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "18000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2026-01-15",
+          "end": "2026-07-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-01-15", "2026-07-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-07-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "150000",
+          "currency": "USD"
+        },
+        "kind": "amortization",
+        "accrual_factor": 0,
+        "principal_date": "2026-07-15"
+      },
+      {
+        "date": "2027-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "13500",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2026-07-15",
+          "end": "2027-01-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-07-15", "2027-01-15"],
+          "end_is_termination_date": true
+        }
+      },
+      {
+        "date": "2027-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "50000",
+          "currency": "USD"
+        },
+        "kind": "amortization",
+        "accrual_factor": 0,
+        "principal_date": "2027-01-15"
+      },
+      {
+        "date": "2027-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "400000",
+          "currency": "USD"
+        },
+        "kind": "notional",
+        "accrual_factor": 0,
+        "principal_date": "2027-01-15"
+      }
+    ],
+    "notional": {
+      "initial": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "amort": {
+        "linear_to": {
+          "final_notional": {
+            "amount": "400000",
+            "currency": "USD"
+          }
+        }
+      }
+    },
+    "day_count": "30_360",
+    "meta": {
+      "representation": "contractual",
+      "calendar_ids": ["weekends_only"],
+      "commitment": null,
+      "issue_date": "2025-01-15",
+      "maturity": "2027-01-15"
+    }
+  },
+  "builder.step_up": {
+    "flows": [
+      {
+        "date": "2025-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "-1000000",
+          "currency": "USD"
+        },
+        "kind": "notional",
+        "accrual_factor": 0
+      },
+      {
+        "date": "2025-07-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "25000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.05,
+        "accrual": {
+          "start": "2025-01-15",
+          "end": "2025-07-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-01-15", "2025-07-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "25000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.05,
+        "accrual": {
+          "start": "2025-07-15",
+          "end": "2026-01-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-07-15", "2026-01-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-07-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "35000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.07,
+        "accrual": {
+          "start": "2026-01-15",
+          "end": "2026-07-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-01-15", "2026-07-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2027-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "35000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.07,
+        "accrual": {
+          "start": "2026-07-15",
+          "end": "2027-01-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-07-15", "2027-01-15"],
+          "end_is_termination_date": true
+        }
+      },
+      {
+        "date": "2027-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "1000000",
+          "currency": "USD"
+        },
+        "kind": "notional",
+        "accrual_factor": 0,
+        "principal_date": "2027-01-15"
+      }
+    ],
+    "notional": {
+      "initial": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "amort": "none"
+    },
+    "day_count": "30_360",
+    "meta": {
+      "representation": "contractual",
+      "calendar_ids": ["weekends_only"],
+      "commitment": null,
+      "issue_date": "2025-01-15",
+      "maturity": "2027-01-15"
+    }
+  },
+  "builder.windows_and_pik_program": {
+    "flows": [
+      {
+        "date": "2025-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "-1000000",
+          "currency": "USD"
+        },
+        "kind": "notional",
+        "accrual_factor": 0
+      },
+      {
+        "date": "2025-07-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "20000",
+          "currency": "USD"
+        },
+        "kind": "pik",
+        "accrual_factor": 0.5,
+        "rate": 0.04,
+        "accrual": {
+          "start": "2025-01-15",
+          "end": "2025-07-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-01-15", "2025-07-15"],
+          "end_is_termination_date": false
+        },
+        "principal_date": "2025-07-15"
+      },
+      {
+        "date": "2026-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "20400",
+          "currency": "USD"
+        },
+        "kind": "pik",
+        "accrual_factor": 0.5,
+        "rate": 0.04,
+        "accrual": {
+          "start": "2025-07-15",
+          "end": "2026-01-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-07-15", "2026-01-15"],
+          "end_is_termination_date": false
+        },
+        "principal_date": "2026-01-15"
+      },
+      {
+        "date": "2026-07-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "20808",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.08,
+        "accrual": {
+          "start": "2026-01-15",
+          "end": "2026-07-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-01-15", "2026-07-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-07-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "20808",
+          "currency": "USD"
+        },
+        "kind": "pik",
+        "accrual_factor": 0.5,
+        "rate": 0.08,
+        "accrual": {
+          "start": "2026-01-15",
+          "end": "2026-07-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-01-15", "2026-07-15"],
+          "end_is_termination_date": false
+        },
+        "principal_date": "2026-07-15"
+      },
+      {
+        "date": "2027-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "21224.16",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.08,
+        "accrual": {
+          "start": "2026-07-15",
+          "end": "2027-01-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-07-15", "2027-01-15"],
+          "end_is_termination_date": true
+        }
+      },
+      {
+        "date": "2027-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "21224.16",
+          "currency": "USD"
+        },
+        "kind": "pik",
+        "accrual_factor": 0.5,
+        "rate": 0.08,
+        "accrual": {
+          "start": "2026-07-15",
+          "end": "2027-01-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-07-15", "2027-01-15"],
+          "end_is_termination_date": true
+        },
+        "principal_date": "2027-01-15"
+      },
+      {
+        "date": "2027-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "1082432.16",
+          "currency": "USD"
+        },
+        "kind": "notional",
+        "accrual_factor": 0,
+        "principal_date": "2027-01-15"
+      }
+    ],
+    "notional": {
+      "initial": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "amort": "none"
+    },
+    "day_count": "30_360",
+    "meta": {
+      "representation": "contractual",
+      "calendar_ids": ["weekends_only"],
+      "commitment": null,
+      "issue_date": "2025-01-15",
+      "maturity": "2027-01-15"
+    }
+  },
+  "builder.payment_window": {
+    "flows": [
+      {
+        "date": "2025-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "-1000000",
+          "currency": "USD"
+        },
+        "kind": "notional",
+        "accrual_factor": 0
+      },
+      {
+        "date": "2025-07-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "30000",
+          "currency": "USD"
+        },
+        "kind": "pik",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2025-01-15",
+          "end": "2025-07-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-01-15", "2025-07-15"],
+          "end_is_termination_date": false
+        },
+        "principal_date": "2025-07-15"
+      },
+      {
+        "date": "2026-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "30900",
+          "currency": "USD"
+        },
+        "kind": "pik",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2025-07-15",
+          "end": "2026-01-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-07-15", "2026-01-15"],
+          "end_is_termination_date": false
+        },
+        "principal_date": "2026-01-15"
+      },
+      {
+        "date": "2026-07-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "31827",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2026-01-15",
+          "end": "2026-07-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-01-15", "2026-07-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2027-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "31827",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2026-07-15",
+          "end": "2027-01-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-07-15", "2027-01-15"],
+          "end_is_termination_date": true
+        }
+      },
+      {
+        "date": "2027-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "1060900",
+          "currency": "USD"
+        },
+        "kind": "notional",
+        "accrual_factor": 0,
+        "principal_date": "2027-01-15"
+      }
+    ],
+    "notional": {
+      "initial": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "amort": "none"
+    },
+    "day_count": "30_360",
+    "meta": {
+      "representation": "contractual",
+      "calendar_ids": ["weekends_only"],
+      "commitment": null,
+      "issue_date": "2025-01-15",
+      "maturity": "2027-01-15"
+    }
+  },
+  "builder.floating_with_market": {
+    "flows": [
+      {
+        "date": "2025-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "-1000000",
+          "currency": "USD"
+        },
+        "kind": "notional",
+        "accrual_factor": 0
+      },
+      {
+        "date": "2025-04-15",
+        "reset_date": "2025-01-15",
+        "amount": {
+          "amount": "13798.61111111111",
+          "currency": "USD"
+        },
+        "kind": "float_reset",
+        "accrual_factor": 0.25,
+        "rate": 0.05519444444444444,
+        "accrual": {
+          "start": "2025-01-15",
+          "end": "2025-04-15",
+          "day_count": "act_360",
+          "projected_index_rate": 0.04019444444444444,
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-01-15", "2025-04-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2025-07-15",
+        "reset_date": "2025-04-15",
+        "amount": {
+          "amount": "14267.9012345679",
+          "currency": "USD"
+        },
+        "kind": "float_reset",
+        "accrual_factor": 0.25277777777777777,
+        "rate": 0.05644444444444444,
+        "accrual": {
+          "start": "2025-04-15",
+          "end": "2025-07-15",
+          "day_count": "act_360",
+          "projected_index_rate": 0.041444444444444443,
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-04-15", "2025-07-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2025-10-15",
+        "reset_date": "2025-07-15",
+        "amount": {
+          "amount": "14747.68518518518",
+          "currency": "USD"
+        },
+        "kind": "float_reset",
+        "accrual_factor": 0.25555555555555554,
+        "rate": 0.057708333333333334,
+        "accrual": {
+          "start": "2025-07-15",
+          "end": "2025-10-15",
+          "day_count": "act_360",
+          "projected_index_rate": 0.042708333333333334,
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-07-15", "2025-10-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-01-15",
+        "reset_date": "2025-10-15",
+        "amount": {
+          "amount": "15074.22839506173",
+          "currency": "USD"
+        },
+        "kind": "float_reset",
+        "accrual_factor": 0.25555555555555554,
+        "rate": 0.05898611111111111,
+        "accrual": {
+          "start": "2025-10-15",
+          "end": "2026-01-15",
+          "day_count": "act_360",
+          "projected_index_rate": 0.04398611111111111,
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-10-15", "2026-01-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-04-15",
+        "reset_date": "2026-01-15",
+        "amount": {
+          "amount": "15032.98611111111",
+          "currency": "USD"
+        },
+        "kind": "float_reset",
+        "accrual_factor": 0.25,
+        "rate": 0.06013194444444444,
+        "accrual": {
+          "start": "2026-01-15",
+          "end": "2026-04-15",
+          "day_count": "act_360",
+          "projected_index_rate": 0.04513194444444444,
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-01-15", "2026-04-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-07-15",
+        "reset_date": "2026-04-15",
+        "amount": {
+          "amount": "15358.00540123457",
+          "currency": "USD"
+        },
+        "kind": "float_reset",
+        "accrual_factor": 0.25277777777777777,
+        "rate": 0.06075694444444444,
+        "accrual": {
+          "start": "2026-04-15",
+          "end": "2026-07-15",
+          "day_count": "act_360",
+          "projected_index_rate": 0.04575694444444444,
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-04-15", "2026-07-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-10-15",
+        "reset_date": "2026-07-15",
+        "amount": {
+          "amount": "15688.27160493827",
+          "currency": "USD"
+        },
+        "kind": "float_reset",
+        "accrual_factor": 0.25555555555555554,
+        "rate": 0.06138888888888889,
+        "accrual": {
+          "start": "2026-07-15",
+          "end": "2026-10-15",
+          "day_count": "act_360",
+          "projected_index_rate": 0.04638888888888889,
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-07-15", "2026-10-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2027-01-15",
+        "reset_date": "2026-10-15",
+        "amount": {
+          "amount": "15851.54320987654",
+          "currency": "USD"
+        },
+        "kind": "float_reset",
+        "accrual_factor": 0.25555555555555554,
+        "rate": 0.06202777777777778,
+        "accrual": {
+          "start": "2026-10-15",
+          "end": "2027-01-15",
+          "day_count": "act_360",
+          "projected_index_rate": 0.04702777777777778,
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-10-15", "2027-01-15"],
+          "end_is_termination_date": true
+        }
+      },
+      {
+        "date": "2027-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "1000000",
+          "currency": "USD"
+        },
+        "kind": "notional",
+        "accrual_factor": 0,
+        "principal_date": "2027-01-15"
+      }
+    ],
+    "notional": {
+      "initial": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "amort": "none"
+    },
+    "day_count": "act_360",
+    "meta": {
+      "projected_fixings": [
+        {
+          "series_id": "FIXING:USD-SOFR-3M",
+          "date": "2025-01-15",
+          "value": 0.04019444444444444
+        },
+        {
+          "series_id": "FIXING:USD-SOFR-3M",
+          "date": "2025-04-15",
+          "value": 0.041444444444444443
+        },
+        {
+          "series_id": "FIXING:USD-SOFR-3M",
+          "date": "2025-07-15",
+          "value": 0.042708333333333334
+        },
+        {
+          "series_id": "FIXING:USD-SOFR-3M",
+          "date": "2025-10-15",
+          "value": 0.04398611111111111
+        },
+        {
+          "series_id": "FIXING:USD-SOFR-3M",
+          "date": "2026-01-15",
+          "value": 0.04513194444444444
+        },
+        {
+          "series_id": "FIXING:USD-SOFR-3M",
+          "date": "2026-04-15",
+          "value": 0.04575694444444444
+        },
+        {
+          "series_id": "FIXING:USD-SOFR-3M",
+          "date": "2026-07-15",
+          "value": 0.04638888888888889
+        },
+        {
+          "series_id": "FIXING:USD-SOFR-3M",
+          "date": "2026-10-15",
+          "value": 0.04702777777777778
+        }
+      ],
+      "representation": "contractual",
+      "calendar_ids": ["weekends_only"],
+      "commitment": null,
+      "issue_date": "2025-01-15",
+      "maturity": "2027-01-15"
+    }
+  },
+  "builder.fixed_to_float": {
+    "flows": [
+      {
+        "date": "2025-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "-1000000",
+          "currency": "USD"
+        },
+        "kind": "notional",
+        "accrual_factor": 0
+      },
+      {
+        "date": "2025-04-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "15000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.25,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2025-01-15",
+          "end": "2025-04-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-01-15", "2025-04-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2025-07-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "15000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.25,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2025-04-15",
+          "end": "2025-07-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-04-15", "2025-07-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2025-10-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "15000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.25,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2025-07-15",
+          "end": "2025-10-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-07-15", "2025-10-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "15000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.25,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2025-10-15",
+          "end": "2026-01-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-10-15", "2026-01-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-04-15",
+        "reset_date": "2026-01-15",
+        "amount": {
+          "amount": "15032.98611111111",
+          "currency": "USD"
+        },
+        "kind": "float_reset",
+        "accrual_factor": 0.25,
+        "rate": 0.06013194444444444,
+        "accrual": {
+          "start": "2026-01-15",
+          "end": "2026-04-15",
+          "day_count": "act_360",
+          "projected_index_rate": 0.04513194444444444,
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-01-15", "2026-04-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-07-15",
+        "reset_date": "2026-04-15",
+        "amount": {
+          "amount": "15358.00540123457",
+          "currency": "USD"
+        },
+        "kind": "float_reset",
+        "accrual_factor": 0.25277777777777777,
+        "rate": 0.06075694444444444,
+        "accrual": {
+          "start": "2026-04-15",
+          "end": "2026-07-15",
+          "day_count": "act_360",
+          "projected_index_rate": 0.04575694444444444,
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-04-15", "2026-07-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-10-15",
+        "reset_date": "2026-07-15",
+        "amount": {
+          "amount": "15688.27160493827",
+          "currency": "USD"
+        },
+        "kind": "float_reset",
+        "accrual_factor": 0.25555555555555554,
+        "rate": 0.06138888888888889,
+        "accrual": {
+          "start": "2026-07-15",
+          "end": "2026-10-15",
+          "day_count": "act_360",
+          "projected_index_rate": 0.04638888888888889,
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-07-15", "2026-10-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2027-01-15",
+        "reset_date": "2026-10-15",
+        "amount": {
+          "amount": "15851.54320987654",
+          "currency": "USD"
+        },
+        "kind": "float_reset",
+        "accrual_factor": 0.25555555555555554,
+        "rate": 0.06202777777777778,
+        "accrual": {
+          "start": "2026-10-15",
+          "end": "2027-01-15",
+          "day_count": "act_360",
+          "projected_index_rate": 0.04702777777777778,
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-10-15", "2027-01-15"],
+          "end_is_termination_date": true
+        }
+      },
+      {
+        "date": "2027-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "1000000",
+          "currency": "USD"
+        },
+        "kind": "notional",
+        "accrual_factor": 0,
+        "principal_date": "2027-01-15"
+      }
+    ],
+    "notional": {
+      "initial": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "amort": "none"
+    },
+    "day_count": "30_360",
+    "meta": {
+      "projected_fixings": [
+        {
+          "series_id": "FIXING:USD-SOFR-3M",
+          "date": "2026-01-15",
+          "value": 0.04513194444444444
+        },
+        {
+          "series_id": "FIXING:USD-SOFR-3M",
+          "date": "2026-04-15",
+          "value": 0.04575694444444444
+        },
+        {
+          "series_id": "FIXING:USD-SOFR-3M",
+          "date": "2026-07-15",
+          "value": 0.04638888888888889
+        },
+        {
+          "series_id": "FIXING:USD-SOFR-3M",
+          "date": "2026-10-15",
+          "value": 0.04702777777777778
+        }
+      ],
+      "representation": "contractual",
+      "calendar_ids": ["weekends_only"],
+      "commitment": null,
+      "issue_date": "2025-01-15",
+      "maturity": "2027-01-15"
+    }
+  },
+  "builder.float_margin_steps_and_floating_window": [
+    {
+      "flows": [
+        {
+          "date": "2025-01-15",
+          "reset_date": null,
+          "amount": {
+            "amount": "-1000000",
+            "currency": "USD"
+          },
+          "kind": "notional",
+          "accrual_factor": 0
+        },
+        {
+          "date": "2025-04-15",
+          "reset_date": "2025-01-15",
+          "amount": {
+            "amount": "13798.61111111111",
+            "currency": "USD"
+          },
+          "kind": "float_reset",
+          "accrual_factor": 0.25,
+          "rate": 0.05519444444444444,
+          "accrual": {
+            "start": "2025-01-15",
+            "end": "2025-04-15",
+            "day_count": "act_360",
+            "projected_index_rate": 0.04019444444444444,
+            "calendar_id": "weekends_only",
+            "coupon_period": ["2025-01-15", "2025-04-15"],
+            "end_is_termination_date": false
+          }
+        },
+        {
+          "date": "2025-07-15",
+          "reset_date": "2025-04-15",
+          "amount": {
+            "amount": "14267.9012345679",
+            "currency": "USD"
+          },
+          "kind": "float_reset",
+          "accrual_factor": 0.25277777777777777,
+          "rate": 0.05644444444444444,
+          "accrual": {
+            "start": "2025-04-15",
+            "end": "2025-07-15",
+            "day_count": "act_360",
+            "projected_index_rate": 0.041444444444444443,
+            "calendar_id": "weekends_only",
+            "coupon_period": ["2025-04-15", "2025-07-15"],
+            "end_is_termination_date": false
+          }
+        },
+        {
+          "date": "2025-10-15",
+          "reset_date": "2025-07-15",
+          "amount": {
+            "amount": "14747.68518518518",
+            "currency": "USD"
+          },
+          "kind": "float_reset",
+          "accrual_factor": 0.25555555555555554,
+          "rate": 0.057708333333333334,
+          "accrual": {
+            "start": "2025-07-15",
+            "end": "2025-10-15",
+            "day_count": "act_360",
+            "projected_index_rate": 0.042708333333333334,
+            "calendar_id": "weekends_only",
+            "coupon_period": ["2025-07-15", "2025-10-15"],
+            "end_is_termination_date": false
+          }
+        },
+        {
+          "date": "2026-01-15",
+          "reset_date": "2025-10-15",
+          "amount": {
+            "amount": "15074.22839506173",
+            "currency": "USD"
+          },
+          "kind": "float_reset",
+          "accrual_factor": 0.25555555555555554,
+          "rate": 0.05898611111111111,
+          "accrual": {
+            "start": "2025-10-15",
+            "end": "2026-01-15",
+            "day_count": "act_360",
+            "projected_index_rate": 0.04398611111111111,
+            "calendar_id": "weekends_only",
+            "coupon_period": ["2025-10-15", "2026-01-15"],
+            "end_is_termination_date": false
+          }
+        },
+        {
+          "date": "2026-04-15",
+          "reset_date": "2026-01-15",
+          "amount": {
+            "amount": "17532.98611111111",
+            "currency": "USD"
+          },
+          "kind": "float_reset",
+          "accrual_factor": 0.25,
+          "rate": 0.07013194444444444,
+          "accrual": {
+            "start": "2026-01-15",
+            "end": "2026-04-15",
+            "day_count": "act_360",
+            "projected_index_rate": 0.04513194444444444,
+            "calendar_id": "weekends_only",
+            "coupon_period": ["2026-01-15", "2026-04-15"],
+            "end_is_termination_date": false
+          }
+        },
+        {
+          "date": "2026-07-15",
+          "reset_date": "2026-04-15",
+          "amount": {
+            "amount": "17885.78317901235",
+            "currency": "USD"
+          },
+          "kind": "float_reset",
+          "accrual_factor": 0.25277777777777777,
+          "rate": 0.07075694444444444,
+          "accrual": {
+            "start": "2026-04-15",
+            "end": "2026-07-15",
+            "day_count": "act_360",
+            "projected_index_rate": 0.04575694444444444,
+            "calendar_id": "weekends_only",
+            "coupon_period": ["2026-04-15", "2026-07-15"],
+            "end_is_termination_date": false
+          }
+        },
+        {
+          "date": "2026-10-15",
+          "reset_date": "2026-07-15",
+          "amount": {
+            "amount": "18243.82716049383",
+            "currency": "USD"
+          },
+          "kind": "float_reset",
+          "accrual_factor": 0.25555555555555554,
+          "rate": 0.07138888888888889,
+          "accrual": {
+            "start": "2026-07-15",
+            "end": "2026-10-15",
+            "day_count": "act_360",
+            "projected_index_rate": 0.04638888888888889,
+            "calendar_id": "weekends_only",
+            "coupon_period": ["2026-07-15", "2026-10-15"],
+            "end_is_termination_date": false
+          }
+        },
+        {
+          "date": "2027-01-15",
+          "reset_date": "2026-10-15",
+          "amount": {
+            "amount": "18407.0987654321",
+            "currency": "USD"
+          },
+          "kind": "float_reset",
+          "accrual_factor": 0.25555555555555554,
+          "rate": 0.07202777777777777,
+          "accrual": {
+            "start": "2026-10-15",
+            "end": "2027-01-15",
+            "day_count": "act_360",
+            "projected_index_rate": 0.04702777777777778,
+            "calendar_id": "weekends_only",
+            "coupon_period": ["2026-10-15", "2027-01-15"],
+            "end_is_termination_date": true
+          }
+        },
+        {
+          "date": "2027-01-15",
+          "reset_date": null,
+          "amount": {
+            "amount": "1000000",
+            "currency": "USD"
+          },
+          "kind": "notional",
+          "accrual_factor": 0,
+          "principal_date": "2027-01-15"
+        }
+      ],
+      "notional": {
+        "initial": {
+          "amount": "1000000",
+          "currency": "USD"
+        },
+        "amort": "none"
+      },
+      "day_count": "act_360",
+      "meta": {
+        "projected_fixings": [
+          {
+            "series_id": "FIXING:USD-SOFR-3M",
+            "date": "2025-01-15",
+            "value": 0.04019444444444444
+          },
+          {
+            "series_id": "FIXING:USD-SOFR-3M",
+            "date": "2025-04-15",
+            "value": 0.041444444444444443
+          },
+          {
+            "series_id": "FIXING:USD-SOFR-3M",
+            "date": "2025-07-15",
+            "value": 0.042708333333333334
+          },
+          {
+            "series_id": "FIXING:USD-SOFR-3M",
+            "date": "2025-10-15",
+            "value": 0.04398611111111111
+          },
+          {
+            "series_id": "FIXING:USD-SOFR-3M",
+            "date": "2026-01-15",
+            "value": 0.04513194444444444
+          },
+          {
+            "series_id": "FIXING:USD-SOFR-3M",
+            "date": "2026-04-15",
+            "value": 0.04575694444444444
+          },
+          {
+            "series_id": "FIXING:USD-SOFR-3M",
+            "date": "2026-07-15",
+            "value": 0.04638888888888889
+          },
+          {
+            "series_id": "FIXING:USD-SOFR-3M",
+            "date": "2026-10-15",
+            "value": 0.04702777777777778
+          }
+        ],
+        "representation": "contractual",
+        "calendar_ids": ["weekends_only"],
+        "commitment": null,
+        "issue_date": "2025-01-15",
+        "maturity": "2027-01-15"
+      }
+    },
+    {
+      "flows": [
+        {
+          "date": "2025-01-15",
+          "reset_date": null,
+          "amount": {
+            "amount": "-1000000",
+            "currency": "USD"
+          },
+          "kind": "notional",
+          "accrual_factor": 0
+        },
+        {
+          "date": "2025-04-15",
+          "reset_date": "2025-01-15",
+          "amount": {
+            "amount": "13798.61111111111",
+            "currency": "USD"
+          },
+          "kind": "float_reset",
+          "accrual_factor": 0.25,
+          "rate": 0.05519444444444444,
+          "accrual": {
+            "start": "2025-01-15",
+            "end": "2025-04-15",
+            "day_count": "act_360",
+            "projected_index_rate": 0.04019444444444444,
+            "calendar_id": "weekends_only",
+            "coupon_period": ["2025-01-15", "2025-04-15"],
+            "end_is_termination_date": false
+          }
+        },
+        {
+          "date": "2025-07-15",
+          "reset_date": "2025-04-15",
+          "amount": {
+            "amount": "14267.9012345679",
+            "currency": "USD"
+          },
+          "kind": "float_reset",
+          "accrual_factor": 0.25277777777777777,
+          "rate": 0.05644444444444444,
+          "accrual": {
+            "start": "2025-04-15",
+            "end": "2025-07-15",
+            "day_count": "act_360",
+            "projected_index_rate": 0.041444444444444443,
+            "calendar_id": "weekends_only",
+            "coupon_period": ["2025-04-15", "2025-07-15"],
+            "end_is_termination_date": false
+          }
+        },
+        {
+          "date": "2025-10-15",
+          "reset_date": "2025-07-15",
+          "amount": {
+            "amount": "14747.68518518518",
+            "currency": "USD"
+          },
+          "kind": "float_reset",
+          "accrual_factor": 0.25555555555555554,
+          "rate": 0.057708333333333334,
+          "accrual": {
+            "start": "2025-07-15",
+            "end": "2025-10-15",
+            "day_count": "act_360",
+            "projected_index_rate": 0.042708333333333334,
+            "calendar_id": "weekends_only",
+            "coupon_period": ["2025-07-15", "2025-10-15"],
+            "end_is_termination_date": false
+          }
+        },
+        {
+          "date": "2026-01-15",
+          "reset_date": "2025-10-15",
+          "amount": {
+            "amount": "15074.22839506173",
+            "currency": "USD"
+          },
+          "kind": "float_reset",
+          "accrual_factor": 0.25555555555555554,
+          "rate": 0.05898611111111111,
+          "accrual": {
+            "start": "2025-10-15",
+            "end": "2026-01-15",
+            "day_count": "act_360",
+            "projected_index_rate": 0.04398611111111111,
+            "calendar_id": "weekends_only",
+            "coupon_period": ["2025-10-15", "2026-01-15"],
+            "end_is_termination_date": false
+          }
+        },
+        {
+          "date": "2026-04-15",
+          "reset_date": "2026-01-15",
+          "amount": {
+            "amount": "15032.98611111111",
+            "currency": "USD"
+          },
+          "kind": "float_reset",
+          "accrual_factor": 0.25,
+          "rate": 0.06013194444444444,
+          "accrual": {
+            "start": "2026-01-15",
+            "end": "2026-04-15",
+            "day_count": "act_360",
+            "projected_index_rate": 0.04513194444444444,
+            "calendar_id": "weekends_only",
+            "coupon_period": ["2026-01-15", "2026-04-15"],
+            "end_is_termination_date": false
+          }
+        },
+        {
+          "date": "2026-07-15",
+          "reset_date": "2026-04-15",
+          "amount": {
+            "amount": "15358.00540123457",
+            "currency": "USD"
+          },
+          "kind": "float_reset",
+          "accrual_factor": 0.25277777777777777,
+          "rate": 0.06075694444444444,
+          "accrual": {
+            "start": "2026-04-15",
+            "end": "2026-07-15",
+            "day_count": "act_360",
+            "projected_index_rate": 0.04575694444444444,
+            "calendar_id": "weekends_only",
+            "coupon_period": ["2026-04-15", "2026-07-15"],
+            "end_is_termination_date": false
+          }
+        },
+        {
+          "date": "2026-10-15",
+          "reset_date": "2026-07-15",
+          "amount": {
+            "amount": "15688.27160493827",
+            "currency": "USD"
+          },
+          "kind": "float_reset",
+          "accrual_factor": 0.25555555555555554,
+          "rate": 0.06138888888888889,
+          "accrual": {
+            "start": "2026-07-15",
+            "end": "2026-10-15",
+            "day_count": "act_360",
+            "projected_index_rate": 0.04638888888888889,
+            "calendar_id": "weekends_only",
+            "coupon_period": ["2026-07-15", "2026-10-15"],
+            "end_is_termination_date": false
+          }
+        },
+        {
+          "date": "2027-01-15",
+          "reset_date": "2026-10-15",
+          "amount": {
+            "amount": "15851.54320987654",
+            "currency": "USD"
+          },
+          "kind": "float_reset",
+          "accrual_factor": 0.25555555555555554,
+          "rate": 0.06202777777777778,
+          "accrual": {
+            "start": "2026-10-15",
+            "end": "2027-01-15",
+            "day_count": "act_360",
+            "projected_index_rate": 0.04702777777777778,
+            "calendar_id": "weekends_only",
+            "coupon_period": ["2026-10-15", "2027-01-15"],
+            "end_is_termination_date": true
+          }
+        },
+        {
+          "date": "2027-01-15",
+          "reset_date": null,
+          "amount": {
+            "amount": "1000000",
+            "currency": "USD"
+          },
+          "kind": "notional",
+          "accrual_factor": 0,
+          "principal_date": "2027-01-15"
+        }
+      ],
+      "notional": {
+        "initial": {
+          "amount": "1000000",
+          "currency": "USD"
+        },
+        "amort": "none"
+      },
+      "day_count": "act_360",
+      "meta": {
+        "projected_fixings": [
+          {
+            "series_id": "FIXING:USD-SOFR-3M",
+            "date": "2025-01-15",
+            "value": 0.04019444444444444
+          },
+          {
+            "series_id": "FIXING:USD-SOFR-3M",
+            "date": "2025-04-15",
+            "value": 0.041444444444444443
+          },
+          {
+            "series_id": "FIXING:USD-SOFR-3M",
+            "date": "2025-07-15",
+            "value": 0.042708333333333334
+          },
+          {
+            "series_id": "FIXING:USD-SOFR-3M",
+            "date": "2025-10-15",
+            "value": 0.04398611111111111
+          },
+          {
+            "series_id": "FIXING:USD-SOFR-3M",
+            "date": "2026-01-15",
+            "value": 0.04513194444444444
+          },
+          {
+            "series_id": "FIXING:USD-SOFR-3M",
+            "date": "2026-04-15",
+            "value": 0.04575694444444444
+          },
+          {
+            "series_id": "FIXING:USD-SOFR-3M",
+            "date": "2026-07-15",
+            "value": 0.04638888888888889
+          },
+          {
+            "series_id": "FIXING:USD-SOFR-3M",
+            "date": "2026-10-15",
+            "value": 0.04702777777777778
+          }
+        ],
+        "representation": "contractual",
+        "calendar_ids": ["weekends_only"],
+        "commitment": null,
+        "issue_date": "2025-01-15",
+        "maturity": "2027-01-15"
+      }
+    }
+  ],
+  "schedule.accessors": {
+    "flows": [
+      {
+        "date": "2025-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "-1000000",
+          "currency": "USD"
+        },
+        "kind": "notional",
+        "accrual_factor": 0
+      },
+      {
+        "date": "2025-07-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "30000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2025-01-15",
+          "end": "2025-07-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-01-15", "2025-07-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "30000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2025-07-15",
+          "end": "2026-01-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-07-15", "2026-01-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-07-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "30000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2026-01-15",
+          "end": "2026-07-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-01-15", "2026-07-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2027-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "30000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2026-07-15",
+          "end": "2027-01-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-07-15", "2027-01-15"],
+          "end_is_termination_date": true
+        }
+      },
+      {
+        "date": "2027-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "1000000",
+          "currency": "USD"
+        },
+        "kind": "notional",
+        "accrual_factor": 0,
+        "principal_date": "2027-01-15"
+      }
+    ],
+    "coupons": [
+      {
+        "date": "2025-07-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "30000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2025-01-15",
+          "end": "2025-07-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-01-15", "2025-07-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "30000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2025-07-15",
+          "end": "2026-01-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-07-15", "2026-01-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-07-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "30000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2026-01-15",
+          "end": "2026-07-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-01-15", "2026-07-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2027-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "30000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2026-07-15",
+          "end": "2027-01-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-07-15", "2027-01-15"],
+          "end_is_termination_date": true
+        }
+      }
+    ],
+    "dates": ["2025-01-15", "2025-07-15", "2026-01-15", "2026-07-15", "2027-01-15", "2027-01-15"],
+    "notional": {
+      "initial": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "amort": "none"
+    },
+    "day_count": "30_360",
+    "meta": {
+      "representation": "contractual",
+      "calendar_ids": ["weekends_only"],
+      "commitment": null,
+      "issue_date": "2025-01-15",
+      "maturity": "2027-01-15"
+    }
+  },
+  "schedule.wal": 2,
+  "schedule.outstanding_by_date": [
+    {
+      "date": "2025-01-15",
+      "amount": {
+        "amount": "1000000",
+        "currency": "USD"
+      }
+    },
+    {
+      "date": "2025-07-15",
+      "amount": {
+        "amount": "1000000",
+        "currency": "USD"
+      }
+    },
+    {
+      "date": "2026-01-15",
+      "amount": {
+        "amount": "1000000",
+        "currency": "USD"
+      }
+    },
+    {
+      "date": "2026-07-15",
+      "amount": {
+        "amount": "1000000",
+        "currency": "USD"
+      }
+    },
+    {
+      "date": "2027-01-15",
+      "amount": {
+        "amount": "0",
+        "currency": "USD"
+      }
+    }
+  ],
+  "schedule.scale_amounts": {
+    "flows": [
+      {
+        "date": "2025-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "250000.00",
+          "currency": "USD"
+        },
+        "kind": "notional",
+        "accrual_factor": 0
+      },
+      {
+        "date": "2025-07-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "-7500.00",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2025-01-15",
+          "end": "2025-07-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-01-15", "2025-07-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "-7500.00",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2025-07-15",
+          "end": "2026-01-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-07-15", "2026-01-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-07-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "-7500.00",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2026-01-15",
+          "end": "2026-07-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-01-15", "2026-07-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2027-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "-7500.00",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2026-07-15",
+          "end": "2027-01-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-07-15", "2027-01-15"],
+          "end_is_termination_date": true
+        }
+      },
+      {
+        "date": "2027-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "-250000.00",
+          "currency": "USD"
+        },
+        "kind": "notional",
+        "accrual_factor": 0,
+        "principal_date": "2027-01-15"
+      }
+    ],
+    "notional": {
+      "initial": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "amort": "none"
+    },
+    "day_count": "30_360",
+    "meta": {
+      "representation": "contractual",
+      "calendar_ids": ["weekends_only"],
+      "commitment": null,
+      "issue_date": "2025-01-15",
+      "maturity": "2027-01-15"
+    }
+  },
+  "schedule.with_representation": {
+    "flows": [
+      {
+        "date": "2025-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "-1000000",
+          "currency": "USD"
+        },
+        "kind": "notional",
+        "accrual_factor": 0
+      },
+      {
+        "date": "2025-07-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "30000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2025-01-15",
+          "end": "2025-07-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-01-15", "2025-07-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "30000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2025-07-15",
+          "end": "2026-01-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-07-15", "2026-01-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-07-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "30000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2026-01-15",
+          "end": "2026-07-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-01-15", "2026-07-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2027-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "30000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2026-07-15",
+          "end": "2027-01-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-07-15", "2027-01-15"],
+          "end_is_termination_date": true
+        }
+      },
+      {
+        "date": "2027-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "1000000",
+          "currency": "USD"
+        },
+        "kind": "notional",
+        "accrual_factor": 0,
+        "principal_date": "2027-01-15"
+      }
+    ],
+    "notional": {
+      "initial": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "amort": "none"
+    },
+    "day_count": "30_360",
+    "meta": {
+      "representation": "projected",
+      "calendar_ids": ["weekends_only"],
+      "commitment": null,
+      "issue_date": "2025-01-15",
+      "maturity": "2027-01-15"
+    }
+  },
+  "schedule.with_notional": {
+    "flows": [
+      {
+        "date": "2025-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "-1000000",
+          "currency": "USD"
+        },
+        "kind": "notional",
+        "accrual_factor": 0
+      },
+      {
+        "date": "2025-07-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "30000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2025-01-15",
+          "end": "2025-07-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-01-15", "2025-07-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "30000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2025-07-15",
+          "end": "2026-01-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-07-15", "2026-01-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-07-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "30000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2026-01-15",
+          "end": "2026-07-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-01-15", "2026-07-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2027-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "30000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2026-07-15",
+          "end": "2027-01-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-07-15", "2027-01-15"],
+          "end_is_termination_date": true
+        }
+      },
+      {
+        "date": "2027-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "1000000",
+          "currency": "USD"
+        },
+        "kind": "notional",
+        "accrual_factor": 0,
+        "principal_date": "2027-01-15"
+      }
+    ],
+    "notional": {
+      "initial": {
+        "amount": "2000000",
+        "currency": "USD"
+      },
+      "amort": "none"
+    },
+    "day_count": "30_360",
+    "meta": {
+      "representation": "contractual",
+      "calendar_ids": ["weekends_only"],
+      "commitment": null,
+      "issue_date": "2025-01-15",
+      "maturity": "2027-01-15"
+    }
+  },
+  "schedule.pv_by_period": {
+    "default_day_count": {
+      "2025Q1": {
+        "USD": {
+          "amount": "0",
+          "currency": "USD"
+        }
+      },
+      "2025Q3": {
+        "USD": {
+          "amount": "29410.7944529988",
+          "currency": "USD"
+        }
+      },
+      "2026Q1": {
+        "USD": {
+          "amount": "28823.6831745697",
+          "currency": "USD"
+        }
+      },
+      "2026Q3": {
+        "USD": {
+          "amount": "28257.58070752098",
+          "currency": "USD"
+        }
+      },
+      "2027Q1": {
+        "USD": {
+          "amount": "950809.836778235",
+          "currency": "USD"
+        }
+      }
+    },
+    "act_360": {
+      "2025Q1": {
+        "USD": {
+          "amount": "0",
+          "currency": "USD"
+        }
+      },
+      "2025Q3": {
+        "USD": {
+          "amount": "29410.7944529988",
+          "currency": "USD"
+        }
+      },
+      "2026Q1": {
+        "USD": {
+          "amount": "28823.6831745697",
+          "currency": "USD"
+        }
+      },
+      "2026Q3": {
+        "USD": {
+          "amount": "28257.58070752098",
+          "currency": "USD"
+        }
+      },
+      "2027Q1": {
+        "USD": {
+          "amount": "950809.836778235",
+          "currency": "USD"
+        }
+      }
+    }
+  },
+  "schedule.calendar_year_ladder": [
+    {
+      "year": 2025,
+      "non_principal": 30000,
+      "principal": -1000000,
+      "pv": 2
+    },
+    {
+      "year": 2026,
+      "non_principal": 60000,
+      "principal": 0,
+      "pv": 6
+    },
+    {
+      "year": 2027,
+      "non_principal": 30000,
+      "principal": 1000000,
+      "pv": 10
+    }
+  ],
+  "schedule.from_parts_and_from_flows": [
+    {
+      "flows": [
+        {
+          "date": "2025-01-15",
+          "reset_date": null,
+          "amount": {
+            "amount": "-1000000",
+            "currency": "USD"
+          },
+          "kind": "notional",
+          "accrual_factor": 0
+        },
+        {
+          "date": "2025-07-15",
+          "reset_date": null,
+          "amount": {
+            "amount": "30000",
+            "currency": "USD"
+          },
+          "kind": "fixed",
+          "accrual_factor": 0.5,
+          "rate": 0.06,
+          "accrual": {
+            "start": "2025-01-15",
+            "end": "2025-07-15",
+            "day_count": "30_360",
+            "calendar_id": "weekends_only",
+            "coupon_period": ["2025-01-15", "2025-07-15"],
+            "end_is_termination_date": false
+          }
+        },
+        {
+          "date": "2026-01-15",
+          "reset_date": null,
+          "amount": {
+            "amount": "30000",
+            "currency": "USD"
+          },
+          "kind": "fixed",
+          "accrual_factor": 0.5,
+          "rate": 0.06,
+          "accrual": {
+            "start": "2025-07-15",
+            "end": "2026-01-15",
+            "day_count": "30_360",
+            "calendar_id": "weekends_only",
+            "coupon_period": ["2025-07-15", "2026-01-15"],
+            "end_is_termination_date": false
+          }
+        },
+        {
+          "date": "2026-07-15",
+          "reset_date": null,
+          "amount": {
+            "amount": "30000",
+            "currency": "USD"
+          },
+          "kind": "fixed",
+          "accrual_factor": 0.5,
+          "rate": 0.06,
+          "accrual": {
+            "start": "2026-01-15",
+            "end": "2026-07-15",
+            "day_count": "30_360",
+            "calendar_id": "weekends_only",
+            "coupon_period": ["2026-01-15", "2026-07-15"],
+            "end_is_termination_date": false
+          }
+        },
+        {
+          "date": "2027-01-15",
+          "reset_date": null,
+          "amount": {
+            "amount": "30000",
+            "currency": "USD"
+          },
+          "kind": "fixed",
+          "accrual_factor": 0.5,
+          "rate": 0.06,
+          "accrual": {
+            "start": "2026-07-15",
+            "end": "2027-01-15",
+            "day_count": "30_360",
+            "calendar_id": "weekends_only",
+            "coupon_period": ["2026-07-15", "2027-01-15"],
+            "end_is_termination_date": true
+          }
+        },
+        {
+          "date": "2027-01-15",
+          "reset_date": null,
+          "amount": {
+            "amount": "1000000",
+            "currency": "USD"
+          },
+          "kind": "notional",
+          "accrual_factor": 0,
+          "principal_date": "2027-01-15"
+        }
+      ],
+      "notional": {
+        "initial": {
+          "amount": "1000000",
+          "currency": "USD"
+        },
+        "amort": "none"
+      },
+      "day_count": "30_360",
+      "meta": {
+        "representation": "contractual",
+        "calendar_ids": ["weekends_only"],
+        "commitment": null,
+        "issue_date": "2025-01-15",
+        "maturity": "2027-01-15"
+      }
+    },
+    {
+      "flows": [
+        {
+          "date": "2025-07-15",
+          "reset_date": null,
+          "amount": {
+            "amount": "30000",
+            "currency": "USD"
+          },
+          "kind": "fixed",
+          "accrual_factor": 0.5,
+          "rate": 0.06,
+          "accrual": {
+            "start": "2025-01-15",
+            "end": "2025-07-15",
+            "day_count": "30_360",
+            "calendar_id": "weekends_only",
+            "coupon_period": ["2025-01-15", "2025-07-15"],
+            "end_is_termination_date": false
+          }
+        },
+        {
+          "date": "2026-01-15",
+          "reset_date": null,
+          "amount": {
+            "amount": "30000",
+            "currency": "USD"
+          },
+          "kind": "fixed",
+          "accrual_factor": 0.5,
+          "rate": 0.06,
+          "accrual": {
+            "start": "2025-07-15",
+            "end": "2026-01-15",
+            "day_count": "30_360",
+            "calendar_id": "weekends_only",
+            "coupon_period": ["2025-07-15", "2026-01-15"],
+            "end_is_termination_date": false
+          }
+        }
+      ],
+      "notional": {
+        "initial": {
+          "amount": "1000",
+          "currency": "USD"
+        },
+        "amort": "none"
+      },
+      "day_count": "act_365f",
+      "meta": {
+        "representation": "contractual",
+        "calendar_ids": [],
+        "commitment": null
+      }
+    }
+  ],
+  "build_cashflow_schedule": {
+    "flows": [
+      {
+        "date": "2025-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "-1000000",
+          "currency": "USD"
+        },
+        "kind": "notional",
+        "accrual_factor": 0
+      },
+      {
+        "date": "2025-04-15",
+        "reset_date": "2025-01-15",
+        "amount": {
+          "amount": "13798.61111111111",
+          "currency": "USD"
+        },
+        "kind": "float_reset",
+        "accrual_factor": 0.25,
+        "rate": 0.05519444444444444,
+        "accrual": {
+          "start": "2025-01-15",
+          "end": "2025-04-15",
+          "day_count": "act_360",
+          "projected_index_rate": 0.04019444444444444,
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-01-15", "2025-04-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2025-07-15",
+        "reset_date": "2025-04-15",
+        "amount": {
+          "amount": "14267.9012345679",
+          "currency": "USD"
+        },
+        "kind": "float_reset",
+        "accrual_factor": 0.25277777777777777,
+        "rate": 0.05644444444444444,
+        "accrual": {
+          "start": "2025-04-15",
+          "end": "2025-07-15",
+          "day_count": "act_360",
+          "projected_index_rate": 0.041444444444444443,
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-04-15", "2025-07-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2025-10-15",
+        "reset_date": "2025-07-15",
+        "amount": {
+          "amount": "14747.68518518518",
+          "currency": "USD"
+        },
+        "kind": "float_reset",
+        "accrual_factor": 0.25555555555555554,
+        "rate": 0.057708333333333334,
+        "accrual": {
+          "start": "2025-07-15",
+          "end": "2025-10-15",
+          "day_count": "act_360",
+          "projected_index_rate": 0.042708333333333334,
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-07-15", "2025-10-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-01-15",
+        "reset_date": "2025-10-15",
+        "amount": {
+          "amount": "15074.22839506173",
+          "currency": "USD"
+        },
+        "kind": "float_reset",
+        "accrual_factor": 0.25555555555555554,
+        "rate": 0.05898611111111111,
+        "accrual": {
+          "start": "2025-10-15",
+          "end": "2026-01-15",
+          "day_count": "act_360",
+          "projected_index_rate": 0.04398611111111111,
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-10-15", "2026-01-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-04-15",
+        "reset_date": "2026-01-15",
+        "amount": {
+          "amount": "15032.98611111111",
+          "currency": "USD"
+        },
+        "kind": "float_reset",
+        "accrual_factor": 0.25,
+        "rate": 0.06013194444444444,
+        "accrual": {
+          "start": "2026-01-15",
+          "end": "2026-04-15",
+          "day_count": "act_360",
+          "projected_index_rate": 0.04513194444444444,
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-01-15", "2026-04-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-07-15",
+        "reset_date": "2026-04-15",
+        "amount": {
+          "amount": "15358.00540123457",
+          "currency": "USD"
+        },
+        "kind": "float_reset",
+        "accrual_factor": 0.25277777777777777,
+        "rate": 0.06075694444444444,
+        "accrual": {
+          "start": "2026-04-15",
+          "end": "2026-07-15",
+          "day_count": "act_360",
+          "projected_index_rate": 0.04575694444444444,
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-04-15", "2026-07-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-10-15",
+        "reset_date": "2026-07-15",
+        "amount": {
+          "amount": "15688.27160493827",
+          "currency": "USD"
+        },
+        "kind": "float_reset",
+        "accrual_factor": 0.25555555555555554,
+        "rate": 0.06138888888888889,
+        "accrual": {
+          "start": "2026-07-15",
+          "end": "2026-10-15",
+          "day_count": "act_360",
+          "projected_index_rate": 0.04638888888888889,
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-07-15", "2026-10-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2027-01-15",
+        "reset_date": "2026-10-15",
+        "amount": {
+          "amount": "15851.54320987654",
+          "currency": "USD"
+        },
+        "kind": "float_reset",
+        "accrual_factor": 0.25555555555555554,
+        "rate": 0.06202777777777778,
+        "accrual": {
+          "start": "2026-10-15",
+          "end": "2027-01-15",
+          "day_count": "act_360",
+          "projected_index_rate": 0.04702777777777778,
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-10-15", "2027-01-15"],
+          "end_is_termination_date": true
+        }
+      },
+      {
+        "date": "2027-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "1000000",
+          "currency": "USD"
+        },
+        "kind": "notional",
+        "accrual_factor": 0,
+        "principal_date": "2027-01-15"
+      }
+    ],
+    "notional": {
+      "initial": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "amort": "none"
+    },
+    "day_count": "act_360",
+    "meta": {
+      "projected_fixings": [
+        {
+          "series_id": "FIXING:USD-SOFR-3M",
+          "date": "2025-01-15",
+          "value": 0.04019444444444444
+        },
+        {
+          "series_id": "FIXING:USD-SOFR-3M",
+          "date": "2025-04-15",
+          "value": 0.041444444444444443
+        },
+        {
+          "series_id": "FIXING:USD-SOFR-3M",
+          "date": "2025-07-15",
+          "value": 0.042708333333333334
+        },
+        {
+          "series_id": "FIXING:USD-SOFR-3M",
+          "date": "2025-10-15",
+          "value": 0.04398611111111111
+        },
+        {
+          "series_id": "FIXING:USD-SOFR-3M",
+          "date": "2026-01-15",
+          "value": 0.04513194444444444
+        },
+        {
+          "series_id": "FIXING:USD-SOFR-3M",
+          "date": "2026-04-15",
+          "value": 0.04575694444444444
+        },
+        {
+          "series_id": "FIXING:USD-SOFR-3M",
+          "date": "2026-07-15",
+          "value": 0.04638888888888889
+        },
+        {
+          "series_id": "FIXING:USD-SOFR-3M",
+          "date": "2026-10-15",
+          "value": 0.04702777777777778
+        }
+      ],
+      "representation": "contractual",
+      "calendar_ids": ["weekends_only"],
+      "commitment": null,
+      "issue_date": "2025-01-15",
+      "maturity": "2027-01-15"
+    }
+  },
+  "dated_flows": [
+    {
+      "date": "2025-01-15",
+      "amount": {
+        "amount": "-1000000",
+        "currency": "USD"
+      }
+    },
+    {
+      "date": "2025-07-15",
+      "amount": {
+        "amount": "30000",
+        "currency": "USD"
+      }
+    },
+    {
+      "date": "2026-01-15",
+      "amount": {
+        "amount": "30000",
+        "currency": "USD"
+      }
+    },
+    {
+      "date": "2026-07-15",
+      "amount": {
+        "amount": "30000",
+        "currency": "USD"
+      }
+    },
+    {
+      "date": "2027-01-15",
+      "amount": {
+        "amount": "30000",
+        "currency": "USD"
+      }
+    },
+    {
+      "date": "2027-01-15",
+      "amount": {
+        "amount": "1000000",
+        "currency": "USD"
+      }
+    }
+  ],
+  "schedule_from_flows": [
+    {
+      "flows": [
+        {
+          "date": "2025-03-31",
+          "reset_date": null,
+          "amount": {
+            "amount": "1000",
+            "currency": "USD"
+          },
+          "kind": "fee",
+          "accrual_factor": 0
+        },
+        {
+          "date": "2025-06-30",
+          "reset_date": null,
+          "amount": {
+            "amount": "1500",
+            "currency": "USD"
+          },
+          "kind": "fee",
+          "accrual_factor": 0
+        }
+      ],
+      "notional": {
+        "initial": {
+          "amount": "100000",
+          "currency": "USD"
+        },
+        "amort": "none"
+      },
+      "day_count": "act_360",
+      "meta": {
+        "representation": "contractual",
+        "calendar_ids": [],
+        "commitment": null
+      }
+    },
+    {
+      "flows": [
+        {
+          "date": "2025-03-31",
+          "reset_date": null,
+          "amount": {
+            "amount": "1000",
+            "currency": "USD"
+          },
+          "kind": "fixed",
+          "accrual_factor": 0
+        },
+        {
+          "date": "2025-06-30",
+          "reset_date": null,
+          "amount": {
+            "amount": "1500",
+            "currency": "USD"
+          },
+          "kind": "fixed",
+          "accrual_factor": 0
+        }
+      ],
+      "notional": {
+        "initial": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "amort": "none"
+      },
+      "day_count": "act_360",
+      "meta": {
+        "representation": "contractual",
+        "calendar_ids": [],
+        "commitment": null
+      }
+    },
+    {
+      "flows": [
+        {
+          "date": "2025-01-15",
+          "reset_date": null,
+          "amount": {
+            "amount": "-1000000",
+            "currency": "USD"
+          },
+          "kind": "notional",
+          "accrual_factor": 0
+        },
+        {
+          "date": "2025-07-15",
+          "reset_date": null,
+          "amount": {
+            "amount": "30000",
+            "currency": "USD"
+          },
+          "kind": "fixed",
+          "accrual_factor": 0.5,
+          "rate": 0.06,
+          "accrual": {
+            "start": "2025-01-15",
+            "end": "2025-07-15",
+            "day_count": "30_360",
+            "calendar_id": "weekends_only",
+            "coupon_period": ["2025-01-15", "2025-07-15"],
+            "end_is_termination_date": false
+          }
+        },
+        {
+          "date": "2026-01-15",
+          "reset_date": null,
+          "amount": {
+            "amount": "30000",
+            "currency": "USD"
+          },
+          "kind": "fixed",
+          "accrual_factor": 0.5,
+          "rate": 0.06,
+          "accrual": {
+            "start": "2025-07-15",
+            "end": "2026-01-15",
+            "day_count": "30_360",
+            "calendar_id": "weekends_only",
+            "coupon_period": ["2025-07-15", "2026-01-15"],
+            "end_is_termination_date": false
+          }
+        }
+      ],
+      "notional": {
+        "initial": {
+          "amount": "100000",
+          "currency": "USD"
+        },
+        "amort": "none"
+      },
+      "day_count": "30_360",
+      "meta": {
+        "representation": "contractual",
+        "calendar_ids": [],
+        "commitment": null
+      }
+    }
+  ],
+  "merge_cashflow_schedules": {
+    "flows": [
+      {
+        "date": "2025-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "-1000000",
+          "currency": "USD"
+        },
+        "kind": "notional",
+        "accrual_factor": 0
+      },
+      {
+        "date": "2025-06-30",
+        "reset_date": null,
+        "amount": {
+          "amount": "1500",
+          "currency": "USD"
+        },
+        "kind": "fee",
+        "accrual_factor": 0
+      },
+      {
+        "date": "2025-07-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "30000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2025-01-15",
+          "end": "2025-07-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-01-15", "2025-07-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "30000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2025-07-15",
+          "end": "2026-01-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2025-07-15", "2026-01-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2026-07-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "30000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2026-01-15",
+          "end": "2026-07-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-01-15", "2026-07-15"],
+          "end_is_termination_date": false
+        }
+      },
+      {
+        "date": "2027-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "30000",
+          "currency": "USD"
+        },
+        "kind": "fixed",
+        "accrual_factor": 0.5,
+        "rate": 0.06,
+        "accrual": {
+          "start": "2026-07-15",
+          "end": "2027-01-15",
+          "day_count": "30_360",
+          "calendar_id": "weekends_only",
+          "coupon_period": ["2026-07-15", "2027-01-15"],
+          "end_is_termination_date": true
+        }
+      },
+      {
+        "date": "2027-01-15",
+        "reset_date": null,
+        "amount": {
+          "amount": "1000000",
+          "currency": "USD"
+        },
+        "kind": "notional",
+        "accrual_factor": 0,
+        "principal_date": "2027-01-15"
+      }
+    ],
+    "notional": {
+      "initial": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "amort": "none"
+    },
+    "day_count": "30_360",
+    "meta": {
+      "representation": "contractual",
+      "calendar_ids": ["weekends_only"],
+      "commitment": null
+    }
+  },
+  "accrual": {
+    "amount": {
+      "amount": "15000",
+      "currency": "USD"
+    },
+    "amount_compounded": {
+      "amount": "14889.15650922195",
+      "currency": "USD"
+    },
+    "index": [
+      {
+        "amount": "0",
+        "currency": "USD"
+      },
+      {
+        "amount": "15000",
+        "currency": "USD"
+      },
+      {
+        "amount": "29166.66666666667",
+        "currency": "USD"
+      },
+      {
+        "amount": "27666.66666666667",
+        "currency": "USD"
+      }
+    ],
+    "index_ex_coupon": [
+      {
+        "amount": "14889.15650922195",
+        "currency": "USD"
+      },
+      {
+        "amount": "-821.415016729059",
+        "currency": "USD"
+      }
+    ],
+    "ex_date_calendar_days": "2025-07-08",
+    "ex_date_business_days": "2025-07-03"
+  },
+  "aggregation": {
+    "by_period": {
+      "2025Q1": {
+        "USD": {
+          "amount": "100.25",
+          "currency": "USD"
+        }
+      },
+      "2025Q3": {
+        "USD": {
+          "amount": "50",
+          "currency": "USD"
+        }
+      },
+      "2026Q1": {
+        "EUR": {
+          "amount": "75",
+          "currency": "EUR"
+        },
+        "USD": {
+          "amount": "0.1",
+          "currency": "USD"
+        }
+      }
+    },
+    "get_amount": [
+      {
+        "amount": "75",
+        "currency": "EUR"
+      },
+      null,
+      null
+    ],
+    "checked": {
+      "amount": "150.25",
+      "currency": "USD"
+    },
+    "ladder": [
+      {
+        "year": 2025,
+        "non_principal": 100.25,
+        "principal": 50,
+        "pv": 147.5
+      },
+      {
+        "year": 2026,
+        "non_principal": 75,
+        "principal": 0,
+        "pv": 70.125
+      }
+    ]
+  },
+  "primitives": {
+    "parse": ["fixed", "pre_payment", "collateral_substitution_out"],
+    "interest_like": [true, true, false, false],
+    "principal_like": [false, true, true, false],
+    "cash_settlement": [true, false, false, true],
+    "balance_date": ["2025-07-15", "2025-07-11"],
+    "with_accrual": {
+      "date": "2025-07-15",
+      "reset_date": null,
+      "amount": {
+        "amount": "30000",
+        "currency": "USD"
+      },
+      "kind": "fixed",
+      "accrual_factor": 0.5,
+      "rate": 0.06,
+      "accrual": {
+        "start": "2025-01-15",
+        "end": "2025-07-15",
+        "day_count": "30_360",
+        "end_is_termination_date": false
+      }
+    },
+    "with_principal_delta": {
+      "date": "2025-07-15",
+      "reset_date": null,
+      "amount": {
+        "amount": "30000",
+        "currency": "USD"
+      },
+      "kind": "fixed",
+      "accrual_factor": 0.5,
+      "rate": 0.06,
+      "principal_delta": {
+        "amount": "-1000",
+        "currency": "USD"
+      }
+    }
+  },
+  "specs.amortization": [
+    {
+      "linear_to": {
+        "final_notional": {
+          "amount": "250000",
+          "currency": "USD"
+        }
+      }
+    },
+    {
+      "step_remaining": {
+        "schedule": [
+          [
+            "2026-01-15",
+            {
+              "amount": "750000",
+              "currency": "USD"
+            }
+          ],
+          [
+            "2027-01-15",
+            {
+              "amount": "0",
+              "currency": "USD"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "percent_of_original_per_period": {
+        "pct": 0.05
+      }
+    },
+    {
+      "percent_of_remaining_per_period": {
+        "pct": 0.1
+      }
+    },
+    {
+      "linear_between": {
+        "start": "2025-07-15",
+        "end": "2027-01-15"
+      }
+    },
+    {
+      "custom_principal": {
+        "items": [
+          [
+            "2026-01-15",
+            {
+              "amount": "250000",
+              "currency": "USD"
+            }
+          ]
+        ]
+      }
+    }
+  ],
+  "specs.coupon_fee_floating": [
+    {
+      "split": {
+        "cash_fraction": "0.6",
+        "pik_fraction": "0.4"
+      }
+    },
+    {
+      "undrawn": {
+        "commitment": {
+          "amount": "5000000",
+          "currency": "USD"
+        }
+      }
+    },
+    {
+      "fixed": {
+        "date": "2025-03-01",
+        "amount": {
+          "amount": "25000",
+          "currency": "USD"
+        }
+      }
+    },
+    {
+      "periodic_bp": {
+        "base": {
+          "undrawn": {
+            "commitment": {
+              "amount": "5000000",
+              "currency": "USD"
+            }
+          }
+        },
+        "bp": "37.5",
+        "frequency": {
+          "count": 3,
+          "unit": "months"
+        },
+        "day_count": "act_360",
+        "business_day_convention": "modified_following",
+        "calendar_id": "usny",
+        "stub": "short_front"
+      }
+    },
+    {
+      "fixed_rate": "0.03"
+    },
+    {
+      "compounded_in_arrears": {
+        "lookback_days": 5
+      }
+    },
+    {
+      "compounded_with_observation_shift": {
+        "shift_days": 2
+      }
+    },
+    {
+      "compounded_with_rate_cutoff": {
+        "cutoff_days": 3
+      }
+    },
+    {
+      "forward_curve_id": "USD-SOFR",
+      "spread_bp": "150",
+      "gearing": "1",
+      "gearing_includes_spread": true,
+      "index_floor_bp": null,
+      "all_in_floor_bp": null,
+      "all_in_cap_bp": null,
+      "index_cap_bp": null,
+      "reset_frequency": {
+        "count": 3,
+        "unit": "months"
+      },
+      "reset_lag_days": 0,
+      "fixing_calendar_id": "usny",
+      "compounding": {
+        "compounded_in_arrears": {
+          "lookback_days": 0
+        }
+      },
+      "overnight_basis": "act_360"
+    },
+    {
+      "forward_curve_id": "GBP-SONIA",
+      "spread_bp": "25.5",
+      "gearing": "1",
+      "gearing_includes_spread": true,
+      "index_floor_bp": null,
+      "all_in_floor_bp": null,
+      "all_in_cap_bp": null,
+      "index_cap_bp": null,
+      "reset_frequency": {
+        "count": 1,
+        "unit": "years"
+      },
+      "reset_lag_days": 0,
+      "fixing_calendar_id": "gblo",
+      "compounding": {
+        "compounded_in_arrears": {
+          "lookback_days": 0
+        }
+      },
+      "overnight_basis": "act_365f"
+    },
+    {
+      "forward_curve_id": "EUR-EURIBOR-3M",
+      "spread_bp": "-10",
+      "gearing": "1",
+      "gearing_includes_spread": true,
+      "index_floor_bp": null,
+      "all_in_floor_bp": null,
+      "all_in_cap_bp": null,
+      "index_cap_bp": null,
+      "reset_frequency": {
+        "count": 3,
+        "unit": "months"
+      },
+      "index_tenor": {
+        "count": 3,
+        "unit": "months"
+      },
+      "reset_lag_days": 2,
+      "fixing_calendar_id": "target2"
+    }
+  ],
+  "specs.notional": [
+    {
+      "initial": {
+        "amount": "1000000.005",
+        "currency": "USD"
+      },
+      "amort": "none"
+    },
+    "JPY"
+  ],
+  "specs.default_model": {
+    "models": [
+      {
+        "cdr": 0.03,
+        "curve": null
+      },
+      {
+        "cdr": 0.0003,
+        "curve": {
+          "curve": "sda",
+          "speed_multiplier": 1.5
+        }
+      },
+      {
+        "cdr": 0.02,
+        "curve": null
+      },
+      {
+        "cdr": 0.01,
+        "curve": {
+          "curve": "vector",
+          "monthly_cdr": [0.01, 0.02, 0.04]
+        }
+      },
+      {
+        "cdr": 0,
+        "curve": {
+          "curve": "cumulative_loss",
+          "cumulative_net_loss_pct": [0.5, 1.5, 2],
+          "severity": 0.4
+        }
+      },
+      {
+        "cdr": 0,
+        "curve": {
+          "curve": "timing",
+          "cumulative_default_rate": 0.1,
+          "annual_pct": [15, 30, 30, 15, 10]
+        }
+      }
+    ],
+    "mdr": [
+      [0.0025350486138367213, 0.0025350486138367213, 0.0025350486138367213, 0.0025350486138367213],
+      [2.500343815899557e-5, 0.0003004961414970192, 0.0007531116566323619, 0.0003946052978783281],
+      [0.0016821425527395358, 0.0016821425527395358, 0.0016821425527395358, 0.0016821425527395358],
+      [0.0008371773591205603, 0.0033960531989175907, 0.0033960531989175907, 0.0033960531989175907],
+      [0.012499999999999999, 0, 0, 0],
+      [0.00125, 0.0012674271229404321, 0.002659574468085109, 0]
+    ]
+  },
+  "specs.prepayment_model": {
+    "models": [
+      {
+        "cpr": 0.06,
+        "curve": null
+      },
+      {
+        "cpr": 0.06,
+        "curve": {
+          "curve": "psa",
+          "speed_multiplier": 1.5
+        }
+      },
+      {
+        "cpr": 0.06,
+        "curve": {
+          "curve": "psa",
+          "speed_multiplier": 1
+        }
+      },
+      {
+        "cpr": 0.1,
+        "curve": {
+          "curve": "cmbs_lockout",
+          "lockout_months": 60
+        }
+      },
+      {
+        "cpr": 0.1658680316591229,
+        "curve": {
+          "curve": "abs",
+          "speed": 0.015
+        }
+      },
+      {
+        "cpr": 0.02,
+        "curve": {
+          "curve": "vector",
+          "monthly_cpr": [0.02, 0.05, 0.08]
+        }
+      }
+    ],
+    "smm": [
+      [0.0051430128318229506, 0.0051430128318229506, 0.0051430128318229506, 0.0051430128318229506],
+      [0.0002503444102988056, 0.0030506692540423065, 0.007828420342483175, 0.007828420342483175],
+      [0.0001668196399456308, 0.0020223433498772095, 0.0051430128318229506, 0.0051430128318229506],
+      [0, 0, 0, 0.008741610954696704],
+      [0.015, 0.017964071856287425, 0.027272727272727268, 1],
+      [0.0016821425527395358, 0.006924382628299436, 0.006924382628299436, 0.006924382628299436]
+    ]
+  },
+  "specs.recovery_model": {
+    "vector": {
+      "rate": 0.4,
+      "recovery_lag": 6,
+      "severity_vector": [0.7, 0.6, 0.55]
+    },
+    "recovery_rate": [
+      [0.4, 0.4, 0.4, 0.4],
+      [0.30000000000000004, 0.30000000000000004, 0.4, 0.44999999999999996]
+    ]
+  },
+  "specs.schedule_params": [
+    {
+      "frequency": {
+        "count": 3,
+        "unit": "months"
+      },
+      "day_count": "act_360",
+      "business_day_convention": "modified_following",
+      "calendar_id": "weekends_only",
+      "stub": "short_front",
+      "end_of_month": false,
+      "payment_lag_days": 0
+    },
+    {
+      "frequency": {
+        "count": 6,
+        "unit": "months"
+      },
+      "day_count": "30_360",
+      "business_day_convention": "modified_following",
+      "calendar_id": "weekends_only",
+      "stub": "short_front",
+      "end_of_month": false,
+      "payment_lag_days": 0
+    },
+    {
+      "frequency": {
+        "count": 1,
+        "unit": "years"
+      },
+      "day_count": "act_act",
+      "business_day_convention": "following",
+      "calendar_id": "weekends_only",
+      "stub": "short_front",
+      "end_of_month": false,
+      "payment_lag_days": 0
+    },
+    {
+      "frequency": {
+        "count": 3,
+        "unit": "months"
+      },
+      "day_count": "act_360",
+      "business_day_convention": "modified_following",
+      "calendar_id": "usny",
+      "stub": "short_front",
+      "end_of_month": false,
+      "payment_lag_days": 2,
+      "adjust_accrual_dates": true
+    },
+    {
+      "frequency": {
+        "count": 6,
+        "unit": "months"
+      },
+      "day_count": "30_360",
+      "business_day_convention": "following",
+      "calendar_id": "usny",
+      "stub": "short_front",
+      "end_of_month": false,
+      "payment_lag_days": 0
+    },
+    {
+      "frequency": {
+        "count": 6,
+        "unit": "months"
+      },
+      "day_count": "act_act_isma",
+      "business_day_convention": "following",
+      "calendar_id": "usny",
+      "stub": "short_front",
+      "end_of_month": false,
+      "payment_lag_days": 0
+    },
+    {
+      "frequency": {
+        "count": 1,
+        "unit": "years"
+      },
+      "day_count": "act_360",
+      "business_day_convention": "modified_following",
+      "calendar_id": "target2",
+      "stub": "short_front",
+      "end_of_month": false,
+      "payment_lag_days": 2,
+      "adjust_accrual_dates": true
+    },
+    {
+      "frequency": {
+        "count": 1,
+        "unit": "years"
+      },
+      "day_count": "act_act_isma",
+      "business_day_convention": "following",
+      "calendar_id": "target2",
+      "stub": "short_front",
+      "end_of_month": false,
+      "payment_lag_days": 0
+    },
+    {
+      "frequency": {
+        "count": 1,
+        "unit": "years"
+      },
+      "day_count": "act_365f",
+      "business_day_convention": "modified_following",
+      "calendar_id": "gblo",
+      "stub": "short_front",
+      "end_of_month": false,
+      "payment_lag_days": 0,
+      "adjust_accrual_dates": true
+    },
+    {
+      "frequency": {
+        "count": 1,
+        "unit": "years"
+      },
+      "day_count": "act_365f",
+      "business_day_convention": "modified_following",
+      "calendar_id": "jpto",
+      "stub": "short_front",
+      "end_of_month": false,
+      "payment_lag_days": 2,
+      "adjust_accrual_dates": true
+    }
+  ],
+  "materialize_fixings": [
+    {
+      "id": "FIXING:USD-SOFR",
+      "currency": null,
+      "observations": [["2025-01-03", 0.03]],
+      "interpolation": "step"
+    }
+  ]
+}

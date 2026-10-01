@@ -38,12 +38,14 @@
       "type": "number"
     },
     "num_paths": {
+      "default": 0,
       "description": "Selects the stochastic sub-mode: closed-form analytic vs. Monte Carlo.\n\n`0` (the default) uses the closed-form analytic lognormal\nprobabilities via [`norm_cdf`]. A value greater than `0` switches to\npath-consistent Monte Carlo simulation with that many paths; with\n`antithetic` enabled, paths are simulated in `(Z, -Z)` pairs and this\ncount is rounded up to a whole number of pairs. Ignored when\n`stochastic` is `false`.",
       "format": "uint",
       "minimum": 0,
       "type": "integer"
     },
     "random_seed": {
+      "default": null,
       "description": "RNG seed for Monte Carlo mode (`num_paths > 0`).\n\n`None` uses the crate-internal `DEFAULT_MC_SEED` (`0`). Ignored in analytic mode\n(`num_paths == 0`) and when `stochastic` is `false`.",
       "format": "uint64",
       "minimum": 0,
@@ -65,13 +67,16 @@
     },
     "scope": {
       "$ref": "#/$defs/CovenantScope",
+      "default": "maintenance",
       "description": "Scope selected by batch forecasts: maintenance by default. Incurrence\nforecasts are hypothetical capacity checks, not actual breach events."
     },
     "stochastic": {
+      "default": false,
       "description": "Whether to use stochastic (as opposed to deterministic) breach probabilities.",
       "type": "boolean"
     },
     "volatility": {
+      "default": null,
       "description": "Volatility for stochastic scenarios (annualized).",
       "format": "double",
       "type": [
@@ -80,11 +85,6 @@
       ]
     }
   },
-  "required": [
-    "scope",
-    "stochastic",
-    "num_paths"
-  ],
   "title": "CovenantForecastConfig",
   "type": "object"
 }

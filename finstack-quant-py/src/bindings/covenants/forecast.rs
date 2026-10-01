@@ -2,10 +2,9 @@
 //! `FutureBreach` and the DataFrame-backed `forecast_covenant` /
 //! `forecast_breaches` entry points.
 //!
-//! The Rust forecaster reads projections through the `ModelTimeSeries` trait,
-//! which is keyed by `PeriodId`. `FrameTimeSeries` is a pure data adapter over
-//! a date-indexed `pandas.DataFrame`: every index date becomes a daily
-//! `PeriodId` (year + ordinal day) whose period end is the date itself, so no
+//! A date-indexed `pandas.DataFrame` is read into the Rust
+//! `DatedMetricSeries`, which owns the period mapping (every date is a daily
+//! period ending on itself), ordering and duplicate-date checks, so no
 //! statement model is needed.
 
 use super::engine::{extract_metric_frame, PyCovenantEngine};
@@ -13,60 +12,19 @@ use super::spec::PyCovenantSpec;
 use crate::bindings::date_utils::{date_to_py, extract_date};
 use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, ColumnSchema};
 use crate::bindings::repr_support::repr_from_serde;
-use crate::errors::{core_to_py, display_to_py, value_error};
-use finstack_quant_core::dates::{Date, PeriodId};
+use crate::errors::{core_to_py, display_to_py};
 use finstack_quant_covenants::{
-    forecast_breaches_generic, forecast_covenant_generic, BoundKind, CovenantForecast,
-    CovenantForecastConfig, FutureBreach, ModelTimeSeries,
+    BoundKind, CovenantForecast, CovenantForecastConfig, DatedMetricSeries, FutureBreach,
 };
 use pyo3::prelude::*;
-use std::collections::HashMap;
 
-/// Date-indexed metric projections exposed as a `ModelTimeSeries`.
+/// Read a date-indexed metrics frame as a Rust `DatedMetricSeries`.
 ///
-/// Each frame row is one forecast period identified by the daily `PeriodId`
-/// of its index date; `period_end_date` maps that identifier back to the
-/// date. With `reference_date` unset in the config the forecaster anchors
-/// stochastic horizons on the day before the first row.
-struct FrameTimeSeries {
-    periods: Vec<PeriodId>,
-    values: HashMap<PeriodId, HashMap<String, f64>>,
-}
-
-impl FrameTimeSeries {
-    fn from_frame(frame: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let mut rows = extract_metric_frame(frame)?;
-        if rows.is_empty() {
-            return Err(value_error("metrics frame must contain at least one row"));
-        }
-        rows.sort_by_key(|(date, _)| *date);
-        let mut periods = Vec::with_capacity(rows.len());
-        let mut values = HashMap::with_capacity(rows.len());
-        for (date, pairs) in rows {
-            let period = PeriodId::day(date.year(), date.ordinal()).map_err(core_to_py)?;
-            if values.insert(period, pairs.into_iter().collect()).is_some() {
-                return Err(value_error(format!(
-                    "metrics frame index contains duplicate date {date}"
-                )));
-            }
-            periods.push(period);
-        }
-        Ok(Self { periods, values })
-    }
-}
-
-impl ModelTimeSeries for FrameTimeSeries {
-    fn get_scalar(&self, node_id: &str, period: &PeriodId) -> Option<f64> {
-        self.values.get(period)?.get(node_id).copied()
-    }
-
-    fn period_end_date(&self, period: &PeriodId) -> finstack_quant_core::Result<Date> {
-        Date::from_ordinal_date(period.year, period.index)
-            .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))
-    }
-    fn period_start_date(&self, period: &PeriodId) -> finstack_quant_core::Result<Date> {
-        self.period_end_date(period)
-    }
+/// Each frame row is one forecast period on its index date. With
+/// `reference_date` unset in the config the forecaster anchors stochastic
+/// horizons on the day before the first row.
+fn metric_series(frame: &Bound<'_, PyAny>) -> PyResult<DatedMetricSeries> {
+    DatedMetricSeries::new(extract_metric_frame(frame)?).map_err(core_to_py)
 }
 
 fn bound_kind_name(kind: BoundKind) -> &'static str {
@@ -509,11 +467,11 @@ pub(crate) fn forecast_covenant(
     metrics: &Bound<'_, PyAny>,
     config: Option<PyRef<'_, PyCovenantForecastConfig>>,
 ) -> PyResult<PyCovenantForecast> {
-    let series = FrameTimeSeries::from_frame(metrics)?;
+    let series = metric_series(metrics)?;
     let config = config.map_or_else(CovenantForecastConfig::default, |c| c.inner.clone());
     let spec = spec.inner.clone();
     py.detach(|| {
-        forecast_covenant_generic(&spec, &series, &series.periods, config)
+        finstack_quant_covenants::forecast_covenant(&spec, &series, config)
             .map(PyCovenantForecast::from_inner)
             .map_err(core_to_py)
     })
@@ -538,11 +496,11 @@ pub(crate) fn forecast_breaches(
     metrics: &Bound<'_, PyAny>,
     config: Option<PyRef<'_, PyCovenantForecastConfig>>,
 ) -> PyResult<Vec<PyFutureBreach>> {
-    let series = FrameTimeSeries::from_frame(metrics)?;
+    let series = metric_series(metrics)?;
     let config = config.map_or_else(CovenantForecastConfig::default, |c| c.inner.clone());
     let engine = engine.inner.clone();
     py.detach(|| {
-        forecast_breaches_generic(&engine, &series, &series.periods, config)
+        finstack_quant_covenants::forecast_breaches(&engine, &series, config)
             .map(|breaches| {
                 breaches
                     .into_iter()

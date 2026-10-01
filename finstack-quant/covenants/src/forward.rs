@@ -20,9 +20,12 @@ use serde::{Deserialize, Serialize};
 pub(crate) const DEFAULT_MC_SEED: u64 = 0;
 
 /// Covenant forecast configuration.
+///
+/// Every field is optional on the wire; a missing field takes its
+/// [`Default`] value (deterministic maintenance-scope forecasting).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct CovenantForecastConfig {
     /// Scope selected by batch forecasts: maintenance by default. Incurrence
     /// forecasts are hypothetical capacity checks, not actual breach events.

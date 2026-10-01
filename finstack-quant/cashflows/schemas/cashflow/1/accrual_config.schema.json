@@ -1,0 +1,88 @@
+{
+  "$defs": {
+    "AccrualMethod": {
+      "description": "Generic accrual method usable across instruments.\n\nThis mirrors the semantics of bond accrual methods but is defined at the\ncashflow layer so it can be reused by any instrument that exposes a\n`CashFlowSchedule`.",
+      "oneOf": [
+        {
+          "const": "linear",
+          "description": "Linear accrual (simple interest interpolation).\n\n`Accrued = Coupon × (elapsed / period)`",
+          "type": "string"
+        },
+        {
+          "const": "compounded",
+          "description": "Compounded accrual.\n\n`Accrued = N × expm1(f × ln1p(r))`\n\nwhich is the numerically stable form of\n`N × [(1 + r)^f − 1]`, where `r = coupon_amount / notional`\nand `f = elapsed / period` (time fraction within the current\ncoupon period).\n\n**Note:** ICMA Rule 251.1 prescribes *linear* accrual for bond\nAI calculations. This variant uses true exponential compounding\nand should not be cited as ICMA-style. It is intended for\ninstruments that genuinely compound within a coupon period\n(e.g. some leveraged loans).\n\n**Ex-coupon window convention:** inside an ex-coupon window the\naccrued interest is the negative rebate of the *remaining* stub,\ncompounded on the same basis:\n\n`Accrued = −N × expm1((1 − f) × ln1p(r))`\n\nwhere `f = elapsed / period`. ICMA Rule 251.1 (and the UK DMO\ngilt convention) prescribe a *linear* ex-coupon rebate\n(`−C × (1 − f)`); use [`AccrualMethod::Linear`] for those markets.",
+          "type": "string"
+        }
+      ]
+    },
+    "ExCouponRule": {
+      "additionalProperties": false,
+      "description": "Ex-coupon convention applied to coupon flows.",
+      "properties": {
+        "calendar_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional calendar ID for business day calculation.\n\n- `Some(id)`: Subtract N business days from payment date.\n- `None`: Subtract N calendar days from payment date."
+        },
+        "days_before_coupon": {
+          "description": "Number of days before coupon date that go ex.\n\nValues greater than 366 are rejected by [`ExCouponRule::ex_date`].",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "days_before_coupon"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/cashflow/1/accrual_config.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Schedule-driven accrued-interest configuration.",
+  "properties": {
+    "ex_coupon": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ExCouponRule"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Optional ex-coupon rule applied to coupon dates."
+    },
+    "frequency": {
+      "anyOf": [
+        {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Coupon frequency — required for ACT/ACT ISMA day count.\n\nWhen `None` and the schedule uses ACT/ACT ISMA, year-fraction\ncalculations return\n[`InputError::MissingFrequencyForActActIsma`](finstack_quant_core::InputError::MissingFrequencyForActActIsma);\nthere is no fallback to ISDA semantics."
+    },
+    "include_pik": {
+      "description": "Whether to include PIK interest in the accrued amount.",
+      "type": "boolean"
+    },
+    "method": {
+      "$ref": "#/$defs/AccrualMethod",
+      "description": "Accrual method (Linear or Compounded)."
+    }
+  },
+  "required": [
+    "method",
+    "include_pik"
+  ],
+  "title": "AccrualConfig",
+  "type": "object"
+}

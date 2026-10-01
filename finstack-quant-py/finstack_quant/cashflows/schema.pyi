@@ -1,10 +1,11 @@
 """
-Compiled-in JSON Schemas for the cashflow component wire format.
+Compiled-in JSON Schemas for the cashflow wire format.
 
-The seven cashflow component schemas (amortization, coupon, default, fee,
-prepayment, recovery, and schedule specifications) are embedded in the
-extension module, so they always match the installed version and cannot drift
-from the wheel that ships them. These are the documents that resolve the
+Every cashflow schema (the amortization, coupon, default, fee, prepayment,
+recovery and schedule specifications, plus the schedule, build-spec, accrual
+and aggregation contracts) is embedded in the extension module, so they always
+match the installed version and cannot drift from the wheel that ships them.
+These are the documents that resolve the
 ``https://finstack_quant.dev/schemas/cashflow/1/...`` references appearing
 inside instrument schemas.
 
@@ -29,7 +30,7 @@ __all__ = [
 
 def resources() -> dict[str, str]:
     """
-    Return every embedded cashflow component schema, keyed by canonical URI.
+    Return every embedded cashflow schema, keyed by canonical URI.
 
     The keys are the published ``$id`` URIs used by ``$ref`` targets in
     instrument and cashflow payload schemas, so the mapping can be handed
@@ -39,19 +40,19 @@ def resources() -> dict[str, str]:
     -------
     dict of str to str
         Mapping from canonical schema URI to pretty-printed JSON Schema text,
-        one entry per embedded cashflow component schema.
+        one entry per embedded cashflow schema.
 
     Raises
     ------
     ValueError
-        If a compiled-in component schema is malformed or cannot be serialized
+        If a compiled-in schema is malformed or cannot be serialized
         back to JSON text.
 
     Examples
     --------
     >>> from finstack_quant.cashflows import schema
     >>> sorted(uri.rsplit("/", 1)[-1] for uri in schema.resources())[:2]
-    ['amortization_spec.schema.json', 'coupon_specs.schema.json']
+    ['accrual_config.schema.json', 'amortization_spec.schema.json']
 
     """
 

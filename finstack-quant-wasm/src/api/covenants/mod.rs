@@ -1,4 +1,13 @@
 //! WASM bindings for the `finstack-quant-covenants` crate.
+//!
+//! This module holds the JSON wire surface (validators, `evaluateEngine`, the
+//! `*Json` templates). The typed surface lives in the submodules: the
+//! `CovenantEngine` handle, forecasting, and free functions over wire-shaped
+//! covenant definitions.
+
+pub mod engine;
+pub mod forecast;
+pub mod spec;
 
 use crate::utils::input::{js_f64, js_string, json_text};
 use crate::utils::to_js_err;
