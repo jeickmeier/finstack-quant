@@ -12,6 +12,9 @@
 //! - `"unconditional"` — long-run (identical to `"one_step"` for `Sample` vol
 //!   model).
 //! - JSON string `'{"n_steps": N}'` — variance scaled by `N`.
+//! - JSON string `'{"years": Y}'` — variance scaled by the fractional year `Y`.
+//! - JSON string `'{"n_steps": N, "periods_per_year": P}'` — the same as
+//!   `'{"years": N / P}'`.
 
 use crate::utils::input::{
     from_js_json, js_f64, js_f64_matrix, js_f64_seq, js_opt_bool, js_opt_f64, js_string,
@@ -38,8 +41,8 @@ fn parse_vol_horizon(
 
 /// Calibrated credit factor hierarchy artifact.
 ///
-/// Produced by [`JsCreditCalibrator`] or loaded from JSON via
-/// [`JsCreditFactorModel::from_json`]. Immutable once constructed.
+/// Produced by `CreditCalibrator` or loaded from JSON via
+/// `CreditFactorModel.fromJson`. Immutable once constructed.
 #[wasm_bindgen(js_name = CreditFactorModel)]
 pub struct JsCreditFactorModel {
     /// Underlying Rust value (not exposed to JS).
@@ -84,7 +87,7 @@ impl JsCreditFactorModel {
     }
 }
 
-/// Deterministic calibrator that produces a [`JsCreditFactorModel`].
+/// Deterministic calibrator that produces a `CreditFactorModel`.
 ///
 /// Configuration and inputs are passed as JSON strings or plain objects.
 #[wasm_bindgen(js_name = CreditCalibrator)]
@@ -154,7 +157,6 @@ impl JsLevelsAtDate {
     /// # Errors
     ///
     /// Throws when the JSON is malformed or a numeric field is non-finite.
-    /// @param json - Canonical `LevelsAtDate` JSON.
     /// @returns A validated `LevelsAtDate` handle.
     #[wasm_bindgen(js_name = fromJson)]
     pub fn from_json(json: JsValue) -> Result<JsLevelsAtDate, JsValue> {
@@ -204,7 +206,6 @@ impl JsLevelsAtDate {
     ///
     /// Throws when `level_index` is outside the available levels or the map
     /// cannot be converted to a JavaScript object.
-    /// @param levelIndex - Zero-based hierarchy level index.
     /// @returns A bucket-name to factor-level mapping in basis points.
     #[wasm_bindgen(js_name = levelValues)]
     pub fn level_values(&self, level_index: JsValue) -> Result<JsValue, JsValue> {
@@ -225,7 +226,7 @@ impl JsLevelsAtDate {
     }
 }
 
-/// Component-wise difference between two [`JsLevelsAtDate`] snapshots.
+/// Component-wise difference between two `LevelsAtDate` snapshots.
 ///
 /// Produced by [`decompose_period`].
 #[wasm_bindgen(js_name = PeriodDecomposition)]
@@ -246,7 +247,6 @@ impl JsPeriodDecomposition {
     /// # Errors
     ///
     /// Throws when the JSON is malformed or a numeric field is non-finite.
-    /// @param json - Canonical `PeriodDecomposition` JSON.
     /// @returns A validated `PeriodDecomposition` handle.
     #[wasm_bindgen(js_name = fromJson)]
     pub fn from_json(json: JsValue) -> Result<JsPeriodDecomposition, JsValue> {
@@ -304,7 +304,6 @@ impl JsPeriodDecomposition {
     ///
     /// Throws when `level_index` is outside the available levels or the map
     /// cannot be converted to a JavaScript object.
-    /// @param levelIndex - Zero-based hierarchy level index.
     /// @returns A bucket-name to factor-change mapping in basis points.
     #[wasm_bindgen(js_name = levelDeltas)]
     pub fn level_deltas(&self, level_index: JsValue) -> Result<JsValue, JsValue> {
@@ -349,12 +348,6 @@ impl JsPeriodDecomposition {
 /// Throws a `not_found` error if an issuer has no model row and no
 /// `runtime_tags` entry, and a `validation` error if `as_of` cannot be parsed
 /// or a spread is outside the decimal band.
-///
-/// @param model - Calibrated CreditFactorModel used for the peel.
-/// @param observedSpreadsJson - JSON `{issuer_id: spread}` map in decimal (`0.012` = 120 bp). Returned levels are bp.
-/// @param observedGeneric - Observed generic-market spread in decimal, aligned with the model factors.
-/// @param asOf - ISO-8601 valuation date used to stamp the snapshot.
-/// @param runtimeTagsJson - Optional runtime-tag JSON for issuers missing from the artifact.
 #[wasm_bindgen(js_name = decomposeLevels)]
 pub fn decompose_levels(
     model: &JsCreditFactorModel,
@@ -444,8 +437,9 @@ impl JsFactorCovarianceForecast {
     ///
     /// Returns a structured `FactorCovarianceMatrix` JavaScript object.
     ///
-    /// `horizon_json` accepts `"one_step"`, `"unconditional"`, or
-    /// `'{"n_steps": N}'`.
+    /// `horizon_json` accepts `"one_step"`, `"unconditional"`,
+    /// `'{"n_steps": N}'`, `'{"years": Y}'`, or
+    /// `'{"n_steps": N, "periods_per_year": P}'` (years = N / P).
     ///
     /// # Errors
     /// Throws if the horizon string is invalid or the model data is
@@ -468,6 +462,7 @@ impl JsFactorCovarianceForecast {
     /// # Errors
     /// Throws if the issuer is not present in the model's vol state or the
     /// calibrated variance is negative.
+    /// @returns Issuer idiosyncratic volatility (standard deviation) in basis points of spread, scaled to the horizon.
     /// @param issuer_id - Stable issuer identifier used to select the required domain object.
     /// @param horizon_json - JSON-serialized forecast horizon defining the future covariance date or period.
     #[wasm_bindgen(js_name = idiosyncraticVol)]

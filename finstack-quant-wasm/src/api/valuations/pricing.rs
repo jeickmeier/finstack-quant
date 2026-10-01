@@ -237,8 +237,8 @@ pub fn valuation_result_metric_series(result: JsValue, base: JsValue) -> Result<
 ///
 /// * `json` - Required `finstack_quant.instrument/1` envelope.
 /// * `metric_pricing_overrides` - Serialized metric-pricing override object merged before
-///   native instrument validation; `None` (omitted or null in JavaScript) retains
-///   the envelope configuration.
+///   native instrument validation; omit it, or pass `null` or `undefined`, to keep
+///   the envelope configuration as-is.
 ///
 /// # Errors
 ///

@@ -153,6 +153,44 @@ function checkDocumentedNode(node, label, options = {}) {
       error(node, `${label}: contains ${message}`);
     }
   }
+  // Shapes the completer used to derive from a name or a type alone. They say
+  // nothing the signature does not, and the unit templates were wrong (vega and
+  // rho are per vol point and per 1bp; theta is per day).
+  const placeholderPatterns = [
+    [/@param \S+ - [A-Z][\w ]* used by this call\./, 'placeholder @param'],
+    [/@param \S+ - [A-Z][\w ]* as a (?:finite number|string)\./, 'placeholder @param'],
+    [/@param \S+ - Whether [\w ]+ is true\./, 'placeholder @param'],
+    [/@returns JSON string or identifier produced by this call\./, 'placeholder @returns'],
+    [/@returns Returns the result of this call\./, 'placeholder @returns'],
+    [/@returns Returns the [\w ]+ as a finite number\./, 'placeholder @returns'],
+    [/per 1\.0 absolute move in/, 'template Greek unit (state the Rust unit in the Rustdoc)'],
+    [/per year of calendar time/, 'template Greek unit (state the Rust unit in the Rustdoc)'],
+  ];
+  for (const [pattern, message] of placeholderPatterns) {
+    if (pattern.test(joined)) {
+      error(node, `${label}: contains ${message}`);
+    }
+  }
+  const internalName = joined.match(/\[`Js[A-Z]\w*/);
+  if (internalName) {
+    error(
+      node,
+      `${label}: names the internal Rust wrapper ${internalName[0]}\`]; use the public JS name`
+    );
+  } else {
+    const rustLink = joined.match(/\[`[^`\]]+`\]/);
+    if (rustLink) {
+      error(node, `${label}: contains the rustdoc link ${rustLink[0]}; write the public JS name`);
+    }
+  }
+  const seenParameters = new Set();
+  for (const [, name] of joined.matchAll(/@param(?:\s+\{[^}]+\})?\s+([A-Za-z_$][\w$]*)\b/g)) {
+    if (seenParameters.has(name)) {
+      error(node, `${label}: documents @param \`${name}\` more than once`);
+    }
+    seenParameters.add(name);
+  }
+
   if (/Perform \S+ for this `/.test(joined)) {
     error(node, `${label}: contains generic method-summary boilerplate`);
   }
@@ -228,7 +266,8 @@ function checkClass(node) {
 for (const statement of sourceFile.statements) {
   if (ts.isInterfaceDeclaration(statement) && isExported(statement)) {
     checkInterface(statement);
-  } else if (ts.isClassDeclaration(statement) && isExported(statement)) {
+  } else if (ts.isClassDeclaration(statement)) {
+    // `declare class` handles are published through the namespace interfaces.
     checkClass(statement);
   } else if (ts.isTypeAliasDeclaration(statement) && isExported(statement)) {
     checkDocumentedNode(statement, `type ${declarationName(statement)}`);

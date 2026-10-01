@@ -8,8 +8,9 @@
 //
 // Building a MarketContext from quotes (canonical path):
 //
-//   import { calibration } from 'finstack-quant-wasm/exports/calibration.js';
+//   import init, { calibration } from 'finstack-quant-wasm';
 //   import type { CalibrationEnvelope } from 'finstack-quant-wasm';
+//   await init();
 //   const envelope: CalibrationEnvelope = {
 //     schema: 'finstack_quant.calibration/1',
 //     plan: { id: 'usd_curves', quote_sets: {...}, steps: [...], settings: {} },
@@ -788,12 +789,12 @@ interface Performance extends WasmOwned {}
 /**
  * Calibrated credit factor hierarchy artifact.
  *
- * Produced by [`JsCreditCalibrator`] or loaded from JSON via
- * [`JsCreditFactorModel::from_json`]. Immutable once constructed.
+ * Produced by `CreditCalibrator` or loaded from JSON via
+ * `CreditFactorModel.fromJson`. Immutable once constructed.
  */
 interface CreditFactorModel extends WasmOwned {}
 /**
- * Deterministic calibrator that produces a [`JsCreditFactorModel`].
+ * Deterministic calibrator that produces a `CreditFactorModel`.
  *
  * Configuration and inputs are passed as JSON strings.
  */
@@ -801,14 +802,14 @@ interface CreditCalibrator extends WasmOwned {}
 /**
  * Snapshot of all hierarchy-level factor values at a single date.
  *
- * Produced by [`decompose_levels`]. Pass to [`decompose_period`] to compute
+ * Produced by `decomposeLevels`. Pass to `decomposePeriod` to compute
  * period-over-period changes.  The full data is available via `toJson`.
  */
 interface LevelsAtDate extends WasmOwned {}
 /**
- * Component-wise difference between two [`JsLevelsAtDate`] snapshots.
+ * Component-wise difference between two `LevelsAtDate` snapshots.
  *
- * Produced by [`decompose_period`].
+ * Produced by `decomposePeriod`.
  */
 interface PeriodDecomposition extends WasmOwned {}
 /**
@@ -818,7 +819,7 @@ interface PeriodDecomposition extends WasmOwned {}
  */
 interface FactorCovarianceForecast extends WasmOwned {}
 /**
- * Handle to a built [`finstack_quant_portfolio::Portfolio`] that can be reused
+ * Handle to a built Rust `finstack_quant_portfolio::Portfolio` that can be reused
  * across WASM calls without re-parsing and rebuilding from the spec.
  *
  * `Portfolio::from_spec` parses positions, builds indices, and validates
@@ -1885,7 +1886,7 @@ export interface CurrencyConstructor {
 /**
  * Currency-tagged monetary amount.
  *
- * Money values pin a numeric amount to a [`JsCurrency`]. The arithmetic
+ * Money values pin a numeric amount to a `Currency`. The arithmetic
  * methods carry the Rust names: `checkedAdd` / `checkedSub` refuse to mix
  * currencies; `checkedMulF64` / `checkedDivF64` scale by a number and keep
  * the currency; `checkedNeg` negates exactly.
@@ -1915,7 +1916,7 @@ export interface Money extends WasmOwned {
   /**
    * Currency of this amount.
    *
-   * @returns The [`JsCurrency`] this amount is tagged with.
+   * @returns The `Currency` this amount is tagged with.
    */
   readonly currency: Currency;
   /**
@@ -2042,7 +2043,7 @@ export interface Money extends WasmOwned {
 /**
  * Currency-tagged monetary amount.
  *
- * Money values pin a numeric amount to a [`JsCurrency`]. The arithmetic
+ * Money values pin a numeric amount to a `Currency`. The arithmetic
  * methods carry the Rust names: `checkedAdd` / `checkedSub` refuse to mix
  * currencies; `checkedMulF64` / `checkedDivF64` scale by a number and keep
  * the currency; `checkedNeg` negates exactly.
@@ -2266,12 +2267,10 @@ export interface RateConstructor {
   /**
    * Create a rate from a whole number of basis points.
    *
-   * The canonical Rust `Rate::from_bp` takes an integer (`i32`) number
-   * of basis points. Because JavaScript numbers are `f64`, this binding
-   * accepts a float but **rejects fractional input** rather than
-   * silently rounding it: a sub-bp rate quietly rounded to whole bp is a
-   * pricing bug, not a convenience. Use `new Rate(decimal)` or
-   * `Rate.fromPercent` for sub-bp rates.
+   * The canonical Rust `Bps::try_new` is integer-backed and **rejects
+   * fractional input** rather than silently rounding it: a sub-bp rate
+   * quietly rounded to whole bp is a pricing bug, not a convenience.
+   * Use `new Rate(decimal)` or `Rate.fromPercent` for sub-bp rates.
    *
    * @example
    * ```javascript
@@ -7863,14 +7862,14 @@ export interface CoreNamespace {
    * Pearson correlation over typed numeric arrays.
    * @param x - First numeric series; must have the same length as `y`.
    * @param y - Second numeric series, aligned one-for-one with `x`.
-   * @returns Sample correlation in `[-1, 1]`, or NaN when a series has fewer than two points.
+   * @returns Sample correlation in `[-1, 1]`; 0.0 when fewer than two points or either series is constant; NaN when `x` and `y` lengths differ.
    */
   correlation(x: NumericArray, y: NumericArray): number;
   /**
    * Sample covariance over typed numeric arrays.
    * @param x - First numeric series; must have the same length as `y`.
    * @param y - Second numeric series, aligned one-for-one with `x`.
-   * @returns Unbiased sample covariance, or 0.0 when a series has fewer than two points.
+   * @returns Unbiased sample covariance; 0.0 when fewer than two points; NaN when `x` and `y` lengths differ.
    */
   covariance(x: NumericArray, y: NumericArray): number;
   /**
@@ -8621,8 +8620,9 @@ export interface RollingGreeks {
  * and column-oriented; matrix inputs to other methods follow their parameter
  * documentation.
  *
- * All multi-ticker scalar outputs come back as `number[]` indexed by the
- * panel's ticker order; vector / per-ticker / structured outputs are
+ * Multi-ticker scalar outputs come back as a `Float64Array` in
+ * `tickerNames()` order (`maxDrawdownDuration` returns a plain `number[]` of
+ * integer day counts); vector / per-ticker / structured outputs are
  * serialized to plain JS objects (e.g. `DatedSeries`, `BetaResult[]`).
  */
 declare class Performance {
@@ -9060,7 +9060,7 @@ declare class Performance {
    * const [[point]] = perf.periodicReturns();
    * console.log(point.date, point.value); // "2024-01-02", 0.0302
    * ```
-   * @param frequency - Optional calendar frequency token: `"daily"`, `"weekly"`, `"monthly"`, `"quarterly"`, `"semi_annual"`, or `"annual"` (pandas offset aliases `D`/`B`, `W`, `M`, `Q`, `A`/`Y` are accepted too); defaults to `"monthly"`.
+   * @param frequency - Optional calendar frequency token: `"daily"`, `"weekly"`, `"monthly"`, `"quarterly"`, `"semi_annual"`, or `"annual"` (pandas offset aliases `D`/`B`, `W`, `M`/`ME`, `Q`/`QE`, `A`/`Y`/`YE` are accepted too); defaults to `"monthly"`.
    * @returns Ticker-major nested arrays of chronological Rust `PeriodicReturn` `{ date, value }` points with simple decimal returns.
    * @throws Error - Rejects an unsupported frequency or a panel that cannot be serialized to JavaScript.
    */
@@ -9084,7 +9084,6 @@ declare class Performance {
    * `true` when `correlationMatrix()` had to be Higham-repaired to the nearest valid correlation matrix (ragged panels can yield a raw pairwise estimate that is not positive semi-definite).
    * @returns `true` when the estimate was projected to the nearest correlation matrix.
    * @throws Error - Rejects the same degenerate-pair conditions as `correlationMatrix`.
-   * @throws Error - Rejects when a ticker pair is degenerate or Higham repair fails.
    */
   correlationMatrixRepaired(): boolean;
   /**
@@ -9201,9 +9200,6 @@ declare class Performance {
    * @param refDate - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end.
    * @param fiscalYearStartMonth - Optional fiscal-year start month from 1 through 12; defaults to January. With both parts omitted the fiscal year is the calendar year.
    * @param fiscalYearStartDay - Optional fiscal-year start day; defaults to the first day of the month (Rust `FiscalConfig::from_parts`).
-   * @param refDate - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end.
-   * @param fiscalYearStartMonth - Optional fiscal-year start month from 1 through 12; defaults to January.
-   * @param fiscalYearStartDay - Optional fiscal-year start day; defaults to the first day.
    * @returns Per-ticker `{ mtd, qtd, ytd, fytd }` numeric arrays of lookback returns as decimal fractions; `fytd` is never null.
    * @throws Error - Rejects an invalid ISO `ref_date`, a fiscal month outside `1..=12`, a fiscal day outside `1..=31`, or a result that cannot be serialized to JavaScript.
    */
@@ -9460,7 +9456,6 @@ declare class LevelsAtDate {
   /**
    * Deserialize a hierarchy-level snapshot from canonical JSON.
    * @param json - Canonical `LevelsAtDate` JSON containing `date`, `generic`, `by_level`, and `adder` fields.
-   * @param json - Canonical `LevelsAtDate` JSON.
    * @returns A validated `LevelsAtDate` handle.
    * @throws Error - Throws when the JSON is malformed or a numeric field is non-finite.
    */
@@ -9480,7 +9475,6 @@ declare class LevelsAtDate {
   /**
    * Return bucket values for a zero-based hierarchy level.
    * @param levelIndex - Zero-based hierarchy level index, which must be less than `nLevels`.
-   * @param levelIndex - Zero-based hierarchy level index.
    * @returns A bucket-name to factor-level mapping in basis points.
    * @throws Error - Throws when `level_index` is outside the available levels or the map cannot be converted to a JavaScript object.
    */
@@ -9513,7 +9507,6 @@ declare class PeriodDecomposition {
   /**
    * Deserialize a period decomposition from canonical JSON.
    * @param json - Canonical `PeriodDecomposition` JSON containing `from`, `to`, `d_generic`, `by_level`, and `d_adder` fields.
-   * @param json - Canonical `PeriodDecomposition` JSON.
    * @returns A validated `PeriodDecomposition` handle.
    * @throws Error - Throws when the JSON is malformed or a numeric field is non-finite.
    */
@@ -9537,7 +9530,6 @@ declare class PeriodDecomposition {
   /**
    * Return bucket deltas for a zero-based hierarchy level.
    * @param levelIndex - Zero-based hierarchy level index, which must be less than `nLevels`.
-   * @param levelIndex - Zero-based hierarchy level index.
    * @returns A bucket-name to factor-change mapping in basis points.
    * @throws Error - Throws when `level_index` is outside the available levels or the map cannot be converted to a JavaScript object.
    */
@@ -9570,6 +9562,8 @@ declare class PeriodDecomposition {
  * - `"one_step"` — calibrated annualized variance unchanged.
  * - `"unconditional"` — long-run.
  * - `'{"n_steps": N}'` — variance scaled by `N`.
+ * - `'{"years": Y}'` — variance scaled by the fractional year `Y`.
+ * - `'{"n_steps": N, "periods_per_year": P}'` — the same as `'{"years": N / P}'`.
  */
 declare class FactorCovarianceForecast {
   /**
@@ -9586,9 +9580,9 @@ declare class FactorCovarianceForecast {
   covarianceAt(horizonJson: JsonInput): FactorCovarianceMatrix;
   /**
    * Idiosyncratic vol (std dev) for a specific issuer at the requested horizon.
-   * @returns Issuer idiosyncratic volatility as a decimal standard deviation at `horizonJson`.
    * @param issuerId - Stable issuer identifier used to select the required domain object.
    * @param horizonJson - JSON-serialized forecast horizon defining the future covariance date or period.
+   * @returns Issuer idiosyncratic volatility (standard deviation) in basis points of spread, scaled to the horizon.
    * @throws Error - Throws if the issuer is not present in the model's vol state or the calibrated variance is negative.
    */
   idiosyncraticVol(issuerId: string, horizonJson: JsonInput): number;
@@ -9742,11 +9736,6 @@ export interface FactorModelCreditNamespace {
    * @param observedGeneric - Generic (PC) factor value at `as_of`, same decimal convention as the spreads.
    * @param asOf - ISO-8601 valuation date for the snapshot.
    * @param runtimeTagsJson - Optional JSON `{issuer_id: {dim_key: tag}}` for issuers not present in the model artifact.
-   * @param model - Calibrated CreditFactorModel used for the peel.
-   * @param observedSpreadsJson - JSON `{issuer_id: spread}` map in decimal (`0.012` = 120 bp). Returned levels are bp.
-   * @param observedGeneric - Observed generic-market spread in decimal, aligned with the model factors.
-   * @param asOf - ISO-8601 valuation date used to stamp the snapshot.
-   * @param runtimeTagsJson - Optional runtime-tag JSON for issuers missing from the artifact.
    * @throws Error - Throws a `not_found` error if an issuer has no model row and no `runtime_tags` entry, and a `validation` error if `as_of` cannot be parsed or a spread is outside the decimal band.
    */
   decomposeLevels(
@@ -10353,7 +10342,7 @@ export interface Copula extends WasmOwned {
    * @returns Conditional default probability in `[0, 1]`.
    * @param defaultThreshold - Latent-variable default threshold corresponding to the marginal default probability.
    * @param factorRealization - Realized systematic-factor value conditioning the default probability.
-   * @param correlation - Dependence correlation from -1 through 1 under the selected copula or recovery model.
+   * @param correlation - Asset correlation as a decimal in `[0, 1]`; values outside this range throw.
    * @throws Error - Throws a JavaScript exception if the factor count does not match the copula, any input is non-finite, `correlation` is outside `[0, 1]`, or the model produces a probability outside `[0, 1]`.
    */
   conditionalDefaultProb(
@@ -10369,7 +10358,7 @@ export interface Copula extends WasmOwned {
    * Loading); check `Number.isNaN()` before using the result. For the
    * RFL heuristic stress gauge use `stressCorrelationProxy` instead.
    * @returns Lower-tail dependence `λ_L` in `[0, 1]`, or `NaN` when the copula has no closed form.
-   * @param correlation - Dependence correlation from -1 through 1 under the selected copula or recovery model.
+   * @param correlation - Asset correlation as a decimal in `[0, 1]`. Out-of-range values are clamped by the model, not rejected (Student-t clamps to its supported correlation range; Gaussian models ignore the value and return 0).
    */
   tailDependence(correlation: number): number;
   /**
@@ -10383,7 +10372,7 @@ export interface Copula extends WasmOwned {
    *
    * Throws for non-RFL copulas.
    * @returns Heuristic extra correlation mass in the high-loading tail; 0 in the Gaussian limit.
-   * @param correlation - Dependence correlation from -1 through 1 under the selected copula or recovery model.
+   * @param correlation - Base asset correlation as a decimal in `[0, 1]`; out-of-range values are clamped to `[0, 1]`.
    * @throws Error - Throws a JavaScript exception if this copula is not a Random Factor Loading model.
    */
   stressCorrelationProxy(correlation: number): number;
@@ -10454,7 +10443,7 @@ export interface CopulaSpecConstructor {
   /**
    * Random Factor Loading copula with stochastic correlation.
    * @returns A `CopulaSpec` handle for deferred construction.
-   * @param loadingVol - Standard deviation used to randomize the factor loading.
+   * @param loadingVol - Factor-loading volatility (standard deviation of the loading); clamped to `[0, 0.5]`, typically 0.05 to 0.20.
    */
   randomFactorLoading(loadingVol: number): CopulaSpec;
   /**
@@ -10573,8 +10562,8 @@ export interface RecoverySpecConstructor {
    * `correlation` are not finite.
    * @returns A `RecoverySpec` handle for deferred construction.
    * @param mean - Mean recovery rate expressed as a fraction from 0 through 1.
-   * @param vol - Recovery-rate volatility scale in the correlated recovery model.
-   * @param correlation - Dependence correlation from -1 through 1 under the selected copula or recovery model.
+   * @param vol - Recovery-rate volatility; finite values are clamped to `[0, 0.5]`.
+   * @param correlation - Correlation between recovery and the systematic factor, from -1 through 1; finite values outside that range are clamped.
    * @throws Error - Throws a JavaScript exception if `mean` is not finite or lies outside `[0, 1]`, or if `vol` or `correlation` is non-finite. Finite volatility and correlation inputs are clamped to their supported ranges.
    */
   marketCorrelated(mean: number, vol: number, correlation: number): RecoverySpec;
@@ -11151,8 +11140,8 @@ export interface CorrelationNamespace {
    * @returns Nearest valid correlation matrix as a flat row-major `Float64Array` of `n * n` entries.
    * @param matrix - Flat row-major `n * n` near-correlation matrix to project onto the correlation set.
    * @param n - Positive square-matrix dimension; `matrix` must contain exactly `n * n` entries.
-   * @param maxIter - Maximum number of Higham nearest-correlation projection iterations.
-   * @param tol - Positive convergence tolerance for the nearest-correlation projection.
+   * @param maxIter - Maximum number of Higham nearest-correlation projection iterations; omitted uses Rust `NearestCorrelationOpts::default()` (200).
+   * @param tol - Positive convergence tolerance for the nearest-correlation projection; omitted uses Rust `NearestCorrelationOpts::default()` (`1e-10`).
    * @throws Error - Throws a `validation` error if the flat length is not `n * n` or the input has a gross diagonal or symmetry violation, and a `computation` error if the projection does not converge within `maxIter` iterations at `tol`.
    */
   nearestCorrelation(matrix: NumericArray, n: number, maxIter?: number, tol?: number): Float64Array;
@@ -11641,8 +11630,8 @@ export interface MonteCarloNamespace {
    * @param expiry - Time to option expiry in years on the model's annual time basis.
    * @param numPaths - Number of simulated stochastic paths; omitted or `null` uses the Rust registry European-pricer default (100 000).
    * @param seed - Deterministic random-number seed (number or BigInt); omitted or `null` uses the Rust registry default seed, so results stay reproducible.
-   * @param numSteps - Number of time steps per simulated path.
-   * @param currency - ISO-4217 currency code for the monetary amount or market convention.
+   * @param numSteps - Optional time steps per simulated path; omitted uses the Rust registry default.
+   * @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the Rust registry default currency.
    * @returns The Rust `MoneyEstimate` serde object: `mean` and `ci_95` as `{amount, currency}` money, plus `stderr`, `num_paths`, `num_simulated_paths` and the optional statistics (`null` when not captured).
    * @throws Error - Throws a JavaScript exception if `currency` is unknown; embedded defaults cannot be loaded when `num_steps` is omitted; `rate` or `div_yield` is non-finite; `kappa`, `theta`, `vol_of_vol`, or `v0` is non-finite or non-positive; `rho` is outside `[-1, 1]`; the expiry, step count, path count, or computed discount factor fails validation; a simulated discounted payoff is non-finite; or the result cannot be serialized.
    */
@@ -11676,8 +11665,8 @@ export interface MonteCarloNamespace {
    * @param expiry - Time to option expiry in years on the model's annual time basis.
    * @param numPaths - Number of simulated stochastic paths; omitted or `null` uses the Rust registry European-pricer default (100 000).
    * @param seed - Deterministic random-number seed (number or BigInt); omitted or `null` uses the Rust registry default seed, so results stay reproducible.
-   * @param numSteps - Number of time steps per simulated path.
-   * @param currency - ISO-4217 currency code for the monetary amount or market convention.
+   * @param numSteps - Optional time steps per simulated path; omitted uses the Rust registry default.
+   * @param currency - Optional ISO-4217 code stamped on the estimate; omitted uses the Rust registry default currency.
    * @returns The Rust `MoneyEstimate` serde object: `mean` and `ci_95` as `{amount, currency}` money, plus `stderr`, `num_paths`, `num_simulated_paths` and the optional statistics (`null` when not captured).
    * @throws Error - Throws a JavaScript exception if `currency` is unknown; embedded defaults cannot be loaded when `num_steps` is omitted; `rate` or `div_yield` is non-finite; `kappa`, `theta`, `vol_of_vol`, or `v0` is non-finite or non-positive; `rho` is outside `[-1, 1]`; the expiry, step count, path count, or computed discount factor fails validation; a simulated discounted payoff is non-finite; or the result cannot be serialized.
    */
@@ -15245,8 +15234,13 @@ export interface CovenantEngineConstructor {
  * ```typescript
  * import init, { covenants } from "finstack-quant-wasm";
  * await init();
- * const engine = JSON.parse(covenants.lboStandardJson(6, 2, 1.5, 50_000_000));
- * console.log(engine);
+ * const specs = JSON.parse(covenants.lboStandardJson(6, 2, 1.5, 50_000_000));
+ * const reports = covenants.evaluateEngine(
+ *   JSON.stringify({ specs }),
+ *   JSON.stringify({ debt_to_ebitda: 4.5, interest_coverage: 3, fixed_charge_coverage: 2, capex: 1e7 }),
+ *   "2026-03-31"
+ * );
+ * console.log(Object.values(reports).every((report) => report.passed));
  * ```
  */
 export interface CovenantsNamespace {
@@ -15276,7 +15270,7 @@ export interface CovenantsNamespace {
    * @returns A plain object keyed by covenant instance key, each value a `CovenantReport`.
    * @param engineJson - JSON-serialized covenant engine and its covenant definitions.
    * @param metricsJson - JSON object of financial metrics referenced by the covenant engine.
-   * @param asOf - ISO-8601 date on which every covenant test is evaluated.
+   * @param asOf - ISO-8601 covenant test date; selects the active covenant window, applicable waivers, threshold-schedule step and cure-period state.
    * @throws Error - Throws a JavaScript exception if either JSON input is malformed or has the wrong schema, a metric is non-numeric, `asOf` is not a valid ISO date, the engine or required metrics fail validation, or the reports cannot be serialized to JavaScript.
    */
   evaluateEngine(
@@ -15286,11 +15280,11 @@ export interface CovenantsNamespace {
   ): Record<string, CovenantReport>;
   /**
    * Standard leveraged-buyout covenant package as JSON.
-   * @returns Standard leveraged-buyout covenant package as canonical JSON.
-   * @param initialLeverage - Maximum leverage ratio permitted at the initial test date.
+   * @param initialLeverage - Maximum debt-to-EBITDA threshold in turns (`5.0` = 5.0x), applied at every quarterly test date.
    * @param interestCoverage - Minimum EBIT-to-interest coverage ratio in turns.
-   * @param fixedChargeCoverage - Minimum EBITDA-to-fixed-charges coverage ratio.
+   * @param fixedChargeCoverage - Minimum fixed-charge-coverage threshold in turns, tested against the caller-supplied `fixed_charge_coverage` metric.
    * @param maxCapex - Maximum annual capital expenditure amount in the caller's reporting currency.
+   * @returns Compact JSON array of `CovenantSpec` objects in serde field order (not key-sorted canonical form); wrap it as `{ "specs": [...] }` for `evaluateEngine` / `validateCovenantEngineJson`, or pass one element through `validateCovenantSpecJson` for canonical form.
    * @throws Error - Throws a JavaScript exception if any threshold is `NaN`, infinite or negative, or if the generated covenant package cannot be serialized to JSON.
    */
   lboStandardJson(
@@ -15301,28 +15295,28 @@ export interface CovenantsNamespace {
   ): string;
   /**
    * Covenant-lite package as JSON.
-   * @returns Covenant-lite package as canonical JSON.
    * @param maxLeverage - Maximum total debt-to-EBITDA leverage ratio.
    * @param maxSeniorLeverage - Maximum senior-debt-to-EBITDA leverage ratio.
+   * @returns Compact JSON array of `CovenantSpec` objects in serde field order (not key-sorted canonical form); wrap it as `{ "specs": [...] }` for `evaluateEngine` / `validateCovenantEngineJson`, or pass one element through `validateCovenantSpecJson` for canonical form.
    * @throws Error - Throws a JavaScript exception if any threshold is `NaN`, infinite or negative, or if the generated covenant package cannot be serialized to JSON.
    */
   covLiteJson(maxLeverage: number, maxSeniorLeverage: number): string;
   /**
    * Real-estate covenant package as JSON.
-   * @returns Real-estate covenant package as canonical JSON.
    * @param minDscr - Minimum debt-service coverage ratio.
    * @param minDebtYield - Minimum net-operating-income debt yield expressed as a decimal.
    * @param maxLtv - Maximum loan-to-value ratio expressed as a decimal.
+   * @returns Compact JSON array of `CovenantSpec` objects in serde field order (not key-sorted canonical form); wrap it as `{ "specs": [...] }` for `evaluateEngine` / `validateCovenantEngineJson`, or pass one element through `validateCovenantSpecJson` for canonical form.
    * @throws Error - Throws a JavaScript exception if any threshold is `NaN`, infinite or negative, or if the generated covenant package cannot be serialized to JSON.
    */
   realEstateJson(minDscr: number, minDebtYield: number, maxLtv: number): string;
   /**
    * Project-finance covenant package as JSON.
-   * @returns Project-finance covenant package as canonical JSON.
    * @param minDscr - Minimum debt-service coverage ratio.
    * @param distributionLockupDscr - DSCR threshold below which borrower distributions are locked up.
    * @param minLiquidity - Minimum required liquidity reserve in the model's monetary units.
    * @param maxNetLeverage - Maximum net-debt-to-EBITDA leverage ratio.
+   * @returns Compact JSON array of `CovenantSpec` objects in serde field order (not key-sorted canonical form); wrap it as `{ "specs": [...] }` for `evaluateEngine` / `validateCovenantEngineJson`, or pass one element through `validateCovenantSpecJson` for canonical form.
    * @throws Error - Throws a JavaScript exception if any threshold is `NaN`, infinite or negative, or if the generated covenant package cannot be serialized to JSON.
    */
   projectFinanceJson(
@@ -22081,7 +22075,7 @@ export interface ValuationInstrumentsNamespace {
    * Bare instrument payloads are rejected. Returns canonical re-serialized JSON.
    * @returns Canonical instrument envelope JSON after schema validation.
    * @param json - Required `finstack_quant.instrument/1` envelope.
-   * @param metricPricingOverrides - Serialized metric-pricing override object merged before native instrument validation; `None` (omitted or null in JavaScript) retains the envelope configuration.
+   * @param metricPricingOverrides - Serialized metric-pricing override object merged before native instrument validation; omit it, or pass `null` or `undefined`, to keep the envelope configuration as-is.
    * @throws Error - Throws a JavaScript exception if the instrument or override JSON is malformed, the merged payload is not a canonical v1 instrument envelope, instrument validation fails, or the envelope cannot be canonically serialized.
    */
   validateInstrumentJson(json: JsonInput, metricPricingOverrides?: JsonInput | null): string;
@@ -22325,8 +22319,8 @@ export interface ValuationInstrumentsNamespace {
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param marketPricePct - Clean settlement quote as a percentage of CURRENT balance; accrued interest is added once.
+   * @param config - Optional OasConfig JSON; omit to use the default OAS solver configuration.
    * @throws Error - Throws a JavaScript exception if the instrument, market, or optional configuration JSON is malformed; the instrument fails pricing validation; `as_of` is invalid; the tranche or discount curve is missing; the OAS solve fails or produces a non-finite result; or the result cannot be converted to a JavaScript value.
-   * @param config - Config used by this call.
    */
   structuredCreditTrancheOas(
     instrumentJson: JsonInput,
@@ -22349,8 +22343,8 @@ export interface ValuationInstrumentsNamespace {
    * @param trancheId - Stable tranche identifier used to select the required domain object.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param grid - ScenarioGrid JSON containing the CPR, CDR, and severity axes for the table.
    * @throws Error - Throws a JavaScript exception if the instrument, market, or scenario-grid JSON is malformed; the instrument fails pricing validation; `as_of` is invalid; the tranche or required market data is missing; a scenario fails or produces a non-finite result; or the table cannot be converted to a JavaScript value.
-   * @param grid - Grid as a string.
    */
   structuredCreditTrancheScenarioTable(
     instrumentJson: JsonInput,
@@ -22907,10 +22901,10 @@ export interface FxForwardInstrument extends FxInstrument {
   withForwardPips(spotRate: number, pips: number): FxForwardInstrument;
   /**
    * Covered-interest-parity forward rate implied by the market (mirrors Rust `FxForward::market_forward_rate`).
-   * @param marketJson - Serialized `MarketContext` carrying both discount curves and the FX spot.
+   * @param marketJson - Serialized `MarketContext` carrying both discount curves and the FX spot (or an explicit `quoted_spot` on the instrument).
    * @param asOf - Valuation date as an ISO-8601 string.
    * @returns Forward rate, quote currency per unit of base currency.
-   * @throws Error - Throws with kind `not_found` if a discount curve or the FX spot is missing, and kind `validation` if an input is malformed.
+   * @throws Error - Throws with kind `not_found` if a discount curve or the FX spot is missing, and kind `validation` if the market JSON or `asOf` is malformed.
    */
   marketForwardRate(marketJson: JsonInput, asOf: string): number;
   /**
@@ -23121,75 +23115,100 @@ export interface FxOptionInstrument extends FxInstrument {
   /**
    * Spot delta of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Spot delta: change in value per unit spot.
+   * @returns Cash delta `dPV/dS`: PV change per unit move in the spot rate, including notional scaling.
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
    */
   delta(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Spot gamma of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Spot gamma: change in delta per unit spot.
+   * @returns Cash gamma `d²PV/dS²`: PV per unit-spot squared, including notional scaling.
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
    */
   gamma(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Vega of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Vega: change in value per 1.0 absolute move in implied volatility.
+   * @returns Cash vega: PV change for a 1 vol-point (0.01 absolute) move in implied volatility.
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
    */
   vega(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Theta of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Theta: change in value per year of calendar time.
+   * @returns Model theta per day: annual analytic theta divided by the `metric_pricing_overrides.theta_day_basis` day count (default 365 calendar days); not annualized.
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
    */
   theta(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Domestic-rate rho of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Domestic rho: change in value per 1.0 absolute move in the domestic rate.
+   * @returns Domestic rho: PV change for a 1bp (0.0001) move in the domestic discount rate.
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
    */
   rho(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Foreign-rate rho of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Foreign rho: change in value per 1.0 absolute move in the foreign rate.
+   * @returns Foreign rho: PV change for a 1bp (0.0001) move in the foreign discount rate.
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
    */
   foreignRho(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Vanna of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Vanna: cross sensitivity of delta to implied volatility.
+   * @returns Vanna `d²PV/(dS dσ)`: PV per unit spot per vol point (0.01 absolute vol).
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
    */
   vanna(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Volga of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Volga: change in vega per 1.0 absolute move in implied volatility.
+   * @returns Volga `d²PV/dσ²`: PV per vol-point squared (0.01 absolute vol).
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
    */
   volga(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Named first-order greeks produced by the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Map of greek name to value, keyed in the Rust `STANDARD_OPTION_GREEKS` order (`delta`, `gamma`, `vega`, `theta`, `rho`, …); only the Greeks that apply to the instrument are present.
+   * @returns Map of Greek name to value, with keys in the Rust `STANDARD_OPTION_GREEKS` order (`delta`, `gamma`, `vega`, `theta`, `rho`, …); only the Greeks that apply to the instrument are present.
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; a returned Greek is non-finite; or the result cannot be converted to a JavaScript value.
    */
   greeks(marketJson: JsonInput, asOf: string, model?: string | null): Record<string, number>;
+}
+
+/**
+ * Quanto option handle. It shares the vanilla Greek surface; only `theta`
+ * differs: the quanto reports the theta-horizon P&L, not the model theta.
+ */
+export interface QuantoOptionInstrument extends FxOptionInstrument {
+  /**
+   * Theta of the option under the selected model.
+   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @returns Theta: P&L over the theta horizon (default one day, capped at expiry) with spot held at its `asOf` level, so a roll into the monitoring window observes that spot; not annualized.
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
+   */
+  theta(marketJson: JsonInput, asOf: string, model?: string | null): number;
 }
 
 /**
@@ -23199,49 +23218,55 @@ export interface FxDigitalOptionInstrument extends FxInstrument {
   /**
    * Spot delta of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Spot delta: change in value per unit spot.
+   * @returns Cash delta `dPV/dS`: PV change per unit move in the spot rate, including notional scaling.
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
    */
   delta(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Spot gamma of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Spot gamma: change in delta per unit spot.
+   * @returns Cash gamma `d²PV/dS²`: PV per unit-spot squared, including notional scaling.
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
    */
   gamma(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Vega of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Vega: change in value per 1.0 absolute move in implied volatility.
+   * @returns Cash vega: PV change for a 1 vol-point (0.01 absolute) move in implied volatility.
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
    */
   vega(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Theta of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Theta: change in value per year of calendar time.
+   * @returns Model theta per day on the `metric_pricing_overrides.theta_day_basis` day count (default 365 calendar days): analytic for cash-or-nothing payouts, a one-day finite-difference decay for asset-or-nothing; not annualized.
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
    */
   theta(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Domestic-rate rho of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Domestic rho: change in value per 1.0 absolute move in the domestic rate.
+   * @returns Domestic rho: PV change for a 1bp (0.0001) move in the domestic discount rate.
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
    */
   rho(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Named first-order greeks produced by the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Map of greek name to value, keyed in the Rust `STANDARD_OPTION_GREEKS` order (`delta`, `gamma`, `vega`, `theta`, `rho`, …); only the Greeks that apply to the instrument are present.
+   * @returns Map of Greek name to value, with keys in the Rust `STANDARD_OPTION_GREEKS` order (`delta`, `gamma`, `vega`, `theta`, `rho`, …); only the Greeks that apply to the instrument are present.
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; a returned Greek is non-finite; or the result cannot be converted to a JavaScript value.
    */
   greeks(marketJson: JsonInput, asOf: string, model?: string | null): Record<string, number>;
 }
@@ -23253,49 +23278,55 @@ export interface FxTouchOptionInstrument extends FxInstrument {
   /**
    * Spot delta of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Spot delta: change in value per unit spot.
+   * @returns Cash delta `dPV/dS`: PV change per unit move in the spot rate, including notional scaling.
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
    */
   delta(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Spot gamma of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Spot gamma: change in delta per unit spot.
+   * @returns Cash gamma `d²PV/dS²`: PV per unit-spot squared, including notional scaling.
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
    */
   gamma(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Vega of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Vega: change in value per 1.0 absolute move in implied volatility.
+   * @returns Cash vega: PV change for a 1 vol-point (0.01 absolute) move in implied volatility.
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
    */
   vega(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Theta of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
    * @returns Theta: P&L over the theta horizon (default one day, capped at expiry) with spot held at its `asOf` level, so a roll into the monitoring window observes that spot; not annualized.
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
    */
   theta(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Domestic-rate rho of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Domestic rho: change in value per 1.0 absolute move in the domestic rate.
+   * @returns Domestic rho: PV change for a 1bp (0.0001) move in the domestic discount rate.
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
    */
   rho(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Named first-order greeks produced by the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Map of greek name to value, keyed in the Rust `STANDARD_OPTION_GREEKS` order (`delta`, `gamma`, `vega`, `theta`, `rho`, …); only the Greeks that apply to the instrument are present.
+   * @returns Map of Greek name to value, with keys in the Rust `STANDARD_OPTION_GREEKS` order (`delta`, `gamma`, `vega`, `theta`, `rho`, …); only the Greeks that apply to the instrument are present.
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; a returned Greek is non-finite; or the result cannot be converted to a JavaScript value.
    */
   greeks(marketJson: JsonInput, asOf: string, model?: string | null): Record<string, number>;
 }
@@ -23307,17 +23338,19 @@ export interface FxBarrierOptionInstrument extends FxTouchOptionInstrument {
   /**
    * Vanna of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Vanna: cross sensitivity of delta to implied volatility.
+   * @returns Vanna `d²PV/(dS dσ)`: PV per unit spot per vol point (0.01 absolute vol).
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
    */
   vanna(marketJson: JsonInput, asOf: string, model?: string | null): number;
   /**
    * Volga of the option under the selected model.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to select market inputs and date-dependent cashflows.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-   * @returns Volga: change in vega per 1.0 absolute move in implied volatility.
+   * @returns Volga `d²PV/dσ²`: PV per vol-point squared (0.01 absolute vol).
+   * @throws Error - Throws a JavaScript exception if the instrument or market JSON, `asOf`, or `model` is invalid; required market data is missing; pricing fails; or the Greek is not produced by the selected model.
    */
   volga(marketJson: JsonInput, asOf: string, model?: string | null): number;
 }
@@ -23533,7 +23566,7 @@ export interface FxNamespace {
   /**
    * Quanto option constructor.
    */
-  QuantoOption: FxInstrumentConstructor<FxOptionInstrument>;
+  QuantoOption: FxInstrumentConstructor<QuantoOptionInstrument>;
   /**
    * Fluent `FxForwardBuilder` class (see `FxForwardBuilderConstructor`).
    */
@@ -27766,13 +27799,13 @@ export interface LiquidityNamespace {
   liquidityTier(daysToLiquidate: number, thresholds?: NumericArray | null): string;
   /**
    * Compute Bangia liquidity-adjusted VaR under the loss-sign convention.
+   * @param varValue - Loss-convention VaR in the same units as `positionValue`; must be non-positive.
    * @param spreadMean - Finite non-negative mean relative bid-ask spread as a decimal.
    * @param spreadVol - Finite non-negative volatility of the relative spread.
    * @param confidence - Confidence level strictly between 0.5 and 1.
    * @param positionValue - Finite current market value; only its magnitude is used.
    * @returns An object containing `var`, `spread_cost`, `lvar`, and `lvar_ratio`.
    * @throws Error - Throws a JavaScript exception if an input violates the stated finiteness, sign, or range contract, or if the result cannot be converted.
-   * @param varValue - Loss-convention VaR in the same units as `positionValue`; must be non-positive.
    */
   lvarBangia(
     varValue: number,
@@ -27947,7 +27980,7 @@ export interface ModelsNamespace {
    * @param isCall - `true` for a call, `false` for a put.
    * @param thetaDaysPerYear - Day-count denominator for theta. Default `365`. Pass `252` for trading-day theta.
    * @returns Object `{ delta, gamma, vega, theta, rho_r, rho_q }` (snake_case keys matching the Rust/Python canonical `BsGreeks` fields). `vega` and both rho values are **per 1% move**; `theta` is **per day** under `thetaDaysPerYear`.
-   * @throws If serialization to JS fails (should not happen on valid inputs).
+   * @throws `FinstackError` (kind `validation`) if any input is non-finite, `spot` or `strike` is not positive, `vol`, `expiry` or `thetaDaysPerYear` is not positive, or a computed Greek is non-finite.
    */
   bsGreeks(
     spot: number,
@@ -28428,39 +28461,39 @@ export declare const models: ModelsNamespace;
 export interface CalibrationNamespace {
   /**
    * Execute a calibration envelope and return its fitted market and reports.
-   * @param envelope - Typed calibration envelope or its serialized JSON form.
    * @returns Calibration result including the materialized market and per-step reports.
-   * @throws Error - Throws a JavaScript exception if `envelopeJson` is malformed or violates the calibration schema or static plan contract (fail-fast: first static error; `dryRun` lists every static error), market context construction or a calibration step fails, a solver does not converge, or the result envelope cannot be converted to a JavaScript value.
+   * @param envelope - `CalibrationEnvelope` as a plain object or its JSON string: the plan (steps, quote sets, settings) plus `market_data` and optional `prior_market`.
+   * @throws Error - Throws a `CalibrationEnvelopeError` if the envelope is malformed or violates the calibration schema or static plan contract (fail-fast: first static error; `dryRun` lists every static error), market context construction or a calibration step fails, a solver does not converge, or the result envelope cannot be converted to a JavaScript value.
    */
   calibrate(envelope: CalibrationEnvelope | string): CalibrationResultEnvelope;
   /**
    * Validate and canonicalize a calibration envelope without solving it.
    * @param envelope - Typed calibration envelope or its serialized JSON form.
    * @returns Canonical pretty-printed calibration-envelope JSON.
-   * @throws Error - Throws a JavaScript exception if `json` is malformed, its calibration schema marker is missing, malformed, or unsupported, static envelope validation fails (fail-fast: first error; `dryRun` lists every static error), or the canonical envelope cannot be serialized.
+   * @throws Error - Throws a `CalibrationEnvelopeError` if the envelope is malformed, its calibration schema marker is missing, malformed, or unsupported, static envelope validation fails (fail-fast: first error; `dryRun` lists every static error), or the canonical envelope cannot be serialized.
    */
   validateCalibrationJson(envelope: CalibrationEnvelope | string): string;
   /**
    * Return all static plan errors and dependencies without running solvers.
-   * @param envelope - Typed calibration envelope or its serialized JSON form.
    * @returns `CalibrationValidationReport` object containing every static error and the dependency graph.
-   * @throws Error - Throws a JavaScript exception if `envelopeJson` is malformed, its schema marker is missing, malformed, or unsupported, the envelope structure is invalid, or the validation report cannot be converted to a JavaScript value. Semantic findings are returned in the report rather than thrown.
+   * @param envelope - `CalibrationEnvelope` as a plain object or its JSON string: the plan (steps, quote sets, settings) plus `market_data` and optional `prior_market`.
+   * @throws Error - Throws a `CalibrationEnvelopeError` if the envelope is malformed, its schema marker is missing, malformed, or unsupported, the envelope structure is invalid, or the validation report cannot be converted to a JavaScript value. Semantic findings are returned in the report rather than thrown.
    */
   dryRun(envelope: CalibrationEnvelope | string): CalibrationValidationReport;
   /**
    * JSON wire twin of `dryRun`: the validation report as pretty-printed JSON.
-   * @param envelope - Typed calibration envelope or its serialized JSON form.
    * @returns Pretty-printed `CalibrationValidationReport` JSON.
-   * @throws Error - Throws a JavaScript exception if `envelopeJson` is malformed, its schema marker is missing, malformed, or unsupported, the envelope structure is invalid, or the validation report cannot be serialized. Semantic findings are returned in the report rather than thrown.
+   * @param envelope - `CalibrationEnvelope` as a plain object or its JSON string: the plan (steps, quote sets, settings) plus `market_data` and optional `prior_market`.
+   * @throws Error - Throws a `CalibrationEnvelopeError` if the envelope is malformed, its schema marker is missing, malformed, or unsupported, the envelope structure is invalid, or the validation report cannot be serialized. Semantic findings are returned in the report rather than thrown.
    */
   dryRunJson(envelope: CalibrationEnvelope | string): string;
   /**
    * Fit the Bermudan LMM loading scale from the market swaption surface.
+   * @param instrument - Canonical Bermudan swaption instrument envelope, as a plain object or its JSON string.
    * @param market - Reusable market handle containing discount and swaption-volatility inputs.
    * @param asOf - ISO-8601 valuation date.
    * @returns Positive finite LMM base volatility.
    * @throws Error - Throws if the envelope is not a Bermudan swaption, the date or market inputs are invalid, or the Rebonato calibration cannot be completed.
-   * @param instrument - Instrument used by this call.
    */
   calibrateBermudanLmmBaseVol(
     instrument: Record<string, unknown> | string,
@@ -28484,7 +28517,7 @@ export interface CalibrationNamespace {
   /**
    * Validate a calibration envelope and return it as a plain `CalibrationEnvelope` object.
    *
-   * Typed twin of [`validate_calibration_json`]: the same strict load and
+   * Typed twin of `validateCalibrationJson`: the same strict load and
    * fail-fast static validation, returning the envelope object instead of its
    * pretty-printed JSON.
    * @param envelope - `CalibrationEnvelope` (object or JSON) with schema marker `finstack_quant.calibration/1`.
@@ -28509,7 +28542,7 @@ export interface CalibrationNamespace {
   /**
    * Report of one calibration step as a compact JSON string.
    *
-   * JSON wire twin of [`calibration_result_step_report`] and free-function twin
+   * JSON wire twin of `calibrationResultStepReport` and free-function twin
    * of Python `CalibrationResult.step_report_json`.
    * @param resultJson - `CalibrationResultEnvelope` returned by `calibrate` (object or JSON).
    * @param stepId - Identifier of the calibration step, as given in the plan.
@@ -29227,7 +29260,7 @@ export interface ValuationsNamespace {
    *
    * Each period's coupon is `max(fixed_rate - L_i, coupon_floor) * day_count_fraction`.
    * Payments accumulate in a
-   * [`CumulativeCouponTracker`](finstack_quant_valuations::instruments::rates::hw1f::cumulative_coupon::CumulativeCouponTracker) configured with
+   * Rust `CumulativeCouponTracker` configured with
    * `target_coupon`; once cumulative hits the target, the final coupon is
    * capped and the instrument is considered redeemed.
    * @returns Period coupons, running cumulative, redemption index, and whether the TARN redeemed early.
@@ -29296,7 +29329,7 @@ export interface ValuationsNamespace {
    * @param shortCms - Short-tenor CMS rate in decimal form.
    * @param strike - CMS rate-spread strike in decimal form.
    * @param isCall - Whether to value a call (`true`) or put (`false`).
-   * @param notional - Signed trade notional in the instrument's native currency units.
+   * @param notional - Non-negative trade notional in the instrument's native currency units.
    * @throws Error - Throws a JavaScript exception if a CMS rate or `strike` is non-finite, or if `notional` is negative or non-finite.
    */
   cmsSpreadOptionIntrinsic(
@@ -29442,9 +29475,9 @@ export interface AttributionNamespace {
   /**
    * Parameters constructor emitted by wasm-bindgen for attribution calls.
    *
-   * `configJson` may include `{ "execution_policy": "parallel" }` to opt into
-   * inner Rayon when the host is not already parallelizing attribution at the
-   * portfolio or batch level. Serial is the default. Set
+   * `configJson` may include `{ "execution_policy": "parallel" }`; it opts into
+   * inner Rayon on native hosts and is accepted but ignored in WebAssembly,
+   * where attribution always runs serially with the same result. Set
    * `modelParamsT0Json` / `creditFactorModelJson` on the constructed object
    * to attach an opening model-parameter snapshot or credit-factor model.
    */
@@ -29461,13 +29494,13 @@ export interface AttributionNamespace {
   /**
    * Run P&L attribution for a single instrument.
    *
-   * Accepts an [`AttributionJsonInputs`] struct with the instrument JSON, two market
+   * Accepts an `AttributionJsonInputs` object with the instrument JSON, two market
    * snapshots, dates, and a method descriptor. Returns the `PnlAttribution`
    * result as a structured object with the canonical Rust serde field names;
    * use `attributePnlJson` for the JSON wire string. `config_json` may include
-   * `"execution_policy": "parallel"` to opt into inner Rayon when the host
-   * is not already parallelizing attribution at a higher level. Serial is
-   * the default.
+   * `"execution_policy": "parallel"`, which opts into inner Rayon on native
+   * hosts; WebAssembly builds have no Rayon, so the field is accepted but
+   * ignored here and attribution always runs serially (same result).
    * @returns Structured `PnlAttribution` result object for the instrument.
    * @param params - Fully specified AttributionJsonInputs object containing instrument, markets, dates, and method.
    * @throws Error - Throws a `FinstackError` whose `kind` is the Rust classification (`not_found` for missing market data, `computation` for a caught panic or solver failure, otherwise `validation`). Rejects malformed instrument, market, method, or configuration JSON; invalid ISO attribution dates; instrument or market reconstruction, pricing, FX, rounding, metric, or method-specific attribution failures; a caught attribution panic; or failure to convert the result to a JavaScript value.
@@ -29481,7 +29514,7 @@ export interface AttributionNamespace {
    * a structured object.
    * @returns JSON-serialized `PnlAttribution` wire document.
    * @param params - Fully specified AttributionJsonInputs object containing instrument, markets, dates, and method.
-   * @throws Error - Rejects the same conditions as [`attribute_pnl`], plus failure to serialize the result to JSON.
+   * @throws Error - Rejects the same conditions as `attributePnl`, plus failure to serialize the result to JSON.
    */
   attributePnlJson(params: AttributionJsonInputs): string;
   /**
@@ -29502,7 +29535,7 @@ export interface AttributionNamespace {
    * workflows.
    * @returns JSON attribution result envelope for the supplied spec.
    * @param specJson - JSON-serialized AttributionEnvelope (schema `finstack_quant.attribution/1`) to validate and execute.
-   * @throws Error - Rejects the same conditions as [`attribute_pnl_envelope`], plus failure to serialize the result envelope.
+   * @throws Error - Rejects the same conditions as `attributePnlEnvelope`, plus failure to serialize the result envelope.
    */
   attributePnlEnvelopeJson(specJson: JsonInput): string;
   /**
@@ -29679,7 +29712,7 @@ export interface Evaluator extends WasmOwned {
    * structure, whose instruments are priced from the market.
    * @param model - `FinancialModelSpec` to evaluate (object or JSON).
    * @param market - `MarketContext` state supplying curves, quotes and FX (object or JSON).
-   * @param asOf - ISO 8601 valuation date (`"2025-01-15"`) used to resolve date-dependent market data.
+   * @param asOf - ISO 8601 date (`"2025-01-15"`): the pricing date for capital-structure instruments and the cutoff for explicit-value visibility. An actual whose availability date falls after `asOf` is hidden, so the node falls back to its forecast or formula, and a value-only node then fails.
    * @returns `StatementResult` plain object, including `cs_cashflows` for capital-structure models.
    * @throws Error with kind `validation` if an input is malformed, `asOf` is not an ISO date, or a formula fails to evaluate; kind `not_found` if a node or market datum is missing; kind `computation` for a dependency cycle or a capital-structure failure.
    */
@@ -31065,7 +31098,7 @@ export interface StatementsNamespace {
   /**
    * Normalize a target metric and return the results as JSON text.
    *
-   * JSON wire twin of [`normalize`] (Python `normalize_json`).
+   * JSON wire twin of `normalize` (Python `normalize_json`).
    * @param results - Evaluated `StatementResult` holding the target node and any reference nodes (object or JSON).
    * @param config - `NormalizationConfig`: target node plus the adjustments to apply (object or JSON).
    * @returns JSON array of `NormalizationResult` objects, one per period.
@@ -31661,10 +31694,10 @@ export interface StatementsAnalyticsNamespace {
    * Accepts a model and mapping JSON, builds the appropriate suite, and
    * evaluates the model only when results are absent.
    * @param modelJson - Financial-model specification JSON.
-   * @param mappingJson - Node-mapping JSON from statement nodes to check inputs.
+   * @param mappingJson - `ThreeStatementMapping` (object or JSON) naming the model nodes that feed each check.
    * @param resultsJson - Evaluated statement-result JSON.
    * @returns Structured three-statement check report with results and aggregate summary.
-   * @throws Error - Rejects malformed model, mapping, or supplied result JSON; model-evaluation failures when results are omitted; missing mapped nodes, incompatible data, or invalid check configuration; or failure to convert the report to JavaScript.
+   * @throws Error - Rejects malformed model, mapping, or supplied result JSON; model-evaluation failures when results are omitted; incompatible data or invalid check configuration; or failure to convert the report to JavaScript. A mapped node that is missing from the model does not throw: its check is skipped or reported as a finding.
    */
   runThreeStatementChecks(
     modelJson: JsonInput,
@@ -31674,10 +31707,10 @@ export interface StatementsAnalyticsNamespace {
   /**
    * Run credit underwriting checks using credit-specific mappings.
    * @param modelJson - Financial-model specification JSON.
-   * @param mappingJson - Node-mapping JSON from statement nodes to check inputs.
+   * @param mappingJson - `CreditMapping` (object or JSON) naming the debt, EBITDA and interest nodes plus the optional warning bands (`leverage_warn` is a `(min, max)` band in turns).
    * @param resultsJson - Evaluated statement-result JSON.
    * @returns Structured credit-underwriting check report with results and aggregate summary.
-   * @throws Error - Rejects malformed model, mapping, or supplied result JSON; model-evaluation failures when results are omitted; missing mapped nodes, incompatible data, or invalid check configuration; or failure to convert the report to JavaScript.
+   * @throws Error - Rejects malformed model, mapping, or supplied result JSON; model-evaluation failures when results are omitted; incompatible data or invalid check configuration; or failure to convert the report to JavaScript. A mapped node that is missing from the model does not throw: its check is skipped or reported as a finding.
    */
   runCreditUnderwritingChecks(
     modelJson: JsonInput,
@@ -32971,9 +33004,9 @@ export interface PortfolioNamespace {
     metrics?: string[]
   ): PortfolioValuation;
   /**
-   * Value an already-built [`Portfolio`] handle. Skips the per-call
+   * Value an already-built `Portfolio` handle. Skips the per-call
    * `PortfolioSpec` parse + `Portfolio::from_spec` rebuild that
-   * [`value_portfolio`] performs; use this when sweeping market scenarios
+   * `valuePortfolio` performs; use this when sweeping market scenarios
    * against a fixed portfolio.
    * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
    * @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
@@ -33003,7 +33036,7 @@ export interface PortfolioNamespace {
   ): PortfolioCashflows;
   /**
    * Aggregate the full classified cashflow ladder for an already-built
-   * [`Portfolio`] handle.
+   * `Portfolio` handle.
    *
    * Skips the per-call `PortfolioSpec` parse + `Portfolio::from_spec` rebuild.
    * For batched or chained workflows (repeated cashflow builds across market
@@ -33060,7 +33093,7 @@ export interface PortfolioNamespace {
     marketJson: JsonInput
   ): ScenarioRevalueView;
   /**
-   * Apply a scenario to an already-built [`Portfolio`] handle and revalue.
+   * Apply a scenario to an already-built `Portfolio` handle and revalue.
    * Returns a JS object with structured `valuation` and `report` values.
    * @returns Revalued result object and scenario application report.
    * @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
@@ -33088,7 +33121,7 @@ export interface PortfolioNamespace {
   scenarioPnl(specJson: JsonInput, scenarioJson: JsonInput, marketJson: JsonInput): ScenarioPnlView;
   /**
    * Compute the profit and loss attributable to a scenario for an
-   * already-built [`Portfolio`] handle.
+   * already-built `Portfolio` handle.
    *
    * Values the portfolio against the unshocked market and against the
    * scenario-shocked market, and returns a JS object with structured `pnl`
@@ -33546,7 +33579,7 @@ export interface ScenariosNamespace {
    *
    * Returns the validated scenario as a plain JavaScript object.
    * @returns Validated structured scenario specification.
-   * @param jsonStr - Canonical JSON string to validate and re-serialize.
+   * @param jsonStr - Scenario specification JSON string to deserialize and validate; the result is returned as a plain object.
    * @throws Error - Rejects malformed or schema-incompatible `json_str`, a blank scenario ID, multiple time-roll operations, invalid operation identifiers or numeric fields, variant-specific operation violations, or serialization failure.
    */
   parseScenarioSpec(jsonStr: JsonInput): ScenarioSpec;
@@ -33567,14 +33600,14 @@ export interface ScenariosNamespace {
    * spec raises rather than returning a falsy value, so
    * `if (validateScenarioSpec(s))` is not a validity check.
    * @returns nothing; failure is reported by throwing.
-   * @param jsonStr - Canonical JSON string to validate and re-serialize.
+   * @param jsonStr - Scenario specification JSON string to deserialize and validate.
    * @throws Error - Rejects malformed or schema-incompatible `json_str`, a blank scenario ID, multiple time-roll operations, invalid operation identifiers or numeric fields, or variant-specific operation violations.
    */
   validateScenarioSpec(jsonStr: JsonInput): void;
   /**
    * List all built-in template identifiers.
    *
-   * Returns a JSON array of template ID strings.
+   * Returns a JavaScript array of built-in template ID strings in registry order.
    * @returns Built-in scenario template identifiers.
    * @throws Error - Rejects if the embedded template registry cannot be parsed and validated, or if its template identifiers cannot be serialized to JavaScript.
    */
@@ -33667,7 +33700,7 @@ export interface ScenariosNamespace {
   /**
    * Apply a scenario to a market context only (no model mutations).
    *
-   * Returns the same envelope shape as [`apply_scenario`] minus `model`;
+   * Returns the same envelope shape as `applyScenario` minus `model`;
    * the same inventory, configuration and calendar rules apply.
    * @returns Mutated market after applying the scenario.
    * @param scenarioJson - JSON-serialized ScenarioSpec to validate and apply.

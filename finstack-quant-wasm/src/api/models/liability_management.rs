@@ -1,9 +1,11 @@
 //! WASM bindings for `finstack_quant_models::credit` liability management.
 //!
 //! Mirrors `finstack-quant-py/src/bindings/models/credit/liability_management.rs`.
-//! Structure labels are passed as strings and parsed with the canonical Rust
-//! [`FromStr`](core::str::FromStr) implementations, so JS callers may use the
-//! same market shorthand (`"par"`, `"omr"`, `"A&E"`) as Python. Results are
+//! Structure labels are the canonical snake_case wire values (`par_for_par`,
+//! `discount`, `uptier`, `downtier`; `open_market_repurchase`, `tender_offer`,
+//! `amend_and_extend`, `dropdown`), parsed with the Rust
+//! [`FromStr`](core::str::FromStr) implementations; any other label throws.
+//! Results are
 //! returned as plain JS objects with snake_case keys matching the serde
 //! representation of the Rust result types.
 

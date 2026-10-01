@@ -40,7 +40,7 @@ pub struct JsInflationCurve {
     pub(crate) inner: Arc<RustInflationCurve>,
 }
 
-/// Named constructor options for [`JsInflationCurve`]; unknown keys are rejected.
+/// Named constructor options for `InflationCurve`; unknown keys are rejected.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct InflationCurveOptions {
@@ -300,7 +300,7 @@ pub struct JsPriceCurve {
     pub(crate) inner: Arc<RustPriceCurve>,
 }
 
-/// Named constructor options for [`JsPriceCurve`]; unknown keys are rejected.
+/// Named constructor options for `PriceCurve`; unknown keys are rejected.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct PriceCurveOptions {

@@ -152,7 +152,7 @@ pub fn inverse_floater_coupon_profile(
 /// @param short_cms - Short-tenor CMS rate in decimal form.
 /// @param strike - CMS rate-spread strike in decimal form.
 /// @param is_call - Whether to value a call (`true`) or put (`false`).
-/// @param notional - Signed trade notional in the instrument's native currency units.
+/// @param notional - Non-negative trade notional in the instrument's native currency units.
 #[wasm_bindgen(js_name = cmsSpreadOptionIntrinsic)]
 pub fn cms_spread_option_intrinsic(
     long_cms: JsValue,

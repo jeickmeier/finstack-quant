@@ -64,7 +64,7 @@ pub fn validate_covenant_engine_json(engine_json: JsValue) -> Result<String, JsV
 ///
 /// @param engine_json - JSON-serialized covenant engine and its covenant definitions.
 /// @param metrics_json - JSON object of financial metrics referenced by the covenant engine.
-/// @param as_of - ISO-8601 date on which every covenant test is evaluated.
+/// @param as_of - ISO-8601 covenant test date; selects the active covenant window, applicable waivers, threshold-schedule step and cure-period state.
 ///
 /// # Errors
 ///
@@ -87,10 +87,11 @@ pub fn evaluate_engine(
 }
 
 /// Standard leveraged-buyout covenant package as JSON.
-/// @param initial_leverage - Maximum leverage ratio permitted at the initial test date.
+/// @param initial_leverage - Maximum debt-to-EBITDA threshold in turns (`5.0` = 5.0x), applied at every quarterly test date.
 /// @param interest_coverage - Minimum EBIT-to-interest coverage ratio in turns.
-/// @param fixed_charge_coverage - Minimum EBITDA-to-fixed-charges coverage ratio.
+/// @param fixed_charge_coverage - Minimum fixed-charge-coverage threshold in turns, tested against the caller-supplied `fixed_charge_coverage` metric.
 /// @param max_capex - Maximum annual capital expenditure amount in the caller's reporting currency.
+/// @returns Compact JSON array of `CovenantSpec` objects in serde field order (not key-sorted canonical form); wrap it as `{ "specs": [...] }` for `evaluateEngine` / `validateCovenantEngineJson`, or pass one element through `validateCovenantSpecJson` for canonical form.
 ///
 /// # Errors
 ///
@@ -120,6 +121,7 @@ pub fn lbo_standard_json(
 /// Covenant-lite package as JSON.
 /// @param max_leverage - Maximum total debt-to-EBITDA leverage ratio.
 /// @param max_senior_leverage - Maximum senior-debt-to-EBITDA leverage ratio.
+/// @returns Compact JSON array of `CovenantSpec` objects in serde field order (not key-sorted canonical form); wrap it as `{ "specs": [...] }` for `evaluateEngine` / `validateCovenantEngineJson`, or pass one element through `validateCovenantSpecJson` for canonical form.
 ///
 /// # Errors
 ///
@@ -140,6 +142,7 @@ pub fn cov_lite_json(
 /// @param min_dscr - Minimum debt-service coverage ratio.
 /// @param min_debt_yield - Minimum net-operating-income debt yield expressed as a decimal.
 /// @param max_ltv - Maximum loan-to-value ratio expressed as a decimal.
+/// @returns Compact JSON array of `CovenantSpec` objects in serde field order (not key-sorted canonical form); wrap it as `{ "specs": [...] }` for `evaluateEngine` / `validateCovenantEngineJson`, or pass one element through `validateCovenantSpecJson` for canonical form.
 ///
 /// # Errors
 ///
@@ -163,6 +166,7 @@ pub fn real_estate_json(
 /// @param distribution_lockup_dscr - DSCR threshold below which borrower distributions are locked up.
 /// @param min_liquidity - Minimum required liquidity reserve in the model's monetary units.
 /// @param max_net_leverage - Maximum net-debt-to-EBITDA leverage ratio.
+/// @returns Compact JSON array of `CovenantSpec` objects in serde field order (not key-sorted canonical form); wrap it as `{ "specs": [...] }` for `evaluateEngine` / `validateCovenantEngineJson`, or pass one element through `validateCovenantSpecJson` for canonical form.
 ///
 /// # Errors
 ///

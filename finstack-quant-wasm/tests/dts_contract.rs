@@ -291,7 +291,7 @@ fn periodic_returns_has_one_exact_frequency_param_description() {
 
     assert_eq!(docs.matches("@param frequency").count(), 1);
     assert!(docs.contains(
-        "@param frequency - Optional calendar frequency token: `\"daily\"`, `\"weekly\"`, `\"monthly\"`, `\"quarterly\"`, `\"semi_annual\"`, or `\"annual\"` (pandas offset aliases `D`/`B`, `W`, `M`, `Q`, `A`/`Y` are accepted too); defaults to `\"monthly\"`."
+        "@param frequency - Optional calendar frequency token: `\"daily\"`, `\"weekly\"`, `\"monthly\"`, `\"quarterly\"`, `\"semi_annual\"`, or `\"annual\"` (pandas offset aliases `D`/`B`, `W`, `M`/`ME`, `Q`/`QE`, `A`/`Y`/`YE` are accepted too); defaults to `\"monthly\"`."
     ));
 }
 
@@ -479,7 +479,7 @@ fn valuations_dts_exposes_direct_fx_instruments() {
     assert!(dts.contains("FxBarrierOption: FxInstrumentConstructor<FxBarrierOptionInstrument>;"));
     assert!(dts.contains("FxDigitalOption: FxInstrumentConstructor<FxDigitalOptionInstrument>;"));
     assert!(dts.contains("FxTouchOption: FxInstrumentConstructor<FxTouchOptionInstrument>;"));
-    assert!(dts.contains("QuantoOption: FxInstrumentConstructor<FxOptionInstrument>;"));
+    assert!(dts.contains("QuantoOption: FxInstrumentConstructor<QuantoOptionInstrument>;"));
     assert!(dts.contains("fx: FxNamespace;"));
     assert!(dts.contains(
         "foreignRho(marketJson: JsonInput, asOf: string, model?: string | null): number;"

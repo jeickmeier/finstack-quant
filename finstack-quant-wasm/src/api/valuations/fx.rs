@@ -279,7 +279,8 @@ macro_rules! fx_option_class {
             /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
             /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
             /// @returns Map of Greek name to value, with keys in the Rust
-            /// `STANDARD_OPTION_GREEKS` order (`delta`, `gamma`, `vega`, `theta`, `rho`, …).
+            /// `STANDARD_OPTION_GREEKS` order (`delta`, `gamma`, `vega`, `theta`, `rho`, …);
+            /// only the Greeks that apply to the instrument are present.
             ///
             /// # Errors
             ///
@@ -316,30 +317,40 @@ fx_class!(
 );
 
 macro_rules! fx_option_with_all_greeks {
-    ($rust_name:ident, $js_name:literal, $type_tag:literal, $rust_ty:ty, $instrument_type:ident) => {
+    ($rust_name:ident, $js_name:literal, $type_tag:literal, $rust_ty:ty, $instrument_type:ident, $theta_returns:literal) => {
         fx_option_class!(
             $rust_name, $js_name, $type_tag, $rust_ty, $instrument_type,
             [
-                (delta, "delta", "delta", "Spot delta of the option.", "@returns Spot delta: change in value per unit spot."),
-                (gamma, "gamma", "gamma", "Spot gamma of the option.", "@returns Spot gamma: change in delta per unit spot."),
-                (vega, "vega", "vega", "Vega of the option.", "@returns Vega: change in value per 1.0 absolute move in implied volatility."),
-                (theta, "theta", "theta", "Theta of the option.", "@returns Theta: change in value per year of calendar time."),
-                (rho, "rho", "rho", "Domestic rate rho of the option.", "@returns Domestic rho: change in value per 1.0 absolute move in the domestic rate."),
-                (foreign_rho, "foreignRho", "foreign_rho", "Foreign rate rho of the option.", "@returns Foreign rho: change in value per 1.0 absolute move in the foreign rate."),
-                (vanna, "vanna", "vanna", "Vanna of the option.", "@returns Vanna: cross sensitivity of delta to implied volatility."),
-                (volga, "volga", "volga", "Volga of the option.", "@returns Volga: change in vega per 1.0 absolute move in implied volatility."),
+                (delta, "delta", "delta", "Spot delta of the option.", "@returns Cash delta `dPV/dS`: PV change per unit move in the spot rate, including notional scaling."),
+                (gamma, "gamma", "gamma", "Spot gamma of the option.", "@returns Cash gamma `d²PV/dS²`: PV per unit-spot squared, including notional scaling."),
+                (vega, "vega", "vega", "Vega of the option.", "@returns Cash vega: PV change for a 1 vol-point (0.01 absolute) move in implied volatility."),
+                (theta, "theta", "theta", "Theta of the option.", $theta_returns),
+                (rho, "rho", "rho", "Domestic rate rho of the option.", "@returns Domestic rho: PV change for a 1bp (0.0001) move in the domestic discount rate."),
+                (foreign_rho, "foreignRho", "foreign_rho", "Foreign rate rho of the option.", "@returns Foreign rho: PV change for a 1bp (0.0001) move in the foreign discount rate."),
+                (vanna, "vanna", "vanna", "Vanna of the option.", "@returns Vanna `d²PV/(dS dσ)`: PV per unit spot per vol point (0.01 absolute vol)."),
+                (volga, "volga", "volga", "Volga of the option.", "@returns Volga `d²PV/dσ²`: PV per vol-point squared (0.01 absolute vol)."),
             ]
         );
     };
 }
 
-fx_option_with_all_greeks!(JsFxOption, "FxOption", "fx_option", fxi::FxOption, FxOption);
+// `FxOption` registers the model (analytic) theta; `QuantoOption` keeps the
+// universal theta-horizon P&L.
+fx_option_with_all_greeks!(
+    JsFxOption,
+    "FxOption",
+    "fx_option",
+    fxi::FxOption,
+    FxOption,
+    "@returns Model theta per day: annual analytic theta divided by the `metric_pricing_overrides.theta_day_basis` day count (default 365 calendar days); not annualized."
+);
 fx_option_with_all_greeks!(
     JsQuantoOption,
     "QuantoOption",
     "quanto_option",
     fxi::QuantoOption,
-    QuantoOption
+    QuantoOption,
+    "@returns Theta: P&L over the theta horizon (default one day, capped at expiry) with spot held at its `asOf` level, so a roll into the monitoring window observes that spot; not annualized."
 );
 fx_option_class!(
     JsFxDigitalOption,
@@ -353,35 +364,35 @@ fx_option_class!(
             "delta",
             "delta",
             "Spot delta of the option.",
-            "@returns Spot delta: change in value per unit spot."
+            "@returns Cash delta `dPV/dS`: PV change per unit move in the spot rate, including notional scaling."
         ),
         (
             gamma,
             "gamma",
             "gamma",
             "Spot gamma of the option.",
-            "@returns Spot gamma: change in delta per unit spot."
+            "@returns Cash gamma `d²PV/dS²`: PV per unit-spot squared, including notional scaling."
         ),
         (
             vega,
             "vega",
             "vega",
             "Vega of the option.",
-            "@returns Vega: change in value per 1.0 absolute move in implied volatility."
+            "@returns Cash vega: PV change for a 1 vol-point (0.01 absolute) move in implied volatility."
         ),
         (
             theta,
             "theta",
             "theta",
             "Theta of the option.",
-            "@returns Theta: change in value per year of calendar time."
+            "@returns Model theta per day on the `metric_pricing_overrides.theta_day_basis` day count (default 365 calendar days): analytic for cash-or-nothing payouts, a one-day finite-difference decay for asset-or-nothing; not annualized."
         ),
         (
             rho,
             "rho",
             "rho",
             "Domestic rate rho of the option.",
-            "@returns Domestic rho: change in value per 1.0 absolute move in the domestic rate."
+            "@returns Domestic rho: PV change for a 1bp (0.0001) move in the domestic discount rate."
         ),
     ]
 );
@@ -397,21 +408,21 @@ fx_option_class!(
             "delta",
             "delta",
             "Spot delta of the option.",
-            "@returns Spot delta: change in value per unit spot."
+            "@returns Cash delta `dPV/dS`: PV change per unit move in the spot rate, including notional scaling."
         ),
         (
             gamma,
             "gamma",
             "gamma",
             "Spot gamma of the option.",
-            "@returns Spot gamma: change in delta per unit spot."
+            "@returns Cash gamma `d²PV/dS²`: PV per unit-spot squared, including notional scaling."
         ),
         (
             vega,
             "vega",
             "vega",
             "Vega of the option.",
-            "@returns Vega: change in value per 1.0 absolute move in implied volatility."
+            "@returns Cash vega: PV change for a 1 vol-point (0.01 absolute) move in implied volatility."
         ),
         (
             theta,
@@ -425,7 +436,7 @@ fx_option_class!(
             "rho",
             "rho",
             "Domestic rate rho of the option.",
-            "@returns Domestic rho: change in value per 1.0 absolute move in the domestic rate."
+            "@returns Domestic rho: PV change for a 1bp (0.0001) move in the domestic discount rate."
         ),
     ]
 );
@@ -441,21 +452,21 @@ fx_option_class!(
             "delta",
             "delta",
             "Spot delta of the option.",
-            "@returns Spot delta: change in value per unit spot."
+            "@returns Cash delta `dPV/dS`: PV change per unit move in the spot rate, including notional scaling."
         ),
         (
             gamma,
             "gamma",
             "gamma",
             "Spot gamma of the option.",
-            "@returns Spot gamma: change in delta per unit spot."
+            "@returns Cash gamma `d²PV/dS²`: PV per unit-spot squared, including notional scaling."
         ),
         (
             vega,
             "vega",
             "vega",
             "Vega of the option.",
-            "@returns Vega: change in value per 1.0 absolute move in implied volatility."
+            "@returns Cash vega: PV change for a 1 vol-point (0.01 absolute) move in implied volatility."
         ),
         (
             theta,
@@ -469,21 +480,21 @@ fx_option_class!(
             "rho",
             "rho",
             "Domestic rate rho of the option.",
-            "@returns Domestic rho: change in value per 1.0 absolute move in the domestic rate."
+            "@returns Domestic rho: PV change for a 1bp (0.0001) move in the domestic discount rate."
         ),
         (
             vanna,
             "vanna",
             "vanna",
             "Vanna of the option.",
-            "@returns Vanna: cross sensitivity of delta to implied volatility."
+            "@returns Vanna `d²PV/(dS dσ)`: PV per unit spot per vol point (0.01 absolute vol)."
         ),
         (
             volga,
             "volga",
             "volga",
             "Volga of the option.",
-            "@returns Volga: change in vega per 1.0 absolute move in implied volatility."
+            "@returns Volga `d²PV/dσ²`: PV per vol-point squared (0.01 absolute vol)."
         ),
     ]
 );

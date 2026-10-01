@@ -84,10 +84,11 @@ fn build_cashflow_schedule_json(
 /// --------
 /// >>> from finstack_quant.cashflows import build_cashflow_schedule
 /// >>> spec = {
-/// ...     "notional": {"initial": {"amount": 1000000.0, "currency": "USD"}, "amort": "none"},
+/// ...     "notional": {"initial": {"amount": "1000000", "currency": "USD"}, "amort": "none"},
 /// ...     "issue_date": "2025-01-15", "maturity": "2026-01-15",
-/// ...     "coupon_program": [{"kind": "fixed", "rate": "0.05", "coupon_type": "cash",
-/// ...         "frequency": "6M", "day_count": "30/360", "calendar_id": "weekends_only"}],
+/// ...     "coupon_program": [{"kind": "fixed", "spec": {"rate": "0.05",
+/// ...         "frequency": {"count": 6, "unit": "months"}, "day_count": "30_360",
+/// ...         "calendar_id": "weekends_only"}}],
 /// ... }
 /// >>> build_cashflow_schedule(spec).get_flows()[0].kind.name
 /// 'notional'

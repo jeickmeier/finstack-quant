@@ -552,10 +552,15 @@ def compose_scenarios(specs: list[ScenarioSpec]) -> ScenarioSpec:
     """
     Merge multiple scenario specs using the scenario engine composer.
 
+    Specs are stably sorted by ascending ``priority`` (equal priorities keep
+    input order) and their operations concatenated in that order. Every input
+    must use the same ``hazard_bump_mode``.
+
     Parameters
     ----------
     specs : list[ScenarioSpec]
-        Typed scenario specifications to compose.
+        Typed scenario specifications to compose; execution order is determined
+        by each spec's ``priority``, not by list position.
 
     Returns
     -------

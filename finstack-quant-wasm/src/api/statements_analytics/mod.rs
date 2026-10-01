@@ -647,11 +647,13 @@ pub fn run_checks(
 /// # Errors
 ///
 /// Rejects malformed model, mapping, or supplied result JSON; model-evaluation
-/// failures when results are omitted; missing mapped nodes, incompatible data,
-/// or invalid check configuration; or failure to convert the report to JavaScript.
+/// failures when results are omitted; incompatible data or invalid check
+/// configuration; or failure to convert the report to JavaScript. A mapped node
+/// that is missing from the model does not throw: its check is skipped or
+/// reported as a finding.
 /// @returns Structured three-statement check report with results and aggregate summary.
 /// @param model_json - Financial-model specification JSON.
-/// @param mapping_json - Node-mapping JSON from statement nodes to check inputs.
+/// @param mapping_json - `ThreeStatementMapping` (object or JSON) naming the model nodes that feed each check.
 /// @param results_json - Evaluated statement-result JSON.
 #[wasm_bindgen(js_name = runThreeStatementChecks)]
 pub fn run_three_statement_checks(
@@ -678,11 +680,13 @@ pub fn run_three_statement_checks(
 /// # Errors
 ///
 /// Rejects malformed model, mapping, or supplied result JSON; model-evaluation
-/// failures when results are omitted; missing mapped nodes, incompatible data,
-/// or invalid check configuration; or failure to convert the report to JavaScript.
+/// failures when results are omitted; incompatible data or invalid check
+/// configuration; or failure to convert the report to JavaScript. A mapped node
+/// that is missing from the model does not throw: its check is skipped or
+/// reported as a finding.
 /// @returns Structured credit-underwriting check report with results and aggregate summary.
 /// @param model_json - Financial-model specification JSON.
-/// @param mapping_json - Node-mapping JSON from statement nodes to check inputs.
+/// @param mapping_json - `CreditMapping` (object or JSON) naming the debt, EBITDA and interest nodes plus the optional warning bands (`leverage_warn` is a `(min, max)` band in turns).
 /// @param results_json - Evaluated statement-result JSON.
 #[wasm_bindgen(js_name = runCreditUnderwritingChecks)]
 pub fn run_credit_underwriting_checks(

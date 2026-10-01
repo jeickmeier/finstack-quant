@@ -71,7 +71,7 @@ pub struct JsDiscountCurve {
     pub(crate) inner: Arc<RustDiscountCurve>,
 }
 
-/// Named constructor options for [`JsDiscountCurve`]; unknown keys are rejected.
+/// Named constructor options for `DiscountCurve`; unknown keys are rejected.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct DiscountCurveOptions {
@@ -553,7 +553,7 @@ pub struct JsHazardCurve {
     pub(crate) inner: Arc<RustHazardCurve>,
 }
 
-/// Named constructor options for [`JsHazardCurve`]; unknown keys are rejected.
+/// Named constructor options for `HazardCurve`; unknown keys are rejected.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct HazardCurveOptions {

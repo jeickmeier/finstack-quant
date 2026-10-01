@@ -28,8 +28,8 @@ struct PanelInputs {
 }
 
 /// Parse a frequency token (`daily`, `weekly`, `monthly`, `quarterly`,
-/// `semi_annual`, `annual` or a pandas offset alias `D`/`B`, `W`, `M`, `Q`,
-/// `A`/`Y`); the descriptive error comes from core.
+/// `semi_annual`/`semiannual`, `annual` or a pandas offset alias `D`/`B`, `W`,
+/// `M`/`ME`, `Q`/`QE`, `A`/`Y`/`YE`); the descriptive error comes from core.
 /// An omitted token resolves to `default`, a Rust-owned constant.
 fn parse_frequency(frequency: Option<&str>, default: PeriodKind) -> Result<PeriodKind, JsValue> {
     frequency
@@ -519,7 +519,8 @@ impl JsPerformance {
     /// @returns Per-ticker longest drawdown duration in calendar days, as a JavaScript number array.
     #[wasm_bindgen(js_name = maxDrawdownDuration)]
     pub fn max_drawdown_duration(&self) -> Result<JsValue, JsValue> {
-        // `usize` does not fit a typed array; keep the serde path.
+        // `i64` day counts do not fit a `Float64Array` contract; they cross as a
+        // plain JS number array through the serde path.
         to_js(&self.inner.max_drawdown_duration())
     }
 
@@ -874,7 +875,7 @@ impl JsPerformance {
     ///
     /// * `frequency` - Optional calendar frequency token: `"daily"`,
     ///   `"weekly"`, `"monthly"`, `"quarterly"`, `"semi_annual"`, or
-    ///   `"annual"` (pandas offset aliases `D`/`B`, `W`, `M`, `Q`, `A`/`Y` are accepted too); defaults to `"monthly"`.
+    ///   `"annual"` (pandas offset aliases `D`/`B`, `W`, `M`/`ME`, `Q`/`QE`, `A`/`Y`/`YE` are accepted too); defaults to `"monthly"`.
     ///
     /// # Errors
     ///
@@ -920,7 +921,6 @@ impl JsPerformance {
     ///
     /// Rejects the same degenerate-pair conditions as `correlationMatrix`.
     /// @returns `true` when the estimate was projected to the nearest correlation matrix.
-    /// @throws Error - Rejects when a ticker pair is degenerate or Higham repair fails.
     #[wasm_bindgen(js_name = correlationMatrixRepaired)]
     pub fn correlation_matrix_repaired(&self) -> Result<bool, JsValue> {
         self.inner
@@ -1223,9 +1223,6 @@ impl JsPerformance {
     /// Rejects an invalid ISO `ref_date`, a fiscal month outside `1..=12`, a
     /// fiscal day outside `1..=31`, or a result that cannot be serialized to
     /// JavaScript.
-    /// @param ref_date - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end.
-    /// @param fiscal_year_start_month - Optional fiscal-year start month from 1 through 12; defaults to January.
-    /// @param fiscal_year_start_day - Optional fiscal-year start day; defaults to the first day.
     /// @returns Per-ticker `{ mtd, qtd, ytd, fytd }` numeric arrays of lookback returns as decimal fractions; `fytd` is never null.
     #[wasm_bindgen(js_name = lookbackReturns)]
     pub fn lookback_returns(

@@ -228,7 +228,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 + **Python:** `finstack_quant.scenarios` — `ScenarioSpec`, `TemplateMetadata`,
   `OperationSpec`, `CurveKind`, `TimeRollMode`, `TenorMatchMode`, `Compounding`, `RateBindingSpec`,
   `apply_scenario`, `apply_scenario_to_market`, `compose_scenarios`,
-  `validate_scenario_spec`, `parse_scenario_spec`, `build_scenario_spec`,
+  `validate_scenario_spec` (build a spec with `ScenarioSpec(...)` or
+  `ScenarioSpec.from_json(...)`),
   `compute_horizon_return`, the template helpers, and
   `finstack_quant.scenarios.schema`.
 + **WASM:** the `scenarios` namespace from `finstack-quant-wasm/index.js`

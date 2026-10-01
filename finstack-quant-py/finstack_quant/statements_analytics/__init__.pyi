@@ -4356,7 +4356,9 @@ class CreditMapping:
     cash_burn_node : str | None
         Cash-burn node (liquidity runway).
     leverage_warn : tuple[float, float] | None
-        ``(warn, error)`` debt/EBITDA thresholds in turns.
+        ``(min, max)`` debt/EBITDA warning band in turns; leverage outside it
+        warns. The error band is fixed at ``(0, 10)``. ``None`` uses the
+        Rust default ``(0.0, 6.0)``.
     coverage_min_warn : float | None
         Minimum EBITDA/interest coverage in turns before a warning.
 
@@ -4452,14 +4454,14 @@ class CreditMapping:
     @property
     def leverage_warn(self) -> tuple[float, float] | None:
         """
-        ``(warn, error)`` leverage thresholds in turns, or ``None``.
+        ``(min, max)`` leverage warning band in turns, or ``None``.
 
         This property does not raise.
 
         Returns
         -------
         tuple[float, float] | None
-            ``(warn, error)`` leverage thresholds in turns, or ``None``.
+            ``(min, max)`` leverage warning band in turns, or ``None``.
         """
     @property
     def coverage_min_warn(self) -> float | None:
@@ -11089,7 +11091,9 @@ def run_credit_underwriting_checks(model: Any, mapping: Any, results: Any | None
     ValueError
         If the mapping is malformed or the evaluation fails.
     KeyError
-        If a mapped node is missing from the model.
+        If ``results`` is omitted and a model formula references a node that
+        does not exist. A mapped node that is missing from the model does not
+        raise: its check is skipped or reported as a finding.
 
     Examples
     --------
@@ -11159,7 +11163,9 @@ def run_three_statement_checks(model: Any, mapping: Any, results: Any | None = N
     ValueError
         If the mapping is malformed or the evaluation fails.
     KeyError
-        If a mapped node is missing from the model.
+        If ``results`` is omitted and a model formula references a node that
+        does not exist. A mapped node that is missing from the model does not
+        raise: its check is skipped or reported as a finding.
 
     Examples
     --------
