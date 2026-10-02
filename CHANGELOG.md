@@ -2,28 +2,6 @@
 
 ## [Unreleased]
 
-### Rates and credit audit fixes (2026-09-30)
-
-#### Changed (BREAKING — numbers move)
-
-- Hull-White 1F Monte Carlo now follows log-linear and linear discount curves. The θ(t) fit (`calibrate_theta_from_curve`, `calibrate_theta_from_curve_with_piecewise_sigma`, `prepare_hw1f_params`) matches the curve-implied short-rate mean at every θ boundary from forward levels; the previous slope-based fit missed the forward jump at each curve pillar. Bermudan swaption LSMC, TARN, snowball, callable range accrual, MBS Monte Carlo OAS and revolver rate paths reprice on those curves (a 10MM 5Y Bermudan payer LSMC moves from 2.82MM to 0.25MM, in line with the tree). Monotone-convex curves move by a fraction of a basis point.
-- TARN, snowball and callable range accrual simulate on the ACT/365F model clock. Fixing, call and payment times used the coupon day count, so an Act/360 note was discounted about 1.4% too far out.
-- A callable range accrual call pays the call price plus the range coupon accrued to the call date. The call previously forfeited the whole coupon, so a note callable on its final date priced as a zero-coupon bond. Call dates after the final payment date are rejected.
-- IRS `dv01` is a full revaluation: a quote shock and re-bootstrap when the curves carry calibration metadata, a parallel fitted-curve bump otherwise. The closed form it replaces moved the swap's own par rate by a full basis point and overstated a seasoned swap's DV01 (5.6× with two months left). Unseasoned swaps are unchanged.
-- Zero-coupon inflation swap 1/1 fixed leg counts a short first period as its share of a year. Any stub previously counted as a full year (a 5-year-and-one-day swap compounded for six years).
-- Par-yield cash-settled swaption annuity discounts each accrual of the fixed leg's own schedule at the swap rate and settles on the swap effective date. It used the leg's year fraction as a period count and discounted to expiry.
-
-#### Fixed
-
-- A Bermudan swaption valued on an exercise date keeps that day's exercise right (tree, LSMC and LMM); it previously dropped to the value of the later dates, zero on the last one.
-- Cap/floor `forward_pv01` shifts the projection curve in place, keeping its interpolation, and reprices with the selected model. It rebuilt the curve with default interpolation and always repriced with Black.
-- CMS option `delta`, `vega`, `rho` and `volga` reprice with the selected model; under static replication they differenced a Hagan price against a replication base.
-- CDS tranches price on steep base-correlation skews. A negative tranchelet loss before maturity is a time-interpolation artefact and is floored at zero; arbitrage at the tranche maturity is still an error.
-
-#### Added
-
-- `fx_delta`, `fx01` and per-curve `pv01::{curve}` for cross-currency swaps.
-
 ### Release gate fixes (2026-10-01)
 
 #### Fixed
@@ -476,6 +454,28 @@
 
 - `attributePnlEnvelope` (WASM) and `attribute_pnl_envelope` / `AttributionResultEnvelope` (Python) return the attribution envelope as a typed value.
 - Rust: `validate::parse_envelope` (public), `validate::validate_fail_fast`, `CalibrationPlan::DEFAULT_ID`, `SolverConfig::validate`, `HashMapMetricSource::from_json`, `cashflows::dated_flows`, and `features::{datetime_order_key, naive_datetime_order_key}`.
+
+### Rates and credit audit fixes (2026-09-30)
+
+#### Changed (BREAKING — numbers move)
+
+- Hull-White 1F Monte Carlo now follows log-linear and linear discount curves. The θ(t) fit (`calibrate_theta_from_curve`, `calibrate_theta_from_curve_with_piecewise_sigma`, `prepare_hw1f_params`) matches the curve-implied short-rate mean at every θ boundary from forward levels; the previous slope-based fit missed the forward jump at each curve pillar. Bermudan swaption LSMC, TARN, snowball, callable range accrual, MBS Monte Carlo OAS and revolver rate paths reprice on those curves (a 10MM 5Y Bermudan payer LSMC moves from 2.82MM to 0.25MM, in line with the tree). Monotone-convex curves move by a fraction of a basis point.
+- TARN, snowball and callable range accrual simulate on the ACT/365F model clock. Fixing, call and payment times used the coupon day count, so an Act/360 note was discounted about 1.4% too far out.
+- A callable range accrual call pays the call price plus the range coupon accrued to the call date. The call previously forfeited the whole coupon, so a note callable on its final date priced as a zero-coupon bond. Call dates after the final payment date are rejected.
+- IRS `dv01` is a full revaluation: a quote shock and re-bootstrap when the curves carry calibration metadata, a parallel fitted-curve bump otherwise. The closed form it replaces moved the swap's own par rate by a full basis point and overstated a seasoned swap's DV01 (5.6× with two months left). Unseasoned swaps are unchanged.
+- Zero-coupon inflation swap 1/1 fixed leg counts a short first period as its share of a year. Any stub previously counted as a full year (a 5-year-and-one-day swap compounded for six years).
+- Par-yield cash-settled swaption annuity discounts each accrual of the fixed leg's own schedule at the swap rate and settles on the swap effective date. It used the leg's year fraction as a period count and discounted to expiry.
+
+#### Fixed
+
+- A Bermudan swaption valued on an exercise date keeps that day's exercise right (tree, LSMC and LMM); it previously dropped to the value of the later dates, zero on the last one.
+- Cap/floor `forward_pv01` shifts the projection curve in place, keeping its interpolation, and reprices with the selected model. It rebuilt the curve with default interpolation and always repriced with Black.
+- CMS option `delta`, `vega`, `rho` and `volga` reprice with the selected model; under static replication they differenced a Hagan price against a replication base.
+- CDS tranches price on steep base-correlation skews. A negative tranchelet loss before maturity is a time-interpolation artefact and is floored at zero; arbitrage at the tranche maturity is still an error.
+
+#### Added
+
+- `fx_delta`, `fx01` and per-curve `pv01::{curve}` for cross-currency swaps.
 
 ### WASM binding audit: models credit, factor, correlation and liquidity (2026-09-29)
 

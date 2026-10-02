@@ -1028,6 +1028,15 @@ mod tests {
         )
         .expect("term forward");
         let notional = inst.range_accrual.notional.amount();
+        // The call pays the coupon accrued to the call date: one of the three
+        // observations has been made, and it is in range.
+        let accrued = notional
+            * inst.range_accrual.coupon_rate
+            * inst
+                .range_accrual
+                .accrual_year_fraction()
+                .expect("accrual factor")
+            / 3.0;
         let mut deterministic_prices = [0.0; 2];
         for (slot, percent_of_par) in deterministic_prices.iter_mut().zip([100.0, 102.0]) {
             inst.call_provision.price_pct_of_par = percent_of_par;
@@ -1038,10 +1047,17 @@ mod tests {
                 .amount();
             let expected = notional * percent_of_par / 100.0 * call_df;
             // Keep the original end-to-end PV budget. This rejects redemption
-            // at maturity without treating positive-sigma MC as exact.
-            assert!((mc_price - expected).abs() < 1.0);
+            // at maturity without treating positive-sigma MC as exact. The
+            // called note also pays the coupon accrued to the call date.
+            let expected_called = expected + accrued * call_df;
+            assert!(
+                (mc_price - expected_called).abs() < 1.0,
+                "called note {mc_price} should be worth the call price plus accrued \
+                 at the call date {expected_called}"
+            );
 
-            // Isolate redemption units and scheduled payment timing from MC:
+            // Isolate redemption units and scheduled payment timing from MC
+            // (a fresh payoff has seen no observation, so no coupon is accrued):
             // evaluate the production schedule/payoff on an exact flat-rate
             // bank account, with no random draws or fitted theta involved.
             let schedule =
@@ -1078,6 +1094,56 @@ mod tests {
             (deterministic_prices[1] - deterministic_prices[0] - expected_premium).abs() < 1e-6,
             "redemption premium {}, expected {expected_premium}",
             deterministic_prices[1] - deterministic_prices[0]
+        );
+    }
+
+    /// A call on the final payment date changes nothing: the holder receives
+    /// par and the whole range coupon either way. A call that forfeited the
+    /// coupon would price this note as a zero-coupon bond.
+    #[test]
+    fn call_on_the_final_payment_date_matches_the_noncallable_note() {
+        let as_of = date(2025, Month::January, 1);
+        let curves = market(as_of, 0.02, 0.03);
+        let final_date = date(2026, Month::July, 1);
+        let callable = test_callable(vec![final_date], None, 0.06);
+        let bullet = test_callable(vec![final_date], Some(date(2030, Month::January, 1)), 0.06);
+
+        let price = |inst: &CallableRangeAccrual| {
+            deterministic_pricer(8)
+                .price_estimate(inst, &curves, as_of)
+                .expect("price")
+                .mean
+                .amount()
+        };
+        let (callable_pv, bullet_pv) = (price(&callable), price(&bullet));
+        assert!(
+            (callable_pv - bullet_pv).abs() < 1e-6,
+            "callable at the final date {callable_pv} should equal the bullet {bullet_pv}"
+        );
+        let zero_coupon = callable.range_accrual.notional.amount()
+            * curves
+                .get_discount("USD-OIS")
+                .expect("discount")
+                .df_between_dates(as_of, final_date)
+                .expect("df");
+        assert!(
+            callable_pv > zero_coupon + 50_000.0,
+            "the coupon must not be forfeited: {callable_pv} vs zero-coupon {zero_coupon}"
+        );
+    }
+
+    #[test]
+    fn call_date_after_the_final_payment_is_rejected() {
+        let as_of = date(2025, Month::January, 1);
+        let curves = market(as_of, 0.02, 0.03);
+        let inst = test_callable(vec![date(2027, Month::January, 1)], None, 0.06);
+
+        let error = deterministic_pricer(4)
+            .price_estimate(&inst, &curves, as_of)
+            .expect_err("a call after redemption is not a valid contract");
+        assert!(
+            error.to_string().contains("after the final payment date"),
+            "unexpected error: {error}"
         );
     }
 
