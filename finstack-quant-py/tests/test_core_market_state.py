@@ -79,7 +79,7 @@ def test_from_json_requires_an_explicit_supported_schema_version() -> None:
     del unversioned["schema_version"]
     for state, code in (
         (unversioned, "contract/version-missing"),
-        ({**unversioned, "schema_version": 2}, "contract/version-unsupported"),
+        (dict(unversioned, schema_version=2), "contract/version-unsupported"),
     ):
         with pytest.raises(ContractValidationError) as excinfo:
             MarketContext.from_json(json.dumps(state))
