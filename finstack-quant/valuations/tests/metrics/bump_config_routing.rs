@@ -767,9 +767,16 @@ fn lookback_rho_honours_rate_bump() {
         MetricId::Rho,
         PricingOptions::default(),
     );
-    // The log-CDF reflection formula changes the last bits of the old direct
-    // product formula. Retain an exact pin for the current stable calculation.
-    assert_pins(&[("lookback rho", default_rho, 0x3f72bd0500ee2000)]);
+    // The log-CDF reflection is stable on one libm and not bit-identical
+    // across libm implementations. macOS pins `0x3f72bd0500ee2000`; the
+    // Linux libm on GitHub Actions pins `0x3f72bd0500ee5000` (12,288 ulps,
+    // about 2e-12 relative). A third pattern means the default rho moved.
+    let bits = default_rho.to_bits();
+    const LOOKBACK_RHO_BITS: [u64; 2] = [0x3f72bd0500ee2000, 0x3f72bd0500ee5000];
+    assert!(
+        LOOKBACK_RHO_BITS.contains(&bits),
+        "default outputs moved:\nlookback rho: got {default_rho} (0x{bits:016x})"
+    );
     let default_ref =
         pv(&opt, &bump_rate(&market, "USD-OIS", 1.0), as_of) - pv(&opt, &market, as_of);
     assert_rel(
