@@ -571,11 +571,11 @@
       },
       "reference": {
         "baseline": {
-          "amount": "911324.640753023",
+          "amount": "931476.795406835",
           "currency": "USD"
         },
         "edited": {
-          "amount": "1002457.104828326",
+          "amount": "1024624.474947518",
           "currency": "USD"
         }
       }
@@ -2657,11 +2657,11 @@
       },
       "reference": {
         "baseline": {
-          "amount": "994168.445763835",
+          "amount": "1000019.046674638",
           "currency": "USD"
         },
         "edited": {
-          "amount": "1093585.290340219",
+          "amount": "1100020.951342102",
           "currency": "USD"
         }
       }
@@ -2792,11 +2792,11 @@
       },
       "reference": {
         "baseline": {
-          "amount": "879899.872684117",
+          "amount": "885144.104968204",
           "currency": "USD"
         },
         "edited": {
-          "amount": "967889.859952529",
+          "amount": "973658.515465024",
           "currency": "USD"
         }
       }
