@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-02
+
 ### Carry and breakeven across coupon fixings (2026-10-01)
 
 #### Fixed

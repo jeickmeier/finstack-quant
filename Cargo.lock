@@ -972,8 +972,6 @@ dependencies = [
  "nalgebra",
  "numpy",
  "pyo3",
- "rand 0.9.5",
- "rand_pcg",
  "rust_decimal",
  "serde",
  "serde_json",
