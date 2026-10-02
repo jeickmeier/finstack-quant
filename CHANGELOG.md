@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Carry and breakeven across coupon fixings (2026-10-01)
+
+#### Fixed
+
+- Carry decomposition (`carry_total` and its components) and iterative `breakeven` no longer fail when the horizon crosses a coupon fixing the market has not published. Their horizon reprices now hold each crossed `FIXING:*` observation at its as-of projection, as theta does. Carry decomposition keeps its unrolled curves. Iterative breakeven applies each bump on top of the fixings-held market, so crossed fixings stay at their unbumped as-of projections in the base and bumped reprices.
+
+#### Known gaps
+
+- Theta at 1M and 6M still fails for caps/floors, structured credit and equity/FX variance swaps when the roll crosses an unpublished fixing or price observation. `valuations/tests/golden/theta_horizons.rs` runs theta at 1D, 1M and 6M for every pricing golden and registry example and lists each remaining failure with its reason.
+
 ### Release gate fixes (2026-10-01)
 
 #### Fixed

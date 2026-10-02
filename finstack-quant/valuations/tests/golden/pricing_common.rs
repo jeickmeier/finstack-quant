@@ -53,7 +53,7 @@ pub(crate) fn requested_metrics(fixture: &GoldenFixture) -> Vec<String> {
     metrics
 }
 
-fn resolve_market(market: &Market) -> Result<MarketContext, String> {
+pub(crate) fn resolve_market(market: &Market) -> Result<MarketContext, String> {
     match market {
         Market::Snapshot { data } => serde_json::from_value::<MarketContext>(data.clone())
             .map_err(|err| format!("parse market snapshot: {err}")),

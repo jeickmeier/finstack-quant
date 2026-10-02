@@ -11,6 +11,15 @@
 //! the yield it vanishes. The accretion inverts the same discounting
 //! convention the instrument's `Ytm` metric was solved under (Street
 //! compounding for bonds).
+//!
+//! # Market-Held Fixings
+//!
+//! The horizon PV is repriced on the unrolled curves with every coupon fixing
+//! the as-of schedule projected in `[as_of, horizon]` added as an exact-date
+//! `FIXING:` observation at its as-of projection, as theta does (see
+//! [`theta`](crate::metrics::sensitivities::theta), "Market Held Fixed").
+//! Floating-rate bonds and OIS/term swaps whose horizon crosses a fixing
+//! therefore reprice instead of failing on the unpublished fixing.
 
 use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
     df_from_yield, YieldCompounding,
@@ -57,9 +66,10 @@ impl MetricCalculator for CarryDecompositionCalculator {
         let coupon_income = cash.income.amount();
         let principal_cash = cash.total.checked_sub(cash.income)?.amount();
 
-        let curved_pv = context
-            .reprice_money(context.curves.as_ref(), rolled_date)?
-            .amount();
+        // Unrolled curves, with coupon fixings crossed by the horizon held at
+        // their as-of projections (module docs, "Market-Held Fixings").
+        let held_market = context.fixings_held_market(rolled_date)?;
+        let curved_pv = context.reprice_money(&held_market, rolled_date)?.amount();
         let total_pv_change = curved_pv - base_pv;
 
         // `degenerate` is set when the pull-to-par / roll-down split cannot be

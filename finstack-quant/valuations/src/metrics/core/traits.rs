@@ -593,6 +593,40 @@ impl MetricContext {
             .ok_or_else(|| finstack_quant_core::InputError::Invalid.into())
     }
 
+    /// The context market with every coupon fixing the canonical schedule
+    /// projected in `[as_of, horizon]` added as an exact-date `FIXING:`
+    /// observation at its as-of projection, for repricing at `horizon` with
+    /// the market held fixed.
+    ///
+    /// Existing observations keep priority and the context market is
+    /// unchanged. Theta rolls the returned market's curves; carry
+    /// decomposition and iterative breakeven reprice on it unrolled.
+    ///
+    /// # Arguments
+    ///
+    /// * `horizon` - Date the caller reprices at, on or after `as_of`. An
+    ///   equal date returns the market unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the schedule cannot be built or a crossed
+    /// fixing has no finite as-of projection (see
+    /// `finstack_quant_cashflows::fixings::materialize_fixings`).
+    pub(crate) fn fixings_held_market(
+        &self,
+        horizon: Date,
+    ) -> finstack_quant_core::Result<MarketContext> {
+        let schedule = self
+            .instrument
+            .cashflow_schedule(&self.curves, self.as_of)?;
+        finstack_quant_cashflows::fixings::materialize_fixings(
+            &self.curves,
+            [&schedule],
+            self.as_of,
+            horizon,
+        )
+    }
+
     /// Downcast the instrument to a specific concrete type.
     ///
     /// # Returns

@@ -401,16 +401,9 @@ fn compute_theta_breakdown(context: &mut crate::metrics::MetricContext) -> Resul
     let horizon_days = (rolled_date - context.as_of).whole_days();
     // Coupon fixings the roll crosses are projected from the pre-roll schedule
     // and written into the market before its curves roll.
-    let schedule = context
-        .instrument
-        .cashflow_schedule(&context.curves, context.as_of)?;
-    let projected_market = finstack_quant_cashflows::fixings::materialize_fixings(
-        &context.curves,
-        [&schedule],
-        context.as_of,
-        rolled_date,
-    )?;
-    let rolled_market = projected_market.roll_forward(horizon_days)?;
+    let rolled_market = context
+        .fixings_held_market(rolled_date)?
+        .roll_forward(horizon_days)?;
     // Spot is held at its as-of level, so the observation state over the roll
     // is the one that spot implies (`Instrument::theta_observed_state`).
     let observed =

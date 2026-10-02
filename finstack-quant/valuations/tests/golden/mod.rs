@@ -8,5 +8,6 @@ mod pricing;
 mod pricing_common;
 mod runner;
 mod schema;
+mod theta_horizons;
 mod tolerance;
 mod walk;
