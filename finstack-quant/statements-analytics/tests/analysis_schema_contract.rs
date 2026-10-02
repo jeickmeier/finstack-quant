@@ -60,10 +60,7 @@ fn forecast_metrics_with_undefined_mape_validate() {
     // A zero actual leaves MAPE without an effective observation.
     let metrics = backtest_forecast(&[0.0, 0.0], &[1.0, 2.0]).expect("metrics");
     let wire = serde_json::to_value(&metrics).expect("serialize");
-    assert!(
-        wire["mape"].is_string(),
-        "undefined MAPE is a sentinel: {wire}"
-    );
+    assert!(wire["mape"].is_null(), "undefined MAPE is null: {wire}");
     assert_wire_matches_schema("ForecastMetrics", &metrics);
 }
 

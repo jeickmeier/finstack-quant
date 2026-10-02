@@ -27,7 +27,9 @@ fn calibration_engine_rejects_invalid_solver_controls_before_execution() {
         });
         let error =
             calibrate_from_json(&envelope.to_string()).expect_err("invalid solver controls");
-        assert_eq!(error.details().stage, ExecutionStage::Configuration);
+        // `SolverConfig` validates while deserializing, so invalid controls
+        // are rejected at ingestion, before the configuration stage.
+        assert_eq!(error.details().stage, ExecutionStage::Ingestion);
     }
 }
 
