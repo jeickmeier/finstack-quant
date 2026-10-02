@@ -1962,9 +1962,6 @@ constants_on = "core.Currency"
 js = "core"
 types = { CalendarMetadata = "CalendarMetadata", Period = "Period", PeriodPlan = "PeriodPlan" }
 
-[parity.modules."finstack_quant.core.market_data"]
-js = "core"
-
 [parity.modules."finstack_quant.core.market_data.context"]
 js = "core"
 
@@ -2229,6 +2226,7 @@ defaultModelSpecTiming = "twin of Python DefaultModelSpec.timing (Rust DefaultMo
 defaultModelSpecValidate = "twin of Python DefaultModelSpec.validate (Rust DefaultModelSpec::validate); recorded as a member rename of finstack_quant.cashflows.builder.DefaultModelSpec"
 defaultModelSpecVector = "twin of Python DefaultModelSpec.vector (Rust DefaultModelSpec::vector); recorded as a member rename of finstack_quant.cashflows.builder.DefaultModelSpec"
 exCouponRuleExDate = "twin of Python ExCouponRule.ex_date (Rust ExCouponRule::ex_date); recorded as a member rename of finstack_quant.cashflows.accrual.ExCouponRule"
+exCouponRuleIsExCoupon = "twin of Python ExCouponRule.is_ex_coupon (Rust ExCouponRule::is_ex_coupon); recorded as a member rename of finstack_quant.cashflows.accrual.ExCouponRule"
 feeBaseUndrawn = "twin of Python FeeBase.undrawn (Rust FeeBase::Undrawn); recorded as a member rename of finstack_quant.cashflows.builder.FeeBase"
 feeSpecFixed = "twin of Python FeeSpec.fixed (Rust FeeSpec::Fixed); recorded as a member rename of finstack_quant.cashflows.builder.FeeSpec"
 feeSpecPeriodicBp = "twin of Python FeeSpec.periodic_bp (Rust FeeSpec::PeriodicBp); recorded as a member rename of finstack_quant.cashflows.builder.FeeSpec"
@@ -2511,6 +2509,7 @@ adjustmentWithCategory = "free-function twin of Python Adjustment.with_category 
 normalizationConfigAddAdjustment = "free-function twin of Python NormalizationConfig.add_adjustment (WASM data types are plain objects)"
 validateNormalizationConfigJson = "free-function twin of Python NormalizationConfig.validate (WASM data types are plain objects)"
 checkSuiteSpecBuiltinCheckNames = "free-function twin of Python CheckSuiteSpec.builtin_check_names (WASM data types are plain objects)"
+checkConfigValidate = "free-function twin of Python CheckConfig.validate (WASM data types are plain objects)"
 
 [parity.js."statements_analytics".wasm_only]
 scenarioComparisonTable = "free-function twin of Python ScenarioResults.to_comparison_table (WASM data types are plain objects)"
@@ -2700,7 +2699,7 @@ wasm_only = { parse = "Rust Rate::from_str; twin of the Python Rate(text) constr
 
 
 [parity.members."finstack_quant.cashflows.accrual.ExCouponRule"]
-renames = { ex_date = { js = "cashflows.exCouponRuleExDate", reason = "WASM ExCouponRule values are plain objects; the Rust ExCouponRule::ex_date function is a free function over the wire value" } }
+renames = { ex_date = { js = "cashflows.exCouponRuleExDate", reason = "WASM ExCouponRule values are plain objects; the Rust ExCouponRule::ex_date function is a free function over the wire value" }, is_ex_coupon = { js = "cashflows.exCouponRuleIsExCoupon", reason = "WASM ExCouponRule values are plain objects; the Rust ExCouponRule::is_ex_coupon function is a free function over the wire value" } }
 
 [parity.members."finstack_quant.cashflows.aggregation.PeriodAggregation"]
 renames = { get_amount = { js = "cashflows.periodAggregationGetAmount", reason = "WASM PeriodAggregation values are plain objects; the Rust PeriodAggregation::get_amount function is a free function over the wire value" } }
@@ -2871,6 +2870,9 @@ renames = { fixed = { js = "statements.adjustmentFixed", reason = "WASM adjustme
 
 [parity.members."finstack_quant.statements.CapitalStructureCashflows"]
 renames = { get_interest = { js = "statements.capitalStructureCashflowsGetInterest", reason = "WASM capital-structure cashflows are plain objects; the Rust CapitalStructureCashflows::get_interest method is a free function taking the object" }, get_interest_cash = { js = "statements.capitalStructureCashflowsGetInterestCash", reason = "WASM capital-structure cashflows are plain objects; the Rust CapitalStructureCashflows::get_interest_cash method is a free function taking the object" }, get_interest_pik = { js = "statements.capitalStructureCashflowsGetInterestPik", reason = "WASM capital-structure cashflows are plain objects; the Rust CapitalStructureCashflows::get_interest_pik method is a free function taking the object" }, get_principal = { js = "statements.capitalStructureCashflowsGetPrincipal", reason = "WASM capital-structure cashflows are plain objects; the Rust CapitalStructureCashflows::get_principal method is a free function taking the object" }, get_debt_balance = { js = "statements.capitalStructureCashflowsGetDebtBalance", reason = "WASM capital-structure cashflows are plain objects; the Rust CapitalStructureCashflows::get_debt_balance method is a free function taking the object" }, get_fees = { js = "statements.capitalStructureCashflowsGetFees", reason = "WASM capital-structure cashflows are plain objects; the Rust CapitalStructureCashflows::get_fees method is a free function taking the object" }, get_accrued_interest = { js = "statements.capitalStructureCashflowsGetAccruedInterest", reason = "WASM capital-structure cashflows are plain objects; the Rust CapitalStructureCashflows::get_accrued_interest method is a free function taking the object" }, get_total_interest = { js = "statements.capitalStructureCashflowsGetTotalInterest", reason = "WASM capital-structure cashflows are plain objects; the Rust CapitalStructureCashflows::get_total_interest method is a free function taking the object" }, get_total_principal = { js = "statements.capitalStructureCashflowsGetTotalPrincipal", reason = "WASM capital-structure cashflows are plain objects; the Rust CapitalStructureCashflows::get_total_principal method is a free function taking the object" }, get_total_debt_balance = { js = "statements.capitalStructureCashflowsGetTotalDebtBalance", reason = "WASM capital-structure cashflows are plain objects; the Rust CapitalStructureCashflows::get_total_debt_balance method is a free function taking the object" }, get_total_fees = { js = "statements.capitalStructureCashflowsGetTotalFees", reason = "WASM capital-structure cashflows are plain objects; the Rust CapitalStructureCashflows::get_total_fees method is a free function taking the object" } }
+
+[parity.members."finstack_quant.statements.CheckConfig"]
+renames = { validate = { js = "statements.checkConfigValidate", reason = "WASM `CheckConfig` values are plain objects; Rust `CheckConfig::validate` is a free function taking the object" } }
 
 [parity.members."finstack_quant.statements.CheckReport"]
 renames = { findings_by_severity = { js = "statements.checkReportFindingsBySeverity", reason = "WASM check reports are plain objects; the Rust CheckReport::findings_by_severity method is a free function taking the object" }, has_errors = { js = "statements.checkReportHasErrors", reason = "WASM check reports are plain objects; the Rust CheckReport::has_errors method is a free function taking the object" }, has_warnings = { js = "statements.checkReportHasWarnings", reason = "WASM check reports are plain objects; the Rust CheckReport::has_warnings method is a free function taking the object" } }

@@ -131,8 +131,13 @@ class TestModels:
             models.bs_cos_price(100.0, 100.0, 0.05, 0.0, -0.2, 1.0, True)
 
     def test_a_degenerate_cos_range_is_a_computation_failure(self) -> None:
-        with pytest.raises(RuntimeError):
+        # Twin of `COS separates invalid inputs from a degenerate range` in
+        # finstack-quant-wasm/tests/facade/error_kinds.test.mjs: a zero expiry
+        # is an invalid input, a vanishing one collapses the truncation range.
+        with pytest.raises(ValueError, match="expiry must be finite and positive"):
             models.bs_cos_price(100.0, 100.0, 0.05, 0.0, 0.2, 0.0, True)
+        with pytest.raises(RuntimeError, match="degenerate cumulant set"):
+            models.bs_cos_price(100.0, 100.0, 0.05, 0.0, 0.2, 1e-320, True)
 
 
 class TestCoreAndAnalytics:

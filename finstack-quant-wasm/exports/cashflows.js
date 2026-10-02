@@ -65,6 +65,7 @@ export const cashflows = {
   defaultModelSpecValidate: wasm.defaultModelSpecValidate,
   defaultModelSpecVector: wasm.defaultModelSpecVector,
   exCouponRuleExDate: wasm.exCouponRuleExDate,
+  exCouponRuleIsExCoupon: wasm.exCouponRuleIsExCoupon,
   feeBaseUndrawn: wasm.feeBaseUndrawn,
   feeSpecFixed: wasm.feeSpecFixed,
   feeSpecPeriodicBp: wasm.feeSpecPeriodicBp,

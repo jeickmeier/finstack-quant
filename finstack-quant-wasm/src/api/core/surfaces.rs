@@ -1,6 +1,6 @@
 //! WASM bindings for the volatility surfaces of
-//! `finstack_quant_core::market_data::surfaces`: `VolSurface`, `VolCube` and
-//! `FxDeltaVolSurface`.
+//! `finstack_quant_core::market_data::surfaces`: `VolSurface`, `VolCube`,
+//! `VolCubeExpirySlice` and `FxDeltaVolSurface`.
 
 use crate::utils::input::{
     from_js_json, js_f64, js_f64_seq, js_opt_f64_seq, js_opt_string, js_string, js_uint, json_text,
@@ -8,7 +8,8 @@ use crate::utils::input::{
 use crate::utils::to_js_err;
 use finstack_quant_core::market_data::surfaces::{
     FxDeltaVolSurface as RustFxDeltaVolSurface, SabrParameterData, VolCube as RustVolCube,
-    VolGridOpts, VolInterpolationMode, VolSurface as RustVolSurface,
+    VolCubeExpirySlice as RustVolCubeExpirySlice, VolGridOpts, VolInterpolationMode,
+    VolSurface as RustVolSurface,
 };
 use finstack_quant_core::wire::{serde_label, serde_parse};
 use std::sync::Arc;
@@ -410,15 +411,20 @@ impl JsVolSurface {
     ///   omitted uses the Rust default (`"strike"`).
     /// * `interpolation_mode` - `"vol"` or `"total_variance"`; omitted uses the
     ///   Rust default (`"vol"`).
-    /// * `quote_type` - `"black_lognormal"` or `"normal"`; omitted uses the
-    ///   Rust default (`"black_lognormal"`).
+    /// * `quote_type` - `"black_lognormal"`, `"shifted_black_lognormal"` or
+    ///   `"normal"`; omitted uses the Rust default (`"black_lognormal"`).
+    /// * `displacements` - Shifted-Black displacements in strike/rate units,
+    ///   one per expiry; required for `"shifted_black_lognormal"` quotes and
+    ///   omitted for the other conventions.
     ///
     /// @returns The validated `VolSurface`.
     /// @throws `TypeError` (kind `invalid_type`) for a mistyped argument;
     /// `FinstackError` (kind `validation`) for an empty or unsorted axis, a
-    /// grid of the wrong length, a negative or non-finite volatility, or an
-    /// unknown axis, mode or quote-type name.
+    /// grid of the wrong length, a negative or non-finite volatility, an
+    /// unknown axis, mode or quote-type name, or displacements that do not
+    /// match the quote convention and the expiry count.
     #[wasm_bindgen(constructor)]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         id: JsValue,
         expiries: JsValue,
@@ -427,6 +433,7 @@ impl JsVolSurface {
         secondary_axis: Option<JsValue>,
         interpolation_mode: Option<JsValue>,
         quote_type: Option<JsValue>,
+        displacements: Option<JsValue>,
     ) -> Result<JsVolSurface, JsValue> {
         let id = js_string(&id, "id")?;
         let expiries = js_f64_seq(&expiries, "expiries")?;
@@ -442,9 +449,17 @@ impl JsVolSurface {
         if let Some(quote) = js_opt_string(quote_type.as_ref(), "quoteType")? {
             opts.quote_type = quote.parse().map_err(|error: String| to_js_err(error))?;
         }
-        RustVolSurface::from_grid_opts(id, &expiries, &strikes, &vols, opts, None)
-            .map(|surface| Self::from_inner(Arc::new(surface)))
-            .map_err(to_js_err)
+        let displacements = js_opt_f64_seq(displacements.as_ref(), "displacements")?;
+        RustVolSurface::from_grid_opts(
+            id,
+            &expiries,
+            &strikes,
+            &vols,
+            opts,
+            displacements.as_deref(),
+        )
+        .map(|surface| Self::from_inner(Arc::new(surface)))
+        .map_err(to_js_err)
     }
 
     /// Deserialize from the canonical JSON wire form shared with Python `VolSurface.to_json`.
@@ -525,10 +540,42 @@ impl JsVolSurface {
         self.inner.secondary_axis().to_string()
     }
 
-    /// Volatility quote convention: `"black_lognormal"` or `"normal"`.
+    /// Volatility quote convention: `"black_lognormal"`, `"shifted_black_lognormal"` or `"normal"`.
     #[wasm_bindgen(getter, js_name = quoteType)]
     pub fn quote_type(&self) -> String {
         self.inner.quote_type().to_string()
+    }
+
+    /// Per-expiry shifted-Black displacements (Rust `VolSurface::get_displacements`).
+    ///
+    /// @returns One displacement per expiry in strike/rate units, or
+    /// `undefined` for unshifted and normal quotes.
+    #[wasm_bindgen(js_name = getDisplacements)]
+    pub fn get_displacements(&self) -> Option<Box<[f64]>> {
+        self.inner.get_displacements().map(Into::into)
+    }
+
+    /// A shifted-Black copy of this surface carrying one displacement per
+    /// expiry (Rust `VolSurface::with_displacements`).
+    ///
+    /// # Arguments
+    ///
+    /// * `displacements` - Finite additive shifts in strike/rate units, one
+    ///   per expiry, in expiry-axis order.
+    ///
+    /// @returns A new validated `VolSurface` whose quote type is
+    /// `"shifted_black_lognormal"`; this surface is unchanged.
+    /// @throws `TypeError` (kind `invalid_type`) if `displacements` is not a
+    /// numeric array; `FinstackError` (kind `validation`) if the count differs
+    /// from the expiry count or a shift is non-finite.
+    #[wasm_bindgen(js_name = withDisplacements)]
+    pub fn with_displacements(&self, displacements: JsValue) -> Result<JsVolSurface, JsValue> {
+        self.inner
+            .as_ref()
+            .clone()
+            .with_displacements(&js_f64_seq(&displacements, "displacements")?)
+            .map(|surface| Self::from_inner(Arc::new(surface)))
+            .map_err(to_js_err)
     }
 
     /// Interpolation across the expiry axis: `"vol"` or `"total_variance"`.
@@ -543,6 +590,185 @@ impl JsVolSurface {
         let (expiries, strikes) = self.inner.grid_shape();
         Ok(Box::new([
             u32::try_from(expiries).map_err(|e| to_js_err(e.to_string()))?,
+            u32::try_from(strikes).map_err(|e| to_js_err(e.to_string()))?,
+        ]))
+    }
+}
+
+/// Volatility grid at one fixed option expiry, indexed by underlying tenor and strike.
+///
+/// The fixed-expiry slice of a SABR cube: `models.volatility.materializeCubeExpirySlice`
+/// returns its wire object, and `fromJson` turns that object into a handle.
+/// Shifted-Black quotes carry one displacement per tenor, in strike units.
+///
+/// @example
+/// ```typescript
+/// import init, { core } from "finstack-quant-wasm";
+/// await init();
+/// const slice = new core.VolCubeExpirySlice(
+///   "USD-SWAPTION-1Y",
+///   1.0,
+///   [2.0, 5.0],
+///   [0.02, 0.03, 0.04],
+///   [0.3, 0.25, 0.27, 0.28, 0.24, 0.26],
+/// );
+/// slice.getGridShape(); // [2, 3]
+/// slice.getQuoteType(); // "black_lognormal"
+/// ```
+#[wasm_bindgen(js_name = VolCubeExpirySlice)]
+pub struct JsVolCubeExpirySlice {
+    pub(crate) inner: Arc<RustVolCubeExpirySlice>,
+}
+
+#[wasm_bindgen(js_class = VolCubeExpirySlice)]
+impl JsVolCubeExpirySlice {
+    /// Construct a fixed-expiry tenor-by-strike grid (Rust
+    /// `VolCubeExpirySlice::from_grid`).
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Identifier of the materialized grid.
+    /// * `expiry` - Fixed option expiry in years; finite and positive.
+    /// * `tenors` - Underlying tenors in years, positive and strictly increasing.
+    /// * `strikes` - Strike coordinates in forward-rate units, strictly increasing.
+    /// * `vols` - Flat tenor-major grid, `tenors.length * strikes.length`
+    ///   entries: decimal Black volatilities or absolute normal volatilities.
+    /// * `quote_type` - `"black_lognormal"`, `"shifted_black_lognormal"` or
+    ///   `"normal"`; omitted uses `"black_lognormal"`.
+    /// * `displacements` - Shifted-Black displacements in rate units, one per
+    ///   tenor; required for shifted quotes and omitted otherwise.
+    ///
+    /// @returns The validated `VolCubeExpirySlice`.
+    /// @throws `TypeError` (kind `invalid_type`) for a mistyped argument;
+    /// `FinstackError` (kind `validation`) for an invalid expiry or axis, a
+    /// grid of the wrong length, an invalid volatility, an unknown quote type,
+    /// or displacements that do not match the quote convention and tenor count.
+    #[wasm_bindgen(constructor)]
+    pub fn new(
+        id: JsValue,
+        expiry: JsValue,
+        tenors: JsValue,
+        strikes: JsValue,
+        vols: JsValue,
+        quote_type: Option<JsValue>,
+        displacements: Option<JsValue>,
+    ) -> Result<JsVolCubeExpirySlice, JsValue> {
+        let quote_type = js_opt_string(quote_type.as_ref(), "quoteType")?
+            .map(|quote| quote.parse().map_err(|error: String| to_js_err(error)))
+            .transpose()?
+            .unwrap_or_default();
+        let displacements = js_opt_f64_seq(displacements.as_ref(), "displacements")?;
+        RustVolCubeExpirySlice::from_grid(
+            js_string(&id, "id")?,
+            js_f64(&expiry, "expiry")?,
+            &js_f64_seq(&tenors, "tenors")?,
+            &js_f64_seq(&strikes, "strikes")?,
+            &js_f64_seq(&vols, "vols")?,
+            quote_type,
+            displacements.as_deref(),
+        )
+        .map(|slice| Self {
+            inner: Arc::new(slice),
+        })
+        .map_err(to_js_err)
+    }
+
+    /// Deserialize from the canonical JSON wire form shared with Python
+    /// `VolCubeExpirySlice.to_json`.
+    ///
+    /// # Arguments
+    ///
+    /// * `json` - Canonical VolCubeExpirySlice JSON text or plain object, such
+    ///   as a `materializeCubeExpirySlice` result; unknown fields are rejected
+    ///   and the grid is re-validated.
+    ///
+    /// @returns The validated `VolCubeExpirySlice`.
+    /// @throws `TypeError` if `json` is not a JSON string or plain object;
+    /// `FinstackError` (kind `validation`) if it does not match the schema or
+    /// fails grid validation.
+    #[wasm_bindgen(js_name = fromJson)]
+    pub fn from_json(json: JsValue) -> Result<JsVolCubeExpirySlice, JsValue> {
+        from_js_json::<RustVolCubeExpirySlice>(&json, "json").map(|slice| Self {
+            inner: Arc::new(slice),
+        })
+    }
+
+    /// Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
+    ///
+    /// @returns Compact JSON text.
+    /// @throws If serialization fails (not expected for a valid slice).
+    #[wasm_bindgen(js_name = toJson)]
+    pub fn to_json(&self) -> Result<String, JsValue> {
+        serde_json::to_string(&*self.inner).map_err(to_js_err)
+    }
+
+    /// Identifier of the materialized grid.
+    ///
+    /// @returns The identifier text.
+    #[wasm_bindgen(js_name = getId)]
+    pub fn get_id(&self) -> String {
+        self.inner.get_id().as_str().to_string()
+    }
+
+    /// Fixed option expiry of the slice.
+    ///
+    /// @returns The expiry in years.
+    #[wasm_bindgen(js_name = getExpiry)]
+    pub fn get_expiry(&self) -> f64 {
+        self.inner.get_expiry()
+    }
+
+    /// Underlying-tenor axis.
+    ///
+    /// @returns Tenors in years, strictly increasing.
+    #[wasm_bindgen(js_name = getTenors)]
+    pub fn get_tenors(&self) -> Box<[f64]> {
+        self.inner.get_tenors().into()
+    }
+
+    /// Strike axis.
+    ///
+    /// @returns Strikes in forward-rate units, strictly increasing.
+    #[wasm_bindgen(js_name = getStrikes)]
+    pub fn get_strikes(&self) -> Box<[f64]> {
+        self.inner.get_strikes().into()
+    }
+
+    /// Volatility grid in the declared quote convention.
+    ///
+    /// @returns Flat tenor-major grid (`getGridShape()[0]` rows of `getGridShape()[1]`).
+    #[wasm_bindgen(js_name = getVols)]
+    pub fn get_vols(&self) -> Box<[f64]> {
+        self.inner.get_vols().into()
+    }
+
+    /// Quote convention of the stored volatilities.
+    ///
+    /// @returns `"black_lognormal"`, `"shifted_black_lognormal"` or `"normal"`.
+    #[wasm_bindgen(js_name = getQuoteType)]
+    pub fn get_quote_type(&self) -> String {
+        self.inner.get_quote_type().to_string()
+    }
+
+    /// Per-tenor shifted-Black displacements.
+    ///
+    /// @returns One displacement per tenor in rate units, or `undefined` for
+    /// unshifted and normal quotes.
+    #[wasm_bindgen(js_name = getDisplacements)]
+    pub fn get_displacements(&self) -> Option<Box<[f64]>> {
+        self.inner.get_displacements().map(Into::into)
+    }
+
+    /// Grid dimensions.
+    ///
+    /// @returns `[tenorCount, strikeCount]`.
+    /// @throws If a dimension does not fit a 32-bit count (not reachable for
+    /// a grid that fits in memory).
+    #[wasm_bindgen(js_name = getGridShape)]
+    pub fn get_grid_shape(&self) -> Result<Box<[u32]>, JsValue> {
+        let (tenors, strikes) = self.inner.get_grid_shape();
+        Ok(Box::new([
+            u32::try_from(tenors).map_err(|e| to_js_err(e.to_string()))?,
             u32::try_from(strikes).map_err(|e| to_js_err(e.to_string()))?,
         ]))
     }

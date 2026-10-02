@@ -5415,12 +5415,18 @@ class MarketContext:
     @staticmethod
     def from_json(json: str) -> MarketContext:
         """
-        Deserialize a market context from a JSON string.
+        Strictly load a persisted market context from its canonical state JSON.
+
+        Uses the Rust ``MarketContext::from_state_slice`` contract loader with
+        the default load limits (64 MiB of input, 96 nested JSON containers),
+        exactly as WASM ``core.MarketContext.fromJson`` does.
 
         Parameters
         ----------
         json : str
-            JSON produced by :meth:`to_json` or by the calibration pipeline.
+            Canonical JSON produced by :meth:`to_json` or by the calibration
+            pipeline. It must carry ``schema_version: 1``; unknown fields are
+            rejected.
 
         Returns
         -------
@@ -5430,8 +5436,14 @@ class MarketContext:
 
         Raises
         ------
-        ValueError
-            If the JSON is malformed or fails validation.
+        finstack_quant.portfolio.ContractValidationError
+            If the JSON is malformed, ``schema_version`` is missing or
+            unsupported, or the state has unknown fields, invalid market
+            objects, duplicate ids or unresolved curve references; its
+            ``report`` attribute lists the diagnostics. A subclass of
+            ``ValueError``.
+        finstack_quant.portfolio.ContractLimitExceededError
+            If the JSON exceeds the input-size or nesting-depth limit.
 
         Examples
         --------

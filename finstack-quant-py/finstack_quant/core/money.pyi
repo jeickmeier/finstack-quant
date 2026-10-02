@@ -92,7 +92,8 @@ class Money:
             through ``float`` (no IEEE 754 round-trip), but digits beyond
             Decimal's 96-bit mantissa or 28-digit scale are rounded exactly as
             in ``from_json``; use ``from_decimal_str`` to reject such inputs.
-            ``str`` amounts are not trimmed. ``float``/``int`` follow standard
+            Whitespace around a ``str`` amount is ignored (Rust
+            ``decimal::parse_decimal``). ``float``/``int`` follow standard
             IEEE 754 semantics.
         currency : Currency | str
             Currency object or ISO-4217 alphabetic code string

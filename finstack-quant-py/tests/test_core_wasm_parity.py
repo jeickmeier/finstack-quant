@@ -36,6 +36,7 @@ from finstack_quant.core.market_data import (
     MarketContext,
     PriceCurve,
     ScalarTimeSeries,
+    VolCubeExpirySlice,
     VolSurface,
 )
 from finstack_quant.core.math import linalg, special_functions, stats
@@ -72,6 +73,25 @@ def _base_correlation() -> BaseCorrelationCurve:
 
 def _surface() -> VolSurface:
     return VolSurface("SPX-VOL", [0.5, 1.0], [90.0, 100.0, 110.0], [0.24, 0.2, 0.22, 0.23, 0.21, 0.22])
+
+
+def _shifted_surface() -> VolSurface:
+    return _surface().with_displacements([0.01, 0.015])
+
+
+def _expiry_slice(quote_type: str = "black_lognormal", displacements: list[float] | None = None) -> VolCubeExpirySlice:
+    return VolCubeExpirySlice(
+        "USD-SWAPTION-1Y",
+        1.0,
+        [2.0, 5.0],
+        [0.02, 0.03, 0.04],
+        [0.3, 0.25, 0.27, 0.28, 0.24, 0.26],
+        quote_type=quote_type,
+        displacements=displacements,
+    )
+
+
+PUBLICATION_DATES = [("2024-10-01", "2024-11-13"), ("2024-11-01", "2024-12-11")]
 
 
 def _series() -> ScalarTimeSeries:
@@ -330,6 +350,35 @@ CASES: dict[str, Callable[[], Any]] = {
         _surface().quote_type,
         _surface().interpolation_mode,
     ],
+    "vol_surface_displacements": lambda: [
+        _surface().get_displacements(),
+        _shifted_surface().get_displacements(),
+        _shifted_surface().quote_type,
+        json.loads(_shifted_surface().to_json()),
+        VolSurface(
+            "SPX-VOL",
+            [0.5, 1.0],
+            [90.0, 100.0, 110.0],
+            [0.24, 0.2, 0.22, 0.23, 0.21, 0.22],
+            quote_type="shifted_black_lognormal",
+            displacements=[0.01, 0.015],
+        ).to_json()
+        == _shifted_surface().to_json(),
+    ],
+    "vol_cube_expiry_slice": lambda: json.loads(_expiry_slice().to_json()),
+    "vol_cube_expiry_slice_queries": lambda: [
+        _expiry_slice().get_id(),
+        _expiry_slice().get_expiry(),
+        _expiry_slice().get_tenors(),
+        _expiry_slice().get_strikes(),
+        _expiry_slice().get_vols(),
+        _expiry_slice().get_quote_type(),
+        _expiry_slice().get_displacements(),
+        list(_expiry_slice().get_grid_shape()),
+        _expiry_slice("shifted_black_lognormal", [0.01, 0.02]).get_displacements(),
+        _expiry_slice("normal").get_quote_type(),
+        json.loads(VolCubeExpirySlice.from_json(_expiry_slice().to_json()).to_json()),
+    ],
     "scalar_time_series": lambda: json.loads(_series().to_json()),
     "scalar_time_series_queries": lambda: [
         _series().value_on("2025-01-04"),
@@ -344,6 +393,17 @@ CASES: dict[str, Callable[[], Any]] = {
         _index().ref_cpi_months_lag("2025-02-15", 3),
         _isos(list(_index().date_range())),
         _index().lag,
+    ],
+    "inflation_index_publication_dates": lambda: [
+        _index().get_publication_dates(),
+        _index().get_publication_date("2024-10-20"),
+        [
+            list(_isos(list(pair)))
+            for pair in _index().with_publication_dates(PUBLICATION_DATES).get_publication_dates()
+        ],
+        _iso(_index().with_publication_dates(PUBLICATION_DATES).get_publication_date("2024-10-20")),
+        _index().with_publication_dates(PUBLICATION_DATES).get_publication_date("2024-12-05"),
+        json.loads(_index().with_publication_dates(PUBLICATION_DATES).to_json()),
     ],
     "fx_matrix": lambda: [
         _fx().rate("EUR", "USD", "2025-01-02").rate,

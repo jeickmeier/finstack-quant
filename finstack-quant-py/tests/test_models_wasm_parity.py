@@ -25,7 +25,7 @@ from typing import Any
 import pytest
 
 from finstack_quant import models
-from finstack_quant.core.market_data import DiscountCurve, FxDeltaVolSurface, VolCube
+from finstack_quant.core.market_data import DiscountCurve, FxDeltaVolSurface, VolCube, VolCubeExpirySlice
 from finstack_quant.models import correlation, liquidity, monte_carlo, volatility
 from finstack_quant.models.credit import (
     AssetDynamics,
@@ -593,6 +593,10 @@ def _rates_cases() -> dict[str, Callable[[], Any]]:
 def _volatility_cases() -> dict[str, Callable[[], Any]]:
     svi = lambda: volatility.SviParams(*SVI)  # noqa: E731
     tenor_slice = lambda: volatility.materialize_cube_tenor_slice(_cube(), 5.0, [0.02, 0.03, 0.04])  # noqa: E731
+    expiry_slice = lambda: volatility.materialize_cube_expiry_slice(_cube(), 1.0, [0.02, 0.03, 0.04])  # noqa: E731
+    grid_slice = lambda: VolCubeExpirySlice(  # noqa: E731
+        "GRID", 1.0, [2.0, 5.0], [0.02, 0.03, 0.04], [0.3, 0.25, 0.27, 0.28, 0.24, 0.26]
+    )
     fx = lambda: FxDeltaVolSurface("EURUSD", [0.5, 1.0], [0.10, 0.11], [0.01, 0.012], [0.002, 0.003])  # noqa: E731
     greeks = lambda: models.bs_greeks(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, True)  # noqa: E731
     smile = lambda: volatility.SabrSmile(volatility.SabrParameters(0.2, 1.0, 0.3, -0.2), 100.0, 1.5)  # noqa: E731
@@ -615,6 +619,14 @@ def _volatility_cases() -> dict[str, Callable[[], Any]]:
             _surface_vols(volatility.materialize_cube_expiry_slice_normal(_cube(), 1.0, [0.02, 0.03, 0.04])),
             volatility.get_surface_vol(tenor_slice(), 1.5, 0.025),
             volatility.get_surface_vol_clamped(tenor_slice(), 9.0, 0.5),
+        ],
+        "volatility.cube_expiry_slice": lambda: [
+            json.loads(expiry_slice().to_json()),
+            volatility.get_cube_expiry_slice_vol(expiry_slice(), 5.0, 0.025),
+            volatility.get_cube_expiry_slice_vol_clamped(expiry_slice(), 9.0, 0.5),
+            volatility.get_cube_expiry_slice_vol(grid_slice(), 3.0, 0.025),
+            volatility.get_cube_expiry_slice_vol_clamped(grid_slice(), 0.5, 0.01),
+            volatility.get_cube_expiry_slice_vol_clamped(grid_slice(), 9.0, 0.035),
         ],
         "volatility.fx_delta_surface": lambda: _surface_vols(
             volatility.materialize_fx_delta_surface(fx(), 1.10, 0.03, 0.02)

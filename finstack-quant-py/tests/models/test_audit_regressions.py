@@ -42,11 +42,12 @@ def test_cos_rejects_invalid_process_parameters() -> None:
 
 def test_sabr_diagnostics_accept_uneven_strike_spacing() -> None:
     smile = SabrSmile(SabrParameters(0.2, 1.0, 0.0, 0.0), 100.0, 1.0)
-    result = smile.arbitrage_diagnostics([99.0, 100.0, 120.0])
+    # Rust `SabrSmile::validate_no_arbitrage(strikes, r)`, the twin of WASM `validateNoArbitrage`.
+    result = smile.validate_no_arbitrage([99.0, 100.0, 120.0], 0.0)
     assert result["arbitrage_free"]
     assert result["butterfly_violations"] == []
     with pytest.raises(ValueError, match="ascending"):
-        smile.arbitrage_diagnostics([100.0, 99.0, 120.0])
+        smile.validate_no_arbitrage([100.0, 99.0, 120.0], 0.0)
 
 
 @pytest.mark.parametrize("forward", [0.0, -100.0, math.nan, math.inf])

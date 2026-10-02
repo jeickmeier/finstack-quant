@@ -40,6 +40,26 @@ test('one Rust currency parser: case-insensitive, not trimmed, error names the c
   }
 });
 
+// Twin of `test_money_text_amount_is_trimmed_by_the_rust_decimal_parser` in
+// finstack-quant-py/tests/test_core_rust_owned.py.
+test('Money text amounts are trimmed by the Rust decimal parser', () => {
+  const usd = new core.Currency('USD');
+  for (const text of [' 100.25 ', '\t100.25\n']) {
+    assert.equal(
+      core.Money.fromDecimalStr(text, usd).toJson(),
+      '{"amount":"100.25","currency":"USD"}'
+    );
+  }
+  for (const text of ['100 .25', ' ', 'abc']) {
+    assert.throws(
+      () => core.Money.fromDecimalStr(text, usd),
+      (error) =>
+        error.kind === 'validation' &&
+        error.message.includes('decimal value must be exactly representable as Decimal')
+    );
+  }
+});
+
 test('Money.checkedNeg is the exact Rust checked_neg and cannot throw', () => {
   const usd = new core.Currency('USD');
   const cases = [

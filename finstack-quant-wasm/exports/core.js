@@ -173,6 +173,7 @@ export const core = {
   CreditIndexData: wasm.CreditIndexData,
   VolSurface: wasm.VolSurface,
   VolCube: wasm.VolCube,
+  VolCubeExpirySlice: wasm.VolCubeExpirySlice,
   FxDeltaVolSurface: wasm.FxDeltaVolSurface,
   ScalarTimeSeries: wasm.ScalarTimeSeries,
   InflationIndex: wasm.InflationIndex,

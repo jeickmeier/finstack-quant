@@ -102,8 +102,10 @@ def test_monte_carlo_pricers_resolve_defaults_in_rust() -> None:
 
     asian = monte_carlo.PathDependentPricer(500, 7, False, True)
     assert (asian.num_paths, asian.seed, asian.antithetic) == (500, 7, True)
-    with pytest.raises(ValueError, match="num_paths must be positive"):
-        monte_carlo.EuropeanPricer(0)
+    # A standard error needs two independent estimators: Rust rejects 0 and 1 paths.
+    for num_paths in (0, 1):
+        with pytest.raises(ValueError, match="EuropeanPricer requires at least two independent path estimators"):
+            monte_carlo.EuropeanPricer(num_paths)
 
 
 def test_pca_convenience_functions_default_to_three_components() -> None:

@@ -525,7 +525,7 @@
 
 - Currency codes are parsed by one Rust parser that does not trim. `" USD "` is rejected in both hosts, including by WASM `new Currency`, `Money.fromDecimalStr` and Python `Money(1, " usd ")`. The error names the code: `Invalid currency code "<code>": not a supported ISO-4217 alphabetic code`.
   - Rust: `Currency: FromStr` now returns `core::Error` (was `strum::ParseError`), `TryFrom<&str>` is derived, and `InputError::UnknownCurrency` carries `code`.
-- Python `Money(" 100.25 ", "USD")` is rejected (the amount parser no longer trims).
+- Python `Money(" 100.25 ", "USD")` was rejected by this slice; superseded by the merge of master below: the Rust-owned `decimal::parse_decimal` ignores surrounding whitespace, in both hosts.
 - `RoundingMode: FromStr` returns `core::Error` and accepts only the serde names. Both bindings parse rounding and scenario modes with it and take their defaults from Rust.
 - A zero scalar divisor for `Money` is `Validation error: division by zero` in both hosts. The Python pre-check is gone.
 - `realized_variance` and `realized_variance_ohlc` take `Option` for the method and annualization factor. The defaults are CloseToClose and `RealizedVarMethod::OHLC_DEFAULT` (YangZhang), and the factor defaults to 252 via `PeriodKind::Daily`. Python passes `None` through, and its default values are unchanged.
@@ -583,6 +583,36 @@
 
 - WASM `CalibrationEnvelopeError` carries the strict-load `diagnostics` array.
 - `ErrorKind::as_str`, `core::error::format_chain` and `AttributionEnvelope::from_json` in Rust.
+
+### Merge of master (2026-10-01)
+
+User-visible changes from merging master into the WASM binding audit branch.
+
+#### Changed (BREAKING)
+
+- WASM `core.nextEquityOptionExpiry` is renamed `core.nextThirdFriday`.
+- WASM `calibration.calibrationStepCapFloorHullWhite` requires `indexId` and no longer accepts `payment_frequency`.
+- The WASM core date helpers, the structured-credit constructors, `insertCreditIndex` and `repaymentDate` throw on invalid input.
+- WASM `core.MarketContext.fromJson` and Python `MarketContext.from_json` are the strict persisted-state load (Rust `MarketContext::from_state_slice` with the default `LoadLimits`: 64 MiB, 96 nested containers). The JSON must carry `schema_version: 1`. Failures are `ContractValidationError` (a `ValueError` in Python) with the diagnostics on `report`; an over-limit input is `ContractLimitExceededError` in Python and `code: "limit_exceeded"` in WASM.
+- A zero Bus/252 basis is rejected.
+- Text amounts are parsed by the Rust-owned `decimal::parse_decimal`, which ignores surrounding whitespace: Python `Money(" 100.25 ", "USD")`, `Money.from_decimal_str` and WASM `Money.fromDecimalStr` all accept it. Currency codes are still not trimmed. This supersedes the "amount parser no longer trims" entry of the core audit section.
+- WASM `materializeCubeExpirySlice` and `materializeCubeExpirySliceNormal` return the `VolCubeExpirySlice` wire object (`id`, `expiry`, `tenors`, `strikes`, `vols_row_major`, `quote_type`, optional `displacements`), as Rust and Python do. `index.d.ts` declared `VolSurface` for them.
+- Python `ForecastMetrics.mape` / `smape` are `None` (JSON `null`) when undefined, not a NaN sentinel, in both hosts.
+- `EuropeanPricer` requires at least two paths in both hosts.
+- A zero expiry in the COS pricers is a validation error (`ValueError`); a vanishing expiry that collapses the truncation range stays a computation error (`RuntimeError`).
+
+#### Fixed
+
+- RFL `tailDependence` is finite.
+
+#### Added
+
+- WASM `core.VolCubeExpirySlice`: constructor, `fromJson`, `toJson`, `getId`, `getExpiry`, `getTenors`, `getStrikes`, `getVols`, `getQuoteType`, `getDisplacements` and `getGridShape`, the twin of Python `VolCubeExpirySlice`.
+- WASM `models.volatility.getCubeExpirySliceVol` and `getCubeExpirySliceVolClamped`.
+- WASM `core.VolSurface.getDisplacements` and `withDisplacements`; the constructor takes an optional `displacements` argument and accepts the `"shifted_black_lognormal"` quote type.
+- WASM `core.InflationIndex.withPublicationDates`, `getPublicationDate` and `getPublicationDates`.
+- WASM `cashflows.exCouponRuleIsExCoupon` (Python `ExCouponRule.is_ex_coupon`).
+- WASM `statements.checkConfigValidate` (Python `CheckConfig.validate`).
 
 ### Master cleanup (2026-09-28)
 

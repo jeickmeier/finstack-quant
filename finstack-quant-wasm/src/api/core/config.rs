@@ -297,7 +297,7 @@ impl JsFinstackConfig {
     /// @throws If the map cannot be converted (not expected).
     #[wasm_bindgen(js_name = outputScaleOverrides)]
     pub fn output_scale_overrides(&self) -> Result<JsValue, JsValue> {
-        scale_overrides(&self.inner.rounding.output_scale.get_overrides())
+        scale_overrides(self.inner.rounding.output_scale.get_overrides())
     }
 
     /// Per-currency ingest-scale overrides.
@@ -307,7 +307,7 @@ impl JsFinstackConfig {
     /// @throws If the map cannot be converted (not expected).
     #[wasm_bindgen(js_name = ingestScaleOverrides)]
     pub fn ingest_scale_overrides(&self) -> Result<JsValue, JsValue> {
-        scale_overrides(&self.inner.rounding.ingest_scale.get_overrides())
+        scale_overrides(self.inner.rounding.ingest_scale.get_overrides())
     }
 
     /// Store a versioned extension section (Rust `ConfigExtensions::insert`).

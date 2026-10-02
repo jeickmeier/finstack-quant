@@ -257,9 +257,13 @@ def test_matrix_helpers_accept_two_dimensional_input() -> None:
 def test_matrix_helpers_reject_dimension_product_overflow(
     operation: Callable[..., object], matrix: list[object]
 ) -> None:
-    """Oversized dimensions raise ValueError before Rust can panic or allocate."""
+    """Oversized dimensions raise ValueError before Rust can panic or allocate.
+
+    ``n * n`` overflows ``usize``; the Rust shape checks (``flatten_square_matrix``
+    and the flat-length checks) reject the input by naming the requested size.
+    """
     n = 1 << (struct.calcsize("P") * 4)
-    with pytest.raises(ValueError, match=r"dimension.*overflows"):
+    with pytest.raises(ValueError, match=rf"matrix must have {n} rows, got 1|expected {n}[×x]{n}(?: entries)?, got 0"):
         operation(matrix, n)
 
 

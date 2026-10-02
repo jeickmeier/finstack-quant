@@ -13,6 +13,11 @@ from finstack_quant.models import (
     black_shifted_vega,
 )
 
+# Rust `closed_form::forward` names the model and the rejected argument.
+NEGATIVE_INPUT = (
+    r"(?:Black-76|Bachelier|shifted Black|Shifted Black)[\w -]* (?:vol|normal_vol|expiry) must be non-negative"
+)
+
 
 @pytest.mark.parametrize("invalid", [math.nan, math.inf, -math.inf])
 @pytest.mark.parametrize("expiry", [0.0, 1.0])
@@ -33,23 +38,23 @@ def test_invalid_quotes_raise_before_intrinsic(invalid: float, expiry: float) ->
 
 @pytest.mark.parametrize("df", [0.0, -0.95, math.nan, math.inf])
 def test_black76_rejects_invalid_discount_factor(df: float) -> None:
-    with pytest.raises(ValueError, match="discount factor"):
+    with pytest.raises(ValueError, match=r"Black-76 df must be (?:finite|positive)"):
         black76_price(100.0, 100.0, df, 1.0, 0.2, True)
 
 
 @pytest.mark.parametrize(("vol", "expiry"), [(-0.2, 1.0), (0.2, -1.0)])
 def test_negative_volatility_or_expiry_raises(vol: float, expiry: float) -> None:
-    with pytest.raises(ValueError, match="volatility and expiry must be non-negative"):
+    with pytest.raises(ValueError, match=NEGATIVE_INPUT):
         black76_price(100.0, 100.0, 0.95, expiry, vol, True)
-    with pytest.raises(ValueError, match="volatility and expiry must be non-negative"):
+    with pytest.raises(ValueError, match=NEGATIVE_INPUT):
         black76_greeks(100.0, 100.0, expiry, vol, True)
-    with pytest.raises(ValueError, match="volatility and expiry must be non-negative"):
+    with pytest.raises(ValueError, match=NEGATIVE_INPUT):
         bachelier_price(100.0, 100.0, vol, expiry, True)
-    with pytest.raises(ValueError, match="volatility and expiry must be non-negative"):
+    with pytest.raises(ValueError, match=NEGATIVE_INPUT):
         bachelier_greeks(100.0, 100.0, vol, expiry, True)
-    with pytest.raises(ValueError, match="volatility and expiry must be non-negative"):
+    with pytest.raises(ValueError, match=NEGATIVE_INPUT):
         black_shifted_price(-0.01, -0.01, vol, expiry, 0.02, True)
-    with pytest.raises(ValueError, match="volatility and expiry must be non-negative"):
+    with pytest.raises(ValueError, match=NEGATIVE_INPUT):
         black_shifted_vega(-0.01, -0.01, vol, expiry, 0.02)
 
 

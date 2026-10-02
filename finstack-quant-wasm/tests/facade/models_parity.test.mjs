@@ -610,6 +610,24 @@ const CASES = {
       volatility.getSurfaceVolClamped(JSON.stringify(tenorSlice), 9.0, 0.5),
     ];
   },
+  'volatility.cube_expiry_slice': () => {
+    const expirySlice = volatility.materializeCubeExpirySlice(cube(), 1.0, [0.02, 0.03, 0.04]);
+    const gridSlice = new core.VolCubeExpirySlice(
+      'GRID',
+      1.0,
+      [2.0, 5.0],
+      [0.02, 0.03, 0.04],
+      [0.3, 0.25, 0.27, 0.28, 0.24, 0.26]
+    ).toJson();
+    return [
+      expirySlice,
+      volatility.getCubeExpirySliceVol(expirySlice, 5.0, 0.025),
+      volatility.getCubeExpirySliceVolClamped(JSON.stringify(expirySlice), 9.0, 0.5),
+      volatility.getCubeExpirySliceVol(gridSlice, 3.0, 0.025),
+      volatility.getCubeExpirySliceVolClamped(gridSlice, 0.5, 0.01),
+      volatility.getCubeExpirySliceVolClamped(JSON.parse(gridSlice), 9.0, 0.035),
+    ];
+  },
   'volatility.fx_delta_surface': () =>
     surfaceVols(
       volatility.materializeFxDeltaSurface(

@@ -286,6 +286,16 @@ def _accrual() -> Any:
         "index_ex_coupon": [wire(with_ex_coupon.accrued_at(date)) for date in ("2025-04-15", "2025-07-10")],
         "ex_date_calendar_days": wire(ExCouponRule(7).ex_date(payment)),
         "ex_date_business_days": wire(ExCouponRule(7, "usny").ex_date(payment)),
+        "is_ex_coupon": [
+            ExCouponRule(7, calendar).is_ex_coupon(payment, settlement)
+            for settlement, calendar in (
+                ("2025-07-08", None),
+                ("2025-07-09", None),
+                ("2025-07-15", None),
+                ("2025-07-03", "usny"),
+                ("2025-07-07", "usny"),
+            )
+        ],
     }
 
 

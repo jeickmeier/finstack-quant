@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 import numpy as np
 import numpy.typing as npt
 import pytest
@@ -43,9 +45,22 @@ def test_shrinkage_preserves_observation_rows_and_variable_columns(layout: str) 
     assert shrinkage == expected_shrinkage
 
 
-@pytest.mark.parametrize("pair", ["ééé", "€USD", "US😀D", "USD/é", "USD/EUR/USD", "US1USD", "USD/12A"])
-def test_fx_pair_parser_rejects_malformed_unicode_and_ascii(pair: str) -> None:
-    with pytest.raises(ValueError, match="invalid FX pair"):
+@pytest.mark.parametrize(
+    ("pair", "message"),
+    [
+        # Not `AAA/BBB` and not six ASCII characters: the pair shape is rejected.
+        ("ééé", "invalid FX pair"),
+        ("€USD", "invalid FX pair"),
+        ("US😀D", "invalid FX pair"),
+        # Pair-shaped text: Rust `CurrencyPair::from_str` names the half it rejected.
+        ("USD/é", 'Invalid currency code "é"'),
+        ("USD/EUR/USD", 'Invalid currency code "EUR/USD"'),
+        ("US1USD", 'Invalid currency code "US1"'),
+        ("USD/12A", 'Invalid currency code "12A"'),
+    ],
+)
+def test_fx_pair_parser_rejects_malformed_unicode_and_ascii(pair: str, message: str) -> None:
+    with pytest.raises(ValueError, match=re.escape(message)):
         FxMatrix.from_dict({pair: 1.0})
 
 

@@ -413,6 +413,7 @@
       "defaultModelSpecValidate",
       "defaultModelSpecVector",
       "exCouponRuleExDate",
+      "exCouponRuleIsExCoupon",
       "feeBaseUndrawn",
       "feeSpecFixed",
       "feeSpecPeriodicBp",
@@ -624,6 +625,9 @@
   "cashflows.exCouponRuleExDate": {
     "kind": "function"
   },
+  "cashflows.exCouponRuleIsExCoupon": {
+    "kind": "function"
+  },
   "cashflows.feeBaseUndrawn": {
     "kind": "function"
   },
@@ -832,6 +836,7 @@
       "Thirty360Convention",
       "UnknownScalePolicy",
       "VolCube",
+      "VolCubeExpirySlice",
       "VolSurface",
       "addBusinessDays",
       "addMonths",
@@ -1602,7 +1607,7 @@
   "core.VolSurface": {
     "kind": "class",
     "statics": ["fromJson"],
-    "methods": ["free", "toJson", "vol"],
+    "methods": ["free", "getDisplacements", "toJson", "vol", "withDisplacements"],
     "getters": [
       "expiries",
       "gridShape",
@@ -1620,6 +1625,23 @@
     "methods": ["forwardAt", "free", "paramsAt", "toJson"],
     "getters": ["expiries", "forwards", "gridShape", "id", "interpolationMode", "params", "tenors"]
   },
+  "core.VolCubeExpirySlice": {
+    "kind": "class",
+    "statics": ["fromJson"],
+    "methods": [
+      "free",
+      "getDisplacements",
+      "getExpiry",
+      "getGridShape",
+      "getId",
+      "getQuoteType",
+      "getStrikes",
+      "getTenors",
+      "getVols",
+      "toJson"
+    ],
+    "getters": []
+  },
   "core.FxDeltaVolSurface": {
     "kind": "class",
     "statics": ["fromJson"],
@@ -1635,7 +1657,17 @@
   "core.InflationIndex": {
     "kind": "class",
     "statics": ["fromJson"],
-    "methods": ["dateRange", "free", "ratio", "refCpiMonthsLag", "toJson", "valueOn"],
+    "methods": [
+      "dateRange",
+      "free",
+      "getPublicationDate",
+      "getPublicationDates",
+      "ratio",
+      "refCpiMonthsLag",
+      "toJson",
+      "valueOn",
+      "withPublicationDates"
+    ],
     "getters": ["currency", "id", "interpolation", "lag", "observations", "seasonality"]
   },
   "core.MarketContext": {
@@ -3395,6 +3427,8 @@
       "checkSurfaceGrid",
       "convertAtmVolatility",
       "deltaToStrike",
+      "getCubeExpirySliceVol",
+      "getCubeExpirySliceVolClamped",
       "getCubeNormalVol",
       "getCubeNormalVolClamped",
       "getCubeVol",
@@ -3464,6 +3498,12 @@
     "kind": "function"
   },
   "models.volatility.getCubeVolClamped": {
+    "kind": "function"
+  },
+  "models.volatility.getCubeExpirySliceVol": {
+    "kind": "function"
+  },
+  "models.volatility.getCubeExpirySliceVolClamped": {
     "kind": "function"
   },
   "models.volatility.getFxDeltaPillarVols": {
@@ -4118,6 +4158,7 @@
       "capitalStructureCashflowsGetTotalFees",
       "capitalStructureCashflowsGetTotalInterest",
       "capitalStructureCashflowsGetTotalPrincipal",
+      "checkConfigValidate",
       "checkReportFindingsBySeverity",
       "checkReportHasErrors",
       "checkReportHasWarnings",
@@ -4400,6 +4441,9 @@
     "kind": "function"
   },
   "statements.checkSuiteSpecBuiltinCheckNames": {
+    "kind": "function"
+  },
+  "statements.checkConfigValidate": {
     "kind": "function"
   },
   "statements.schema": {

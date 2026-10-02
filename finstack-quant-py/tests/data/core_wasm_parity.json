@@ -293,6 +293,55 @@
     ],
     "seasonality": null
   },
+  "inflation_index_publication_dates": [
+    [],
+    null,
+    [
+      [
+        "2024-10-01",
+        "2024-11-13"
+      ],
+      [
+        "2024-11-01",
+        "2024-12-11"
+      ]
+    ],
+    "2024-11-13",
+    null,
+    {
+      "currency": "USD",
+      "id": "US-CPI-U",
+      "interpolation": "linear",
+      "lag": {
+        "months": 3
+      },
+      "observations": [
+        [
+          "2024-10-01",
+          315.664
+        ],
+        [
+          "2024-11-01",
+          315.493
+        ],
+        [
+          "2024-12-01",
+          315.605
+        ]
+      ],
+      "publication_dates": [
+        {
+          "publication_date": "2024-11-13",
+          "reference_month": "2024-10-01"
+        },
+        {
+          "publication_date": "2024-12-11",
+          "reference_month": "2024-11-01"
+        }
+      ],
+      "seasonality": null
+    }
+  ],
   "inflation_index_queries": [
     0.9998130924020479,
     315.549,
@@ -872,6 +921,82 @@
   ],
   "third_friday": "2025-03-21",
   "third_wednesday": "2025-03-19",
+  "vol_cube_expiry_slice": {
+    "expiry": 1.0,
+    "id": "USD-SWAPTION-1Y",
+    "quote_type": "black_lognormal",
+    "strikes": [
+      0.02,
+      0.03,
+      0.04
+    ],
+    "tenors": [
+      2.0,
+      5.0
+    ],
+    "vols_row_major": [
+      0.3,
+      0.25,
+      0.27,
+      0.28,
+      0.24,
+      0.26
+    ]
+  },
+  "vol_cube_expiry_slice_queries": [
+    "USD-SWAPTION-1Y",
+    1.0,
+    [
+      2.0,
+      5.0
+    ],
+    [
+      0.02,
+      0.03,
+      0.04
+    ],
+    [
+      0.3,
+      0.25,
+      0.27,
+      0.28,
+      0.24,
+      0.26
+    ],
+    "black_lognormal",
+    null,
+    [
+      2,
+      3
+    ],
+    [
+      0.01,
+      0.02
+    ],
+    "normal",
+    {
+      "expiry": 1.0,
+      "id": "USD-SWAPTION-1Y",
+      "quote_type": "black_lognormal",
+      "strikes": [
+        0.02,
+        0.03,
+        0.04
+      ],
+      "tenors": [
+        2.0,
+        5.0
+      ],
+      "vols_row_major": [
+        0.3,
+        0.25,
+        0.27,
+        0.28,
+        0.24,
+        0.26
+      ]
+    }
+  ],
   "vol_surface": {
     "expiries": [
       0.5,
@@ -895,6 +1020,42 @@
       0.22
     ]
   },
+  "vol_surface_displacements": [
+    null,
+    [
+      0.01,
+      0.015
+    ],
+    "shifted_black_lognormal",
+    {
+      "displacements": [
+        0.01,
+        0.015
+      ],
+      "expiries": [
+        0.5,
+        1.0
+      ],
+      "id": "SPX-VOL",
+      "interpolation_mode": "vol",
+      "quote_type": "shifted_black_lognormal",
+      "secondary_axis": "strike",
+      "strikes": [
+        90.0,
+        100.0,
+        110.0
+      ],
+      "vols_row_major": [
+        0.24,
+        0.2,
+        0.22,
+        0.23,
+        0.21,
+        0.22
+      ]
+    },
+    true
+  ],
   "vol_surface_queries": [
     0.20500000000000002,
     [

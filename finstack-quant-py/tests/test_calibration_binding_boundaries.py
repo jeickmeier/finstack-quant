@@ -73,9 +73,9 @@ def test_cap_floor_step_preserves_required_index_and_rejects_frequency_override(
 
 @pytest.mark.parametrize("settings", [{"tolerance": -1.0}, {"tolerance": 0.0}, {"max_iterations": 0}])
 def test_solver_config_constructor_and_json_reject_invalid_settings(settings: dict) -> None:
-    with pytest.raises(ValueError, match=r"must be .*positive"):
+    with pytest.raises(ValueError, match=r"must be (?:.*positive|at least 1)"):
         SolverConfig(**settings)
-    with pytest.raises(ValueError, match=r"must be .*positive"):
+    with pytest.raises(ValueError, match=r"must be (?:.*positive|at least 1)"):
         SolverConfig.from_json(json.dumps(settings))
 
 

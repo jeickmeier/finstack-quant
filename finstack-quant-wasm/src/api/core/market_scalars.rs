@@ -435,4 +435,79 @@ impl JsInflationIndex {
     pub fn observations(&self) -> Result<JsValue, JsValue> {
         observations_value(self.inner.observations())
     }
+
+    /// A copy of this index with an explicit monthly publication schedule
+    /// (Rust `InflationIndex::with_publication_dates`).
+    ///
+    /// # Arguments
+    ///
+    /// * `dates` - Array of `[referenceMonth, publicationDate]` ISO-8601 date
+    ///   pairs (or its JSON text). Each reference month is a first-of-month
+    ///   date and each publication date is the inclusive date its print
+    ///   becomes available; the schedule replaces any existing one and is
+    ///   independent of the contractual observation lag.
+    ///
+    /// @returns A new `InflationIndex` keeping the observations and other
+    /// conventions; this index is unchanged.
+    /// @throws `TypeError` (kind `invalid_type`) if `dates` is not an array or
+    /// JSON text; `FinstackError` (kind `validation`) for a malformed date or
+    /// pair, a reference date that is not a month start, a duplicated month,
+    /// or a publication date before its reference month.
+    #[wasm_bindgen(js_name = withPublicationDates)]
+    pub fn with_publication_dates(&self, dates: JsValue) -> Result<JsInflationIndex, JsValue> {
+        let dates = from_js_json::<Vec<(String, String)>>(&dates, "dates")?
+            .into_iter()
+            .map(|(reference_month, publication_date)| {
+                Ok((
+                    parse_iso_date(&reference_month)?,
+                    parse_iso_date(&publication_date)?,
+                ))
+            })
+            .collect::<Result<Vec<_>, JsValue>>()?;
+        self.inner
+            .as_ref()
+            .clone()
+            .with_publication_dates(dates)
+            .map(|index| Self::from_inner(Arc::new(index)))
+            .map_err(to_js_err)
+    }
+
+    /// Explicit publication date of a reference month (Rust
+    /// `InflationIndex::get_publication_date`).
+    ///
+    /// # Arguments
+    ///
+    /// * `reference_date` - Any ISO-8601 date in the reference month; its day
+    ///   is ignored.
+    ///
+    /// @returns The inclusive ISO-8601 availability date, or `undefined` when
+    /// the month has no configured publication date.
+    /// @throws `TypeError` (kind `invalid_type`) if `referenceDate` is not a
+    /// string; `FinstackError` (kind `validation`) if it is not an ISO-8601 date.
+    #[wasm_bindgen(js_name = getPublicationDate)]
+    pub fn get_publication_date(&self, reference_date: JsValue) -> Result<Option<String>, JsValue> {
+        Ok(self
+            .inner
+            .get_publication_date(date_arg(&reference_date, "referenceDate")?)
+            .map(date_to_iso))
+    }
+
+    /// Configured monthly publication schedule (Rust
+    /// `InflationIndex::get_publication_dates`).
+    ///
+    /// @returns `[referenceMonth, publicationDate]` ISO-8601 pairs in
+    /// ascending reference-month order; empty when no schedule is set.
+    /// @throws If the pairs cannot be converted to a JavaScript array.
+    #[wasm_bindgen(js_name = getPublicationDates)]
+    pub fn get_publication_dates(&self) -> Result<JsValue, JsValue> {
+        let pairs: Vec<(String, String)> = self
+            .inner
+            .get_publication_dates()
+            .into_iter()
+            .map(|(reference_month, publication_date)| {
+                (date_to_iso(reference_month), date_to_iso(publication_date))
+            })
+            .collect();
+        to_js_value(&pairs)
+    }
 }

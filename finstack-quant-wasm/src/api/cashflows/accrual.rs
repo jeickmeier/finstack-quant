@@ -16,20 +16,46 @@ fn accrued_money(amount: f64, currency: Currency) -> Result<JsValue, JsValue> {
     to_js_value(&Money::new(amount, currency).map_err(to_js_err)?)
 }
 
-/// Ex-coupon date for a coupon paid on a date.
+/// Coupon record date for a coupon paid on a date.
 ///
-/// From the returned date (inclusive) until the payment date (exclusive) the
-/// bond trades ex-coupon and accrued interest is negative.
+/// Settlement on the returned date keeps the coupon; settlement strictly
+/// after it and before the payment date trades ex-coupon, and accrued
+/// interest is then negative.
 ///
 /// @param rule - `ExCouponRule` wire object: `days_before_coupon` and an optional `calendar_id` (business days when set, calendar days otherwise).
 /// @param payment_date - ISO-8601 coupon payment date the window is counted back from.
-/// @returns ISO-8601 ex-coupon date.
+/// @returns ISO-8601 record date.
 /// @throws If `rule` is not an `ExCouponRule`, `days_before_coupon` exceeds 366, the calendar id cannot be resolved (kind `validation`), or `paymentDate` is not an ISO-8601 string (kind `invalid_type` or `validation`).
 #[wasm_bindgen(js_name = exCouponRuleExDate)]
 pub fn ex_coupon_rule_ex_date(rule: JsValue, payment_date: JsValue) -> Result<String, JsValue> {
     js_wire::<ExCouponRule>(&rule, "rule")?
         .ex_date(js_date(&payment_date, "paymentDate")?)
         .map(date_to_iso)
+        .map_err(to_js_err)
+}
+
+/// Whether a settlement date falls in the ex-coupon window of a coupon.
+///
+/// Free-function twin of Python `ExCouponRule.is_ex_coupon` (Rust
+/// `ExCouponRule::is_ex_coupon`): a buyer settling in the window forfeits the
+/// imminent coupon.
+///
+/// @param rule - `ExCouponRule` wire object: `days_before_coupon` and an optional `calendar_id` (business days when set, calendar days otherwise).
+/// @param payment_date - ISO-8601 coupon payment date the record date is counted back from.
+/// @param settlement_date - ISO-8601 ownership-transfer (settlement) date; convert a trade date to settlement first.
+/// @returns `true` strictly after the record date and before the payment date; settlement on the record date keeps the coupon and returns `false`.
+/// @throws If `rule` is not an `ExCouponRule`, `days_before_coupon` exceeds 366, the calendar id cannot be resolved, the record date is out of range (kind `validation`), or a date is not an ISO-8601 string (kind `invalid_type` or `validation`).
+#[wasm_bindgen(js_name = exCouponRuleIsExCoupon)]
+pub fn ex_coupon_rule_is_ex_coupon(
+    rule: JsValue,
+    payment_date: JsValue,
+    settlement_date: JsValue,
+) -> Result<bool, JsValue> {
+    js_wire::<ExCouponRule>(&rule, "rule")?
+        .is_ex_coupon(
+            js_date(&payment_date, "paymentDate")?,
+            js_date(&settlement_date, "settlementDate")?,
+        )
         .map_err(to_js_err)
 }
 

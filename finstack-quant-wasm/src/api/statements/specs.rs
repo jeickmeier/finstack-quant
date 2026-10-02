@@ -1,7 +1,7 @@
 //! Free-function twins of the Python spec-object constructors and methods.
 //!
 //! WASM specs are plain objects, so each Rust constructor or method on
-//! `ForecastSpec`, `Adjustment`, `NormalizationConfig` and `CheckSuiteSpec`
+//! `ForecastSpec`, `Adjustment`, `NormalizationConfig`, `CheckConfig` and `CheckSuiteSpec`
 //! is a function that returns (or takes) the plain object.
 
 use crate::utils::input::{
@@ -11,7 +11,7 @@ use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::adjustments::engine::NormalizationEngine;
 use finstack_quant_statements::adjustments::types::{Adjustment, NormalizationConfig};
-use finstack_quant_statements::checks::BuiltinCheckSpec;
+use finstack_quant_statements::checks::{BuiltinCheckSpec, CheckConfig};
 use finstack_quant_statements::evaluator::StatementResult;
 use finstack_quant_statements::types::ForecastSpec;
 use indexmap::IndexMap;
@@ -466,4 +466,22 @@ pub fn normalize_json(results: JsValue, config: JsValue) -> Result<String, JsVal
 #[wasm_bindgen(js_name = checkSuiteSpecBuiltinCheckNames)]
 pub fn check_suite_spec_builtin_check_names() -> Result<JsValue, JsValue> {
     to_js_value(&BuiltinCheckSpec::names())
+}
+
+/// Validate the tolerances and materiality thresholds of a check configuration.
+///
+/// Free-function twin of Python `CheckConfig.validate` (Rust
+/// `CheckConfig::validate`). Returns `undefined` when valid.
+/// @param config - `CheckConfig` object or JSON: `default_tolerance`, `default_relative_tolerance`, `materiality_threshold` and `min_severity`; omitted fields take the Rust defaults.
+///
+/// # Errors
+///
+/// Throws a `TypeError` when `config` is not an object or JSON string, and a
+/// `validation` error when it does not match the `CheckConfig` contract or a
+/// tolerance or materiality threshold is negative or non-finite.
+#[wasm_bindgen(js_name = checkConfigValidate)]
+pub fn check_config_validate(config: JsValue) -> Result<(), JsValue> {
+    from_js_json::<CheckConfig>(&config, "config")?
+        .validate()
+        .map_err(to_js_err)
 }

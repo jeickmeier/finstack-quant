@@ -7247,7 +7247,7 @@ export interface VolSurface extends WasmOwned {
    */
   readonly secondaryAxis: string;
   /**
-   * Volatility quote convention: `"black_lognormal"` or `"normal"`.
+   * Volatility quote convention: `"black_lognormal"`, `"shifted_black_lognormal"` or `"normal"`.
    */
   readonly quoteType: string;
   /**
@@ -7258,6 +7258,21 @@ export interface VolSurface extends WasmOwned {
    * Grid dimensions as `[expiryCount, strikeCount]`.
    */
   readonly gridShape: Uint32Array;
+  /**
+   * Per-expiry shifted-Black displacements (Rust `VolSurface::get_displacements`).
+   *
+   * @returns One displacement per expiry in strike/rate units, or `undefined` for unshifted and normal quotes.
+   */
+  getDisplacements(): Float64Array | undefined;
+  /**
+   * A shifted-Black copy of this surface carrying one displacement per
+   * expiry (Rust `VolSurface::with_displacements`).
+   *
+   * @param displacements - Finite additive shifts in strike/rate units, one per expiry, in expiry-axis order.
+   * @returns A new validated `VolSurface` whose quote type is `"shifted_black_lognormal"`; this surface is unchanged.
+   * @throws `TypeError` (kind `invalid_type`) if `displacements` is not a numeric array; `FinstackError` (kind `validation`) if the count differs from the expiry count or a shift is non-finite.
+   */
+  withDisplacements(displacements: NumericArray): VolSurface;
   /**
    * Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
    *
@@ -7309,9 +7324,10 @@ export interface VolSurfaceConstructor {
    * @param vols - Flat row-major grid of decimal volatilities, `expiries.length * strikes.length` entries; row `i` holds the smile at `expiries[i]`. Entries must be finite and non-negative.
    * @param secondaryAxis - What `strikes` holds: `"strike"` or `"tenor"`; omitted uses the Rust default (`"strike"`).
    * @param interpolationMode - `"vol"` or `"total_variance"`; omitted uses the Rust default (`"vol"`).
-   * @param quoteType - `"black_lognormal"` or `"normal"`; omitted uses the Rust default (`"black_lognormal"`).
+   * @param quoteType - `"black_lognormal"`, `"shifted_black_lognormal"` or `"normal"`; omitted uses the Rust default (`"black_lognormal"`).
+   * @param displacements - Shifted-Black displacements in strike/rate units, one per expiry; required for `"shifted_black_lognormal"` quotes and omitted for the other conventions.
    * @returns The validated `VolSurface`.
-   * @throws `TypeError` (kind `invalid_type`) for a mistyped argument; `FinstackError` (kind `validation`) for an empty or unsorted axis, a grid of the wrong length, a negative or non-finite volatility, or an unknown axis, mode or quote-type name.
+   * @throws `TypeError` (kind `invalid_type`) for a mistyped argument; `FinstackError` (kind `validation`) for an empty or unsorted axis, a grid of the wrong length, a negative or non-finite volatility, an unknown axis, mode or quote-type name, or displacements that do not match the quote convention and the expiry count.
    */
   new (
     id: string,
@@ -7320,7 +7336,8 @@ export interface VolSurfaceConstructor {
     vols: NumericArray,
     secondaryAxis?: string | null,
     interpolationMode?: string | null,
-    quoteType?: string | null
+    quoteType?: string | null,
+    displacements?: NumericArray | null
   ): VolSurface;
   /**
    * Deserialize from the canonical JSON wire form shared with Python `VolSurface.to_json`.
@@ -7330,6 +7347,144 @@ export interface VolSurfaceConstructor {
    * @throws `TypeError` if `json` is not a JSON string or plain object; `FinstackError` (kind `validation`) if it does not match the schema or fails grid validation.
    */
   fromJson(json: JsonInput): VolSurface;
+}
+
+/**
+ * Volatility grid at one fixed option expiry, indexed by underlying tenor and strike.
+ *
+ * The fixed-expiry slice of a SABR cube: `models.volatility.materializeCubeExpirySlice`
+ * returns its wire object, and `fromJson` turns that object into a handle.
+ * Shifted-Black quotes carry one displacement per tenor, in strike units.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const slice = new core.VolCubeExpirySlice(
+ *   "USD-SWAPTION-1Y",
+ *   1.0,
+ *   [2.0, 5.0],
+ *   [0.02, 0.03, 0.04],
+ *   [0.3, 0.25, 0.27, 0.28, 0.24, 0.26],
+ * );
+ * slice.getGridShape(); // [2, 3]
+ * slice.getQuoteType(); // "black_lognormal"
+ * ```
+ */
+export interface VolCubeExpirySlice extends WasmOwned {
+  /**
+   * Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
+   *
+   * @returns Compact JSON text.
+   * @throws If serialization fails (not expected for a valid slice).
+   */
+  toJson(): string;
+  /**
+   * Identifier of the materialized grid.
+   *
+   * @returns The identifier text.
+   */
+  getId(): string;
+  /**
+   * Fixed option expiry of the slice.
+   *
+   * @returns The expiry in years.
+   */
+  getExpiry(): number;
+  /**
+   * Underlying-tenor axis.
+   *
+   * @returns Tenors in years, strictly increasing.
+   */
+  getTenors(): Float64Array;
+  /**
+   * Get strikes for this `VolCubeExpirySlice`.
+   *
+   * @returns Strikes in forward-rate units, strictly increasing.
+   */
+  getStrikes(): Float64Array;
+  /**
+   * Volatility grid in the declared quote convention.
+   *
+   * @returns Flat tenor-major grid (`getGridShape()[0]` rows of `getGridShape()[1]`).
+   */
+  getVols(): Float64Array;
+  /**
+   * Quote convention of the stored volatilities.
+   *
+   * @returns `"black_lognormal"`, `"shifted_black_lognormal"` or `"normal"`.
+   */
+  getQuoteType(): string;
+  /**
+   * Per-tenor shifted-Black displacements.
+   *
+   * @returns One displacement per tenor in rate units, or `undefined` for unshifted and normal quotes.
+   */
+  getDisplacements(): Float64Array | undefined;
+  /**
+   * Grid dimensions.
+   *
+   * @returns `[tenorCount, strikeCount]`.
+   * @throws If a dimension does not fit a 32-bit count (not reachable for a grid that fits in memory).
+   */
+  getGridShape(): Uint32Array;
+}
+
+/**
+ * Volatility grid at one fixed option expiry, indexed by underlying tenor and strike.
+ *
+ * The fixed-expiry slice of a SABR cube: `models.volatility.materializeCubeExpirySlice`
+ * returns its wire object, and `fromJson` turns that object into a handle.
+ * Shifted-Black quotes carry one displacement per tenor, in strike units.
+ *
+ * @example
+ * ```typescript
+ * import init, { core } from "finstack-quant-wasm";
+ * await init();
+ * const slice = new core.VolCubeExpirySlice(
+ *   "USD-SWAPTION-1Y",
+ *   1.0,
+ *   [2.0, 5.0],
+ *   [0.02, 0.03, 0.04],
+ *   [0.3, 0.25, 0.27, 0.28, 0.24, 0.26],
+ * );
+ * slice.getGridShape(); // [2, 3]
+ * slice.getQuoteType(); // "black_lognormal"
+ * ```
+ */
+export interface VolCubeExpirySliceConstructor {
+  /**
+   * Construct a fixed-expiry tenor-by-strike grid (Rust
+   * `VolCubeExpirySlice::from_grid`).
+   *
+   * @param id - Identifier of the materialized grid.
+   * @param expiry - Fixed option expiry in years; finite and positive.
+   * @param tenors - Underlying tenors in years, positive and strictly increasing.
+   * @param strikes - Strike coordinates in forward-rate units, strictly increasing.
+   * @param vols - Flat tenor-major grid, `tenors.length * strikes.length` entries: decimal Black volatilities or absolute normal volatilities.
+   * @param quoteType - `"black_lognormal"`, `"shifted_black_lognormal"` or `"normal"`; omitted uses `"black_lognormal"`.
+   * @param displacements - Shifted-Black displacements in rate units, one per tenor; required for shifted quotes and omitted otherwise.
+   * @returns The validated `VolCubeExpirySlice`.
+   * @throws `TypeError` (kind `invalid_type`) for a mistyped argument; `FinstackError` (kind `validation`) for an invalid expiry or axis, a grid of the wrong length, an invalid volatility, an unknown quote type, or displacements that do not match the quote convention and tenor count.
+   */
+  new (
+    id: string,
+    expiry: number,
+    tenors: NumericArray,
+    strikes: NumericArray,
+    vols: NumericArray,
+    quoteType?: string | null,
+    displacements?: NumericArray | null
+  ): VolCubeExpirySlice;
+  /**
+   * Deserialize from the canonical JSON wire form shared with Python
+   * `VolCubeExpirySlice.to_json`.
+   *
+   * @param json - Canonical VolCubeExpirySlice JSON text or plain object, such as a `materializeCubeExpirySlice` result; unknown fields are rejected and the grid is re-validated.
+   * @returns The validated `VolCubeExpirySlice`.
+   * @throws `TypeError` if `json` is not a JSON string or plain object; `FinstackError` (kind `validation`) if it does not match the schema or fails grid validation.
+   */
+  fromJson(json: JsonInput): VolCubeExpirySlice;
 }
 
 /**
@@ -7495,6 +7650,32 @@ export interface InflationIndex extends WasmOwned {
    * Observations in date order as `[isoDate, level]` pairs.
    */
   readonly observations: [string, number][];
+  /**
+   * A copy of this index with an explicit monthly publication schedule
+   * (Rust `InflationIndex::with_publication_dates`).
+   *
+   * @param dates - Array of `[referenceMonth, publicationDate]` ISO-8601 date pairs (or its JSON text). Each reference month is a first-of-month date and each publication date is the inclusive date its print becomes available; the schedule replaces any existing one and is independent of the contractual observation lag.
+   * @returns A new `InflationIndex` keeping the observations and other conventions; this index is unchanged.
+   * @throws `TypeError` (kind `invalid_type`) if `dates` is not an array or JSON text; `FinstackError` (kind `validation`) for a malformed date or pair, a reference date that is not a month start, a duplicated month, or a publication date before its reference month.
+   */
+  withPublicationDates(dates: readonly (readonly [string, string])[] | string): InflationIndex;
+  /**
+   * Explicit publication date of a reference month (Rust
+   * `InflationIndex::get_publication_date`).
+   *
+   * @param referenceDate - Any ISO-8601 date in the reference month; its day is ignored.
+   * @returns The inclusive ISO-8601 availability date, or `undefined` when the month has no configured publication date.
+   * @throws `TypeError` (kind `invalid_type`) if `referenceDate` is not a string; `FinstackError` (kind `validation`) if it is not an ISO-8601 date.
+   */
+  getPublicationDate(referenceDate: string): string | undefined;
+  /**
+   * Configured monthly publication schedule (Rust
+   * `InflationIndex::get_publication_dates`).
+   *
+   * @returns `[referenceMonth, publicationDate]` ISO-8601 pairs in ascending reference-month order; empty when no schedule is set.
+   * @throws If the pairs cannot be converted to a JavaScript array.
+   */
+  getPublicationDates(): [string, string][];
   /**
    * Serialize to the canonical JSON wire form accepted by `fromJson` and Python.
    *
@@ -8084,6 +8265,10 @@ export interface CoreNamespace {
    * SABR swaption volatility cube constructor.
    */
   VolCube: VolCubeConstructor;
+  /**
+   * Vol cube expiry slice of this `Core`.
+   */
+  VolCubeExpirySlice: VolCubeExpirySliceConstructor;
   /**
    * FX delta-quoted volatility surface constructor.
    */
@@ -14693,17 +14878,33 @@ export interface CashflowsNamespace {
   mergeCashflowSchedules(schedules: readonly (CashFlowSchedule | JsonInput)[], notional: generated.cashflows.Notional, dayCount: generated.core.DayCount): CashFlowSchedule;
 
   /**
-   * Ex-coupon date for a coupon paid on a date.
+   * Coupon record date for a coupon paid on a date.
    *
-   * From the returned date (inclusive) until the payment date (exclusive) the
-   * bond trades ex-coupon and accrued interest is negative.
+   * Settlement on the returned date keeps the coupon; settlement strictly
+   * after it and before the payment date trades ex-coupon, and accrued
+   * interest is then negative.
    *
    * @param rule - `ExCouponRule` wire object: `days_before_coupon` and an optional `calendar_id` (business days when set, calendar days otherwise).
    * @param paymentDate - ISO-8601 coupon payment date the window is counted back from.
-   * @returns ISO-8601 ex-coupon date.
+   * @returns ISO-8601 record date.
    * @throws If `rule` is not an `ExCouponRule`, `days_before_coupon` exceeds 366, the calendar id cannot be resolved (kind `validation`), or `paymentDate` is not an ISO-8601 string (kind `invalid_type` or `validation`).
    */
   exCouponRuleExDate(rule: generated.cashflows.ExCouponRule, paymentDate: string): generated.core.DateWire;
+
+  /**
+   * Whether a settlement date falls in the ex-coupon window of a coupon.
+   *
+   * Free-function twin of Python `ExCouponRule.is_ex_coupon` (Rust
+   * `ExCouponRule::is_ex_coupon`): a buyer settling in the window forfeits the
+   * imminent coupon.
+   *
+   * @param rule - `ExCouponRule` wire object: `days_before_coupon` and an optional `calendar_id` (business days when set, calendar days otherwise).
+   * @param paymentDate - ISO-8601 coupon payment date the record date is counted back from.
+   * @param settlementDate - ISO-8601 ownership-transfer (settlement) date; convert a trade date to settlement first.
+   * @returns `true` strictly after the record date and before the payment date; settlement on the record date keeps the coupon and returns `false`.
+   * @throws If `rule` is not an `ExCouponRule`, `days_before_coupon` exceeds 366, the calendar id cannot be resolved, the record date is out of range (kind `validation`), or a date is not an ISO-8601 string (kind `invalid_type` or `validation`).
+   */
+  exCouponRuleIsExCoupon(rule: generated.cashflows.ExCouponRule, paymentDate: string, settlementDate: string): boolean;
 
   /**
    * Accrued interest of a schedule as of a date.
@@ -27668,6 +27869,32 @@ export interface VolatilityNamespace {
    */
   getCubeVolClamped(cube: VolCube, expiry: number, tenor: number, strike: number): number;
   /**
+   * Interpolate a fixed-expiry cube slice; coordinates outside the grid are rejected.
+   * @param slice - `VolCubeExpirySlice` object or JSON in the canonical wire form, such as a `materializeCubeExpirySlice` result or `core.VolCubeExpirySlice.toJson()`.
+   * @param tenor - Underlying tenor in years, within the slice's tenor axis.
+   * @param strike - Strike in forward-rate units, within the slice's strike axis.
+   * @returns The bilinearly interpolated volatility in the slice's quote convention.
+   * @throws Error - Throws a `validation` error if `slice` is malformed or a coordinate is non-finite or outside the grid.
+   */
+  getCubeExpirySliceVol(
+    slice: generated.core.VolCubeExpirySlice | string,
+    tenor: number,
+    strike: number
+  ): number;
+  /**
+   * Interpolate a fixed-expiry cube slice with flat clamping to the grid edges.
+   * @param slice - `VolCubeExpirySlice` object or JSON in the canonical wire form.
+   * @param tenor - Underlying tenor in years; clamped to the slice's tenor axis.
+   * @param strike - Strike in forward-rate units; clamped to the slice's strike axis.
+   * @returns The interpolated volatility in the slice's quote convention; `NaN` for non-finite coordinates.
+   * @throws Error - Throws a `validation` error if `slice` is malformed.
+   */
+  getCubeExpirySliceVolClamped(
+    slice: generated.core.VolCubeExpirySlice | string,
+    tenor: number,
+    strike: number
+  ): number;
+  /**
    * Evaluate checked normal/Bachelier volatility from a data-only SABR cube.
    * @returns Annualized normal volatility in absolute rate units.
    * @param cube - Structurally validated data-only volatility cube.
@@ -27863,27 +28090,27 @@ export interface VolatilityNamespace {
    * @param cube - `core.VolCube` handle.
    * @param expiry - Option expiry in years, within the cube grid.
    * @param strikes - Strictly increasing strikes of the output surface.
-   * @returns The tenor by strike `VolSurface` object in its canonical wire form.
+   * @returns The tenor by strike `VolCubeExpirySlice` object in its canonical wire form (`id`, `expiry`, `tenors`, `strikes`, `vols_row_major`, `quote_type`, optional `displacements`).
    * @throws Error - Throws a `validation` error if the expiry is outside the cube, the strikes are invalid, or a SABR evaluation fails.
    */
   materializeCubeExpirySlice(
     cube: VolCube,
     expiry: number,
     strikes: NumericArray
-  ): generated.core.VolSurface;
+  ): generated.core.VolCubeExpirySlice;
   /**
    * Materialize the normal (Bachelier) volatility slice of a SABR cube at one option expiry.
    * @param cube - `core.VolCube` handle.
    * @param expiry - Option expiry in years, within the cube grid.
    * @param strikes - Strictly increasing strikes of the output surface.
-   * @returns The tenor by strike `VolSurface` object of normal volatilities.
+   * @returns The tenor by strike `VolCubeExpirySlice` object of normal volatilities.
    * @throws Error - Throws a `validation` error if the expiry is outside the cube, the strikes are invalid, or a SABR evaluation fails.
    */
   materializeCubeExpirySliceNormal(
     cube: VolCube,
     expiry: number,
     strikes: NumericArray
-  ): generated.core.VolSurface;
+  ): generated.core.VolCubeExpirySlice;
   /**
    * Materialize the Black volatility slice of a SABR cube at one underlying tenor.
    * @param cube - `core.VolCube` handle.
@@ -31516,6 +31743,15 @@ export interface StatementsNamespace {
    * @throws Error - Throws only if the list cannot be converted to a JavaScript array.
    */
   checkSuiteSpecBuiltinCheckNames(): string[];
+  /**
+   * Validate the tolerances and materiality thresholds of a check configuration.
+   *
+   * Free-function twin of Python `CheckConfig.validate` (Rust
+   * `CheckConfig::validate`). Returns `undefined` when valid.
+   * @param config - `CheckConfig` object or JSON: `default_tolerance`, `default_relative_tolerance`, `materiality_threshold` and `min_severity`; omitted fields take the Rust defaults.
+   * @throws Error - Throws a `TypeError` when `config` is not an object or JSON string, and a `validation` error when it does not match the `CheckConfig` contract or a tolerance or materiality threshold is negative or non-finite.
+   */
+  checkConfigValidate(config: generated.statements.CheckConfig | string): void;
 }
 
 /**

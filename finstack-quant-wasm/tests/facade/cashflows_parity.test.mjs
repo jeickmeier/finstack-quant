@@ -299,6 +299,20 @@ const cases = {
             { days_before_coupon: 7, calendar_id: 'usny' },
             '2025-07-15'
           ),
+          // Record date 2025-07-08 (calendar) / 2025-07-03 (USNY business days).
+          is_ex_coupon: [
+            ['2025-07-08', null],
+            ['2025-07-09', null],
+            ['2025-07-15', null],
+            ['2025-07-03', 'usny'],
+            ['2025-07-07', 'usny'],
+          ].map(([settlement, calendar]) =>
+            cashflows.exCouponRuleIsExCoupon(
+              { days_before_coupon: 7, calendar_id: calendar },
+              '2025-07-15',
+              settlement
+            )
+          ),
         })
       )
     ),

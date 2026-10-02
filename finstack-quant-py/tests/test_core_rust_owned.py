@@ -51,10 +51,21 @@ def test_one_rust_currency_parser_names_the_code_and_does_not_trim(build: Callab
         build()
 
 
-def test_money_text_amount_is_not_trimmed() -> None:
+def test_money_text_amount_is_trimmed_by_the_rust_decimal_parser() -> None:
+    """Rust ``decimal::parse_decimal`` ignores surrounding whitespace; the currency parser does not.
+
+    WASM twin: ``Money text amounts are trimmed by the Rust decimal parser`` in
+    ``finstack-quant-wasm/tests/facade/core_rust_owned.test.mjs``.
+    """
     assert Money("100.25", "USD").amount_decimal == Money.from_decimal_str("100.25", "USD").amount_decimal
-    with pytest.raises(ValueError, match="Invalid Decimal value"):
-        Money(" 100.25 ", "USD")
+    for text in (" 100.25 ", "\t100.25\n"):
+        assert Money(text, "USD").to_json() == '{"amount":"100.25","currency":"USD"}'
+        assert Money.from_decimal_str(text, "USD").to_json() == '{"amount":"100.25","currency":"USD"}'
+    for text in ("100 .25", " ", "abc"):
+        with pytest.raises(ValueError, match="decimal value must be exactly representable as Decimal"):
+            Money.from_decimal_str(text, "USD")
+        with pytest.raises(ValueError, match="decimal value must be exactly representable as Decimal"):
+            Money(text, "USD")
 
 
 @pytest.mark.parametrize(

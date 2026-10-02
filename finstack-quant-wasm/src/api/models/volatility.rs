@@ -11,7 +11,7 @@ use crate::utils::input::{
 };
 use crate::utils::wire::js_wire;
 use crate::utils::{to_js_err, to_js_value};
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{VolCubeExpirySlice, VolSurface};
 use finstack_quant_models::volatility as vol;
 use finstack_quant_models::volatility::arbitrage as model_arbitrage;
 use finstack_quant_models::volatility::sabr::{
@@ -1028,7 +1028,7 @@ pub fn materialize_cube_tenor_slice_normal(
 /// @param cube - `core.VolCube` handle.
 /// @param expiry - Option expiry in years, within the cube grid.
 /// @param strikes - Strictly increasing strikes of the output surface.
-/// @returns The tenor by strike `VolSurface` object in its canonical wire form.
+/// @returns The tenor by strike `VolCubeExpirySlice` object in its canonical wire form (`id`, `expiry`, `tenors`, `strikes`, `vols_row_major`, `quote_type`, optional `displacements`).
 ///
 /// # Errors
 ///
@@ -1053,7 +1053,7 @@ pub fn materialize_cube_expiry_slice(
 /// @param cube - `core.VolCube` handle.
 /// @param expiry - Option expiry in years, within the cube grid.
 /// @param strikes - Strictly increasing strikes of the output surface.
-/// @returns The tenor by strike `VolSurface` object of normal volatilities.
+/// @returns The tenor by strike `VolCubeExpirySlice` object of normal volatilities.
 ///
 /// # Errors
 ///
@@ -1072,6 +1072,50 @@ pub fn materialize_cube_expiry_slice_normal(
     )
     .map_err(to_js_err)?;
     to_js_value(&surface)
+}
+
+/// Interpolate a fixed-expiry cube slice; coordinates outside the grid are rejected.
+/// @param slice - `VolCubeExpirySlice` object or JSON in the canonical wire form, such as a `materializeCubeExpirySlice` result or `core.VolCubeExpirySlice.toJson()`.
+/// @param tenor - Underlying tenor in years, within the slice's tenor axis.
+/// @param strike - Strike in forward-rate units, within the slice's strike axis.
+/// @returns The bilinearly interpolated volatility in the slice's quote convention.
+///
+/// # Errors
+///
+/// Throws a `validation` error if `slice` is malformed or a coordinate is
+/// non-finite or outside the grid.
+#[wasm_bindgen(js_name = getCubeExpirySliceVol)]
+pub fn get_cube_expiry_slice_vol(
+    slice: JsValue,
+    tenor: JsValue,
+    strike: JsValue,
+) -> Result<f64, JsValue> {
+    let slice: VolCubeExpirySlice = from_js_json(&slice, "slice")?;
+    vol::get_cube_expiry_slice_vol(&slice, js_f64(&tenor, "tenor")?, js_f64(&strike, "strike")?)
+        .map_err(to_js_err)
+}
+
+/// Interpolate a fixed-expiry cube slice with flat clamping to the grid edges.
+/// @param slice - `VolCubeExpirySlice` object or JSON in the canonical wire form.
+/// @param tenor - Underlying tenor in years; clamped to the slice's tenor axis.
+/// @param strike - Strike in forward-rate units; clamped to the slice's strike axis.
+/// @returns The interpolated volatility in the slice's quote convention; `NaN` for non-finite coordinates.
+///
+/// # Errors
+///
+/// Throws a `validation` error if `slice` is malformed.
+#[wasm_bindgen(js_name = getCubeExpirySliceVolClamped)]
+pub fn get_cube_expiry_slice_vol_clamped(
+    slice: JsValue,
+    tenor: JsValue,
+    strike: JsValue,
+) -> Result<f64, JsValue> {
+    let slice: VolCubeExpirySlice = from_js_json(&slice, "slice")?;
+    Ok(vol::get_cube_expiry_slice_vol_clamped(
+        &slice,
+        js_f64(&tenor, "tenor")?,
+        js_f64(&strike, "strike")?,
+    ))
 }
 
 /// Materialize an FX delta-quoted surface as an expiry by strike volatility surface.

@@ -3093,7 +3093,8 @@
       }
     ],
     "ex_date_calendar_days": "2025-07-08",
-    "ex_date_business_days": "2025-07-03"
+    "ex_date_business_days": "2025-07-03",
+    "is_ex_coupon": [false, true, false, false, true]
   },
   "aggregation": {
     "by_period": {

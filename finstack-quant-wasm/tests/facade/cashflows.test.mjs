@@ -102,6 +102,7 @@ const EXPORTED_KEYS = [
   'defaultModelSpecValidate',
   'defaultModelSpecVector',
   'exCouponRuleExDate',
+  'exCouponRuleIsExCoupon',
   'feeBaseUndrawn',
   'feeSpecFixed',
   'feeSpecPeriodicBp',

@@ -66,5 +66,6 @@ export const statements = {
   normalize: wasm.normalize,
   normalizeJson: wasm.normalizeJson,
   checkSuiteSpecBuiltinCheckNames: wasm.checkSuiteSpecBuiltinCheckNames,
+  checkConfigValidate: wasm.checkConfigValidate,
   schema,
 };

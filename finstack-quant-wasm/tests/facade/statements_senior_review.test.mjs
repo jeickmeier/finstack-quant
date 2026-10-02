@@ -198,3 +198,34 @@ test('model validation rejects PIK capitalization of a swap payment', () => {
     /only borrowing debt coupons/
   );
 });
+
+// Twin of `test_check_config_rejects_invalid_thresholds` and
+// `test_check_config_json_validates_thresholds` in
+// finstack-quant-py/tests/test_statements_senior_review.py: the same Rust
+// `CheckConfig::validate` names the offending field in both hosts.
+test('checkConfigValidate is the Rust CheckConfig::validate', () => {
+  assert.equal(statements.checkConfigValidate({}), undefined);
+  assert.equal(statements.checkConfigValidate('{"default_tolerance":0.01}'), undefined);
+  for (const field of [
+    'default_tolerance',
+    'default_relative_tolerance',
+    'materiality_threshold',
+  ]) {
+    for (const value of [-1.0, -0.01]) {
+      assert.throws(
+        () => statements.checkConfigValidate({ [field]: value }),
+        (error) => error.kind === 'validation' && error.message.includes(field)
+      );
+    }
+    // A non-finite number is not JSON: the boundary rejects it before Rust.
+    assert.throws(
+      () => statements.checkConfigValidate({ [field]: Number.NaN }),
+      (error) => error instanceof TypeError
+    );
+  }
+  assert.throws(
+    () => statements.checkConfigValidate({ tolerance: 0.01 }),
+    (error) => error.kind === 'validation'
+  );
+  assert.throws(() => statements.checkConfigValidate(1), TypeError);
+});

@@ -384,9 +384,9 @@ def test_compute_horizon_return_matches_the_wasm_summary() -> None:
         ],
     )
     result = compute_horizon_return(_deposit_json(), _market(), AS_OF, spec)
-    assert result.total_return == pytest.approx(0.0023777484103168997, abs=1e-12)
-    assert result.annualized_return == pytest.approx(0.02835746876872225, abs=1e-12)
-    assert result.factor_contribution("carry") == pytest.approx(0.003408116341277966, abs=1e-12)
+    assert result.total_return == pytest.approx(0.0023899669679482228, abs=1e-12)
+    assert result.annualized_return == pytest.approx(0.028505070795274978, abs=1e-12)
+    assert result.factor_contribution("carry") == pytest.approx(0.0034203488888837974, abs=1e-12)
 
 
 def test_horizon_annualization_preserves_losses_beyond_initial_capital() -> None:

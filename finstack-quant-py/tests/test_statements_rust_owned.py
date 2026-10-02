@@ -9,7 +9,6 @@ results (model ingest and validation, ``GoalSeekResult``, ``DependencyTree``,
 from __future__ import annotations
 
 import json
-import math
 import pickle
 
 import pytest
@@ -215,10 +214,12 @@ def test_compute_multiple_treats_none_as_missing() -> None:
 
 def test_non_finite_values_use_the_nan_sentinel() -> None:
     metrics = backtest_forecast([0.0, 0.0], [1.0, 2.0])
-    assert json.loads(metrics.to_json())["mape"] == "nan"
+    # An undefined MAPE (every actual is zero) is Rust `None` / JSON null, as in WASM; it is not a NaN sentinel.
+    assert json.loads(metrics.to_json())["mape"] is None
+    assert metrics.mape_effective_n == 0
     restored = ForecastMetrics.from_json(metrics.to_json())
-    assert math.isnan(restored.mape)
-    assert math.isnan(pickle.loads(pickle.dumps(metrics)).mape)  # noqa: S301 - trusted in-process round trip
+    assert restored.mape is None
+    assert pickle.loads(pickle.dumps(metrics)).mape is None  # noqa: S301 - trusted in-process round trip
 
     model = json.dumps({
         "id": "lag",

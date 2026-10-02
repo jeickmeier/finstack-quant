@@ -28,6 +28,8 @@ test('volatility engines are exposed only under models.volatility', () => {
     'SabrCalibrator',
     'getCubeVol',
     'getCubeVolClamped',
+    'getCubeExpirySliceVol',
+    'getCubeExpirySliceVolClamped',
     'getCubeNormalVol',
     'getCubeNormalVolClamped',
     'getFxDeltaPillarVols',

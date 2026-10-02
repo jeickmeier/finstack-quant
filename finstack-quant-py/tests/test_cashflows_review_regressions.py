@@ -30,8 +30,8 @@ def test_aggregation_round_trip_preserves_currency_labels() -> None:
     })
     totals = PeriodAggregation.from_json(wire)
     restored = PeriodAggregation.from_json(totals.to_json())
-    assert restored.get("2025Q1", "USD") == Money(100, "USD")
-    assert restored.get("2025Q1", "EUR") == Money(200, "EUR")
+    assert restored.get_amount("2025Q1", "USD") == Money(100, "USD")
+    assert restored.get_amount("2025Q1", "EUR") == Money(200, "EUR")
     assert restored.to_dataframe().to_dict("records") == [
         {"period": "2025Q1", "currency": "USD", "amount": 100.0},
         {"period": "2025Q1", "currency": "EUR", "amount": 200.0},

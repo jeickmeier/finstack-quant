@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use finstack_quant_core::contract::LoadLimits;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::types::CurveId;
@@ -622,17 +623,40 @@ impl PyMarketContext {
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Deserialize a market context from a JSON string.
+    /// Strictly load a persisted market context from its canonical state JSON.
     ///
-    /// Accepts the same JSON format produced by :meth:`to_json` and by the
-    /// calibration and pricing pipelines.
+    /// Uses the Rust ``MarketContext::from_state_slice`` contract loader with
+    /// the default ``LoadLimits`` (64 MiB of input, 96 nested JSON containers),
+    /// exactly as WASM ``core.MarketContext.fromJson`` does.
     ///
-    /// Raises ``ValueError`` if the JSON is malformed or fails validation.
+    /// Parameters
+    /// ----------
+    /// json : str
+    ///     Canonical MarketContext JSON produced by :meth:`to_json` or by the
+    ///     calibration pipeline, carrying ``schema_version: 1``. Unknown fields
+    ///     are rejected.
+    ///
+    /// Returns
+    /// -------
+    /// MarketContext
+    ///     The restored context.
+    ///
+    /// Raises
+    /// ------
+    /// ContractValidationError
+    ///     If the JSON is malformed, ``schema_version`` is missing or
+    ///     unsupported, or the state has unknown fields, invalid market
+    ///     objects, duplicate ids or unresolved curve references; the
+    ///     ``report`` attribute lists the diagnostics. Subclass of ``ValueError``.
+    /// ContractLimitExceededError
+    ///     If the JSON exceeds the canonical input-size or nesting-depth limit.
     #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let ctx: MarketContext = serde_json::from_str(json)
-            .map_err(|e| crate::errors::value_error(format!("invalid MarketContext JSON: {e}")))?;
-        Ok(Self { inner: ctx })
+    #[pyo3(text_signature = "(json, /)")]
+    fn from_json(py: Python<'_>, json: &str) -> PyResult<Self> {
+        let (inner, _report) =
+            MarketContext::from_state_slice(json.as_bytes(), &LoadLimits::default())
+                .map_err(|e| crate::errors::contract_to_py(py, e))?;
+        Ok(Self { inner })
     }
 
     /// Serialize this market context to compact JSON (round-trips with pricers).

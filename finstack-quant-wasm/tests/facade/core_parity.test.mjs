@@ -61,6 +61,22 @@ const surface = () =>
     [90.0, 100.0, 110.0],
     [0.24, 0.2, 0.22, 0.23, 0.21, 0.22]
   );
+const shiftedSurface = () => surface().withDisplacements([0.01, 0.015]);
+const expirySlice = (quoteType, displacements) =>
+  new core.VolCubeExpirySlice(
+    'USD-SWAPTION-1Y',
+    1.0,
+    [2.0, 5.0],
+    [0.02, 0.03, 0.04],
+    [0.3, 0.25, 0.27, 0.28, 0.24, 0.26],
+    quoteType,
+    displacements
+  );
+const numbers = (values) => (values === undefined ? null : Array.from(values));
+const PUBLICATION_DATES = [
+  ['2024-10-01', '2024-11-13'],
+  ['2024-11-01', '2024-12-11'],
+];
 const series = () =>
   new core.ScalarTimeSeries(
     'SOFR-FIXINGS',
@@ -338,6 +354,36 @@ const CASES = {
     surface().quoteType,
     surface().interpolationMode,
   ],
+  vol_surface_displacements: () => [
+    numbers(surface().getDisplacements()),
+    numbers(shiftedSurface().getDisplacements()),
+    shiftedSurface().quoteType,
+    JSON.parse(shiftedSurface().toJson()),
+    new core.VolSurface(
+      'SPX-VOL',
+      [0.5, 1.0],
+      [90.0, 100.0, 110.0],
+      [0.24, 0.2, 0.22, 0.23, 0.21, 0.22],
+      null,
+      null,
+      'shifted_black_lognormal',
+      [0.01, 0.015]
+    ).toJson() === shiftedSurface().toJson(),
+  ],
+  vol_cube_expiry_slice: () => JSON.parse(expirySlice().toJson()),
+  vol_cube_expiry_slice_queries: () => [
+    expirySlice().getId(),
+    expirySlice().getExpiry(),
+    numbers(expirySlice().getTenors()),
+    numbers(expirySlice().getStrikes()),
+    numbers(expirySlice().getVols()),
+    expirySlice().getQuoteType(),
+    numbers(expirySlice().getDisplacements()),
+    numbers(expirySlice().getGridShape()),
+    numbers(expirySlice('shifted_black_lognormal', [0.01, 0.02]).getDisplacements()),
+    expirySlice('normal').getQuoteType(),
+    JSON.parse(core.VolCubeExpirySlice.fromJson(JSON.parse(expirySlice().toJson())).toJson()),
+  ],
   scalar_time_series: () => JSON.parse(series().toJson()),
   scalar_time_series_queries: () => [
     series().valueOn('2025-01-04'),
@@ -352,6 +398,16 @@ const CASES = {
     index().refCpiMonthsLag('2025-02-15', 3),
     index().dateRange(),
     index().lag,
+  ],
+  inflation_index_publication_dates: () => [
+    index().getPublicationDates(),
+    index().getPublicationDate('2024-10-20') ?? null,
+    index().withPublicationDates(PUBLICATION_DATES).getPublicationDates(),
+    index()
+      .withPublicationDates(JSON.stringify(PUBLICATION_DATES))
+      .getPublicationDate('2024-10-20'),
+    index().withPublicationDates(PUBLICATION_DATES).getPublicationDate('2024-12-05') ?? null,
+    JSON.parse(index().withPublicationDates(PUBLICATION_DATES).toJson()),
   ],
   fx_matrix: () => [
     fx().rate('EUR', 'USD', '2025-01-02').rate,
