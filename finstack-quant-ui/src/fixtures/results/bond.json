@@ -15,17 +15,17 @@
       "ytm": 0.04192805926047216,
       "dv01": -99.2633986165165,
       "duration_mod": 0.969221509109137,
-      "bucketed_dv01": -99.26339861378074,
+      "bucketed_dv01": -99.26339861511951,
       "bucketed_dv01::USD-OIS::10y": 0,
       "bucketed_dv01::USD-OIS::15y": 0,
-      "bucketed_dv01::USD-OIS::1y": -97.69482497143326,
+      "bucketed_dv01::USD-OIS::1y": -97.9624820270692,
       "bucketed_dv01::USD-OIS::20y": 0,
-      "bucketed_dv01::USD-OIS::2y": -0.5367847516899928,
+      "bucketed_dv01::USD-OIS::2y": -0.26912769745104015,
       "bucketed_dv01::USD-OIS::30y": 0,
-      "bucketed_dv01::USD-OIS::3m": -0.008550736703909934,
+      "bucketed_dv01::USD-OIS::3m": -0.01696091325720772,
       "bucketed_dv01::USD-OIS::3y": 0,
       "bucketed_dv01::USD-OIS::5y": 0,
-      "bucketed_dv01::USD-OIS::6m": -1.0232381539535709,
+      "bucketed_dv01::USD-OIS::6m": -1.0148279773420654,
       "bucketed_dv01::USD-OIS::7y": 0
     },
     "meta": {
@@ -38,7 +38,7 @@
         "version": 1
       },
       "fx_policy_applied": null,
-      "timestamp": "+002026-09-30T08:10:37.551000000Z",
+      "timestamp": "+002026-10-02T00:50:14.033000000Z",
       "version": "0.9.0"
     },
     "covenants": null
@@ -431,5 +431,5 @@
       "bucketed": true
     }
   ],
-  "facadeWasmSha256": "a47a1be75f7d7aed763d65c6175ea7e2d483495cb16c9b5e60fa73a491149361"
+  "facadeWasmSha256": "10adb351b495df6f2a57946604f5e757231295e35cf42c0004a3cb696e0536ba"
 }

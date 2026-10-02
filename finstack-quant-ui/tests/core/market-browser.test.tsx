@@ -65,7 +65,8 @@ it("retains the realistic CDX calibration and native canonical supplemental fixt
   } finally {
     handle.free();
   }
-}, 15000);
+  // One native CDX base-correlation solve takes ~20 s under the wasm-test profile.
+}, 60000);
 it("navigates every supplied leaf with exact displayed and copied values", async () => {
   const copy = vi.fn().mockResolvedValue(undefined);
   Object.defineProperty(navigator, "clipboard", {

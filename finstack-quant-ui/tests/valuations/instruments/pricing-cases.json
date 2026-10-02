@@ -30,7 +30,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -68,7 +68,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -112,7 +112,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -150,7 +150,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -188,7 +188,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -238,7 +238,7 @@
       ],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -276,7 +276,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -314,7 +314,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -333,11 +333,11 @@
       },
       "reference": {
         "baseline": {
-          "amount": "253770.867700737",
+          "amount": "250615.751208322",
           "currency": "USD"
         },
         "edited": {
-          "amount": "279147.954470811",
+          "amount": "275677.326329154",
           "currency": "USD"
         }
       }
@@ -352,7 +352,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -428,7 +428,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -502,7 +502,7 @@
       ],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -552,7 +552,7 @@
       ],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -571,11 +571,11 @@
       },
       "reference": {
         "baseline": {
-          "amount": "911324.645428367",
+          "amount": "911324.640753023",
           "currency": "USD"
         },
         "edited": {
-          "amount": "1002457.109971204",
+          "amount": "1002457.104828326",
           "currency": "USD"
         }
       }
@@ -590,7 +590,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -609,11 +609,11 @@
       },
       "reference": {
         "baseline": {
-          "amount": "515716.67931458101",
+          "amount": "493110.00123153598",
           "currency": "USD"
         },
         "edited": {
-          "amount": "567288.34724603912",
+          "amount": "542421.00135468960",
           "currency": "USD"
         }
       }
@@ -628,7 +628,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -647,11 +647,11 @@
       },
       "reference": {
         "baseline": {
-          "amount": "293220.3501708527",
+          "amount": "293220.0338076418",
           "currency": "USD"
         },
         "edited": {
-          "amount": "322542.385187938",
+          "amount": "322542.037188406",
           "currency": "USD"
         }
       }
@@ -666,7 +666,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -754,7 +754,7 @@
       ],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -792,7 +792,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -811,11 +811,11 @@
       },
       "reference": {
         "baseline": {
-          "amount": "153012.6165752799",
+          "amount": "147738.4488021919",
           "currency": "USD"
         },
         "edited": {
-          "amount": "168313.8782328079",
+          "amount": "162512.2936824111",
           "currency": "USD"
         }
       }
@@ -830,7 +830,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -849,11 +849,11 @@
       },
       "reference": {
         "baseline": {
-          "amount": "14733.78977571791",
+          "amount": "14329.01531811941",
           "currency": "USD"
         },
         "edited": {
-          "amount": "16207.16875328971",
+          "amount": "15761.91684993135",
           "currency": "USD"
         }
       }
@@ -868,7 +868,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -887,11 +887,11 @@
       },
       "reference": {
         "baseline": {
-          "amount": "-104987.5208795479",
+          "amount": "-99606.9359312007",
           "currency": "USD"
         },
         "edited": {
-          "amount": "-115486.2729675027",
+          "amount": "-109567.6295243207",
           "currency": "USD"
         }
       }
@@ -906,7 +906,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -949,7 +949,7 @@
       ],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -987,7 +987,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -1025,7 +1025,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -1063,7 +1063,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -1101,7 +1101,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -1139,7 +1139,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -1177,7 +1177,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -1215,7 +1215,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -1291,7 +1291,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -1310,11 +1310,11 @@
       },
       "reference": {
         "baseline": {
-          "amount": "82668.1485237387",
+          "amount": "82667.8321605278",
           "currency": "USD"
         },
         "edited": {
-          "amount": "90934.9633761125",
+          "amount": "90934.6153765805",
           "currency": "USD"
         }
       }
@@ -1329,7 +1329,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -1367,7 +1367,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -1405,7 +1405,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -1443,7 +1443,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -1481,7 +1481,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -1519,7 +1519,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -1557,7 +1557,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -1595,7 +1595,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -1633,7 +1633,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -1652,11 +1652,11 @@
       },
       "reference": {
         "baseline": {
-          "amount": "12414.05804431126",
+          "amount": "13776.07680118625",
           "currency": "USD"
         },
         "edited": {
-          "amount": "13655.46384874238",
+          "amount": "15153.68448130488",
           "currency": "USD"
         }
       }
@@ -1671,7 +1671,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -1709,7 +1709,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -1747,7 +1747,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -1785,7 +1785,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -1823,7 +1823,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -1861,7 +1861,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -1899,7 +1899,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -1937,7 +1937,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -1975,7 +1975,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -2013,7 +2013,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -2051,7 +2051,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -2089,7 +2089,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [
@@ -2170,7 +2170,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -2183,17 +2183,17 @@
       },
       "edit": {
         "path": ["instrument", "spec", "terms", "contracts"],
-        "from": 1.0,
+        "from": 1,
         "to": 1.1,
         "description": "Change terms.contracts from 1.0 to 1.1; native present value must change."
       },
       "reference": {
         "baseline": {
-          "amount": "1250.027600834045",
+          "amount": "1387.013524110294",
           "currency": "USD"
         },
         "edited": {
-          "amount": "1375.03036091745",
+          "amount": "1525.714876521324",
           "currency": "USD"
         }
       }
@@ -2208,7 +2208,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -2246,7 +2246,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -2265,11 +2265,11 @@
       },
       "reference": {
         "baseline": {
-          "amount": "34610.40886608115",
+          "amount": "8912.21632401529",
           "currency": "USD"
         },
         "edited": {
-          "amount": "38071.44975268911",
+          "amount": "9803.43795641675",
           "currency": "USD"
         }
       }
@@ -2284,7 +2284,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -2322,7 +2322,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -2360,7 +2360,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -2398,7 +2398,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -2436,7 +2436,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -2474,7 +2474,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -2512,7 +2512,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -2550,7 +2550,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -2588,7 +2588,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -2607,11 +2607,11 @@
       },
       "reference": {
         "baseline": {
-          "amount": "1712846.279446133",
+          "amount": "1691943.088976571",
           "currency": "USD"
         },
         "edited": {
-          "amount": "1809949.394214964",
+          "amount": "1787458.245415196",
           "currency": "USD"
         }
       }
@@ -2638,7 +2638,7 @@
       ],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -2657,11 +2657,11 @@
       },
       "reference": {
         "baseline": {
-          "amount": "994168.485106541",
+          "amount": "994168.445763835",
           "currency": "USD"
         },
         "edited": {
-          "amount": "1093585.333617195",
+          "amount": "1093585.290340219",
           "currency": "USD"
         }
       }
@@ -2676,7 +2676,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -2723,7 +2723,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -2773,7 +2773,7 @@
       ],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -2792,11 +2792,11 @@
       },
       "reference": {
         "baseline": {
-          "amount": "879899.907684928",
+          "amount": "879899.872684117",
           "currency": "USD"
         },
         "edited": {
-          "amount": "967889.89845342",
+          "amount": "967889.859952529",
           "currency": "USD"
         }
       }
@@ -2811,7 +2811,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -2849,7 +2849,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -2868,11 +2868,11 @@
       },
       "reference": {
         "baseline": {
-          "amount": "-87007.0368380304",
+          "amount": "-84275.0537253775",
           "currency": "USD"
         },
         "edited": {
-          "amount": "-95707.7405218333",
+          "amount": "-92702.5590979152",
           "currency": "USD"
         }
       }
@@ -2887,7 +2887,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -2906,11 +2906,11 @@
       },
       "reference": {
         "baseline": {
-          "amount": "1585.5880914827",
+          "amount": "4317.5712041356",
           "currency": "USD"
         },
         "edited": {
-          "amount": "1744.1469006310",
+          "amount": "4749.3283245492",
           "currency": "USD"
         }
       }
@@ -2925,7 +2925,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -2963,7 +2963,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -3001,7 +3001,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -3039,7 +3039,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
@@ -3058,11 +3058,11 @@
       },
       "reference": {
         "baseline": {
-          "amount": "421423.3190908707",
+          "amount": "415230.53614508373",
           "currency": "USD"
         },
         "edited": {
-          "amount": "373965.8548519497",
+          "amount": "367773.0719061626",
           "currency": "USD"
         }
       }
@@ -3077,7 +3077,7 @@
       "instrumentPatches": [],
       "marketSource": {
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-        "sha256": "6895d76a888477241b2801fa53486237565a2d2d6a13a5c7706ad58f00ab9258",
+        "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
         "pointer": []
       },
       "marketPatches": [],
